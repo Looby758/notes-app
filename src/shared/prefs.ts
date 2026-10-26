@@ -38,12 +38,21 @@ export interface Prefs {
   showWordCount: boolean
   /** Opening a note adds a tab instead of changing the current one. */
   openInNewTab: boolean
+  /** Typewriter mode: keep the line you're writing on in the middle of the screen. */
+  typewriterCenter: boolean
+  /** Typewriter mode: fade everything but the current paragraph or line. */
+  typewriterDim: boolean
+  typewriterDimUnit: 'paragraph' | 'line'
+  /** How the graph tab draws your notes. */
+  graphStyle: 'neighbourhood' | 'constellation'
 
   // Files (vault-relative folder paths)
   /** Where pasted and dropped images and files are saved. */
   attachmentFolder: string
   /** Notes in this folder can be used as templates. */
   templatesFolder: string
+  /** Notes in the templates folder don't show up under tags (or in #tag searches). */
+  hideTemplatesFromTags: boolean
 
   // Calendar
   dailyFolder: string
@@ -107,9 +116,14 @@ export const DEFAULT_PREFS: Prefs = {
   cursorBlink: true,
   showWordCount: true,
   openInNewTab: false,
+  typewriterCenter: false,
+  typewriterDim: false,
+  typewriterDimUnit: 'paragraph',
+  graphStyle: 'neighbourhood',
 
   attachmentFolder: 'attachments',
   templatesFolder: 'Templates',
+  hideTemplatesFromTags: true,
 
   dailyFolder: 'Daily',
   dailyFormat: 'YYYY-MM-DD',
@@ -148,6 +162,8 @@ const CHOICES = {
   density: ['compact', 'comfortable'],
   timeFormat: ['24h', '12h'],
   captureTarget: ['daily', 'inbox'],
+  typewriterDimUnit: ['paragraph', 'line'],
+  graphStyle: ['neighbourhood', 'constellation'],
   captureShortcut: IS_MAC
     ? ['Control+Alt+Space', 'Alt+Space', 'Control+Shift+Space', 'Super+Alt+N', '']
     : ['Super+Shift+N', 'Control+Alt+Space', 'Control+Shift+Space', 'Alt+Shift+N', '']

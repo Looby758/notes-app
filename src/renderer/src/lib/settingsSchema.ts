@@ -190,6 +190,36 @@ export const SETTINGS: SettingDef[] = [
   { key: 'cursorBlink', section: 'editor', group: 'Display', type: 'toggle', label: 'Blinking cursor', keywords: 'caret' },
   { key: 'showWordCount', section: 'editor', group: 'Display', type: 'toggle', label: 'Word count in the status bar', keywords: 'words' },
   {
+    key: 'typewriterCenter',
+    section: 'editor',
+    group: 'Typewriter mode',
+    type: 'toggle',
+    label: 'Keep the current line in the middle',
+    description: 'The note scrolls as you type, so the line you’re writing on stays in the middle of the screen.',
+    keywords: 'typewriter focus scroll centre center writing'
+  },
+  {
+    key: 'typewriterDim',
+    section: 'editor',
+    group: 'Typewriter mode',
+    type: 'toggle',
+    label: 'Fade everything else',
+    description: 'While you write, the rest of the note fades back so only what you’re working on stands out.',
+    keywords: 'typewriter focus dim fade writing'
+  },
+  {
+    key: 'typewriterDimUnit',
+    section: 'editor',
+    group: 'Typewriter mode',
+    type: 'choice',
+    options: [
+      { value: 'paragraph', label: 'Current paragraph' },
+      { value: 'line', label: 'Current line' }
+    ],
+    label: 'What stays bright',
+    keywords: 'typewriter focus dim paragraph line'
+  },
+  {
     key: 'openInNewTab',
     section: 'editor',
     group: 'Tabs',
@@ -247,6 +277,15 @@ export const SETTINGS: SettingDef[] = [
     label: 'Templates folder',
     description: 'Notes in this folder show up in "New note from template" and /template.',
     keywords: 'template'
+  },
+  {
+    key: 'hideTemplatesFromTags',
+    section: 'files',
+    group: 'Folders',
+    type: 'toggle',
+    label: 'Hide templates from tags',
+    description: 'Templates can carry tags for the notes made from them without showing up under those tags themselves (in the Tags list and #tag searches).',
+    keywords: 'template tags hide search'
   },
 
   // ---------- Calendar ----------

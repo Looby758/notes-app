@@ -7,6 +7,7 @@ import { EDITOR_COMMANDS } from '../components/Editor/formatting'
 import {
   applyPreset,
   CALENDAR_TAB,
+  GRAPH_TAB,
   closePane,
   closeTabUnlessPinned,
   cycleTab,
@@ -166,10 +167,23 @@ export const commands: Command[] = [
   { id: 'files', group: 'Navigation', title: 'Show files', shortcut: 'Ctrl+Shift+E', run: () => showSidebarView('files') },
   { id: 'tags', group: 'Navigation', title: 'Show tags', run: () => showSidebarView('tags') },
   { id: 'backlinks', group: 'Navigation', title: 'Show backlinks', run: () => showRightView('backlinks') },
+  { id: 'graph.open', group: 'Navigation', title: 'Open graph', shortcut: 'Ctrl+Shift+G', run: () => openSpecialTab(GRAPH_TAB) },
   { id: 'outline', group: 'Navigation', title: 'Show outline', shortcut: 'Ctrl+Shift+O', run: () => showRightView('outline') },
 
   { id: 'settings', group: 'View', title: 'Open settings', shortcut: 'Ctrl+,', run: () => openSpecialTab(SETTINGS_TAB) },
   { id: 'focus', group: 'View', title: 'Toggle focus mode', shortcut: 'Ctrl+\\', run: toggleFocusMode },
+  {
+    id: 'typewriter.center',
+    group: 'View',
+    title: 'Typewriter mode: keep the current line in the middle',
+    run: () => setPrefs({ typewriterCenter: !usePrefs.getState().prefs.typewriterCenter })
+  },
+  {
+    id: 'typewriter.dim',
+    group: 'View',
+    title: 'Typewriter mode: fade everything else',
+    run: () => setPrefs({ typewriterDim: !usePrefs.getState().prefs.typewriterDim })
+  },
   { id: 'left', group: 'View', title: 'Toggle left sidebar', run: () => useUI.setState((s) => ({ leftOpen: !s.leftOpen })) },
   { id: 'right', group: 'View', title: 'Toggle right panel', run: () => useUI.setState((s) => ({ rightOpen: !s.rightOpen })) },
   { id: 'font.bigger', group: 'View', title: 'Bigger text', shortcut: 'Ctrl+=', run: () => changeFontSize(1) },

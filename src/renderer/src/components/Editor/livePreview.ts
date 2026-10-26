@@ -15,6 +15,7 @@ import { parseWikiInner } from '../../lib/links'
 import { parseFrontmatter } from '../../lib/tags'
 import { parseEventText } from '../../lib/schedule'
 import { dailyDateOf } from '../../lib/dailyPaths'
+import { properties } from './properties'
 import { CLICK_MOD } from '@shared/platform'
 
 /** The time at the start of a schedule line: "09:30", "9am", "09:30-10:30", "2pm – 3pm". */
@@ -517,4 +518,4 @@ const clickHandlers = EditorView.domEventHandlers({
   }
 })
 
-export const livePreview = [inlinePreview, tablePreview, clickHandlers]
+export const livePreview = [inlinePreview, tablePreview, clickHandlers, properties]

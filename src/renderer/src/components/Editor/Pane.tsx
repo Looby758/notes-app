@@ -10,6 +10,7 @@ import {
   openNote,
   resolveConflict,
   CALENDAR_TAB,
+  GRAPH_TAB,
   SETTINGS_TAB,
   splitPane
 } from '../../lib/editorController'
@@ -17,6 +18,7 @@ import { getDrag, setDrag, zoneAt, type DropZone } from '../../lib/dnd'
 import NewTabPage from '../Picker/NewTabPage'
 import SettingsPage from '../Settings/SettingsPage'
 import CalendarPage from '../Calendar/CalendarPage'
+import GraphPage from '../Graph/GraphPage'
 import TabBar from './TabBar'
 import { IS_MAC, showKeys } from '@shared/platform'
 
@@ -101,6 +103,7 @@ export default function Pane({ pane }: { pane: string }) {
         {isBlankTab(active) && <NewTabPage key={active} autoFocus={isActivePane} />}
         {active === SETTINGS_TAB && <SettingsPage />}
         {active === CALENDAR_TAB && <CalendarPage />}
+        {active === GRAPH_TAB && <GraphPage />}
         {!active && (
           <div className="editor-empty">
             <FileText size={36} strokeWidth={1.2} />

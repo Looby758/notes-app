@@ -3074,3 +3074,504 @@ body.resizing-rows * {
 .update-status .setting-warning {
   margin: 0;
 }
+
+/* ---------- Unlinked mentions (under Backlinks) ---------- */
+
+.mentions {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.mentions-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.mentions-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 2px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.mentions-toggle:hover {
+  color: var(--text);
+}
+.backlink-source-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.backlink-source-row .backlink-source {
+  flex: 1;
+  min-width: 0;
+}
+.mention-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+.mention-row .backlink-snippet {
+  flex: 1;
+  min-width: 0;
+}
+.mention-link-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 120ms var(--ease), color 120ms var(--ease);
+}
+.mention-link-btn:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--text);
+}
+.mention-link-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.panel-empty.small {
+  padding: 4px 2px 8px;
+  font-size: 12px;
+}
+
+/* ---------- Typewriter mode ---------- */
+
+/* Room under the last line, so it too can scroll to the middle. */
+.cm-editor.cm-typewriter .cm-content {
+  padding-bottom: 45vh !important;
+}
+.cm-line.cm-dimmed {
+  opacity: 0.28;
+  transition: opacity 160ms var(--ease);
+}
+.cm-line {
+  transition: opacity 160ms var(--ease);
+}
+
+/* ---------- Note properties (top of a note) ---------- */
+
+.cm-props {
+  padding: 2px 0 14px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: default;
+}
+.cm-props-none {
+  padding: 0 0 4px;
+}
+.props {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-raised) 70%, transparent);
+  padding: 6px 8px 8px;
+}
+.props-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.props-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 2px;
+  border: none;
+  background: none;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.props-toggle:hover {
+  color: var(--text-muted);
+}
+.props-raw {
+  width: 24px;
+  height: 24px;
+}
+.props-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 150px) minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 1px 2px;
+  border-radius: 6px;
+}
+.props-row:hover {
+  background: var(--bg-hover);
+}
+.props-remove {
+  width: 22px;
+  height: 22px;
+  opacity: 0;
+}
+.props-row:hover .props-remove,
+.props-remove:focus-visible {
+  opacity: 1;
+}
+.props-key {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-muted);
+}
+.props-icon {
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+.props-key-input,
+.props-input,
+.props-chip-input {
+  width: 100%;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+.props-key-input {
+  color: var(--text-muted);
+}
+.props-key-input:hover,
+.props-input:hover {
+  border-color: var(--border);
+}
+.props-key-input:focus,
+.props-input:focus,
+.props-chip-input:focus {
+  border-color: var(--accent);
+  background: var(--bg);
+}
+.props-date {
+  width: auto;
+  color-scheme: dark;
+}
+.props-number {
+  max-width: 120px;
+}
+.props-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.props-link .icon-btn {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.props-complex {
+  display: block;
+  overflow: hidden;
+  padding: 4px 6px;
+  color: var(--text-faint);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.props-check {
+  width: 15px;
+  height: 15px;
+  margin: 0 6px;
+  accent-color: var(--accent);
+}
+.props-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+}
+.props-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 4px 2px 9px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: 12px;
+}
+.props-chip button {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.props-chip button:hover {
+  background: color-mix(in srgb, var(--text) 15%, transparent);
+  color: var(--text);
+}
+.props-chip-input {
+  flex: 1;
+  min-width: 80px;
+  width: auto;
+}
+.props-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.props-choice-btn {
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 120ms var(--ease), color 120ms var(--ease), border-color 120ms var(--ease);
+}
+.props-choice-btn:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.props-choice-btn.on {
+  border-color: transparent;
+  background: var(--accent-soft);
+  color: var(--text-strong);
+  font-weight: 500;
+}
+.props-status .props-choice-btn.on[data-value='done'] {
+  background: color-mix(in srgb, #4ade80 22%, transparent);
+}
+.props-status .props-choice-btn.on[data-value='in-progress'] {
+  background: color-mix(in srgb, #5ea8ff 24%, transparent);
+}
+.props-status .props-choice-btn.on[data-value='waiting'] {
+  background: color-mix(in srgb, #e0a458 24%, transparent);
+}
+.props-priority .props-choice-btn.on[data-value='high'] {
+  background: color-mix(in srgb, #f97066 26%, transparent);
+}
+.props-priority .props-choice-btn.on[data-value='low'] {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+.props-add {
+  position: relative;
+  margin-top: 2px;
+}
+.props-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.props-add-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+/* A note without properties: the button only shows while you're over the note. */
+.props-empty .props-add-btn {
+  opacity: 0;
+  transition: opacity 140ms var(--ease);
+}
+.cm-editor:hover .props-empty .props-add-btn,
+.props-empty .props-add-btn:focus-visible,
+.props-empty .props-add:focus-within .props-add-btn {
+  opacity: 1;
+}
+.props-menu {
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 220px;
+  z-index: 20;
+}
+.props-menu button {
+  justify-content: space-between;
+}
+.props-menu-key {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.props-menu-custom {
+  padding: 4px 6px 2px;
+}
+.props-menu-custom input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+.props-menu-custom input:focus {
+  border-color: var(--accent);
+}
+
+/* ---------- Graph tab ---------- */
+
+.graph-page {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px 14px;
+}
+.graph-toolbar {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.graph-toolbar .segmented button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.graph-search {
+  width: 200px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  outline: none;
+}
+.graph-search:focus {
+  border-color: var(--accent);
+}
+.graph-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.graph-check input {
+  accent-color: var(--accent);
+}
+.graph-spacer {
+  flex: 1;
+}
+.graph-count {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.graph-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: radial-gradient(ellipse at 50% 45%, color-mix(in srgb, var(--accent) 7%, var(--bg)) 0%, var(--bg) 70%);
+}
+.graph-stage canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+.graph-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+.graph-legend {
+  position: absolute;
+  left: 12px;
+  top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  max-width: 60%;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  pointer-events: none;
+}
+.graph-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.graph-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.graph-page[data-graph-style='neighbourhood'] .graph-legend {
+  opacity: 0.8;
+}
+.graph-hint {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  color: var(--text-faint);
+  font-size: 11px;
+  pointer-events: none;
+}
+.graph-toolbar {
+  flex-wrap: nowrap;
+}
+.graph-search {
+  flex: 1 1 120px;
+  min-width: 90px;
+  max-width: 220px;
+}
+.graph-count {
+  white-space: nowrap;
+}
+@container (max-width: 640px) {
+  .graph-count {
+    display: none;
+  }
+}
+.graph-fit {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: color-mix(in srgb, var(--bg-raised) 80%, transparent);
+}
+.graph-legend i.graph-legend-root {
+  background: var(--accent);
+}

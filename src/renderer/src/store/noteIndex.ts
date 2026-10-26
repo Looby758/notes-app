@@ -2,7 +2,8 @@ import { create } from 'zustand'
 import MiniSearch from 'minisearch'
 import { NoteLookup, parseLinks, type LinkRef } from '../lib/links'
 import { parseTags, tagMatches } from '../lib/tags'
-import { noteTitle } from '../lib/paths'
+import { isWithin, noteTitle } from '../lib/paths'
+import { findMentions, type Mention } from '../lib/mentions'
 import { compareItems, parseDatedItems, type DatedItem } from '../lib/schedule'
 import { dailyDateOf } from '../lib/dailyPaths'
 import { usePrefs } from './prefs'
@@ -190,7 +191,38 @@ export function backlinksTo(target: string): Backlink[] {
   return result.sort((a, b) => a.source.localeCompare(b.source, undefined, { numeric: true, sensitivity: 'base' }))
 }
 
+// ---------- unlinked mentions ----------
+
+export interface MentionGroup {
+  source: string
+  mentions: Mention[]
+}
+
+/** Notes that mention `target`'s name in plain text without linking to it. */
+export function unlinkedMentionsOf(target: string): MentionGroup[] {
+  const title = noteTitle(target)
+  const result: MentionGroup[] = []
+  for (const [source, text] of texts) {
+    if (source === target) continue
+    const mentions = findMentions(text, title)
+    if (mentions.length) result.push({ source, mentions })
+  }
+  return result.sort((a, b) => a.source.localeCompare(b.source, undefined, { numeric: true, sensitivity: 'base' }))
+}
+
+/** How a new link to `target` is written: its name, or its path if other notes share the name. */
+export function linkNameFor(target: string): string {
+  const title = noteTitle(target)
+  return useNoteIndex.getState().lookup.isUnique(title) ? title : target.replace(/\.md$/i, '')
+}
+
 // ---------- tags ----------
+
+/** With "hide templates from tags" on, notes in the templates folder don't count for tags. */
+function hiddenFromTags(path: string): boolean {
+  const { hideTemplatesFromTags, templatesFolder } = usePrefs.getState().prefs
+  return hideTemplatesFromTags && !!templatesFolder && isWithin(path, templatesFolder)
+}
 
 export interface TagCount {
   name: string
@@ -200,7 +232,8 @@ export interface TagCount {
 /** Every tag in the vault with how many notes use it, alphabetically. */
 export function allTags(): TagCount[] {
   const counts = new Map<string, TagCount>()
-  for (const { tags } of useNoteIndex.getState().notes.values()) {
+  for (const [path, { tags }] of useNoteIndex.getState().notes) {
+    if (hiddenFromTags(path)) continue
     for (const tag of tags) {
       const key = tag.toLowerCase()
       const entry = counts.get(key)
@@ -282,6 +315,8 @@ export function searchNotes(query: string): SearchHit[] {
 
   const { notes } = useNoteIndex.getState()
   const hasTags = (path: string): boolean => {
+    // Searching by #tag leaves out templates (when hidden from tags); plain word searches still find them.
+    if (tagFilters.length && hiddenFromTags(path)) return false
     const tags = notes.get(path)?.tags ?? []
     return tagFilters.every((want) => tags.some((t) => tagMatches(t, want)))
   }

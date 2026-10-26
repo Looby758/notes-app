@@ -2,11 +2,13 @@ import { useMemo } from 'react'
 import { Hash } from 'lucide-react'
 import { allTags, useNoteIndex } from '../../store/noteIndex'
 import { showSearch } from '../../store/ui'
+import { usePrefs } from '../../store/prefs'
 
 export default function TagsPane() {
   const version = useNoteIndex((s) => s.version)
+  const hideTemplates = usePrefs((s) => s.prefs.hideTemplatesFromTags && s.prefs.templatesFolder)
   // `version` changes whenever any note's tags change.
-  const tags = useMemo(() => allTags(), [version])
+  const tags = useMemo(() => allTags(), [version, hideTemplates])
 
   if (tags.length === 0) {
     return (

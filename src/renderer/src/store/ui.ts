@@ -17,6 +17,13 @@ interface UIState {
   sidebarView: SidebarView
   rightView: RightView
   starredOpen: boolean
+  /** The Unlinked mentions section under Backlinks is expanded. */
+  mentionsOpen: boolean
+  /** The properties panel at the top of notes is folded up. */
+  propertiesCollapsed: boolean
+  /** Graph tab: how many steps out the neighbourhood reaches, and whether unlinked notes show. */
+  graphDepth: 1 | 2
+  graphOrphans: boolean
   /** The day selected in the calendars (day key) and the full calendar's view. */
   calendarDay: string
   calendarView: CalendarView
@@ -29,7 +36,7 @@ interface UIState {
 }
 
 /** Layout bits remembered per computer. (Text size and the rest live in Settings, in settings.json.) */
-const PERSISTED = ['leftOpen', 'rightOpen', 'leftWidth', 'rightWidth', 'sidebarView', 'rightView', 'starredOpen', 'calendarView'] as const
+const PERSISTED = ['leftOpen', 'rightOpen', 'leftWidth', 'rightWidth', 'sidebarView', 'rightView', 'starredOpen', 'mentionsOpen', 'propertiesCollapsed', 'graphDepth', 'graphOrphans', 'calendarView'] as const
 
 const saved = ((): Partial<UIState> => {
   try {
@@ -47,6 +54,10 @@ export const useUI = create<UIState>(() => ({
   sidebarView: saved.sidebarView ?? 'files',
   rightView: saved.rightView ?? 'backlinks',
   starredOpen: saved.starredOpen ?? true,
+  mentionsOpen: saved.mentionsOpen ?? true,
+  propertiesCollapsed: saved.propertiesCollapsed ?? false,
+  graphDepth: saved.graphDepth === 1 ? 1 : 2,
+  graphOrphans: saved.graphOrphans ?? true,
   calendarDay: dayKeyOf(new Date()),
   calendarView: saved.calendarView ?? 'month',
   searchQuery: '',

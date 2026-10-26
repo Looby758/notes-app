@@ -50,6 +50,7 @@ export const isBlankTab = (id: string | null): boolean => !!id && id.startsWith(
 export const isNoteTab = (id: string | null): id is string => !!id && !id.includes(':')
 export const SETTINGS_TAB = 'settings:'
 export const CALENDAR_TAB = 'calendar:'
+export const GRAPH_TAB = 'graph:'
 const blankId = (): string => `blank:${Date.now()}${Math.random().toString(36).slice(2, 5)}`
 
 // ---------- state ----------
@@ -136,6 +137,9 @@ const EDITOR_PREF_KEYS = [
   'autoPair',
   'vimMode',
   'cursorBlink',
+  'typewriterCenter',
+  'typewriterDim',
+  'typewriterDimUnit',
   'shortcuts'
 ] as const satisfies readonly (keyof Prefs)[]
 

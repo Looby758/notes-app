@@ -25,6 +25,7 @@ import { attachmentHandlers } from './attachments'
 import { slashCompletions } from './slash'
 import { embedDepth, embeds, setEmbedStateFactory } from './embeds'
 import { toCodeMirrorKey } from '../../lib/shortcuts'
+import { typewriter } from './typewriter'
 import { usePrefs } from '../../store/prefs'
 
 /** Holds everything Settings can change, so it can be swapped without rebuilding the editor. */
@@ -51,6 +52,7 @@ export function prefsExtensions(p: Prefs): Extension {
     p.highlightActiveLine ? highlightActiveLine() : [],
     p.autoPair ? [closeBrackets(), keymap.of(closeBracketsKeymap)] : [],
     drawSelection({ cursorBlinkRate: p.cursorBlink ? 1200 : 0 }),
+    typewriter(p),
     // Above the default keymap, which also uses Ctrl+I.
     Prec.high(keymap.of(editorKeys))
   ]
