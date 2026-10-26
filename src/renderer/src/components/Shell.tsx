@@ -43,7 +43,7 @@ import Modals from './Picker/Modals'
 import { EventDetails } from './Calendar/shared'
 import Resizer from './Resizer'
 import UpdateToast from './UpdateToast'
-import ZenBar from './ZenBar'
+import ZenBar, { StatusTimer } from './ZenBar'
 import { openRandomNote } from '../lib/random'
 
 interface Props {
@@ -286,6 +286,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <footer className="statusbar">
         <span title={vault}>{vault}</span>
         <span className="statusbar-spacer" />
+        <StatusTimer />
         <button className="statusbar-btn" onClick={toggleZen} title={`Zen mode (${showKeys('Ctrl+Alt+Z')})`} data-zen-toggle>
           <Moon size={11} /> Zen
         </button>

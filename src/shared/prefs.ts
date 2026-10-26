@@ -52,6 +52,19 @@ export interface Prefs {
   /** How the graph tab draws your notes. */
   graphStyle: 'neighbourhood' | 'constellation'
 
+  // Focus timer (zen mode)
+  focusMinutes: number
+  /** Breaks between focus rounds; 0 rounds of breaks = one focus session. */
+  breakMinutes: number
+  longBreakMinutes: number
+  /** How many focus rounds in a session (a long break after the last one, if more than one). */
+  focusRounds: number
+  timerChime: boolean
+  /** The countdown stays faintly visible while you write. */
+  timerAlwaysVisible: boolean
+  /** Leave zen mode when the whole session is done. */
+  timerLeaveZen: boolean
+
   // Files (vault-relative folder paths)
   /** Where pasted and dropped images and files are saved. */
   attachmentFolder: string
@@ -130,6 +143,14 @@ export const DEFAULT_PREFS: Prefs = {
   typewriterDimUnit: 'paragraph',
   graphStyle: 'neighbourhood',
 
+  focusMinutes: 25,
+  breakMinutes: 5,
+  longBreakMinutes: 15,
+  focusRounds: 1,
+  timerChime: true,
+  timerAlwaysVisible: true,
+  timerLeaveZen: false,
+
   attachmentFolder: 'attachments',
   templatesFolder: 'Templates',
   hideTemplatesFromTags: true,
@@ -163,7 +184,11 @@ export const RANGES = {
   zoom: { min: 0.8, max: 1.5, step: 0.05 },
   autosaveDelay: { min: 300, max: 5000, step: 100 },
   tabSize: { min: 2, max: 8, step: 1 },
-  weekStart: { min: 0, max: 1, step: 1 }
+  weekStart: { min: 0, max: 1, step: 1 },
+  focusMinutes: { min: 1, max: 180, step: 1 },
+  breakMinutes: { min: 1, max: 60, step: 1 },
+  longBreakMinutes: { min: 1, max: 90, step: 1 },
+  focusRounds: { min: 1, max: 12, step: 1 }
 } as const
 
 const CHOICES = {
@@ -230,6 +255,7 @@ export function normalizePrefs(raw: unknown): Prefs {
     out.spellcheckLanguage = input.spellcheckLanguage
   }
   out.tabSize = Math.round(out.tabSize)
+  for (const k of ['focusMinutes', 'breakMinutes', 'longBreakMinutes', 'focusRounds'] as const) out[k] = Math.round(out[k])
   out.attachmentFolder = cleanFolder(input.attachmentFolder ?? DEFAULT_PREFS.attachmentFolder, DEFAULT_PREFS.attachmentFolder)
   out.templatesFolder = cleanFolder(input.templatesFolder ?? DEFAULT_PREFS.templatesFolder, DEFAULT_PREFS.templatesFolder)
   out.dailyFolder = cleanFolder(input.dailyFolder ?? DEFAULT_PREFS.dailyFolder, DEFAULT_PREFS.dailyFolder)

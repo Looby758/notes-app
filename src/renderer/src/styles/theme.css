@@ -4554,17 +4554,6 @@ body.zen .pane-body {
   background: var(--accent-soft);
   color: var(--text-strong);
 }
-.zen-volume {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: 4px;
-  color: var(--text-faint);
-}
-.zen-volume input {
-  width: 80px;
-  accent-color: var(--accent);
-}
 .zen-timer-icon {
   color: var(--text-faint);
 }
@@ -4576,4 +4565,100 @@ body.zen .pane-body {
 }
 .zen-exit {
   color: var(--text-faint);
+}
+
+/* ---------- Focus timer ---------- */
+
+.zen-bar {
+  flex-direction: row;
+}
+.zen-btn.main {
+  color: var(--text);
+  font-weight: 600;
+}
+.zen-phase {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.zen-phase.break,
+.zen-phase.longBreak {
+  background: color-mix(in srgb, #4ade80 22%, transparent);
+}
+.timer-options {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-raised);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.4);
+}
+.timer-options-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 14px;
+}
+.timer-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.timer-field span {
+  flex: 1;
+  white-space: nowrap;
+}
+.timer-field input {
+  width: 60px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  text-align: right;
+  outline: none;
+}
+.timer-field input:focus {
+  border-color: var(--accent);
+}
+.timer-field em {
+  width: 44px;
+  color: var(--text-faint);
+  font-style: normal;
+  font-size: 11.5px;
+}
+.timer-summary {
+  margin: 10px 0 8px;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.timer-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 4px 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.timer-check input {
+  accent-color: var(--accent);
+}
+.timer-start {
+  margin-top: 8px;
+  padding: 6px 16px;
+  font-size: 12.5px;
+}
+.status-timer {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
 }

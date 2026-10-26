@@ -230,6 +230,33 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'typewriter focus dim paragraph line'
   },
   {
+    key: 'focusMinutes',
+    section: 'editor',
+    group: 'Focus timer',
+    type: 'slider',
+    ...RANGES.focusMinutes,
+    format: (v) => `${v} min`,
+    label: 'Focus length',
+    description: 'The timer in zen mode (Ctrl+Alt+Z). It can also be changed there.',
+    keywords: 'timer pomodoro zen focus minutes'
+  },
+  {
+    key: 'focusRounds',
+    section: 'editor',
+    group: 'Focus timer',
+    type: 'slider',
+    ...RANGES.focusRounds,
+    format: (v) => (v === 1 ? '1 (no breaks)' : `${v}`),
+    label: 'Rounds',
+    description: 'More than one: a break between rounds, and a longer one at the end.',
+    keywords: 'timer pomodoro rounds cycles'
+  },
+  { key: 'breakMinutes', section: 'editor', group: 'Focus timer', type: 'slider', ...RANGES.breakMinutes, format: (v) => `${v} min`, label: 'Break', keywords: 'timer pomodoro break rest' },
+  { key: 'longBreakMinutes', section: 'editor', group: 'Focus timer', type: 'slider', ...RANGES.longBreakMinutes, format: (v) => `${v} min`, label: 'Long break', keywords: 'timer pomodoro break rest' },
+  { key: 'timerChime', section: 'editor', group: 'Focus timer', type: 'toggle', label: 'Chime when a part ends', keywords: 'timer sound alarm' },
+  { key: 'timerAlwaysVisible', section: 'editor', group: 'Focus timer', type: 'toggle', label: 'Keep the countdown faintly visible while writing', keywords: 'timer zen' },
+  { key: 'timerLeaveZen', section: 'editor', group: 'Focus timer', type: 'toggle', label: 'Leave zen mode when the session ends', keywords: 'timer zen exit' },
+  {
     key: 'openInNewTab',
     section: 'editor',
     group: 'Tabs',

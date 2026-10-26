@@ -1,31 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
-import { CloudRain, Coffee, LogOut, Timer, Volume2, Waves, X } from 'lucide-react'
+import { LogOut, Pause, Play, Plus, Settings2, SkipForward, Square, Timer } from 'lucide-react'
 import { useUI, toggleZen } from '../store/ui'
-import { chime, playSound, playingSound, setVolume, type Sound } from '../lib/ambience'
-import { notify } from '../store/notify'
-
-const SOUNDS: { id: Sound; label: string; icon: typeof CloudRain }[] = [
-  { id: 'rain', label: 'Rain', icon: CloudRain },
-  { id: 'cafe', label: 'Café', icon: Coffee },
-  { id: 'white', label: 'White noise', icon: Waves }
-]
-
-const fmt = (s: number): string => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+import { setPrefs, usePrefs } from '../store/prefs'
+import { addMinutes, formatClock, next, pauseTimer, phaseLabel, resumeTimer, secondsLeft, startTimer, stop, useTimer } from '../store/focusTimer'
 
 /**
- * Zen mode's controls: sounds, a focus timer, and the way out. They fade away while you write and
- * come back when you move the mouse.
+ * Zen mode's controls: the focus timer and the way out. They fade away while you write and come
+ * back when you move the mouse.
  */
 export default function ZenBar() {
   const zen = useUI((s) => s.zen)
   const [visible, setVisible] = useState(true)
-  const [sound, setSound] = useState<Sound | null>(playingSound())
-  const [vol, setVol] = useState(0.5)
-  const [endsAt, setEndsAt] = useState<number | null>(null)
-  const [left, setLeft] = useState(0)
+  const [options, setOptions] = useState(false)
   const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const timer = useTimer()
+  const alwaysVisible = usePrefs((s) => s.prefs.timerAlwaysVisible)
 
-  // Show on mouse movement; hide after a few quiet seconds.
+  // Show on mouse movement; hide after a few quiet seconds (not while the options are open).
   useEffect(() => {
     if (!zen) return
     const wake = (): void => {
@@ -40,87 +31,143 @@ export default function ZenBar() {
       clearTimeout(hideTimer.current)
     }
   }, [zen])
-
-  // Leaving zen stops the sound and the timer.
   useEffect(() => {
-    if (zen) return
-    playSound(null)
-    setSound(null)
-    setEndsAt(null)
+    if (!zen) setOptions(false)
   }, [zen])
 
-  // The countdown.
-  useEffect(() => {
-    if (!endsAt) return
-    const tick = (): void => {
-      const s = Math.max(0, Math.round((endsAt - Date.now()) / 1000))
-      setLeft(s)
-      if (s === 0) {
-        setEndsAt(null)
-        chime()
-        notify('Focus session done. Nice work.', 'info')
-        setVisible(true)
-      }
-    }
-    tick()
-    const t = setInterval(tick, 500)
-    return () => clearInterval(t)
-  }, [endsAt])
-
   if (!zen) return null
-
-  const pick = (s: Sound): void => {
-    const next = sound === s ? null : s
-    playSound(next)
-    setSound(next)
-  }
+  const running = timer.phase !== null
+  const show = visible || options || (running && alwaysVisible)
 
   return (
-    <div className={`zen-bar ${visible || endsAt ? 'show' : ''} ${visible ? '' : 'quiet'}`} data-zen-bar>
-      <div className="zen-group">
-        {SOUNDS.map(({ id, label, icon: Icon }) => (
-          <button key={id} className={`zen-btn ${sound === id ? 'on' : ''}`} onClick={() => pick(id)} title={sound === id ? `Stop ${label.toLowerCase()}` : label} data-sound={id}>
-            <Icon size={15} />
-            <span>{label}</span>
-          </button>
-        ))}
-        <label className="zen-volume" title="Volume">
-          <Volume2 size={14} />
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={vol}
-            onChange={(e) => {
-              setVol(Number(e.target.value))
-              setVolume(Number(e.target.value))
-            }}
-          />
-        </label>
-      </div>
+    <div className={`zen-bar ${show ? 'show' : ''} ${visible || options ? '' : 'quiet'}`} data-zen-bar>
+      {options && <TimerOptions close={() => setOptions(false)} />}
       <div className="zen-group">
         <Timer size={15} className="zen-timer-icon" />
-        {endsAt ? (
+        {running ? (
           <>
+            <span className={`zen-phase ${timer.phase}`}>{phaseLabel(timer.phase!, timer.round, timer.rounds)}</span>
             <span className="zen-time" data-zen-time>
-              {fmt(left)}
+              {formatClock(secondsLeft(timer))}
             </span>
-            <button className="zen-btn" onClick={() => setEndsAt(null)} title="Stop the timer">
-              <X size={14} />
+            {timer.pausedLeft !== null ? (
+              <button className="zen-btn" onClick={resumeTimer} title="Carry on" data-timer-resume>
+                <Play size={14} />
+              </button>
+            ) : (
+              <button className="zen-btn" onClick={pauseTimer} title="Pause" data-timer-pause>
+                <Pause size={14} />
+              </button>
+            )}
+            <button className="zen-btn" onClick={() => addMinutes(5)} title="5 more minutes" data-timer-add>
+              <Plus size={13} />5
+            </button>
+            <button className="zen-btn" onClick={() => next(true)} title="Skip to the next part" data-timer-skip>
+              <SkipForward size={14} />
+            </button>
+            <button className="zen-btn" onClick={stop} title="Stop the timer" data-timer-stop>
+              <Square size={13} />
             </button>
           </>
         ) : (
-          [15, 25, 50].map((m) => (
-            <button key={m} className="zen-btn" onClick={() => setEndsAt(Date.now() + m * 60_000)} title={`Focus for ${m} minutes`} data-timer={m}>
-              {m} min
-            </button>
-          ))
+          <QuickStart />
         )}
+        <button className={`zen-btn ${options ? 'on' : ''}`} onClick={() => setOptions(!options)} title="Timer options" data-timer-options>
+          <Settings2 size={14} />
+        </button>
       </div>
       <button className="zen-btn zen-exit" onClick={toggleZen} title="Leave zen mode (Esc)">
         <LogOut size={14} /> Leave
       </button>
     </div>
+  )
+}
+
+/** One click to start: your usual length (from Settings), or a few others. */
+function QuickStart() {
+  const focus = usePrefs((s) => s.prefs.focusMinutes)
+  const rounds = usePrefs((s) => s.prefs.focusRounds)
+  const lengths = [...new Set([focus, 15, 25, 50])].slice(0, 4)
+  return (
+    <>
+      {lengths.map((m) => (
+        <button key={m} className={`zen-btn ${m === focus ? 'main' : ''}`} onClick={() => startTimer(m)} title={`Focus for ${m} minutes${rounds > 1 ? `, ${rounds} rounds` : ''}`} data-timer={m}>
+          {m} min
+        </button>
+      ))}
+    </>
+  )
+}
+
+function NumberField({ label, value, min, max, onChange, unit }: { label: string; value: number; min: number; max: number; onChange: (n: number) => void; unit: string }) {
+  const [draft, setDraft] = useState(String(value))
+  useEffect(() => setDraft(String(value)), [value])
+  const commit = (): void => {
+    const n = Math.round(Number(draft))
+    if (Number.isFinite(n) && n >= min && n <= max) onChange(n)
+    else setDraft(String(value))
+  }
+  return (
+    <label className="timer-field">
+      <span>{label}</span>
+      <input type="number" min={min} max={max} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && commit()} aria-label={label} />
+      <em>{unit}</em>
+    </label>
+  )
+}
+
+/** The timer's settings, right in zen mode (also in Settings → Editor → Focus timer). */
+function TimerOptions({ close }: { close: () => void }) {
+  const p = usePrefs((s) => s.prefs)
+  const running = useTimer((s) => s.phase !== null)
+  const total = p.focusRounds * p.focusMinutes + Math.max(0, p.focusRounds - 1) * p.breakMinutes + (p.focusRounds > 1 ? p.longBreakMinutes : 0)
+  return (
+    <div className="timer-options" data-timer-panel>
+      <div className="timer-options-grid">
+        <NumberField label="Focus" value={p.focusMinutes} min={1} max={180} unit="min" onChange={(n) => setPrefs({ focusMinutes: n })} />
+        <NumberField label="Rounds" value={p.focusRounds} min={1} max={12} unit={p.focusRounds === 1 ? 'round' : 'rounds'} onChange={(n) => setPrefs({ focusRounds: n })} />
+        <NumberField label="Break" value={p.breakMinutes} min={1} max={60} unit="min" onChange={(n) => setPrefs({ breakMinutes: n })} />
+        <NumberField label="Long break" value={p.longBreakMinutes} min={1} max={90} unit="min" onChange={(n) => setPrefs({ longBreakMinutes: n })} />
+      </div>
+      <p className="timer-summary">
+        {p.focusRounds === 1
+          ? `${p.focusMinutes} minutes of focus.`
+          : `${p.focusRounds} × ${p.focusMinutes} min focus, ${p.breakMinutes} min breaks between, then a ${p.longBreakMinutes} min break. About ${total} min in all.`}
+      </p>
+      <label className="timer-check">
+        <input type="checkbox" checked={p.timerChime} onChange={(e) => setPrefs({ timerChime: e.target.checked })} /> Chime when a part ends
+      </label>
+      <label className="timer-check">
+        <input type="checkbox" checked={p.timerAlwaysVisible} onChange={(e) => setPrefs({ timerAlwaysVisible: e.target.checked })} /> Keep the countdown faintly visible while I write
+      </label>
+      <label className="timer-check">
+        <input type="checkbox" checked={p.timerLeaveZen} onChange={(e) => setPrefs({ timerLeaveZen: e.target.checked })} /> Leave zen mode when the session ends
+      </label>
+      {!running && (
+        <button
+          className="btn btn-primary timer-start"
+          onClick={() => {
+            startTimer()
+            close()
+          }}
+          data-timer-start
+        >
+          <Play size={13} /> Start
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** Outside zen mode, a running timer shows in the status bar (click to stop it). */
+export function StatusTimer() {
+  const timer = useTimer()
+  const zen = useUI((s) => s.zen)
+  if (!timer.phase || zen) return null
+  return (
+    <button className="statusbar-btn status-timer" onClick={() => (timer.pausedLeft !== null ? resumeTimer() : pauseTimer())} title="Focus timer: click to pause or carry on" data-status-timer>
+      <Timer size={11} /> {phaseLabel(timer.phase, timer.round, timer.rounds)} {formatClock(secondsLeft(timer))}
+      {timer.pausedLeft !== null && ' (paused)'}
+    </button>
   )
 }
