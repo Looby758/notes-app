@@ -106,6 +106,8 @@ export interface NotesApi {
   spellcheckLanguages(): Promise<string[]>
   /** Opens settings.json in your default editor. */
   openSettingsFile(): Promise<void>
+  /** Shows notes.log (problems Notes ran into) in File Explorer / Finder. */
+  showLog(): Promise<void>
 
   // Updates
   updateStatus(): Promise<UpdateStatus>

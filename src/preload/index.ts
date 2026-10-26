@@ -13,6 +13,7 @@ const api: NotesApi = {
   },
   spellcheckLanguages: () => ipcRenderer.invoke('prefs:languages'),
   openSettingsFile: () => ipcRenderer.invoke('prefs:openFile'),
+  showLog: () => ipcRenderer.invoke('app:showLog'),
 
   updateStatus: () => ipcRenderer.invoke('update:status'),
   checkForUpdates: () => ipcRenderer.invoke('update:check'),

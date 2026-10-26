@@ -6,11 +6,12 @@ import {
   Menu,
   net,
   protocol,
+  screen,
   session,
   shell,
   type MenuItemConstructorOptions
 } from 'electron'
-import { statSync } from 'fs'
+import { existsSync, statSync } from 'fs'
 import { readFile } from 'fs/promises'
 import { basename, extname, join } from 'path'
 import { pathToFileURL } from 'url'
@@ -25,11 +26,14 @@ import { applyCaptureShortcut, noteHiddenToTray, setupCapture, teardownCapture }
 import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
+import { logCrashes, safely } from './log'
 
 let vault: Vault | null = null
 let mainWindow: BrowserWindow | null = null
 /** True once you've chosen Quit (from the tray), so closing really closes instead of hiding. */
 let quitting = false
+
+logCrashes()
 
 // Only one copy of Notes runs; starting it again just brings the window back.
 if (!app.requestSingleInstanceLock()) {
@@ -38,14 +42,32 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', () => showMain())
 }
 
+// Clicking the Dock icon (Mac) brings the window back. Set up first thing, so that nothing that
+// goes wrong later in start-up can leave Notes running with no way to see it.
+app.on('activate', () => {
+  if (app.isReady()) showMain()
+})
+
 function showMain(): void {
+  if (!app.isReady()) return
+  // Undo "Hide Notes" (⌘H) or the hide after quick capture.
+  if (IS_MAC) app.show()
   if (!mainWindow || mainWindow.isDestroyed()) {
     mainWindow = createWindow()
     return
   }
   if (mainWindow.isMinimized()) mainWindow.restore()
+  keepOnScreen(mainWindow)
   mainWindow.show()
   mainWindow.focus()
+  if (IS_MAC) app.focus({ steal: true })
+}
+
+/** If the window ended up off every screen (a monitor was unplugged), bring it back to the middle. */
+function keepOnScreen(win: BrowserWindow): void {
+  const b = win.getBounds()
+  const visible = screen.getAllDisplays().some(({ workArea: a }) => b.x + 80 < a.x + a.width && b.x + b.width - 80 > a.x && b.y + 40 < a.y + a.height && b.y + 20 > a.y - 20)
+  if (!visible) win.center()
 }
 
 /** Settings that live outside the app's windows: the capture shortcut and starting at login. */
@@ -123,7 +145,7 @@ function broadcastPrefs(prefs: Prefs): void {
     applyPrefs(win, prefs)
     win.webContents.send('prefs:changed', prefs)
   }
-  applySystemPrefs(prefs)
+  safely('system settings', () => applySystemPrefs(prefs))
 }
 
 function openVault(path: string | null): void {
@@ -324,6 +346,11 @@ function registerIpc(): void {
     broadcastPrefs(prefs)
     return prefs
   })
+  ipcMain.handle('app:showLog', () => {
+    const log = join(app.getPath('userData'), 'notes.log')
+    if (existsSync(log)) shell.showItemInFolder(log)
+    else shell.openPath(app.getPath('userData'))
+  })
   ipcMain.handle('prefs:languages', (event) => event.sender.session.availableSpellCheckerLanguages)
   ipcMain.handle('prefs:openFile', async () => {
     if (!loadSettings().prefs) saveSettings({ prefs: currentPrefs() }) // so the file lists every option
@@ -436,22 +463,21 @@ function registerIpc(): void {
 const ALLOWED_PERMISSIONS = new Set(['clipboard-sanitized-write', 'clipboard-read', 'fullscreen', 'local-fonts'])
 
 app.whenReady().then(() => {
-  setAppMenu()
+  safely('menu', setAppMenu)
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) =>
     callback(ALLOWED_PERMISSIONS.has(permission))
   )
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => ALLOWED_PERMISSIONS.has(permission))
   registerVaultProtocol()
   registerIpc()
-  setupExport()
+  safely('export', setupExport)
   // Hand edits to settings.json apply straight away.
-  watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs)))
+  safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))
   mainWindow = createWindow()
-  setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs })
-  applySystemPrefs(currentPrefs())
-  setupUpdater(() => currentPrefs().checkForUpdates)
-  // Clicking the Dock icon brings the window back.
-  app.on('activate', () => showMain())
+  // The extras: if one of them fails on some computer, the app itself still works.
+  safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs }))
+  safely('system settings', () => applySystemPrefs(currentPrefs()))
+  safely('updates', () => setupUpdater(() => currentPrefs().checkForUpdates))
 })
 
 app.on('before-quit', () => {

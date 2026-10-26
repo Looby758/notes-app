@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CalendarDays, FileJson, FolderCog, Info, Keyboard, Palette, PenLine, RefreshCw, RotateCcw, Search, X, Zap } from 'lucide-react'
+import { CalendarDays, FileJson, FolderCog, Info, Keyboard, Palette, PenLine, RefreshCw, RotateCcw, ScrollText, Search, X, Zap } from 'lucide-react'
 import { checkForUpdates, useUpdates, watchUpdates } from '../../store/updates'
 import { DEFAULT_PREFS } from '@shared/prefs'
 import type { CaptureStatus } from '@shared/types'
@@ -163,6 +163,9 @@ function About() {
         </button>
         <button className="btn" onClick={() => resetPrefs(Object.keys(DEFAULT_PREFS) as (keyof typeof DEFAULT_PREFS)[])}>
           <RotateCcw size={14} /> Reset all settings
+        </button>
+        <button className="btn" onClick={() => window.api.showLog()} title="Problems Notes ran into in the background, if any">
+          <ScrollText size={14} /> Show log file
         </button>
       </div>
     </section>
