@@ -584,12 +584,14 @@ export function init(vault: string): void {
 }
 
 /**
- * Opens a note in a tab of the active pane (or `pane`), reusing its tab if already there.
+ * Opens a note in the active pane (or `pane`), switching to its tab if it's already open there.
+ * Otherwise it replaces the note in the current tab, unless that tab is pinned or a page like
+ * Settings, `newTab` is set (Ctrl+click, "Open in new tab"), or the "open in new tab" setting is on.
  * `focus: false` leaves keyboard focus where it is; `line`/`heading` move the cursor there.
  */
 export function openNote(
   path: string,
-  { focus = true, line, heading, match, offset, pane }: { focus?: boolean; pane?: string } & Reveal = {}
+  { focus = true, line, heading, match, offset, pane, newTab }: { focus?: boolean; pane?: string; newTab?: boolean } & Reveal = {}
 ): void {
   const target = pane ?? activePane()
   pendingReveal =
@@ -607,14 +609,28 @@ export function openNote(
   }
 
   const tabs = [...p.tabs]
+  // The note it replaces, if it goes into the current tab.
+  let replaced: string | null = null
   if (!tabs.includes(path)) {
-    const at = p.active ? tabs.indexOf(p.active) + 1 : tabs.length
-    tabs.splice(at, 0, path)
+    const reuse =
+      !newTab &&
+      !usePrefs.getState().prefs.openInNewTab &&
+      isNoteTab(p.active) &&
+      !(p.pinned ?? []).includes(p.active)
+    if (reuse) {
+      replaced = p.active
+      tabs[tabs.indexOf(p.active!)] = path
+    } else {
+      const at = p.active ? tabs.indexOf(p.active) + 1 : tabs.length
+      tabs.splice(at, 0, path)
+    }
   }
   const changed = p.active !== path
   setPanes((s) => ({ panes: { ...s.panes, [target]: { tabs, active: path } }, activePane: target }))
   if (changed) show(target, path, focus)
   else if (focus) views.get(target)?.view.focus()
+  // The replaced note is saved and let go, as if its tab had been closed.
+  if (replaced) void releaseSession(target, replaced)
   refreshStats()
   persist()
 }

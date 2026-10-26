@@ -189,6 +189,15 @@ export const SETTINGS: SettingDef[] = [
   { key: 'highlightActiveLine', section: 'editor', group: 'Display', type: 'toggle', label: 'Highlight the current line', keywords: 'active line' },
   { key: 'cursorBlink', section: 'editor', group: 'Display', type: 'toggle', label: 'Blinking cursor', keywords: 'caret' },
   { key: 'showWordCount', section: 'editor', group: 'Display', type: 'toggle', label: 'Word count in the status bar', keywords: 'words' },
+  {
+    key: 'openInNewTab',
+    section: 'editor',
+    group: 'Tabs',
+    type: 'toggle',
+    label: 'Open notes in a new tab',
+    description: `Off: opening a note changes the current tab (pinned tabs are left alone). Either way, ${IS_MAC ? '⌘-click' : 'Ctrl+click'} or middle-click a note to open it in a new tab.`,
+    keywords: 'tab replace reuse open'
+  },
 
   {
     key: 'tabSize',

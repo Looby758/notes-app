@@ -66,7 +66,7 @@ export default function StarredSection() {
   }
 
   const items = (path: string): MenuItem[] => [
-    { label: 'Open in new tab', icon: <FileText size={15} />, onClick: () => openNote(path) },
+    { label: 'Open in new tab', icon: <FileText size={15} />, onClick: () => openNote(path, { newTab: true }) },
     { label: 'Open to the right', icon: <Columns2 size={15} />, onClick: () => splitPane('right', { tab: path }) },
     'separator',
     { label: 'Unstar', icon: <StarOff size={15} />, onClick: () => toggleStar(path) }
@@ -110,7 +110,8 @@ export default function StarredSection() {
                 setDrag(null)
                 setDropIndex(null)
               }}
-              onClick={() => openNote(path)}
+              onClick={(e) => openNote(path, { newTab: e.ctrlKey || e.metaKey })}
+              onAuxClick={(e) => e.button === 1 && openNote(path, { newTab: true })}
               onContextMenu={(e) => onContextMenu(e, path)}
             >
               <Star size={13} className="tree-icon starred-icon" />

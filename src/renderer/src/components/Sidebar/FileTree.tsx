@@ -73,7 +73,7 @@ export default function FileTree() {
     const open: MenuItem[] =
       node.type === 'file'
         ? [
-            { label: 'Open in new tab', icon: <FileText size={15} />, onClick: () => openNote(node.path) },
+            { label: 'Open in new tab', icon: <FileText size={15} />, onClick: () => openNote(node.path, { newTab: true }) },
             { label: 'Open to the right', icon: <Columns2 size={15} />, onClick: () => splitPane('right', { tab: node.path }) },
             isStarred(node.path)
               ? { label: 'Unstar', icon: <StarOff size={15} />, onClick: () => toggleStar(node.path) }
@@ -224,10 +224,11 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
 
   useEffect(() => () => clearTimeout(expandTimer.current), [])
 
-  const onClick = (): void => {
+  // Ctrl/⌘+click opens the note in a new tab instead of the current one.
+  const onClick = (e: MouseEvent): void => {
     select(node.path)
     if (isFolder) toggle(node.path)
-    else openNote(node.path)
+    else openNote(node.path, { newTab: e.ctrlKey || e.metaKey })
   }
 
   const onDragStart = (e: DragEvent): void => {
@@ -269,6 +270,7 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
         onClick={onClick}
         onDoubleClick={() => !isFolder && startRename(node.path)}
         onContextMenu={(e) => onContextMenu(e, node)}
+        onAuxClick={(e) => e.button === 1 && !isFolder && openNote(node.path, { newTab: true })}
         onDragStart={onDragStart}
         onDragEnd={() => {
           dragging = null

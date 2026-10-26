@@ -36,6 +36,8 @@ export interface Prefs {
   vimMode: boolean
   cursorBlink: boolean
   showWordCount: boolean
+  /** Opening a note adds a tab instead of changing the current one. */
+  openInNewTab: boolean
 
   // Files (vault-relative folder paths)
   /** Where pasted and dropped images and files are saved. */
@@ -104,6 +106,7 @@ export const DEFAULT_PREFS: Prefs = {
   vimMode: false,
   cursorBlink: true,
   showWordCount: true,
+  openInNewTab: false,
 
   attachmentFolder: 'attachments',
   templatesFolder: 'Templates',

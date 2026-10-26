@@ -76,7 +76,8 @@ export default function TabBar({ pane }: { pane: string }) {
       const adjusted = drag.pane === pane && from !== -1 && from < index ? index - 1 : index
       moveTab(drag.id, drag.pane, pane, adjusted)
     } else {
-      openNote(drag.path, { pane })
+      // Dropped on the tab bar: always its own tab.
+      openNote(drag.path, { pane, newTab: true })
     }
     setDrag(null)
   }
