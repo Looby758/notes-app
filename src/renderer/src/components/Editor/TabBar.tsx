@@ -12,7 +12,9 @@ import {
   closePane,
   closeTab,
   closeTabUnlessPinned,
+  fileOfTab,
   isBlankTab,
+  isFileTab,
   isNoteTab,
   moveTab,
   newTab,
@@ -26,6 +28,7 @@ const NO_PINS: string[] = []
 import { getDrag, setDrag } from '../../lib/dnd'
 import { noteTitle } from '../../lib/paths'
 import ContextMenu, { type MenuItem } from '../ContextMenu'
+import FileIcon from '../FileIcon'
 import { FILE_MANAGER, showKeys } from '@shared/platform'
 
 function tabTitle(id: string): string {
@@ -34,6 +37,7 @@ function tabTitle(id: string): string {
   if (id === CALENDAR_TAB) return 'Calendar'
   if (id === GRAPH_TAB) return 'Graph'
   if (id === REPLACE_TAB) return 'Find & replace'
+  if (isFileTab(id)) return fileOfTab(id).slice(fileOfTab(id).lastIndexOf('/') + 1)
   return noteTitle(id)
 }
 
@@ -158,7 +162,7 @@ export default function TabBar({ pane }: { pane: string }) {
             <div
               key={id}
               className={`tab ${id === active ? 'active' : ''} ${unsaved ? 'unsaved' : ''} ${isBlankTab(id) ? 'blank' : ''} ${isTabPinned ? 'pinned' : ''} ${dropIndex === i ? 'drop-before' : ''}`}
-              title={`${id.includes(':') ? tabTitle(id) : id}${isTabPinned ? ' (pinned)' : ''}`}
+              title={`${isFileTab(id) ? fileOfTab(id) : (id as string).includes(':') ? tabTitle(id) : id}${isTabPinned ? ' (pinned)' : ''}`}
               draggable
               onDragStart={(e) => {
                 setDrag({ kind: 'tab', pane, id })
@@ -182,6 +186,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === CALENDAR_TAB && <CalendarDays size={13} className="tab-icon" />}
               {id === GRAPH_TAB && <Orbit size={13} className="tab-icon" />}
               {id === REPLACE_TAB && <Replace size={13} className="tab-icon" />}
+              {isFileTab(id) && <FileIcon path={fileOfTab(id)} size={13} className="tab-icon" />}
               {icons.get(id) && <span className="tab-emoji">{icons.get(id)}</span>}
               <span className="tab-title">{tabTitle(id)}</span>
               {isTabPinned ? (

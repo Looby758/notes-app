@@ -44,7 +44,8 @@ export function parseReminders(text: string, path: string, dailyDate: string | n
       return
     }
     const time = `${pad(h)}:${m[3]}`
-    const title = task[2].replace(REMINDER, '').replace(/\s{2,}/g, ' ').trim()
+    // Schedule items start with their time ("- [ ] 20:00 Film ⏰ 20:00"): that's not part of the name.
+    const title = task[2].replace(REMINDER, '').replace(/^\d{1,2}:\d{2}(?:\s*-\s*\d{1,2}:\d{2})?\s+/, '').replace(/\s{2,}/g, ' ').trim()
     reminders.push({ path, line: i, title, date, time, key: `${path}|${title}|${date} ${time}` })
   })
   return { reminders, undated }

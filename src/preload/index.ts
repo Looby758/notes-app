@@ -55,14 +55,14 @@ const api: NotesApi = {
   closeCapture: () => ipcRenderer.invoke('capture:close'),
   captureKeepOpen: (on) => ipcRenderer.invoke('capture:keepOpen', on),
   captureStatus: () => ipcRenderer.invoke('capture:status'),
-  submitCapture: (text) => ipcRenderer.invoke('capture:submit', text),
+  submitCapture: (request) => ipcRenderer.invoke('capture:submit', request),
   onCaptureReset: (callback) => {
     const handler = (): void => callback()
     ipcRenderer.on('capture:reset', handler)
     return () => ipcRenderer.removeListener('capture:reset', handler)
   },
   onCaptureRequest: (callback) => {
-    const handler = (_e: unknown, id: number, text: string): void => callback(id, text)
+    const handler = (_e: unknown, id: number, request: Parameters<typeof callback>[1]): void => callback(id, request)
     ipcRenderer.on('capture:add', handler)
     return () => ipcRenderer.removeListener('capture:add', handler)
   },

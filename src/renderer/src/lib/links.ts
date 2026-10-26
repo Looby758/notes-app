@@ -1,4 +1,4 @@
-import { parentOf, replacePrefix, resolveRelative } from './paths'
+import { isWithin, parentOf, replacePrefix, resolveRelative } from './paths'
 
 /** A link found in a note: `[[Target#Heading|Alias]]` or `[text](relative/path.md)`. */
 export interface LinkRef {
@@ -187,6 +187,44 @@ export function rewriteLinks(
     if (next === raw) continue
     out += text.slice(last, link.from) + next
     last = link.to
+    changed = true
+  }
+  return changed ? out + text.slice(last) : null
+}
+
+const FILE_LINK = /(!?\[[^\]\n]*\]\()(?:<([^>\n]+)>|([^)\s]+))((?:\s+"[^"\n]*")?\))/g
+const NOTE_OR_PAGE = /(^[a-z][a-z0-9+.-]*:)|\.md$|^#/i
+
+/**
+ * Fixes links to pictures, recordings and other files (`![](attachments/a.png)`) in one note after
+ * `from` (a file or folder) became `to`. Also fixes them when the note itself moved, since the links
+ * are relative to it. `source` is where the note was before. Returns null if nothing changed.
+ */
+export function rewriteFileLinks(text: string, source: string, from: string, to: string): string | null {
+  const newSource = replacePrefix(source, from, to)
+  const masked = maskCode(text)
+  let out = ''
+  let last = 0
+  let changed = false
+  for (const m of masked.matchAll(FILE_LINK)) {
+    // Code is blanked out in `masked`, so these groups are the real text.
+    const raw = m[0]
+    const [, head, angled, plain, rest] = m
+    let url = angled ?? plain
+    if (!url || NOTE_OR_PAGE.test(url) || !/\.[a-z0-9]{1,5}$/i.test(url.split('#')[0])) continue
+    try {
+      url = decodeURI(url)
+    } catch {
+      // keep as typed
+    }
+    const target = resolveRelative(parentOf(source), url)
+    const newTarget = isWithin(target, from) ? replacePrefix(target, from, to) : target
+    if (newTarget === target && newSource === source) continue
+    const rel = relativePath(parentOf(newSource), newTarget)
+    const next = angled !== undefined ? `${head}<${rel}>${rest}` : `${head}${encodeUrl(rel)}${rest}`
+    if (next === raw) continue
+    out += text.slice(last, m.index) + next
+    last = m.index + m[0].length
     changed = true
   }
   return changed ? out + text.slice(last) : null

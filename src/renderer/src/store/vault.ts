@@ -1,5 +1,6 @@
 import { loadLock } from '../lib/lock/session'
 import { loadSnippets } from './snippets'
+import { fixFileLinks } from '../lib/fileLinks'
 import { create } from 'zustand'
 import type { FileNode } from '@shared/types'
 import { ancestorsOf, findNode, isWithin, notePaths, parentOf, replacePrefix } from '../lib/paths'
@@ -190,6 +191,7 @@ export const useVault = create<VaultState>((set, get) => {
         remap(path, next)
         await get().refresh()
         await updateLinksAfterMove(snapshot, path, next)
+        await fixFileLinks(path, next)
       } catch (err) {
         notify(err)
       }
@@ -205,6 +207,7 @@ export const useVault = create<VaultState>((set, get) => {
         get().expandTo(folder)
         await get().refresh()
         await updateLinksAfterMove(snapshot, path, next, updateLinks)
+        await fixFileLinks(path, next)
       } catch (err) {
         notify(err)
       }

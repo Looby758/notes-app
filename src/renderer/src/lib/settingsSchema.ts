@@ -343,6 +343,15 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'template'
   },
   {
+    key: 'showAttachments',
+    section: 'files',
+    group: 'Folders',
+    type: 'toggle',
+    label: 'Show pictures, recordings and other files',
+    description: 'In the file list, next to your notes. Pictures, recordings, videos and PDFs open in a tab; drag one into a note to show it there.',
+    keywords: 'attachments images audio pdf files hide show tree'
+  },
+  {
     key: 'randomIncludeDaily',
     section: 'files',
     group: 'Random note',
@@ -401,8 +410,17 @@ export const SETTINGS: SettingDef[] = [
     prefix: 'Template note:',
     placeholder: 'e.g. Templates/Daily',
     label: 'Daily note template',
-    description: 'New daily notes start from this note (leave empty for just a title). {{date:…}} uses that day’s date.',
-    keywords: 'template journal'
+    description: 'New daily notes start from this note (leave empty for just a title). Placeholders like {{date:dddd D MMMM YYYY}} become that day’s date: see the list below, or type /placeholder in a template.',
+    keywords: 'template journal placeholder date'
+  },
+  {
+    key: 'dailyKeepHeading',
+    section: 'calendar',
+    group: 'Daily notes',
+    type: 'toggle',
+    label: 'Keep the date heading above my template',
+    description: 'If your daily template doesn’t start with a heading of its own, the usual one (like “Monday 26 October 2026”) goes on top.',
+    keywords: 'template heading title date day'
   },
   {
     key: 'createDailyOnClick',
@@ -492,6 +510,15 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'capture inbox'
   },
   { key: 'captureTimestamp', section: 'capture', group: 'Quick capture', type: 'toggle', label: 'Add the time to each capture', description: 'Like "- 14:05 Call the plumber".' },
+  {
+    key: 'captureRememberTarget',
+    section: 'capture',
+    group: 'Quick capture',
+    type: 'toggle',
+    label: 'Remember where I last sent a capture',
+    description: 'The → menu at the top of quick capture picks another note or folder. Normally each capture starts back at the usual place; with this on, it stays where you last chose.',
+    keywords: 'destination folder note target where'
+  },
   {
     key: 'closeToTray',
     section: 'capture',

@@ -54,6 +54,11 @@ export const SETTINGS_TAB = 'settings:'
 export const CALENDAR_TAB = 'calendar:'
 export const GRAPH_TAB = 'graph:'
 export const REPLACE_TAB = 'replace:'
+/** A picture, recording, PDF… from the notes folder, shown in a tab: "file:attachments/a.png". */
+export const FILE_TAB = 'file:'
+export const fileTab = (path: string): string => FILE_TAB + path
+export const isFileTab = (id: string | null): id is string => !!id && id.startsWith(FILE_TAB)
+export const fileOfTab = (id: string): string => id.slice(FILE_TAB.length)
 const blankId = (): string => `blank:${Date.now()}${Math.random().toString(36).slice(2, 5)}`
 
 // ---------- state ----------
@@ -665,8 +670,8 @@ export function openNote(
     const reuse =
       !newTab &&
       !usePrefs.getState().prefs.openInNewTab &&
-      isNoteTab(p.active) &&
-      !(p.pinned ?? []).includes(p.active)
+      (isNoteTab(p.active) || isFileTab(p.active)) &&
+      !(p.pinned ?? []).includes(p.active!)
     if (reuse) {
       replaced = p.active
       tabs[tabs.indexOf(p.active!)] = path
@@ -683,6 +688,11 @@ export function openNote(
   if (replaced) void releaseSession(target, replaced)
   refreshStats()
   persist()
+}
+
+/** Opens a picture, recording or PDF from the notes folder in a tab (like a note). */
+export function openFileTab(path: string, opts: { pane?: string; newTab?: boolean } = {}): void {
+  openNote(fileTab(path), opts)
 }
 
 /** Opens an empty tab next to the current one; the next note you pick opens in it. */
@@ -840,7 +850,7 @@ export function remap(from: string, to: string): void {
     s.path = next
     sessions.set(keyOf(s.pane, next), s)
   }
-  const map = (t: string): string => (isNoteTab(t) ? replacePrefix(t, from, to) : t)
+  const map = (t: string): string => (isNoteTab(t) ? replacePrefix(t, from, to) : isFileTab(t) ? fileTab(replacePrefix(fileOfTab(t), from, to)) : t)
   setPanes((s) => ({
     panes: Object.fromEntries(
       Object.entries(s.panes).map(([id, p]) => [
@@ -860,7 +870,9 @@ export function discardWithin(path: string): void {
   for (const f of [...files.values()]) if (isWithin(f.path, path)) forgetFile(f.path)
   for (const s of [...sessions.values()]) if (isWithin(s.path, path)) sessions.delete(keyOf(s.pane, s.path))
   for (const [pane, p] of Object.entries(useEditor.getState().panes)) {
-    for (const tab of p.tabs) if (isNoteTab(tab) && isWithin(tab, path)) closeTab(tab, pane)
+    for (const tab of p.tabs) {
+      if ((isNoteTab(tab) && isWithin(tab, path)) || (isFileTab(tab) && isWithin(fileOfTab(tab), path))) closeTab(tab, pane)
+    }
   }
 }
 
@@ -868,6 +880,10 @@ export function discardWithin(path: string): void {
 export function closeMissing(exists: (path: string) => boolean): void {
   for (const [pane, p] of Object.entries(useEditor.getState().panes)) {
     for (const tab of p.tabs) {
+      if (isFileTab(tab) && !exists(fileOfTab(tab))) {
+        closeTab(tab, pane)
+        continue
+      }
       if (!isNoteTab(tab) || exists(tab) || loading.has(tab)) continue
       const f = files.get(tab)
       if (!(f && currentText(tab) !== f.saved)) closeTab(tab, pane)

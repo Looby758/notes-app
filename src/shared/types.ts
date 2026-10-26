@@ -45,11 +45,14 @@ export interface UpdateStatus {
   reason?: string
 }
 
-/** A folder or markdown note. `path` is relative to the vault root and always uses `/`. */
+/**
+ * A folder, a markdown note ('file'), or any other file ('attachment': pictures, recordings, PDFs…).
+ * `path` is relative to the vault root and always uses `/`.
+ */
 export interface FileNode {
   name: string
   path: string
-  type: 'file' | 'folder'
+  type: 'file' | 'folder' | 'attachment'
   children?: FileNode[]
 }
 
@@ -158,11 +161,11 @@ export interface NotesApi {
   captureKeepOpen(on: boolean): Promise<void>
   captureStatus(): Promise<CaptureStatus>
   /** From the capture window: save this text (the main window does the saving). */
-  submitCapture(text: string): Promise<{ ok: boolean; where?: string; error?: string }>
+  submitCapture(request: CaptureRequest): Promise<{ ok: boolean; where?: string; error?: string }>
   /** Capture window: called each time it's shown, to start fresh. */
   onCaptureReset(callback: () => void): () => void
   /** Main window: asked to save a capture; reply with captureResult. */
-  onCaptureRequest(callback: (id: number, text: string) => void): () => void
+  onCaptureRequest(callback: (id: number, request: CaptureRequest) => void): () => void
   captureResult(id: number, result: { ok: boolean; where?: string; error?: string }): Promise<void>
 
   // Google Calendar and calendar links (read-only)
@@ -228,3 +231,11 @@ export interface NotesApi {
 
 /** An item in a native menu described by the UI. */
 export type PopupMenuItem = 'separator' | { id?: string; label: string; accelerator?: string; submenu?: PopupMenuItem[] }
+/** What quick capture sends to be saved. */
+export interface CaptureRequest {
+  text: string
+  /** Where it goes; by default your capture setting (today's note or the inbox). */
+  target?: { kind: 'daily' | 'inbox' } | { kind: 'note' | 'folder'; path: string }
+  /** Instead: a calendar event on that day (in its daily note's schedule). */
+  event?: { date: string; time?: string; title: string; remind: boolean }
+}

@@ -117,8 +117,9 @@ export function parseDatedItems(
     const remind = check !== undefined ? REMINDER.exec(body) : null
     const remindDate = remind ? (remind[1] ?? dailyDate) : null
     if (remind && remindDate && fromDayKey(remindDate) && Number(remind[2]) < 24) {
-      const start = `${remind[2].padStart(2, '0')}:${remind[3]}`
-      items.push({ kind: 'due', date: remindDate, path, line: i, title: `⏰ ${body.replace(REMINDER, '').trim()}`, done, start })
+      const event = parseEventText(body.replace(REMINDER, ''))
+      const start = event.start ?? `${remind[2].padStart(2, '0')}:${remind[3]}`
+      items.push({ kind: 'due', date: remindDate, path, line: i, title: `⏰ ${event.title.trim()}`, done, start, ...(event.end ? { end: event.end } : {}) })
       continue
     }
     if (scheduleLevel && dailyDate && body.trim()) {

@@ -16,6 +16,20 @@ export { dailyDateOf, dailyPath }
 
 const exists = (path: string): boolean => findNode(useVault.getState().tree, path)?.type === 'file'
 
+const DATE_HEADING = '# {{date:dddd D MMMM YYYY}}\n\n'
+
+/**
+ * With "keep the date heading" on, a daily template that doesn't start with a heading of its own
+ * gets the usual date heading on top (after its properties, if it has any).
+ */
+export function withDateHeading(template: string, keep: boolean): string {
+  if (!keep) return template
+  const front = /^---\n[\s\S]*?\n---\n/.exec(template)?.[0] ?? ''
+  const body = template.slice(front.length)
+  if (/^\s*#\s/.test(body)) return template
+  return front + DATE_HEADING + body.replace(/^\s*\n/, '')
+}
+
 /** What a brand-new daily note starts with: your daily template, or just a title. */
 function newDailyContent(date: Date): { text: string; cursor: number | null } {
   const prefs = usePrefs.getState().prefs
@@ -23,7 +37,7 @@ function newDailyContent(date: Date): { text: string; cursor: number | null } {
   const templatePath = prefs.dailyTemplate ? (/\.md$/i.test(prefs.dailyTemplate) ? prefs.dailyTemplate : `${prefs.dailyTemplate}.md`) : ''
   const template = templatePath ? getNoteText(templatePath) : undefined
   if (templatePath && template === undefined) notify(`Daily template "${prefs.dailyTemplate}" wasn't found, so a plain note was made.`, 'info')
-  return fillTemplate(template ?? `# {{date:dddd D MMMM YYYY}}\n\n{{cursor}}`, { title, date })
+  return fillTemplate(template === undefined ? `${DATE_HEADING}{{cursor}}` : withDateHeading(template, prefs.dailyKeepHeading), { title, date })
 }
 
 /** Opens a day's daily note, creating it first (unless `create` is false). */

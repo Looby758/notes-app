@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react'
 import {
   ChevronRight,
+  ExternalLink,
   FileDown,
   FolderInput,
   Hash,
@@ -32,6 +33,9 @@ import { openExport, useUI } from '../../store/ui'
 import { clearSelection, selectRange, toggleSelected, useSelection } from '../../store/selection'
 import { starMany, trashMany } from '../../lib/bulk'
 import { FILE_MANAGER } from '@shared/platform'
+import { usePrefs } from '../../store/prefs'
+import { fileKind, openAttachment, openExternally } from '../../lib/fileKinds'
+import FileIcon from '../FileIcon'
 import { useLock, isLocked } from '../../lib/lock/session'
 import { lockNote, removeLock } from '../../lib/lock/actions'
 
@@ -50,6 +54,17 @@ function visibleRows(nodes: FileNode[], expanded: Set<string>, out: FileNode[] =
   return out
 }
 
+/** The tree as shown: without pictures, recordings and other files if Settings says so. */
+function withoutAttachments(nodes: FileNode[]): FileNode[] {
+  return nodes.filter((n) => n.type !== 'attachment').map((n) => (n.children ? { ...n, children: withoutAttachments(n.children) } : n))
+}
+
+/** Opens a note, or a picture/recording/PDF (in a tab) or other file (in its usual app). */
+function openItem(node: FileNode, opts: { newTab?: boolean } = {}): void {
+  if (node.type === 'attachment') openAttachment(node.path, opts)
+  else openNote(node.path, opts)
+}
+
 function canDrop(source: string | null, folder: string): boolean {
   return source !== null && !isWithin(folder, source) && parentOf(source) !== folder
 }
@@ -61,7 +76,9 @@ interface MenuState {
 }
 
 export default function FileTree() {
-  const tree = useVault((s) => s.tree)
+  const fullTree = useVault((s) => s.tree)
+  const showAttachments = usePrefs((s) => s.prefs.showAttachments)
+  const tree = useMemo(() => (showAttachments ? fullTree : withoutAttachments(fullTree)), [fullTree, showAttachments])
   const selected = useVault((s) => s.selected)
   // Actions never change, so read them once instead of subscribing to the whole store.
   const { newNote, newFolder, startRename, trash, move } = useVault.getState()
@@ -112,11 +129,22 @@ export default function FileTree() {
             'separator'
           ]
         : []
+    const attachment: MenuItem[] =
+      node.type === 'attachment'
+        ? [
+            ...(fileKind(node.path) !== 'other'
+              ? [{ label: 'Open in new tab', icon: <FileIcon path={node.path} />, onClick: () => openAttachment(node.path, { newTab: true }) }]
+              : []),
+            { label: 'Open in its usual app', icon: <ExternalLink size={15} />, onClick: () => openExternally(node.path) },
+            'separator'
+          ]
+        : []
     const edit: MenuItem[] = [
       ...open,
+      ...attachment,
       { label: 'Rename', icon: <Pencil size={15} />, onClick: () => startRename(node.path) },
       { label: `Show in ${FILE_MANAGER}`, icon: <FolderSearch size={15} />, onClick: () => window.api.reveal(node.path) },
-      { label: 'Export…', icon: <FileDown size={15} />, onClick: () => openExport(node.path, node.type === 'folder') },
+      ...(node.type === 'attachment' ? [] : [{ label: 'Export…', icon: <FileDown size={15} />, onClick: () => openExport(node.path, node.type === 'folder') } as MenuItem]),
       'separator',
       { label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: () => trash(node.path) }
     ]
@@ -175,7 +203,7 @@ export default function FileTree() {
       case 'Enter':
         if (!node) return
         if (node.type === 'folder') toggle(node.path)
-        else openNote(node.path)
+        else openItem(node)
         break
       case 'F2':
         if (!node) return
@@ -285,17 +313,17 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
     clearSelection()
     select(node.path)
     if (isFolder) toggle(node.path)
-    else openNote(node.path)
+    else openItem(node)
   }
 
   const onDragStart = (e: DragEvent): void => {
     dragging = node.path
     // Notes can also be dropped onto a pane to open them there (or on its edge to split).
-    setDrag(isFolder ? null : { kind: 'note', path: node.path })
+    setDrag(isFolder ? null : node.type === 'attachment' ? { kind: 'file', path: node.path } : { kind: 'note', path: node.path })
     // Reveals drop targets that only matter while a note is being dragged (like "drop here to star").
     // Not straight away: Chromium cancels a drag if the page shifts under it during dragstart.
     const path = node.path
-    if (!isFolder) setTimeout(() => dragging === path && document.body.classList.add('dragging-note'), 0)
+    if (node.type === 'file') setTimeout(() => dragging === path && document.body.classList.add('dragging-note'), 0)
     // Move into a folder or pane, or "link" when dropped on Starred (each target must be allowed here).
     e.dataTransfer.effectAllowed = 'linkMove'
     e.dataTransfer.setData('text/plain', node.path)
@@ -321,13 +349,13 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
     <>
       <div
         data-path={node.path}
-        className={`tree-row ${isSelected ? 'selected' : ''} ${multi ? 'multi' : ''} ${isDropTarget ? 'drop' : ''}`}
+        className={`tree-row ${node.type === 'attachment' ? 'attachment' : ''} ${isSelected ? 'selected' : ''} ${multi ? 'multi' : ''} ${isDropTarget ? 'drop' : ''}`}
         style={{ paddingLeft: 8 + depth * INDENT }}
         draggable={!isRenaming}
         onClick={onClick}
         onDoubleClick={() => !isFolder && startRename(node.path)}
         onContextMenu={(e) => onContextMenu(e, node)}
-        onAuxClick={(e) => e.button === 1 && !isFolder && openNote(node.path, { newTab: true })}
+        onAuxClick={(e) => e.button === 1 && !isFolder && openItem(node, { newTab: true })}
         onDragStart={onDragStart}
         onDragEnd={() => {
           dragging = null
@@ -351,7 +379,13 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
             <Folder size={15} className="tree-icon" />
           )
         ) : (
-          noteIcon ? <span className="tree-icon tree-emoji">{noteIcon}</span> : <FileText size={15} className="tree-icon" />
+          node.type === 'attachment' ? (
+            <FileIcon path={node.path} className="tree-icon tree-file-icon" />
+          ) : noteIcon ? (
+            <span className="tree-icon tree-emoji">{noteIcon}</span>
+          ) : (
+            <FileText size={15} className="tree-icon" />
+          )
         )}
         {isRenaming ? <RenameInput node={node} /> : <span className="tree-label">{displayName(node)}</span>}
         {locked && !isRenaming && <Lock size={11} className="tree-lock" aria-label="Locked" />}

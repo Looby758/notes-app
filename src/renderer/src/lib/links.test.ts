@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { maskCode, NoteLookup, parseLinks, parseWikiInner, relativePath, rewriteLinks } from './links'
+import { maskCode, NoteLookup, parseLinks, parseWikiInner, relativePath, rewriteFileLinks, rewriteLinks } from './links'
 import { replacePrefix } from './paths'
 
 describe('parseLinks', () => {
@@ -120,5 +120,23 @@ describe('rewriteLinks', () => {
     expect(run(['A.md', 'B.md', 'C.md'], '[[B]] [[Missing]] [c](C.md)', 'A.md', 'B.md', 'B2.md')).toBe(
       '[[B2]] [[Missing]] [c](C.md)'
     )
+  })
+})
+
+describe('rewriteFileLinks', () => {
+  const text = 'Pic ![Cat](attachments/Cat%20photo.png) and [doc](attachments/a.pdf)\n`![x](attachments/Cat%20photo.png)` [[Note]] [web](https://x.com/a.png)\n'
+  it('follows a renamed file', () => {
+    expect(rewriteFileLinks(text, 'Diary.md', 'attachments/Cat photo.png', 'attachments/Kitty.png')).toBe(
+      'Pic ![Cat](attachments/Kitty.png) and [doc](attachments/a.pdf)\n`![x](attachments/Cat%20photo.png)` [[Note]] [web](https://x.com/a.png)\n'
+    )
+  })
+  it('follows a renamed folder', () => {
+    expect(rewriteFileLinks(text, 'Diary.md', 'attachments', 'media')).toContain('![Cat](media/Cat%20photo.png) and [doc](media/a.pdf)')
+  })
+  it('keeps links working when the note itself moves', () => {
+    expect(rewriteFileLinks(text, 'Diary.md', 'Diary.md', 'Journal/Diary.md')).toContain('![Cat](../attachments/Cat%20photo.png)')
+  })
+  it('leaves notes that are not affected alone', () => {
+    expect(rewriteFileLinks(text, 'Diary.md', 'other.png', 'x.png')).toBeNull()
   })
 })

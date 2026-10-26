@@ -191,7 +191,9 @@ function openVault(path: string | null): void {
 
 // Images (and voice notes) in notes load through vault://local/<path>, served only from inside the open vault.
 const IMAGE_TYPES = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.avif'])
-const AUDIO_TYPES = new Set(['.webm', '.mp3', '.m4a', '.wav', '.ogg', '.oga', '.aac'])
+const AUDIO_TYPES = new Set(['.webm', '.mp3', '.m4a', '.wav', '.ogg', '.oga', '.aac', '.flac', '.opus'])
+/** Shown in their own tab from the file list. */
+const VIEWER_TYPES = new Set(['.mp4', '.mov', '.m4v', '.ogv', '.pdf', '.ico'])
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'vault', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }
@@ -203,7 +205,7 @@ function registerVaultProtocol(): void {
       const rel = decodeURIComponent(new URL(request.url).pathname.slice(1))
       const full = currentVault().abs(rel)
       const ext = extname(full).toLowerCase()
-      if (!IMAGE_TYPES.has(ext) && !AUDIO_TYPES.has(ext)) return new Response('Not allowed', { status: 403 })
+      if (!IMAGE_TYPES.has(ext) && !AUDIO_TYPES.has(ext) && !VIEWER_TYPES.has(ext)) return new Response('Not allowed', { status: 403 })
       return net.fetch(pathToFileURL(full).toString(), { headers: request.headers })
     } catch {
       return new Response('Not found', { status: 404 })
@@ -250,7 +252,9 @@ function createWindow(): BrowserWindow {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
+      sandbox: true,
+      // Chromium's PDF viewer, for PDFs opened from the file list.
+      plugins: true
     }
   })
 

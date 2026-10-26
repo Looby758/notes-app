@@ -1,3 +1,4 @@
+import type { CaptureRequest } from '@shared/types'
 import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, screen, Tray } from 'electron'
 import { join } from 'path'
 import { getTheme } from '@shared/themes'
@@ -186,7 +187,7 @@ export function setupCapture(h: Hooks): void {
   }))
 
   // The capture window submits text; the main window saves it and reports back.
-  ipcMain.handle('capture:submit', async (_e, text: string): Promise<CaptureResult> => {
+  ipcMain.handle('capture:submit', async (_e, request: CaptureRequest): Promise<CaptureResult> => {
     const main = hooks.getMain()
     if (!main || main.isDestroyed()) return { ok: false, error: 'Notes isn’t ready yet. Try again in a moment.' }
     const id = nextRequest++
@@ -196,7 +197,7 @@ export function setupCapture(h: Hooks): void {
         if (pending.delete(id)) resolve({ ok: false, error: 'Saving took too long. Try again.' })
       }, 8000)
     })
-    main.webContents.send('capture:add', id, text)
+    main.webContents.send('capture:add', id, request)
     const r = await result
     if (r.ok) hideCapture()
     return r

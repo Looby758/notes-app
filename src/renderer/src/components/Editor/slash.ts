@@ -23,7 +23,7 @@ interface SlashItem {
   label: string
   /** Extra words that find this item, e.g. "todo" for Checklist. */
   keywords: string
-  section: 'Format' | 'Insert' | 'Templates'
+  section: 'Format' | 'Insert' | 'Placeholders' | 'Templates'
   detail?: string
   /** Replaces the typed "/query" (from..to) with this item. */
   apply: (view: EditorView, from: number, to: number) => void
@@ -194,7 +194,33 @@ function templateItems(): SlashItem[] {
     }))
 }
 
-const SECTION_ORDER = { Format: 0, Insert: 1, Templates: 2 }
+/** In a template: {{date}} and friends, each with what it becomes today. */
+export const PLACEHOLDERS: { code: string; label: string; keywords: string }[] = [
+  { code: '{{date:dddd D MMMM YYYY}}', label: 'Date, written out', keywords: 'day weekday long heading' },
+  { code: '{{date:D MMMM YYYY}}', label: 'Date without the weekday', keywords: 'day month year' },
+  { code: '{{date:ddd D MMM}}', label: 'Short date', keywords: 'day abbreviated' },
+  { code: '{{date}}', label: 'Date (YYYY-MM-DD)', keywords: 'iso day number' },
+  { code: '{{date:DD/MM/YYYY}}', label: 'Date with slashes', keywords: 'uk numbers' },
+  { code: '{{weekday}}', label: 'Weekday', keywords: 'day name monday' },
+  { code: '{{date:MMMM YYYY}}', label: 'Month and year', keywords: 'month' },
+  { code: '{{time}}', label: 'Time', keywords: 'clock hour now' },
+  { code: '{{title}}', label: 'Note name', keywords: 'title name file' },
+  { code: '{{cursor}}', label: 'Cursor starts here', keywords: 'caret start typing' }
+]
+
+function placeholderItems(): SlashItem[] {
+  return PLACEHOLDERS.map((p) => ({
+    label: `Placeholder: ${p.label}`,
+    keywords: `placeholder template variable ${p.keywords} ${p.code}`,
+    section: 'Placeholders' as const,
+    detail: p.code.startsWith('{{date') || p.code.startsWith('{{weekday') || p.code.startsWith('{{time')
+      ? fillTemplate(p.code, { title: '' }).text
+      : p.code,
+    apply: text(() => p.code)
+  }))
+}
+
+const SECTION_ORDER = { Format: 0, Insert: 1, Placeholders: 2, Templates: 3 }
 
 /**
  * Best matches first: a word in the name starting with what you typed ("/check"), then a keyword
@@ -225,7 +251,11 @@ export function slashCompletions(ctx: CompletionContext): CompletionResult | nul
     if (!node.parent) break
   }
 
-  const items = [...ITEMS, ...templateItems()]
+  // Placeholders only make sense in templates.
+  const folder = usePrefs.getState().prefs.templatesFolder
+  const path = ctx.state.facet(notePath)
+  const inTemplate = !!folder && !!path && isWithin(path, folder)
+  const items = [...ITEMS, ...(inTemplate ? placeholderItems() : []), ...templateItems()]
   const ranked = query.trim() ? rank(items, query.trim()) : items
   if (ranked.length === 0) return null
 

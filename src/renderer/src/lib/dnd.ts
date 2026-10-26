@@ -8,6 +8,8 @@ export type DragPayload =
   | { kind: 'tab'; pane: string; id: string }
   /** A note from the file tree, or (fromStarred) from the Starred list being reordered. */
   | { kind: 'note'; path: string; fromStarred?: boolean }
+  /** A picture, recording or other file from the file tree: dropped into a note, it's embedded. */
+  | { kind: 'file'; path: string }
 
 let current: DragPayload | null = null
 

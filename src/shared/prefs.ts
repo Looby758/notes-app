@@ -48,6 +48,8 @@ export interface Prefs {
   openInNewTab: boolean
   /** Every note opens read-only (links open with a plain click) until you switch back to writing. */
   readingMode: boolean
+  /** The file list shows pictures, recordings and other files, not just notes. */
+  showAttachments: boolean
   /** "Random note" may pick daily notes too. */
   randomIncludeDaily: boolean
   /** Typewriter mode: keep the line you're writing on in the middle of the screen. */
@@ -88,6 +90,8 @@ export interface Prefs {
   /** Template note for new daily notes ('' for none), e.g. "Templates/Daily.md". */
   dailyTemplate: string
   /** Clicking a day in the calendar creates its daily note if it doesn't exist. */
+  /** A daily template without a heading of its own still gets the date heading on top. */
+  dailyKeepHeading: boolean
   createDailyOnClick: boolean
   /** 0 = Sunday, 1 = Monday. */
   weekStart: number
@@ -104,6 +108,8 @@ export interface Prefs {
   /** Inbox note path, e.g. "Inbox". */
   captureInbox: string
   /** Start each capture with the time ("- 14:05 …"). */
+  /** Quick capture keeps the last place you chose instead of going back to the usual one. */
+  captureRememberTarget: boolean
   captureTimestamp: boolean
   /** Closing the window keeps Notes running in the tray (so quick capture still works). */
   closeToTray: boolean
@@ -149,6 +155,7 @@ export const DEFAULT_PREFS: Prefs = {
   openInNewTab: false,
   readingMode: false,
   randomIncludeDaily: false,
+  showAttachments: true,
   typewriterCenter: false,
   typewriterDim: false,
   typewriterDimUnit: 'paragraph',
@@ -171,6 +178,7 @@ export const DEFAULT_PREFS: Prefs = {
   dailyFormat: 'YYYY-MM-DD',
   dailyTemplate: '',
   createDailyOnClick: true,
+  dailyKeepHeading: true,
   weekStart: 1,
   timeFormat: '24h',
   scheduleHeading: 'Schedule',
@@ -181,6 +189,7 @@ export const DEFAULT_PREFS: Prefs = {
   captureHeading: 'Captured',
   captureInbox: 'Inbox',
   captureTimestamp: true,
+  captureRememberTarget: false,
   closeToTray: true,
   launchAtStartup: false,
 

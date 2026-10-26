@@ -91,8 +91,8 @@ export class Vault {
       const full = join(dir, e.name)
       if (e.isDirectory()) {
         nodes.push({ name: e.name, path: this.rel(full), type: 'folder', children: await this.readDir(full) })
-      } else if (e.isFile() && isMarkdown(e.name)) {
-        nodes.push({ name: e.name, path: this.rel(full), type: 'file' })
+      } else if (e.isFile()) {
+        nodes.push({ name: e.name, path: this.rel(full), type: isMarkdown(e.name) ? 'file' : 'attachment' })
       }
     }
     return nodes.sort(compareNodes)
@@ -225,7 +225,9 @@ export class Vault {
     const src = this.abs(rel)
     const isFile = (await fs.stat(src)).isFile()
     let name = cleanName(newName)
-    if (isFile && !isMarkdown(name)) name += '.md'
+    // Notes stay .md; other files keep their extension unless you type a new one.
+    if (isFile && isMarkdown(src) && !isMarkdown(name)) name += '.md'
+    else if (isFile && !isMarkdown(src) && !splitName(name)[1]) name += splitName(basename(src))[1]
     const target = join(dirname(src), name)
     if (target === src) return rel
     // A case-only rename ("note" → "Note") points at the same file on Windows, so allow it.

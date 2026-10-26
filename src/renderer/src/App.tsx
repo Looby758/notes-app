@@ -27,9 +27,9 @@ export default function App() {
   vaultRef.current = vault
   useEffect(
     () =>
-      window.api.onCaptureRequest(async (id, text) => {
+      window.api.onCaptureRequest(async (id, request) => {
         const result = vaultRef.current
-          ? await saveCapture(text)
+          ? await saveCapture(request)
           : { ok: false, error: 'Open Notes and choose a notes folder first.' }
         window.api.captureResult(id, result)
       }),

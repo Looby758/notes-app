@@ -85,9 +85,9 @@ export const attachmentHandlers = EditorView.domEventHandlers({
     return true
   },
   dragover(e) {
-    if (e.dataTransfer?.types.includes('Files')) {
+    if (e.dataTransfer?.types.includes('Files') || getDrag()?.kind === 'file') {
       e.preventDefault()
-      e.dataTransfer.dropEffect = 'copy'
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
       return true
     }
     return false
@@ -95,7 +95,14 @@ export const attachmentHandlers = EditorView.domEventHandlers({
   drop(e, view) {
     // Tabs and notes dragged inside the app are handled by the pane (it opens or moves them).
     // Returning true stops the editor from also inserting their name as text.
-    if (getDrag()) return true
+    const drag = getDrag()
+    if (drag?.kind === 'file') {
+      e.preventDefault()
+      const pos = view.posAtCoords({ x: e.clientX, y: e.clientY }) ?? view.state.selection.main.head
+      insertLinks(view, [attachmentLink(drag.path, view.state.facet(notePath))], pos)
+      return true
+    }
+    if (drag) return true
     const files = [...(e.dataTransfer?.files ?? [])]
     if (files.length === 0) return false
     e.preventDefault()

@@ -3,7 +3,9 @@ import { AlertTriangle, FileText } from 'lucide-react'
 import { useEditor } from '../../store/editor'
 import {
   focusPane,
+  fileOfTab,
   isBlankTab,
+  isFileTab,
   isNoteTab,
   mountPane,
   moveTab,
@@ -23,6 +25,7 @@ import GraphPage from '../Graph/GraphPage'
 import ReplacePage from '../Replace/ReplacePage'
 import TabBar from './TabBar'
 import LockScreen from '../Lock/LockScreen'
+import FileViewer from './FileViewer'
 import { needsUnlock, useLock } from '../../lib/lock/session'
 import { IS_MAC, showKeys } from '@shared/platform'
 
@@ -55,7 +58,8 @@ export default function Pane({ pane }: { pane: string }) {
   useEffect(() => mountPane(pane, host.current!), [pane])
 
   const onDragOver = (e: DragEvent<HTMLDivElement>): void => {
-    if (!getDrag()) return
+    // Files from the list are dropped into the note (the editor handles that).
+    if (!getDrag() || getDrag()!.kind === 'file') return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
     setZone(zoneAt(e.currentTarget.getBoundingClientRect(), e.clientX, e.clientY))
@@ -65,7 +69,7 @@ export default function Pane({ pane }: { pane: string }) {
     const drag = getDrag()
     const where = zone ?? zoneAt(e.currentTarget.getBoundingClientRect(), e.clientX, e.clientY)
     setZone(null)
-    if (!drag) return
+    if (!drag || drag.kind === 'file') return
     e.preventDefault()
     if (drag.kind === 'tab') {
       if (where === 'center') moveTab(drag.id, drag.pane, pane)
@@ -106,6 +110,7 @@ export default function Pane({ pane }: { pane: string }) {
         )}
         <div ref={host} className={`editor-host ${showingNote ? '' : 'hidden'}`} />
         {lockedNote && <LockScreen key={active} path={active!} autoFocus={isActivePane} />}
+        {isFileTab(active) && <FileViewer key={active} path={fileOfTab(active)} />}
         {isBlankTab(active) && <NewTabPage key={active} autoFocus={isActivePane} />}
         {active === SETTINGS_TAB && <SettingsPage />}
         {active === CALENDAR_TAB && <CalendarPage />}
