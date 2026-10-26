@@ -8,6 +8,7 @@ import {
   Orbit,
   BookOpen,
   Dices,
+  Moon,
   PenLine,
   PanelLeft,
   PanelRight,
@@ -17,7 +18,7 @@ import { useVault } from '../store/vault'
 import { useEditor, type SaveStatus } from '../store/editor'
 import { useNoteIndex } from '../store/noteIndex'
 import { setPrefs, usePrefs } from '../store/prefs'
-import { showSearch, useUI } from '../store/ui'
+import { showSearch, toggleZen, useUI } from '../store/ui'
 import { countNotes, parentOf } from '../lib/paths'
 import { FILE_MANAGER, IS_MAC, showKeys } from '@shared/platform'
 import { commandForKey } from '../lib/commands'
@@ -30,7 +31,8 @@ import {
   refreshLinkDecorations,
   remeasure,
   SETTINGS_TAB,
-  GRAPH_TAB
+  GRAPH_TAB,
+  setZenEditor
 } from '../lib/editorController'
 import { openLink, openWikiLink } from '../lib/openLink'
 import Sidebar from './Sidebar/Sidebar'
@@ -41,6 +43,7 @@ import Modals from './Picker/Modals'
 import { EventDetails } from './Calendar/shared'
 import Resizer from './Resizer'
 import UpdateToast from './UpdateToast'
+import ZenBar from './ZenBar'
 import { openRandomNote } from '../lib/random'
 
 interface Props {
@@ -71,6 +74,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
   const fonts = usePrefs((s) => s.prefs.editorFont + s.prefs.uiFont + s.prefs.zoom)
   const showWordCount = usePrefs((s) => s.prefs.showWordCount)
   const reading = usePrefs((s) => s.prefs.readingMode)
+  const zen = useUI((s) => s.zen)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const tree = useVault((s) => s.tree)
@@ -146,10 +150,27 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     }
   }, [])
 
+  // Zen mode: full screen, just the note, typewriter mode on.
+  const zenStarted = useRef(false)
+  useEffect(() => {
+    // Nothing to undo at start-up (and a window you made full screen yourself stays that way).
+    if (!zen && !zenStarted.current) return
+    zenStarted.current = true
+    document.body.classList.toggle('zen', zen)
+    window.api.setFullScreen(zen)
+    setZenEditor(zen)
+    remeasure()
+  }, [zen])
+
   // Every keyboard shortcut comes from the command list, so Ctrl+K shows exactly what works.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setMenuOpen(false)
+      // Esc leaves zen mode (unless it's closing something else first).
+      if (e.key === 'Escape' && useUI.getState().zen && !useUI.getState().modal && !e.defaultPrevented) {
+        toggleZen()
+        return
+      }
       const cmd = commandForKey(e)
       if (!cmd) return
       e.preventDefault()
@@ -265,6 +286,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <footer className="statusbar">
         <span title={vault}>{vault}</span>
         <span className="statusbar-spacer" />
+        <button className="statusbar-btn" onClick={toggleZen} title={`Zen mode (${showKeys('Ctrl+Alt+Z')})`} data-zen-toggle>
+          <Moon size={11} /> Zen
+        </button>
         {reading && (
           <button className="reading-pill" onClick={() => setPrefs({ readingMode: false })} title="Notes are read-only. Click to write again.">
             <BookOpen size={11} /> Reading
@@ -284,6 +308,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <Modals />
       <EventDetails />
       <UpdateToast />
+      <ZenBar />
     </div>
   )
 }

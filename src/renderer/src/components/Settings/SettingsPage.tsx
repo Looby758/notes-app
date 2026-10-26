@@ -30,6 +30,7 @@ function SettingRow({ def }: { def: SettingDef }) {
   // Pickers and text boxes with long explanations read better with the control under the label.
   const wide =
     def.type === 'theme' ||
+    def.type === 'appIcon' ||
     def.type === 'font' ||
     def.type === 'color' ||
     ((def.type === 'text' || def.type === 'folder') && (def.description?.length ?? 0) > 70)

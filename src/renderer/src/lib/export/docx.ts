@@ -272,12 +272,25 @@ export async function toDocx(opts: DocxOptions): Promise<Uint8Array> {
     const firstHeading = tokens.find((t) => t.type !== 'space')
     const opensWithTitle = firstHeading?.type === 'heading' && (firstHeading as Tokens.Heading).depth === 1 && (firstHeading as Tokens.Heading).text.trim().toLowerCase() === item.title.toLowerCase()
     const anchor = bookmarkName(item.anchor)
+    // A banner image goes above the title (colour banners don't carry over to Word).
+    const bannerImg = item.banner ? opts.images.get(item.banner.replace(/^\[\[|\]\]$/g, '').replace(/^\/+/, '')) : undefined
+    if (bannerImg) {
+      const scale = Math.min(1, MAX_IMAGE_WIDTH / bannerImg.width)
+      children.push(
+        new Paragraph({
+          pageBreakBefore: index > 0,
+          children: [new ImageRun({ type: bannerImg.type, data: bannerImg.data, transformation: { width: Math.round(bannerImg.width * scale), height: Math.round(bannerImg.height * scale) } })]
+        })
+      )
+    }
+    const icon = item.icon ? [new TextRun(`${item.icon} `)] : []
+    const breakBefore = index > 0 && !bannerImg
     if (opensWithTitle) {
       const h = firstHeading as Tokens.Heading
-      children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, pageBreakBefore: index > 0, children: [new Bookmark({ id: anchor, children: inline(h.tokens) })] }))
+      children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, pageBreakBefore: breakBefore, children: [new Bookmark({ id: anchor, children: [...icon, ...inline(h.tokens)] })] }))
       tokens.splice(tokens.indexOf(firstHeading!), 1)
     } else {
-      children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, pageBreakBefore: index > 0, children: [new Bookmark({ id: anchor, children: [new TextRun(item.title)] })] }))
+      children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, pageBreakBefore: breakBefore, children: [new Bookmark({ id: anchor, children: [...icon, new TextRun(item.title)] })] }))
     }
     if (item.properties.length) {
       for (const [k, v] of item.properties) {

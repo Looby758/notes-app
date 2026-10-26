@@ -1,5 +1,6 @@
 import { Marked, type Tokens } from 'marked'
 import { headingAnchor, parseNoteHref, slug, type ExportItem } from './prepare'
+import { BANNER_GRADIENTS } from '../banners'
 
 /**
  * Notes as a web page (also what PDFs are printed from): clean, light, readable on paper, with
@@ -93,11 +94,21 @@ function renderNote(item: ExportItem, opts: HtmlOptions): string {
     markdown = markdown.slice(markdown.indexOf(firstLine) + firstLine.length)
   }
   const body = marked.parse(markdown, { async: false }) as string
-  const heading = `<h1 class="note-title" id="${headingAnchor(item.path, item.title)}">${titleHtml}</h1>\n`
+  const heading = `<h1 class="note-title" id="${headingAnchor(item.path, item.title)}">${item.icon ? `<span class="note-icon">${esc(item.icon)}</span> ` : ''}${titleHtml}</h1>\n`
+  // The banner: an image (built in), a colour or a gradient.
+  let banner = ''
+  if (item.banner) {
+    const b = item.banner.trim()
+    const path = b.replace(/^\[\[|\]\]$/g, '').replace(/^\/+/, '')
+    const image = opts.images.get(path) ?? (/^https?:\/\//i.test(b) ? b : null)
+    const fill = /^#[0-9a-f]{3,8}$/i.test(b) ? b : BANNER_GRADIENTS[b.toLowerCase()]
+    if (image) banner = `<div class="banner" style="background-image:url('${esc(image)}');background-position:center ${item.bannerY ?? 50}%"></div>\n`
+    else if (fill) banner = `<div class="banner" style="background:${esc(fill)}"></div>\n`
+  }
   const props = item.properties.length
     ? `<table class="properties">${item.properties.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table>\n`
     : ''
-  return `<article class="note" id="${item.anchor}">\n${heading}${props}${body}</article>`
+  return `<article class="note" id="${item.anchor}">\n${banner}${heading}${props}${body}</article>`
 }
 
 const CSS = `
@@ -130,6 +141,8 @@ table.properties th, table.properties td { border: none; border-bottom: 1px soli
 table.properties th { color: var(--faint); font-weight: 500; }
 .missing-image { color: var(--faint); font-style: italic; }
 footer { margin-top: 48px; color: var(--faint); font-size: 12px; }
+.banner { height: 180px; margin: 0 0 22px; border-radius: 12px; background-size: cover; background-repeat: no-repeat; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.note-icon { font-size: 1.1em; }
 mark { background: color-mix(in srgb, #f5d547 40%, transparent); color: inherit; border-radius: 3px; padding: 0 2px; }
 mark.hl-green { background: color-mix(in srgb, #4ade80 35%, transparent); }
 mark.hl-blue { background: color-mix(in srgb, #5ea8ff 35%, transparent); }

@@ -5,6 +5,7 @@ import { parseTags, tagMatches } from '../lib/tags'
 import { isWithin, noteTitle } from '../lib/paths'
 import { findMentions, type Mention } from '../lib/mentions'
 import { buildVectors, relatedTo, type Related, type RelatedInput } from '../lib/related'
+import { readFrontmatter } from '../lib/properties'
 import { compareItems, parseDatedItems, type DatedItem } from '../lib/schedule'
 import { dailyDateOf } from '../lib/dailyPaths'
 import { usePrefs } from './prefs'
@@ -27,6 +28,8 @@ export interface NoteEntry {
   tags: string[]
   /** Calendar items: the daily note itself, dated notes, due tasks, schedule events. */
   dated: DatedItem[]
+  /** The note's emoji icon (`icon:` property), if it has one. */
+  icon?: string
 }
 
 export interface Backlink {
@@ -82,7 +85,8 @@ function datedItems(path: string, text: string): DatedItem[] {
 function put(notes: Map<string, NoteEntry>, path: string, raw: string): void {
   const text = normalizeText(raw)
   texts.set(path, text)
-  notes.set(path, { links: indexLinks(text), tags: parseTags(text), dated: datedItems(path, text) })
+  const icon = readFrontmatter(text)?.properties.find((p) => p.key === 'icon')?.value
+  notes.set(path, { links: indexLinks(text), tags: parseTags(text), dated: datedItems(path, text), icon: typeof icon === 'string' && icon ? icon : undefined })
   const doc = { id: path, title: noteTitle(path), text }
   if (search.has(path)) search.replace(doc)
   else search.add(doc)

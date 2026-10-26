@@ -15,6 +15,29 @@ const FONT_VARS: Partial<Record<keyof Prefs, string>> = {
   codeFont: 'var(--font-mono)'
 }
 
+const APP_ICONS: [string, string][] = [
+  ['default', 'Purple'],
+  ['green', 'Green'],
+  ['forest', 'Forest'],
+  ['ocean', 'Ocean'],
+  ['sunset', 'Sunset'],
+  ['light', 'Paper'],
+  ['midnight', 'Midnight']
+]
+
+function AppIconPicker({ value }: { value: string }) {
+  return (
+    <div className="app-icons" role="radiogroup" aria-label="App icon">
+      {APP_ICONS.map(([id, label]) => (
+        <button key={id} role="radio" aria-checked={value === id} className={`app-icon ${value === id ? 'on' : ''}`} onClick={() => set('appIcon', id)} data-app-icon={id}>
+          <img src={`./icons/${id}.png`} alt="" />
+          <span>{label}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
 /** The input for one setting, chosen by its type. */
 export function SettingControl({ def }: { def: SettingDef }) {
   const value = usePrefs((s) => s.prefs[def.key])
@@ -68,6 +91,9 @@ export function SettingControl({ def }: { def: SettingDef }) {
 
     case 'theme':
       return <ThemePicker />
+
+    case 'appIcon':
+      return <AppIconPicker value={String(value)} />
 
     case 'color':
       return <AccentPicker />

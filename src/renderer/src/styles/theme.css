@@ -4235,3 +4235,345 @@ body.resizing-rows * {
 .sidebar-inner:has(.bulk-bar) .toast {
   bottom: 118px;
 }
+
+/* ---------- Note banner and icon ---------- */
+
+.note-header {
+  position: relative;
+}
+.note-banner {
+  position: relative;
+  height: 190px;
+  margin: 0 0 14px;
+  border-radius: 12px;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+.note-header.has-banner.has-icon .note-banner {
+  margin-bottom: 0;
+}
+.note-banner.moving {
+  cursor: ns-resize;
+}
+.note-banner-tools {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 140ms var(--ease);
+}
+.note-banner:hover .note-banner-tools,
+.note-banner.moving .note-banner-tools {
+  opacity: 1;
+}
+.note-banner-tools button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(10, 10, 14, 0.62);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+.note-banner-tools button:hover {
+  background: rgba(10, 10, 14, 0.82);
+}
+.note-icon {
+  display: block;
+  margin: 0 0 6px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  font-size: 54px;
+  line-height: 1.15;
+  cursor: pointer;
+}
+.note-icon:disabled {
+  cursor: default;
+}
+.note-icon:not(:disabled):hover {
+  background: var(--bg-hover);
+}
+/* Over a banner, the icon sits on its bottom edge. */
+.note-header.has-banner .note-icon {
+  position: relative;
+  margin-top: -36px;
+  margin-left: 16px;
+}
+.note-header-adds {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 2px;
+  opacity: 0;
+  transition: opacity 140ms var(--ease);
+}
+.cm-editor:hover .note-header-adds,
+.note-header-adds:focus-within {
+  opacity: 1;
+}
+.note-header-adds button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.note-header-adds button:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.header-popover {
+  top: 30px;
+  left: 0;
+  z-index: 30;
+  padding: 8px;
+}
+.icon-picker {
+  width: 340px;
+}
+.icon-picker-top {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.icon-picker-top input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+.icon-picker-top input:focus {
+  border-color: var(--accent);
+}
+.icon-picker-top .btn {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  max-height: 230px;
+  overflow-y: auto;
+}
+.icon-grid button {
+  height: 34px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  font-size: 20px;
+  cursor: pointer;
+}
+.icon-grid button:hover {
+  background: var(--bg-hover);
+}
+.banner-picker {
+  width: 300px;
+}
+.banner-picker-section {
+  margin: 4px 2px 6px;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.banner-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.banner-swatches button {
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  cursor: pointer;
+}
+.banner-swatches button:hover {
+  outline: 2px solid var(--accent);
+}
+.banner-image-btn {
+  width: 100%;
+  justify-content: center;
+  padding: 7px;
+  font-size: 12.5px;
+}
+.tree-emoji {
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  font-size: 13px;
+  line-height: 1;
+}
+.tab-emoji {
+  margin-right: 5px;
+  font-size: 12px;
+}
+
+/* ---------- App icon picker ---------- */
+
+.app-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.app-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 84px;
+  padding: 10px 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.app-icon img {
+  width: 52px;
+  height: 52px;
+}
+.app-icon:hover {
+  border-color: var(--border-strong);
+}
+.app-icon.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+/* ---------- Zen mode ---------- */
+
+/* Title bar and status bar are hidden, so the note area is the only row. */
+body.zen .shell {
+  grid-template-rows: minmax(0, 1fr);
+}
+body.zen .titlebar,
+body.zen .statusbar,
+body.zen .tabbar,
+body.zen .divider,
+body.zen .split-child:not(:has(.active-pane)),
+body.zen .pane:not(.active-pane) {
+  display: none !important;
+}
+body.zen .pane-body {
+  background: var(--bg);
+}
+.statusbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.statusbar-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.zen-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-raised) 88%, transparent);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  transform: translateX(-50%) translateY(16px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 300ms var(--ease), transform 300ms var(--ease);
+}
+.zen-bar.show {
+  transform: translateX(-50%);
+  opacity: 1;
+  pointer-events: auto;
+}
+/* While a timer runs and you're writing, only a faint countdown stays. */
+.zen-bar.show.quiet {
+  opacity: 0.35;
+}
+.zen-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.zen-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.zen-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.zen-btn.on {
+  background: var(--accent-soft);
+  color: var(--text-strong);
+}
+.zen-volume {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+  color: var(--text-faint);
+}
+.zen-volume input {
+  width: 80px;
+  accent-color: var(--accent);
+}
+.zen-timer-icon {
+  color: var(--text-faint);
+}
+.zen-time {
+  min-width: 44px;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.zen-exit {
+  color: var(--text-faint);
+}

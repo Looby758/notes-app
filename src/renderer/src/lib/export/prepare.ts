@@ -18,6 +18,10 @@ export interface ExportItem {
   anchor: string
   markdown: string
   properties: [string, string][]
+  /** Shown above the note: its banner (image path, colour or gradient name) and emoji icon. */
+  banner?: string
+  bannerY?: number
+  icon?: string
 }
 
 export interface PrepareContext {
@@ -106,11 +110,28 @@ export function prepareNote(path: string, ctx: PrepareContext, includeProperties
   const text = (ctx.textOf(path) ?? '').replace(/\r\n?/g, '\n')
   const fm = readFrontmatter(text)
   const body = fm ? text.slice(fm.to) : text
+  const header = new Set(['banner', 'banner_y', 'icon'])
   const properties: [string, string][] =
     includeProperties && fm
-      ? fm.properties.filter((p) => p.value !== null && (Array.isArray(p.value) ? p.value.length : p.value !== '')).map((p) => [p.key, Array.isArray(p.value) ? p.value.join(', ') : p.value!])
+      ? fm.properties
+          .filter((p) => !header.has(p.key) && p.value !== null && (Array.isArray(p.value) ? p.value.length : p.value !== ''))
+          .map((p) => [p.key, Array.isArray(p.value) ? p.value.join(', ') : p.value!])
       : []
-  return { path, title: noteTitle(path), anchor: anchorFor(path), markdown: rewriteMarkdown(body.trim(), path, ctx), properties }
+  const value = (k: string): string | undefined => {
+    const v = fm?.properties.find((p) => p.key === k)?.value
+    return typeof v === 'string' && v ? v : undefined
+  }
+  const bannerY = Number(value('banner_y'))
+  return {
+    path,
+    title: noteTitle(path),
+    anchor: anchorFor(path),
+    markdown: rewriteMarkdown(body.trim(), path, ctx),
+    properties,
+    banner: value('banner'),
+    bannerY: Number.isFinite(bannerY) ? bannerY : undefined,
+    icon: value('icon')
+  }
 }
 
 /** The notes to export for a note, a folder (optionally with its subfolders), or '' for everything. */
@@ -128,7 +149,11 @@ export function notesUnder(all: string[], target: string, isFolder: boolean, sub
 /** Image paths (in the vault) a set of prepared notes uses. */
 export function imagesIn(items: ExportItem[]): string[] {
   const out = new Set<string>()
-  for (const it of items) for (const m of it.markdown.matchAll(/!\[[^\]\n]*\]\(vault:([^)\s]+)\)/g)) out.add(decodeURI(m[1]))
+  for (const it of items) {
+    for (const m of it.markdown.matchAll(/!\[[^\]\n]*\]\(vault:([^)\s]+)\)/g)) out.add(decodeURI(m[1]))
+    // A banner that's an image in the notes folder.
+    if (it.banner && /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i.test(it.banner) && !/^https?:/i.test(it.banner)) out.add(it.banner.replace(/^\[\[|\]\]$/g, '').replace(/^\/+/, ''))
+  }
   return [...out]
 }
 

@@ -25,6 +25,7 @@ export type SettingDef = Base &
     | { type: 'choice'; options: { value: string; label: string }[] }
     | { type: 'slider'; min: number; max: number; step: number; format: (v: number) => string }
     | { type: 'theme' }
+    | { type: 'appIcon' }
     | { type: 'color' }
     | { type: 'font'; sample: string }
     | { type: 'language' }
@@ -38,6 +39,15 @@ const pct = (v: number): string => `${Math.round(v * 100)}%`
 export const SETTINGS: SettingDef[] = [
   // ---------- Appearance ----------
   { key: 'theme', section: 'appearance', group: 'Theme', type: 'theme', label: 'Theme', keywords: 'colour color dark black nord blue' },
+  {
+    key: 'appIcon',
+    section: 'appearance',
+    group: 'App icon',
+    type: 'appIcon',
+    label: 'App icon',
+    description: IS_MAC ? 'Shown in the Dock.' : 'Shown on the taskbar and the window while Notes runs. (The Start menu and desktop shortcut keep the original.)',
+    keywords: 'icon logo dock taskbar green'
+  },
   {
     key: 'accent',
     section: 'appearance',

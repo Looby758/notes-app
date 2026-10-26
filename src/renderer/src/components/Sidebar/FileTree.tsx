@@ -25,6 +25,7 @@ import ContextMenu, { type MenuItem } from '../ContextMenu'
 import { focusEditor, openNote, splitPane } from '../../lib/editorController'
 import { setDrag } from '../../lib/dnd'
 import { useEditor } from '../../store/editor'
+import { useNoteIndex } from '../../store/noteIndex'
 import { openExport, useUI } from '../../store/ui'
 import { clearSelection, selectRange, toggleSelected, useSelection } from '../../store/selection'
 import { starMany, trashMany } from '../../lib/bulk'
@@ -252,6 +253,7 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
   const isRenaming = useVault((s) => s.renaming === node.path)
   const starred = useStarred((s) => s.paths.includes(node.path))
   const multi = useSelection((s) => s.paths.includes(node.path))
+  const noteIcon = useNoteIndex((s) => (isFolder ? undefined : s.notes.get(node.path)?.icon))
   const { toggle, expand, select, startRename } = useVault.getState()
   const expandTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
@@ -341,7 +343,7 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
             <Folder size={15} className="tree-icon" />
           )
         ) : (
-          <FileText size={15} className="tree-icon" />
+          noteIcon ? <span className="tree-icon tree-emoji">{noteIcon}</span> : <FileText size={15} className="tree-icon" />
         )}
         {isRenaming ? <RenameInput node={node} /> : <span className="tree-label">{displayName(node)}</span>}
         {starred && !isRenaming && <Star size={11} className="tree-star" aria-label="Starred" />}

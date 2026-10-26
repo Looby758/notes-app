@@ -4,7 +4,7 @@ import { createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { readFrontmatter } from '../../lib/properties'
 import { readingFacet } from './facets'
-import PropertiesPanel from './PropertiesPanel'
+import NoteHeader from './NoteHeader'
 
 /**
  * The properties panel: in live preview, a note's frontmatter shows as a small form at the top
@@ -60,7 +60,7 @@ class PropertiesWidget extends WidgetType {
   private render(dom: HTMLElement, view: EditorView): void {
     const fm = this.yaml === null ? null : readFrontmatter(`---\n${this.yaml}\n---\n`)
     roots.get(dom)!.render(
-      createElement(PropertiesPanel, {
+      createElement(NoteHeader, {
         properties: fm ? fm.properties : null,
         readOnly: this.readOnly,
         apply: (change: (text: string) => string) => applyTo(view, change),

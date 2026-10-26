@@ -77,7 +77,7 @@ export default function Pane({ pane }: { pane: string }) {
 
   return (
     <div
-      className={`pane ${isActivePane && multiple ? 'focused' : ''}`}
+      className={`pane ${isActivePane && multiple ? 'focused' : ''} ${isActivePane ? 'active-pane' : ''}`}
       data-pane={pane}
       onMouseDownCapture={() => focusPane(pane)}
       onFocusCapture={() => focusPane(pane)}

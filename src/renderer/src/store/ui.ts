@@ -23,6 +23,8 @@ interface UIState {
   propertiesCollapsed: boolean
   /** The Related notes section under Backlinks is expanded. */
   relatedOpen: boolean
+  /** Zen mode is on (not remembered between runs). */
+  zen: boolean
   /** Graph tab: how many steps out the neighbourhood reaches, and whether unlinked notes show. */
   graphDepth: 1 | 2
   graphOrphans: boolean
@@ -63,6 +65,7 @@ export const useUI = create<UIState>(() => ({
   mentionsOpen: saved.mentionsOpen ?? true,
   propertiesCollapsed: saved.propertiesCollapsed ?? false,
   relatedOpen: saved.relatedOpen ?? true,
+  zen: false,
   graphDepth: saved.graphDepth === 1 ? 1 : 2,
   graphOrphans: saved.graphOrphans ?? true,
   calendarDay: dayKeyOf(new Date()),
@@ -118,4 +121,18 @@ export function toggleFocusMode(): void {
 /** Opens the Export dialog for a note, a folder, or ('' as a folder) every note. */
 export function openExport(path: string, isFolder: boolean, paths?: string[]): void {
   useUI.setState({ modal: 'export', exportTarget: { path, isFolder, paths } })
+}
+
+let beforeZen: { leftOpen: boolean; rightOpen: boolean } | null = null
+
+/** Zen mode: full screen, nothing but the note. (Shell applies the window and editor side.) */
+export function toggleZen(): void {
+  const s = useUI.getState()
+  if (!s.zen) {
+    beforeZen = { leftOpen: s.leftOpen, rightOpen: s.rightOpen }
+    useUI.setState({ zen: true, leftOpen: false, rightOpen: false })
+  } else {
+    useUI.setState({ zen: false, ...(beforeZen ?? {}) })
+    beforeZen = null
+  }
 }

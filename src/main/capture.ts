@@ -148,6 +148,12 @@ function createTray(): void {
   updateTrayMenu()
 }
 
+/** Windows: the tray shows the app icon you picked (the Mac menu bar keeps its plain template). */
+export function setTrayIcon(image: Electron.NativeImage): void {
+  if (IS_MAC || !tray) return
+  tray.setImage(image.resize({ width: 16, height: 16, quality: 'best' }))
+}
+
 /** The first time the window goes to the tray, say where it went. */
 export function noteHiddenToTray(): void {
   // Mac apps routinely keep running with no window, so there's nothing to explain there.

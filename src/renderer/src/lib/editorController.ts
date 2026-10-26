@@ -1,6 +1,6 @@
 import { Annotation, ChangeSet, EditorState, Transaction, type ChangeSpec } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
-import { createState, prefsCompartment, prefsExtensions } from '../components/Editor/setup'
+import { createState, prefsCompartment, prefsExtensions, zenCompartment, zenExtensions } from '../components/Editor/setup'
 import { linksChanged, notePath, paneCompartment, paneFacet, pathCompartment } from '../components/Editor/facets'
 import { EDITOR_COMMANDS } from '../components/Editor/formatting'
 import { embedsChanged } from '../components/Editor/embeds'
@@ -160,6 +160,16 @@ usePrefs.subscribe(({ prefs }) => {
     else s.state = s.state.update({ effects }).state
   }
 })
+
+/** Zen mode on or off: every editor (on screen or not) gets typewriter mode for the duration. */
+export function setZenEditor(on: boolean): void {
+  const effects = zenCompartment.reconfigure(zenExtensions(on))
+  for (const s of sessions.values()) {
+    const pv = views.get(s.pane)
+    if (pv && pv.shown === s.path) pv.view.dispatch({ effects })
+    else s.state = s.state.update({ effects }).state
+  }
+}
 
 // ---------- stats for the active pane ----------
 

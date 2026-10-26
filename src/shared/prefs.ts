@@ -21,6 +21,8 @@ export interface Prefs {
   zoom: number
   showStatusBar: boolean
   reduceMotion: boolean
+  /** Which app icon design to use (taskbar / Dock / window). */
+  appIcon: string
 
   // Editor
   livePreview: boolean
@@ -106,6 +108,7 @@ export const DEFAULT_PREFS: Prefs = {
   zoom: 1,
   showStatusBar: true,
   reduceMotion: false,
+  appIcon: 'default',
 
   livePreview: true,
   spellcheck: true,
@@ -170,6 +173,7 @@ const CHOICES = {
   captureTarget: ['daily', 'inbox'],
   typewriterDimUnit: ['paragraph', 'line'],
   graphStyle: ['neighbourhood', 'constellation'],
+  appIcon: ['default', 'green', 'forest', 'ocean', 'sunset', 'light', 'midnight'],
   captureShortcut: IS_MAC
     ? ['Control+Alt+Space', 'Alt+Space', 'Control+Shift+Space', 'Super+Alt+N', '']
     : ['Super+Shift+N', 'Control+Alt+Space', 'Control+Shift+Space', 'Alt+Shift+N', '']

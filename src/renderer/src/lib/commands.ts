@@ -1,6 +1,6 @@
 import { useEditor } from '../store/editor'
 import { useVault } from '../store/vault'
-import { openExport, showRightView, showSearch, showSidebarView, toggleFocusMode, useUI } from '../store/ui'
+import { openExport, showRightView, showSearch, showSidebarView, toggleFocusMode, toggleZen, useUI } from '../store/ui'
 import { effectiveShortcut, setPrefs, usePrefs } from '../store/prefs'
 import { RANGES, DEFAULT_PREFS } from '@shared/prefs'
 import { EDITOR_COMMANDS } from '../components/Editor/formatting'
@@ -187,6 +187,7 @@ export const commands: Command[] = [
 
   { id: 'settings', group: 'View', title: 'Open settings', shortcut: 'Ctrl+,', run: () => openSpecialTab(SETTINGS_TAB) },
   { id: 'focus', group: 'View', title: 'Toggle focus mode', shortcut: 'Ctrl+\\', run: toggleFocusMode },
+  { id: 'view.zen', group: 'View', title: 'Zen mode', shortcut: 'Ctrl+Alt+Z', run: () => toggleZen() },
   {
     id: 'view.reading',
     group: 'View',

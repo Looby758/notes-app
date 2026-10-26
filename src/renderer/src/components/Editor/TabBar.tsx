@@ -2,6 +2,7 @@ import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from '
 import { CalendarDays, Columns2, FileDown, Orbit, Replace, FolderSearch, Pin, PinOff, Plus, Rows2, Settings, Star, StarOff, X } from 'lucide-react'
 import { useEditor } from '../../store/editor'
 import { toggleStar, useStarred } from '../../store/starred'
+import { useNoteIndex } from '../../store/noteIndex'
 import { openExport } from '../../store/ui'
 import {
   activateTab,
@@ -45,6 +46,9 @@ export default function TabBar({ pane }: { pane: string }) {
   const status = useEditor((s) => s.status)
   const pinned = useEditor((s) => s.panes[pane]?.pinned ?? NO_PINS)
   const starred = useStarred((s) => s.paths)
+  // Notes' emoji icons, shown before their names.
+  const notesIndex = useNoteIndex((s) => s.notes)
+  const icons = new Map(tabs.map((t) => [t, notesIndex.get(t)?.icon]))
   const bar = useRef<HTMLDivElement>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; id: string } | null>(null)
@@ -178,6 +182,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === CALENDAR_TAB && <CalendarDays size={13} className="tab-icon" />}
               {id === GRAPH_TAB && <Orbit size={13} className="tab-icon" />}
               {id === REPLACE_TAB && <Replace size={13} className="tab-icon" />}
+              {icons.get(id) && <span className="tab-emoji">{icons.get(id)}</span>}
               <span className="tab-title">{tabTitle(id)}</span>
               {isTabPinned ? (
                 // Pinned tabs show a pin instead of ✕; clicking it unpins.

@@ -4,6 +4,7 @@ import {
   dialog,
   ipcMain,
   Menu,
+  nativeImage,
   net,
   protocol,
   screen,
@@ -22,7 +23,7 @@ import { loadSettings, saveSettings, settingsFile, watchSettingsFile } from './s
 import { Vault } from './vault'
 import { startWatching, stopWatching } from './watcher'
 import * as calendars from './calendarSources'
-import { applyCaptureShortcut, noteHiddenToTray, setupCapture, teardownCapture } from './capture'
+import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
 import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
@@ -71,9 +72,31 @@ function keepOnScreen(win: BrowserWindow): void {
   if (!visible) win.center()
 }
 
-/** Settings that live outside the app's windows: the capture shortcut and starting at login. */
+let appliedIcon = 'default'
+
+/**
+ * The app icon you picked (Settings → Appearance): the Dock icon on a Mac; on Windows the window's
+ * taskbar icon and the tray icon. "default" leaves the built-in one.
+ */
+function applyAppIcon(id: string): void {
+  if (id === appliedIcon) return
+  const candidates = [join(__dirname, '../renderer/icons', `${id}.png`), join(app.getAppPath(), 'src/renderer/public/icons', `${id}.png`)]
+  const file = candidates.find((f) => existsSync(f))
+  if (!file) return
+  appliedIcon = id
+  const image = nativeImage.createFromPath(file)
+  if (IS_MAC) {
+    app.dock?.setIcon(image)
+  } else {
+    for (const win of BrowserWindow.getAllWindows()) win.setIcon(image)
+    setTrayIcon(image)
+  }
+}
+
+/** Settings that live outside the app's windows: the capture shortcut, the app icon and starting at login. */
 function applySystemPrefs(prefs: Prefs): void {
   applyCaptureShortcut(prefs.captureShortcut)
+  safely('app icon', () => applyAppIcon(prefs.appIcon))
   // Only the installed app registers itself (in development it would register electron.exe).
   if (!app.isPackaged) return
   if (IS_MAC) app.setLoginItemSettings({ openAtLogin: prefs.launchAtStartup })
@@ -363,6 +386,7 @@ function registerIpc(): void {
     broadcastPrefs(prefs)
     return prefs
   })
+  ipcMain.handle('app:fullscreen', (event, on: boolean) => BrowserWindow.fromWebContents(event.sender)?.setFullScreen(on))
   ipcMain.handle('app:showLog', () => {
     const log = join(app.getPath('userData'), 'notes.log')
     if (existsSync(log)) shell.showItemInFolder(log)

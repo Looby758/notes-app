@@ -110,6 +110,8 @@ export interface NotesApi {
   openSettingsFile(): Promise<void>
   /** Shows notes.log (problems Notes ran into) in File Explorer / Finder. */
   showLog(): Promise<void>
+  /** Puts the window into (or out of) full screen. */
+  setFullScreen(on: boolean): Promise<void>
 
   // Updates
   updateStatus(): Promise<UpdateStatus>

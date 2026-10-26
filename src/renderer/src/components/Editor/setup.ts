@@ -28,6 +28,9 @@ import { toCodeMirrorKey } from '../../lib/shortcuts'
 import { typewriter } from './typewriter'
 import { usePrefs } from '../../store/prefs'
 
+/** Zen mode turns typewriter mode on for as long as it lasts (without changing your settings). */
+export const zenCompartment = new Compartment()
+
 /** Holds everything Settings can change, so it can be swapped without rebuilding the editor. */
 export const prefsCompartment = new Compartment()
 
@@ -92,9 +95,18 @@ setEmbedStateFactory((text, path, depth) => {
   })
 })
 
+let zenOn = false
+
+/** Typewriter centring and fading while in zen mode (unless reading). */
+export function zenExtensions(on: boolean): Extension {
+  zenOn = on
+  const p = usePrefs.getState().prefs
+  return on && !p.readingMode ? typewriter({ typewriterCenter: !p.typewriterCenter, typewriterDim: !p.typewriterDim, typewriterDimUnit: p.typewriterDimUnit }) : []
+}
+
 export function createState(doc: string, path: string, extra: Extension, prefs: Prefs): EditorState {
   return EditorState.create({
     doc,
-    extensions: [base, prefsCompartment.of(prefsExtensions(prefs)), pathCompartment.of(notePath.of(path)), extra]
+    extensions: [base, prefsCompartment.of(prefsExtensions(prefs)), zenCompartment.of(zenExtensions(zenOn)), pathCompartment.of(notePath.of(path)), extra]
   })
 }
