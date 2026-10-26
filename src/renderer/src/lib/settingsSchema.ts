@@ -38,14 +38,25 @@ const pct = (v: number): string => `${Math.round(v * 100)}%`
 
 export const SETTINGS: SettingDef[] = [
   // ---------- Appearance ----------
-  { key: 'theme', section: 'appearance', group: 'Theme', type: 'theme', label: 'Theme', keywords: 'colour color dark black nord blue' },
+  {
+    key: 'followSystem',
+    section: 'appearance',
+    group: 'Theme',
+    type: 'toggle',
+    label: IS_MAC ? 'Match the Mac’s light or dark appearance' : 'Match Windows’ light or dark mode',
+    description: 'Pick one dark and one light theme below; Notes switches between them when your system does.',
+    keywords: 'light dark mode system auto automatic appearance night day'
+  },
+  { key: 'theme', section: 'appearance', group: 'Theme', type: 'theme', label: 'Theme', keywords: 'colour color dark light white paper sepia black nord blue' },
   {
     key: 'appIcon',
     section: 'appearance',
     group: 'App icon',
     type: 'appIcon',
     label: 'App icon',
-    description: IS_MAC ? 'Shown in the Dock.' : 'Shown on the taskbar and the window while Notes runs. (The Start menu and desktop shortcut keep the original.)',
+    description: IS_MAC
+      ? 'Shown in the Dock while Notes runs.'
+      : 'Shown on the window, the taskbar (also when pinned), the Start menu and the desktop shortcut. Windows can take a moment to catch up; if a pinned icon doesn’t change, unpin and pin Notes again.',
     keywords: 'icon logo dock taskbar green'
   },
   {

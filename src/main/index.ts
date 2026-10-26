@@ -7,6 +7,7 @@ import {
   nativeImage,
   Notification,
   systemPreferences,
+  nativeTheme,
   net,
   protocol,
   screen,
@@ -20,7 +21,7 @@ import { basename, extname, join } from 'path'
 import { pathToFileURL } from 'url'
 import type { ConfirmOptions } from '@shared/types'
 import { normalizePrefs, type Prefs } from '@shared/prefs'
-import { getTheme } from '@shared/themes'
+import { activeThemeId, getTheme } from '@shared/themes'
 import { loadSettings, saveSettings, settingsFile, watchSettingsFile } from './settings'
 import { Vault } from './vault'
 import { startWatching, stopWatching } from './watcher'
@@ -32,6 +33,7 @@ import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
 import { setupWebTitle } from './webTitle'
+import { applyIconOutsideApp } from './appIcon'
 
 let vault: Vault | null = null
 const shownReminders = new Set<Electron.Notification>()
@@ -80,11 +82,12 @@ function keepOnScreen(win: BrowserWindow): void {
   if (!visible) win.center()
 }
 
-let appliedIcon = 'default'
+// Empty at start, so the icon is checked once each launch (an update puts the original back on shortcuts).
+let appliedIcon = ''
 
 /**
  * The app icon you picked (Settings → Appearance): the Dock icon on a Mac; on Windows the window's
- * taskbar icon and the tray icon. "default" leaves the built-in one.
+ * taskbar icon and the tray icon, and (installed app) its shortcuts.
  */
 function applyAppIcon(id: string): void {
   if (id === appliedIcon) return
@@ -93,6 +96,7 @@ function applyAppIcon(id: string): void {
   if (!file) return
   appliedIcon = id
   const image = nativeImage.createFromPath(file)
+  safely('app icon outside the app', () => applyIconOutsideApp(id, file))
   if (IS_MAC) {
     app.dock?.setIcon(image)
   } else {
@@ -149,13 +153,16 @@ function setAppMenu(): void {
   )
 }
 
+/** The theme showing now (yours, or your light/dark one when matching the system). */
+export const currentTheme = (prefs: Prefs): ReturnType<typeof getTheme> => getTheme(activeThemeId(prefs, nativeTheme.shouldUseDarkColors))
+
 function currentPrefs(): Prefs {
   return normalizePrefs(loadSettings().prefs)
 }
 
 /** The parts of preferences the main process handles: title-bar colours, zoom and spellcheck. */
 function applyPrefs(win: BrowserWindow, prefs: Prefs): void {
-  const { colors } = getTheme(prefs.theme)
+  const { colors } = currentTheme(prefs)
   win.setBackgroundColor(colors.bg)
   // Only the main window has the native title-bar buttons (the capture window is frameless).
   // On a Mac they're the coloured circles, which need no colouring.
@@ -171,6 +178,12 @@ function applyPrefs(win: BrowserWindow, prefs: Prefs): void {
     }
   }
 }
+
+// The system switched light/dark: windows matching it recolour their title bars.
+nativeTheme.on('updated', () => {
+  const prefs = currentPrefs()
+  if (prefs.followSystem) for (const win of BrowserWindow.getAllWindows()) applyPrefs(win, prefs)
+})
 
 function broadcastPrefs(prefs: Prefs): void {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -229,7 +242,7 @@ function isDirectory(path: string): boolean {
 function createWindow(): BrowserWindow {
   const { window: bounds } = loadSettings()
   const prefs = currentPrefs()
-  const BG = getTheme(prefs.theme).colors.bg
+  const BG = currentTheme(prefs).colors.bg
 
   const win = new BrowserWindow({
     width: bounds?.width ?? 1280,
@@ -244,7 +257,7 @@ function createWindow(): BrowserWindow {
       ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 14, y: 12 } }
       : {
           titleBarStyle: 'hidden' as const,
-          titleBarOverlay: { color: BG, symbolColor: getTheme(prefs.theme).colors.textMuted, height: 38 }
+          titleBarOverlay: { color: BG, symbolColor: currentTheme(prefs).colors.textMuted, height: 38 }
         }),
     // The installed app uses the icon baked into Notes.exe; while developing, use the source PNG.
     ...(app.isPackaged ? {} : { icon: join(__dirname, '../../build/icon.png') }),

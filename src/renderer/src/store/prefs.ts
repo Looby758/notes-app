@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { DEFAULT_PREFS, type Prefs } from '@shared/prefs'
-import { applyAppearance } from '../lib/appearance'
+import { applyAppearance, watchSystemTheme } from '../lib/appearance'
 
 /** Your Settings. The main process stores them in settings.json and checks every value. */
 export const usePrefs = create<{ prefs: Prefs }>(() => ({ prefs: DEFAULT_PREFS }))
@@ -47,3 +47,4 @@ export function setShortcut(id: string, shortcut: string | null, defaultShortcut
 }
 
 usePrefs.subscribe((s) => applyAppearance(s.prefs))
+watchSystemTheme(() => usePrefs.getState().prefs)

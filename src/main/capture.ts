@@ -1,7 +1,7 @@
 import type { CaptureRequest } from '@shared/types'
-import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, screen, Tray } from 'electron'
+import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, screen, Tray, nativeTheme } from 'electron'
 import { join } from 'path'
-import { getTheme } from '@shared/themes'
+import { activeThemeId, getTheme } from '@shared/themes'
 import type { Prefs } from '@shared/prefs'
 import { acceleratorLabel, IS_MAC, SYSTEM_NAME } from '@shared/platform'
 
@@ -48,7 +48,7 @@ function loadRenderer(win: BrowserWindow, hash: string): void {
 export const shortcutLabel = acceleratorLabel
 
 function createCaptureWindow(): BrowserWindow {
-  const { colors } = getTheme(hooks.prefs().theme)
+  const { colors } = getTheme(activeThemeId(hooks.prefs(), nativeTheme.shouldUseDarkColors))
   const win = new BrowserWindow({
     width: 560,
     height: 212,

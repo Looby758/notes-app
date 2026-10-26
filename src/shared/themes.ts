@@ -20,6 +20,8 @@ export interface Theme {
   colors: ThemeColors
   /** Accent used when you haven't picked your own. */
   accent: string
+  /** A light theme (dark text on a light background). */
+  light?: boolean
 }
 
 export const THEMES: Theme[] = [
@@ -114,6 +116,73 @@ export const THEMES: Theme[] = [
     }
   }
 ]
+
+// Light themes: dark text on white, paper or warm sepia.
+THEMES.push(
+  {
+    id: 'daylight',
+    name: 'Daylight',
+    light: true,
+    accent: '#6d5ce8',
+    colors: {
+      bg: '#ffffff',
+      bgPanel: '#f6f6f8',
+      bgRaised: '#ffffff',
+      bgHover: '#ececf1',
+      bgCode: '#f4f4f7',
+      border: '#e4e4ea',
+      borderStrong: '#d2d2db',
+      textStrong: '#14151a',
+      text: '#2a2c33',
+      textMuted: '#636773',
+      textFaint: '#9a9daa'
+    }
+  },
+  {
+    id: 'paper',
+    name: 'Paper',
+    light: true,
+    accent: '#2f7d5b',
+    colors: {
+      bg: '#fbfaf7',
+      bgPanel: '#f3f1ec',
+      bgRaised: '#ffffff',
+      bgHover: '#e9e6df',
+      bgCode: '#f1eee8',
+      border: '#e3dfd6',
+      borderStrong: '#d0cbc0',
+      textStrong: '#1d1b17',
+      text: '#33302a',
+      textMuted: '#6e695f',
+      textFaint: '#a29c90'
+    }
+  },
+  {
+    id: 'sepia',
+    name: 'Sepia',
+    light: true,
+    accent: '#b4572e',
+    colors: {
+      bg: '#f4ecd8',
+      bgPanel: '#ece2ca',
+      bgRaised: '#f9f3e4',
+      bgHover: '#e3d7ba',
+      bgCode: '#ebe1c8',
+      border: '#dccfb0',
+      borderStrong: '#cbbb96',
+      textStrong: '#2b2115',
+      text: '#433625',
+      textMuted: '#7a6a51',
+      textFaint: '#a89878'
+    }
+  }
+)
+
+/** The theme in use: yours, or (when matching the system) your light or dark one. */
+export function activeThemeId(p: { theme: string; followSystem: boolean; lightTheme: string; darkTheme: string }, systemDark: boolean): string {
+  if (!p.followSystem) return p.theme
+  return systemDark ? p.darkTheme : p.lightTheme
+}
 
 export function getTheme(id: string): Theme {
   return THEMES.find((t) => t.id === id) ?? THEMES[0]

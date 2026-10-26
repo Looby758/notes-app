@@ -13,8 +13,10 @@ import {
   Plus,
   Sigma,
   Type,
-  X
+  X,
+  CaseSensitive
 } from 'lucide-react'
+import { FONT_OPTIONS } from './noteFont'
 import {
   kindOf,
   PRIORITY_OPTIONS,
@@ -45,6 +47,7 @@ const ICONS: Record<PropKind, typeof Calendar> = {
   list: List,
   status: CircleDot,
   priority: Flag,
+  font: CaseSensitive,
   checkbox: CheckSquare,
   number: Sigma,
   link: Link2,
@@ -128,7 +131,7 @@ function ReadOnlyProperties({ properties }: { properties: Property[] }) {
                   {values[0]}
                 </a>
               ) : (
-                <span className={kind === 'status' || kind === 'priority' ? 'props-choice-btn on' : ''} data-value={(values[0] ?? '').replace(/\s+/g, '-')}>
+                <span className={kind === 'status' || kind === 'priority' || kind === 'font' ? 'props-choice-btn on' : ''} data-value={(values[0] ?? '').replace(/\s+/g, '-')}>
                   {values[0]}
                 </span>
               )}
@@ -193,6 +196,8 @@ function ValueControl({ kind, value, onChange, name }: { kind: PropKind; value: 
       return <Choice value={text} options={STATUS_OPTIONS} onChange={onChange} className="props-status" name={name} />
     case 'priority':
       return <Choice value={text} options={PRIORITY_OPTIONS} onChange={onChange} className="props-priority" name={name} />
+    case 'font':
+      return <Choice value={text} options={FONT_OPTIONS} onChange={onChange} className="props-font" name={name} />
     case 'checkbox':
       return (
         <input

@@ -26,6 +26,7 @@ import { slashCompletions } from './slash'
 import { snippetCompletions, snippetExpander } from './snippets'
 import { selectionToolbar, wrapOnType } from './selectionTools'
 import { smartPaste } from './smartPaste'
+import { noteFont } from './noteFont'
 import { embedDepth, embeds, setEmbedStateFactory } from './embeds'
 import { toCodeMirrorKey } from '../../lib/shortcuts'
 import { typewriter } from './typewriter'
@@ -79,6 +80,7 @@ const base: Extension = [
   highlightSelectionMatches(),
   autocompletion({ override: [wikiLinkCompletions, slashCompletions, snippetCompletions], icons: false }),
   snippetExpander,
+  noteFont,
   attachmentHandlers,
   embeds,
   editorTheme,

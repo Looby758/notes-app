@@ -1,5 +1,5 @@
 import type { Prefs } from '@shared/prefs'
-import { getTheme, type ThemeColors } from '@shared/themes'
+import { activeThemeId, getTheme, type ThemeColors } from '@shared/themes'
 
 // -apple-system / SF Mono are the Mac's own; Windows skips them.
 const UI_FALLBACK = "'Segoe UI Variable Text', 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif"
@@ -20,7 +20,7 @@ const fontStack = (font: string, fallback: string): string => (font ? `'${font}'
 /** Applies the look-and-feel preferences to the page as CSS variables and body classes. */
 export function applyAppearance(p: Prefs): void {
   const root = document.documentElement.style
-  const theme = getTheme(p.theme)
+  const theme = getTheme(activeThemeId(p, systemDark()))
   for (const [key, value] of Object.entries(theme.colors) as [keyof ThemeColors, string][]) {
     root.setProperty(cssVar(key), value)
   }
@@ -32,8 +32,23 @@ export function applyAppearance(p: Prefs): void {
   root.setProperty('--editor-line-height', String(p.lineHeight))
   root.setProperty('--editor-width', NOTE_WIDTHS[p.noteWidth])
 
+  root.setProperty('color-scheme', theme.light ? 'light' : 'dark')
+
   const body = document.body.classList
+  body.toggle('theme-light', !!theme.light)
   body.toggle('density-compact', p.density === 'compact')
   body.toggle('reduce-motion', p.reduceMotion)
   body.toggle('hide-statusbar', !p.showStatusBar)
+}
+
+const darkQuery = typeof window !== 'undefined' ? window.matchMedia('(prefers-color-scheme: dark)') : null
+const systemDark = (): boolean => darkQuery?.matches ?? true
+
+/** Re-applies the look when the system switches between light and dark (for "match my system"). */
+export function watchSystemTheme(current: () => Prefs): () => void {
+  const onChange = (): void => {
+    if (current().followSystem) applyAppearance(current())
+  }
+  darkQuery?.addEventListener('change', onChange)
+  return () => darkQuery?.removeEventListener('change', onChange)
 }

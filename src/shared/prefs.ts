@@ -8,6 +8,10 @@ import { IS_MAC } from './platform'
 export interface Prefs {
   // Appearance
   theme: string
+  /** Switch between a light and a dark theme with the system's light/dark mode. */
+  followSystem: boolean
+  lightTheme: string
+  darkTheme: string
   /** Hex colour, or '' to use the theme's own accent. */
   accent: string
   /** Font family names; '' means the built-in default. */
@@ -124,6 +128,9 @@ export interface Prefs {
 
 export const DEFAULT_PREFS: Prefs = {
   theme: 'midnight',
+  followSystem: false,
+  lightTheme: 'daylight',
+  darkTheme: 'midnight',
   accent: '',
   uiFont: '',
   editorFont: '',
@@ -269,6 +276,8 @@ export function normalizePrefs(raw: unknown): Prefs {
   }
 
   if (typeof input.theme === 'string' && THEMES.some((t) => t.id === input.theme)) out.theme = input.theme
+  if (typeof input.lightTheme === 'string' && THEMES.some((t) => t.id === input.lightTheme && t.light)) out.lightTheme = input.lightTheme
+  if (typeof input.darkTheme === 'string' && THEMES.some((t) => t.id === input.darkTheme && !t.light)) out.darkTheme = input.darkTheme
   if (input.accent === '' || isHex(input.accent)) out.accent = (input.accent as string).toLowerCase()
   out.uiFont = cleanFont(input.uiFont)
   out.editorFont = cleanFont(input.editorFont)

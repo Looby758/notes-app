@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { Check, ChevronDown, X } from 'lucide-react'
-import { THEMES } from '@shared/themes'
+import { activeThemeId, THEMES } from '@shared/themes'
 import { DEFAULT_PREFS, type Prefs } from '@shared/prefs'
 import { SYSTEM_NAME } from '@shared/platform'
 import { setPrefs, usePrefs } from '../../store/prefs'
@@ -169,35 +169,36 @@ function FolderInput({ def, value }: { def: Extract<SettingDef, { type: 'folder'
 }
 
 function ThemePicker() {
-  const theme = usePrefs((s) => s.prefs.theme)
-  const accent = usePrefs((s) => s.prefs.accent)
-  return (
-    <div className="theme-grid">
-      {THEMES.map((t) => {
+  const p = usePrefs((s) => s.prefs)
+  // Matching the system: a light and a dark theme are both chosen, one from each group.
+  const chosen = (id: string, light: boolean): boolean => (p.followSystem ? (light ? p.lightTheme : p.darkTheme) === id : p.theme === id)
+  const pick = (id: string, light: boolean): void => {
+    if (!p.followSystem) set('theme', id)
+    else set(light ? 'lightTheme' : 'darkTheme', id)
+  }
+  const group = (light: boolean) => (
+    <div className="theme-grid" data-theme-group={light ? 'light' : 'dark'}>
+      {THEMES.filter((t) => !!t.light === light).map((t) => {
         const c = t.colors
+        const on = chosen(t.id, light)
         return (
-          <button
-            key={t.id}
-            className={`theme-card ${theme === t.id ? 'selected' : ''}`}
-            onClick={() => set('theme', t.id)}
-            aria-pressed={theme === t.id}
-          >
+          <button key={t.id} className={`theme-card ${on ? 'selected' : ''}`} onClick={() => pick(t.id, light)} aria-pressed={on} data-theme-id={t.id}>
             {/* A tiny picture of the app in this theme */}
             <span className="theme-preview" style={{ background: c.bg, borderColor: c.border }}>
               <span className="theme-preview-side" style={{ background: c.bgPanel, borderColor: c.border }}>
                 <span style={{ background: c.textFaint }} />
-                <span style={{ background: accent || t.accent }} />
+                <span style={{ background: p.accent || t.accent }} />
                 <span style={{ background: c.textFaint }} />
               </span>
               <span className="theme-preview-main">
                 <span style={{ background: c.textStrong, width: '55%', height: 5 }} />
                 <span style={{ background: c.textMuted }} />
-                <span style={{ background: accent || t.accent, width: '35%' }} />
+                <span style={{ background: p.accent || t.accent, width: '35%' }} />
                 <span style={{ background: c.textMuted, width: '70%' }} />
               </span>
             </span>
             <span className="theme-name">
-              {theme === t.id && <Check size={12} />}
+              {on && <Check size={12} />}
               {t.name}
             </span>
           </button>
@@ -205,11 +206,19 @@ function ThemePicker() {
       })}
     </div>
   )
+  return (
+    <div className="theme-groups">
+      <span className="theme-group-label">Dark{p.followSystem && ' (when your system is in dark mode)'}</span>
+      {group(false)}
+      <span className="theme-group-label">Light{p.followSystem && ' (when your system is in light mode)'}</span>
+      {group(true)}
+    </div>
+  )
 }
-
 function AccentPicker() {
   const accent = usePrefs((s) => s.prefs.accent)
-  const themeId = usePrefs((s) => s.prefs.theme)
+  // The theme showing now (matching the system picks your light or dark one).
+  const themeId = usePrefs((s) => activeThemeId(s.prefs, window.matchMedia('(prefers-color-scheme: dark)').matches))
   const themeAccent = THEMES.find((t) => t.id === themeId)?.accent ?? ACCENT_SWATCHES[0]
   const current = accent || themeAccent
   return (

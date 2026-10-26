@@ -33,6 +33,17 @@
   --font-editor: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
 
   color-scheme: dark;
+
+  /* Code colours in fenced blocks (light themes have their own below). */
+  --syn-keyword: #c792ea;
+  --syn-string: #c3e88d;
+  --syn-number: #f78c6c;
+  --syn-comment: #676e95;
+  --syn-function: #82aaff;
+  --syn-type: #ffcb6b;
+  --syn-property: #89ddff;
+  --syn-tag: #f07178;
+  --syn-variable: #d7d9e0;
 }
 
 * {
@@ -1955,7 +1966,6 @@ body.capture-window {
   background: var(--bg);
   color: var(--text-strong);
   font: inherit;
-  color-scheme: dark;
 }
 .capture-event .capture-check {
   flex-basis: 100%;
@@ -5293,4 +5303,77 @@ body.zen .pane-body {
   color: var(--text-muted);
   font-size: 13px;
   line-height: 1.6;
+}
+
+/* ---------- light themes: colours that were picked for dark backgrounds ---------- */
+body.theme-light {
+  --syn-keyword: #8839c4;
+  --syn-string: #2d7d1b;
+  --syn-number: #b5501a;
+  --syn-comment: #8a8f9c;
+  --syn-function: #2b5fd6;
+  --syn-type: #9a6a00;
+  --syn-property: #0d7891;
+  --syn-tag: #c22c3a;
+  --syn-variable: #2a2c33;
+}
+body.theme-light ::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+}
+body.theme-light .menu button.danger,
+body.theme-light .lock-error {
+  color: #c43c3c !important;
+}
+body.theme-light .toast.error,
+body.theme-light .toast:not(.info) {
+  background: #fdecec;
+  border-color: #f2c4c4;
+  color: #8f2a2a;
+}
+body.theme-light .setting-warning,
+body.theme-light .capture-warning,
+body.theme-light .capture-error,
+body.theme-light .cal-badge,
+body.theme-light .cal-ext-status {
+  color: #b45f06 !important;
+}
+body.theme-light .picker-label mark {
+  background: rgba(255, 190, 60, 0.35);
+  color: inherit;
+}
+body.theme-light .modal-backdrop {
+  background: rgba(40, 40, 52, 0.25);
+}
+body.theme-light .modal,
+body.theme-light .cm-tooltip,
+body.theme-light .menu {
+  box-shadow: 0 16px 44px rgba(20, 20, 30, 0.16);
+}
+body.theme-light .conflict-banner {
+  background: #fff4e0;
+  border-bottom-color: #f0d6a8;
+  color: #6b4a12;
+}
+body.theme-light .btn-primary,
+body.theme-light .cm-selection-toolbar {
+  box-shadow: none;
+}
+body.theme-light .cm-selection-toolbar {
+  box-shadow: 0 6px 18px rgba(20, 20, 30, 0.14);
+}
+body.theme-light .tree-star {
+  color: #c98a12;
+  fill: #e9b23c;
+}
+.theme-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.theme-group-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.theme-groups .theme-grid + .theme-group-label {
+  margin-top: 10px;
 }

@@ -163,7 +163,7 @@ export function renameProperty(text: string, from: string, to: string): string {
 
 // ---------- what kind of control each property gets ----------
 
-export type PropKind = 'date' | 'tags' | 'list' | 'status' | 'priority' | 'checkbox' | 'number' | 'link' | 'text'
+export type PropKind = 'date' | 'tags' | 'list' | 'status' | 'priority' | 'font' | 'checkbox' | 'number' | 'link' | 'text'
 
 export const STATUS_OPTIONS = ['to do', 'in progress', 'waiting', 'done']
 export const PRIORITY_OPTIONS = ['low', 'medium', 'high']
@@ -178,6 +178,7 @@ export function kindOf(p: Pick<Property, 'key' | 'value'>): PropKind {
   if (DATE_KEYS.test(key) || /^\d{4}-\d{2}-\d{2}$/.test(v)) return 'date'
   if (key === 'status') return 'status'
   if (key === 'priority') return 'priority'
+  if (key === 'font') return 'font'
   if (/^(true|false)$/i.test(v)) return 'checkbox'
   if (v !== '' && /^-?\d+(\.\d+)?$/.test(v)) return 'number'
   if (/^https?:\/\//i.test(v)) return 'link'
@@ -193,6 +194,7 @@ export const SUGGESTED: { key: string; label: string; initial: () => PropValue }
   { key: 'priority', label: 'Priority', initial: () => 'medium' },
   { key: 'people', label: 'People', initial: () => [] },
   { key: 'aliases', label: 'Other names', initial: () => [] },
+  { key: 'font', label: 'Font', initial: () => 'serif' },
   { key: 'source', label: 'Link', initial: () => 'https://' }
 ]
 
