@@ -26,7 +26,7 @@ import { applyCaptureShortcut, noteHiddenToTray, setupCapture, teardownCapture }
 import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
-import { logCrashes, safely } from './log'
+import { logCrashes, logError, safely } from './log'
 
 let vault: Vault | null = null
 let mainWindow: BrowserWindow | null = null
@@ -57,6 +57,7 @@ function showMain(): void {
     return
   }
   if (mainWindow.isMinimized()) mainWindow.restore()
+  if (mainWindow.webContents.isCrashed()) mainWindow.webContents.reload()
   keepOnScreen(mainWindow)
   mainWindow.show()
   mainWindow.focus()
@@ -222,11 +223,27 @@ function createWindow(): BrowserWindow {
 
   // Started at login: stay in the tray / menu bar until you open it.
   const startHidden = startedAtLogin() && prefs.closeToTray
-  win.once('ready-to-show', () => {
+  let shown = false
+  const reveal = (): void => {
+    if (shown || win.isDestroyed()) return
+    shown = true
     if (bounds?.maximized) win.maximize()
     if (!startHidden) win.show()
-  })
+  }
+  win.once('ready-to-show', reveal)
+  // If the page is slow or fails to load, show the window anyway rather than leaving nothing on screen.
+  setTimeout(reveal, 5000)
   win.webContents.on('did-finish-load', () => applyPrefs(win, currentPrefs()))
+
+  // If the page breaks (it crashed, or its files went missing), note it and load it again.
+  win.webContents.on('did-fail-load', (_e, code, description, url, isMainFrame) => {
+    if (isMainFrame) logError('window', `couldn't load ${url}: ${description} (${code})`)
+  })
+  win.webContents.on('render-process-gone', (_e, details) => {
+    logError('window', `the page stopped: ${details.reason} (exit ${details.exitCode})`)
+    if (details.reason !== 'clean-exit' && !quitting) setTimeout(() => !win.isDestroyed() && win.webContents.reload(), 500)
+  })
+  win.on('unresponsive', () => logError('window', 'the page stopped responding'))
 
   // Before closing, give the renderer a moment to save any unsaved edits.
   let readyToClose = false
@@ -462,7 +479,41 @@ function registerIpc(): void {
 /** Only the browser features the app actually uses; everything else (camera, location…) is refused. */
 const ALLOWED_PERMISSIONS = new Set(['clipboard-sanitized-write', 'clipboard-read', 'fullscreen', 'local-fonts'])
 
-app.whenReady().then(() => {
+/**
+ * On a Mac, apps should live in Applications. Run from the disk image (or Downloads), macOS gives
+ * Notes a temporary read-only copy that breaks if the disk image is ejected, so offer to move it.
+ * Returns true if Notes is moving (it then restarts from Applications).
+ */
+async function offerMoveToApplications(): Promise<boolean> {
+  if (!IS_MAC || !app.isPackaged || app.isInApplicationsFolder() || loadSettings().keepOutsideApplications) return false
+  const { response, checkboxChecked } = await dialog.showMessageBox({
+    type: 'question',
+    buttons: ['Move to Applications', 'Not now'],
+    defaultId: 0,
+    cancelId: 1,
+    message: 'Move Notes to your Applications folder?',
+    detail:
+      'Notes is running from the disk image or your Downloads folder. From there it can stop working (for example when the disk image is ejected) and can’t be kept in the Dock properly. Notes will restart from Applications.',
+    checkboxLabel: 'Don’t ask again'
+  })
+  if (response !== 0) {
+    if (checkboxChecked) saveSettings({ keepOutsideApplications: true })
+    return false
+  }
+  try {
+    return app.moveToApplicationsFolder({
+      // An older copy already in Applications gets replaced; one that's running can't be.
+      conflictHandler: (kind) => kind === 'exists'
+    })
+  } catch (err) {
+    logError('move to Applications', err)
+    dialog.showErrorBox('Couldn’t move Notes', 'Drag Notes from the disk image into your Applications folder instead, then open it from there.')
+    return false
+  }
+}
+
+app.whenReady().then(async () => {
+  if (await offerMoveToApplications()) return
   safely('menu', setAppMenu)
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) =>
     callback(ALLOWED_PERMISSIONS.has(permission))

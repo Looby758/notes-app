@@ -15,6 +15,8 @@ export interface Settings {
   prefs?: unknown
   /** We've shown the "still running in the tray" message once. */
   toldAboutTray?: boolean
+  /** Mac: you chose not to be asked again about moving Notes into Applications. */
+  keepOutsideApplications?: boolean
 }
 
 export interface CaptureStatus {

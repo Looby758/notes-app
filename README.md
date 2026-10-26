@@ -8,7 +8,7 @@ Download the latest version from the [Releases page](https://github.com/Looby758
 
 **Windows:** download `Notes-Setup-<version>.exe` and run it. Windows shows a SmartScreen warning because the installer isn't code-signed: click **More info → Run anyway**.
 
-**Mac:** download `Notes-<version>-arm64.dmg` for Apple Silicon Macs (M1 and newer), or `Notes-<version>-x64.dmg` for older Intel Macs (Apple menu → About This Mac shows which). Open it and drag Notes into Applications. The first time you open it, macOS says it can't check the app for malicious software, because it isn't signed with a paid Apple certificate:
+**Mac:** download `Notes-<version>-arm64.dmg` for Apple Silicon Macs (M1 and newer), or `Notes-<version>-x64.dmg` for older Intel Macs (Apple menu → About This Mac shows which). Open it and drag Notes into Applications (if you open Notes straight from the disk image, it offers to move itself there; say yes). The first time you open it, macOS says it can't check the app for malicious software, because it isn't signed with a paid Apple certificate:
 
 1. Click **Done** (or **OK**).
 2. Open **System Settings → Privacy & Security**, scroll down to the message about Notes, and click **Open Anyway**. Confirm with your password.
