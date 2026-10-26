@@ -235,8 +235,11 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
     // Notes can also be dropped onto a pane to open them there (or on its edge to split).
     setDrag(isFolder ? null : { kind: 'note', path: node.path })
     // Reveals drop targets that only matter while a note is being dragged (like "drop here to star").
-    if (!isFolder) document.body.classList.add('dragging-note')
-    e.dataTransfer.effectAllowed = 'move'
+    // Not straight away: Chromium cancels a drag if the page shifts under it during dragstart.
+    const path = node.path
+    if (!isFolder) setTimeout(() => dragging === path && document.body.classList.add('dragging-note'), 0)
+    // Move into a folder or pane, or "link" when dropped on Starred (each target must be allowed here).
+    e.dataTransfer.effectAllowed = 'linkMove'
     e.dataTransfer.setData('text/plain', node.path)
   }
 
