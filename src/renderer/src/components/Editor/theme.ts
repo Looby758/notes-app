@@ -1,0 +1,290 @@
+import { HighlightStyle } from '@codemirror/language'
+import { EditorView } from '@codemirror/view'
+import { tags as t } from '@lezer/highlight'
+
+export const editorTheme = EditorView.theme(
+  {
+    '&': {
+      height: '100%',
+      color: 'var(--text)',
+      backgroundColor: 'transparent',
+      fontSize: 'var(--editor-font-size)'
+    },
+    '&.cm-focused': { outline: 'none' },
+    '.cm-scroller': {
+      fontFamily: 'var(--font-editor)',
+      lineHeight: 'var(--editor-line-height)',
+      overflow: 'auto'
+    },
+    '.cm-gutters': {
+      backgroundColor: 'transparent',
+      border: 'none',
+      color: 'var(--text-faint)',
+      fontFamily: 'var(--font-mono)',
+      fontSize: '0.75em'
+    },
+    '.cm-lineNumbers .cm-gutterElement': { padding: '0 10px 0 16px', minWidth: '40px' },
+    '.cm-activeLine': { backgroundColor: 'color-mix(in srgb, var(--text) 4%, transparent)' },
+    '.cm-activeLineGutter': { backgroundColor: 'transparent', color: 'var(--text-muted)' },
+    // Vim's command line and mode indicator
+    '.cm-vim-panel': { padding: '2px 10px', fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--text-muted)' },
+    '.cm-vim-panel input': { color: 'var(--text)', fontFamily: 'var(--font-mono)' },
+    '.cm-fat-cursor': { background: 'var(--accent) !important', color: 'var(--bg) !important' },
+    '&:not(.cm-focused) .cm-fat-cursor': { background: 'none !important', outline: '1px solid var(--accent)' },
+    '.cm-content': {
+      maxWidth: 'var(--editor-width)',
+      margin: '0 auto',
+      padding: '36px 32px 45vh',
+      caretColor: 'var(--accent)'
+    },
+    '.cm-line': { padding: '0 2px' },
+    '.cm-cursor, .cm-dropCursor': { borderLeft: '2px solid var(--accent)' },
+    '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection':
+      { backgroundColor: 'color-mix(in srgb, var(--accent) 28%, transparent)' },
+    '.cm-placeholder': { color: 'var(--text-faint)' },
+
+    // headings
+    '.cm-h': { fontWeight: '650', lineHeight: '1.35', letterSpacing: '-0.01em' },
+    '.cm-h1': { fontSize: '1.9em', paddingTop: '0.5em', paddingBottom: '0.15em' },
+    '.cm-h2': { fontSize: '1.5em', paddingTop: '0.45em', paddingBottom: '0.1em' },
+    '.cm-h3': { fontSize: '1.25em', paddingTop: '0.35em' },
+    '.cm-h4': { fontSize: '1.1em', paddingTop: '0.25em' },
+    '.cm-h5, .cm-h6': { fontSize: '1em', color: 'var(--text-muted)' },
+
+    // inline
+    '.cm-strike': { textDecoration: 'line-through', color: 'var(--text-muted)' },
+    '.cm-inline-code': {
+      fontFamily: 'var(--font-mono)',
+      fontSize: '0.87em',
+      backgroundColor: 'var(--bg-raised)',
+      border: '1px solid var(--border)',
+      borderRadius: '4px',
+      padding: '1px 5px'
+    },
+    '.cm-link': {
+      color: 'var(--accent)',
+      textDecoration: 'underline',
+      textDecorationColor: 'color-mix(in srgb, var(--accent) 40%, transparent)',
+      textUnderlineOffset: '3px'
+    },
+    '.cm-link-syntax': { color: 'var(--text-faint)' },
+    '.cm-wikilink': { textDecorationStyle: 'solid' },
+    '.cm-link.cm-unresolved': {
+      color: 'var(--text-muted)',
+      textDecorationStyle: 'dashed',
+      textDecorationColor: 'var(--text-faint)'
+    },
+
+    '.cm-hashtag': {
+      color: 'var(--accent)',
+      backgroundColor: 'var(--accent-soft)',
+      borderRadius: '10px',
+      padding: '1px 7px',
+      fontSize: '0.9em'
+    },
+    '.cm-frontmatter': {
+      fontFamily: 'var(--font-mono)',
+      fontSize: '0.82em',
+      color: 'var(--text-faint)',
+      backgroundColor: 'var(--bg-code)',
+      padding: '0 14px !important'
+    },
+    '.cm-frontmatter-start': { borderTopLeftRadius: '6px', borderTopRightRadius: '6px', paddingTop: '4px !important' },
+    '.cm-frontmatter-end': {
+      borderBottomLeftRadius: '6px',
+      borderBottomRightRadius: '6px',
+      paddingBottom: '4px !important',
+      marginBottom: '8px'
+    },
+
+    '.cm-event-time': {
+      fontFamily: 'var(--font-ui)',
+      fontSize: '0.82em',
+      fontWeight: '600',
+      color: 'var(--accent)',
+      backgroundColor: 'var(--accent-soft)',
+      borderRadius: '5px',
+      padding: '1px 6px',
+      fontVariantNumeric: 'tabular-nums'
+    },
+
+    // embeds
+    '.cm-embed': {
+      margin: '6px 0',
+      border: '1px solid var(--border)',
+      borderLeft: '3px solid var(--accent-dim)',
+      borderRadius: '8px',
+      backgroundColor: 'var(--bg-panel)',
+      overflow: 'hidden'
+    },
+    '.cm-embed-header': {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      padding: '5px 10px',
+      borderBottom: '1px solid var(--border)',
+      fontFamily: 'var(--font-ui)',
+      fontSize: '12.5px',
+      color: 'var(--text-muted)'
+    },
+    '.cm-embed-icon': { color: 'var(--accent)' },
+    '.cm-embed-title': {
+      border: 'none',
+      background: 'none',
+      padding: '0',
+      font: 'inherit',
+      fontWeight: '600',
+      color: 'var(--text)',
+      cursor: 'pointer'
+    },
+    '.cm-embed-title:hover': { color: 'var(--accent)', textDecoration: 'underline' },
+    '.cm-embed-heading': { fontWeight: '400', color: 'var(--text-muted)' },
+    '.cm-embed-edit': {
+      marginLeft: 'auto',
+      border: 'none',
+      borderRadius: '4px',
+      background: 'none',
+      padding: '1px 6px',
+      font: 'inherit',
+      fontSize: '11.5px',
+      color: 'var(--text-faint)',
+      cursor: 'pointer'
+    },
+    '.cm-embed-edit:hover': { backgroundColor: 'var(--bg-hover)', color: 'var(--text)' },
+    '.cm-embed-body': { maxHeight: '420px', overflowY: 'auto', fontSize: '0.95em' },
+    '.cm-embed-missing': { margin: '0', padding: '10px 14px', color: 'var(--text-faint)', fontStyle: 'italic' },
+    '.cm-embed-inline::before': { content: '"↳ "', color: 'var(--text-faint)' },
+
+    // [[ autocomplete
+    '.cm-tooltip': {
+      backgroundColor: 'var(--bg-raised)',
+      border: '1px solid var(--border)',
+      borderRadius: '8px',
+      boxShadow: '0 12px 32px rgba(0, 0, 0, 0.45)',
+      overflow: 'hidden'
+    },
+    '.cm-tooltip.cm-tooltip-autocomplete > ul': {
+      fontFamily: 'var(--font-ui)',
+      fontSize: '13.5px',
+      maxHeight: '280px',
+      minWidth: '240px',
+      padding: '4px'
+    },
+    '.cm-tooltip.cm-tooltip-autocomplete > ul > li': {
+      padding: '5px 10px',
+      borderRadius: '5px',
+      color: 'var(--text)'
+    },
+    '.cm-tooltip-autocomplete ul li[aria-selected]': {
+      backgroundColor: 'var(--accent-soft)',
+      color: 'var(--text-strong)'
+    },
+    '.cm-completionMatchedText': { textDecoration: 'none', color: 'var(--accent)', fontWeight: '600' },
+    '.cm-completionDetail': { marginLeft: '10px', color: 'var(--text-faint)', fontStyle: 'normal', fontSize: '12px' },
+
+    // blocks
+    '.cm-quote': {
+      borderLeft: '3px solid var(--accent-dim)',
+      paddingLeft: '16px !important',
+      color: 'var(--text-muted)'
+    },
+    '.cm-codeblock': {
+      fontFamily: 'var(--font-mono)',
+      fontSize: '0.86em',
+      backgroundColor: 'var(--bg-code)',
+      padding: '0 18px !important',
+      borderLeft: '1px solid var(--border)',
+      borderRight: '1px solid var(--border)'
+    },
+    '.cm-codeblock-start': {
+      borderTop: '1px solid var(--border)',
+      borderTopLeftRadius: '8px',
+      borderTopRightRadius: '8px',
+      paddingTop: '6px !important'
+    },
+    '.cm-codeblock-end': {
+      borderBottom: '1px solid var(--border)',
+      borderBottomLeftRadius: '8px',
+      borderBottomRightRadius: '8px',
+      paddingBottom: '6px !important'
+    },
+    '.cm-code-fence': { color: 'var(--text-faint)' },
+    '.cm-hr': {
+      display: 'inline-block',
+      width: '100%',
+      verticalAlign: 'middle',
+      borderTop: '1px solid var(--border-strong)'
+    },
+
+    // lists and tasks
+    '.cm-bullet': { color: 'var(--text-faint)', display: 'inline-block', width: '1ch', fontWeight: '700' },
+    '.cm-list-number': { color: 'var(--text-faint)' },
+    '.cm-task-checkbox': {
+      width: '15px',
+      height: '15px',
+      margin: '0 8px 0 0',
+      verticalAlign: '-2px',
+      accentColor: 'var(--accent)',
+      cursor: 'pointer'
+    },
+    '.cm-task-done': { color: 'var(--text-faint)', textDecoration: 'line-through' },
+
+    // images and tables
+    '.cm-image': { display: 'block', maxWidth: '100%', maxHeight: '480px', borderRadius: '8px', margin: '8px 0' },
+    '.cm-image-missing': { color: 'var(--text-faint)', fontStyle: 'italic', fontSize: '0.9em' },
+    '.cm-table-wrap': { overflowX: 'auto', margin: '6px 0', cursor: 'text' },
+    '.cm-table-wrap table': { borderCollapse: 'collapse', fontSize: '0.94em', minWidth: '50%' },
+    '.cm-table-wrap th, .cm-table-wrap td': {
+      border: '1px solid var(--border)',
+      padding: '6px 12px',
+      lineHeight: '1.5'
+    },
+    '.cm-table-wrap th': { backgroundColor: 'var(--bg-raised)', fontWeight: '600' },
+
+    // in-note search (Ctrl+F)
+    '.cm-panels': { backgroundColor: 'var(--bg-panel)', color: 'var(--text)' },
+    '.cm-panels.cm-panels-top': { borderBottom: '1px solid var(--border)' },
+    '.cm-panels.cm-panels-bottom': { borderTop: '1px solid var(--border)' },
+    '.cm-search': { fontFamily: 'var(--font-ui)', fontSize: '13px', padding: '6px 10px !important' },
+    '.cm-search input, .cm-search button': {
+      fontFamily: 'inherit',
+      fontSize: 'inherit',
+      color: 'var(--text)',
+      backgroundColor: 'var(--bg-raised)',
+      border: '1px solid var(--border)',
+      borderRadius: '5px',
+      backgroundImage: 'none'
+    },
+    '.cm-search input[type=checkbox]': { accentColor: 'var(--accent)' },
+    '.cm-search input:focus': { outline: 'none', borderColor: 'var(--accent)' },
+    '.cm-searchMatch': { backgroundColor: 'rgba(255, 203, 107, 0.22)', borderRadius: '2px' },
+    '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: 'rgba(255, 203, 107, 0.45)' },
+    '.cm-selectionMatch': { backgroundColor: 'var(--accent-soft)' }
+  },
+  { dark: true }
+)
+
+export const highlightStyle = HighlightStyle.define([
+  // markdown
+  { tag: t.heading, fontWeight: '650', color: 'var(--text-strong)' },
+  { tag: t.emphasis, fontStyle: 'italic' },
+  { tag: t.strong, fontWeight: '700', color: 'var(--text-strong)' },
+  { tag: t.strikethrough, textDecoration: 'line-through' },
+  { tag: t.link, color: 'var(--accent)' },
+  { tag: t.url, color: 'var(--text-faint)' },
+  { tag: t.quote, color: 'var(--text-muted)' },
+  { tag: [t.processingInstruction, t.meta, t.contentSeparator], color: 'var(--text-faint)' },
+  { tag: t.monospace, fontFamily: 'var(--font-mono)' },
+
+  // code inside fenced blocks
+  { tag: [t.keyword, t.controlKeyword, t.moduleKeyword, t.operatorKeyword], color: '#c792ea' },
+  { tag: [t.string, t.special(t.string), t.regexp], color: '#c3e88d' },
+  { tag: [t.number, t.bool, t.null, t.atom], color: '#f78c6c' },
+  { tag: [t.comment, t.lineComment, t.blockComment], color: '#676e95', fontStyle: 'italic' },
+  { tag: [t.function(t.variableName), t.function(t.propertyName)], color: '#82aaff' },
+  { tag: [t.typeName, t.className, t.namespace], color: '#ffcb6b' },
+  { tag: [t.propertyName, t.attributeName], color: '#89ddff' },
+  { tag: [t.operator, t.punctuation], color: '#89ddff' },
+  { tag: [t.tagName], color: '#f07178' },
+  { tag: t.variableName, color: '#d7d9e0' }
+])

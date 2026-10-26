@@ -1,0 +1,455 @@
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  net,
+  protocol,
+  session,
+  shell,
+  type MenuItemConstructorOptions
+} from 'electron'
+import { statSync } from 'fs'
+import { basename, extname, join } from 'path'
+import { pathToFileURL } from 'url'
+import type { ConfirmOptions } from '@shared/types'
+import { normalizePrefs, type Prefs } from '@shared/prefs'
+import { getTheme } from '@shared/themes'
+import { loadSettings, saveSettings, settingsFile, watchSettingsFile } from './settings'
+import { Vault } from './vault'
+import { startWatching, stopWatching } from './watcher'
+import * as calendars from './calendarSources'
+import { applyCaptureShortcut, noteHiddenToTray, setupCapture, teardownCapture } from './capture'
+import { setupUpdater } from './updater'
+import { IS_MAC, TRASH_NAME } from '@shared/platform'
+
+let vault: Vault | null = null
+let mainWindow: BrowserWindow | null = null
+/** True once you've chosen Quit (from the tray), so closing really closes instead of hiding. */
+let quitting = false
+
+// Only one copy of Notes runs; starting it again just brings the window back.
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+} else {
+  app.on('second-instance', () => showMain())
+}
+
+function showMain(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    mainWindow = createWindow()
+    return
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  mainWindow.focus()
+}
+
+/** Settings that live outside the app's windows: the capture shortcut and starting at login. */
+function applySystemPrefs(prefs: Prefs): void {
+  applyCaptureShortcut(prefs.captureShortcut)
+  // Only the installed app registers itself (in development it would register electron.exe).
+  if (!app.isPackaged) return
+  if (IS_MAC) app.setLoginItemSettings({ openAtLogin: prefs.launchAtStartup })
+  else app.setLoginItemSettings({ openAtLogin: prefs.launchAtStartup, args: ['--hidden'] })
+}
+
+/** True when this launch came from starting at login, so the window can stay hidden. */
+function startedAtLogin(): boolean {
+  if (process.argv.includes('--hidden')) return true
+  return IS_MAC && app.isPackaged && app.getLoginItemSettings().wasOpenedAtLogin === true
+}
+
+/**
+ * On a Mac the menu bar is always there, and it's what makes ⌘C, ⌘V, ⌘Q and friends work. On
+ * Windows there's none (it also frees Ctrl+W for closing tabs). App shortcuts like ⌘W and ⌘P
+ * aren't in the menu, so the notes window handles them like on Windows.
+ */
+function setAppMenu(): void {
+  if (!IS_MAC) {
+    Menu.setApplicationMenu(null)
+    return
+  }
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      { role: 'appMenu' },
+      {
+        label: 'Edit',
+        submenu: [
+          { role: 'undo' },
+          { role: 'redo' },
+          { type: 'separator' },
+          { role: 'cut' },
+          { role: 'copy' },
+          { role: 'paste' },
+          { role: 'pasteAndMatchStyle' },
+          { role: 'selectAll' }
+        ]
+      },
+      { label: 'View', submenu: [{ role: 'togglefullscreen' }] },
+      { label: 'Window', submenu: [{ role: 'minimize' }, { role: 'zoom' }, { type: 'separator' }, { role: 'front' }] }
+    ])
+  )
+}
+
+function currentPrefs(): Prefs {
+  return normalizePrefs(loadSettings().prefs)
+}
+
+/** The parts of preferences the main process handles: title-bar colours, zoom and spellcheck. */
+function applyPrefs(win: BrowserWindow, prefs: Prefs): void {
+  const { colors } = getTheme(prefs.theme)
+  win.setBackgroundColor(colors.bg)
+  // Only the main window has the native title-bar buttons (the capture window is frameless).
+  // On a Mac they're the coloured circles, which need no colouring.
+  if (win === mainWindow && !IS_MAC) win.setTitleBarOverlay({ color: colors.bg, symbolColor: colors.textMuted, height: 38 })
+  win.webContents.setZoomFactor(prefs.zoom)
+  const { session } = win.webContents
+  session.setSpellCheckerEnabled(prefs.spellcheck)
+  if (prefs.spellcheckLanguage) {
+    try {
+      session.setSpellCheckerLanguages([prefs.spellcheckLanguage])
+    } catch {
+      // Not available on this machine: keep the current language.
+    }
+  }
+}
+
+function broadcastPrefs(prefs: Prefs): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    applyPrefs(win, prefs)
+    win.webContents.send('prefs:changed', prefs)
+  }
+  applySystemPrefs(prefs)
+}
+
+function openVault(path: string | null): void {
+  stopWatching()
+  vault = path ? new Vault(path) : null
+  if (!path) return
+  startWatching(path, (paths) => {
+    for (const win of BrowserWindow.getAllWindows()) win.webContents.send('vault:changed', paths)
+  })
+}
+
+// Images in notes load through vault://local/<path>, served only from inside the open vault.
+const IMAGE_TYPES = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.avif'])
+
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'vault', privileges: { standard: true, secure: true, supportFetchAPI: true } }
+])
+
+function registerVaultProtocol(): void {
+  protocol.handle('vault', (request) => {
+    try {
+      const rel = decodeURIComponent(new URL(request.url).pathname.slice(1))
+      const full = currentVault().abs(rel)
+      if (!IMAGE_TYPES.has(extname(full).toLowerCase())) return new Response('Not allowed', { status: 403 })
+      return net.fetch(pathToFileURL(full).toString())
+    } catch {
+      return new Response('Not found', { status: 404 })
+    }
+  })
+}
+
+function currentVault(): Vault {
+  if (!vault) throw new Error('No notes folder is open.')
+  return vault
+}
+
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory()
+  } catch {
+    return false
+  }
+}
+
+function createWindow(): BrowserWindow {
+  const { window: bounds } = loadSettings()
+  const prefs = currentPrefs()
+  const BG = getTheme(prefs.theme).colors.bg
+
+  const win = new BrowserWindow({
+    width: bounds?.width ?? 1280,
+    height: bounds?.height ?? 820,
+    x: bounds?.x,
+    y: bounds?.y,
+    minWidth: 720,
+    minHeight: 480,
+    show: false,
+    backgroundColor: BG,
+    ...(IS_MAC
+      ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 14, y: 12 } }
+      : {
+          titleBarStyle: 'hidden' as const,
+          titleBarOverlay: { color: BG, symbolColor: getTheme(prefs.theme).colors.textMuted, height: 38 }
+        }),
+    // The installed app uses the icon baked into Notes.exe; while developing, use the source PNG.
+    ...(app.isPackaged ? {} : { icon: join(__dirname, '../../build/icon.png') }),
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  })
+
+  // Started at login: stay in the tray / menu bar until you open it.
+  const startHidden = startedAtLogin() && prefs.closeToTray
+  win.once('ready-to-show', () => {
+    if (bounds?.maximized) win.maximize()
+    if (!startHidden) win.show()
+  })
+  win.webContents.on('did-finish-load', () => applyPrefs(win, currentPrefs()))
+
+  // Before closing, give the renderer a moment to save any unsaved edits.
+  let readyToClose = false
+  let toldAboutTray = false
+  win.on('close', (e) => {
+    // Keeping Notes in the tray: just hide the window (autosave keeps working while it's hidden).
+    if (!quitting && currentPrefs().closeToTray) {
+      e.preventDefault()
+      const maximized = win.isMaximized()
+      saveSettings({ window: { ...(maximized ? win.getNormalBounds() : win.getBounds()), maximized } })
+      // A full-screen Mac window has to leave full screen first, or hiding it leaves a black space.
+      if (win.isFullScreen()) {
+        win.once('leave-full-screen', () => win.hide())
+        win.setFullScreen(false)
+      } else {
+        win.hide()
+      }
+      if (!toldAboutTray && !loadSettings().toldAboutTray) {
+        toldAboutTray = true
+        saveSettings({ toldAboutTray: true })
+        noteHiddenToTray()
+      }
+      return
+    }
+    if (!readyToClose) {
+      e.preventDefault()
+      win.webContents.send('app:before-close')
+      setTimeout(() => {
+        readyToClose = true
+        if (!win.isDestroyed()) win.close()
+      }, 3000)
+      return
+    }
+    const maximized = win.isMaximized()
+    const b = maximized ? win.getNormalBounds() : win.getBounds()
+    saveSettings({ window: { ...b, maximized } })
+  })
+  ipcMain.removeHandler('app:ready-to-close')
+  ipcMain.handle('app:ready-to-close', () => {
+    readyToClose = true
+    win.close()
+    // Closing the window cancels a quit that was in progress; carry it on now everything's saved.
+    if (quitting) app.quit()
+  })
+
+  // Right-click in text: spelling suggestions plus cut/copy/paste. (The file tree shows its own menu.)
+  win.webContents.on('context-menu', (_e, params) => {
+    const items: MenuItemConstructorOptions[] = []
+    if (params.misspelledWord) {
+      for (const suggestion of params.dictionarySuggestions.slice(0, 5)) {
+        items.push({ label: suggestion, click: () => win.webContents.replaceMisspelling(suggestion) })
+      }
+      if (params.dictionarySuggestions.length === 0) items.push({ label: 'No suggestions', enabled: false })
+      items.push(
+        {
+          label: `Add “${params.misspelledWord}” to dictionary`,
+          click: () => win.webContents.session.addWordToSpellCheckerDictionary(params.misspelledWord)
+        },
+        { type: 'separator' }
+      )
+    }
+    if (params.isEditable) {
+      items.push(
+        { role: 'cut', enabled: params.editFlags.canCut },
+        { role: 'copy', enabled: params.editFlags.canCopy },
+        { role: 'paste', enabled: params.editFlags.canPaste },
+        { type: 'separator' },
+        { role: 'selectAll' }
+      )
+    } else if (params.selectionText) {
+      items.push({ role: 'copy' })
+    }
+    if (items.length) Menu.buildFromTemplate(items).popup({ window: win })
+  })
+
+  // F12 opens DevTools while developing.
+  if (!app.isPackaged) {
+    win.webContents.on('before-input-event', (_e, input) => {
+      if (input.type === 'keyDown' && input.key === 'F12') win.webContents.toggleDevTools()
+    })
+  }
+
+  // Links to the web open in the default browser, never inside the app.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^(https?|mailto):/i.test(url)) shell.openExternal(url)
+    return { action: 'deny' }
+  })
+
+  if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
+    win.loadURL(process.env['ELECTRON_RENDERER_URL'])
+  } else {
+    win.loadFile(join(__dirname, '../renderer/index.html'))
+  }
+
+  return win
+}
+
+function registerIpc(): void {
+  ipcMain.handle('app:confirm', async (event, opts: ConfirmOptions) => {
+    const win = BrowserWindow.fromWebContents(event.sender)!
+    const { response } = await dialog.showMessageBox(win, {
+      type: opts.type ?? 'question',
+      buttons: [opts.ok, opts.cancel ?? 'Cancel'],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+      message: opts.message,
+      detail: opts.detail
+    })
+    return response === 0
+  })
+
+  ipcMain.handle('prefs:get', () => currentPrefs())
+  ipcMain.handle('prefs:set', (_e, patch: Partial<Prefs>) => {
+    const prefs = normalizePrefs({ ...currentPrefs(), ...patch })
+    saveSettings({ prefs })
+    broadcastPrefs(prefs)
+    return prefs
+  })
+  ipcMain.handle('prefs:languages', (event) => event.sender.session.availableSpellCheckerLanguages)
+  ipcMain.handle('prefs:openFile', async () => {
+    if (!loadSettings().prefs) saveSettings({ prefs: currentPrefs() }) // so the file lists every option
+    await shell.openPath(settingsFile())
+  })
+
+  ipcMain.handle('vault:get', () => {
+    const { vaultPath } = loadSettings()
+    const valid = vaultPath && isDirectory(vaultPath) ? vaultPath : null
+    if (valid !== vault?.root) openVault(valid)
+    return valid
+  })
+
+  ipcMain.handle('vault:pick', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)!
+    const result = await dialog.showOpenDialog(win, {
+      title: 'Choose a folder for your notes',
+      buttonLabel: 'Use this folder',
+      properties: ['openDirectory', 'createDirectory', 'promptToCreate']
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    const vaultPath = result.filePaths[0]
+    saveSettings({ vaultPath })
+    openVault(vaultPath)
+    return vaultPath
+  })
+
+  ipcMain.handle('vault:close', () => {
+    saveSettings({ vaultPath: null })
+    openVault(null)
+  })
+
+  ipcMain.handle('vault:reveal', async () => {
+    if (vault) await shell.openPath(vault.root)
+  })
+
+  ipcMain.handle('fs:tree', () => currentVault().tree())
+  ipcMain.handle('fs:read', (_e, path: string) => currentVault().read(path))
+  ipcMain.handle('fs:write', (_e, path: string, content: string) => currentVault().write(path, content))
+  ipcMain.handle('fs:readAll', () => currentVault().readAll())
+  ipcMain.handle('fs:createNote', (_e, folder: string) => currentVault().createNote(folder))
+  ipcMain.handle('fs:createNoteAt', (_e, path: string) => currentVault().createNoteAt(path))
+  ipcMain.handle('fs:createFolder', (_e, folder: string) => currentVault().createFolder(folder))
+  ipcMain.handle('fs:rename', (_e, path: string, name: string) => currentVault().rename(path, name))
+  ipcMain.handle('fs:move', (_e, path: string, folder: string) => currentVault().move(path, folder))
+  ipcMain.handle('fs:reveal', (_e, path: string) => shell.showItemInFolder(currentVault().abs(path)))
+  ipcMain.handle('cal:status', () => calendars.status())
+  ipcMain.handle('cal:setClient', (_e, id: string, secret: string) => calendars.setClient(id, secret))
+  ipcMain.handle('cal:connect', () => calendars.connect())
+  ipcMain.handle('cal:disconnect', () => calendars.disconnect())
+  ipcMain.handle('cal:setEnabled', (_e, id: string, enabled: boolean) => calendars.setCalendarEnabled(id, enabled))
+  ipcMain.handle('cal:addFeed', (_e, name: string, url: string) => calendars.addFeed(name, url))
+  ipcMain.handle('cal:removeFeed', (_e, id: string) => calendars.removeFeed(id))
+  ipcMain.handle('cal:events', (_e, from: string, to: string) => calendars.fetchEvents(from, to))
+
+  ipcMain.handle('vault:readAppData', (_e, name: string) => currentVault().readAppData(name))
+  ipcMain.handle('vault:writeAppData', (_e, name: string, content: string) => currentVault().writeAppData(name, content))
+  ipcMain.handle('fs:saveAttachment', (_e, folder: string, name: string, data: Uint8Array) =>
+    currentVault().saveAttachment(folder, name, data)
+  )
+  ipcMain.handle('fs:pickAttachment', async (event, folder: string, imagesOnly: boolean) => {
+    const win = BrowserWindow.fromWebContents(event.sender)!
+    const result = await dialog.showOpenDialog(win, {
+      title: imagesOnly ? 'Insert image' : 'Attach file',
+      properties: ['openFile', 'multiSelections'],
+      filters: imagesOnly ? [{ name: 'Images', extensions: [...IMAGE_TYPES].map((e) => e.slice(1)) }] : []
+    })
+    if (result.canceled) return []
+    return Promise.all(result.filePaths.map((p) => currentVault().copyAttachment(folder, p)))
+  })
+  // Opens an attachment (PDF, document…) in its usual app. Notes and folders stay in the app.
+  ipcMain.handle('fs:openFile', async (_e, path: string) => {
+    const full = currentVault().abs(path)
+    if (!statSync(full).isFile()) throw new Error('That is not a file.')
+    if (/\.(exe|bat|cmd|com|msi|ps1|vbs|js|lnk|scr|app|command|sh|pkg|workflow|terminal|tool|scpt)$/i.test(full)) throw new Error('For safety, programs and scripts are not opened from notes.')
+    const error = await shell.openPath(full)
+    if (error) throw new Error(error)
+  })
+
+  ipcMain.handle('fs:trash', async (event, path: string) => {
+    const v = currentVault()
+    if (!path) throw new Error('The notes folder itself cannot be deleted here.')
+    const full = v.abs(path)
+    const isFolder = statSync(full).isDirectory()
+    const win = BrowserWindow.fromWebContents(event.sender)!
+    const { response } = await dialog.showMessageBox(win, {
+      type: 'warning',
+      buttons: [`Move to ${TRASH_NAME}`, 'Cancel'],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+      message: `Delete "${basename(full).replace(/\.md$/i, '')}"?`,
+      detail: isFolder
+        ? `The folder and everything in it will be moved to the ${TRASH_NAME}.`
+        : `The note will be moved to the ${TRASH_NAME}.`
+    })
+    if (response !== 0) return false
+    await shell.trashItem(full)
+    return true
+  })
+}
+
+/** Only the browser features the app actually uses; everything else (camera, location…) is refused. */
+const ALLOWED_PERMISSIONS = new Set(['clipboard-sanitized-write', 'clipboard-read', 'fullscreen', 'local-fonts'])
+
+app.whenReady().then(() => {
+  setAppMenu()
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) =>
+    callback(ALLOWED_PERMISSIONS.has(permission))
+  )
+  session.defaultSession.setPermissionCheckHandler((_wc, permission) => ALLOWED_PERMISSIONS.has(permission))
+  registerVaultProtocol()
+  registerIpc()
+  // Hand edits to settings.json apply straight away.
+  watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs)))
+  mainWindow = createWindow()
+  setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs })
+  applySystemPrefs(currentPrefs())
+  setupUpdater(() => currentPrefs().checkForUpdates)
+  // Clicking the Dock icon brings the window back.
+  app.on('activate', () => showMain())
+})
+
+app.on('before-quit', () => {
+  quitting = true
+})
+app.on('will-quit', () => teardownCapture())
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit()
+})

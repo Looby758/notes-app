@@ -1,0 +1,52 @@
+appId: com.notesapp.desktop
+productName: Notes
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**
+  - package.json
+  # The tray / menu bar icons are loaded at run time.
+  - build/icon.png
+  - build/trayTemplate.png
+  - build/trayTemplate@2x.png
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.png
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Notes
+  artifactName: Notes-Setup-${version}.${ext}
+  # Keep your settings if you uninstall and reinstall. Your notes are never touched either way.
+  deleteAppDataOnUninstall: false
+mac:
+  # dmg to install from; zip is what update checks read.
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+  icon: build/icon.png
+  category: public.app-category.productivity
+  # No paid Apple certificate: build/adhoc-sign.cjs signs the app "ad hoc" instead, which Apple
+  # Silicon Macs require before they'll run it at all.
+  identity: null
+  hardenedRuntime: false
+  notarize: false
+  # Used by the zip; the dmg (the one to download) gets the simpler name below.
+  artifactName: Notes-${version}-${arch}-mac.${ext}
+dmg:
+  artifactName: Notes-${version}-${arch}.${ext}
+afterPack: build/adhoc-sign.cjs
+# Installers and update files go to this repository's GitHub Releases.
+publish:
+  provider: github
+  owner: Looby758
+  repo: notes-app
+  releaseType: draft

@@ -1,0 +1,418 @@
+import type { Prefs } from '@shared/prefs'
+import { CAPTURE_SHORTCUTS, RANGES } from '@shared/prefs'
+import { acceleratorLabel, IS_MAC, showKeys, TRAY_NAME } from '@shared/platform'
+import { formatDate } from './dates'
+
+/**
+ * Every setting on the Settings page, described once. The page draws itself from this list,
+ * and search looks through labels, descriptions and keywords.
+ */
+
+export type SectionId = 'appearance' | 'editor' | 'files' | 'calendar' | 'capture' | 'shortcuts' | 'about'
+
+interface Base {
+  key: keyof Prefs
+  section: SectionId
+  group: string
+  label: string
+  description?: string
+  keywords?: string
+}
+
+export type SettingDef = Base &
+  (
+    | { type: 'toggle' }
+    | { type: 'choice'; options: { value: string; label: string }[] }
+    | { type: 'slider'; min: number; max: number; step: number; format: (v: number) => string }
+    | { type: 'theme' }
+    | { type: 'color' }
+    | { type: 'font'; sample: string }
+    | { type: 'language' }
+    | { type: 'folder'; placeholder: string; prefix?: string }
+    | { type: 'text'; placeholder: string; preview?: (value: string) => string }
+  )
+
+const px = (v: number): string => `${v}px`
+const pct = (v: number): string => `${Math.round(v * 100)}%`
+
+export const SETTINGS: SettingDef[] = [
+  // ---------- Appearance ----------
+  { key: 'theme', section: 'appearance', group: 'Theme', type: 'theme', label: 'Theme', keywords: 'colour color dark black nord blue' },
+  {
+    key: 'accent',
+    section: 'appearance',
+    group: 'Theme',
+    type: 'color',
+    label: 'Accent colour',
+    description: 'Used for links, the cursor, selections and highlights.',
+    keywords: 'color highlight purple'
+  },
+
+  {
+    key: 'editorFontSize',
+    section: 'appearance',
+    group: 'Text',
+    type: 'slider',
+    ...RANGES.editorFontSize,
+    format: px,
+    label: 'Text size',
+    description: `Also ${showKeys('Ctrl+=')} and ${showKeys('Ctrl+-')} while writing.`,
+    keywords: 'font size zoom bigger smaller'
+  },
+  {
+    key: 'lineHeight',
+    section: 'appearance',
+    group: 'Text',
+    type: 'slider',
+    ...RANGES.lineHeight,
+    format: (v) => v.toFixed(2),
+    label: 'Line spacing',
+    keywords: 'line height leading'
+  },
+  {
+    key: 'noteWidth',
+    section: 'appearance',
+    group: 'Text',
+    type: 'choice',
+    options: [
+      { value: 'narrow', label: 'Narrow' },
+      { value: 'medium', label: 'Medium' },
+      { value: 'wide', label: 'Wide' },
+      { value: 'full', label: 'Full' }
+    ],
+    label: 'Note width',
+    description: 'How wide lines of text can get before wrapping.',
+    keywords: 'readable line length column'
+  },
+
+  {
+    key: 'editorFont',
+    section: 'appearance',
+    group: 'Fonts',
+    type: 'font',
+    sample: 'The quick brown fox jumps over the lazy dog',
+    label: 'Note font',
+    description: 'The font your notes are written in.',
+    keywords: 'typeface editor'
+  },
+  {
+    key: 'uiFont',
+    section: 'appearance',
+    group: 'Fonts',
+    type: 'font',
+    sample: 'Files  ·  Search  ·  Tags',
+    label: 'Interface font',
+    description: 'Sidebars, tabs and menus. Notes use it too unless you pick a note font.',
+    keywords: 'typeface ui'
+  },
+  {
+    key: 'codeFont',
+    section: 'appearance',
+    group: 'Fonts',
+    type: 'font',
+    sample: 'const answer = 42 // code',
+    label: 'Code font',
+    description: 'Code blocks, inline code and frontmatter.',
+    keywords: 'monospace typeface'
+  },
+
+  {
+    key: 'density',
+    section: 'appearance',
+    group: 'Interface',
+    type: 'choice',
+    options: [
+      { value: 'comfortable', label: 'Comfortable' },
+      { value: 'compact', label: 'Compact' }
+    ],
+    label: 'Density',
+    description: 'Spacing in the file tree, lists and pickers.',
+    keywords: 'spacing compact padding'
+  },
+  {
+    key: 'zoom',
+    section: 'appearance',
+    group: 'Interface',
+    type: 'slider',
+    ...RANGES.zoom,
+    format: pct,
+    label: 'Interface zoom',
+    description: 'Scales the whole window.',
+    keywords: 'scale size dpi'
+  },
+  { key: 'showStatusBar', section: 'appearance', group: 'Interface', type: 'toggle', label: 'Show status bar', description: 'The strip at the bottom with save status and counts.' },
+  {
+    key: 'reduceMotion',
+    section: 'appearance',
+    group: 'Interface',
+    type: 'toggle',
+    label: 'Reduce motion',
+    description: 'Turns off animations and transitions.',
+    keywords: 'animation accessibility'
+  },
+
+  // ---------- Editor ----------
+  {
+    key: 'livePreview',
+    section: 'editor',
+    group: 'Writing',
+    type: 'toggle',
+    label: 'Live preview',
+    description: 'Show formatting as you type. Off shows plain markdown everywhere.',
+    keywords: 'source raw markdown render'
+  },
+  { key: 'spellcheck', section: 'editor', group: 'Writing', type: 'toggle', label: 'Check spelling', description: 'Right-click a misspelled word for suggestions.', keywords: 'spell' },
+  // macOS picks the spelling language itself, from the languages you type in.
+  ...(IS_MAC
+    ? []
+    : [{ key: 'spellcheckLanguage', section: 'editor', group: 'Writing', type: 'language', label: 'Spelling language', keywords: 'spell dictionary english' } as SettingDef]),
+  {
+    key: 'autoPair',
+    section: 'editor',
+    group: 'Writing',
+    type: 'toggle',
+    label: 'Auto-close brackets and quotes',
+    description: 'Typing ( [ { " or ` also types the closing one.',
+    keywords: 'pair close bracket'
+  },
+  {
+    key: 'vimMode',
+    section: 'editor',
+    group: 'Writing',
+    type: 'toggle',
+    label: 'Vim keys',
+    description: 'Edit with Vim-style modes and motions.',
+    keywords: 'vi modal keybindings'
+  },
+
+  { key: 'lineNumbers', section: 'editor', group: 'Display', type: 'toggle', label: 'Line numbers', keywords: 'gutter' },
+  { key: 'highlightActiveLine', section: 'editor', group: 'Display', type: 'toggle', label: 'Highlight the current line', keywords: 'active line' },
+  { key: 'cursorBlink', section: 'editor', group: 'Display', type: 'toggle', label: 'Blinking cursor', keywords: 'caret' },
+  { key: 'showWordCount', section: 'editor', group: 'Display', type: 'toggle', label: 'Word count in the status bar', keywords: 'words' },
+
+  {
+    key: 'tabSize',
+    section: 'editor',
+    group: 'Indentation',
+    type: 'choice',
+    options: [
+      { value: '2', label: '2' },
+      { value: '4', label: '4' },
+      { value: '8', label: '8' }
+    ],
+    label: 'Tab size',
+    description: 'How far Tab indents list items and code.',
+    keywords: 'indent spaces'
+  },
+  { key: 'indentWithTabs', section: 'editor', group: 'Indentation', type: 'toggle', label: 'Indent with tab characters', description: 'Off uses spaces.', keywords: 'spaces' },
+
+  {
+    key: 'autosaveDelay',
+    section: 'editor',
+    group: 'Saving',
+    type: 'slider',
+    ...RANGES.autosaveDelay,
+    format: (v) => (v < 1000 ? `${v} ms` : `${(v / 1000).toFixed(1)} s`),
+    label: 'Autosave after',
+    description: `How long after you stop typing a note is saved. ${showKeys('Ctrl+S')} saves straight away.`,
+    keywords: 'save delay'
+  },
+
+  // ---------- Files ----------
+  {
+    key: 'attachmentFolder',
+    section: 'files',
+    group: 'Folders',
+    type: 'folder',
+    placeholder: 'attachments',
+    label: 'Attachments folder',
+    description: 'Where pasted and dropped images and files are saved, inside your notes folder. Leave empty for the top level.',
+    keywords: 'images pictures screenshots paste media'
+  },
+  {
+    key: 'templatesFolder',
+    section: 'files',
+    group: 'Folders',
+    type: 'folder',
+    placeholder: 'Templates',
+    label: 'Templates folder',
+    description: 'Notes in this folder show up in "New note from template" and /template.',
+    keywords: 'template'
+  },
+
+  // ---------- Calendar ----------
+  {
+    key: 'dailyFolder',
+    section: 'calendar',
+    group: 'Daily notes',
+    type: 'folder',
+    placeholder: 'Daily',
+    label: 'Daily notes folder',
+    keywords: 'journal diary day'
+  },
+  {
+    key: 'dailyFormat',
+    section: 'calendar',
+    group: 'Daily notes',
+    type: 'text',
+    placeholder: 'YYYY-MM-DD',
+    preview: (v) => `Today's note: ${formatDate(new Date(), v || 'YYYY-MM-DD')}.md`,
+    label: 'Daily note name',
+    description: 'YYYY year · MM month · DD day · MMMM month name · dddd weekday. Use / for subfolders, e.g. YYYY/MM/YYYY-MM-DD.',
+    keywords: 'date format file name journal'
+  },
+  {
+    key: 'dailyTemplate',
+    section: 'calendar',
+    group: 'Daily notes',
+    type: 'folder',
+    prefix: 'Template note:',
+    placeholder: 'e.g. Templates/Daily',
+    label: 'Daily note template',
+    description: 'New daily notes start from this note (leave empty for just a title). {{date:…}} uses that day’s date.',
+    keywords: 'template journal'
+  },
+  {
+    key: 'createDailyOnClick',
+    section: 'calendar',
+    group: 'Daily notes',
+    type: 'toggle',
+    label: 'Clicking a day creates its daily note',
+    description: 'Off: clicking a day without a note just shows that day’s agenda.'
+  },
+  {
+    key: 'weekStart',
+    section: 'calendar',
+    group: 'Calendar',
+    type: 'choice',
+    options: [
+      { value: '1', label: 'Monday' },
+      { value: '0', label: 'Sunday' }
+    ],
+    label: 'Week starts on',
+    keywords: 'monday sunday first day'
+  },
+  {
+    key: 'timeFormat',
+    section: 'calendar',
+    group: 'Calendar',
+    type: 'choice',
+    options: [
+      { value: '24h', label: '14:00' },
+      { value: '12h', label: '2 pm' }
+    ],
+    label: 'Time format',
+    keywords: '12 24 hour clock am pm'
+  },
+  {
+    key: 'scheduleHeading',
+    section: 'calendar',
+    group: 'Calendar',
+    type: 'text',
+    placeholder: 'Schedule',
+    label: 'Events heading',
+    description: 'In daily notes, list items under this heading are events, like "- 09:30-10:30 Standup".',
+    keywords: 'schedule agenda events'
+  },
+
+  // ---------- Quick capture & tray ----------
+  {
+    key: 'captureShortcut',
+    section: 'capture',
+    group: 'Quick capture',
+    type: 'choice',
+    options: CAPTURE_SHORTCUTS.map((value) => ({ value, label: value ? acceleratorLabel(value) : 'Off' })),
+    label: 'Shortcut',
+    description: `Works from any app, as long as Notes is running (it can wait in the ${TRAY_NAME}).`,
+    keywords: 'capture hotkey global win key'
+  },
+  {
+    key: 'captureTarget',
+    section: 'capture',
+    group: 'Quick capture',
+    type: 'choice',
+    options: [
+      { value: 'daily', label: "Today's note" },
+      { value: 'inbox', label: 'Inbox note' }
+    ],
+    label: 'Save captures to',
+    keywords: 'capture inbox daily'
+  },
+  {
+    key: 'captureHeading',
+    section: 'capture',
+    group: 'Quick capture',
+    type: 'text',
+    placeholder: 'Captured',
+    label: 'Heading in the daily note',
+    description: 'Captures are added under this heading in today’s note (it’s created if needed).',
+    keywords: 'capture heading'
+  },
+  {
+    key: 'captureInbox',
+    section: 'capture',
+    group: 'Quick capture',
+    type: 'folder',
+    prefix: 'Inbox note:',
+    placeholder: 'Inbox',
+    label: 'Inbox note',
+    description: 'Used when captures go to the inbox. Created if it doesn’t exist.',
+    keywords: 'capture inbox'
+  },
+  { key: 'captureTimestamp', section: 'capture', group: 'Quick capture', type: 'toggle', label: 'Add the time to each capture', description: 'Like "- 14:05 Call the plumber".' },
+  {
+    key: 'closeToTray',
+    section: 'capture',
+    group: IS_MAC ? 'Menu bar' : 'Tray',
+    type: 'toggle',
+    label: `Keep running in the ${TRAY_NAME} when the window is closed`,
+    description: IS_MAC
+      ? 'So quick capture works any time. Quit with ⌘Q or from the menu bar icon.'
+      : 'So quick capture works any time. Quit from the tray icon’s menu.',
+    keywords: 'tray menu bar background minimize system'
+  },
+  {
+    key: 'launchAtStartup',
+    section: 'capture',
+    group: IS_MAC ? 'Menu bar' : 'Tray',
+    type: 'toggle',
+    label: IS_MAC ? 'Open Notes when you log in' : 'Start Notes when Windows starts',
+    description: IS_MAC ? 'Only in the installed app.' : 'It starts quietly in the tray.',
+    keywords: 'startup login boot'
+  },
+
+  // ---------- About ----------
+  {
+    key: 'checkForUpdates',
+    section: 'about',
+    group: 'Updates',
+    type: 'toggle',
+    label: 'Check for updates automatically',
+    description: IS_MAC
+      ? 'Notes tells you when a new version is out and opens its download page.'
+      : 'New versions download in the background and install when you restart Notes.',
+    keywords: 'update upgrade version new release'
+  }
+]
+
+export const SECTIONS: { id: SectionId; label: string }[] = [
+  { id: 'appearance', label: 'Appearance' },
+  { id: 'editor', label: 'Editor' },
+  { id: 'files', label: 'Files' },
+  { id: 'calendar', label: 'Calendar' },
+  { id: 'capture', label: 'Quick capture' },
+  { id: 'shortcuts', label: 'Shortcuts' },
+  { id: 'about', label: 'About' }
+]
+
+/** Accent colours offered as one-click swatches. */
+export const ACCENT_SWATCHES = ['#8b7cf6', '#5ea8ff', '#3ccfcf', '#4ade80', '#e0a458', '#f97066', '#f472b6', '#c4b5fd']
+
+export function matchesSearch(def: SettingDef, query: string): boolean {
+  const haystack = `${def.label} ${def.description ?? ''} ${def.keywords ?? ''} ${def.group}`.toLowerCase()
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((word) => haystack.includes(word))
+}

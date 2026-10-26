@@ -1,0 +1,55 @@
+{
+  "name": "notesapp",
+  "productName": "Notes",
+  "version": "1.2.0",
+  "description": "A dark, fast markdown notes app",
+  "main": "./out/main/index.js",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "build:win": "npm run typecheck && npm test && electron-vite build && electron-builder --win --publish never",
+    "build:mac": "npm run typecheck && npm test && electron-vite build && electron-builder --mac --publish never"
+  },
+  "//": "Only the main process's runtime packages go in dependencies; everything the renderer uses is bundled by Vite, so it lives in devDependencies and stays out of the installer.",
+  "dependencies": {
+    "chokidar": "^4.0.3",
+    "electron-updater": "^6.8.11"
+  },
+  "devDependencies": {
+    "@codemirror/autocomplete": "^6.20.4",
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-markdown": "^6.5.2",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/language-data": "^6.5.2",
+    "@codemirror/search": "^6.7.2",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.15",
+    "@lezer/common": "^1.5.4",
+    "@lezer/highlight": "^1.2.5",
+    "@lezer/markdown": "^1.8.1",
+    "@replit/codemirror-vim": "^6.4.0",
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^4.5.0",
+    "electron": "^36.3.0",
+    "electron-builder": "^26.18.0",
+    "electron-vite": "^3.1.0",
+    "lucide-react": "^0.511.0",
+    "minisearch": "^7.2.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.7",
+    "zustand": "^5.0.16"
+  },
+  "allowScripts": {
+    "electron@36.9.5": true,
+    "esbuild@0.25.12": true
+  }
+}
