@@ -3,6 +3,7 @@ import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet } fr
 import { createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { readFrontmatter } from '../../lib/properties'
+import { readingFacet } from './facets'
 import PropertiesPanel from './PropertiesPanel'
 
 /**
@@ -47,17 +48,21 @@ function applyTo(view: EditorView, change: (text: string) => string): void {
 }
 
 class PropertiesWidget extends WidgetType {
-  constructor(readonly yaml: string | null) {
+  constructor(
+    readonly yaml: string | null,
+    readonly readOnly = false
+  ) {
     super()
   }
   eq(other: PropertiesWidget): boolean {
-    return other.yaml === this.yaml
+    return other.yaml === this.yaml && other.readOnly === this.readOnly
   }
   private render(dom: HTMLElement, view: EditorView): void {
     const fm = this.yaml === null ? null : readFrontmatter(`---\n${this.yaml}\n---\n`)
     roots.get(dom)!.render(
       createElement(PropertiesPanel, {
         properties: fm ? fm.properties : null,
+        readOnly: this.readOnly,
         apply: (change: (text: string) => string) => applyTo(view, change),
         showRaw: () => {
           const end = readFrontmatter(view.state.doc.sliceString(0, Math.min(view.state.doc.length, 20000)))?.to ?? 0
@@ -92,21 +97,29 @@ class PropertiesWidget extends WidgetType {
 }
 
 function build(state: EditorState): DecorationSet {
-  if (state.readOnly || state.field(rawProperties, false)) return Decoration.none
+  // Embedded notes have none; reading mode shows them without editing.
+  const reading = state.facet(readingFacet)
+  if ((state.readOnly && !reading) || state.field(rawProperties, false)) return Decoration.none
   const fm = readFrontmatter(state.doc.sliceString(0, Math.min(state.doc.length, 20000)))
   if (!fm) {
+    if (reading) return Decoration.none
     // No properties yet: a quiet "Add property" above the note (shown on hover).
     return Decoration.set([Decoration.widget({ widget: new PropertiesWidget(null), block: true, side: -1 }).range(0)])
   }
   // Cover whole lines: up to the end of the closing --- line.
   const end = state.doc.lineAt(Math.max(0, fm.to - 1)).to
-  return Decoration.set([Decoration.replace({ widget: new PropertiesWidget(fm.yaml), block: true }).range(0, end)])
+  return Decoration.set([Decoration.replace({ widget: new PropertiesWidget(fm.yaml, reading), block: true }).range(0, end)])
 }
 
 const panel = StateField.define<DecorationSet>({
   create: build,
   update(value, tr) {
-    if (tr.docChanged || tr.effects.some((e) => e.is(setRawProperties)) || tr.startState.field(rawProperties, false) !== tr.state.field(rawProperties, false)) {
+    if (
+      tr.docChanged ||
+      tr.effects.some((e) => e.is(setRawProperties)) ||
+      tr.startState.field(rawProperties, false) !== tr.state.field(rawProperties, false) ||
+      tr.startState.facet(readingFacet) !== tr.state.facet(readingFacet)
+    ) {
       return build(tr.state)
     }
     return value

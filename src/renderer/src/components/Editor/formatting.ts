@@ -49,11 +49,54 @@ export function toggleWrap(marker: string): Command {
   }
 }
 
+/** Highlighter colours besides the plain ==yellow==. */
+export const HIGHLIGHT_COLOURS = ['green', 'blue', 'pink', 'purple', 'orange'] as const
+
+const MARK_TAG = /<mark class="hl-(\w+)">([\s\S]*?)<\/mark>/g
+
+/**
+ * A coloured highlight: <mark class="hl-green">text</mark> (plain HTML, so other apps still show
+ * a highlight). On text that's already highlighted, the same colour removes it and another changes it.
+ */
+export function toggleColourHighlight(colour: string): Command {
+  return (view) => {
+    const { state } = view
+    view.dispatch(
+      state.changeByRange((range) => {
+        const line = state.doc.lineAt(range.from)
+        // Already inside a coloured highlight on this line?
+        for (const m of line.text.matchAll(MARK_TAG)) {
+          const from = line.from + m.index
+          const to = from + m[0].length
+          if (range.from >= from && range.to <= to) {
+            const inner = m[2]
+            const replacement = m[1] === colour ? inner : `<mark class="hl-${colour}">${inner}</mark>`
+            const start = m[1] === colour ? from : from + `<mark class="hl-${colour}">`.length
+            return { changes: { from, to, insert: replacement }, range: EditorSelection.range(start, start + inner.length) }
+          }
+        }
+        const text = state.sliceDoc(range.from, range.to)
+        const from = range.from + (text.length - text.trimStart().length)
+        const to = Math.max(from, range.to - (text.length - text.trimEnd().length))
+        const open = `<mark class="hl-${colour}">`
+        return {
+          changes: [
+            { from, insert: open },
+            { from: to, insert: '</mark>' }
+          ],
+          range: EditorSelection.range(from + open.length, to + open.length)
+        }
+      })
+    )
+    return true
+  }
+}
+
 /** Commands that act on the editor; their shortcuts can be changed in Settings like any other. */
 export interface EditorCommand {
   id: string
   title: string
-  shortcut: string
+  shortcut?: string
   run: Command
 }
 
@@ -61,5 +104,7 @@ export const EDITOR_COMMANDS: EditorCommand[] = [
   { id: 'format.bold', title: 'Bold', shortcut: 'Ctrl+B', run: toggleWrap('**') },
   { id: 'format.italic', title: 'Italic', shortcut: 'Ctrl+I', run: toggleWrap('*') },
   { id: 'format.code', title: 'Inline code', shortcut: 'Ctrl+E', run: toggleWrap('`') },
-  { id: 'format.strike', title: 'Strikethrough', shortcut: 'Ctrl+Shift+X', run: toggleWrap('~~') }
+  { id: 'format.strike', title: 'Strikethrough', shortcut: 'Ctrl+Shift+X', run: toggleWrap('~~') },
+  { id: 'format.highlight', title: 'Highlight', shortcut: 'Ctrl+Shift+H', run: toggleWrap('==') },
+  ...HIGHLIGHT_COLOURS.map((c) => ({ id: `format.highlight.${c}`, title: `Highlight ${c}`, run: toggleColourHighlight(c) }))
 ]

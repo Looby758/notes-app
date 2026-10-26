@@ -38,6 +38,8 @@ export interface Prefs {
   showWordCount: boolean
   /** Opening a note adds a tab instead of changing the current one. */
   openInNewTab: boolean
+  /** Every note opens read-only (links open with a plain click) until you switch back to writing. */
+  readingMode: boolean
   /** Typewriter mode: keep the line you're writing on in the middle of the screen. */
   typewriterCenter: boolean
   /** Typewriter mode: fade everything but the current paragraph or line. */
@@ -116,6 +118,7 @@ export const DEFAULT_PREFS: Prefs = {
   cursorBlink: true,
   showWordCount: true,
   openInNewTab: false,
+  readingMode: false,
   typewriterCenter: false,
   typewriterDim: false,
   typewriterDimUnit: 'paragraph',

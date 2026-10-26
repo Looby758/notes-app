@@ -44,7 +44,14 @@ interface Fmt {
   italics?: boolean
   strike?: boolean
   code?: boolean
+  /** Word highlighter colour. */
+  highlight?: string
 }
+
+/** Highlighter colours in the app → the nearest ones Word has. */
+const WORD_HIGHLIGHT: Record<string, string> = { green: 'green', blue: 'cyan', pink: 'magenta', purple: 'magenta', orange: 'yellow' }
+const CALLOUT_LINE = /^\[!([A-Za-z-]+)\]([+-]?)[ \t]*(.*)$/
+const CALLOUT_COLOURS: Record<string, string> = { tip: '22A35A', success: '22A35A', warning: 'D98A2B', important: '8B6CF0', question: '1FA6A6', danger: 'E0524A', quote: '8A8E9C' }
 
 const HEADINGS = [HeadingLevel.HEADING_1, HeadingLevel.HEADING_2, HeadingLevel.HEADING_3, HeadingLevel.HEADING_4, HeadingLevel.HEADING_5, HeadingLevel.HEADING_6]
 const MONO = 'Consolas'
@@ -61,14 +68,28 @@ export async function toDocx(opts: DocxOptions): Promise<Uint8Array> {
   let listInstance = 0
   const children: (Paragraph | Table)[] = []
 
-  const text = (t: string, f: Fmt): TextRun =>
-    new TextRun({ text: decode(t), bold: f.bold, italics: f.italics, strike: f.strike, font: f.code ? MONO : undefined, shading: f.code ? { type: ShadingType.CLEAR, fill: 'F1F1F4', color: 'auto' } : undefined })
+  const run = (t: string, f: Fmt): TextRun =>
+    new TextRun({
+      text: decode(t),
+      bold: f.bold,
+      italics: f.italics,
+      strike: f.strike,
+      font: f.code ? MONO : undefined,
+      highlight: f.highlight as 'yellow' | undefined,
+      shading: f.code ? { type: ShadingType.CLEAR, fill: 'F1F1F4', color: 'auto' } : undefined
+    })
+  /** Plain text, with any ==highlights== in it. */
+  const text = (t: string, f: Fmt): TextRun | TextRun[] => {
+    if (!t.includes('==')) return run(t, f)
+    return t.split(/(==[^=\n]+==)/).filter(Boolean).map((part) => (/^==[^=\n]+==$/.test(part) ? run(part.slice(2, -2), { ...f, highlight: 'yellow' }) : run(part, f)))
+  }
 
   const linkRun = (t: string, f: Fmt): TextRun =>
     new TextRun({ text: decode(t), bold: f.bold, italics: f.italics, color: '5B4BD0', underline: {} })
 
-  const inline = (tokens: Token[] | undefined, f: Fmt = {}): ParagraphChild[] => {
+  const inline = (tokens: Token[] | undefined, outer: Fmt = {}): ParagraphChild[] => {
     const out: ParagraphChild[] = []
+    let f = outer
     for (const t of tokens ?? []) {
       switch (t.type) {
         case 'strong':
@@ -81,7 +102,7 @@ export async function toDocx(opts: DocxOptions): Promise<Uint8Array> {
           out.push(...inline((t as Tokens.Del).tokens, { ...f, strike: true }))
           break
         case 'codespan':
-          out.push(text((t as Tokens.Codespan).text, { ...f, code: true }))
+          out.push(run((t as Tokens.Codespan).text, { ...f, code: true }))
           break
         case 'br':
           out.push(new TextRun({ break: 1 }))
@@ -106,22 +127,30 @@ export async function toDocx(opts: DocxOptions): Promise<Uint8Array> {
           if (img) {
             const scale = Math.min(1, MAX_IMAGE_WIDTH / img.width)
             out.push(new ImageRun({ type: img.type, data: img.data, transformation: { width: Math.round(img.width * scale), height: Math.round(img.height * scale) } }))
-          } else out.push(text(`[image: ${im.text || im.href}]`, { italics: true }))
+          } else out.push(run(`[image: ${im.text || im.href}]`, { italics: true }))
           break
         }
-        case 'html':
-          // Drop tags, keep any text.
-          out.push(text((t as Tokens.HTML).text.replace(/<[^>]+>/g, ''), f))
+        case 'html': {
+          // <mark class="hl-green"> … </mark> highlights what's between; other tags are dropped.
+          const tag = (t as Tokens.HTML).text
+          const open = /^<mark(?:\s+class="hl-(\w+)")?>$/.exec(tag.trim())
+          if (open) f = { ...f, highlight: WORD_HIGHLIGHT[open[1] ?? ''] ?? 'yellow' }
+          else if (/^<\/mark>$/.test(tag.trim())) f = { ...f, highlight: outer.highlight }
+          else {
+            const plain = tag.replace(/<[^>]+>/g, '')
+            if (plain) out.push(...[text(plain, f)].flat())
+          }
           break
+        }
         case 'text':
         case 'escape': {
           const tt = t as Tokens.Text
           if (tt.tokens?.length) out.push(...inline(tt.tokens, f))
-          else out.push(text(tt.text, f))
+          else out.push(...[text(tt.text, f)].flat())
           break
         }
         default:
-          if ('text' in t && typeof t.text === 'string') out.push(text(t.text, f))
+          if ('text' in t && typeof t.text === 'string') out.push(...[text(t.text, f)].flat())
       }
     }
     return out
@@ -169,9 +198,30 @@ export async function toDocx(opts: DocxOptions): Promise<Uint8Array> {
           }
           break
         }
-        case 'blockquote':
-          block((t as Tokens.Blockquote).tokens, { ...ctx, quote: true }, item)
+        case 'blockquote': {
+          const bq = t as Tokens.Blockquote
+          const first = bq.tokens[0] as Tokens.Paragraph | undefined
+          const m = first?.type === 'paragraph' ? CALLOUT_LINE.exec(first.raw.split('\n')[0]) : null
+          if (!m) {
+            block(bq.tokens, { ...ctx, quote: true }, item)
+            break
+          }
+          // A callout: its title in bold and colour, then its text, inside the quote bar.
+          const type = m[1].toLowerCase()
+          const colour = CALLOUT_COLOURS[type] ?? '5E8BD8'
+          const title = m[3] || type[0].toUpperCase() + type.slice(1)
+          children.push(
+            new Paragraph({
+              children: [new TextRun({ text: decode(title), bold: true, color: colour })],
+              indent: { left: 360 },
+              border: { left: { style: BorderStyle.SINGLE, size: 18, color: colour, space: 10 } },
+              shading: { type: ShadingType.CLEAR, fill: 'F6F6F9', color: 'auto' }
+            })
+          )
+          const rest = first!.raw.split('\n').slice(1).join('\n').trim()
+          block([...(rest ? new Lexer({ gfm: true }).lex(rest) : []), ...bq.tokens.slice(1)], { ...ctx, quote: true }, item)
           break
+        }
         case 'code': {
           const lines = (t as Tokens.Code).text.split('\n')
           lines.forEach((line, i) =>

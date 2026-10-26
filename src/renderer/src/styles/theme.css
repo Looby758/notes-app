@@ -3683,3 +3683,206 @@ body.resizing-rows * {
 .spin {
   animation: spin 900ms linear infinite;
 }
+
+/* ---------- Highlights ---------- */
+
+.cm-hl {
+  --hl: #f5d547;
+  background: color-mix(in srgb, var(--hl) 32%, transparent);
+  border-radius: 3px;
+  padding: 0 1px;
+  color: var(--text-strong);
+}
+.cm-hl-green {
+  --hl: #4ade80;
+}
+.cm-hl-blue {
+  --hl: #5ea8ff;
+}
+.cm-hl-pink {
+  --hl: #f472b6;
+}
+.cm-hl-purple {
+  --hl: #a78bfa;
+}
+.cm-hl-orange {
+  --hl: #fb923c;
+}
+
+/* ---------- Callouts ---------- */
+
+.cm-line.cm-callout {
+  --co: #5ea8ff;
+  position: relative;
+  background: color-mix(in srgb, var(--co) 9%, transparent);
+  border-left: 3px solid var(--co);
+  padding-left: 14px !important;
+  padding-right: 12px !important;
+}
+.cm-line.cm-callout-first {
+  padding-top: 7px !important;
+  border-top-right-radius: 7px;
+}
+.cm-line.cm-callout-last {
+  padding-bottom: 7px !important;
+  border-bottom-right-radius: 7px;
+  margin-bottom: 4px;
+}
+.cm-line.cm-callout-folded {
+  display: none;
+}
+.cm-line.cm-callout-tip,
+.cm-line.cm-callout-success {
+  --co: #4ade80;
+}
+.cm-line.cm-callout-warning {
+  --co: #e0a458;
+}
+.cm-line.cm-callout-important {
+  --co: #a78bfa;
+}
+.cm-line.cm-callout-question {
+  --co: #3ccfcf;
+}
+.cm-line.cm-callout-danger {
+  --co: #f97066;
+}
+.cm-line.cm-callout-quote {
+  --co: #9a9caa;
+}
+.cm-callout-icon {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: -2px;
+  margin-right: 7px;
+  color: var(--co);
+}
+.cm-callout-icon.foldable {
+  cursor: pointer;
+}
+.cm-callout-icon.foldable::after {
+  content: '';
+  width: 0;
+  height: 0;
+  margin-left: 5px;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--text-faint);
+  transition: transform 140ms var(--ease);
+}
+.cm-callout-icon.folded::after {
+  transform: rotate(-90deg);
+}
+.cm-callout-title {
+  color: color-mix(in srgb, var(--co) 70%, var(--text-strong));
+  font-weight: 600;
+}
+
+/* ---------- Editable tables ---------- */
+
+.cm-table-wrap {
+  position: relative;
+  padding-top: 32px;
+}
+.cm-table-wrap td,
+.cm-table-wrap th {
+  cursor: text;
+  outline: none;
+}
+.cm-table-wrap td:focus-within,
+.cm-table-wrap th:focus-within {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.cm-table-input {
+  width: 100%;
+  min-width: 60px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: inherit;
+  outline: none;
+}
+/* The toolbar shows while you're over (or editing) the table. */
+.cm-table-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg-raised);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms var(--ease);
+}
+.cm-table-wrap:hover .cm-table-bar,
+.cm-table-wrap:focus-within .cm-table-bar {
+  opacity: 1;
+  pointer-events: auto;
+}
+.cm-table-bar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.cm-table-bar button small {
+  font-size: 10.5px;
+}
+.cm-table-bar button:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.cm-table-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 3px;
+  background: var(--border);
+}
+
+/* ---------- Reading mode ---------- */
+
+.props-readonly .props-row {
+  grid-template-columns: minmax(90px, 150px) minmax(0, 1fr);
+}
+.props-readonly .props-value {
+  padding: 4px 6px;
+}
+.props-key-text {
+  padding: 4px 6px;
+}
+.props-readonly .props-status,
+.props-readonly .props-choice-btn {
+  display: inline-block;
+}
+.cm-editor.cm-reading .cm-content {
+  caret-color: transparent;
+}
+.cm-editor.cm-reading .cm-link,
+.cm-editor.cm-reading .cm-hashtag {
+  cursor: pointer;
+}
+.reading-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--text);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}

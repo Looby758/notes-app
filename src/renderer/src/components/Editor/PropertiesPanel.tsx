@@ -35,6 +35,8 @@ interface Props {
   /** Changes the note's text (the panel only ever touches the frontmatter). */
   apply: (change: (text: string) => string) => void
   showRaw: () => void
+  /** Reading mode: show the values, without editing. */
+  readOnly?: boolean
 }
 
 const ICONS: Record<PropKind, typeof Calendar> = {
@@ -50,10 +52,12 @@ const ICONS: Record<PropKind, typeof Calendar> = {
 }
 
 /** The form at the top of a note for its properties (frontmatter). */
-export default function PropertiesPanel({ properties, apply, showRaw }: Props) {
+export default function PropertiesPanel({ properties, apply, showRaw, readOnly }: Props) {
   const collapsed = useUI((s) => s.propertiesCollapsed)
   const [adding, setAdding] = useState(false)
   const set = (key: string, value: PropValue | undefined): void => apply((text) => setProperty(text, key, value))
+
+  if (readOnly) return properties?.length ? <ReadOnlyProperties properties={properties} /> : null
 
   if (!properties) {
     return (
@@ -89,6 +93,49 @@ export default function PropertiesPanel({ properties, apply, showRaw }: Props) {
           <AddProperty existing={properties.map((p) => p.key)} open={adding} setOpen={setAdding} onAdd={set} />
         </>
       )}
+    </div>
+  )
+}
+
+/** Reading mode: each property as plain text (tags as chips). */
+function ReadOnlyProperties({ properties }: { properties: Property[] }) {
+  return (
+    <div className="props props-readonly" data-properties>
+      {properties.map((p) => {
+        const kind = kindOf(p)
+        const Icon = ICONS[kind]
+        const values = Array.isArray(p.value) ? p.value : p.value === null ? [p.raw.split('\n').slice(1).join(' ').trim()] : [p.value]
+        return (
+          <div className="props-row" data-prop={p.key} key={p.key}>
+            <div className="props-key">
+              <Icon size={13} className="props-icon" />
+              <span className="props-key-text">{p.key}</span>
+            </div>
+            <div className="props-value">
+              {kind === 'tags' || kind === 'list' ? (
+                <div className="props-chips">
+                  {values.map((v) => (
+                    <span key={v} className="props-chip">
+                      {kind === 'tags' ? '#' : ''}
+                      {v}
+                    </span>
+                  ))}
+                </div>
+              ) : kind === 'checkbox' ? (
+                <span>{/^true$/i.test(values[0] ?? '') ? 'Yes' : 'No'}</span>
+              ) : kind === 'link' ? (
+                <a href={values[0]} target="_blank" rel="noreferrer">
+                  {values[0]}
+                </a>
+              ) : (
+                <span className={kind === 'status' || kind === 'priority' ? 'props-choice-btn on' : ''} data-value={(values[0] ?? '').replace(/\s+/g, '-')}>
+                  {values[0]}
+                </span>
+              )}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

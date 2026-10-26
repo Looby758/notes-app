@@ -21,11 +21,40 @@ export interface HtmlOptions {
 
 const esc = (s: string): string => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 
+const CALLOUT_LINE = /^\[!([A-Za-z-]+)\]([+-]?)[ \t]*(.*)$/
+
+/** ==highlight== as <mark>. */
+export const highlightExtension = {
+  name: 'highlight',
+  level: 'inline' as const,
+  start: (src: string) => src.indexOf('=='),
+  tokenizer(this: { lexer: { inlineTokens: (s: string) => Tokens.Generic[] } }, src: string) {
+    const m = /^==(?=[^\s=])([^\n]*?[^\s=])==(?!=)/.exec(src)
+    if (m) return { type: 'highlight', raw: m[0], text: m[1], tokens: this.lexer.inlineTokens(m[1]) }
+    return undefined
+  },
+  renderer(this: { parser: { parseInline: (t: Tokens.Generic[]) => string } }, token: Tokens.Generic) {
+    return `<mark>${this.parser.parseInline(token.tokens ?? [])}</mark>`
+  }
+}
+
 function renderNote(item: ExportItem, opts: HtmlOptions): string {
   const inFile = new Set(opts.items.map((i) => i.path))
   const marked = new Marked({ gfm: true, breaks: false })
+  marked.use({ extensions: [highlightExtension] })
   marked.use({
     renderer: {
+      // > [!tip] Title  →  a coloured box with a title.
+      blockquote(this: { parser: { parse: (t: Tokens.Generic[]) => string } }, { tokens }: Tokens.Blockquote) {
+        const first = tokens[0] as Tokens.Paragraph | undefined
+        const m = first?.type === 'paragraph' ? CALLOUT_LINE.exec(first.raw.split('\n')[0]) : null
+        if (!m) return `<blockquote>\n${this.parser.parse(tokens)}</blockquote>\n`
+        const type = m[1].toLowerCase()
+        const rest = first!.raw.split('\n').slice(1).join('\n').trim()
+        const restTokens = rest ? marked.lexer(rest) : []
+        const title = m[3] ? (marked.parseInline(m[3], { async: false }) as string) : esc(type[0].toUpperCase() + type.slice(1))
+        return `<div class="callout callout-${esc(type)}"><div class="callout-title">${title}</div>\n${this.parser.parse([...restTokens, ...tokens.slice(1)])}</div>\n`
+      },
       heading(this: { parser: { parseInline: (t: Tokens.Generic[]) => string } }, { tokens, depth, text }: Tokens.Heading) {
         return `<h${depth} id="${headingAnchor(item.path, text.replace(/[*_~`]/g, ''))}">${this.parser.parseInline(tokens)}</h${depth}>\n`
       },
@@ -101,6 +130,21 @@ table.properties th, table.properties td { border: none; border-bottom: 1px soli
 table.properties th { color: var(--faint); font-weight: 500; }
 .missing-image { color: var(--faint); font-style: italic; }
 footer { margin-top: 48px; color: var(--faint); font-size: 12px; }
+mark { background: color-mix(in srgb, #f5d547 40%, transparent); color: inherit; border-radius: 3px; padding: 0 2px; }
+mark.hl-green { background: color-mix(in srgb, #4ade80 35%, transparent); }
+mark.hl-blue { background: color-mix(in srgb, #5ea8ff 35%, transparent); }
+mark.hl-pink { background: color-mix(in srgb, #f472b6 35%, transparent); }
+mark.hl-purple { background: color-mix(in srgb, #a78bfa 35%, transparent); }
+mark.hl-orange { background: color-mix(in srgb, #fb923c 35%, transparent); }
+.callout { --co: #5ea8ff; margin: 0 0 1em; padding: 10px 14px; border-left: 3px solid var(--co); border-radius: 0 8px 8px 0; background: color-mix(in srgb, var(--co) 10%, transparent); }
+.callout > :last-child { margin-bottom: 0; }
+.callout-title { font-weight: 650; color: color-mix(in srgb, var(--co) 70%, var(--text)); margin-bottom: 4px; }
+.callout-tip, .callout-success, .callout-hint, .callout-check, .callout-done { --co: #22a35a; }
+.callout-warning, .callout-caution, .callout-attention { --co: #d98a2b; }
+.callout-important { --co: #8b6cf0; }
+.callout-question, .callout-faq, .callout-help { --co: #1fa6a6; }
+.callout-danger, .callout-error, .callout-bug, .callout-failure { --co: #e0524a; }
+.callout-quote, .callout-cite { --co: #8a8e9c; }
 `
 
 const SCREEN_DARK = `

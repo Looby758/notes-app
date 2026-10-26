@@ -6,6 +6,8 @@ import {
   FolderSync,
   LogOut,
   Orbit,
+  BookOpen,
+  PenLine,
   PanelLeft,
   PanelRight,
   Settings as SettingsIcon
@@ -13,7 +15,7 @@ import {
 import { useVault } from '../store/vault'
 import { useEditor, type SaveStatus } from '../store/editor'
 import { useNoteIndex } from '../store/noteIndex'
-import { usePrefs } from '../store/prefs'
+import { setPrefs, usePrefs } from '../store/prefs'
 import { showSearch, useUI } from '../store/ui'
 import { countNotes, parentOf } from '../lib/paths'
 import { FILE_MANAGER, IS_MAC, showKeys } from '@shared/platform'
@@ -66,6 +68,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
   const lineHeight = usePrefs((s) => s.prefs.lineHeight)
   const fonts = usePrefs((s) => s.prefs.editorFont + s.prefs.uiFont + s.prefs.zoom)
   const showWordCount = usePrefs((s) => s.prefs.showWordCount)
+  const reading = usePrefs((s) => s.prefs.readingMode)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const tree = useVault((s) => s.tree)
@@ -207,6 +210,14 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
 
         <div className="titlebar-spacer" />
 
+        <button
+          className={`icon-btn ${reading ? 'active' : ''}`}
+          onClick={() => setPrefs({ readingMode: !reading })}
+          title={` (${showKeys('Ctrl+Shift+R')})`}
+          data-reading-toggle
+        >
+          {reading ? <PenLine size={15} /> : <BookOpen size={15} />}
+        </button>
         <button className="icon-btn" onClick={() => openSpecialTab(GRAPH_TAB)} title={`Graph (${showKeys('Ctrl+Shift+G')})`}>
           <Orbit size={15} />
         </button>
@@ -249,6 +260,11 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <footer className="statusbar">
         <span title={vault}>{vault}</span>
         <span className="statusbar-spacer" />
+        {reading && (
+          <button className="reading-pill" onClick={() => setPrefs({ readingMode: false })} title="Notes are read-only. Click to write again.">
+            <BookOpen size={11} /> Reading
+          </button>
+        )}
         {showingNote && saveStatus && <span className={`save-status ${saveStatus}`}>{STATUS_LABEL[saveStatus]}</span>}
         {showingNote && showWordCount && (
           <span>

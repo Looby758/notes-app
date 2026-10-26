@@ -9,13 +9,15 @@ import {
   type ViewUpdate
 } from '@codemirror/view'
 import type { SyntaxNode } from '@lezer/common'
-import { linksChanged, notePath } from './facets'
+import { linksChanged, notePath, readingFacet } from './facets'
 import { parentOf, resolveRelative, toVaultUrl } from '../../lib/paths'
 import { parseWikiInner } from '../../lib/links'
 import { parseFrontmatter } from '../../lib/tags'
 import { parseEventText } from '../../lib/schedule'
 import { dailyDateOf } from '../../lib/dailyPaths'
 import { properties } from './properties'
+import { calloutIcon } from './calloutIcons'
+import { TableWidget } from './tableEditor'
 import { CLICK_MOD } from '@shared/platform'
 
 /** The time at the start of a schedule line: "09:30", "9am", "09:30-10:30", "2pm – 3pm". */
@@ -97,59 +99,79 @@ class ImageWidget extends WidgetType {
   }
 }
 
-function splitRow(line: string): string[] {
-  let s = line.trim()
-  if (s.startsWith('|')) s = s.slice(1)
-  if (s.endsWith('|') && !s.endsWith('\\|')) s = s.slice(0, -1)
-  return s.split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, '|'))
-}
+// ---------- callouts ----------
 
-class TableWidget extends WidgetType {
+const CALLOUT = /^\s*>\s?\[!([A-Za-z-]+)\]([+-]?)\s*(.*)$/
+export const CALLOUT_TYPES = ['note', 'tip', 'warning', 'important', 'question', 'success', 'danger', 'quote'] as const
+const CALLOUT_ALIASES: Record<string, (typeof CALLOUT_TYPES)[number]> = {
+  info: 'note',
+  abstract: 'note',
+  summary: 'note',
+  todo: 'note',
+  hint: 'tip',
+  example: 'tip',
+  check: 'success',
+  done: 'success',
+  caution: 'warning',
+  attention: 'warning',
+  faq: 'question',
+  help: 'question',
+  error: 'danger',
+  bug: 'danger',
+  failure: 'danger',
+  fail: 'danger',
+  cite: 'quote'
+}
+export const calloutType = (raw: string): string => {
+  const t = raw.toLowerCase()
+  return (CALLOUT_TYPES as readonly string[]).includes(t) ? t : (CALLOUT_ALIASES[t] ?? 'note')
+}
+export const calloutLabel = (type: string): string => type[0].toUpperCase() + type.slice(1)
+
+class CalloutIconWidget extends WidgetType {
   constructor(
-    readonly text: string,
-    readonly from: number
+    readonly type: string,
+    readonly fold: '' | '+' | '-',
+    /** Where the fold sign (+ or -) is, right after "[!type]". */
+    readonly foldPos: number
   ) {
     super()
   }
-  eq(other: TableWidget): boolean {
-    return other.text === this.text && other.from === this.from
+  eq(o: CalloutIconWidget): boolean {
+    return o.type === this.type && o.fold === this.fold && o.foldPos === this.foldPos
   }
   toDOM(view: EditorView): HTMLElement {
-    const lines = this.text.split('\n')
-    const header = splitRow(lines[0] ?? '')
-    const align = splitRow(lines[1] ?? '').map((d) =>
-      d.startsWith(':') && d.endsWith(':') ? 'center' : d.endsWith(':') ? 'right' : 'left'
-    )
-    const wrap = document.createElement('div')
-    wrap.className = 'cm-table-wrap'
-    wrap.title = 'Click to edit'
-    const table = document.createElement('table')
-    const addRow = (cells: string[], tag: 'th' | 'td', parent: HTMLElement): void => {
-      const tr = document.createElement('tr')
-      header.forEach((_, i) => {
-        const cell = document.createElement(tag)
-        cell.textContent = cells[i] ?? ''
-        cell.style.textAlign = align[i] ?? 'left'
-        tr.appendChild(cell)
+    const el = document.createElement('span')
+    el.className = `cm-callout-icon${this.fold ? ' foldable' : ''}${this.fold === '-' ? ' folded' : ''}`
+    el.innerHTML = calloutIcon(this.type)
+    if (this.fold) {
+      el.title = this.fold === '-' ? 'Open' : 'Fold'
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        view.dispatch({ changes: { from: this.foldPos, to: this.foldPos + 1, insert: this.fold === '-' ? '+' : '-' } })
       })
-      parent.appendChild(tr)
     }
-    const thead = document.createElement('thead')
-    addRow(header, 'th', thead)
-    const tbody = document.createElement('tbody')
-    for (const line of lines.slice(2)) addRow(splitRow(line), 'td', tbody)
-    table.append(thead, tbody)
-    wrap.appendChild(table)
-    // Clicking a rendered table puts the cursor in it, which reveals the markdown for editing.
-    wrap.addEventListener('mousedown', (e) => {
-      e.preventDefault()
-      view.dispatch({ selection: { anchor: this.from } })
-      view.focus()
-    })
-    return wrap
+    return el
   }
   ignoreEvent(): boolean {
     return true
+  }
+}
+
+/** A callout without a title of its own shows its type ("Tip"). */
+class CalloutTitleWidget extends WidgetType {
+  constructor(readonly type: string) {
+    super()
+  }
+  eq(o: CalloutTitleWidget): boolean {
+    return o.type === this.type
+  }
+  toDOM(): HTMLElement {
+    const el = document.createElement('span')
+    el.className = 'cm-callout-title'
+    el.textContent = calloutLabel(this.type)
+    return el
   }
 }
 
@@ -196,6 +218,8 @@ function buildInline(view: EditorView): DecorationSet {
   const path = state.facet(notePath)
   const isDaily = dailyDateOf(path) !== null
   const out: Range<Decoration>[] = []
+  const calloutLines = new Set<number>()
+  const calloutFirst = new Set<number>()
 
   /** Hides a syntax mark plus one following space (e.g. "# " or "> "). */
   const hideWithSpace = (from: number, to: number): void => {
@@ -240,7 +264,12 @@ function buildInline(view: EditorView): DecorationSet {
 
           case 'EmphasisMark':
           case 'StrikethroughMark':
+          case 'HighlightMark':
             if (!lineActive) out.push(hidden.range(node.from, node.to))
+            return
+
+          case 'Highlight':
+            out.push(mark('cm-hl').range(node.from, node.to))
             return
 
           case 'Strikethrough':
@@ -274,10 +303,21 @@ function buildInline(view: EditorView): DecorationSet {
             return
           }
 
-          case 'QuoteMark':
+          case 'Blockquote':
+            callout(node)
+            return
+
+          case 'QuoteMark': {
+            const ln = doc.lineAt(node.from).number
+            if (calloutLines.has(ln)) {
+              // Callout lines: the box styling comes from callout(); the first line's marker is its icon.
+              if (!lineActive && !calloutFirst.has(ln)) hideWithSpace(node.from, node.to)
+              return
+            }
             out.push(line('cm-quote').range(doc.lineAt(node.from).from))
             if (!lineActive) hideWithSpace(node.from, node.to)
             return
+          }
 
           case 'HorizontalRule':
             if (!lineActive) out.push(Decoration.replace({ widget: new HrWidget() }).range(node.from, node.to))
@@ -343,6 +383,38 @@ function buildInline(view: EditorView): DecorationSet {
         return
       }
     })
+  }
+
+  /**
+   * > [!tip] Title       a callout: a coloured box with an icon and a title.
+   * > [!tip]- Title      folded (only the title shows; click the icon to open it).
+   */
+  function callout(node: SyntaxNode): void {
+    const first = doc.lineAt(node.from)
+    const m = CALLOUT.exec(first.text)
+    if (!m) return
+    const type = calloutType(m[1])
+    const fold = m[2] as '' | '+' | '-'
+    const firstN = first.number
+    const lastN = doc.lineAt(node.to).number
+    // The whole box shows its markdown while the cursor is anywhere in it.
+    let anyActive = false
+    for (let n = firstN; n <= lastN; n++) if (active.has(n)) anyActive = true
+    const folded = fold === '-' && !anyActive
+    for (let n = firstN; n <= lastN; n++) {
+      calloutLines.add(n)
+      const cls = `cm-callout cm-callout-${type}${n === firstN ? ' cm-callout-first' : ''}${n === lastN || (folded && n === firstN) ? ' cm-callout-last' : ''}${folded && n > firstN ? ' cm-callout-folded' : ''}`
+      out.push(line(cls).range(doc.line(n).from))
+    }
+    calloutFirst.add(firstN)
+    const title = m[3]
+    const markerEnd = first.to - title.length
+    if (!anyActive) {
+      const foldPos = first.from + first.text.indexOf(']') + 1
+      out.push(Decoration.replace({ widget: new CalloutIconWidget(type, fold, foldPos) }).range(first.from, markerEnd))
+      if (!title.trim()) out.push(Decoration.widget({ widget: new CalloutTitleWidget(type), side: 1 }).range(markerEnd))
+    }
+    if (title.trim()) out.push(mark('cm-callout-title').range(markerEnd, first.to))
   }
 
   function listMark(node: SyntaxNode, lineActive: boolean): void {
@@ -414,6 +486,23 @@ function buildInline(view: EditorView): DecorationSet {
     }
   }
 
+  // Coloured highlights: <mark class="hl-green">text</mark> shows as just the highlighted text.
+  for (const range of view.visibleRanges) {
+    const text = doc.sliceString(range.from, range.to)
+    for (const m of text.matchAll(/<mark class="hl-(\w+)">([^<\n]*)<\/mark>/g)) {
+      const from = range.from + m.index
+      const to = from + m[0].length
+      if (/Code/.test(syntaxTree(state).resolveInner(from, 1).name)) continue
+      const openEnd = from + m[0].indexOf('>') + 1
+      const closeStart = to - '</mark>'.length
+      out.push(mark(`cm-hl cm-hl-${m[1]}`).range(openEnd, closeStart))
+      if (!isActive(from)) {
+        out.push(hidden.range(from, openEnd))
+        out.push(hidden.range(closeStart, to))
+      }
+    }
+  }
+
   // A plugin may not hide line breaks (CodeMirror throws), so drop any replacement that would.
   const safe = out.filter((r) => !r.value.point || r.from === r.to || doc.lineAt(r.from).to >= r.to)
   return Decoration.set(safe, true)
@@ -455,9 +544,10 @@ function buildTables(state: EditorState): DecorationSet {
     const from = doc.lineAt(node.from).from
     const endLine = doc.lineAt(node.to)
     const to = endLine.from === node.to && node.to > node.from ? doc.lineAt(node.to - 1).to : endLine.to
-    if (selection.ranges.some((r) => r.to >= from && r.from <= to)) continue
+    // While writing, a table the cursor is in shows its markdown (reading mode always shows the table).
+    if (!state.readOnly && selection.ranges.some((r) => r.to >= from && r.from <= to)) continue
     out.push(
-      Decoration.replace({ widget: new TableWidget(doc.sliceString(from, to), from), block: true }).range(from, to)
+      Decoration.replace({ widget: new TableWidget(doc.sliceString(from, to), from, state.readOnly), block: true }).range(from, to)
     )
   }
   return Decoration.set(out)
@@ -466,7 +556,7 @@ function buildTables(state: EditorState): DecorationSet {
 const tablePreview = StateField.define<DecorationSet>({
   create: buildTables,
   update(value, tr) {
-    if (tr.docChanged || tr.selection || syntaxTree(tr.state) !== syntaxTree(tr.startState)) {
+    if (tr.docChanged || tr.selection || syntaxTree(tr.state) !== syntaxTree(tr.startState) || tr.startState.readOnly !== tr.state.readOnly) {
       return buildTables(tr.state)
     }
     return value
@@ -486,7 +576,8 @@ const clickHandlers = EditorView.domEventHandlers({
       e.preventDefault()
       return true
     }
-    if (e.ctrlKey || e.metaKey) {
+    // Links and tags open with Ctrl/⌘+click while writing, or a plain click in reading mode.
+    if (e.ctrlKey || e.metaKey || view.state.facet(readingFacet)) {
       const tag = target.closest('[data-tag]')
       if (tag) {
         window.dispatchEvent(new CustomEvent('note:open-tag', { detail: { tag: tag.getAttribute('data-tag') } }))

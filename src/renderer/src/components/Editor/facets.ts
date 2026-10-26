@@ -12,3 +12,6 @@ export const pathCompartment = new Compartment()
 /** Which pane an editor state is shown in (one state per pane per note). */
 export const paneFacet = Facet.define<string, string>({ combine: (values) => values[0] ?? '' })
 export const paneCompartment = new Compartment()
+
+/** Reading mode: notes are shown, not edited (links open with a plain click). */
+export const readingFacet = Facet.define<boolean, boolean>({ combine: (values) => values.some(Boolean) })

@@ -10,6 +10,8 @@ import { isWithin, noteTitle, notePaths } from '../../lib/paths'
 import { useVault } from '../../store/vault'
 import { usePrefs } from '../../store/prefs'
 import { getNoteText } from '../../store/noteIndex'
+import { HIGHLIGHT_COLOURS } from './formatting'
+import { CALLOUT_TYPES, calloutLabel } from './livePreview'
 
 /**
  * Type "/" at the start of a line (or after a space) for a menu of things to insert:
@@ -131,7 +133,28 @@ const ITEMS: SlashItem[] = [
     section: 'Insert',
     apply: text(() => formatDate(new Date(), 'YYYY-MM-DD HH:mm'))
   },
-  { label: 'Tag', keywords: 'hashtag #', section: 'Insert', detail: '#', apply: text(() => '#') }
+  { label: 'Tag', keywords: 'hashtag #', section: 'Insert', detail: '#', apply: text(() => '#') },
+  { label: 'Highlight', keywords: 'marker yellow ==', section: 'Format', detail: '==', apply: tpl('==${}==') },
+  ...HIGHLIGHT_COLOURS.map(
+    (c): SlashItem => ({ label: `Highlight ${c}`, keywords: `marker colour color ${c}`, section: 'Format', apply: tpl(`<mark class="hl-${c}">\${}</mark>`) })
+  ),
+  // One per callout type, e.g. "/tip" or "/callout warning".
+  ...CALLOUT_TYPES.map(
+    (t): SlashItem => ({
+      label: `Callout: ${calloutLabel(t)}`,
+      keywords: `callout box admonition ${t}`,
+      section: 'Insert',
+      detail: `[!${t}]`,
+      apply: block(`> [!${t}] \${${calloutLabel(t)}}\n> \${}`)
+    })
+  ),
+  {
+    label: 'Callout: foldable',
+    keywords: 'callout box collapse fold toggle details',
+    section: 'Insert',
+    detail: '[!note]-',
+    apply: block('> [!note]- ${Title}\n> ${}')
+  }
 ]
 
 /** One item per note in the templates folder. */

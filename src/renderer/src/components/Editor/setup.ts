@@ -16,10 +16,10 @@ import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
 import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from '@codemirror/autocomplete'
 import { vim } from '@replit/codemirror-vim'
 import type { Prefs } from '@shared/prefs'
-import { notePath, pathCompartment } from './facets'
+import { notePath, pathCompartment, readingFacet } from './facets'
 import { livePreview } from './livePreview'
 import { editorTheme, highlightStyle } from './theme'
-import { hashtagSyntax, wikiLinkCompletions, wikiLinkSyntax } from './wikilinks'
+import { hashtagSyntax, highlightSyntax, wikiLinkCompletions, wikiLinkSyntax } from './wikilinks'
 import { EDITOR_COMMANDS } from './formatting'
 import { attachmentHandlers } from './attachments'
 import { slashCompletions } from './slash'
@@ -52,7 +52,9 @@ export function prefsExtensions(p: Prefs): Extension {
     p.highlightActiveLine ? highlightActiveLine() : [],
     p.autoPair ? [closeBrackets(), keymap.of(closeBracketsKeymap)] : [],
     drawSelection({ cursorBlinkRate: p.cursorBlink ? 1200 : 0 }),
-    typewriter(p),
+    // Typewriter mode is for writing; reading mode turns it off.
+    p.readingMode ? [] : typewriter(p),
+    p.readingMode ? [EditorState.readOnly.of(true), EditorView.editable.of(false), readingFacet.of(true), EditorView.editorAttributes.of({ class: 'cm-reading' })] : [],
     // Above the default keymap, which also uses Ctrl+I.
     Prec.high(keymap.of(editorKeys))
   ]
@@ -63,7 +65,7 @@ const base: Extension = [
   dropCursor(),
   EditorView.lineWrapping,
   EditorState.allowMultipleSelections.of(true),
-  markdown({ base: markdownLanguage, codeLanguages: languages, extensions: [wikiLinkSyntax, hashtagSyntax] }),
+  markdown({ base: markdownLanguage, codeLanguages: languages, extensions: [wikiLinkSyntax, hashtagSyntax, highlightSyntax] }),
   syntaxHighlighting(highlightStyle),
   highlightSelectionMatches(),
   autocompletion({ override: [wikiLinkCompletions, slashCompletions], icons: false }),

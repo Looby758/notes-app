@@ -65,6 +65,29 @@ export const hashtagSyntax: MarkdownConfig = {
   ]
 }
 
+const EQUALS = 61 // =
+const HighlightDelim = { resolve: 'Highlight', mark: 'HighlightMark' }
+
+/** ==highlighted text==, parsed like ~~strikethrough~~. */
+export const highlightSyntax: MarkdownConfig = {
+  defineNodes: ['Highlight', { name: 'HighlightMark', style: tags.processingInstruction }],
+  parseInline: [
+    {
+      name: 'Highlight',
+      after: 'Emphasis',
+      parse(cx, next, pos) {
+        if (next !== EQUALS || cx.char(pos + 1) !== EQUALS || cx.char(pos + 2) === EQUALS) return -1
+        if (pos > cx.offset && cx.char(pos - 1) === EQUALS) return -1
+        const before = pos === cx.offset ? ' ' : cx.slice(pos - 1, pos)
+        const after = cx.slice(pos + 2, pos + 3) || ' '
+        const spaceBefore = /\s/.test(before)
+        const spaceAfter = /\s/.test(after)
+        return cx.addDelimiter(HighlightDelim, pos, pos + 2, !spaceAfter, !spaceBefore)
+      }
+    }
+  ]
+}
+
 /** Typing `[[` suggests notes; picking one completes the link. */
 export function wikiLinkCompletions(ctx: CompletionContext): CompletionResult | null {
   const match = ctx.matchBefore(/\[\[[^[\]|#\n]*$/)

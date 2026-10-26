@@ -184,6 +184,13 @@ export const commands: Command[] = [
   { id: 'settings', group: 'View', title: 'Open settings', shortcut: 'Ctrl+,', run: () => openSpecialTab(SETTINGS_TAB) },
   { id: 'focus', group: 'View', title: 'Toggle focus mode', shortcut: 'Ctrl+\\', run: toggleFocusMode },
   {
+    id: 'view.reading',
+    group: 'View',
+    title: 'Reading mode / writing mode',
+    shortcut: 'Ctrl+Shift+R',
+    run: () => setPrefs({ readingMode: !usePrefs.getState().prefs.readingMode })
+  },
+  {
     id: 'typewriter.center',
     group: 'View',
     title: 'Typewriter mode: keep the current line in the middle',

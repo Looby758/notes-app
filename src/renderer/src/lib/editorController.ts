@@ -140,6 +140,7 @@ const EDITOR_PREF_KEYS = [
   'typewriterCenter',
   'typewriterDim',
   'typewriterDimUnit',
+  'readingMode',
   'shortcuts'
 ] as const satisfies readonly (keyof Prefs)[]
 
