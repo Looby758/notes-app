@@ -22,6 +22,8 @@ import CalendarPage from '../Calendar/CalendarPage'
 import GraphPage from '../Graph/GraphPage'
 import ReplacePage from '../Replace/ReplacePage'
 import TabBar from './TabBar'
+import LockScreen from '../Lock/LockScreen'
+import { needsUnlock, useLock } from '../../lib/lock/session'
 import { IS_MAC, showKeys } from '@shared/platform'
 
 /** A shortcut as keycaps: "Ctrl" "P" on Windows, "⌘P" on a Mac. */
@@ -47,7 +49,8 @@ export default function Pane({ pane }: { pane: string }) {
   const multiple = useEditor((s) => Object.keys(s.panes).length > 1)
   const conflict = useEditor((s) => (active ? s.status[active] === 'conflict' : false))
   const [zone, setZone] = useState<DropZone | null>(null)
-  const showingNote = isNoteTab(active)
+  const lockedNote = useLock((s) => isNoteTab(active) && needsUnlock(active, s))
+  const showingNote = isNoteTab(active) && !lockedNote
 
   useEffect(() => mountPane(pane, host.current!), [pane])
 
@@ -102,6 +105,7 @@ export default function Pane({ pane }: { pane: string }) {
           </div>
         )}
         <div ref={host} className={`editor-host ${showingNote ? '' : 'hidden'}`} />
+        {lockedNote && <LockScreen key={active} path={active!} autoFocus={isActivePane} />}
         {isBlankTab(active) && <NewTabPage key={active} autoFocus={isActivePane} />}
         {active === SETTINGS_TAB && <SettingsPage />}
         {active === CALENDAR_TAB && <CalendarPage />}

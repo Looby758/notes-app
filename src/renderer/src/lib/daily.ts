@@ -3,7 +3,8 @@ import { addDays, formatDate, fromDayKey } from './dates'
 import { fillTemplate } from './templates'
 import { formatEventLine, insertEvent, toggleTaskAt, type DatedItem } from './schedule'
 import { applyText, getOpenText, isNoteTab, openNote } from './editorController'
-import { findNode } from './paths'
+import { findNode, noteTitle } from './paths'
+import { isLockedText } from './lock/crypto'
 import { dailyDateOf, dailyPath } from './dailyPaths'
 import { usePrefs } from '../store/prefs'
 import { useVault } from '../store/vault'
@@ -52,7 +53,11 @@ export function stepDaily(step: 1 | -1): void {
  * kept), else on disk.
  */
 export async function editNote(path: string, change: (text: string) => string | null): Promise<boolean> {
-  const current = getOpenText(path) ?? normalizeText(await window.api.readNote(path))
+  let current = getOpenText(path)
+  if (current === null) {
+    current = normalizeText(await window.api.readNote(path))
+    if (isLockedText(current)) throw new Error(`“${noteTitle(path)}” is locked. Open and unlock it to change it.`)
+  }
   const next = change(current)
   if (next === null || next === current) return false
   if (!applyText(path, next)) await window.api.writeNote(path, next)

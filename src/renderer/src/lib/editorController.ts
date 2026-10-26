@@ -19,6 +19,7 @@ import { notify } from '../store/notify'
 import { usePrefs } from '../store/prefs'
 import type { Prefs } from '@shared/prefs'
 import { isWithin, replacePrefix } from './paths'
+import { noteLockState, onBeforeLock, openText, remapLock, sealText, useLock, type NoteLock } from './lock/session'
 import { currentHeadingIndex, extractHeadings } from './outline'
 import {
   isValidLayout,
@@ -65,6 +66,8 @@ interface NoteFile {
   saving?: Promise<void>
   /** Disk content that arrived while there were unsaved edits. */
   conflict?: string
+  /** Set for a locked note: it's saved locked again. */
+  lock?: NoteLock
 }
 
 interface Session {
@@ -86,7 +89,7 @@ const fromDisk = Annotation.define<boolean>()
 const fromSync = Annotation.define<boolean>()
 
 const files = new Map<string, NoteFile>()
-const loading = new Map<string, Promise<NoteFile | null>>()
+const loading = new Map<string, Promise<NoteFile | null | 'locked'>>()
 const sessions = new Map<string, Session>()
 const views = new Map<string, PaneView>()
 let vaultKey = ''
@@ -344,7 +347,8 @@ function restore(): { layout: LayoutNode; panes: Record<string, PaneState>; acti
 
 // ---------- loading and showing ----------
 
-async function loadFile(path: string): Promise<NoteFile | null> {
+/** A note's file, or 'locked' when it's a locked note you haven't unlocked yet. */
+async function loadFile(path: string): Promise<NoteFile | null | 'locked'> {
   const existing = files.get(path)
   if (existing) return existing
   if (!loading.has(path)) {
@@ -352,8 +356,10 @@ async function loadFile(path: string): Promise<NoteFile | null> {
       path,
       window.api
         .readNote(path)
-        .then((raw) => {
-          const file: NoteFile = files.get(path) ?? { path, saved: normalize(raw) }
+        .then((raw) => openText(path, normalize(raw)))
+        .then((opened) => {
+          if (opened === 'locked') return 'locked' as const
+          const file: NoteFile = files.get(path) ?? { path, saved: opened.text, lock: opened.lock }
           files.set(path, file)
           setStatus(path, 'saved')
           return file
@@ -365,11 +371,11 @@ async function loadFile(path: string): Promise<NoteFile | null> {
   return loading.get(path)!
 }
 
-async function getSession(pane: string, path: string): Promise<Session | null> {
+async function getSession(pane: string, path: string): Promise<Session | null | 'locked'> {
   const key = keyOf(pane, path)
   if (sessions.has(key)) return sessions.get(key)!
   const file = await loadFile(path)
-  if (!file) return null
+  if (!file || file === 'locked') return file
   if (sessions.has(key)) return sessions.get(key)! // created while we waited
   // Another pane may already have unsaved edits to this note: start from those.
   const text = currentText(path) ?? file.saved
@@ -403,6 +409,13 @@ async function show(pane: string, id: string | null, focus = true): Promise<void
   if (!s) {
     // The file is gone (deleted or renamed outside the app); drop the tab quietly.
     closeTab(id, pane)
+    return
+  }
+  if (s === 'locked') {
+    // The pane shows the lock screen; this tab is shown again once it's unlocked.
+    now.shown = null
+    now.view.setState(EditorState.create())
+    if (pane === activePane()) clearStats()
     return
   }
   stash(pane)
@@ -804,7 +817,9 @@ export function remap(from: string, to: string): void {
   for (const f of [...files.values()]) {
     if (!isWithin(f.path, from)) continue
     files.delete(f.path)
-    f.path = replacePrefix(f.path, from, to)
+    const next = replacePrefix(f.path, from, to)
+    remapLock(f.path, next)
+    f.path = next
     files.set(f.path, f)
   }
   for (const s of [...sessions.values()]) {
@@ -923,8 +938,8 @@ async function save(f: NoteFile, force = false): Promise<void> {
     return
   }
   setStatus(f.path, 'saving')
-  f.saving = window.api
-    .writeNote(f.path, doc)
+  f.saving = sealText(f.path, doc, f.lock)
+    .then((content) => window.api.writeNote(f.path, content))
     .then(() => {
       f.saved = doc
       setStatus(f.path, currentText(f.path) === doc ? 'saved' : 'unsaved')
@@ -1006,9 +1021,12 @@ export async function handleExternalChanges(paths: string[]): Promise<void> {
     await f.saving
     let disk: string
     try {
-      disk = normalize(await window.api.readNote(path))
+      const opened = await openText(path, normalize(await window.api.readNote(path)))
+      if (opened === 'locked') continue // locked by another device or app; keep what's open
+      f.lock = opened.lock
+      disk = opened.text
     } catch {
-      continue // deleted; the tree refresh deals with it
+      continue // deleted (the tree refresh deals with it), or locked with a key we don't have
     }
     if (disk === f.saved) continue // our own save, or no real change
     if (currentText(path) === f.saved) {
@@ -1037,3 +1055,52 @@ export function resolveConflict(path: string, keep: 'disk' | 'mine'): void {
     save(f, true)
   }
 }
+
+// ---------- locked notes ----------
+
+/**
+ * Locks a note (with the notes password or its own), changes how, or (`lock` undefined) removes
+ * the lock. The note must be readable right now (not locked, or unlocked).
+ */
+export async function setNoteLock(path: string, lock: NoteLock | undefined): Promise<void> {
+  const file = await loadFile(path)
+  if (!file || file === 'locked') throw new Error('Unlock the note first.')
+  await flush(file)
+  const text = currentText(path) ?? file.saved
+  const content = await sealText(path, text, lock)
+  file.lock = lock
+  await window.api.writeNote(path, content)
+  file.saved = text
+  noteLockState(path, content)
+  setStatus(path, currentText(path) === text ? 'saved' : 'unsaved')
+}
+
+/** Whether an open note is saved locked. */
+export const noteLockOf = (path: string): NoteLock | undefined => files.get(path)?.lock
+
+// Before keys are forgotten: save locked notes, and take them off screen.
+onBeforeLock(async () => {
+  const lockedFiles = [...files.values()].filter((f) => f.lock)
+  await Promise.all(lockedFiles.map(flush))
+  for (const f of lockedFiles) {
+    for (const s of sessionsFor(f.path)) {
+      const pv = views.get(s.pane)
+      if (pv && pv.shown === s.path) {
+        pv.shown = null
+        pv.view.setState(EditorState.create())
+      }
+      sessions.delete(keyOf(s.pane, s.path))
+    }
+    forgetFile(f.path)
+  }
+  refreshStats()
+})
+
+// Unlocking (or locking again): panes showing a locked note load it, or show the lock screen.
+useLock.subscribe((s, prev) => {
+  if (s.version === prev.version) return
+  for (const [pane, pv] of views) {
+    const active = paneState(pane).active
+    if (isNoteTab(active) && pv.shown !== active) show(pane, active, pane === activePane())
+  }
+})

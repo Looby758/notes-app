@@ -41,6 +41,7 @@ import EditorArea from './Editor/EditorArea'
 import LayoutMenu from './Editor/LayoutMenu'
 import RightPanel from './Panels/RightPanel'
 import Modals from './Picker/Modals'
+import LockDialog from './Lock/LockDialog'
 import { EventDetails } from './Calendar/shared'
 import Resizer from './Resizer'
 import UpdateToast from './UpdateToast'
@@ -316,6 +317,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       </footer>
 
       <Modals />
+      <LockDialog />
       <EventDetails />
       <UpdateToast />
       <ZenBar />

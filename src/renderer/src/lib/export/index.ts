@@ -1,5 +1,6 @@
 import { useNoteIndex, getNoteText } from '../../store/noteIndex'
 import { getOpenText } from '../editorController'
+import { isLocked } from '../lock/session'
 import { noteTitle } from '../paths'
 import { imagesIn, notesUnder, prepareNote, type ExportItem } from './prepare'
 import { toHtmlDocument } from './html'
@@ -108,8 +109,9 @@ function fileNames(items: ExportItem[], ext: string): Map<string, string> {
  */
 export async function runExport(req: ExportRequest): Promise<string | null> {
   const { lookup } = useNoteIndex.getState()
-  const paths = notesFor(req)
-  if (paths.length === 0) throw new Error('There are no notes to export there.')
+  // Locked notes are only exported while they're open and unlocked.
+  const paths = notesFor(req).filter((p) => !isLocked(p) || getOpenText(p) !== null)
+  if (paths.length === 0) throw new Error(isLocked(req.target) ? 'Open and unlock the note to export it.' : 'There are no notes to export there.')
   const ctx = { lookup, textOf: (p: string) => getOpenText(p) ?? getNoteText(p) }
   const items = paths.map((p) => prepareNote(p, ctx, req.includeProperties))
   const name = fileName(req.paths ? `Notes (${paths.length})` : req.isFolder ? (req.target ? noteTitle(req.target + '.md') : 'All notes') : noteTitle(req.target))

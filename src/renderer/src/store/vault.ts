@@ -1,3 +1,4 @@
+import { loadLock } from '../lib/lock/session'
 import { create } from 'zustand'
 import type { FileNode } from '@shared/types'
 import { ancestorsOf, findNode, isWithin, notePaths, parentOf, replacePrefix } from '../lib/paths'
@@ -93,6 +94,7 @@ export const useVault = create<VaultState>((set, get) => {
     open(vault) {
       set({ vault, tree: [], expanded: loadExpanded(vault), selected: null, renaming: null })
       resetIndex()
+      void loadLock()
       loadStarred()
       get().refresh()
     },

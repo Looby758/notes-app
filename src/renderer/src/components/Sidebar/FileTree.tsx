@@ -12,6 +12,8 @@ import {
   FolderOpen,
   FolderPlus,
   FolderSearch,
+  Lock,
+  LockOpen,
   Pencil,
   Star,
   StarOff,
@@ -30,6 +32,8 @@ import { openExport, useUI } from '../../store/ui'
 import { clearSelection, selectRange, toggleSelected, useSelection } from '../../store/selection'
 import { starMany, trashMany } from '../../lib/bulk'
 import { FILE_MANAGER } from '@shared/platform'
+import { useLock, isLocked } from '../../lib/lock/session'
+import { lockNote, removeLock } from '../../lib/lock/actions'
 
 const INDENT = 14
 const AUTO_EXPAND_MS = 600
@@ -102,6 +106,9 @@ export default function FileTree() {
             isStarred(node.path)
               ? { label: 'Unstar', icon: <StarOff size={15} />, onClick: () => toggleStar(node.path) }
               : { label: 'Star', icon: <Star size={15} />, onClick: () => toggleStar(node.path) },
+            isLocked(node.path)
+              ? { label: 'Remove lock…', icon: <LockOpen size={15} />, onClick: () => removeLock(node.path) }
+              : { label: 'Lock note', icon: <Lock size={15} />, onClick: () => lockNote(node.path) },
             'separator'
           ]
         : []
@@ -254,6 +261,7 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
   const starred = useStarred((s) => s.paths.includes(node.path))
   const multi = useSelection((s) => s.paths.includes(node.path))
   const noteIcon = useNoteIndex((s) => (isFolder ? undefined : s.notes.get(node.path)?.icon))
+  const locked = useLock((s) => !isFolder && node.path in s.locked)
   const { toggle, expand, select, startRename } = useVault.getState()
   const expandTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
@@ -346,6 +354,7 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
           noteIcon ? <span className="tree-icon tree-emoji">{noteIcon}</span> : <FileText size={15} className="tree-icon" />
         )}
         {isRenaming ? <RenameInput node={node} /> : <span className="tree-label">{displayName(node)}</span>}
+        {locked && !isRenaming && <Lock size={11} className="tree-lock" aria-label="Locked" />}
         {starred && !isRenaming && <Star size={11} className="tree-star" aria-label="Starred" />}
       </div>
       {isFolder && expanded && (

@@ -5,6 +5,7 @@ import { useNoteIndex, getNoteText } from '../../store/noteIndex'
 import { useVault } from '../../store/vault'
 import { notify } from '../../store/notify'
 import { getOpenText, openNote } from '../../lib/editorController'
+import { isLocked } from '../../lib/lock/session'
 import { editNote } from '../../lib/daily'
 import { isWithin, noteTitle, parentOf } from '../../lib/paths'
 import { applyMatches, buildPattern, findMatches, type FindOptions, type Match } from '../../lib/replace'
@@ -78,7 +79,7 @@ export default function ReplacePage() {
     const { lookup } = useNoteIndex.getState()
     const out: NoteMatches[] = []
     for (const path of lookup.paths) {
-      if (folder && !isWithin(path, folder)) continue
+      if ((folder && !isWithin(path, folder)) || isLocked(path)) continue
       const text = getOpenText(path) ?? getNoteText(path)
       if (!text) continue
       const matches = findMatches(text, pattern, debounced.replacement, opts)

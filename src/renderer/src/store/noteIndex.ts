@@ -9,6 +9,8 @@ import { readFrontmatter } from '../lib/properties'
 import { compareItems, parseDatedItems, type DatedItem } from '../lib/schedule'
 import { dailyDateOf } from '../lib/dailyPaths'
 import { usePrefs } from './prefs'
+import { forgetLockState, noteLockState } from '../lib/lock/session'
+import { isLockedText } from '../lib/lock/crypto'
 
 /**
  * Everything the app knows about the vault's notes beyond the file tree: links (for backlinks
@@ -83,7 +85,9 @@ function datedItems(path: string, text: string): DatedItem[] {
 }
 
 function put(notes: Map<string, NoteEntry>, path: string, raw: string): void {
-  const text = normalizeText(raw)
+  noteLockState(path, raw)
+  // Locked notes are left out of search, links, tags, the graph and the calendar: only the name shows.
+  const text = isLockedText(raw) ? '' : normalizeText(raw)
   texts.set(path, text)
   const icon = readFrontmatter(text)?.properties.find((p) => p.key === 'icon')?.value
   notes.set(path, { links: indexLinks(text), tags: parseTags(text), dated: datedItems(path, text), icon: typeof icon === 'string' && icon ? icon : undefined })
@@ -93,6 +97,7 @@ function put(notes: Map<string, NoteEntry>, path: string, raw: string): void {
 }
 
 function drop(notes: Map<string, NoteEntry>, path: string): void {
+  forgetLockState(path)
   notes.delete(path)
   texts.delete(path)
   if (search.has(path)) search.discard(path)

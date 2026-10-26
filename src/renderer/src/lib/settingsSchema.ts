@@ -333,6 +333,17 @@ export const SETTINGS: SettingDef[] = [
     description: 'Templates can carry tags for the notes made from them without showing up under those tags themselves (in the Tags list and #tag searches).',
     keywords: 'template tags hide search'
   },
+  {
+    key: 'autoLockMinutes',
+    section: 'files',
+    group: 'Locked notes',
+    type: 'slider',
+    ...RANGES.autoLockMinutes,
+    format: (v) => (v === 0 ? 'Never' : `${v} min`),
+    label: 'Lock again after',
+    description: 'Unlocked notes lock again after this long without using Notes. (Also Ctrl+K → “Lock all notes now”, and they always lock when Notes closes.)',
+    keywords: 'lock password encrypt private secure auto timeout'
+  },
 
   // ---------- Calendar ----------
   {

@@ -64,6 +64,8 @@ export interface Prefs {
   timerAlwaysVisible: boolean
   /** Leave zen mode when the whole session is done. */
   timerLeaveZen: boolean
+  /** Locked notes lock again after this many minutes without using the app (0: only when you say). */
+  autoLockMinutes: number
 
   // Files (vault-relative folder paths)
   /** Where pasted and dropped images and files are saved. */
@@ -150,6 +152,7 @@ export const DEFAULT_PREFS: Prefs = {
   timerChime: true,
   timerAlwaysVisible: true,
   timerLeaveZen: false,
+  autoLockMinutes: 10,
 
   attachmentFolder: 'attachments',
   templatesFolder: 'Templates',
@@ -188,7 +191,8 @@ export const RANGES = {
   focusMinutes: { min: 1, max: 180, step: 1 },
   breakMinutes: { min: 1, max: 60, step: 1 },
   longBreakMinutes: { min: 1, max: 90, step: 1 },
-  focusRounds: { min: 1, max: 12, step: 1 }
+  focusRounds: { min: 1, max: 12, step: 1 },
+  autoLockMinutes: { min: 0, max: 120, step: 5 }
 } as const
 
 const CHOICES = {
@@ -255,7 +259,7 @@ export function normalizePrefs(raw: unknown): Prefs {
     out.spellcheckLanguage = input.spellcheckLanguage
   }
   out.tabSize = Math.round(out.tabSize)
-  for (const k of ['focusMinutes', 'breakMinutes', 'longBreakMinutes', 'focusRounds'] as const) out[k] = Math.round(out[k])
+  for (const k of ['focusMinutes', 'breakMinutes', 'longBreakMinutes', 'focusRounds', 'autoLockMinutes'] as const) out[k] = Math.round(out[k])
   out.attachmentFolder = cleanFolder(input.attachmentFolder ?? DEFAULT_PREFS.attachmentFolder, DEFAULT_PREFS.attachmentFolder)
   out.templatesFolder = cleanFolder(input.templatesFolder ?? DEFAULT_PREFS.templatesFolder, DEFAULT_PREFS.templatesFolder)
   out.dailyFolder = cleanFolder(input.dailyFolder ?? DEFAULT_PREFS.dailyFolder, DEFAULT_PREFS.dailyFolder)

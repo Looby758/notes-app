@@ -29,6 +29,7 @@ import { matchesShortcut } from './shortcuts'
 import { FILE_MANAGER } from '@shared/platform'
 import { openRandomNote } from './random'
 import { notify } from '../store/notify'
+import { changeNotesPassword, lockAllNow, lockNote, lockNoteOwn, removeLock } from './lock/actions'
 
 export interface Command {
   id: string
@@ -115,6 +116,36 @@ export const commands: Command[] = [
     }
   },
   { id: 'vault.export', group: 'Notes folder', title: 'Export all notes…', run: () => openExport('', true) },
+
+  {
+    id: 'lock.note',
+    group: 'Locked notes',
+    title: 'Lock this note',
+    run: () => {
+      const path = activeNote()
+      if (path) lockNote(path)
+    }
+  },
+  {
+    id: 'lock.noteOwn',
+    group: 'Locked notes',
+    title: 'Lock this note with its own password…',
+    run: () => {
+      const path = activeNote()
+      if (path) lockNoteOwn(path)
+    }
+  },
+  {
+    id: 'lock.remove',
+    group: 'Locked notes',
+    title: 'Remove the lock from this note…',
+    run: () => {
+      const path = activeNote()
+      if (path) removeLock(path)
+    }
+  },
+  { id: 'lock.now', group: 'Locked notes', title: 'Lock all notes now', shortcut: 'Ctrl+Alt+L', run: lockAllNow },
+  { id: 'lock.password', group: 'Locked notes', title: 'Change notes password…', run: changeNotesPassword },
 
   { id: 'capture.open', group: 'Notes', title: 'Quick capture…', run: () => window.api.openCapture() },
   { id: 'daily.today', group: 'Calendar', title: "Open today's note", shortcut: 'Ctrl+Shift+D', run: () => openToday() },
