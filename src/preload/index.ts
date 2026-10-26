@@ -23,6 +23,12 @@ const api: NotesApi = {
     return () => ipcRenderer.removeListener('update:status', handler)
   },
 
+  readImage: (path) => ipcRenderer.invoke('fs:readImage', path),
+  printToPdf: (html) => ipcRenderer.invoke('export:pdf', html),
+  exportFile: (name, format, data) => ipcRenderer.invoke('export:file', name, format, data),
+  exportFiles: (folderName, files) => ipcRenderer.invoke('export:files', folderName, files),
+  showExported: (path) => ipcRenderer.invoke('export:show', path),
+
   openCapture: () => ipcRenderer.invoke('capture:open'),
   closeCapture: () => ipcRenderer.invoke('capture:close'),
   captureStatus: () => ipcRenderer.invoke('capture:status'),

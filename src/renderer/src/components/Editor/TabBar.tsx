@@ -1,7 +1,8 @@
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { CalendarDays, Columns2, Orbit, FolderSearch, Pin, PinOff, Plus, Rows2, Settings, Star, StarOff, X } from 'lucide-react'
+import { CalendarDays, Columns2, FileDown, Orbit, FolderSearch, Pin, PinOff, Plus, Rows2, Settings, Star, StarOff, X } from 'lucide-react'
 import { useEditor } from '../../store/editor'
 import { toggleStar, useStarred } from '../../store/starred'
+import { openExport } from '../../store/ui'
 import {
   activateTab,
   CALENDAR_TAB,
@@ -127,7 +128,7 @@ export default function TabBar({ pane }: { pane: string }) {
         label: `Show in ${FILE_MANAGER}`,
         icon: <FolderSearch size={15} />,
         onClick: () => window.api.reveal(id)
-      })
+      }, { label: 'Export…', icon: <FileDown size={15} />, onClick: () => openExport(id, false) })
     }
     return items
   }

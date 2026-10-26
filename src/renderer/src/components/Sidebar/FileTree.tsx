@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react'
 import {
   ChevronRight,
+  FileDown,
   Columns2,
   FilePlus,
   FileText,
@@ -21,6 +22,7 @@ import ContextMenu, { type MenuItem } from '../ContextMenu'
 import { focusEditor, openNote, splitPane } from '../../lib/editorController'
 import { setDrag } from '../../lib/dnd'
 import { useEditor } from '../../store/editor'
+import { openExport } from '../../store/ui'
 import { FILE_MANAGER } from '@shared/platform'
 
 const INDENT = 14
@@ -69,7 +71,7 @@ export default function FileTree() {
       { label: 'New note', icon: <FilePlus size={15} />, onClick: () => newNote(node?.path ?? '') },
       { label: 'New folder', icon: <FolderPlus size={15} />, onClick: () => newFolder(node?.path ?? '') }
     ]
-    if (!node) return create
+    if (!node) return [...create, 'separator', { label: 'Export all notes…', icon: <FileDown size={15} />, onClick: () => openExport('', true) }]
     const open: MenuItem[] =
       node.type === 'file'
         ? [
@@ -85,6 +87,7 @@ export default function FileTree() {
       ...open,
       { label: 'Rename', icon: <Pencil size={15} />, onClick: () => startRename(node.path) },
       { label: `Show in ${FILE_MANAGER}`, icon: <FolderSearch size={15} />, onClick: () => window.api.reveal(node.path) },
+      { label: 'Export…', icon: <FileDown size={15} />, onClick: () => openExport(node.path, node.type === 'folder') },
       'separator',
       { label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: () => trash(node.path) }
     ]

@@ -4,7 +4,7 @@ import { dayKey as dayKeyOf } from '../lib/dates'
 export type SidebarView = 'files' | 'search' | 'tags'
 export type RightView = 'backlinks' | 'outline' | 'calendar'
 export type CalendarView = 'month' | 'week'
-export type Modal = 'switcher' | 'commands' | 'template' | null
+export type Modal = 'switcher' | 'commands' | 'template' | 'export' | null
 
 export const SIDEBAR_MIN = 180
 export const SIDEBAR_MAX = 520
@@ -31,6 +31,8 @@ interface UIState {
   /** Bumped to ask the search box to take focus. */
   searchFocus: number
   modal: Modal
+  /** What the Export dialog exports: a note, or a folder ('' = every note). */
+  exportTarget: { path: string; isFolder: boolean } | null
   /** Provided by App: switching or closing the notes folder. */
   vaultActions: { switchVault: () => void; closeVault: () => void }
 }
@@ -63,6 +65,7 @@ export const useUI = create<UIState>(() => ({
   searchQuery: '',
   searchFocus: 0,
   modal: null,
+  exportTarget: null,
   vaultActions: { switchVault: () => {}, closeVault: () => {} }
 }))
 
@@ -104,4 +107,9 @@ export function toggleFocusMode(): void {
     const anyOpen = s.leftOpen || s.rightOpen
     return { leftOpen: !anyOpen, rightOpen: !anyOpen }
   })
+}
+
+/** Opens the Export dialog for a note, a folder, or ('' as a folder) every note. */
+export function openExport(path: string, isFolder: boolean): void {
+  useUI.setState({ modal: 'export', exportTarget: { path, isFolder } })
 }

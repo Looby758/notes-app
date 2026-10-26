@@ -115,6 +115,18 @@ export interface NotesApi {
   installUpdate(): Promise<void>
   onUpdateStatus(callback: (status: UpdateStatus) => void): () => void
 
+  // Export
+  /** An image file's bytes (images inside the notes folder only). */
+  readImage(path: string): Promise<Uint8Array>
+  /** Turns a complete HTML page into a PDF (A4). */
+  printToPdf(html: string): Promise<Uint8Array>
+  /** Asks where to save one exported file and writes it; resolves with its path, or null if cancelled. */
+  exportFile(defaultName: string, format: 'pdf' | 'docx' | 'html', data: Uint8Array | string): Promise<string | null>
+  /** Asks for a folder and writes several exported files into a new folder inside it; resolves with that folder, or null. */
+  exportFiles(folderName: string, files: { name: string; data: Uint8Array | string }[]): Promise<string | null>
+  /** Shows a file in File Explorer / Finder. */
+  showExported(path: string): Promise<void>
+
   // Quick capture
   /** Opens the quick capture window. */
   openCapture(): Promise<void>

@@ -11,6 +11,7 @@ import {
   type MenuItemConstructorOptions
 } from 'electron'
 import { statSync } from 'fs'
+import { readFile } from 'fs/promises'
 import { basename, extname, join } from 'path'
 import { pathToFileURL } from 'url'
 import type { ConfirmOptions } from '@shared/types'
@@ -22,6 +23,7 @@ import { startWatching, stopWatching } from './watcher'
 import * as calendars from './calendarSources'
 import { applyCaptureShortcut, noteHiddenToTray, setupCapture, teardownCapture } from './capture'
 import { setupUpdater } from './updater'
+import { setupExport } from './exporter'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
 
 let vault: Vault | null = null
@@ -367,6 +369,12 @@ function registerIpc(): void {
   ipcMain.handle('fs:createFolder', (_e, folder: string) => currentVault().createFolder(folder))
   ipcMain.handle('fs:rename', (_e, path: string, name: string) => currentVault().rename(path, name))
   ipcMain.handle('fs:move', (_e, path: string, folder: string) => currentVault().move(path, folder))
+  // Image bytes for export (images only, from inside the notes folder).
+  ipcMain.handle('fs:readImage', async (_e, path: string) => {
+    const full = currentVault().abs(path)
+    if (!IMAGE_TYPES.has(extname(full).toLowerCase())) throw new Error('Not an image.')
+    return new Uint8Array(await readFile(full))
+  })
   ipcMain.handle('fs:reveal', (_e, path: string) => shell.showItemInFolder(currentVault().abs(path)))
   ipcMain.handle('cal:status', () => calendars.status())
   ipcMain.handle('cal:setClient', (_e, id: string, secret: string) => calendars.setClient(id, secret))
@@ -435,6 +443,7 @@ app.whenReady().then(() => {
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => ALLOWED_PERMISSIONS.has(permission))
   registerVaultProtocol()
   registerIpc()
+  setupExport()
   // Hand edits to settings.json apply straight away.
   watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs)))
   mainWindow = createWindow()

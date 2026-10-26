@@ -1,6 +1,6 @@
 import { useEditor } from '../store/editor'
 import { useVault } from '../store/vault'
-import { showRightView, showSearch, showSidebarView, toggleFocusMode, useUI } from '../store/ui'
+import { openExport, showRightView, showSearch, showSidebarView, toggleFocusMode, useUI } from '../store/ui'
 import { effectiveShortcut, setPrefs, usePrefs } from '../store/prefs'
 import { RANGES, DEFAULT_PREFS } from '@shared/prefs'
 import { EDITOR_COMMANDS } from '../components/Editor/formatting'
@@ -95,6 +95,17 @@ export const commands: Command[] = [
     }
   },
   { id: 'save', group: 'Notes', title: 'Save now', shortcut: 'Ctrl+S', run: saveNow },
+  {
+    id: 'note.export',
+    group: 'Notes',
+    title: 'Export note… (PDF, Word, web page)',
+    shortcut: 'Ctrl+Shift+P',
+    run: () => {
+      const path = activeNote()
+      if (path) openExport(path, false)
+    }
+  },
+  { id: 'vault.export', group: 'Notes folder', title: 'Export all notes…', run: () => openExport('', true) },
 
   { id: 'capture.open', group: 'Notes', title: 'Quick capture…', run: () => window.api.openCapture() },
   { id: 'daily.today', group: 'Calendar', title: "Open today's note", shortcut: 'Ctrl+Shift+D', run: () => openToday() },
