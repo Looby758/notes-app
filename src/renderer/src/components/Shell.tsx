@@ -42,6 +42,7 @@ import LayoutMenu from './Editor/LayoutMenu'
 import RightPanel from './Panels/RightPanel'
 import Modals from './Picker/Modals'
 import LockDialog from './Lock/LockDialog'
+import { startFormatMenu } from '../lib/formatMenu'
 import { EventDetails } from './Calendar/shared'
 import Resizer from './Resizer'
 import UpdateToast from './UpdateToast'
@@ -104,6 +105,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     void startReminders()
     const offReminder = window.api.onReminderOpen((path, line) => openNote(path, { line }))
     const offVoice = window.api.onVoiceStart(() => useUI.setState({ voiceOpen: true }))
+    const offFormat = startFormatMenu()
     const offChanged = window.api.onVaultChanged((paths) => {
       useVault.getState().refresh(paths)
       handleExternalChanges(paths)
@@ -127,6 +129,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       offIndex()
       offReminder()
       offVoice()
+      offFormat()
       stopReminders()
     }
   }, [vault])

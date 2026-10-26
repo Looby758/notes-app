@@ -1,4 +1,4 @@
-import { EditorSelection } from '@codemirror/state'
+import { EditorSelection, type EditorState, type Line } from '@codemirror/state'
 import type { Command } from '@codemirror/view'
 
 /**
@@ -112,6 +112,138 @@ export const addReminder: Command = (view) => {
   return true
 }
 
+// ---------- whole lines: headings, lists, quotes, callouts ----------
+
+const BLOCK_MARK = /^(\s*)(#{1,6}\s|[-*+]\s\[[ xX]\]\s|[-*+]\s|\d+[.)]\s|>\s?)?/
+
+/** The lines the selection touches (just the cursor's line when nothing is selected). */
+function selectedLines(state: EditorState): Line[] {
+  const seen = new Map<number, Line>()
+  for (const r of state.selection.ranges) {
+    const last = state.doc.lineAt(r.to).number
+    for (let n = state.doc.lineAt(r.from).number; n <= last; n++) seen.set(n, state.doc.line(n))
+  }
+  const lines = [...seen.values()]
+  // Several lines: leave the empty ones between paragraphs alone.
+  return lines.length > 1 ? lines.filter((l) => l.text.trim()) : lines
+}
+
+/**
+ * Makes the selected lines headings, list items or quotes (replacing any other such marker).
+ * If they all have this one already, it's removed instead.
+ */
+export function toggleLinePrefix(prefix: string): Command {
+  return (view) => {
+    const lines = selectedLines(view.state)
+    const has = (l: Line): boolean => (BLOCK_MARK.exec(l.text)![2] ?? '').trimEnd() === prefix.trimEnd()
+    const remove = lines.every(has)
+    view.dispatch({
+      changes: lines.map((l) => {
+        const m = BLOCK_MARK.exec(l.text)!
+        const from = l.from + m[1].length
+        return { from, to: from + (m[2]?.length ?? 0), insert: remove ? '' : prefix }
+      })
+    })
+    return true
+  }
+}
+
+/** Puts the selected lines in a callout box, with its title selected to type over. */
+export const makeCallout: Command = (view) => {
+  const { state } = view
+  const first = state.doc.lineAt(state.selection.main.from)
+  const last = state.doc.lineAt(state.selection.main.to)
+  const body = state
+    .sliceDoc(first.from, last.to)
+    .split('\n')
+    .map((l) => `> ${l.replace(/^>\s?/, '')}`.trimEnd() || '>')
+    .join('\n')
+  const head = '> [!note] '
+  view.dispatch({
+    changes: { from: first.from, to: last.to, insert: `${head}Note\n${body === '>' ? '> ' : body}` },
+    selection: EditorSelection.range(first.from + head.length, first.from + head.length + 4)
+  })
+  return true
+}
+
+// ---------- links ----------
+
+/** [[selection]]: a link to the note with that name (or unlinks it). */
+export const linkToNote: Command = (view) => {
+  const { state } = view
+  view.dispatch(
+    state.changeByRange((range) => {
+      const text = state.sliceDoc(range.from, range.to)
+      if (state.sliceDoc(range.from - 2, range.from) === '[[' && state.sliceDoc(range.to, range.to + 2) === ']]') {
+        return { changes: [{ from: range.from - 2, to: range.from }, { from: range.to, to: range.to + 2 }], range: EditorSelection.range(range.from - 2, range.to - 2) }
+      }
+      const m = /^\[\[([^\]]*)\]\]$/.exec(text)
+      if (m) return { changes: { from: range.from, to: range.to, insert: m[1] }, range: EditorSelection.range(range.from, range.from + m[1].length) }
+      return { changes: [{ from: range.from, insert: '[[' }, { from: range.to, insert: ']]' }], range: EditorSelection.range(range.from + 2, range.to + 2) }
+    })
+  )
+  return true
+}
+
+const URL_RE = /^https?:\/\/\S+$/i
+
+/**
+ * [selection](url). A copied web address is used for the url; otherwise "url" is selected to
+ * type over. Selecting a web address gives [](address) with the cursor in the brackets.
+ */
+export const webLink: Command = (view) => {
+  const range = view.state.selection.main
+  const text = view.state.sliceDoc(range.from, range.to)
+  const apply = (copied: string): void => {
+    const { from, to } = view.state.selection.main
+    if (URL_RE.test(text.trim())) {
+      view.dispatch({ changes: { from, to, insert: `[](${text.trim()})` }, selection: { anchor: from + 1 } })
+      return
+    }
+    const url = URL_RE.test(copied.trim()) ? copied.trim() : 'url'
+    const insert = `[${text}](${url})`
+    const urlFrom = from + text.length + 3
+    view.dispatch({
+      changes: { from, to, insert },
+      selection: url === 'url' ? EditorSelection.range(urlFrom, urlFrom + 3) : text ? { anchor: from + insert.length } : { anchor: from + 1 }
+    })
+  }
+  navigator.clipboard.readText().then(apply, () => apply(''))
+  return true
+}
+
+// ---------- clear formatting ----------
+
+const INLINE_MARKS = /<\/?mark\b[^>]*>|\*\*|~~|==|\*|`/g
+
+/** Removes bold, italic, strikethrough, code and highlight marks in (and just around) the selection. */
+export const clearFormatting: Command = (view) => {
+  const { state } = view
+  view.dispatch(
+    state.changeByRange((range) => {
+      if (range.empty) return { range }
+      let from = range.from
+      let to = range.to
+      // Take in markers that hug the selection: **[bold]**, <mark …>[text]</mark>.
+      for (let changed = true; changed; ) {
+        changed = false
+        const before = state.sliceDoc(Math.max(0, from - 40), from)
+        const after = state.sliceDoc(to, to + 10)
+        const open = /(<mark\b[^>]*>|\*\*|~~|==|\*|`)$/.exec(before)
+        const close = /^(<\/mark>|\*\*|~~|==|\*|`)/.exec(after)
+        if (open && close && (open[1] === close[1] || (open[1].startsWith('<mark') && close[1] === '</mark>'))) {
+          from -= open[1].length
+          to += close[1].length
+          changed = true
+        }
+      }
+      const cleaned = state.sliceDoc(from, to).replace(INLINE_MARKS, '')
+      return { changes: { from, to, insert: cleaned }, range: EditorSelection.range(from, from + cleaned.length) }
+    })
+  )
+  return true
+}
+
 /** Commands that act on the editor; their shortcuts can be changed in Settings like any other. */
 export interface EditorCommand {
   id: string
@@ -127,5 +259,16 @@ export const EDITOR_COMMANDS: EditorCommand[] = [
   { id: 'format.strike', title: 'Strikethrough', shortcut: 'Ctrl+Shift+X', run: toggleWrap('~~') },
   { id: 'format.highlight', title: 'Highlight', shortcut: 'Ctrl+Shift+H', run: toggleWrap('==') },
   { id: 'insert.reminder', title: 'Add a reminder to this line', shortcut: 'Ctrl+Alt+R', run: addReminder },
-  ...HIGHLIGHT_COLOURS.map((c) => ({ id: `format.highlight.${c}`, title: `Highlight ${c}`, run: toggleColourHighlight(c) }))
+  ...HIGHLIGHT_COLOURS.map((c) => ({ id: `format.highlight.${c}`, title: `Highlight ${c}`, run: toggleColourHighlight(c) })),
+  { id: 'format.linkNote', title: 'Link to a note [[ ]]', run: linkToNote },
+  { id: 'format.linkWeb', title: 'Web link', run: webLink },
+  { id: 'format.h1', title: 'Heading 1', run: toggleLinePrefix('# ') },
+  { id: 'format.h2', title: 'Heading 2', run: toggleLinePrefix('## ') },
+  { id: 'format.h3', title: 'Heading 3', run: toggleLinePrefix('### ') },
+  { id: 'format.bullet', title: 'Bullet list', run: toggleLinePrefix('- ') },
+  { id: 'format.numbered', title: 'Numbered list', run: toggleLinePrefix('1. ') },
+  { id: 'format.checklist', title: 'Checklist', run: toggleLinePrefix('- [ ] ') },
+  { id: 'format.quote', title: 'Quote', run: toggleLinePrefix('> ') },
+  { id: 'format.callout', title: 'Callout', run: makeCallout },
+  { id: 'format.clear', title: 'Clear formatting', run: clearFormatting }
 ]

@@ -186,6 +186,33 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'pair close bracket'
   },
   {
+    key: 'wrapSelection',
+    section: 'editor',
+    group: 'Writing',
+    type: 'toggle',
+    label: 'Wrap selected text when typing * = ~ or `',
+    description: 'Select a word and type * for italic (again for bold), = for a highlight, ~ for strikethrough or ` for code, instead of replacing it.',
+    keywords: 'auto pair format bold italic highlight wrap selection'
+  },
+  {
+    key: 'selectionToolbar',
+    section: 'editor',
+    group: 'Writing',
+    type: 'toggle',
+    label: 'Formatting toolbar on selected text',
+    description: 'Bold, italic, highlight, links and more, just above what you select. (Right-clicking selected text has them all too.)',
+    keywords: 'toolbar format bubble popup selection bold'
+  },
+  {
+    key: 'smartPaste',
+    section: 'editor',
+    group: 'Writing',
+    type: 'toggle',
+    label: 'Smart paste',
+    description: 'A pasted web address becomes a link with the page’s title; a table copied from Excel or a web page becomes a markdown table. Paste over selected text to link it. Ctrl+Shift+V always pastes plain text.',
+    keywords: 'paste link url title table excel spreadsheet'
+  },
+  {
     key: 'vimMode',
     section: 'editor',
     group: 'Writing',

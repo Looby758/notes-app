@@ -30,6 +30,8 @@ import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
+import { formatMenuFor, setupMenus } from './menus'
+import { setupWebTitle } from './webTitle'
 
 let vault: Vault | null = null
 const shownReminders = new Set<Electron.Notification>()
@@ -337,9 +339,10 @@ function createWindow(): BrowserWindow {
       )
     }
     if (params.isEditable) {
-      // In a note (not a text box elsewhere): record a voice note here.
+      // In a note (not a text box elsewhere): format the selected text, or record a voice note here.
       if (win === mainWindow && params.formControlType === 'none') {
-        items.push({ label: 'Record a voice note…', click: () => win.webContents.send('voice:start') }, { type: 'separator' })
+        if (params.selectionText.trim()) items.push(...formatMenuFor(win))
+        else items.push({ label: 'Record a voice note…', click: () => win.webContents.send('voice:start') }, { type: 'separator' })
       }
       items.push(
         { role: 'cut', enabled: params.editFlags.canCut },
@@ -411,6 +414,8 @@ function registerIpc(): void {
     shownReminders.add(n)
     n.on('close', () => shownReminders.delete(n))
   })
+  setupMenus()
+  setupWebTitle()
   // The Mac asks once whether Notes may use the microphone.
   ipcMain.handle('voice:access', async () => (IS_MAC ? systemPreferences.askForMediaAccess('microphone') : true))
   ipcMain.handle('app:fullscreen', (event, on: boolean) => BrowserWindow.fromWebContents(event.sender)?.setFullScreen(on))

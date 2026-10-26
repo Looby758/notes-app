@@ -120,6 +120,16 @@ export interface NotesApi {
   /** The note's right-click menu asked to record a voice note. */
   onVoiceStart(callback: () => void): () => void
 
+  // Menus
+  /** The Format items shown when you right-click selected text in a note. */
+  setFormatMenu(items: PopupMenuItem[]): void
+  /** A Format item was picked from the right-click menu. */
+  onFormat(callback: (id: string) => void): () => void
+  /** Pops up a native menu at (x, y) in the page; resolves to the picked item's id, or null. */
+  popupMenu(items: PopupMenuItem[], x: number, y: number): Promise<string | null>
+  /** A web page's title (for pasted links); null if it can't be read quickly. */
+  webTitle(url: string): Promise<string | null>
+
   // Updates
   updateStatus(): Promise<UpdateStatus>
   /** Looks for a newer version now. */
@@ -215,3 +225,6 @@ export interface NotesApi {
   onBeforeClose(callback: () => void): () => void
   readyToClose(): Promise<void>
 }
+
+/** An item in a native menu described by the UI. */
+export type PopupMenuItem = 'separator' | { id?: string; label: string; accelerator?: string; submenu?: PopupMenuItem[] }

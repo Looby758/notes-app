@@ -8,6 +8,7 @@ import { matchesSearch, SECTIONS, SETTINGS, type SectionId, type SettingDef } fr
 import { SettingControl } from './Controls'
 import ShortcutsEditor, { matchingCommands } from './ShortcutsEditor'
 import CalendarSources from './CalendarSources'
+import SnippetsEditor from './SnippetsEditor'
 import pkg from '../../../../../package.json'
 import { showKeys, TRAY_NAME } from '@shared/platform'
 
@@ -20,6 +21,8 @@ const ICONS: Record<SectionId, typeof Palette> = {
   shortcuts: Keyboard,
   about: Info
 }
+
+const SNIPPET_WORDS = /^(snip|expan|text sh|abbrev|;)/i
 
 const isModified = (def: SettingDef, prefs: Record<string, unknown>): boolean =>
   JSON.stringify(prefs[def.key]) !== JSON.stringify(DEFAULT_PREFS[def.key])
@@ -231,7 +234,8 @@ export default function SettingsPage() {
               <h2>Results for “{q}”</h2>
               {results.length > 0 && <SettingsList defs={results} />}
               <ShortcutsEditor query={q} />
-              {results.length === 0 && matchingCommands(q).length === 0 && <p className="settings-empty">No settings match.</p>}
+              {SNIPPET_WORDS.test(q) && <SnippetsEditor />}
+              {results.length === 0 && matchingCommands(q).length === 0 && !SNIPPET_WORDS.test(q) && <p className="settings-empty">No settings match.</p>}
             </>
           ) : (
             <>
@@ -253,6 +257,7 @@ export default function SettingsPage() {
               ) : (
                 <>
                   <SettingsList defs={sectionDefs} />
+                  {section === 'editor' && <SnippetsEditor />}
                   {section === 'calendar' && <CalendarSources />}
                   {section === 'capture' && <CaptureShortcutStatus />}
                 </>

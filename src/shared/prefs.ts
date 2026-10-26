@@ -35,6 +35,12 @@ export interface Prefs {
   lineNumbers: boolean
   highlightActiveLine: boolean
   autoPair: boolean
+  /** Typing * = ~ or ` with text selected wraps it (bold, highlight…) instead of replacing it. */
+  wrapSelection: boolean
+  /** A small formatting toolbar above selected text. */
+  selectionToolbar: boolean
+  /** Pasting a web address fetches its title; pasting a table (Excel, a web page) makes a markdown table. */
+  smartPaste: boolean
   vimMode: boolean
   cursorBlink: boolean
   showWordCount: boolean
@@ -134,6 +140,9 @@ export const DEFAULT_PREFS: Prefs = {
   lineNumbers: false,
   highlightActiveLine: false,
   autoPair: false,
+  wrapSelection: true,
+  selectionToolbar: true,
+  smartPaste: true,
   vimMode: false,
   cursorBlink: true,
   showWordCount: true,

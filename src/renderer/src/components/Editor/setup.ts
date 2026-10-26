@@ -23,6 +23,9 @@ import { hashtagSyntax, highlightSyntax, wikiLinkCompletions, wikiLinkSyntax } f
 import { EDITOR_COMMANDS } from './formatting'
 import { attachmentHandlers } from './attachments'
 import { slashCompletions } from './slash'
+import { snippetCompletions, snippetExpander } from './snippets'
+import { selectionToolbar, wrapOnType } from './selectionTools'
+import { smartPaste } from './smartPaste'
 import { embedDepth, embeds, setEmbedStateFactory } from './embeds'
 import { toCodeMirrorKey } from '../../lib/shortcuts'
 import { typewriter } from './typewriter'
@@ -54,6 +57,9 @@ export function prefsExtensions(p: Prefs): Extension {
     p.lineNumbers ? lineNumbers() : [],
     p.highlightActiveLine ? highlightActiveLine() : [],
     p.autoPair ? [closeBrackets(), keymap.of(closeBracketsKeymap)] : [],
+    p.wrapSelection && !p.vimMode ? wrapOnType : [],
+    p.selectionToolbar && !p.readingMode ? selectionToolbar : [],
+    p.smartPaste ? smartPaste : [],
     drawSelection({ cursorBlinkRate: p.cursorBlink ? 1200 : 0 }),
     // Typewriter mode is for writing; reading mode turns it off.
     p.readingMode ? [] : typewriter(p),
@@ -71,7 +77,8 @@ const base: Extension = [
   markdown({ base: markdownLanguage, codeLanguages: languages, extensions: [wikiLinkSyntax, hashtagSyntax, highlightSyntax] }),
   syntaxHighlighting(highlightStyle),
   highlightSelectionMatches(),
-  autocompletion({ override: [wikiLinkCompletions, slashCompletions], icons: false }),
+  autocompletion({ override: [wikiLinkCompletions, slashCompletions, snippetCompletions], icons: false }),
+  snippetExpander,
   attachmentHandlers,
   embeds,
   editorTheme,

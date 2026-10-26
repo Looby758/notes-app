@@ -22,6 +22,14 @@ const api: NotesApi = {
     ipcRenderer.on('voice:start', handler)
     return () => ipcRenderer.removeListener('voice:start', handler)
   },
+  setFormatMenu: (items) => ipcRenderer.send('format:menu', items),
+  onFormat: (callback) => {
+    const handler = (_e: unknown, id: string): void => callback(id)
+    ipcRenderer.on('format:run', handler)
+    return () => ipcRenderer.removeListener('format:run', handler)
+  },
+  popupMenu: (items, x, y) => ipcRenderer.invoke('menu:popup', items, x, y),
+  webTitle: (url) => ipcRenderer.invoke('web:title', url),
   onReminderOpen: (callback) => {
     const handler = (_e: unknown, path: string, line: number): void => callback(path, line)
     ipcRenderer.on('reminder:open', handler)
