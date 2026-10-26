@@ -69,7 +69,19 @@ Your sign-in, client secret and calendar links are stored encrypted with the sys
 - **Quick capture** — press **Win+Shift+N** (Mac: **⌃⌥Space**) in any app, type, press Enter: it's added to today's note (under *Captured*) or your Inbox note. Closing the window keeps Notes running in the tray (Mac: the menu bar) so this always works; quit from its icon (or ⌘Q). It can also start when you log in (Settings → Quick capture).
 - **Settings** (Ctrl+,) — five dark themes, any accent colour, fonts, text size and spacing, note width, density, zoom; editor options (live preview, spellcheck language, autosave delay, line numbers, Vim keys…); every keyboard shortcut can be changed. Everything is stored in `settings.json` (Windows: `%APPDATA%\Notes`; Mac: `~/Library/Application Support/Notes`), which you can also edit by hand.
 - **Spellcheck** — right-click a misspelled word for suggestions.
-
+- **Highlighter** — `==text==` (Ctrl+Shift+H), in several colours.
+- **Callouts** — `> [!tip] Title` boxes (note, tip, warning, danger…), foldable with `-` or `+`; insert with `/callout`.
+- **Table editor** — edit cells right in the rendered table instead of the raw markdown.
+- **Reading mode** (Ctrl+Shift+R) — every note in every tab becomes read-only until you switch back; links open with a plain click.
+- **Find and replace in all notes** (Ctrl+Alt+F) — match case, whole words, regular expressions, a single folder; untick matches you want to keep, and undo afterwards.
+- **Bulk actions** — Ctrl/⌘-click or Shift-click several notes (or tick search results) to move, delete, star, tag, set a property or export them together.
+- **Random note**, **related notes** (under Backlinks, with the reason), and **on this day** (notes from this date in past months and years, in the calendar panel).
+- **Banners and icons** — give a note a banner image or colour and an emoji icon, shown above the title and in the file list.
+- **App icon** — pick from several designs (including green) in Settings → Appearance.
+- **Zen mode** (Ctrl+Alt+Z) — full screen, just the note, with typewriter mode and a focus timer you can set up (focus and break lengths, rounds, chime).
+- **Reminders** — add `⏰ 2026-10-28 15:00` to a task (Ctrl+Alt+R or `/reminder`) and you'll get a notification then; click it to open the note. Reminders missed while Notes was closed are listed at the next start.
+- **Voice notes** — record with `/voice`, right-click → *Record a voice note*, or the mic in quick capture. The recording is saved in your attachments folder and plays in the note.
+- **Locked notes** — Ctrl+K → *Lock this note* (or right-click a note). Locked notes are encrypted (AES-256) with your notes password, or a password of their own, and need it to open. Set a recovery key in case you forget the password. They lock again after a while away (Settings → Files) or with Ctrl+Alt+L, and stay out of search, links and the graph. **There's no way in without the password or recovery key.**
 ## Keyboard shortcuts
 
 All of these can be changed in **Settings → Shortcuts**. On a Mac, Ctrl is **⌘** and Alt is **⌥** (so Ctrl+P is ⌘P); tab switching stays on the Control key.
@@ -98,6 +110,12 @@ All of these can be changed in **Settings → Shortcuts**. On a Mac, Ctrl is **�
 | Ctrl+Alt+P | Pin / unpin tab |
 | Ctrl+Alt+S | Star / unstar note |
 | / | Slash commands (at the start of a line) |
+| Ctrl+Alt+F | Find and replace in all notes |
+| Ctrl+Shift+R | Reading mode / writing mode |
+| Ctrl+Alt+Z | Zen mode |
+| Ctrl+Shift+H | Highlight |
+| Ctrl+Alt+R | Add a reminder to this line |
+| Ctrl+Alt+L | Lock all locked notes now |
 | Ctrl+S | Save now |
 | Ctrl+F | Find in this note |
 | Ctrl+B / Ctrl+I / Ctrl+E / Ctrl+Shift+X | Bold / italic / code / strikethrough |
