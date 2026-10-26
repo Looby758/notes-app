@@ -116,7 +116,8 @@ export interface NotesApi {
   /** Puts the window into (or out of) full screen. */
   setFullScreen(on: boolean): Promise<void>
   /** A reminder notification; clicking it opens the note at that line (onReminderOpen). */
-  showReminder(r: { title: string; body: string; path: string; line: number }): Promise<void>
+  /** Resolves false if this system can't show notifications at all. */
+  showReminder(r: { title: string; body: string; path: string; line: number }): Promise<boolean>
   onReminderOpen(callback: (path: string, line: number) => void): () => void
   /** Mac: asks for microphone access (once); elsewhere always true. */
   micAccess(): Promise<boolean>
@@ -130,6 +131,16 @@ export interface NotesApi {
   onFormat(callback: (id: string) => void): () => void
   /** Pops up a native menu at (x, y) in the page; resolves to the picked item's id, or null. */
   popupMenu(items: PopupMenuItem[], x: number, y: number): Promise<string | null>
+  // Importing from other apps
+  /** Picks an export (a file, or a folder) to import; null if cancelled. */
+  pickImport(kind: 'file' | 'folder', extensions?: string[]): Promise<string | null>
+  /** Every file inside a picked folder (paths relative to it, with /). */
+  listImport(root: string): Promise<string[]>
+  readImport(path: string): Promise<Uint8Array>
+  md5(data: Uint8Array): Promise<string>
+  /** Mac: every note in Apple Notes (asks for permission the first time). */
+  appleNotes(): Promise<AppleNote[]>
+
   /** A web page's title (for pasted links); null if it can't be read quickly. */
   webTitle(url: string): Promise<string | null>
 
@@ -238,4 +249,14 @@ export interface CaptureRequest {
   target?: { kind: 'daily' | 'inbox' } | { kind: 'note' | 'folder'; path: string }
   /** Instead: a calendar event on that day (in its daily note's schedule). */
   event?: { date: string; time?: string; title: string; remind: boolean }
+}
+/** A note as read from Apple Notes. */
+export interface AppleNote {
+  account: string
+  folder: string
+  title: string
+  html: string
+  created: string
+  modified: string
+  locked: boolean
 }

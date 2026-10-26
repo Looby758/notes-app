@@ -9,6 +9,7 @@ import {
   CALENDAR_TAB,
   GRAPH_TAB,
   REPLACE_TAB,
+  CONFLICTS_TAB,
   closePane,
   closeTabUnlessPinned,
   cycleTab,
@@ -116,6 +117,7 @@ export const commands: Command[] = [
     }
   },
   { id: 'vault.export', group: 'Notes folder', title: 'Export all notes…', run: () => openExport('', true) },
+  { id: 'vault.import', group: 'Notes folder', title: 'Import notes… (Apple Notes, Google Keep, Notion, Evernote)', run: () => useUI.setState({ modal: 'import' }) },
 
   {
     id: 'lock.note',
@@ -216,6 +218,7 @@ export const commands: Command[] = [
   { id: 'palette', group: 'Navigation', title: 'Show all commands', shortcut: 'Ctrl+K', run: () => useUI.setState({ modal: 'commands' }) },
   { id: 'search', group: 'Navigation', title: 'Search all notes', shortcut: 'Ctrl+Shift+F', run: () => showSearch() },
   { id: 'note.random', group: 'Navigation', title: 'Open a random note', run: () => openRandomNote() },
+  { id: 'conflicts', group: 'Navigation', title: 'Review sync copies (Plan (1) and so on)', run: () => openSpecialTab(CONFLICTS_TAB) },
   { id: 'replace', group: 'Navigation', title: 'Find and replace in all notes', shortcut: 'Ctrl+Alt+F', run: () => openSpecialTab(REPLACE_TAB) },
   { id: 'files', group: 'Navigation', title: 'Show files', shortcut: 'Ctrl+Shift+E', run: () => showSidebarView('files') },
   { id: 'tags', group: 'Navigation', title: 'Show tags', run: () => showSidebarView('tags') },

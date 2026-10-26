@@ -10,6 +10,7 @@ import ShortcutsEditor, { matchingCommands } from './ShortcutsEditor'
 import CalendarSources from './CalendarSources'
 import SnippetsEditor from './SnippetsEditor'
 import PlaceholderHelp from './PlaceholderHelp'
+import RemindersSettings from './RemindersSettings'
 import pkg from '../../../../../package.json'
 import { showKeys, TRAY_NAME } from '@shared/platform'
 
@@ -259,6 +260,7 @@ export default function SettingsPage() {
                 <>
                   <SettingsList defs={sectionDefs} />
                   {section === 'editor' && <SnippetsEditor />}
+                  {section === 'calendar' && <RemindersSettings />}
                   {section === 'calendar' && <PlaceholderHelp />}
                   {section === 'calendar' && <CalendarSources />}
                   {section === 'capture' && <CaptureShortcutStatus />}

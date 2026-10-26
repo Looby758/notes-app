@@ -5,7 +5,7 @@ import { dailyDateOf } from './dailyPaths'
 import { dayKey } from './dates'
 import { editNote } from './daily'
 import { isWithin } from './paths'
-import { dueReminders, fillInDates, parseReminders, type Reminder } from './reminders'
+import { dueReminders, fillInDates, parseReminders, reminderTime, type Reminder } from './reminders'
 
 /**
  * Watches the notes for reminders and shows a notification when one is due. Reminders that came
@@ -63,6 +63,8 @@ async function check(): Promise<void> {
   if (!due.length && !missed.length) return
   for (const r of due) {
     window.api.showReminder({ title: r.title || 'Reminder', body: `${r.time} · ${r.path.replace(/\.md$/i, '')}`, path: r.path, line: r.line })
+    // In the app too, in case the system hides notifications (Do not disturb, or switched off).
+    notify(`⏰ ${r.title || 'Reminder'} (${r.time})`, 'info')
     fired.add(r.key)
   }
   if (missed.length) {
@@ -95,3 +97,12 @@ export function stopReminders(): void {
 
 /** For tests: run a check now. */
 export const checkRemindersNow = check
+
+/** Reminders still to come, soonest first (for Settings). */
+export function upcomingReminders(limit = 8): Reminder[] {
+  const now = Date.now()
+  return allReminders()
+    .reminders.filter((r) => reminderTime(r).getTime() > now && !fired.has(r.key))
+    .sort((a, b) => reminderTime(a).getTime() - reminderTime(b).getTime())
+    .slice(0, limit)
+}

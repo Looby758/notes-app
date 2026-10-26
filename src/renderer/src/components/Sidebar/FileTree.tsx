@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type
 import {
   ChevronRight,
   ExternalLink,
+  Import,
   FileDown,
   FolderInput,
   Hash,
@@ -100,7 +101,13 @@ export default function FileTree() {
       { label: 'New note', icon: <FilePlus size={15} />, onClick: () => newNote(node?.path ?? '') },
       { label: 'New folder', icon: <FolderPlus size={15} />, onClick: () => newFolder(node?.path ?? '') }
     ]
-    if (!node) return [...create, 'separator', { label: 'Export all notes…', icon: <FileDown size={15} />, onClick: () => openExport('', true) }]
+    if (!node)
+      return [
+        ...create,
+        'separator',
+        { label: 'Import notes…', icon: <Import size={15} />, onClick: () => useUI.setState({ modal: 'import' }) },
+        { label: 'Export all notes…', icon: <FileDown size={15} />, onClick: () => openExport('', true) }
+      ]
     // Right-clicking one of several selected items acts on all of them.
     const picked = useSelection.getState().paths
     if (picked.length > 1 && picked.includes(node.path)) {

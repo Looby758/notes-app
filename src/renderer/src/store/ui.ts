@@ -4,7 +4,7 @@ import { dayKey as dayKeyOf } from '../lib/dates'
 export type SidebarView = 'files' | 'search' | 'tags'
 export type RightView = 'backlinks' | 'outline' | 'calendar'
 export type CalendarView = 'month' | 'week'
-export type Modal = 'switcher' | 'commands' | 'template' | 'export' | 'bulk' | null
+export type Modal = 'switcher' | 'commands' | 'template' | 'export' | 'bulk' | 'import' | null
 
 export const SIDEBAR_MIN = 180
 export const SIDEBAR_MAX = 520

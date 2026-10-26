@@ -41,6 +41,8 @@ mac:
   # Asked the first time you record a voice note.
   extendInfo:
     NSMicrophoneUsageDescription: Notes uses the microphone to record voice notes.
+    # Asked when you import from Apple Notes (Notes reads them from the Notes app).
+    NSAppleEventsUsageDescription: Notes reads your Apple Notes so it can import them.
   notarize: false
   # Used by the zip; the dmg (the one to download) gets the simpler name below.
   artifactName: Notes-${version}-${arch}-mac.${ext}

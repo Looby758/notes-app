@@ -1,9 +1,12 @@
-import { FilePlus, FolderPlus, FolderTree, Hash, Search } from 'lucide-react'
+import { FilePlus, FolderPlus, FolderTree, GitCompare, Hash, Search } from 'lucide-react'
 import { useVault } from '../../store/vault'
 import { useNotify } from '../../store/notify'
 import { showSidebarView, useUI, type SidebarView } from '../../store/ui'
 import FileTree from './FileTree'
 import StarredSection from './StarredSection'
+import SavedSearches from './SavedSearches'
+import { useConflicts } from '../Conflicts/ConflictsPage'
+import { CONFLICTS_TAB, openSpecialTab } from '../../lib/editorController'
 import SearchPane from './SearchPane'
 import TagsPane from './TagsPane'
 import BulkBar from './BulkBar'
@@ -49,6 +52,8 @@ export default function Sidebar() {
       </div>
       {view === 'files' && (
         <>
+          <ConflictsNotice />
+          <SavedSearches />
           <StarredSection />
           <FileTree />
         </>
@@ -58,5 +63,18 @@ export default function Sidebar() {
       {view !== 'tags' && <BulkBar />}
       {error && <div className={`toast ${kind}`}>{error}</div>}
     </div>
+  )
+}
+
+/** "2 notes have sync copies": shown above the file list when Google Drive made "(1)" copies. */
+function ConflictsNotice() {
+  const pairs = useConflicts()
+  if (pairs.length === 0) return null
+  return (
+    <button className="conflicts-notice" onClick={() => openSpecialTab(CONFLICTS_TAB)} data-conflicts-notice>
+      <GitCompare size={13} />
+      {pairs.length === 1 ? '1 note has a sync copy' : `${pairs.length} notes have sync copies`}
+      <span>Review</span>
+    </button>
   )
 }

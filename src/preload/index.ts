@@ -30,6 +30,11 @@ const api: NotesApi = {
   },
   popupMenu: (items, x, y) => ipcRenderer.invoke('menu:popup', items, x, y),
   webTitle: (url) => ipcRenderer.invoke('web:title', url),
+  pickImport: (kind, extensions) => ipcRenderer.invoke('import:pick', kind, extensions),
+  listImport: (root) => ipcRenderer.invoke('import:list', root),
+  readImport: (path) => ipcRenderer.invoke('import:read', path),
+  md5: (data) => ipcRenderer.invoke('import:md5', data),
+  appleNotes: () => ipcRenderer.invoke('import:appleNotes'),
   onReminderOpen: (callback) => {
     const handler = (_e: unknown, path: string, line: number): void => callback(path, line)
     ipcRenderer.on('reminder:open', handler)

@@ -103,7 +103,8 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     useVault.getState().open(vault)
     initEditor(vault)
     void startReminders()
-    const offReminder = window.api.onReminderOpen((path, line) => openNote(path, { line }))
+    // (The test notification from Settings has no note to open.)
+    const offReminder = window.api.onReminderOpen((path, line) => path && openNote(path, { line }))
     const offVoice = window.api.onVoiceStart(() => useUI.setState({ voiceOpen: true }))
     const offFormat = startFormatMenu()
     const offChanged = window.api.onVaultChanged((paths) => {

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { FileText, Search, X } from 'lucide-react'
+import { Bookmark, BookmarkCheck, FileText, Search, X } from 'lucide-react'
+import { toggleSavedSearch, useSavedSearches } from '../../store/savedSearches'
+import SavedSearches from './SavedSearches'
 import { useUI } from '../../store/ui'
 import { searchNotes, useNoteIndex, type SearchHit } from '../../store/noteIndex'
 import { openNote } from '../../lib/editorController'
@@ -24,6 +26,7 @@ export default function SearchPane() {
   const input = useRef<HTMLInputElement>(null)
   const [hits, setHits] = useState<SearchHit[]>([])
   const picked = useSelection((s) => s.paths)
+  const saved = useSavedSearches((s) => s.queries.some((q) => q.trim().toLowerCase() === query.trim().toLowerCase()))
 
   useEffect(() => {
     input.current?.focus()
@@ -53,6 +56,16 @@ export default function SearchPane() {
           placeholder="Search notes…  (#tag to filter)"
           spellCheck={false}
         />
+        {query.trim() && (
+          <button
+            className={`icon-btn save-search ${saved ? 'on' : ''}`}
+            title={saved ? 'Saved: click to remove it from the sidebar' : 'Save this search (it appears in the sidebar)'}
+            onClick={() => toggleSavedSearch(query)}
+            data-save-search
+          >
+            {saved ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
+          </button>
+        )}
         {query && (
           <button className="icon-btn" title="Clear" onClick={() => setQuery('')}>
             <X size={13} />
@@ -70,6 +83,7 @@ export default function SearchPane() {
             )}
           </div>
         )}
+        {!query.trim() && <SavedSearches compact />}
         {!query.trim() && (
           <div className="panel-empty">
             Search the text of every note. Use <code>#tag</code> to filter by tag, e.g. <code>#work meeting</code>.

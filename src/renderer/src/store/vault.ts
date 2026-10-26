@@ -1,5 +1,6 @@
 import { loadLock } from '../lib/lock/session'
 import { loadSnippets } from './snippets'
+import { loadSavedSearches } from './savedSearches'
 import { fixFileLinks } from '../lib/fileLinks'
 import { create } from 'zustand'
 import type { FileNode } from '@shared/types'
@@ -98,6 +99,7 @@ export const useVault = create<VaultState>((set, get) => {
       resetIndex()
       void loadLock()
       void loadSnippets()
+      void loadSavedSearches()
       loadStarred()
       get().refresh()
     },

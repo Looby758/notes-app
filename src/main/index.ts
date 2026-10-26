@@ -33,6 +33,7 @@ import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
 import { setupWebTitle } from './webTitle'
+import { setupImporter } from './importer'
 import { applyIconOutsideApp } from './appIcon'
 
 let vault: Vault | null = null
@@ -420,8 +421,13 @@ function registerIpc(): void {
   })
   // A reminder: a system notification; clicking it brings Notes up at that note.
   ipcMain.handle('reminder:show', (_e, r: { title: string; body: string; path: string; line: number }) => {
-    if (!Notification.isSupported()) return
+    if (!Notification.isSupported()) {
+      logError('reminder', new Error('Notifications aren’t supported on this system.'))
+      return false
+    }
     const n = new Notification({ title: r.title, body: r.body, silent: false })
+    // Windows reports some failures (e.g. notifications switched off for Notes) here.
+    n.on('failed', (_ev, error) => logError('reminder notification', new Error(error)))
     n.on('click', () => {
       showMain()
       mainWindow?.webContents.send('reminder:open', r.path, r.line)
@@ -430,9 +436,11 @@ function registerIpc(): void {
     // Keep a reference until it's dealt with (otherwise clicks can be lost).
     shownReminders.add(n)
     n.on('close', () => shownReminders.delete(n))
+    return true
   })
   setupMenus()
   setupWebTitle()
+  setupImporter()
   // The Mac asks once whether Notes may use the microphone.
   ipcMain.handle('voice:access', async () => (IS_MAC ? systemPreferences.askForMediaAccess('microphone') : true))
   ipcMain.handle('app:fullscreen', (event, on: boolean) => BrowserWindow.fromWebContents(event.sender)?.setFullScreen(on))
