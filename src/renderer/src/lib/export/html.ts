@@ -74,6 +74,8 @@ function renderNote(item: ExportItem, opts: HtmlOptions): string {
         return `<a href="${esc(href)}"${title ? ` title="${esc(title)}"` : ''}>${label}</a>`
       },
       image({ href, text, title }: Tokens.Image) {
+        // Voice notes can't play on paper: their name instead.
+        if (/\.(webm|mp3|m4a|wav|ogg|oga|aac)$/i.test(href)) return `<span class="audio-note">🎙 ${esc(text || 'Voice note')}</span>`
         if (href.startsWith('vault:')) {
           const data = opts.images.get(decodeURI(href.slice(6)))
           if (!data) return `<span class="missing-image">[image: ${esc(text || href.slice(6))}]</span>`

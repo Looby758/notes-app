@@ -15,6 +15,18 @@ const api: NotesApi = {
   openSettingsFile: () => ipcRenderer.invoke('prefs:openFile'),
   showLog: () => ipcRenderer.invoke('app:showLog'),
   setFullScreen: (on) => ipcRenderer.invoke('app:fullscreen', on),
+  showReminder: (r) => ipcRenderer.invoke('reminder:show', r),
+  micAccess: () => ipcRenderer.invoke('voice:access'),
+  onVoiceStart: (callback) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('voice:start', handler)
+    return () => ipcRenderer.removeListener('voice:start', handler)
+  },
+  onReminderOpen: (callback) => {
+    const handler = (_e: unknown, path: string, line: number): void => callback(path, line)
+    ipcRenderer.on('reminder:open', handler)
+    return () => ipcRenderer.removeListener('reminder:open', handler)
+  },
 
   updateStatus: () => ipcRenderer.invoke('update:status'),
   checkForUpdates: () => ipcRenderer.invoke('update:check'),
@@ -33,6 +45,7 @@ const api: NotesApi = {
 
   openCapture: () => ipcRenderer.invoke('capture:open'),
   closeCapture: () => ipcRenderer.invoke('capture:close'),
+  captureKeepOpen: (on) => ipcRenderer.invoke('capture:keepOpen', on),
   captureStatus: () => ipcRenderer.invoke('capture:status'),
   submitCapture: (text) => ipcRenderer.invoke('capture:submit', text),
   onCaptureReset: (callback) => {

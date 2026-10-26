@@ -92,6 +92,26 @@ export function toggleColourHighlight(colour: string): Command {
   }
 }
 
+/**
+ * Turns the current line into a task with a reminder in an hour's time (on the hour), and selects
+ * the time so you can type over it: "- [ ] Call Sam ⏰ 2026-10-26 16:00".
+ */
+export const addReminder: Command = (view) => {
+  const { state } = view
+  const line = state.doc.lineAt(state.selection.main.head)
+  const at = new Date(Date.now() + 60 * 60_000)
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  const date = `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`
+  const time = `${pad(at.getHours())}:00`
+  const text = line.text.replace(/\s*(⏰️?|\bremind:)\s*(\d{4}-\d{2}-\d{2}\s+)?\d{1,2}:\d{2}/u, '')
+  const isTask = /^\s*[-*+]\s+\[[ xX]\]\s/.test(text)
+  const isItem = /^\s*[-*+]\s/.test(text)
+  const body = isTask ? text : isItem ? text.replace(/^(\s*[-*+]\s)/, '$1[ ] ') : `- [ ] ${text.trimStart()}`
+  const next = `${body.trimEnd()} ⏰ ${date} ${time}`
+  view.dispatch({ changes: { from: line.from, to: line.to, insert: next }, selection: EditorSelection.range(line.from + next.length - 5, line.from + next.length) })
+  return true
+}
+
 /** Commands that act on the editor; their shortcuts can be changed in Settings like any other. */
 export interface EditorCommand {
   id: string
@@ -106,5 +126,6 @@ export const EDITOR_COMMANDS: EditorCommand[] = [
   { id: 'format.code', title: 'Inline code', shortcut: 'Ctrl+E', run: toggleWrap('`') },
   { id: 'format.strike', title: 'Strikethrough', shortcut: 'Ctrl+Shift+X', run: toggleWrap('~~') },
   { id: 'format.highlight', title: 'Highlight', shortcut: 'Ctrl+Shift+H', run: toggleWrap('==') },
+  { id: 'insert.reminder', title: 'Add a reminder to this line', shortcut: 'Ctrl+Alt+R', run: addReminder },
   ...HIGHLIGHT_COLOURS.map((c) => ({ id: `format.highlight.${c}`, title: `Highlight ${c}`, run: toggleColourHighlight(c) }))
 ]

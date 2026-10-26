@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { CornerDownLeft, Zap } from 'lucide-react'
+import { CornerDownLeft, Mic, Square, Zap } from 'lucide-react'
+import { formatDuration, saveRecording, startRecording, type Recording } from '../lib/voice'
 import type { CaptureStatus } from '@shared/types'
 import { usePrefs } from '../store/prefs'
 
@@ -27,13 +28,50 @@ export default function CaptureApp() {
     return window.api.onCaptureReset(reset)
   }, [])
 
+  // A voice note: the mic button records; stopping saves it and adds it to the capture.
+  const [rec, setRec] = useState<Recording | null>(null)
+  const [voice, setVoice] = useState<string | null>(null)
+  const [elapsed, setElapsed] = useState(0)
+  const folder = usePrefs((s) => s.prefs.attachmentFolder)
+  useEffect(() => {
+    if (!rec) return
+    const t = setInterval(() => setElapsed(Date.now() - rec.startedAt), 250)
+    return () => clearInterval(t)
+  }, [rec])
+  useEffect(() => window.api.onCaptureReset(() => setVoice(null)), [])
+  const toggleRecording = async (): Promise<void> => {
+    setError(null)
+    if (rec) {
+      const blob = await rec.stop()
+      setRec(null)
+      window.api.captureKeepOpen(false)
+      try {
+        setVoice(await saveRecording(blob, folder))
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err))
+      }
+      input.current?.focus()
+      return
+    }
+    try {
+      window.api.captureKeepOpen(true)
+      setElapsed(0)
+      setRec(await startRecording())
+    } catch (err) {
+      window.api.captureKeepOpen(false)
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   const save = async (): Promise<void> => {
-    if (!text.trim() || saving) return
+    if ((!text.trim() && !voice) || saving || rec) return
     setSaving(true)
     setError(null)
-    const result = await window.api.submitCapture(text)
+    const withVoice = voice ? `${text.trim() || 'Voice note'}\n![Voice note](vault:${voice})` : text
+    const result = await window.api.submitCapture(withVoice)
     setSaving(false)
     if (!result.ok) setError(result.error ?? 'Couldn’t save that.')
+    else setVoice(null)
     // On success the window hides itself; the next open resets it.
   }
 
@@ -71,7 +109,17 @@ export default function CaptureApp() {
             <kbd>Enter</kbd> save · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line · <kbd>Esc</kbd> close
           </span>
         )}
-        <button className="btn btn-primary" onClick={save} disabled={!text.trim() || saving}>
+        {voice && !rec && <span className="capture-voice">🎙 Voice note added</span>}
+        <button
+          className={`icon-btn capture-mic ${rec ? 'recording' : ''}`}
+          onClick={toggleRecording}
+          title={rec ? 'Stop recording' : 'Record a voice note'}
+          data-capture-mic
+        >
+          {rec ? <Square size={13} /> : <Mic size={15} />}
+          {rec && <span>{formatDuration(elapsed)}</span>}
+        </button>
+        <button className="btn btn-primary" onClick={save} disabled={(!text.trim() && !voice) || saving || !!rec}>
           <CornerDownLeft size={13} /> {saving ? 'Saving…' : 'Save'}
         </button>
       </div>

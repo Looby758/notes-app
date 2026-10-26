@@ -150,7 +150,7 @@ export function notesUnder(all: string[], target: string, isFolder: boolean, sub
 export function imagesIn(items: ExportItem[]): string[] {
   const out = new Set<string>()
   for (const it of items) {
-    for (const m of it.markdown.matchAll(/!\[[^\]\n]*\]\(vault:([^)\s]+)\)/g)) out.add(decodeURI(m[1]))
+    for (const m of it.markdown.matchAll(/!\[[^\]\n]*\]\(vault:([^)\s]+)\)/g)) if (IMAGE.test(m[1])) out.add(decodeURI(m[1]))
     // A banner that's an image in the notes folder.
     if (it.banner && /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i.test(it.banner) && !/^https?:/i.test(it.banner)) out.add(it.banner.replace(/^\[\[|\]\]$/g, '').replace(/^\/+/, ''))
   }

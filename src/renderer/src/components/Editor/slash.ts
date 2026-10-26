@@ -10,7 +10,8 @@ import { isWithin, noteTitle, notePaths } from '../../lib/paths'
 import { useVault } from '../../store/vault'
 import { usePrefs } from '../../store/prefs'
 import { getNoteText } from '../../store/noteIndex'
-import { HIGHLIGHT_COLOURS } from './formatting'
+import { useUI } from '../../store/ui'
+import { addReminder, HIGHLIGHT_COLOURS } from './formatting'
 import { CALLOUT_TYPES, calloutLabel } from './livePreview'
 
 /**
@@ -134,6 +135,26 @@ const ITEMS: SlashItem[] = [
     apply: text(() => formatDate(new Date(), 'YYYY-MM-DD HH:mm'))
   },
   { label: 'Tag', keywords: 'hashtag #', section: 'Insert', detail: '#', apply: text(() => '#') },
+  {
+    label: 'Voice note',
+    keywords: 'record audio microphone speak mic',
+    section: 'Insert',
+    detail: 'record',
+    apply: (view, from, to) => {
+      view.dispatch({ changes: { from, to, insert: '' } })
+      useUI.setState({ voiceOpen: true })
+    }
+  },
+  {
+    label: 'Reminder',
+    keywords: 'remind alarm notify alert time ⏰',
+    section: 'Insert',
+    detail: '⏰ in an hour',
+    apply: (view, from, to) => {
+      view.dispatch({ changes: { from, to, insert: '' } })
+      addReminder(view)
+    }
+  },
   { label: 'Highlight', keywords: 'marker yellow ==', section: 'Format', detail: '==', apply: tpl('==${}==') },
   ...HIGHLIGHT_COLOURS.map(
     (c): SlashItem => ({ label: `Highlight ${c}`, keywords: `marker colour color ${c}`, section: 'Format', apply: tpl(`<mark class="hl-${c}">\${}</mark>`) })

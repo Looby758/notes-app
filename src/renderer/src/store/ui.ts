@@ -25,6 +25,8 @@ interface UIState {
   relatedOpen: boolean
   /** Zen mode is on (not remembered between runs). */
   zen: boolean
+  /** The voice-note recorder is open. */
+  voiceOpen: boolean
   /** Graph tab: how many steps out the neighbourhood reaches, and whether unlinked notes show. */
   graphDepth: 1 | 2
   graphOrphans: boolean
@@ -66,6 +68,7 @@ export const useUI = create<UIState>(() => ({
   propertiesCollapsed: saved.propertiesCollapsed ?? false,
   relatedOpen: saved.relatedOpen ?? true,
   zen: false,
+  voiceOpen: false,
   graphDepth: saved.graphDepth === 1 ? 1 : 2,
   graphOrphans: saved.graphOrphans ?? true,
   calendarDay: dayKeyOf(new Date()),

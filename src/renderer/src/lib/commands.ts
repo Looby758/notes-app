@@ -28,6 +28,7 @@ import { openToday, stepDaily } from './daily'
 import { matchesShortcut } from './shortcuts'
 import { FILE_MANAGER } from '@shared/platform'
 import { openRandomNote } from './random'
+import { notify } from '../store/notify'
 
 export interface Command {
   id: string
@@ -97,6 +98,12 @@ export const commands: Command[] = [
     }
   },
   { id: 'save', group: 'Notes', title: 'Save now', shortcut: 'Ctrl+S', run: saveNow },
+  {
+    id: 'note.voice',
+    group: 'Notes',
+    title: 'Record a voice note',
+    run: () => (activeNote() ? useUI.setState({ voiceOpen: true }) : notify('Open a note first; the voice note goes into it.', 'info'))
+  },
   {
     id: 'note.export',
     group: 'Notes',

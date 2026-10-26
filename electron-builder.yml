@@ -38,6 +38,9 @@ mac:
   # Silicon Macs require before they'll run it at all.
   identity: null
   hardenedRuntime: false
+  # Asked the first time you record a voice note.
+  extendInfo:
+    NSMicrophoneUsageDescription: Notes uses the microphone to record voice notes.
   notarize: false
   # Used by the zip; the dmg (the one to download) gets the simpler name below.
   artifactName: Notes-${version}-${arch}-mac.${ext}

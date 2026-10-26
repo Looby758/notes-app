@@ -16,6 +16,8 @@ let captureWin: BrowserWindow | null = null
 let registered = ''
 let shortcutError: string | undefined
 let nextRequest = 1
+/** While recording a voice note, clicking elsewhere doesn't put capture away. */
+let keepOpen = false
 const pending = new Map<number, (result: CaptureResult) => void>()
 
 export interface CaptureResult {
@@ -72,7 +74,7 @@ function createCaptureWindow(): BrowserWindow {
   if (IS_MAC) win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
   // Like a launcher: clicking anywhere else puts it away.
   win.on('blur', () => {
-    if (!win.webContents.isDevToolsOpened()) win.hide()
+    if (!win.webContents.isDevToolsOpened() && !keepOpen) win.hide()
   })
   win.on('closed', () => (captureWin = null))
   loadRenderer(win, 'capture')
@@ -100,6 +102,7 @@ export function openCapture(): void {
  * app you were in (Windows does that by itself).
  */
 function hideCapture(): void {
+  keepOpen = false
   captureWin?.hide()
   if (IS_MAC && !BrowserWindow.getAllWindows().some((w) => w.isVisible())) app.hide()
 }
@@ -173,6 +176,9 @@ export function setupCapture(h: Hooks): void {
 
   ipcMain.handle('capture:open', () => openCapture())
   ipcMain.handle('capture:close', () => hideCapture())
+  ipcMain.handle('capture:keepOpen', (_e, on: boolean) => {
+    keepOpen = on
+  })
   ipcMain.handle('capture:status', () => ({
     shortcut: registered ? shortcutLabel(registered) : '',
     error: shortcutError,

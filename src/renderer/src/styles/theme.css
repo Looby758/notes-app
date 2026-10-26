@@ -4662,3 +4662,117 @@ body.zen .pane-body {
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- Reminders ---------- */
+
+.cm-reminder {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #e0a458 18%, transparent);
+  color: color-mix(in srgb, #e0a458 70%, var(--text-strong));
+  font-size: 0.88em;
+  white-space: nowrap;
+}
+
+/* ---------- Voice notes ---------- */
+
+.cm-audio {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  padding: 6px 8px 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  vertical-align: middle;
+}
+.cm-audio-name {
+  color: var(--text-muted);
+  font-size: 0.86em;
+  white-space: nowrap;
+}
+.cm-audio audio {
+  height: 30px;
+  max-width: 320px;
+}
+.voice-recorder {
+  position: fixed;
+  left: 50%;
+  top: 70px;
+  z-index: 180;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 380px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: var(--bg-raised);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+  transform: translateX(-50%);
+  animation: rise 160ms var(--ease);
+}
+.voice-dot {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: color-mix(in srgb, #f97066 22%, transparent);
+  color: #f97066;
+}
+.voice-dot.live {
+  animation: voice-pulse 1.4s ease-in-out infinite;
+}
+@keyframes voice-pulse {
+  50% {
+    box-shadow: 0 0 0 7px color-mix(in srgb, #f97066 18%, transparent);
+  }
+}
+.voice-body {
+  flex: 1;
+  min-width: 0;
+}
+.voice-title {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.voice-meter {
+  display: flex;
+  gap: 3px;
+  margin-top: 6px;
+}
+.voice-meter i {
+  width: 6px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: opacity 60ms linear;
+}
+.voice-time {
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.voice-stop {
+  padding: 6px 12px;
+  font-size: 12.5px;
+}
+.capture-mic {
+  -webkit-app-region: no-drag;
+  width: auto;
+  min-width: 28px;
+  gap: 5px;
+  padding: 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+.capture-mic.recording {
+  background: color-mix(in srgb, #f97066 22%, transparent);
+  color: #f97066;
+}
+.capture-voice {
+  color: var(--text-muted);
+  font-size: 12px;
+}

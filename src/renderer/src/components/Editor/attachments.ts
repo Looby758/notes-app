@@ -7,6 +7,7 @@ import { getDrag } from '../../lib/dnd'
 import { formatDate } from '../../lib/dates'
 import { relativePath } from '../../lib/links'
 import { parentOf } from '../../lib/paths'
+import { AUDIO_EXT } from '../../lib/voice'
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i
 
@@ -25,7 +26,8 @@ export function attachmentLink(file: string, fromNote: string): string {
   const url = relativePath(parentOf(fromNote), file).split('/').map(encodeURIComponent).join('/')
   const name = file.slice(file.lastIndexOf('/') + 1)
   const label = name.replace(/\.[^.]+$/, '')
-  return IMAGE_EXT.test(name) ? `![${label}](${url})` : `[${name}](${url})`
+  // Pictures and voice notes are embedded (shown / playable); other files are links.
+  return IMAGE_EXT.test(name) || AUDIO_EXT.test(name) ? `![${label}](${url})` : `[${name}](${url})`
 }
 
 /** Inserts links at `pos`, adding line breaks so images sit on their own lines. */

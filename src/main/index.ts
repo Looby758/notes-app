@@ -5,6 +5,8 @@ import {
   ipcMain,
   Menu,
   nativeImage,
+  Notification,
+  systemPreferences,
   net,
   protocol,
   screen,
@@ -30,11 +32,15 @@ import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 
 let vault: Vault | null = null
+const shownReminders = new Set<Electron.Notification>()
 let mainWindow: BrowserWindow | null = null
 /** True once you've chosen Quit (from the tray), so closing really closes instead of hiding. */
 let quitting = false
 
 logCrashes()
+
+// Windows shows notifications under this app id (it matches the installer's).
+if (process.platform === 'win32') app.setAppUserModelId('com.notesapp.desktop')
 
 // Only one copy of Notes runs; starting it again just brings the window back.
 if (!app.requestSingleInstanceLock()) {
@@ -181,11 +187,12 @@ function openVault(path: string | null): void {
   })
 }
 
-// Images in notes load through vault://local/<path>, served only from inside the open vault.
+// Images (and voice notes) in notes load through vault://local/<path>, served only from inside the open vault.
 const IMAGE_TYPES = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.avif'])
+const AUDIO_TYPES = new Set(['.webm', '.mp3', '.m4a', '.wav', '.ogg', '.oga', '.aac'])
 
 protocol.registerSchemesAsPrivileged([
-  { scheme: 'vault', privileges: { standard: true, secure: true, supportFetchAPI: true } }
+  { scheme: 'vault', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }
 ])
 
 function registerVaultProtocol(): void {
@@ -193,8 +200,9 @@ function registerVaultProtocol(): void {
     try {
       const rel = decodeURIComponent(new URL(request.url).pathname.slice(1))
       const full = currentVault().abs(rel)
-      if (!IMAGE_TYPES.has(extname(full).toLowerCase())) return new Response('Not allowed', { status: 403 })
-      return net.fetch(pathToFileURL(full).toString())
+      const ext = extname(full).toLowerCase()
+      if (!IMAGE_TYPES.has(ext) && !AUDIO_TYPES.has(ext)) return new Response('Not allowed', { status: 403 })
+      return net.fetch(pathToFileURL(full).toString(), { headers: request.headers })
     } catch {
       return new Response('Not found', { status: 404 })
     }
@@ -329,6 +337,10 @@ function createWindow(): BrowserWindow {
       )
     }
     if (params.isEditable) {
+      // In a note (not a text box elsewhere): record a voice note here.
+      if (win === mainWindow && params.formControlType === 'none') {
+        items.push({ label: 'Record a voice note…', click: () => win.webContents.send('voice:start') }, { type: 'separator' })
+      }
       items.push(
         { role: 'cut', enabled: params.editFlags.canCut },
         { role: 'copy', enabled: params.editFlags.canCopy },
@@ -386,6 +398,21 @@ function registerIpc(): void {
     broadcastPrefs(prefs)
     return prefs
   })
+  // A reminder: a system notification; clicking it brings Notes up at that note.
+  ipcMain.handle('reminder:show', (_e, r: { title: string; body: string; path: string; line: number }) => {
+    if (!Notification.isSupported()) return
+    const n = new Notification({ title: r.title, body: r.body, silent: false })
+    n.on('click', () => {
+      showMain()
+      mainWindow?.webContents.send('reminder:open', r.path, r.line)
+    })
+    n.show()
+    // Keep a reference until it's dealt with (otherwise clicks can be lost).
+    shownReminders.add(n)
+    n.on('close', () => shownReminders.delete(n))
+  })
+  // The Mac asks once whether Notes may use the microphone.
+  ipcMain.handle('voice:access', async () => (IS_MAC ? systemPreferences.askForMediaAccess('microphone') : true))
   ipcMain.handle('app:fullscreen', (event, on: boolean) => BrowserWindow.fromWebContents(event.sender)?.setFullScreen(on))
   ipcMain.handle('app:showLog', () => {
     const log = join(app.getPath('userData'), 'notes.log')
@@ -567,10 +594,15 @@ async function offerMoveToApplications(): Promise<boolean> {
 app.whenReady().then(async () => {
   if (await offerMoveToApplications()) return
   safely('menu', setAppMenu)
-  session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) =>
-    callback(ALLOWED_PERMISSIONS.has(permission))
+  // The microphone (for voice notes) is allowed; the camera and everything else isn't.
+  const audioOnly = (details: { mediaTypes?: string[] } | undefined): boolean =>
+    !!details?.mediaTypes?.length && details.mediaTypes.every((t) => t === 'audio')
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, callback, details) =>
+    callback(ALLOWED_PERMISSIONS.has(permission) || (permission === 'media' && audioOnly(details as { mediaTypes?: string[] })))
   )
-  session.defaultSession.setPermissionCheckHandler((_wc, permission) => ALLOWED_PERMISSIONS.has(permission))
+  session.defaultSession.setPermissionCheckHandler(
+    (_wc, permission, _origin, details) => ALLOWED_PERMISSIONS.has(permission) || (permission === 'media' && (details as { mediaType?: string }).mediaType === 'audio')
+  )
   registerVaultProtocol()
   registerIpc()
   safely('export', setupExport)

@@ -18,6 +18,7 @@ import { dailyDateOf } from '../../lib/dailyPaths'
 import { properties } from './properties'
 import { calloutIcon } from './calloutIcons'
 import { TableWidget } from './tableEditor'
+import { AUDIO_EXT } from '../../lib/voice'
 import { CLICK_MOD } from '@shared/platform'
 
 /** The time at the start of a schedule line: "09:30", "9am", "09:30-10:30", "2pm – 3pm". */
@@ -96,6 +97,35 @@ class ImageWidget extends WidgetType {
       img.replaceWith(missing)
     }
     return img
+  }
+}
+
+/** A voice note in a note: its name and a player. */
+class AudioWidget extends WidgetType {
+  constructor(
+    readonly src: string,
+    readonly label: string
+  ) {
+    super()
+  }
+  eq(other: AudioWidget): boolean {
+    return other.src === this.src && other.label === this.label
+  }
+  toDOM(): HTMLElement {
+    const wrap = document.createElement('span')
+    wrap.className = 'cm-audio'
+    const name = document.createElement('span')
+    name.className = 'cm-audio-name'
+    name.textContent = `🎙 ${this.label || 'Voice note'}`
+    const audio = document.createElement('audio')
+    audio.controls = true
+    audio.preload = 'metadata'
+    audio.src = this.src
+    wrap.append(name, audio)
+    return wrap
+  }
+  ignoreEvent(): boolean {
+    return true
   }
 }
 
@@ -363,8 +393,11 @@ function buildInline(view: EditorView): DecorationSet {
               const marks = node.getChildren('LinkMark')
               if (url && marks.length >= 2) {
                 const alt = doc.sliceString(marks[0].to, marks[1].from)
-                const src = imageSrc(cleanUrl(doc.sliceString(url.from, url.to)), path)
-                out.push(Decoration.replace({ widget: new ImageWidget(src, alt) }).range(node.from, node.to))
+                const raw = cleanUrl(doc.sliceString(url.from, url.to))
+                const src = imageSrc(raw, path)
+                // A voice note (or other audio) gets a player; pictures are shown.
+                const widget = AUDIO_EXT.test(raw) ? new AudioWidget(src, alt) : new ImageWidget(src, alt)
+                out.push(Decoration.replace({ widget }).range(node.from, node.to))
                 return false
               }
             }
@@ -500,6 +533,16 @@ function buildInline(view: EditorView): DecorationSet {
         out.push(hidden.range(from, openEnd))
         out.push(hidden.range(closeStart, to))
       }
+    }
+  }
+
+  // Reminders: "⏰ 2026-10-28 15:00" shows as a small chip.
+  for (const range of view.visibleRanges) {
+    const text = doc.sliceString(range.from, range.to)
+    for (const m of text.matchAll(/(?:⏰️?|\bremind:)\s*(?:\d{4}-\d{2}-\d{2}\s+)?\d{1,2}:\d{2}/gu)) {
+      const from = range.from + m.index
+      if (/Code/.test(syntaxTree(state).resolveInner(from, 1).name)) continue
+      out.push(Decoration.mark({ class: 'cm-reminder', attributes: { title: 'Reminder: Notes will show a notification at this time' } }).range(from, from + m[0].length))
     }
   }
 

@@ -1,6 +1,7 @@
 import { Annotation, ChangeSet, EditorState, Transaction, type ChangeSpec } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { createState, prefsCompartment, prefsExtensions, zenCompartment, zenExtensions } from '../components/Editor/setup'
+import { attachmentLink } from '../components/Editor/attachments'
 import { linksChanged, notePath, paneCompartment, paneFacet, pathCompartment } from '../components/Editor/facets'
 import { EDITOR_COMMANDS } from '../components/Editor/formatting'
 import { embedsChanged } from '../components/Editor/embeds'
@@ -169,6 +170,23 @@ export function setZenEditor(on: boolean): void {
     if (pv && pv.shown === s.path) pv.view.dispatch({ effects })
     else s.state = s.state.update({ effects }).state
   }
+}
+
+/**
+ * Puts an embed for a file from the notes folder (a voice note, an image) on its own line at the
+ * cursor of the note you're in. Returns false if no note is open.
+ */
+export function insertIntoActiveNote(file: string): boolean {
+  const pv = views.get(activePane())
+  if (!pv?.shown || !isNoteTab(pv.shown)) return false
+  const view = pv.view
+  const link = attachmentLink(file, pv.shown)
+  const at = view.state.selection.main.head
+  const line = view.state.doc.lineAt(at)
+  const before = at > line.from ? '\n' : ''
+  const after = at < line.to ? '\n' : ''
+  view.dispatch({ changes: { from: at, insert: before + link + after }, selection: { anchor: at + before.length + link.length } })
+  return true
 }
 
 // ---------- stats for the active pane ----------

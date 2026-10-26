@@ -123,6 +123,10 @@ export async function toDocx(opts: DocxOptions): Promise<Uint8Array> {
         }
         case 'image': {
           const im = t as Tokens.Image
+          if (/\.(webm|mp3|m4a|wav|ogg|oga|aac)$/i.test(im.href)) {
+            out.push(run(`🎙 ${im.text || 'Voice note'}`, { ...f, italics: true }))
+            break
+          }
           const img = im.href.startsWith('vault:') ? opts.images.get(decodeURI(im.href.slice(6))) : undefined
           if (img) {
             const scale = Math.min(1, MAX_IMAGE_WIDTH / img.width)

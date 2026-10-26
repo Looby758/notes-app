@@ -26,6 +26,7 @@ import {
   handleExternalChanges,
   init as initEditor,
   isNoteTab,
+  openNote,
   openSpecialTab,
   refreshEmbeds,
   refreshLinkDecorations,
@@ -44,7 +45,9 @@ import { EventDetails } from './Calendar/shared'
 import Resizer from './Resizer'
 import UpdateToast from './UpdateToast'
 import ZenBar, { StatusTimer } from './ZenBar'
+import VoiceRecorder from './VoiceRecorder'
 import { openRandomNote } from '../lib/random'
+import { startReminders, stopReminders } from '../lib/reminderScheduler'
 
 interface Props {
   vault: string
@@ -97,6 +100,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
   useEffect(() => {
     useVault.getState().open(vault)
     initEditor(vault)
+    void startReminders()
+    const offReminder = window.api.onReminderOpen((path, line) => openNote(path, { line }))
+    const offVoice = window.api.onVoiceStart(() => useUI.setState({ voiceOpen: true }))
     const offChanged = window.api.onVaultChanged((paths) => {
       useVault.getState().refresh(paths)
       handleExternalChanges(paths)
@@ -118,6 +124,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     return () => {
       offChanged()
       offIndex()
+      offReminder()
+      offVoice()
+      stopReminders()
     }
   }, [vault])
 
@@ -310,6 +319,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <EventDetails />
       <UpdateToast />
       <ZenBar />
+      <VoiceRecorder />
     </div>
   )
 }

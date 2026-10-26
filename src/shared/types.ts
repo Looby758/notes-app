@@ -112,6 +112,13 @@ export interface NotesApi {
   showLog(): Promise<void>
   /** Puts the window into (or out of) full screen. */
   setFullScreen(on: boolean): Promise<void>
+  /** A reminder notification; clicking it opens the note at that line (onReminderOpen). */
+  showReminder(r: { title: string; body: string; path: string; line: number }): Promise<void>
+  onReminderOpen(callback: (path: string, line: number) => void): () => void
+  /** Mac: asks for microphone access (once); elsewhere always true. */
+  micAccess(): Promise<boolean>
+  /** The note's right-click menu asked to record a voice note. */
+  onVoiceStart(callback: () => void): () => void
 
   // Updates
   updateStatus(): Promise<UpdateStatus>
@@ -137,6 +144,8 @@ export interface NotesApi {
   /** Opens the quick capture window. */
   openCapture(): Promise<void>
   closeCapture(): Promise<void>
+  /** Capture window: stay open even when it loses focus (while recording). */
+  captureKeepOpen(on: boolean): Promise<void>
   captureStatus(): Promise<CaptureStatus>
   /** From the capture window: save this text (the main window does the saving). */
   submitCapture(text: string): Promise<{ ok: boolean; where?: string; error?: string }>

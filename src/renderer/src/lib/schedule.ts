@@ -1,6 +1,7 @@
 import { maskCode } from './links'
 import { parseFrontmatter } from './tags'
 import { dayKey, fromDayKey } from './dates'
+import { REMINDER } from './reminders'
 
 /**
  * Finding dated things in notes, for the calendar:
@@ -109,7 +110,15 @@ export function parseDatedItems(
     // A due date on a task wins (it can be anywhere, in any note).
     const due = check !== undefined ? TASK_DUE.exec(body) : null
     if (due && fromDayKey(due[1])) {
-      items.push({ kind: 'due', date: due[1], path, line: i, title: body.replace(TASK_DUE, '').trim(), done })
+      items.push({ kind: 'due', date: due[1], path, line: i, title: body.replace(TASK_DUE, '').replace(REMINDER, '').trim(), done })
+      continue
+    }
+    // A reminder (⏰ date time) shows on its day, at its time.
+    const remind = check !== undefined ? REMINDER.exec(body) : null
+    const remindDate = remind ? (remind[1] ?? dailyDate) : null
+    if (remind && remindDate && fromDayKey(remindDate) && Number(remind[2]) < 24) {
+      const start = `${remind[2].padStart(2, '0')}:${remind[3]}`
+      items.push({ kind: 'due', date: remindDate, path, line: i, title: `⏰ ${body.replace(REMINDER, '').trim()}`, done, start })
       continue
     }
     if (scheduleLevel && dailyDate && body.trim()) {
