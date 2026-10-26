@@ -1,0 +1,33 @@
+# Runs the app on one of GitHub's Macs and checks Mac-only behaviour (deleting notes, closing
+# and reopening the window). Start it from the Actions tab, or: gh workflow run mac-check.yml
+name: Mac check
+
+on:
+  workflow_dispatch:
+    inputs:
+      real_dialog:
+        description: Show the real "Move to Bin?" sheet too
+        type: boolean
+        default: false
+
+jobs:
+  check:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx electron-vite build
+      - name: Delete, close and reopen
+        env:
+          REAL_DIALOG: ${{ inputs.real_dialog && '1' || '' }}
+        run: npx electron tests/mac/delete-check.js
+      - name: Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-check-results
+          path: mac-check-results
