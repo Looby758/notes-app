@@ -453,6 +453,34 @@ function registerIpc(): void {
     if (error) throw new Error(error)
   })
 
+  // Several at once: one question, then each to the Bin. Returns the ones moved.
+  ipcMain.handle('fs:trashMany', async (event, paths: string[]) => {
+    const v = currentVault()
+    const items = paths.filter(Boolean)
+    if (items.length === 0) return []
+    const win = BrowserWindow.fromWebContents(event.sender)!
+    const { response } = await dialog.showMessageBox(win, {
+      type: 'warning',
+      buttons: [`Move to ${TRASH_NAME}`, 'Cancel'],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+      message: `Delete ${items.length} items?`,
+      detail: `They'll be moved to the ${TRASH_NAME}:\n${items.slice(0, 8).map((p) => basename(p).replace(/\.md$/i, '')).join('\n')}${items.length > 8 ? `\n…and ${items.length - 8} more` : ''}`
+    })
+    if (response !== 0) return []
+    const done: string[] = []
+    for (const p of items) {
+      try {
+        await shell.trashItem(v.abs(p))
+        done.push(p)
+      } catch (err) {
+        logError('delete', err)
+      }
+    }
+    return done
+  })
+
   ipcMain.handle('fs:trash', async (event, path: string) => {
     const v = currentVault()
     if (!path) throw new Error('The notes folder itself cannot be deleted here.')

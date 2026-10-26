@@ -4,6 +4,7 @@ import { NoteLookup, parseLinks, type LinkRef } from '../lib/links'
 import { parseTags, tagMatches } from '../lib/tags'
 import { isWithin, noteTitle } from '../lib/paths'
 import { findMentions, type Mention } from '../lib/mentions'
+import { buildVectors, relatedTo, type Related, type RelatedInput } from '../lib/related'
 import { compareItems, parseDatedItems, type DatedItem } from '../lib/schedule'
 import { dailyDateOf } from '../lib/dailyPaths'
 import { usePrefs } from './prefs'
@@ -214,6 +215,28 @@ export function unlinkedMentionsOf(target: string): MentionGroup[] {
 export function linkNameFor(target: string): string {
   const title = noteTitle(target)
   return useNoteIndex.getState().lookup.isUnique(title) ? title : target.replace(/\.md$/i, '')
+}
+
+// ---------- related notes ----------
+
+let relatedCache: { version: number; inputs: RelatedInput[]; vectors: ReturnType<typeof buildVectors> } | null = null
+
+/** Notes like `target` (shared tags or links, similar words), best first. Templates are left out. */
+export function relatedNotes(target: string): Related[] {
+  const { notes, lookup, version } = useNoteIndex.getState()
+  if (!relatedCache || relatedCache.version !== version) {
+    const { templatesFolder } = usePrefs.getState().prefs
+    const inputs: RelatedInput[] = [...notes]
+      .filter(([path]) => !templatesFolder || !isWithin(path, templatesFolder))
+      .map(([path, entry]) => ({
+        path,
+        tags: entry.tags,
+        links: entry.links.map((l) => lookup.resolve(l, path)).filter((p): p is string => !!p),
+        text: texts.get(path) ?? ''
+      }))
+    relatedCache = { version, inputs, vectors: buildVectors(inputs) }
+  }
+  return relatedTo(target, relatedCache.inputs, relatedCache.vectors)
 }
 
 // ---------- tags ----------

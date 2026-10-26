@@ -8,6 +8,7 @@ import {
   applyPreset,
   CALENDAR_TAB,
   GRAPH_TAB,
+  REPLACE_TAB,
   closePane,
   closeTabUnlessPinned,
   cycleTab,
@@ -26,6 +27,7 @@ import { toggleStar } from '../store/starred'
 import { openToday, stepDaily } from './daily'
 import { matchesShortcut } from './shortcuts'
 import { FILE_MANAGER } from '@shared/platform'
+import { openRandomNote } from './random'
 
 export interface Command {
   id: string
@@ -175,6 +177,8 @@ export const commands: Command[] = [
   { id: 'switcher', group: 'Navigation', title: 'Open note…', shortcut: 'Ctrl+P', run: () => useUI.setState({ modal: 'switcher' }) },
   { id: 'palette', group: 'Navigation', title: 'Show all commands', shortcut: 'Ctrl+K', run: () => useUI.setState({ modal: 'commands' }) },
   { id: 'search', group: 'Navigation', title: 'Search all notes', shortcut: 'Ctrl+Shift+F', run: () => showSearch() },
+  { id: 'note.random', group: 'Navigation', title: 'Open a random note', run: () => openRandomNote() },
+  { id: 'replace', group: 'Navigation', title: 'Find and replace in all notes', shortcut: 'Ctrl+Alt+F', run: () => openSpecialTab(REPLACE_TAB) },
   { id: 'files', group: 'Navigation', title: 'Show files', shortcut: 'Ctrl+Shift+E', run: () => showSidebarView('files') },
   { id: 'tags', group: 'Navigation', title: 'Show tags', run: () => showSidebarView('tags') },
   { id: 'backlinks', group: 'Navigation', title: 'Show backlinks', run: () => showRightView('backlinks') },

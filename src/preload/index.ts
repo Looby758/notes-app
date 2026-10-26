@@ -67,6 +67,7 @@ const api: NotesApi = {
   rename: (path, newName) => ipcRenderer.invoke('fs:rename', path, newName),
   move: (path, folder) => ipcRenderer.invoke('fs:move', path, folder),
   trash: (path) => ipcRenderer.invoke('fs:trash', path),
+  trashMany: (paths) => ipcRenderer.invoke('fs:trashMany', paths),
   reveal: (path) => ipcRenderer.invoke('fs:reveal', path),
   readAppData: (name) => ipcRenderer.invoke('vault:readAppData', name),
   writeAppData: (name, content) => ipcRenderer.invoke('vault:writeAppData', name, content),

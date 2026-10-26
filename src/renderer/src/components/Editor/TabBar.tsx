@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { CalendarDays, Columns2, FileDown, Orbit, FolderSearch, Pin, PinOff, Plus, Rows2, Settings, Star, StarOff, X } from 'lucide-react'
+import { CalendarDays, Columns2, FileDown, Orbit, Replace, FolderSearch, Pin, PinOff, Plus, Rows2, Settings, Star, StarOff, X } from 'lucide-react'
 import { useEditor } from '../../store/editor'
 import { toggleStar, useStarred } from '../../store/starred'
 import { openExport } from '../../store/ui'
@@ -7,6 +7,7 @@ import {
   activateTab,
   CALENDAR_TAB,
   GRAPH_TAB,
+  REPLACE_TAB,
   closePane,
   closeTab,
   closeTabUnlessPinned,
@@ -31,6 +32,7 @@ function tabTitle(id: string): string {
   if (id === SETTINGS_TAB) return 'Settings'
   if (id === CALENDAR_TAB) return 'Calendar'
   if (id === GRAPH_TAB) return 'Graph'
+  if (id === REPLACE_TAB) return 'Find & replace'
   return noteTitle(id)
 }
 
@@ -175,6 +177,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === SETTINGS_TAB && <Settings size={13} className="tab-icon" />}
               {id === CALENDAR_TAB && <CalendarDays size={13} className="tab-icon" />}
               {id === GRAPH_TAB && <Orbit size={13} className="tab-icon" />}
+              {id === REPLACE_TAB && <Replace size={13} className="tab-icon" />}
               <span className="tab-title">{tabTitle(id)}</span>
               {isTabPinned ? (
                 // Pinned tabs show a pin instead of ✕; clicking it unpins.

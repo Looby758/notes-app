@@ -4,6 +4,7 @@ import { useUI } from '../../store/ui'
 import { searchNotes, useNoteIndex, type SearchHit } from '../../store/noteIndex'
 import { openNote } from '../../lib/editorController'
 import { noteTitle, parentOf } from '../../lib/paths'
+import { clearSelection, selectRange, setSelection, toggleSelected, useSelection } from '../../store/selection'
 
 function Snippet({ hit }: { hit: SearchHit }) {
   const parts: ReactNode[] = []
@@ -22,6 +23,7 @@ export default function SearchPane() {
   const version = useNoteIndex((s) => s.version)
   const input = useRef<HTMLInputElement>(null)
   const [hits, setHits] = useState<SearchHit[]>([])
+  const picked = useSelection((s) => s.paths)
 
   useEffect(() => {
     input.current?.focus()
@@ -61,6 +63,11 @@ export default function SearchPane() {
         {query.trim() && (
           <div className="search-count">
             {hits.length === 0 ? 'No matches' : `${hits.length}${hits.length >= 100 ? '+' : ''} ${hits.length === 1 ? 'note' : 'notes'}`}
+            {hits.length > 1 && (
+              <button className="search-select-all" onClick={() => setSelection(hits.map((h) => h.path))} title="Select every result, for bulk actions">
+                Select all
+              </button>
+            )}
           </div>
         )}
         {!query.trim() && (
@@ -71,8 +78,18 @@ export default function SearchPane() {
         {hits.map((hit) => (
           <button
             key={hit.path}
-            className="search-hit"
-            onClick={() => openNote(hit.path, { line: hit.line, match: hit.match || undefined })}
+            className={`search-hit ${picked.includes(hit.path) ? 'multi' : ''}`}
+            onClick={(e) => {
+              // Ctrl/⌘-click and Shift-click pick results for bulk actions; a plain click opens.
+              if (e.ctrlKey || e.metaKey) return toggleSelected(hit.path)
+              if (e.shiftKey)
+                return selectRange(
+                  hit.path,
+                  hits.map((h) => h.path)
+                )
+              clearSelection()
+              openNote(hit.path, { line: hit.line, match: hit.match || undefined })
+            }}
             title={hit.path}
           >
             <span className="search-hit-title">

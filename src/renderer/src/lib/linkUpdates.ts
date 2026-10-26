@@ -35,8 +35,11 @@ export async function snapshotLinks(path: string): Promise<LinkSnapshot> {
   return { before: lookup, texts }
 }
 
-/** Call after `from` became `to`: offers to fix the links that would otherwise break. */
-export async function updateLinksAfterMove(snapshot: LinkSnapshot, from: string, to: string): Promise<void> {
+/**
+ * Call after `from` became `to`: offers to fix the links that would otherwise break. With
+ * `answer` (moving several things at once, asked once beforehand) it doesn't ask again.
+ */
+export async function updateLinksAfterMove(snapshot: LinkSnapshot, from: string, to: string, answer?: boolean): Promise<void> {
   const { before, texts } = snapshot
   const after = new NoteLookup(before.paths.map((p) => replacePrefix(p, from, to)))
   const edits: { path: string; text: string }[] = []
@@ -47,14 +50,16 @@ export async function updateLinksAfterMove(snapshot: LinkSnapshot, from: string,
   if (edits.length === 0) return
 
   const name = noteTitle(from)
-  const ok = await window.api.confirm({
+  const ok =
+    answer ??
+    (await window.api.confirm({
     message: `Update links to "${name}"?`,
     detail: `${edits.length} ${edits.length === 1 ? 'note links' : 'notes link'} to it. Update ${
       edits.length === 1 ? 'that link' : 'those links'
     } so they keep working?`,
     ok: 'Update links',
     cancel: "Don't update"
-  })
+  }))
   if (!ok) return
 
   for (const { path, text } of edits) {

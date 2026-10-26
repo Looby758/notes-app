@@ -23,8 +23,12 @@ export default function ExportDialog({ close }: { close: () => void }) {
   const [includeProperties, setIncludeProperties] = useState(true)
   const [busy, setBusy] = useState(false)
 
-  const isFolder = target?.isFolder ?? false
-  const count = useMemo(() => (target ? notesFor({ target: target.path, isFolder, subfolders }).length : 0), [target, isFolder, subfolders])
+  // Several selected notes and folders behave like a folder (one file, or a file each).
+  const isFolder = (target?.isFolder ?? false) || !!target?.paths
+  const count = useMemo(
+    () => (target ? notesFor({ target: target.path, isFolder, subfolders, paths: target.paths }).length : 0),
+    [target, isFolder, subfolders]
+  )
   const name = !target ? '' : !isFolder ? noteTitle(target.path) : target.path ? target.path.split('/').pop()! : 'All notes'
 
   useEffect(() => {
@@ -41,7 +45,7 @@ export default function ExportDialog({ close }: { close: () => void }) {
     lastFormat = format
     setBusy(true)
     try {
-      const where = await runExport({ target: target.path, isFolder, format, combine, subfolders, includeProperties })
+      const where = await runExport({ target: target.path, isFolder, format, combine, subfolders, includeProperties, paths: target.paths })
       if (where) {
         close()
         notify(`Exported to ${where}`, 'info')
@@ -59,7 +63,7 @@ export default function ExportDialog({ close }: { close: () => void }) {
       <div className="export-head">
         <FileDown size={16} />
         <div>
-          <h2>Export “{name}”</h2>
+          <h2>{target.paths ? 'Export the selected notes' : `Export “${name}”`}</h2>
           <p>{isFolder ? `${count} ${count === 1 ? 'note' : 'notes'}` : 'One note'}</p>
         </div>
       </div>

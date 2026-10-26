@@ -16,6 +16,8 @@ export interface ExportRequest {
   combine: boolean
   subfolders: boolean
   includeProperties: boolean
+  /** Several selected notes and folders (instead of `target`). */
+  paths?: string[]
 }
 
 export const EXTENSIONS: Record<ExportFormat, string> = { pdf: 'pdf', docx: 'docx', html: 'html' }
@@ -24,8 +26,14 @@ export const EXTENSIONS: Record<ExportFormat, string> = { pdf: 'pdf', docx: 'doc
 const fileName = (s: string): string => s.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim() || 'Notes'
 
 /** The notes a request covers (for showing a count before exporting). */
-export function notesFor(req: Pick<ExportRequest, 'target' | 'isFolder' | 'subfolders'>): string[] {
-  return notesUnder(useNoteIndex.getState().lookup.paths, req.target, req.isFolder, req.subfolders)
+export function notesFor(req: Pick<ExportRequest, 'target' | 'isFolder' | 'subfolders' | 'paths'>): string[] {
+  const all = useNoteIndex.getState().lookup.paths
+  if (req.paths) {
+    const out = new Set<string>()
+    for (const p of req.paths) for (const n of notesUnder(all, p, !all.includes(p), req.subfolders)) out.add(n)
+    return [...out]
+  }
+  return notesUnder(all, req.target, req.isFolder, req.subfolders)
 }
 
 function blobToDataUrl(blob: Blob): Promise<string> {
@@ -104,7 +112,7 @@ export async function runExport(req: ExportRequest): Promise<string | null> {
   if (paths.length === 0) throw new Error('There are no notes to export there.')
   const ctx = { lookup, textOf: (p: string) => getOpenText(p) ?? getNoteText(p) }
   const items = paths.map((p) => prepareNote(p, ctx, req.includeProperties))
-  const name = fileName(req.isFolder ? (req.target ? noteTitle(req.target + '.md') : 'All notes') : noteTitle(req.target))
+  const name = fileName(req.paths ? `Notes (${paths.length})` : req.isFolder ? (req.target ? noteTitle(req.target + '.md') : 'All notes') : noteTitle(req.target))
   const ext = EXTENSIONS[req.format]
 
   // Images, loaded once.
@@ -131,7 +139,7 @@ export async function runExport(req: ExportRequest): Promise<string | null> {
     return req.format === 'pdf' ? window.api.printToPdf(html) : html
   }
 
-  const single = !req.isFolder || req.combine || items.length === 1
+  const single = (!req.isFolder && !req.paths) || req.combine || items.length === 1
   if (single) {
     const data = await build(items, name)
     return window.api.exportFile(`${name}.${ext}`, req.format, data)

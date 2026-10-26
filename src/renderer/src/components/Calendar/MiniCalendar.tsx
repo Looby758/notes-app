@@ -1,14 +1,46 @@
 import { useEffect, useState } from 'react'
-import { CalendarDays, ChevronLeft, ChevronRight, Maximize2, Plus } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, FileText, History, Maximize2, Plus } from 'lucide-react'
 import { useUI } from '../../store/ui'
 import { usePrefs } from '../../store/prefs'
 import { useVault } from '../../store/vault'
 import { addDays, dayKey, formatDate, fromDayKey, monthGrid } from '../../lib/dates'
 import { addEvent, dailyPath, openDaily } from '../../lib/daily'
-import { CALENDAR_TAB, openSpecialTab } from '../../lib/editorController'
+import { CALENDAR_TAB, openNote, openSpecialTab } from '../../lib/editorController'
+import { earlierDays } from '../../lib/onThisDay'
+import type { DatedItem } from '../../lib/schedule'
 import { findNode } from '../../lib/paths'
 import { showKeys } from '@shared/platform'
 import { DayList, ExternalStatus, QuickAdd, useExternalRange, useItemsByDay, weekdayNames } from './shared'
+
+/**
+ * "On this day": daily notes and dated notes from the same date in earlier months and years.
+ * Hidden when there aren't any.
+ */
+function OnThisDay({ date, byDay }: { date: Date; byDay: Map<string, DatedItem[]> }) {
+  const groups = earlierDays(date)
+    .map((d) => ({ ...d, items: (byDay.get(d.key) ?? []).filter((i) => i.kind === 'daily' || i.kind === 'note') }))
+    .filter((g) => g.items.length)
+  if (groups.length === 0) return null
+  return (
+    <div className="on-this-day" data-on-this-day>
+      <div className="on-this-day-head">
+        <History size={13} /> On this day
+      </div>
+      {groups.map((g) => (
+        <div key={g.key} className="on-this-day-group">
+          <span className="on-this-day-when" title={formatDate(fromDayKey(g.key)!, 'dddd D MMMM YYYY')}>
+            {g.label}
+          </span>
+          {g.items.map((i) => (
+            <button key={i.path + i.kind} className="on-this-day-item" onClick={() => openNote(i.path)} title={i.path}>
+              <FileText size={12} /> {i.kind === 'daily' ? formatDate(fromDayKey(g.key)!, 'dddd D MMMM YYYY') : i.title}
+            </button>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
 
 /** A month grid in the side panel, with the selected day's agenda underneath. */
 export default function MiniCalendar() {
@@ -128,6 +160,7 @@ export default function MiniCalendar() {
         )}
         <DayList local={agenda} external={external.get(selected) ?? []} />
         <ExternalStatus />
+        <OnThisDay date={selectedDate} byDay={byDay} />
         <div className="agenda-nav">
           <button className="btn" onClick={() => useUI.setState({ calendarDay: dayKey(addDays(selectedDate, -1)) })}>
             <ChevronLeft size={13} /> Previous day

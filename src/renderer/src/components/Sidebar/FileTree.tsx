@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState, type DragEvent, type Keyboard
 import {
   ChevronRight,
   FileDown,
+  FolderInput,
+  Hash,
+  ListPlus,
   Columns2,
   FilePlus,
   FileText,
@@ -22,7 +25,9 @@ import ContextMenu, { type MenuItem } from '../ContextMenu'
 import { focusEditor, openNote, splitPane } from '../../lib/editorController'
 import { setDrag } from '../../lib/dnd'
 import { useEditor } from '../../store/editor'
-import { openExport } from '../../store/ui'
+import { openExport, useUI } from '../../store/ui'
+import { clearSelection, selectRange, toggleSelected, useSelection } from '../../store/selection'
+import { starMany, trashMany } from '../../lib/bulk'
 import { FILE_MANAGER } from '@shared/platform'
 
 const INDENT = 14
@@ -63,6 +68,8 @@ export default function FileTree() {
     e.preventDefault()
     e.stopPropagation()
     if (node) useVault.getState().select(node.path)
+    // Right-clicking something outside the selection is about that one item.
+    if (!node || !useSelection.getState().paths.includes(node.path)) clearSelection()
     setMenu({ x: e.clientX, y: e.clientY, node })
   }
 
@@ -72,6 +79,20 @@ export default function FileTree() {
       { label: 'New folder', icon: <FolderPlus size={15} />, onClick: () => newFolder(node?.path ?? '') }
     ]
     if (!node) return [...create, 'separator', { label: 'Export all notes…', icon: <FileDown size={15} />, onClick: () => openExport('', true) }]
+    // Right-clicking one of several selected items acts on all of them.
+    const picked = useSelection.getState().paths
+    if (picked.length > 1 && picked.includes(node.path)) {
+      const bulk = (bulkAction: 'move' | 'tag' | 'property') => () => useUI.setState({ modal: 'bulk', bulkAction })
+      return [
+        { label: `Move ${picked.length} items…`, icon: <FolderInput size={15} />, onClick: bulk('move') },
+        { label: 'Star / unstar', icon: <Star size={15} />, onClick: () => starMany(picked) },
+        { label: 'Add or remove a tag…', icon: <Hash size={15} />, onClick: bulk('tag') },
+        { label: 'Set a property…', icon: <ListPlus size={15} />, onClick: bulk('property') },
+        { label: 'Export…', icon: <FileDown size={15} />, onClick: () => openExport('', true, picked) },
+        'separator',
+        { label: `Delete ${picked.length} items…`, icon: <Trash2 size={15} />, danger: true, onClick: () => trashMany(picked) }
+      ]
+    }
     const open: MenuItem[] =
       node.type === 'file'
         ? [
@@ -106,6 +127,18 @@ export default function FileTree() {
       if (!n) return
       select(n.path)
       document.querySelector(`.tree-row[data-path="${CSS.escape(n.path)}"]`)?.scrollIntoView({ block: 'nearest' })
+    }
+
+    const picked = useSelection.getState().paths
+    if (e.key === 'Escape' && picked.length) {
+      clearSelection()
+      e.preventDefault()
+      return
+    }
+    if (e.key === 'Delete' && picked.length > 1) {
+      trashMany(picked)
+      e.preventDefault()
+      return
     }
 
     switch (e.key) {
@@ -218,6 +251,7 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
   const isSelected = useVault((s) => s.selected === node.path)
   const isRenaming = useVault((s) => s.renaming === node.path)
   const starred = useStarred((s) => s.paths.includes(node.path))
+  const multi = useSelection((s) => s.paths.includes(node.path))
   const { toggle, expand, select, startRename } = useVault.getState()
   const expandTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
@@ -227,11 +261,21 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
 
   useEffect(() => () => clearTimeout(expandTimer.current), [])
 
-  // Ctrl/⌘+click opens the note in a new tab instead of the current one.
+  // Ctrl/⌘-click and Shift-click pick several items (for bulk actions); a plain click opens.
   const onClick = (e: MouseEvent): void => {
+    const state = useVault.getState()
+    if (e.ctrlKey || e.metaKey) {
+      toggleSelected(node.path, state.selected)
+      return
+    }
+    if (e.shiftKey) {
+      selectRange(node.path, visibleRows(state.tree, state.expanded).map((n) => n.path), state.selected)
+      return
+    }
+    clearSelection()
     select(node.path)
     if (isFolder) toggle(node.path)
-    else openNote(node.path, { newTab: e.ctrlKey || e.metaKey })
+    else openNote(node.path)
   }
 
   const onDragStart = (e: DragEvent): void => {
@@ -267,7 +311,7 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
     <>
       <div
         data-path={node.path}
-        className={`tree-row ${isSelected ? 'selected' : ''} ${isDropTarget ? 'drop' : ''}`}
+        className={`tree-row ${isSelected ? 'selected' : ''} ${multi ? 'multi' : ''} ${isDropTarget ? 'drop' : ''}`}
         style={{ paddingLeft: 8 + depth * INDENT }}
         draggable={!isRenaming}
         onClick={onClick}

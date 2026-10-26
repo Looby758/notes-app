@@ -11,6 +11,7 @@ import { EXAMPLE_TEMPLATE, fillTemplate } from '../../lib/templates'
 import Picker, { Highlighted, type PickerItem } from './Picker'
 import { useNoteItems } from './noteItems'
 import ExportDialog from './ExportDialog'
+import BulkDialog from './BulkDialog'
 import { showKeys } from '@shared/platform'
 
 /** Ctrl+P (quick switcher), Ctrl+K (command palette) and "new note from template", shown over the app. */
@@ -25,6 +26,7 @@ export default function Modals() {
         {modal === 'commands' && <CommandPalette close={close} />}
         {modal === 'template' && <TemplatePicker close={close} />}
         {modal === 'export' && <ExportDialog close={close} />}
+        {modal === 'bulk' && <BulkDialog close={close} />}
       </div>
     </div>
   )

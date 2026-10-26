@@ -22,9 +22,31 @@ export async function loadStarred(): Promise<void> {
   }
 }
 
+let writing = false
+let again = false
+
+/** Writes the list, one write at a time (starring several at once makes several changes quickly). */
+function persist(): void {
+  if (writing) {
+    again = true
+    return
+  }
+  writing = true
+  window.api
+    .writeAppData(FILE, JSON.stringify({ starred: useStarred.getState().paths }, null, 2))
+    .catch(notify)
+    .finally(() => {
+      writing = false
+      if (again) {
+        again = false
+        persist()
+      }
+    })
+}
+
 function save(paths: string[]): void {
   useStarred.setState({ paths })
-  window.api.writeAppData(FILE, JSON.stringify({ starred: paths }, null, 2)).catch(notify)
+  persist()
 }
 
 export const isStarred = (path: string): boolean => useStarred.getState().paths.includes(path)

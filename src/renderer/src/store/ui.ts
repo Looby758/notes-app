@@ -4,7 +4,7 @@ import { dayKey as dayKeyOf } from '../lib/dates'
 export type SidebarView = 'files' | 'search' | 'tags'
 export type RightView = 'backlinks' | 'outline' | 'calendar'
 export type CalendarView = 'month' | 'week'
-export type Modal = 'switcher' | 'commands' | 'template' | 'export' | null
+export type Modal = 'switcher' | 'commands' | 'template' | 'export' | 'bulk' | null
 
 export const SIDEBAR_MIN = 180
 export const SIDEBAR_MAX = 520
@@ -21,6 +21,8 @@ interface UIState {
   mentionsOpen: boolean
   /** The properties panel at the top of notes is folded up. */
   propertiesCollapsed: boolean
+  /** The Related notes section under Backlinks is expanded. */
+  relatedOpen: boolean
   /** Graph tab: how many steps out the neighbourhood reaches, and whether unlinked notes show. */
   graphDepth: 1 | 2
   graphOrphans: boolean
@@ -32,13 +34,15 @@ interface UIState {
   searchFocus: number
   modal: Modal
   /** What the Export dialog exports: a note, or a folder ('' = every note). */
-  exportTarget: { path: string; isFolder: boolean } | null
+  exportTarget: { path: string; isFolder: boolean; paths?: string[] } | null
+  /** Which bulk dialog is open (for the selected notes). */
+  bulkAction: 'move' | 'tag' | 'property'
   /** Provided by App: switching or closing the notes folder. */
   vaultActions: { switchVault: () => void; closeVault: () => void }
 }
 
 /** Layout bits remembered per computer. (Text size and the rest live in Settings, in settings.json.) */
-const PERSISTED = ['leftOpen', 'rightOpen', 'leftWidth', 'rightWidth', 'sidebarView', 'rightView', 'starredOpen', 'mentionsOpen', 'propertiesCollapsed', 'graphDepth', 'graphOrphans', 'calendarView'] as const
+const PERSISTED = ['leftOpen', 'rightOpen', 'leftWidth', 'rightWidth', 'sidebarView', 'rightView', 'starredOpen', 'mentionsOpen', 'propertiesCollapsed', 'relatedOpen', 'graphDepth', 'graphOrphans', 'calendarView'] as const
 
 const saved = ((): Partial<UIState> => {
   try {
@@ -58,6 +62,7 @@ export const useUI = create<UIState>(() => ({
   starredOpen: saved.starredOpen ?? true,
   mentionsOpen: saved.mentionsOpen ?? true,
   propertiesCollapsed: saved.propertiesCollapsed ?? false,
+  relatedOpen: saved.relatedOpen ?? true,
   graphDepth: saved.graphDepth === 1 ? 1 : 2,
   graphOrphans: saved.graphOrphans ?? true,
   calendarDay: dayKeyOf(new Date()),
@@ -66,6 +71,7 @@ export const useUI = create<UIState>(() => ({
   searchFocus: 0,
   modal: null,
   exportTarget: null,
+  bulkAction: 'move',
   vaultActions: { switchVault: () => {}, closeVault: () => {} }
 }))
 
@@ -110,6 +116,6 @@ export function toggleFocusMode(): void {
 }
 
 /** Opens the Export dialog for a note, a folder, or ('' as a folder) every note. */
-export function openExport(path: string, isFolder: boolean): void {
-  useUI.setState({ modal: 'export', exportTarget: { path, isFolder } })
+export function openExport(path: string, isFolder: boolean, paths?: string[]): void {
+  useUI.setState({ modal: 'export', exportTarget: { path, isFolder, paths } })
 }

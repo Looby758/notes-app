@@ -7,6 +7,7 @@ import {
   LogOut,
   Orbit,
   BookOpen,
+  Dices,
   PenLine,
   PanelLeft,
   PanelRight,
@@ -40,6 +41,7 @@ import Modals from './Picker/Modals'
 import { EventDetails } from './Calendar/shared'
 import Resizer from './Resizer'
 import UpdateToast from './UpdateToast'
+import { openRandomNote } from '../lib/random'
 
 interface Props {
   vault: string
@@ -217,6 +219,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
           data-reading-toggle
         >
           {reading ? <PenLine size={15} /> : <BookOpen size={15} />}
+        </button>
+        <button className="icon-btn" onClick={() => openRandomNote()} title="Open a random note" data-random-note>
+          <Dices size={15} />
         </button>
         <button className="icon-btn" onClick={() => openSpecialTab(GRAPH_TAB)} title={`Graph (${showKeys('Ctrl+Shift+G')})`}>
           <Orbit size={15} />

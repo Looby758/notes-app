@@ -60,6 +60,10 @@ async function renameWithRetry(src: string, dest: string): Promise<void> {
   }
 }
 
+/** A temp-file name part that's unique even for two saves in the same millisecond. */
+let tempCounter = 0
+const tempSuffix = (): string => `${process.pid}-${Date.now()}-${++tempCounter}`
+
 export class Vault {
   constructor(readonly root: string) {}
 
@@ -116,7 +120,7 @@ export class Vault {
   async write(rel: string, content: string): Promise<void> {
     const full = this.abs(rel)
     if (!isMarkdown(full)) throw new Error('Only .md notes can be saved.')
-    const tmp = join(dirname(full), `.${basename(full)}.${process.pid}-${Date.now()}.tmp`)
+    const tmp = join(dirname(full), `.${basename(full)}.${tempSuffix()}.tmp`)
     await fs.writeFile(tmp, content, 'utf8')
     try {
       await renameWithRetry(tmp, full)
@@ -174,7 +178,7 @@ export class Vault {
   async writeAppData(name: string, content: string): Promise<void> {
     const file = this.appDataPath(name)
     await fs.mkdir(dirname(file), { recursive: true })
-    const tmp = `${file}.${process.pid}-${Date.now()}.tmp`
+    const tmp = `${file}.${tempSuffix()}.tmp`
     await fs.writeFile(tmp, content, 'utf8')
     await renameWithRetry(tmp, file)
   }

@@ -180,6 +180,8 @@ export interface NotesApi {
   move(path: string, folder: string): Promise<string>
   /** Asks for confirmation, then moves the item to the Recycle Bin / Bin. Returns false if cancelled. */
   trash(path: string): Promise<boolean>
+  /** Asks once, then moves several items to the Bin; resolves with the ones moved. */
+  trashMany(paths: string[]): Promise<string[]>
   /** Shows the item selected in File Explorer / Finder. */
   reveal(path: string): Promise<void>
   /** Reads/writes a small app file kept in the vault's hidden ".notesapp" folder (synced with your notes). */

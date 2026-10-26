@@ -225,7 +225,7 @@ export const SETTINGS: SettingDef[] = [
     group: 'Tabs',
     type: 'toggle',
     label: 'Open notes in a new tab',
-    description: `Off: opening a note changes the current tab (pinned tabs are left alone). Either way, ${IS_MAC ? '⌘-click' : 'Ctrl+click'} or middle-click a note to open it in a new tab.`,
+    description: `Off: opening a note changes the current tab (pinned tabs are left alone). Either way, middle-click a note (or right-click → Open in new tab) to open it in a new tab.`,
     keywords: 'tab replace reuse open'
   },
 
@@ -277,6 +277,15 @@ export const SETTINGS: SettingDef[] = [
     label: 'Templates folder',
     description: 'Notes in this folder show up in "New note from template" and /template.',
     keywords: 'template'
+  },
+  {
+    key: 'randomIncludeDaily',
+    section: 'files',
+    group: 'Random note',
+    type: 'toggle',
+    label: 'Random note can pick daily notes',
+    description: 'The dice button (or Ctrl+K → “Open a random note”) opens any note except templates. Daily notes are skipped unless this is on.',
+    keywords: 'random dice shuffle daily'
   },
   {
     key: 'hideTemplatesFromTags',

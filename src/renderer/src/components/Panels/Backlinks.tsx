@@ -3,7 +3,17 @@ import { ChevronRight, FileText, Link2 } from 'lucide-react'
 import { useEditor } from '../../store/editor'
 import { useUI } from '../../store/ui'
 import { notify } from '../../store/notify'
-import { backlinksTo, linkNameFor, unlinkedMentionsOf, useNoteIndex, type IndexedLink, type MentionGroup } from '../../store/noteIndex'
+import { backlinksTo, linkNameFor, relatedNotes, unlinkedMentionsOf, useNoteIndex, type IndexedLink, type MentionGroup } from '../../store/noteIndex'
+import type { Related } from '../../lib/related'
+
+/** "shares #medical · links to Insurance · similar wording" */
+function reasons(r: Related): string {
+  const out: string[] = []
+  if (r.sharedTags.length) out.push(`shares ${r.sharedTags.slice(0, 3).map((t) => `#${t}`).join(', ')}`)
+  if (r.sharedLinks.length) out.push(`also links to ${r.sharedLinks.slice(0, 2).map((p) => noteTitle(p)).join(', ')}`)
+  if (r.similarity >= 0.12) out.push('similar wording')
+  return out.join(' · ')
+}
 import { isNoteTab, openNote } from '../../lib/editorController'
 import { editNote } from '../../lib/daily'
 import { linkMentions, type Mention } from '../../lib/mentions'
@@ -93,6 +103,8 @@ export default function Backlinks() {
   const groups = useMemo(() => (active ? backlinksTo(active) : []), [active, version])
   const mentions = useMemo(() => (active ? unlinkedMentionsOf(active) : []), [active, version])
   const mentionCount = mentions.reduce((n, g) => n + g.mentions.length, 0)
+  const relatedOpen = useUI((s) => s.relatedOpen)
+  const related = useMemo(() => (active && relatedOpen ? relatedNotes(active) : []), [active, version, relatedOpen])
 
   const linkEverywhere = async (): Promise<void> => {
     if (!active) return
@@ -148,6 +160,30 @@ export default function Backlinks() {
               <div className="panel-empty small">No other notes mention “{noteTitle(active)}” without linking to it.</div>
             )}
             {mentionsOpen && mentions.map((g) => <MentionGroupRow key={g.source} group={g} target={active} />)}
+          </section>
+        )}
+
+        {active && (
+          <section className="mentions related" data-related>
+            <div className="mentions-header">
+              <button className="mentions-toggle" onClick={() => useUI.setState({ relatedOpen: !relatedOpen })}>
+                <ChevronRight size={13} className={`tree-chevron ${relatedOpen ? 'open' : ''}`} />
+                Related notes
+                <span className="panel-count">{related.length}</span>
+              </button>
+            </div>
+            {relatedOpen && related.length === 0 && <div className="panel-empty small">Nothing similar yet. Notes with shared tags, links or wording show up here.</div>}
+            {relatedOpen &&
+              related.map((r) => (
+                <button key={r.path} className="related-row" onClick={() => openNote(r.path)} title={r.path} data-related-path={r.path}>
+                  <span className="backlink-source">
+                    <FileText size={14} />
+                    <span className="backlink-title">{noteTitle(r.path)}</span>
+                    {parentOf(r.path) && <span className="backlink-folder">{parentOf(r.path)}</span>}
+                  </span>
+                  <span className="related-why">{reasons(r)}</span>
+                </button>
+              ))}
           </section>
         )}
       </div>

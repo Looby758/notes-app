@@ -6,6 +6,7 @@ import FileTree from './FileTree'
 import StarredSection from './StarredSection'
 import SearchPane from './SearchPane'
 import TagsPane from './TagsPane'
+import BulkBar from './BulkBar'
 import { showKeys } from '@shared/platform'
 
 const VIEWS: { id: SidebarView; title: string; icon: typeof Search }[] = [
@@ -54,6 +55,7 @@ export default function Sidebar() {
       )}
       {view === 'search' && <SearchPane />}
       {view === 'tags' && <TagsPane />}
+      {view !== 'tags' && <BulkBar />}
       {error && <div className={`toast ${kind}`}>{error}</div>}
     </div>
   )

@@ -11,6 +11,7 @@ import {
   resolveConflict,
   CALENDAR_TAB,
   GRAPH_TAB,
+  REPLACE_TAB,
   SETTINGS_TAB,
   splitPane
 } from '../../lib/editorController'
@@ -19,6 +20,7 @@ import NewTabPage from '../Picker/NewTabPage'
 import SettingsPage from '../Settings/SettingsPage'
 import CalendarPage from '../Calendar/CalendarPage'
 import GraphPage from '../Graph/GraphPage'
+import ReplacePage from '../Replace/ReplacePage'
 import TabBar from './TabBar'
 import { IS_MAC, showKeys } from '@shared/platform'
 
@@ -104,6 +106,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === SETTINGS_TAB && <SettingsPage />}
         {active === CALENDAR_TAB && <CalendarPage />}
         {active === GRAPH_TAB && <GraphPage />}
+        {active === REPLACE_TAB && <ReplacePage />}
         {!active && (
           <div className="editor-empty">
             <FileText size={36} strokeWidth={1.2} />

@@ -51,6 +51,7 @@ export const isNoteTab = (id: string | null): id is string => !!id && !id.includ
 export const SETTINGS_TAB = 'settings:'
 export const CALENDAR_TAB = 'calendar:'
 export const GRAPH_TAB = 'graph:'
+export const REPLACE_TAB = 'replace:'
 const blankId = (): string => `blank:${Date.now()}${Math.random().toString(36).slice(2, 5)}`
 
 // ---------- state ----------

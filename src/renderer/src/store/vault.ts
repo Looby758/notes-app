@@ -32,8 +32,11 @@ interface VaultState {
   createNoteAt(path: string, content?: string, cursor?: number | null): Promise<string | null>
   newFolder(folder?: string): Promise<void>
   rename(path: string, name: string): Promise<void>
-  move(path: string, folder: string): Promise<void>
+  /** `updateLinks`: already decided (moving several things at once), so don't ask. */
+  move(path: string, folder: string, updateLinks?: boolean): Promise<void>
   trash(path: string): Promise<void>
+  /** Several notes or folders at once, after one question. */
+  trashMany(paths: string[]): Promise<void>
 }
 
 const expandedKey = (vault: string): string => `expanded:${vault}`
@@ -188,7 +191,7 @@ export const useVault = create<VaultState>((set, get) => {
       }
     },
 
-    async move(path, folder) {
+    async move(path, folder, updateLinks) {
       try {
         await flushAll()
         const snapshot = await snapshotLinks(path)
@@ -197,7 +200,7 @@ export const useVault = create<VaultState>((set, get) => {
         remap(path, next)
         get().expandTo(folder)
         await get().refresh()
-        await updateLinksAfterMove(snapshot, path, next)
+        await updateLinksAfterMove(snapshot, path, next, updateLinks)
       } catch (err) {
         notify(err)
       }
@@ -211,6 +214,22 @@ export const useVault = create<VaultState>((set, get) => {
         removeStarsWithin(path)
         const { selected } = get()
         if (selected && isWithin(selected, path)) set({ selected: null })
+        await get().refresh()
+      } catch (err) {
+        notify(err)
+      }
+    },
+
+    async trashMany(paths) {
+      try {
+        await flushAll()
+        const gone = await window.api.trashMany(paths)
+        for (const path of gone) {
+          discardWithin(path)
+          removeStarsWithin(path)
+        }
+        const { selected } = get()
+        if (selected && gone.some((p) => isWithin(selected, p))) set({ selected: null })
         await get().refresh()
       } catch (err) {
         notify(err)
