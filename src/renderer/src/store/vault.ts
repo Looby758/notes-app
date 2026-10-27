@@ -10,6 +10,7 @@ import { snapshotLinks, updateLinksAfterMove } from '../lib/linkUpdates'
 import { notify } from './notify'
 import { resetIndex, syncIndex } from './noteIndex'
 import { loadStarred, remapStars, removeStarsWithin } from './starred'
+import { loadFlashcards, remapFlashcards, removeFlashcardsWithin } from './flashcards'
 
 interface VaultState {
   vault: string
@@ -85,6 +86,7 @@ export const useVault = create<VaultState>((set, get) => {
     }
     remapTabs(from, to)
     remapStars(from, to)
+    remapFlashcards(from, to)
   }
 
   return {
@@ -101,6 +103,7 @@ export const useVault = create<VaultState>((set, get) => {
       void loadSnippets()
       void loadSavedSearches()
       loadStarred()
+      void loadFlashcards()
       get().refresh()
     },
 
@@ -221,6 +224,7 @@ export const useVault = create<VaultState>((set, get) => {
         if (!(await window.api.trash(path))) return
         discardWithin(path)
         removeStarsWithin(path)
+        removeFlashcardsWithin(path)
         const { selected } = get()
         if (selected && isWithin(selected, path)) set({ selected: null })
         await get().refresh()
@@ -236,6 +240,8 @@ export const useVault = create<VaultState>((set, get) => {
         for (const path of gone) {
           discardWithin(path)
           removeStarsWithin(path)
+          removeFlashcardsWithin(path)
+        removeFlashcardsWithin(path)
         }
         const { selected } = get()
         if (selected && gone.some((p) => isWithin(selected, p))) set({ selected: null })

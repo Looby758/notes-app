@@ -11,6 +11,7 @@ import { dailyDateOf } from '../lib/dailyPaths'
 import { usePrefs } from './prefs'
 import { forgetLockState, noteLockState } from '../lib/lock/session'
 import { isLockedText } from '../lib/lock/crypto'
+import { parseCards, type Flashcard } from '../lib/flashcards'
 
 /**
  * Everything the app knows about the vault's notes beyond the file tree: links (for backlinks
@@ -32,6 +33,8 @@ export interface NoteEntry {
   dated: DatedItem[]
   /** The note's emoji icon (`icon:` property), if it has one. */
   icon?: string
+  /** Flashcards: `Question :: Answer` lines. */
+  cards: Flashcard[]
 }
 
 export interface Backlink {
@@ -86,11 +89,11 @@ function datedItems(path: string, text: string): DatedItem[] {
 
 function put(notes: Map<string, NoteEntry>, path: string, raw: string): void {
   noteLockState(path, raw)
-  // Locked notes are left out of search, links, tags, the graph and the calendar: only the name shows.
+  // Locked notes are left out of search, links, tags, the graph, the calendar and flashcards: only the name shows.
   const text = isLockedText(raw) ? '' : normalizeText(raw)
   texts.set(path, text)
   const icon = readFrontmatter(text)?.properties.find((p) => p.key === 'icon')?.value
-  notes.set(path, { links: indexLinks(text), tags: parseTags(text), dated: datedItems(path, text), icon: typeof icon === 'string' && icon ? icon : undefined })
+  notes.set(path, { links: indexLinks(text), tags: parseTags(text), dated: datedItems(path, text), icon: typeof icon === 'string' && icon ? icon : undefined, cards: parseCards(text, path) })
   const doc = { id: path, title: noteTitle(path), text }
   if (search.has(path)) search.replace(doc)
   else search.add(doc)

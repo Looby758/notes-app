@@ -10,6 +10,7 @@ import {
   GRAPH_TAB,
   REPLACE_TAB,
   CONFLICTS_TAB,
+  FLASHCARDS_TAB,
   closePane,
   closeTabUnlessPinned,
   cycleTab,
@@ -225,6 +226,7 @@ export const commands: Command[] = [
   { id: 'tags', group: 'Navigation', title: 'Show tags', run: () => showSidebarView('tags') },
   { id: 'backlinks', group: 'Navigation', title: 'Show backlinks', run: () => showRightView('backlinks') },
   { id: 'graph.open', group: 'Navigation', title: 'Open graph', shortcut: 'Ctrl+Shift+G', run: () => openSpecialTab(GRAPH_TAB) },
+  { id: 'flashcards.open', group: 'Navigation', title: 'Review flashcards', shortcut: 'Ctrl+Shift+Y', run: () => openSpecialTab(FLASHCARDS_TAB) },
   { id: 'outline', group: 'Navigation', title: 'Show outline', shortcut: 'Ctrl+Shift+O', run: () => showRightView('outline') },
 
   { id: 'ai.ask', group: 'AI helper', title: 'AI helper: ask my notes', run: () => openAsk() },
