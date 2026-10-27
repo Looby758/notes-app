@@ -32,6 +32,7 @@ import { FILE_MANAGER } from '@shared/platform'
 import { openRandomNote } from './random'
 import { notify } from '../store/notify'
 import { newBoard } from './boards'
+import { openAsk, runNoteJob } from '../store/ai'
 import { changeNotesPassword, lockAllNow, lockNote, lockNoteOwn, removeLock } from './lock/actions'
 
 export interface Command {
@@ -229,6 +230,10 @@ export const commands: Command[] = [
   { id: 'graph.open', group: 'Navigation', title: 'Open graph', shortcut: 'Ctrl+Shift+G', run: () => openSpecialTab(GRAPH_TAB) },
   { id: 'flashcards.open', group: 'Navigation', title: 'Review flashcards', shortcut: 'Ctrl+Shift+Y', run: () => openSpecialTab(FLASHCARDS_TAB) },
   { id: 'outline', group: 'Navigation', title: 'Show outline', shortcut: 'Ctrl+Shift+O', run: () => showRightView('outline') },
+
+  { id: 'ai.ask', group: 'AI helper', title: 'AI helper: ask my notes', run: () => openAsk() },
+  { id: 'ai.summarise', group: 'AI helper', title: 'AI helper: summarise this note', run: () => activeNote() && runNoteJob('summary') },
+  { id: 'ai.tidy', group: 'AI helper', title: 'AI helper: tidy up this note', run: () => activeNote() && runNoteJob('tidy') },
 
   { id: 'settings', group: 'View', title: 'Open settings', shortcut: 'Ctrl+,', run: () => openSpecialTab(SETTINGS_TAB) },
   { id: 'focus', group: 'View', title: 'Toggle focus mode', shortcut: 'Ctrl+\\', run: toggleFocusMode },

@@ -4,7 +4,7 @@ import { dayKey as dayKeyOf } from '../lib/dates'
 export type SidebarView = 'files' | 'search' | 'tags'
 export type RightView = 'backlinks' | 'outline' | 'calendar'
 export type CalendarView = 'month' | 'week'
-export type Modal = 'switcher' | 'commands' | 'template' | 'export' | 'bulk' | 'import' | null
+export type Modal = 'switcher' | 'commands' | 'template' | 'export' | 'bulk' | 'import' | 'ai' | null
 
 export const SIDEBAR_MIN = 180
 export const SIDEBAR_MAX = 520
@@ -39,6 +39,8 @@ interface UIState {
   /** Bumped to ask the search box to take focus. */
   searchFocus: number
   modal: Modal
+  /** Asks Settings to switch to this section (e.g. from a "Set up" button elsewhere). */
+  settingsSection: string | null
   /** What the Export dialog exports: a note, or a folder ('' = every note). */
   exportTarget: { path: string; isFolder: boolean; paths?: string[] } | null
   /** Which bulk dialog is open (for the selected notes). */
@@ -79,6 +81,7 @@ export const useUI = create<UIState>(() => ({
   searchQuery: '',
   searchFocus: 0,
   modal: null,
+  settingsSection: null,
   exportTarget: null,
   bulkAction: 'move',
   vaultActions: { switchVault: () => {}, closeVault: () => {} }

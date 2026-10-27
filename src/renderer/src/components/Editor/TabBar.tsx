@@ -1,11 +1,12 @@
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { CalendarDays, GitCompare, Columns2, FileDown, Layers, Orbit, Replace, FolderSearch, Pin, PinOff, Plus, Rows2, Settings, Star, StarOff, X } from 'lucide-react'
+import { CalendarDays, GitCompare, Columns2, FileDown, Layers, Orbit, Replace, FolderSearch, Pin, PinOff, Plus, Rows2, Settings, Sparkles, Star, StarOff, X } from 'lucide-react'
 import { useEditor } from '../../store/editor'
 import { toggleStar, useStarred } from '../../store/starred'
 import { useNoteIndex } from '../../store/noteIndex'
 import { openExport } from '../../store/ui'
 import {
   activateTab,
+  AI_TAB,
   CALENDAR_TAB,
   GRAPH_TAB,
   REPLACE_TAB,
@@ -40,6 +41,7 @@ function tabTitle(id: string): string {
   if (id === GRAPH_TAB) return 'Graph'
   if (id === REPLACE_TAB) return 'Find & replace'
   if (id === CONFLICTS_TAB) return 'Sync copies'
+  if (id === AI_TAB) return 'Ask my notes'
   if (id === FLASHCARDS_TAB) return 'Flashcards'
   if (isFileTab(id)) return fileOfTab(id).slice(fileOfTab(id).lastIndexOf('/') + 1).replace(/\.canvas$/i, '')
   return noteTitle(id)
@@ -191,6 +193,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === GRAPH_TAB && <Orbit size={13} className="tab-icon" />}
               {id === REPLACE_TAB && <Replace size={13} className="tab-icon" />}
               {id === CONFLICTS_TAB && <GitCompare size={13} className="tab-icon" />}
+              {id === AI_TAB && <Sparkles size={13} className="tab-icon" />}
               {id === FLASHCARDS_TAB && <Layers size={13} className="tab-icon" />}
               {isFileTab(id) && <FileIcon path={fileOfTab(id)} size={13} className="tab-icon" />}
               {icons.get(id) && <span className="tab-emoji">{icons.get(id)}</span>}

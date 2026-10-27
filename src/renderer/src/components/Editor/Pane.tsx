@@ -15,6 +15,7 @@ import {
   GRAPH_TAB,
   REPLACE_TAB,
   CONFLICTS_TAB,
+  AI_TAB,
   FLASHCARDS_TAB,
   SETTINGS_TAB,
   splitPane
@@ -31,6 +32,7 @@ import FileViewer from './FileViewer'
 import CanvasBoard from '../Canvas/CanvasBoard'
 import { isBoard } from '../../lib/canvas'
 import ConflictsPage from '../Conflicts/ConflictsPage'
+import AiPage from '../Ai/AiPage'
 import FlashcardsPage from '../Flashcards/FlashcardsPage'
 import { needsUnlock, useLock } from '../../lib/lock/session'
 import { IS_MAC, showKeys } from '@shared/platform'
@@ -128,6 +130,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === GRAPH_TAB && <GraphPage />}
         {active === REPLACE_TAB && <ReplacePage />}
         {active === CONFLICTS_TAB && <ConflictsPage />}
+        {active === AI_TAB && <AiPage autoFocus={isActivePane} />}
         {active === FLASHCARDS_TAB && <FlashcardsPage />}
         {!active && (
           <div className="editor-empty">

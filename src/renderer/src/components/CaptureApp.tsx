@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { CalendarPlus, ChevronDown, CornerDownLeft, FileText, Folder, Inbox, Mic, Square, Sun, X, Zap } from 'lucide-react'
+import { CalendarPlus, ChevronDown, CornerDownLeft, FileText, Folder, Inbox, Loader2, Mic, Sparkles, Square, Sun, Undo2, X, Zap } from 'lucide-react'
 import { formatDuration, saveRecording, startRecording, type Recording } from '../lib/voice'
 import type { CaptureRequest, CaptureStatus, FileNode } from '@shared/types'
 import { usePrefs } from '../store/prefs'
 import { dayKeyOf, findWhen } from '../lib/when'
 import { formatDate, fromDayKey } from '../lib/dates'
 import { fuzzyFilter } from '../lib/fuzzy'
-import { noteTitle } from '../lib/paths'
+import { errorMessage, noteTitle } from '../lib/paths'
 
 type Dest = NonNullable<CaptureRequest['target']>
 
@@ -58,6 +58,10 @@ export default function CaptureApp() {
   const [eventMode, setEventMode] = useState<'auto' | 'on' | 'off'>('auto')
   const [manual, setManual] = useState<{ date: string; time: string } | null>(null)
   const [remind, setRemind] = useState(false)
+  // AI helper: shown only once you've added a key. `untidied` is what you typed, for Undo.
+  const [canTidy, setCanTidy] = useState(false)
+  const [tidying, setTidying] = useState(false)
+  const [untidied, setUntidied] = useState<string | null>(null)
 
   // Each time the window is shown: start fresh and focus.
   useEffect(() => {
@@ -69,6 +73,9 @@ export default function CaptureApp() {
       setEventMode('auto')
       setManual(null)
       setRemind(false)
+      setUntidied(null)
+      setTidying(false)
+      window.api.aiStatus().then((s) => setCanTidy(s.hasKey), () => setCanTidy(false))
       setDest(usePrefs.getState().prefs.captureRememberTarget ? readStored<Dest | null>(LAST_KEY, null) : null)
       window.api.captureStatus().then(setStatus)
       setTimeout(() => input.current?.focus(), 0)
@@ -76,6 +83,23 @@ export default function CaptureApp() {
     reset()
     return window.api.onCaptureReset(reset)
   }, [])
+
+  const tidy = async (): Promise<void> => {
+    if (!text.trim() || tidying) return
+    setTidying(true)
+    setError(null)
+    const before = text
+    try {
+      const tidied = await window.api.aiTidy(before, 'capture')
+      setUntidied(before)
+      setText(tidied)
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setTidying(false)
+      input.current?.focus()
+    }
+  }
 
   // ---------- calendar ----------
   const found = useMemo(() => findWhen(text), [text])
@@ -127,7 +151,7 @@ export default function CaptureApp() {
   }
 
   const save = async (): Promise<void> => {
-    if ((!text.trim() && !voice) || saving || rec) return
+    if ((!text.trim() && !voice) || saving || tidying || rec) return
     setSaving(true)
     setError(null)
     const withVoice = voice ? `${text.trim() || 'Voice note'}\n![Voice note](vault:${voice})` : text
@@ -232,7 +256,11 @@ export default function CaptureApp() {
           value={text}
           placeholder="What’s on your mind? (Add a time, like “dinner at 8 tomorrow”, to put it in the calendar.)"
           spellCheck
-          onChange={(e) => setText(e.target.value)}
+          readOnly={tidying}
+          onChange={(e) => {
+            setText(e.target.value)
+            setUntidied(null)
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
@@ -253,6 +281,25 @@ export default function CaptureApp() {
           </span>
         )}
         {voice && !rec && <span className="capture-voice">🎙 Voice note added</span>}
+        {canTidy &&
+          (untidied !== null ? (
+            <button
+              className="icon-btn"
+              onClick={() => {
+                setText(untidied)
+                setUntidied(null)
+                input.current?.focus()
+              }}
+              title="Undo: go back to what you typed"
+              data-capture-untidy
+            >
+              <Undo2 size={15} />
+            </button>
+          ) : (
+            <button className={`icon-btn ${tidying ? 'on' : ''}`} onClick={tidy} disabled={!text.trim() || tidying} title="Tidy up with AI: fix typos and add structure" data-capture-tidy>
+              {tidying ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
+            </button>
+          ))}
         <button
           className={`icon-btn ${eventOn ? 'on' : ''}`}
           onClick={() => {
@@ -271,7 +318,7 @@ export default function CaptureApp() {
           {rec ? <Square size={13} /> : <Mic size={15} />}
           {rec && <span>{formatDuration(elapsed)}</span>}
         </button>
-        <button className="btn btn-primary" onClick={save} disabled={(!text.trim() && !voice) || saving || !!rec} data-capture-save>
+        <button className="btn btn-primary" onClick={save} disabled={(!text.trim() && !voice) || saving || tidying || !!rec} data-capture-save>
           <CornerDownLeft size={13} /> {saving ? 'Saving…' : 'Save'}
         </button>
       </div>

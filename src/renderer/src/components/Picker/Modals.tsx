@@ -13,6 +13,7 @@ import { useNoteItems } from './noteItems'
 import ExportDialog from './ExportDialog'
 import BulkDialog from './BulkDialog'
 import ImportDialog from './ImportDialog'
+import AiDialog from '../Ai/AiDialog'
 import { showKeys } from '@shared/platform'
 
 /** Ctrl+P (quick switcher), Ctrl+K (command palette) and "new note from template", shown over the app. */
@@ -22,13 +23,14 @@ export default function Modals() {
   if (!modal) return null
   return (
     <div className="modal-backdrop" onMouseDown={close}>
-      <div className={`modal ${modal === 'export' || modal === 'import' ? 'modal-export' : ''}`} onMouseDown={(e) => e.stopPropagation()}>
+      <div className={`modal ${modal === 'export' || modal === 'import' || modal === 'ai' ? 'modal-export' : ''}`} onMouseDown={(e) => e.stopPropagation()}>
         {modal === 'switcher' && <QuickSwitcher close={close} />}
         {modal === 'commands' && <CommandPalette close={close} />}
         {modal === 'template' && <TemplatePicker close={close} />}
         {modal === 'export' && <ExportDialog close={close} />}
         {modal === 'bulk' && <BulkDialog close={close} />}
         {modal === 'import' && <ImportDialog close={close} />}
+        {modal === 'ai' && <AiDialog close={close} />}
       </div>
     </div>
   )
