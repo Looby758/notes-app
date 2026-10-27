@@ -5,6 +5,7 @@ import { openNote } from '../../lib/editorController'
 import { noteTitle } from '../../lib/paths'
 import { getNoteText, useNoteIndex } from '../../store/noteIndex'
 import { FILE_MANAGER } from '@shared/platform'
+import SheetView from './SheetView'
 
 /** Notes that show or link to `path` (by its file name, as embeds are written). */
 function usedIn(path: string): string[] {
@@ -19,7 +20,7 @@ function usedIn(path: string): string[] {
     .sort((a, b) => noteTitle(a).localeCompare(noteTitle(b)))
 }
 
-/** A picture, recording, video or PDF from the notes folder, in its own tab. */
+/** A picture, recording, video, PDF or spreadsheet from the notes folder, in its own tab. */
 export default function FileViewer({ path }: { path: string }) {
   const kind = fileKind(path)
   const url = vaultUrl(path)
@@ -56,6 +57,8 @@ export default function FileViewer({ path }: { path: string }) {
           />
         ) : kind === 'audio' ? (
           <audio src={url} controls onError={() => setFailed(true)} />
+        ) : kind === 'sheet' ? (
+          <SheetView path={path} url={url} name={name} />
         ) : kind === 'video' ? (
           <video src={url} controls onError={() => setFailed(true)} />
         ) : (
