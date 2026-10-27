@@ -19,6 +19,8 @@ import { properties } from './properties'
 import { calloutIcon } from './calloutIcons'
 import { TableWidget } from './tableEditor'
 import { AUDIO_EXT } from '../../lib/voice'
+import { looksLikeSketch, withSketchVersion } from '../../lib/sketch'
+import { useUI } from '../../store/ui'
 import { CLICK_MOD } from '@shared/platform'
 import { mathDiagrams } from './mathDiagrams'
 
@@ -79,25 +81,42 @@ class HrWidget extends WidgetType {
 class ImageWidget extends WidgetType {
   constructor(
     readonly src: string,
-    readonly alt: string
+    readonly alt: string,
+    /** The picture's path in the notes folder, if it's a sketch drawn in Notes (offers Edit). */
+    readonly sketch: string | null = null
   ) {
     super()
   }
   eq(other: ImageWidget): boolean {
-    return other.src === this.src && other.alt === this.alt
+    return other.src === this.src && other.alt === this.alt && other.sketch === this.sketch
   }
   toDOM(): HTMLElement {
     const img = document.createElement('img')
     img.className = 'cm-image'
     img.src = this.src
     img.alt = this.alt
+    let wrap: HTMLElement | null = null
     img.onerror = () => {
       const missing = document.createElement('span')
       missing.className = 'cm-image-missing'
       missing.textContent = `Image not found: ${this.alt || this.src}`
-      img.replaceWith(missing)
+      ;(wrap ?? img).replaceWith(missing)
     }
-    return img
+    if (!this.sketch) return img
+    const sketch = this.sketch
+    wrap = document.createElement('span')
+    wrap.className = 'cm-sketch'
+    const edit = document.createElement('button')
+    edit.className = 'cm-sketch-edit'
+    edit.textContent = '✏️ Edit sketch'
+    edit.title = 'Draw more on this sketch'
+    edit.addEventListener('mousedown', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      useUI.setState({ sketch: { path: sketch } })
+    })
+    wrap.append(img, edit)
+    return wrap
   }
 }
 
@@ -228,15 +247,21 @@ function cleanUrl(raw: string): string {
   return raw.trim().replace(/^<(.*)>$/, '$1')
 }
 
-function imageSrc(url: string, path: string): string {
-  if (/^(https?:|data:)/i.test(url)) return url
+/** The picture's path in the notes folder; null for pictures on the web. */
+function imagePath(url: string, path: string): string | null {
+  if (/^(https?:|data:)/i.test(url)) return null
   let rel = url
   try {
     rel = decodeURI(url)
   } catch {
     // keep as typed
   }
-  return toVaultUrl(resolveRelative(parentOf(path), rel))
+  return resolveRelative(parentOf(path), rel)
+}
+
+function imageSrc(url: string, path: string): string {
+  const file = imagePath(url, path)
+  return file === null ? url : withSketchVersion(toVaultUrl(file), file)
 }
 
 // ---------- inline decorations (visible range only) ----------
@@ -397,7 +422,10 @@ function buildInline(view: EditorView): DecorationSet {
                 const raw = cleanUrl(doc.sliceString(url.from, url.to))
                 const src = imageSrc(raw, path)
                 // A voice note (or other audio) gets a player; pictures are shown.
-                const widget = AUDIO_EXT.test(raw) ? new AudioWidget(src, alt) : new ImageWidget(src, alt)
+                const file = imagePath(raw, path)
+                const widget = AUDIO_EXT.test(raw)
+                  ? new AudioWidget(src, alt)
+                  : new ImageWidget(src, alt, file && looksLikeSketch(file) ? file : null)
                 out.push(Decoration.replace({ widget }).range(node.from, node.to))
                 return false
               }

@@ -161,6 +161,16 @@ const ITEMS: SlashItem[] = [
     }
   },
   {
+    label: 'Sketch',
+    keywords: 'draw drawing handwriting pen doodle diagram picture',
+    section: 'Insert',
+    detail: 'draw',
+    apply: (view, from, to) => {
+      view.dispatch({ changes: { from, to, insert: '' } })
+      useUI.setState({ sketch: { path: null } })
+    }
+  },
+  {
     label: 'Reminder',
     keywords: 'remind alarm notify alert time ⏰',
     section: 'Insert',
