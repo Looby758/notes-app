@@ -2,6 +2,7 @@ import { htmlToMarkdown } from './html'
 import { baseName, dirName, joinPath, safeDecode, type Source } from './source'
 import type { ImportedNote } from './write'
 import { formatDate } from '../dates'
+import { parseDelimited } from '../sheets'
 
 /** Collects a note's files and hands out `att:N` links for them. */
 class Files {
@@ -78,31 +79,7 @@ const NOTION_ID = /\s+[0-9a-f]{32}(?=$|\.|\/)/gi
 const stripId = (p: string): string => p.replace(NOTION_ID, '')
 
 function csvToTable(csv: string): string {
-  const rows: string[][] = []
-  let row: string[] = []
-  let cell = ''
-  let quoted = false
-  for (let i = 0; i < csv.length; i++) {
-    const c = csv[i]
-    if (quoted) {
-      if (c === '"' && csv[i + 1] === '"') {
-        cell += '"'
-        i++
-      } else if (c === '"') quoted = false
-      else cell += c
-    } else if (c === '"') quoted = true
-    else if (c === ',') {
-      row.push(cell)
-      cell = ''
-    } else if (c === '\n' || c === '\r') {
-      if (c === '\r' && csv[i + 1] === '\n') i++
-      row.push(cell)
-      rows.push(row)
-      row = []
-      cell = ''
-    } else cell += c
-  }
-  if (cell || row.length) rows.push([...row, cell])
+  const rows = parseDelimited(csv)
   const clean = rows.filter((r) => r.some((c) => c.trim())).map((r) => r.map((c) => c.replace(/\n/g, ' ').replace(/\|/g, '\\|').trim() || ' '))
   if (clean.length === 0) return ''
   const cols = Math.max(...clean.map((r) => r.length))
