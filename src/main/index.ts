@@ -357,10 +357,15 @@ function createWindow(): BrowserWindow {
       )
     }
     if (params.isEditable) {
-      // In a note (not a text box elsewhere): format the selected text, or record a voice note here.
+      // In a note (not a text box elsewhere): format the selected text, or record a voice note / draw a sketch here.
       if (win === mainWindow && params.formControlType === 'none') {
         if (params.selectionText.trim()) items.push(...formatMenuFor(win))
-        else items.push({ label: 'Record a voice note…', click: () => win.webContents.send('voice:start') }, { type: 'separator' })
+        else
+          items.push(
+            { label: 'Record a voice note…', click: () => win.webContents.send('voice:start') },
+            { label: 'Draw a sketch…', click: () => win.webContents.send('sketch:start') },
+            { type: 'separator' }
+          )
       }
       items.push(
         { role: 'cut', enabled: params.editFlags.canCut },
@@ -512,6 +517,7 @@ function registerIpc(): void {
 
   ipcMain.handle('vault:readAppData', (_e, name: string) => currentVault().readAppData(name))
   ipcMain.handle('vault:writeAppData', (_e, name: string, content: string) => currentVault().writeAppData(name, content))
+  ipcMain.handle('fs:writeSketch', (_e, path: string, svg: string) => currentVault().writeSketch(path, svg))
   ipcMain.handle('fs:saveAttachment', (_e, folder: string, name: string, data: Uint8Array) =>
     currentVault().saveAttachment(folder, name, data)
   )
