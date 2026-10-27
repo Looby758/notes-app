@@ -32,6 +32,8 @@ interface UIState {
   /** Graph tab: how many steps out the neighbourhood reaches, and whether unlinked notes show. */
   graphDepth: 1 | 2
   graphOrphans: boolean
+  /** Notes shown as a mind map instead of text, as "pane|path" (not remembered between runs). */
+  mindMaps: string[]
   /** The day selected in the calendars (day key) and the full calendar's view. */
   calendarDay: string
   calendarView: CalendarView
@@ -76,6 +78,7 @@ export const useUI = create<UIState>(() => ({
   sketch: null,
   graphDepth: saved.graphDepth === 1 ? 1 : 2,
   graphOrphans: saved.graphOrphans ?? true,
+  mindMaps: [],
   calendarDay: dayKeyOf(new Date()),
   calendarView: saved.calendarView ?? 'month',
   searchQuery: '',
@@ -124,6 +127,21 @@ export function toggleFocusMode(): void {
   useUI.setState((s) => {
     const anyOpen = s.leftOpen || s.rightOpen
     return { leftOpen: !anyOpen, rightOpen: !anyOpen }
+  })
+}
+
+const mindMapKey = (pane: string, path: string): string => `${pane}|${path}`
+
+export const isMindMap = (s: UIState, pane: string, path: string | null): boolean =>
+  !!path && s.mindMaps.includes(mindMapKey(pane, path))
+
+/** Switches a note in a pane between its text and its mind map (or to `on`). */
+export function toggleMindMap(pane: string, path: string, on?: boolean): void {
+  const key = mindMapKey(pane, path)
+  useUI.setState((s) => {
+    const showing = s.mindMaps.includes(key)
+    if ((on ?? !showing) === showing) return {}
+    return { mindMaps: showing ? s.mindMaps.filter((k) => k !== key) : [...s.mindMaps, key] }
   })
 }
 

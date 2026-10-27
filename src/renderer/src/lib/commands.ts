@@ -1,6 +1,6 @@
 import { useEditor } from '../store/editor'
 import { useVault } from '../store/vault'
-import { openExport, showRightView, showSearch, showSidebarView, toggleFocusMode, toggleZen, useUI } from '../store/ui'
+import { openExport, showRightView, showSearch, showSidebarView, toggleFocusMode, toggleMindMap, toggleZen, useUI } from '../store/ui'
 import { effectiveShortcut, setPrefs, usePrefs } from '../store/prefs'
 import { RANGES, DEFAULT_PREFS } from '@shared/prefs'
 import { EDITOR_COMMANDS } from '../components/Editor/formatting'
@@ -229,6 +229,16 @@ export const commands: Command[] = [
   { id: 'backlinks', group: 'Navigation', title: 'Show backlinks', run: () => showRightView('backlinks') },
   { id: 'graph.open', group: 'Navigation', title: 'Open graph', shortcut: 'Ctrl+Shift+G', run: () => openSpecialTab(GRAPH_TAB) },
   { id: 'flashcards.open', group: 'Navigation', title: 'Review flashcards', shortcut: 'Ctrl+Shift+Y', run: () => openSpecialTab(FLASHCARDS_TAB) },
+  {
+    id: 'view.mindmap',
+    group: 'View',
+    title: 'Mind map of this note / back to writing',
+    shortcut: 'Ctrl+Shift+M',
+    run: () => {
+      const { activePane, active } = useEditor.getState()
+      if (isNoteTab(active)) toggleMindMap(activePane, active)
+    }
+  },
   { id: 'outline', group: 'Navigation', title: 'Show outline', shortcut: 'Ctrl+Shift+O', run: () => showRightView('outline') },
 
   { id: 'ai.ask', group: 'AI helper', title: 'AI helper: ask my notes', run: () => openAsk() },

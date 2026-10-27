@@ -67,6 +67,7 @@ Nothing is sent unless you press one of these. Then only what's needed goes to A
 - **Export** (Ctrl+Shift+P, or right-click a note or folder) — to PDF, Word (.docx) or a web page, with images built in. Folders export as one file (links between notes still work) or a file per note.
 - **Typewriter mode** (Settings → Editor, off by default) — keep the line you're writing in the middle of the screen, and/or fade everything but the current paragraph or line.
 - **Tags** — `#idea`, `#project/alpha`, or `tags: [a, b]` in frontmatter. The Tags view lists them all.
+- **Dictionary and synonyms** — right-click any word in a note to see what it means; click the meaning for all of them, with examples. *Synonyms* swaps in another word, with the same ending ("running" → "sprinting"). Works offline, using Princeton's [WordNet](https://wordnet.princeton.edu/).
 - **Search** — full text, typo-tolerant, with `#tag` filters.
 - **Tabs** — opening a note changes the current tab; Ctrl+click (Mac: ⌘-click) or middle-click opens it in a new one (or turn on *Open notes in a new tab* in Settings → Editor). Blank tabs wait for you to pick a note. Pin a tab (right-click → *Pin tab*) to keep it at the front; Ctrl+W leaves pinned tabs open.
 - **Split view** — split any pane right or down as often as you like, drag the dividers, drag tabs between panes (or onto a pane's edge to split it), and drag notes from the file tree onto a pane. Presets: two or three columns, two rows, a grid of four. The same note can be open in two panes at once.

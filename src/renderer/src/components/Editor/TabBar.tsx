@@ -1,9 +1,9 @@
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { CalendarDays, GitCompare, Columns2, FileDown, Layers, Orbit, Replace, FolderSearch, Pin, PinOff, Plus, Rows2, Settings, Sparkles, Star, StarOff, X } from 'lucide-react'
+import { CalendarDays, GitCompare, Columns2, FileDown, Layers, Network, Orbit, Replace, FolderSearch, Pin, PinOff, Plus, Rows2, Settings, Sparkles, Star, StarOff, X } from 'lucide-react'
 import { useEditor } from '../../store/editor'
 import { toggleStar, useStarred } from '../../store/starred'
 import { useNoteIndex } from '../../store/noteIndex'
-import { openExport } from '../../store/ui'
+import { isMindMap, openExport, toggleMindMap, useUI } from '../../store/ui'
 import {
   activateTab,
   AI_TAB,
@@ -55,6 +55,7 @@ export default function TabBar({ pane }: { pane: string }) {
   const paneCount = useEditor((s) => Object.keys(s.panes).length)
   const status = useEditor((s) => s.status)
   const pinned = useEditor((s) => s.panes[pane]?.pinned ?? NO_PINS)
+  const mindMap = useUI((s) => isMindMap(s, pane, active))
   const starred = useStarred((s) => s.paths)
   // Notes' emoji icons, shown before their names.
   const notesIndex = useNoteIndex((s) => s.notes)
@@ -234,6 +235,16 @@ export default function TabBar({ pane }: { pane: string }) {
         <div className="tabbar-spacer" onDoubleClick={() => newTab(pane)} />
       </div>
       <div className="pane-actions">
+        {isNoteTab(active) && (
+          <button
+            className={`icon-btn ${mindMap ? 'active' : ''}`}
+            title={mindMap ? `Back to writing (${showKeys('Ctrl+Shift+M')})` : `Mind map of this note (${showKeys('Ctrl+Shift+M')})`}
+            onClick={() => toggleMindMap(pane, active)}
+            data-mindmap-toggle
+          >
+            <Network size={14} />
+          </button>
+        )}
         <button className="icon-btn" title={`Split right (${showKeys('Ctrl+Alt+\\')})`} onClick={() => splitPane('right', { pane })}>
           <Columns2 size={14} />
         </button>

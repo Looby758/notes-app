@@ -1,4 +1,5 @@
 import type { Prefs } from './prefs'
+import type { DictionaryEntry } from './dictionary'
 
 export interface WindowBounds {
   x?: number
@@ -152,6 +153,12 @@ export interface NotesApi {
   onFormat(callback: (id: string) => void): () => void
   /** Pops up a native menu at (x, y) in the page; resolves to the picked item's id, or null. */
   popupMenu(items: PopupMenuItem[], x: number, y: number): Promise<string | null>
+  /** The word you just right-clicked in a note (null: not on a word), for the dictionary on the menu. */
+  setMenuWord(word: MenuWord | null): void
+  /** "See all meanings" was picked on the right-click menu. */
+  onShowDefinition(callback: (entry: DictionaryEntry) => void): () => void
+  /** A synonym was picked on the right-click menu: put it in place of the right-clicked word. */
+  onReplaceWord(callback: (text: string) => void): () => void
   // Importing from other apps
   /** Picks an export (a file, or a folder) to import; null if cancelled. */
   pickImport(kind: 'file' | 'folder', extensions?: string[]): Promise<string | null>
@@ -274,6 +281,12 @@ export interface NotesApi {
 }
 
 /** An item in a native menu described by the UI. */
+/** The word under a right-click in a note; `editable` if a synonym may replace it. */
+export interface MenuWord {
+  word: string
+  editable: boolean
+}
+
 export type PopupMenuItem = 'separator' | { id?: string; label: string; accelerator?: string; submenu?: PopupMenuItem[] }
 /** What quick capture sends to be saved. */
 export interface CaptureRequest {

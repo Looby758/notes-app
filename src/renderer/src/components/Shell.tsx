@@ -43,11 +43,13 @@ import RightPanel from './Panels/RightPanel'
 import Modals from './Picker/Modals'
 import LockDialog from './Lock/LockDialog'
 import { startFormatMenu } from '../lib/formatMenu'
+import { startDictionary } from '../lib/dictionary'
 import { EventDetails } from './Calendar/shared'
 import Resizer from './Resizer'
 import UpdateToast from './UpdateToast'
 import ZenBar, { StatusTimer } from './ZenBar'
 import VoiceRecorder from './VoiceRecorder'
+import DefinitionCard from './DefinitionCard'
 import SketchPad from './Sketch/SketchPad'
 import { FlashcardsButton } from './Flashcards/FlashcardsPage'
 import { openRandomNote } from '../lib/random'
@@ -110,6 +112,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     const offVoice = window.api.onVoiceStart(() => useUI.setState({ voiceOpen: true }))
     const offSketch = window.api.onSketchStart(() => useUI.setState({ sketch: { path: null } }))
     const offFormat = startFormatMenu()
+    const offDictionary = startDictionary()
     const offChanged = window.api.onVaultChanged((paths) => {
       useVault.getState().refresh(paths)
       handleExternalChanges(paths)
@@ -135,6 +138,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       offVoice()
       offSketch()
       offFormat()
+      offDictionary()
       stopReminders()
     }
   }, [vault])
@@ -331,6 +335,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <UpdateToast />
       <ZenBar />
       <VoiceRecorder />
+      <DefinitionCard />
       <SketchPad />
     </div>
   )
