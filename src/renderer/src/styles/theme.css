@@ -5695,6 +5695,226 @@ body.theme-light .tree-star {
   font-size: 12.5px;
 }
 
+/* ---------- flashcards ---------- */
+.flashcards-button {
+  position: relative;
+}
+.flashcards-badge {
+  position: absolute;
+  top: 1px;
+  right: -2px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 14px;
+  text-align: center;
+  pointer-events: none;
+}
+.pane-body > .flashcards-page {
+  flex: 1;
+}
+.flashcards-page {
+  overflow-y: auto;
+  min-height: 0;
+}
+.flashcards-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 28px 32px 60px;
+}
+.flashcards-inner h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+.flashcards-intro,
+.flashcards-none {
+  margin: 0 0 18px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.flashcards-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-panel);
+}
+.flashcards-summary strong {
+  font-size: 18px;
+}
+.flashcards-summary span {
+  color: var(--text-muted);
+}
+.flashcards-inner .btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.flashcards-decks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.flashcards-decks li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.flashcards-decks .link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flashcards-deck-count {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.flashcards-decks .btn {
+  padding: 5px 12px;
+  font-size: 12.5px;
+}
+.flashcards-review {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  outline: none;
+}
+.flashcards-review header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+}
+.flashcards-review header > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+.flashcards-left {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.flashcards-review header .btn {
+  padding: 5px 12px;
+  font-size: 12.5px;
+}
+.flashcard {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+  min-height: 220px;
+  padding: 32px 28px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-panel);
+  text-align: center;
+  user-select: text;
+}
+.flashcard-question {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+.flashcard-answer {
+  padding-top: 18px;
+  border-top: 1px dashed var(--border);
+  font-size: 19px;
+  line-height: 1.5;
+  color: var(--accent);
+  white-space: pre-wrap;
+}
+.flashcard-grades {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+.flashcard-grade {
+  flex: 1;
+  max-width: 140px;
+  flex-direction: column;
+  gap: 2px;
+}
+.flashcard-grade small {
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+.flashcard-grade kbd {
+  font-size: 10px;
+  color: var(--text-faint);
+}
+.flashcard-grade.grade-again span {
+  color: #f97066;
+}
+.flashcard-grade.grade-hard span {
+  color: #f5a524;
+}
+.flashcard-grade.grade-good span {
+  color: #4ade80;
+}
+.flashcard-grade.grade-easy span {
+  color: #60a5fa;
+}
+.flashcard-show kbd {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.4);
+  color: inherit;
+}
+.flashcard-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: center;
+  font-size: 12px;
+}
+.flashcards-finished {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 0;
+  color: var(--text-muted);
+}
+.flashcards-finished svg {
+  color: #4ade80;
+}
+body.theme-light .flashcard-grade.grade-again span {
+  color: #d92d20;
+}
+body.theme-light .flashcard-grade.grade-hard span {
+  color: #b54708;
+}
+body.theme-light .flashcard-grade.grade-good span,
+body.theme-light .flashcards-finished svg {
+  color: #15803d;
+}
+body.theme-light .flashcard-grade.grade-easy span {
+  color: #1d4ed8;
+}
+
 /* ---------- import ---------- */
 .import-dialog {
   display: flex;
