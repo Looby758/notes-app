@@ -5,6 +5,7 @@ import { noteTitle } from '../paths'
 import { imagesIn, notesUnder, prepareNote, type ExportItem } from './prepare'
 import { toHtmlDocument } from './html'
 import type { DocxImage } from './docx'
+import { diagramsIn, renderDiagram } from '../diagrams'
 
 export type ExportFormat = 'pdf' | 'docx' | 'html'
 
@@ -132,12 +133,24 @@ export async function runExport(req: ExportRequest): Promise<string | null> {
     } else dataUrls.set(p, await blobToDataUrl(blob))
   }
 
+  // Diagrams, drawn once (web pages and PDFs only; Word gets their text).
+  const diagrams = new Map<string, string>()
+  if (req.format !== 'docx') {
+    for (const code of new Set(items.flatMap((it) => diagramsIn(it.markdown)))) {
+      try {
+        diagrams.set(code.trim(), await renderDiagram(code, false))
+      } catch {
+        // Shown as its text instead.
+      }
+    }
+  }
+
   const build = async (group: ExportItem[], title: string, otherFiles?: Map<string, string>): Promise<Uint8Array | string> => {
     if (req.format === 'docx') {
       const { toDocx } = await import('./docx')
       return toDocx({ items: group, images: wordImages, title })
     }
-    const html = toHtmlDocument({ items: group, images: dataUrls, title, forPrint: req.format === 'pdf', otherFiles })
+    const html = toHtmlDocument({ items: group, images: dataUrls, diagrams, title, forPrint: req.format === 'pdf', otherFiles })
     return req.format === 'pdf' ? window.api.printToPdf(html) : html
   }
 

@@ -85,6 +85,21 @@ const ITEMS: SlashItem[] = [
     detail: '2 × 2',
     apply: block('| ${Column 1} | ${Column 2} |\n| --- | --- |\n| ${} |  |\n')
   },
+  {
+    label: 'Maths',
+    keywords: 'math formula equation latex tex katex sum fraction',
+    section: 'Insert',
+    detail: '$$',
+    apply: block('$$\n${E = mc^2}\n$$\n${}')
+  },
+  { label: 'Maths in a sentence', keywords: 'math inline formula equation latex tex', section: 'Insert', detail: '$x$', apply: tpl('$${x^2}$') },
+  {
+    label: 'Diagram',
+    keywords: 'mermaid flowchart chart graph sequence timeline mindmap pie',
+    section: 'Insert',
+    detail: 'flowchart',
+    apply: block('```mermaid\nflowchart TD\n  A[${Start}] --> B[Next step]\n  B --> C[Done]\n```\n${}')
+  },
   { label: 'Divider', keywords: 'hr rule line separator', section: 'Insert', detail: '---', apply: block('---\n${}') },
   {
     label: 'Link to note',

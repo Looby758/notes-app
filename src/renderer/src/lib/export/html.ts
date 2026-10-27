@@ -1,4 +1,5 @@
 import { Marked, type Tokens } from 'marked'
+import katex from 'katex'
 import { headingAnchor, parseNoteHref, slug, type ExportItem } from './prepare'
 import { BANNER_GRADIENTS } from '../banners'
 
@@ -15,6 +16,8 @@ export interface HtmlOptions {
   otherFiles?: Map<string, string>
   /** Vault image path → data: URL. */
   images: Map<string, string>
+  /** A ```mermaid block's text (trimmed) → the diagram as SVG. */
+  diagrams?: Map<string, string>
   title: string
   /** PDF: always light, page breaks between notes. */
   forPrint: boolean
@@ -39,12 +42,50 @@ export const highlightExtension = {
   }
 }
 
+/**
+ * Maths as MathML, which browsers (and the PDF printer) draw themselves, so the file needs no
+ * fonts or styles of its own.
+ */
+const mathHtml = (tex: string, displayMode: boolean): string =>
+  katex.renderToString(tex, { displayMode, output: 'mathml', throwOnError: false })
+
+/** $$ … $$ as a centred formula. */
+export const mathBlockExtension = {
+  name: 'mathBlock',
+  level: 'block' as const,
+  start: (src: string) => src.match(/^ {0,3}\$\$/m)?.index,
+  tokenizer(src: string) {
+    const m = /^ {0,3}\$\$([\s\S]+?)\$\$[ \t]*(?:\n|$)/.exec(src)
+    if (m && m[1].trim()) return { type: 'mathBlock', raw: m[0], text: m[1].trim() }
+    return undefined
+  },
+  renderer: (token: Tokens.Generic) => `<div class="math-block">${mathHtml(token.text, true)}</div>\n`
+}
+
+/** $x^2$ inside a sentence. */
+export const mathInlineExtension = {
+  name: 'mathInline',
+  level: 'inline' as const,
+  start: (src: string) => src.match(/(?<![\\$\w])\$(?=[^\s$])/)?.index,
+  tokenizer(src: string) {
+    const m = /^\$(?=[^\s$])((?:\\.|[^$\n\\])*?[^\s\\])\$(?![$\d])/.exec(src)
+    if (m) return { type: 'mathInline', raw: m[0], text: m[1] }
+    return undefined
+  },
+  renderer: (token: Tokens.Generic) => mathHtml(token.text, false)
+}
+
 function renderNote(item: ExportItem, opts: HtmlOptions): string {
   const inFile = new Set(opts.items.map((i) => i.path))
   const marked = new Marked({ gfm: true, breaks: false })
-  marked.use({ extensions: [highlightExtension] })
+  marked.use({ extensions: [highlightExtension, mathBlockExtension, mathInlineExtension] })
   marked.use({
     renderer: {
+      // ```mermaid blocks: the diagram, drawn before exporting (or the text, if it couldn't be).
+      code({ text, lang }: Tokens.Code) {
+        const svg = lang?.trim().toLowerCase() === 'mermaid' ? opts.diagrams?.get(text.trim()) : undefined
+        return svg ? `<div class="diagram">${svg}</div>\n` : false
+      },
       // > [!tip] Title  →  a coloured box with a title.
       blockquote(this: { parser: { parse: (t: Tokens.Generic[]) => string } }, { tokens }: Tokens.Blockquote) {
         const first = tokens[0] as Tokens.Paragraph | undefined
@@ -138,6 +179,10 @@ th { background: var(--soft); font-weight: 600; }
 hr { border: none; border-top: 1px solid var(--border); margin: 2em 0; }
 li > input[type=checkbox] { margin: 0 6px 0 -2px; accent-color: var(--accent); }
 ul:has(> li > input[type=checkbox]) { list-style: none; padding-left: 1.2em; }
+.math-block { margin: 0 0 1em; overflow-x: auto; text-align: center; }
+math { font-size: 1.1em; }
+.diagram { margin: 0 0 1em; text-align: center; break-inside: avoid; }
+.diagram svg { max-width: 100%; height: auto; }
 table.properties { width: auto; margin-bottom: 1.6em; font-size: 0.88em; }
 table.properties th, table.properties td { border: none; border-bottom: 1px solid var(--border); padding: 4px 16px 4px 0; background: none; }
 table.properties th { color: var(--faint); font-weight: 500; }
