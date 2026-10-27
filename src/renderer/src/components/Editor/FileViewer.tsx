@@ -7,6 +7,7 @@ import { getNoteText, useNoteIndex } from '../../store/noteIndex'
 import { FILE_MANAGER } from '@shared/platform'
 import { loadSketch, useSketchVersions } from '../../lib/sketch'
 import { useUI } from '../../store/ui'
+import SheetView from './SheetView'
 
 /** Notes that show or link to `path` (by its file name, as embeds are written). */
 function usedIn(path: string): string[] {
@@ -37,7 +38,7 @@ function useIsSketch(path: string): boolean {
   return isSketch
 }
 
-/** A picture, recording, video or PDF from the notes folder, in its own tab. */
+/** A picture, recording, video, PDF or spreadsheet from the notes folder, in its own tab. */
 export default function FileViewer({ path }: { path: string }) {
   const kind = fileKind(path)
   // Bumped when a sketch is saved, so the new drawing shows instead of the old one.
@@ -82,6 +83,8 @@ export default function FileViewer({ path }: { path: string }) {
           />
         ) : kind === 'audio' ? (
           <audio src={url} controls onError={() => setFailed(true)} />
+        ) : kind === 'sheet' ? (
+          <SheetView path={path} url={url} name={name} />
         ) : kind === 'video' ? (
           <video src={url} controls onError={() => setFailed(true)} />
         ) : (

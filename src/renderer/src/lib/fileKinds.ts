@@ -3,7 +3,7 @@ import { openFileTab } from './editorController'
 
 /** What kind of file something in the notes folder is, and how Notes opens it. */
 
-export type FileKind = 'image' | 'audio' | 'video' | 'pdf' | 'other'
+export type FileKind = 'image' | 'audio' | 'video' | 'pdf' | 'sheet' | 'other'
 
 export function fileKind(path: string): FileKind {
   const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
@@ -12,13 +12,15 @@ export function fileKind(path: string): FileKind {
   if (['mp3', 'm4a', 'wav', 'ogg', 'oga', 'aac', 'flac', 'opus', 'webm'].includes(ext)) return 'audio'
   if (['mp4', 'mov', 'm4v', 'ogv'].includes(ext)) return 'video'
   if (ext === 'pdf') return 'pdf'
+  // Old binary .xls and .ods files still open in their usual app.
+  if (['xlsx', 'xlsm', 'csv', 'tsv'].includes(ext)) return 'sheet'
   return 'other'
 }
 
 /** The address Notes serves a vault file at (see the vault: protocol in the main process). */
 export const vaultUrl = (path: string): string => `vault://local/${path.split('/').map(encodeURIComponent).join('/')}`
 
-/** Pictures, recordings, videos and PDFs open in a tab; anything else in its usual app. */
+/** Pictures, recordings, videos, PDFs and spreadsheets open in a tab; anything else in its usual app. */
 export function openAttachment(path: string, opts: { newTab?: boolean; pane?: string } = {}): void {
   if (fileKind(path) === 'other') openExternally(path)
   else openFileTab(path, opts)
