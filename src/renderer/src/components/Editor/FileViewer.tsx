@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react'
-import { ExternalLink, FileText, FolderSearch } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ExternalLink, FileText, FolderSearch, Pencil } from 'lucide-react'
 import { fileKind, openExternally, vaultUrl } from '../../lib/fileKinds'
 import { openNote } from '../../lib/editorController'
 import { noteTitle } from '../../lib/paths'
 import { getNoteText, useNoteIndex } from '../../store/noteIndex'
 import { FILE_MANAGER } from '@shared/platform'
+import { loadSketch, useSketchVersions } from '../../lib/sketch'
+import { useUI } from '../../store/ui'
 import SheetView from './SheetView'
 
 /** Notes that show or link to `path` (by its file name, as embeds are written). */
@@ -20,15 +22,34 @@ function usedIn(path: string): string[] {
     .sort((a, b) => noteTitle(a).localeCompare(noteTitle(b)))
 }
 
+/** True once `path` turns out to be a sketch drawn in Notes (so it can be edited). */
+function useIsSketch(path: string): boolean {
+  const [isSketch, setIsSketch] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    setIsSketch(false)
+    loadSketch(path)
+      .then((s) => !cancelled && setIsSketch(!!s))
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [path])
+  return isSketch
+}
+
 /** A picture, recording, video, PDF or spreadsheet from the notes folder, in its own tab. */
 export default function FileViewer({ path }: { path: string }) {
   const kind = fileKind(path)
-  const url = vaultUrl(path)
+  // Bumped when a sketch is saved, so the new drawing shows instead of the old one.
+  const sketchVersion = useSketchVersions((s) => s[path] ?? 0)
+  const url = vaultUrl(path) + (sketchVersion ? `?v=${sketchVersion}` : '')
   const name = path.slice(path.lastIndexOf('/') + 1)
   const version = useNoteIndex((s) => s.version)
   const notes = useMemo(() => usedIn(path), [path, version])
   const [actualSize, setActualSize] = useState(false)
   const [failed, setFailed] = useState(false)
+  const isSketch = useIsSketch(path)
 
   return (
     <div className="file-viewer" data-file-viewer={path}>
@@ -36,6 +57,11 @@ export default function FileViewer({ path }: { path: string }) {
         <span className="file-viewer-name" title={path}>
           {name}
         </span>
+        {isSketch && (
+          <button className="btn btn-primary" onClick={() => useUI.setState({ sketch: { path } })} data-edit-sketch>
+            <Pencil size={13} /> Edit sketch
+          </button>
+        )}
         <button className="btn" onClick={() => openExternally(path)}>
           <ExternalLink size={13} /> Open in its usual app
         </button>

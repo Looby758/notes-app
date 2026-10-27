@@ -48,6 +48,7 @@ import Resizer from './Resizer'
 import UpdateToast from './UpdateToast'
 import ZenBar, { StatusTimer } from './ZenBar'
 import VoiceRecorder from './VoiceRecorder'
+import SketchPad from './Sketch/SketchPad'
 import { openRandomNote } from '../lib/random'
 import { startReminders, stopReminders } from '../lib/reminderScheduler'
 
@@ -106,6 +107,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     // (The test notification from Settings has no note to open.)
     const offReminder = window.api.onReminderOpen((path, line) => path && openNote(path, { line }))
     const offVoice = window.api.onVoiceStart(() => useUI.setState({ voiceOpen: true }))
+    const offSketch = window.api.onSketchStart(() => useUI.setState({ sketch: { path: null } }))
     const offFormat = startFormatMenu()
     const offChanged = window.api.onVaultChanged((paths) => {
       useVault.getState().refresh(paths)
@@ -130,6 +132,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       offIndex()
       offReminder()
       offVoice()
+      offSketch()
       offFormat()
       stopReminders()
     }
@@ -326,6 +329,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <UpdateToast />
       <ZenBar />
       <VoiceRecorder />
+      <SketchPad />
     </div>
   )
 }

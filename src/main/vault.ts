@@ -1,5 +1,5 @@
 import { promises as fs } from 'fs'
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'path'
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'path'
 import type { FileNode } from '@shared/types'
 
 /** Hidden folders (.git, .obsidian, .trash…) and node_modules never show in the tree. */
@@ -196,6 +196,22 @@ export class Vault {
     const target = await this.uniquePath(dir, ...splitName(safeFileName(fileName)))
     await fs.writeFile(target, data, { flag: 'wx' })
     return this.rel(target)
+  }
+
+  /** Saves an edited sketch over its .svg (only an existing picture, so nothing else can be written). */
+  async writeSketch(rel: string, svg: string): Promise<void> {
+    const full = this.abs(rel)
+    if (extname(full).toLowerCase() !== '.svg') throw new Error('Only sketches (.svg) can be saved this way.')
+    if (!(await exists(full))) throw new Error('That sketch is no longer in the notes folder.')
+    if (Buffer.byteLength(svg) > MAX_ATTACHMENT_BYTES) throw new Error('That sketch is too big to save.')
+    const tmp = join(dirname(full), `.${basename(full)}.${tempSuffix()}.tmp`)
+    await fs.writeFile(tmp, svg, 'utf8')
+    try {
+      await renameWithRetry(tmp, full)
+    } catch (err) {
+      await fs.rm(tmp, { force: true })
+      throw err
+    }
   }
 
   /** Copies a file from anywhere on disk into `folderRel` (for "insert image" from a file picker). */
