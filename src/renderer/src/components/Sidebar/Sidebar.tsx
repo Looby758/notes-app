@@ -1,4 +1,4 @@
-import { FilePlus, FolderPlus, FolderTree, GitCompare, Hash, Search } from 'lucide-react'
+import { FilePlus, FolderPlus, FolderTree, GitCompare, Hash, LayoutDashboard, Search } from 'lucide-react'
 import { useVault } from '../../store/vault'
 import { useNotify } from '../../store/notify'
 import { showSidebarView, useUI, type SidebarView } from '../../store/ui'
@@ -11,6 +11,7 @@ import SearchPane from './SearchPane'
 import TagsPane from './TagsPane'
 import BulkBar from './BulkBar'
 import { showKeys } from '@shared/platform'
+import { newBoard } from '../../lib/boards'
 
 const VIEWS: { id: SidebarView; title: string; icon: typeof Search }[] = [
   { id: 'files', title: `Files (${showKeys('Ctrl+Shift+E')})`, icon: FolderTree },
@@ -43,6 +44,9 @@ export default function Sidebar() {
           <div className="panel-actions">
             <button className="icon-btn" title={`New note (${showKeys('Ctrl+N')})`} onClick={() => newNote()}>
               <FilePlus size={15} />
+            </button>
+            <button className="icon-btn" title="New canvas board" onClick={() => newBoard()}>
+              <LayoutDashboard size={15} />
             </button>
             <button className="icon-btn" title={`New folder (${showKeys('Ctrl+Shift+N')})`} onClick={() => newFolder()}>
               <FolderPlus size={15} />

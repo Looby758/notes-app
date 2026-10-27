@@ -28,6 +28,8 @@ import ReplacePage from '../Replace/ReplacePage'
 import TabBar from './TabBar'
 import LockScreen from '../Lock/LockScreen'
 import FileViewer from './FileViewer'
+import CanvasBoard from '../Canvas/CanvasBoard'
+import { isBoard } from '../../lib/canvas'
 import ConflictsPage from '../Conflicts/ConflictsPage'
 import FlashcardsPage from '../Flashcards/FlashcardsPage'
 import { needsUnlock, useLock } from '../../lib/lock/session'
@@ -114,7 +116,12 @@ export default function Pane({ pane }: { pane: string }) {
         )}
         <div ref={host} className={`editor-host ${showingNote ? '' : 'hidden'}`} />
         {lockedNote && <LockScreen key={active} path={active!} autoFocus={isActivePane} />}
-        {isFileTab(active) && <FileViewer key={active} path={fileOfTab(active)} />}
+        {isFileTab(active) &&
+          (isBoard(active) ? (
+            <CanvasBoard key={active} path={fileOfTab(active)} />
+          ) : (
+            <FileViewer key={active} path={fileOfTab(active)} />
+          ))}
         {isBlankTab(active) && <NewTabPage key={active} autoFocus={isActivePane} />}
         {active === SETTINGS_TAB && <SettingsPage />}
         {active === CALENDAR_TAB && <CalendarPage />}

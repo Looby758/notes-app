@@ -39,10 +39,10 @@ export default function SketchPad() {
   const sketch = useUI((s) => s.sketch)
   const close = useCallback(() => useUI.setState({ sketch: null }), [])
   // Keyed so opening another sketch starts afresh.
-  return sketch ? <Pad key={sketch.path ?? 'new'} path={sketch.path} close={close} /> : null
+  return sketch ? <Pad key={sketch.path ?? 'new'} path={sketch.path} onSaved={sketch.onSaved} close={close} /> : null
 }
 
-function Pad({ path, close }: { path: string | null; close: () => void }) {
+function Pad({ path, onSaved, close }: { path: string | null; onSaved?: (path: string) => void; close: () => void }) {
   const folder = usePrefs((s) => s.prefs.attachmentFolder)
   const [board, setBoard] = useState<Sketch | null>(path ? null : emptySketch())
   const [history, setHistory] = useState<{ undo: Stroke[][]; redo: Stroke[][] }>({ undo: [], redo: [] })
@@ -243,7 +243,8 @@ function Pad({ path, close }: { path: string | null; close: () => void }) {
         refreshLinkDecorations()
       } else {
         const saved = await window.api.saveAttachment(folder, sketchFileName(), new TextEncoder().encode(svg))
-        if (!insertIntoActiveNote(saved)) notify(`Your sketch was saved in the “${folder}” folder.`)
+        if (onSaved) onSaved(saved)
+        else if (!insertIntoActiveNote(saved)) notify(`Your sketch was saved in the “${folder}” folder.`)
         useVault.getState().refresh()
       }
       close()

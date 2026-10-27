@@ -18,6 +18,8 @@ function cleanName(name: string): string {
 }
 
 const isMarkdown = (name: string): boolean => name.toLowerCase().endsWith('.md')
+/** Canvas boards (.canvas files) are saved through the same safe write as notes. */
+const isBoard = (name: string): boolean => name.toLowerCase().endsWith('.canvas')
 
 const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024
 
@@ -119,7 +121,7 @@ export class Vault {
   /** Atomic save: write a hidden temp file next to the note, then swap it in. */
   async write(rel: string, content: string): Promise<void> {
     const full = this.abs(rel)
-    if (!isMarkdown(full)) throw new Error('Only .md notes can be saved.')
+    if (!isMarkdown(full) && !isBoard(full)) throw new Error('Only .md notes and .canvas boards can be saved.')
     const tmp = join(dirname(full), `.${basename(full)}.${tempSuffix()}.tmp`)
     await fs.writeFile(tmp, content, 'utf8')
     try {
@@ -227,6 +229,13 @@ export class Vault {
   async createNote(folderRel: string): Promise<string> {
     const target = await this.uniquePath(await this.folder(folderRel), 'Untitled', '.md')
     await fs.writeFile(target, '', { flag: 'wx' })
+    return this.rel(target)
+  }
+
+  /** Creates an empty "Untitled board.canvas" in the folder. */
+  async createBoard(folderRel: string): Promise<string> {
+    const target = await this.uniquePath(await this.folder(folderRel), 'Untitled board', '.canvas')
+    await fs.writeFile(target, '{\n\t"nodes":[],\n\t"edges":[]\n}\n', { flag: 'wx' })
     return this.rel(target)
   }
 

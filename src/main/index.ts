@@ -496,6 +496,7 @@ function registerIpc(): void {
   ipcMain.handle('fs:readAll', () => currentVault().readAll())
   ipcMain.handle('fs:createNote', (_e, folder: string) => currentVault().createNote(folder))
   ipcMain.handle('fs:createNoteAt', (_e, path: string) => currentVault().createNoteAt(path))
+  ipcMain.handle('fs:createBoard', (_e, folder: string) => currentVault().createBoard(folder))
   ipcMain.handle('fs:createFolder', (_e, folder: string) => currentVault().createFolder(folder))
   ipcMain.handle('fs:rename', (_e, path: string, name: string) => currentVault().rename(path, name))
   ipcMain.handle('fs:move', (_e, path: string, folder: string) => currentVault().move(path, folder))

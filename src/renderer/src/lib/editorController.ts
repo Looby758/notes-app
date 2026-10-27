@@ -21,6 +21,7 @@ import type { Prefs } from '@shared/prefs'
 import { isWithin, replacePrefix } from './paths'
 import { noteLockState, onBeforeLock, openText, remapLock, sealText, useLock, type NoteLock } from './lock/session'
 import { currentHeadingIndex, extractHeadings } from './outline'
+import { flushBoards } from './boards'
 import {
   isValidLayout,
   newId,
@@ -979,7 +980,7 @@ async function flush(f: NoteFile): Promise<void> {
 }
 
 export async function flushAll(): Promise<void> {
-  await Promise.all([...files.values()].map(flush))
+  await Promise.all([...[...files.values()].map(flush), flushBoards()])
 }
 
 /** Ctrl+S: save right away instead of waiting for the pause. */
