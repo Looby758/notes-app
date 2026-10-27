@@ -241,6 +241,31 @@ export const editorTheme = EditorView.theme(
     },
     '.cm-table-wrap th': { backgroundColor: 'var(--bg-raised)', fontWeight: '600' },
 
+    // maths and diagrams
+    '.cm-math': { cursor: 'text' },
+    '.cm-math .katex': { fontSize: '1.08em' },
+    '.cm-math-block': { padding: '6px 0', overflowX: 'auto', overflowY: 'hidden', cursor: 'text' },
+    '.cm-math-block .katex-display': { margin: '0.4em 0' },
+    '.cm-diagram': {
+      display: 'flex',
+      justifyContent: 'center',
+      margin: '8px 0',
+      padding: '12px',
+      overflowX: 'auto',
+      border: '1px solid var(--border)',
+      borderRadius: '8px',
+      cursor: 'text'
+    },
+    '.cm-diagram svg': { maxWidth: '100%', height: 'auto' },
+    '.cm-diagram-loading': { color: 'var(--text-faint)', fontStyle: 'italic', fontSize: '0.9em' },
+    '.cm-diagram-error': {
+      display: 'block',
+      whiteSpace: 'pre-wrap',
+      color: 'var(--text-muted)',
+      fontFamily: 'var(--font-mono)',
+      fontSize: '0.82em'
+    },
+
     // in-note search (Ctrl+F)
     '.cm-panels': { backgroundColor: 'var(--bg-panel)', color: 'var(--text)' },
     '.cm-panels.cm-panels-top': { borderBottom: '1px solid var(--border)' },

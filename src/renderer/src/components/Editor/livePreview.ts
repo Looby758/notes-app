@@ -22,6 +22,7 @@ import { AUDIO_EXT } from '../../lib/voice'
 import { looksLikeSketch, withSketchVersion } from '../../lib/sketch'
 import { useUI } from '../../store/ui'
 import { CLICK_MOD } from '@shared/platform'
+import { mathDiagrams } from './mathDiagrams'
 
 /** The time at the start of a schedule line: "09:30", "9am", "09:30-10:30", "2pm – 3pm". */
 const EVENT_TIME = /^(\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?(?:\s*[-–—]\s*\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?)?)\s/i
@@ -680,4 +681,5 @@ const clickHandlers = EditorView.domEventHandlers({
   }
 })
 
-export const livePreview = [inlinePreview, tablePreview, clickHandlers, properties]
+// Maths and diagrams first, so a formula's own symbols (like * and _) aren't styled as markdown.
+export const livePreview = [mathDiagrams, inlinePreview, tablePreview, clickHandlers, properties]
