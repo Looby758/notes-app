@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ImagePlus, MoveVertical, Smile, Trash2 } from 'lucide-react'
+import { ImagePlus, MoveVertical, Smile, Sparkles, Trash2, WandSparkles } from 'lucide-react'
 import { setProperty, type Property } from '../../lib/properties'
 import { BANNER_COLOURS, BANNER_GRADIENTS, bannerY, parseBanner } from '../../lib/banners'
 import { EMOJI } from '../../lib/emoji'
 import { usePrefs } from '../../store/prefs'
 import { notify } from '../../store/notify'
+import { runNoteJob } from '../../store/ai'
 import PropertiesPanel from './PropertiesPanel'
 
 /** Properties that the header shows as pictures rather than as rows. */
@@ -50,6 +51,13 @@ export default function NoteHeader({ properties, apply, showRaw, readOnly }: Pro
               <ImagePlus size={13} /> Add banner
             </button>
           )}
+          {/* The pane takes focus on mouse down, so by the click this note is the active one. */}
+          <button onClick={() => runNoteJob('summary')} title="Summarise this note with the AI helper" data-ai-summarise>
+            <Sparkles size={13} /> Summarise
+          </button>
+          <button onClick={() => runNoteJob('tidy')} title="Fix typos and add structure with the AI helper (you see it before anything changes)" data-ai-tidy>
+            <WandSparkles size={13} /> Tidy up
+          </button>
         </div>
       )}
       {picker === 'icon' && (

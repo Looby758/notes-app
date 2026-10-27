@@ -1,0 +1,146 @@
+/* The AI helper: "Ask my notes", the summary / tidy-up dialog. */
+
+.ai-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ai-turns {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 28px 24px 12px;
+  box-sizing: border-box;
+}
+.ai-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 460px;
+  margin: 8vh auto 0;
+  color: var(--text-muted);
+  text-align: center;
+}
+.ai-empty svg {
+  color: var(--accent);
+}
+.ai-empty h2 {
+  margin: 4px 0 0;
+  color: var(--text-strong);
+  font-size: 19px;
+  font-weight: 600;
+}
+.ai-empty p {
+  margin: 0;
+  line-height: 1.5;
+}
+.ai-empty .btn-primary {
+  margin-top: 8px;
+}
+.ai-examples {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+.ai-turn {
+  margin-bottom: 22px;
+}
+.ai-question {
+  width: fit-content;
+  max-width: 80%;
+  margin: 0 0 10px auto;
+  padding: 8px 12px;
+  border-radius: 12px 12px 4px 12px;
+  background: var(--accent-soft);
+  color: var(--text-strong);
+  white-space: pre-wrap;
+}
+.ai-answer,
+.ai-result {
+  color: var(--text);
+  font-family: var(--font-editor);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ai-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent-strong);
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--accent-dim);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.ai-link:hover {
+  text-decoration-color: currentColor;
+}
+.ai-working {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-muted);
+}
+.ai-input {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 10px 24px 18px;
+  box-sizing: border-box;
+}
+.ai-input textarea {
+  flex: 1;
+  min-height: 38px;
+  max-height: 160px;
+  resize: vertical;
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--bg-panel);
+  color: var(--text-strong);
+  font: inherit;
+  line-height: 1.4;
+  outline: none;
+}
+.ai-input textarea:focus {
+  border-color: var(--accent);
+}
+.ai-input .btn-primary {
+  height: 38px;
+}
+.ai-input .icon-btn {
+  height: 38px;
+}
+
+.ai-dialog .ai-result {
+  max-height: 50vh;
+  overflow-y: auto;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 14px;
+}
+.ai-dialog .ai-working {
+  margin-bottom: 14px;
+}
+.ai-dialog .setting-warning {
+  margin-bottom: 14px;
+}
+.ai-dialog > .export-note {
+  margin-bottom: 14px;
+}

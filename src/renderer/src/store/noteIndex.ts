@@ -372,3 +372,23 @@ export function searchNotes(query: string): SearchHit[] {
   }
   return hits
 }
+
+/**
+ * Notes most likely to answer a question, best first: any of its words may match (unlike search,
+ * which needs all of them). Locked notes are never included, since the index has no text for them.
+ */
+const QUESTION_WORDS = new Set(
+  'a an and are as at be but by can did do does for from had has have how i in is it its me my of on or so than that the their them then there these they this to was we were what when where which who why will with you your'.split(' ')
+)
+
+export function notesForQuestion(question: string, limit = 40): { path: string; title: string; text: string }[] {
+  return search
+    .search(question, {
+      combineWith: 'OR',
+      // Little words like "the" match nearly every note, so only the meaningful ones count.
+      processTerm: (term) => (QUESTION_WORDS.has(term.toLowerCase()) ? null : term.toLowerCase())
+    })
+    .slice(0, limit)
+    .map((r) => ({ path: r.id as string, title: noteTitle(r.id as string), text: texts.get(r.id as string) ?? '' }))
+    .filter((n) => n.text.trim())
+}
