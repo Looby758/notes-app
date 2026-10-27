@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CalendarDays, FileJson, FolderCog, Info, Keyboard, Palette, PenLine, RefreshCw, RotateCcw, ScrollText, Search, X, Zap } from 'lucide-react'
+import { CalendarDays, FileJson, FolderCog, Info, Keyboard, Palette, PenLine, RefreshCw, RotateCcw, ScrollText, Search, Sparkles, X, Zap } from 'lucide-react'
 import { checkForUpdates, useUpdates, watchUpdates } from '../../store/updates'
 import { DEFAULT_PREFS } from '@shared/prefs'
 import type { CaptureStatus } from '@shared/types'
@@ -11,6 +11,8 @@ import CalendarSources from './CalendarSources'
 import SnippetsEditor from './SnippetsEditor'
 import PlaceholderHelp from './PlaceholderHelp'
 import RemindersSettings from './RemindersSettings'
+import AiSettings from '../Ai/AiSettings'
+import { useUI } from '../../store/ui'
 import pkg from '../../../../../package.json'
 import { showKeys, TRAY_NAME } from '@shared/platform'
 
@@ -20,6 +22,7 @@ const ICONS: Record<SectionId, typeof Palette> = {
   files: FolderCog,
   calendar: CalendarDays,
   capture: Zap,
+  ai: Sparkles,
   shortcuts: Keyboard,
   about: Info
 }
@@ -186,6 +189,13 @@ export default function SettingsPage() {
   const body = useRef<HTMLDivElement>(null)
 
   useEffect(() => search.current?.focus(), [])
+  const requested = useUI((s) => s.settingsSection)
+  useEffect(() => {
+    if (!requested) return
+    setQuery('')
+    setSection(requested as SectionId)
+    useUI.setState({ settingsSection: null })
+  }, [requested])
   useEffect(() => body.current?.scrollTo({ top: 0 }), [section])
 
   const q = query.trim()
@@ -264,6 +274,7 @@ export default function SettingsPage() {
                   {section === 'calendar' && <PlaceholderHelp />}
                   {section === 'calendar' && <CalendarSources />}
                   {section === 'capture' && <CaptureShortcutStatus />}
+                  {section === 'ai' && <AiSettings />}
                 </>
               )}
             </>

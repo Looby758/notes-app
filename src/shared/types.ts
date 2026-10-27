@@ -98,6 +98,25 @@ export interface ConfirmOptions {
 }
 
 /** The API the preload script exposes to the renderer as `window.api`. */
+/** Settings → AI helper: whether an Anthropic API key is saved. */
+export interface AiStatus {
+  hasKey: boolean
+  /** False if the system can't encrypt the key (it is then not saved). */
+  canEncrypt: boolean
+}
+
+/** A note handed to the AI helper as context for a question. */
+export interface AiNote {
+  title: string
+  text: string
+}
+
+/** An earlier question and answer, so follow-up questions make sense. */
+export interface AiAskTurn {
+  question: string
+  answer: string
+}
+
 export interface NotesApi {
   /** A native yes/no dialog; resolves true if the user picked `ok`. */
   confirm(options: ConfirmOptions): Promise<boolean>
@@ -192,6 +211,14 @@ export interface NotesApi {
   removeCalendarFeed(id: string): Promise<CalendarSourcesStatus>
   /** Events between two instants from every enabled calendar (cached ones if offline). */
   fetchCalendarEvents(from: string, to: string): Promise<{ events: CalEvent[]; errors: string[]; offline: boolean }>
+  aiStatus(): Promise<AiStatus>
+  /** Checks the key with Anthropic, then stores it encrypted. */
+  aiSetKey(key: string): Promise<AiStatus>
+  aiClearKey(): Promise<AiStatus>
+  aiSummarise(title: string, text: string): Promise<string>
+  /** A quick capture is tidied as one list item; a note can get headings and lists. */
+  aiTidy(text: string, kind: 'note' | 'capture'): Promise<string>
+  aiAsk(question: string, notes: AiNote[], history: AiAskTurn[]): Promise<string>
   /** The last-opened vault, or null if none is set or the folder no longer exists. */
   getVault(): Promise<string | null>
   /** Opens a folder picker; returns the chosen vault path, or null if cancelled. */
