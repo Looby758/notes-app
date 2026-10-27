@@ -43,7 +43,7 @@ function tabTitle(id: string): string {
   if (id === CONFLICTS_TAB) return 'Sync copies'
   if (id === AI_TAB) return 'Ask my notes'
   if (id === FLASHCARDS_TAB) return 'Flashcards'
-  if (isFileTab(id)) return fileOfTab(id).slice(fileOfTab(id).lastIndexOf('/') + 1)
+  if (isFileTab(id)) return fileOfTab(id).slice(fileOfTab(id).lastIndexOf('/') + 1).replace(/\.canvas$/i, '')
   return noteTitle(id)
 }
 

@@ -112,6 +112,7 @@ const api: NotesApi = {
   listTree: () => ipcRenderer.invoke('fs:tree'),
   createNote: (folder) => ipcRenderer.invoke('fs:createNote', folder),
   createNoteAt: (path) => ipcRenderer.invoke('fs:createNoteAt', path),
+  createBoard: (folder) => ipcRenderer.invoke('fs:createBoard', folder),
   readAllNotes: () => ipcRenderer.invoke('fs:readAll'),
   createFolder: (folder) => ipcRenderer.invoke('fs:createFolder', folder),
   rename: (path, newName) => ipcRenderer.invoke('fs:rename', path, newName),

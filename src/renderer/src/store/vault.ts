@@ -2,6 +2,7 @@ import { loadLock } from '../lib/lock/session'
 import { loadSnippets } from './snippets'
 import { loadSavedSearches } from './savedSearches'
 import { fixFileLinks } from '../lib/fileLinks'
+import { fixBoardLinks } from '../lib/boards'
 import { create } from 'zustand'
 import type { FileNode } from '@shared/types'
 import { ancestorsOf, findNode, isWithin, notePaths, parentOf, replacePrefix } from '../lib/paths'
@@ -197,6 +198,7 @@ export const useVault = create<VaultState>((set, get) => {
         await get().refresh()
         await updateLinksAfterMove(snapshot, path, next)
         await fixFileLinks(path, next)
+        await fixBoardLinks(path, next)
       } catch (err) {
         notify(err)
       }
@@ -213,6 +215,7 @@ export const useVault = create<VaultState>((set, get) => {
         await get().refresh()
         await updateLinksAfterMove(snapshot, path, next, updateLinks)
         await fixFileLinks(path, next)
+        await fixBoardLinks(path, next)
       } catch (err) {
         notify(err)
       }

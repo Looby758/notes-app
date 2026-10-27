@@ -31,6 +31,7 @@ import { matchesShortcut } from './shortcuts'
 import { FILE_MANAGER } from '@shared/platform'
 import { openRandomNote } from './random'
 import { notify } from '../store/notify'
+import { newBoard } from './boards'
 import { openAsk, runNoteJob } from '../store/ai'
 import { changeNotesPassword, lockAllNow, lockNote, lockNoteOwn, removeLock } from './lock/actions'
 
@@ -60,6 +61,7 @@ const changeFontSize = (step: number | null): void => {
 export const commands: Command[] = [
   { id: 'note.new', group: 'Notes', title: 'New note', shortcut: 'Ctrl+N', run: () => useVault.getState().newNote() },
   { id: 'folder.new', group: 'Notes', title: 'New folder', shortcut: 'Ctrl+Shift+N', run: () => useVault.getState().newFolder() },
+  { id: 'board.new', group: 'Notes', title: 'New canvas board', run: () => newBoard() },
   { id: 'note.fromTemplate', group: 'Notes', title: 'New note from template…', shortcut: 'Ctrl+Alt+N', run: () => useUI.setState({ modal: 'template' }) },
   {
     id: 'note.rename',

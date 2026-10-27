@@ -44,6 +44,7 @@ export function noteTitle(path: string): string {
 }
 
 export function displayName(node: FileNode): string {
+  if (node.type === 'attachment') return node.name.replace(/\.canvas$/i, '')
   return node.type === 'file' ? node.name.replace(/\.md$/i, '') : node.name
 }
 

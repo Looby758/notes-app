@@ -241,6 +241,8 @@ export interface NotesApi {
   createNote(folder: string): Promise<string>
   /** Creates a note at an exact path, making folders as needed; returns its path. */
   createNoteAt(path: string): Promise<string>
+  /** Creates an empty "Untitled board" (a .canvas file) in the folder; returns its path. */
+  createBoard(folder: string): Promise<string>
   /** Every note's path and text (for the link index). */
   readAllNotes(): Promise<{ path: string; content: string }[]>
   /** Creates a "New folder" in the folder; returns its path. */
@@ -268,7 +270,7 @@ export interface NotesApi {
   openFile(path: string): Promise<void>
   /** Reads a note's markdown. */
   readNote(path: string): Promise<string>
-  /** Saves a note atomically. */
+  /** Saves a note (or a .canvas board) atomically. */
   writeNote(path: string, content: string): Promise<void>
 
   /** Called with the changed paths whenever files in the vault change on disk. Returns an unsubscribe function. */

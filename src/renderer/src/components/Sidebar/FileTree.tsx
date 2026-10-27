@@ -14,6 +14,7 @@ import {
   FolderOpen,
   FolderPlus,
   FolderSearch,
+  LayoutDashboard,
   Lock,
   LockOpen,
   Pencil,
@@ -37,6 +38,8 @@ import { FILE_MANAGER } from '@shared/platform'
 import { usePrefs } from '../../store/prefs'
 import { fileKind, openAttachment, openExternally } from '../../lib/fileKinds'
 import FileIcon from '../FileIcon'
+import { newBoard } from '../../lib/boards'
+import { isBoard } from '../../lib/canvas'
 import { useLock, isLocked } from '../../lib/lock/session'
 import { lockNote, removeLock } from '../../lib/lock/actions'
 
@@ -55,9 +58,9 @@ function visibleRows(nodes: FileNode[], expanded: Set<string>, out: FileNode[] =
   return out
 }
 
-/** The tree as shown: without pictures, recordings and other files if Settings says so. */
+/** The tree as shown: without pictures, recordings and other files if Settings says so (boards always show). */
 function withoutAttachments(nodes: FileNode[]): FileNode[] {
-  return nodes.filter((n) => n.type !== 'attachment').map((n) => (n.children ? { ...n, children: withoutAttachments(n.children) } : n))
+  return nodes.filter((n) => n.type !== 'attachment' || isBoard(n.path)).map((n) => (n.children ? { ...n, children: withoutAttachments(n.children) } : n))
 }
 
 /** Opens a note, or a picture/recording/PDF (in a tab) or other file (in its usual app). */
@@ -99,6 +102,7 @@ export default function FileTree() {
   const menuItems = (node: FileNode | null): MenuItem[] => {
     const create: MenuItem[] = [
       { label: 'New note', icon: <FilePlus size={15} />, onClick: () => newNote(node?.path ?? '') },
+      { label: 'New canvas board', icon: <LayoutDashboard size={15} />, onClick: () => newBoard(node?.path ?? '') },
       { label: 'New folder', icon: <FolderPlus size={15} />, onClick: () => newFolder(node?.path ?? '') }
     ]
     if (!node)
@@ -356,7 +360,7 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
     <>
       <div
         data-path={node.path}
-        className={`tree-row ${node.type === 'attachment' ? 'attachment' : ''} ${isSelected ? 'selected' : ''} ${multi ? 'multi' : ''} ${isDropTarget ? 'drop' : ''}`}
+        className={`tree-row ${node.type === 'attachment' && !isBoard(node.path) ? 'attachment' : ''} ${isSelected ? 'selected' : ''} ${multi ? 'multi' : ''} ${isDropTarget ? 'drop' : ''}`}
         style={{ paddingLeft: 8 + depth * INDENT }}
         draggable={!isRenaming}
         onClick={onClick}
