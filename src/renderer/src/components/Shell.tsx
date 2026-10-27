@@ -49,6 +49,7 @@ import UpdateToast from './UpdateToast'
 import ZenBar, { StatusTimer } from './ZenBar'
 import VoiceRecorder from './VoiceRecorder'
 import SketchPad from './Sketch/SketchPad'
+import { FlashcardsButton } from './Flashcards/FlashcardsPage'
 import { openRandomNote } from '../lib/random'
 import { startReminders, stopReminders } from '../lib/reminderScheduler'
 
@@ -264,6 +265,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         <button className="icon-btn" onClick={() => openSpecialTab(GRAPH_TAB)} title={`Graph (${showKeys('Ctrl+Shift+G')})`}>
           <Orbit size={15} />
         </button>
+        <FlashcardsButton />
         <LayoutMenu />
         <button className="icon-btn" onClick={() => useUI.setState({ modal: 'commands' })} title={`All commands (${showKeys('Ctrl+K')})`}>
           <CommandIcon size={15} />

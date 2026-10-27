@@ -55,6 +55,7 @@ export const CALENDAR_TAB = 'calendar:'
 export const GRAPH_TAB = 'graph:'
 export const REPLACE_TAB = 'replace:'
 export const CONFLICTS_TAB = 'conflicts:'
+export const FLASHCARDS_TAB = 'flashcards:'
 /** A picture, recording, PDF… from the notes folder, shown in a tab: "file:attachments/a.png". */
 export const FILE_TAB = 'file:'
 export const fileTab = (path: string): string => FILE_TAB + path
