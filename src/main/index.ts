@@ -33,6 +33,7 @@ import { setupExport } from './exporter'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
+import { dictionaryMenu, setupDictionary } from './dictionary'
 import { setupWebTitle } from './webTitle'
 import { setupImporter } from './importer'
 import { applyIconOutsideApp } from './appIcon'
@@ -341,8 +342,9 @@ function createWindow(): BrowserWindow {
     if (quitting) app.quit()
   })
 
-  // Right-click in text: spelling suggestions plus cut/copy/paste. (The file tree shows its own menu.)
-  win.webContents.on('context-menu', (_e, params) => {
+  // Right-click in text: spelling suggestions (or the word's meaning and synonyms) plus cut/copy/paste.
+  // (The file tree shows its own menu.)
+  win.webContents.on('context-menu', async (_e, params) => {
     const items: MenuItemConstructorOptions[] = []
     if (params.misspelledWord) {
       for (const suggestion of params.dictionarySuggestions.slice(0, 5)) {
@@ -356,6 +358,8 @@ function createWindow(): BrowserWindow {
         },
         { type: 'separator' }
       )
+    } else if (win === mainWindow) {
+      items.push(...(await dictionaryMenu(win)))
     }
     if (params.isEditable) {
       // In a note (not a text box elsewhere): format the selected text, or record a voice note / draw a sketch here.
@@ -445,6 +449,7 @@ function registerIpc(): void {
     return true
   })
   setupMenus()
+  setupDictionary()
   setupWebTitle()
   setupImporter()
   // The Mac asks once whether Notes may use the microphone.

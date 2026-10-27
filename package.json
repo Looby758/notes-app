@@ -52,6 +52,7 @@
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
     "vitest": "^3.2.7",
+    "wordnet-db": "^3.1.14",
     "zustand": "^5.0.16"
   },
   "allowScripts": {

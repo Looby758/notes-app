@@ -34,6 +34,18 @@ const api: NotesApi = {
     return () => ipcRenderer.removeListener('format:run', handler)
   },
   popupMenu: (items, x, y) => ipcRenderer.invoke('menu:popup', items, x, y),
+  // Waits for the main process, so it has the word before it builds the right-click menu.
+  setMenuWord: (word) => ipcRenderer.sendSync('dictionary:word', word),
+  onShowDefinition: (callback) => {
+    const handler = (_e: unknown, entry: Parameters<typeof callback>[0]): void => callback(entry)
+    ipcRenderer.on('dictionary:show', handler)
+    return () => ipcRenderer.removeListener('dictionary:show', handler)
+  },
+  onReplaceWord: (callback) => {
+    const handler = (_e: unknown, text: string): void => callback(text)
+    ipcRenderer.on('dictionary:replace', handler)
+    return () => ipcRenderer.removeListener('dictionary:replace', handler)
+  },
   webTitle: (url) => ipcRenderer.invoke('web:title', url),
   pickImport: (kind, extensions) => ipcRenderer.invoke('import:pick', kind, extensions),
   listImport: (root) => ipcRenderer.invoke('import:list', root),
