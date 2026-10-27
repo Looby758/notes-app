@@ -22,6 +22,11 @@ const api: NotesApi = {
     ipcRenderer.on('voice:start', handler)
     return () => ipcRenderer.removeListener('voice:start', handler)
   },
+  onSketchStart: (callback) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('sketch:start', handler)
+    return () => ipcRenderer.removeListener('sketch:start', handler)
+  },
   setFormatMenu: (items) => ipcRenderer.send('format:menu', items),
   onFormat: (callback) => {
     const handler = (_e: unknown, id: string): void => callback(id)
@@ -104,6 +109,7 @@ const api: NotesApi = {
   reveal: (path) => ipcRenderer.invoke('fs:reveal', path),
   readAppData: (name) => ipcRenderer.invoke('vault:readAppData', name),
   writeAppData: (name, content) => ipcRenderer.invoke('vault:writeAppData', name, content),
+  writeSketch: (path, svg) => ipcRenderer.invoke('fs:writeSketch', path, svg),
   saveAttachment: (folder, name, data) => ipcRenderer.invoke('fs:saveAttachment', folder, name, data),
   pickAttachment: (folder, imagesOnly) => ipcRenderer.invoke('fs:pickAttachment', folder, imagesOnly),
   openFile: (path) => ipcRenderer.invoke('fs:openFile', path),

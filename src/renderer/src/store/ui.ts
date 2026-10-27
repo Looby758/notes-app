@@ -27,6 +27,8 @@ interface UIState {
   zen: boolean
   /** The voice-note recorder is open. */
   voiceOpen: boolean
+  /** The sketch pad is open: a new sketch (path null) or editing a saved one. */
+  sketch: { path: string | null } | null
   /** Graph tab: how many steps out the neighbourhood reaches, and whether unlinked notes show. */
   graphDepth: 1 | 2
   graphOrphans: boolean
@@ -71,6 +73,7 @@ export const useUI = create<UIState>(() => ({
   relatedOpen: saved.relatedOpen ?? true,
   zen: false,
   voiceOpen: false,
+  sketch: null,
   graphDepth: saved.graphDepth === 1 ? 1 : 2,
   graphOrphans: saved.graphOrphans ?? true,
   calendarDay: dayKeyOf(new Date()),

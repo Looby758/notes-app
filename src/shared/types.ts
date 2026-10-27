@@ -142,6 +142,8 @@ export interface NotesApi {
   micAccess(): Promise<boolean>
   /** The note's right-click menu asked to record a voice note. */
   onVoiceStart(callback: () => void): () => void
+  /** The note's right-click menu asked to draw a sketch. */
+  onSketchStart(callback: () => void): () => void
 
   // Menus
   /** The Format items shown when you right-click selected text in a note. */
@@ -251,6 +253,8 @@ export interface NotesApi {
   writeAppData(name: string, content: string): Promise<void>
   /** Saves pasted/dropped file data into a vault folder; returns the new file's path. */
   saveAttachment(folder: string, name: string, data: Uint8Array): Promise<string>
+  /** Saves an edited sketch over its existing .svg. */
+  writeSketch(path: string, svg: string): Promise<void>
   /** Lets you pick files on disk and copies them into a vault folder; returns their paths. */
   pickAttachment(folder: string, imagesOnly: boolean): Promise<string[]>
   /** Opens a vault file (like a PDF) in its usual app. */

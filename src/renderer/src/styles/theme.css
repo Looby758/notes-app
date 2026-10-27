@@ -5830,3 +5830,108 @@ body.theme-light .tree-star {
 .reminder-where {
   color: var(--text-faint);
 }
+
+/* ---------- sketch pad ---------- */
+
+.modal-backdrop.sketch-backdrop {
+  align-items: center;
+  padding: 24px;
+}
+.modal.sketch-pad {
+  display: flex;
+  flex-direction: column;
+  width: min(1240px, calc(100vw - 48px));
+  max-width: none;
+  max-height: calc(100vh - 48px);
+}
+.sketch-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.sketch-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sketch-spacer {
+  flex: 1;
+}
+.sketch-colour {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--border-strong);
+  cursor: pointer;
+}
+.sketch-colour.active {
+  border-color: var(--bg-raised);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.sketch-size i {
+  display: block;
+  border-radius: 50%;
+  background: currentColor;
+}
+.sketch-board {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  overflow: hidden;
+  background: var(--bg-panel);
+}
+.sketch-canvas {
+  display: block;
+  /* The canvas keeps the paper's shape, as big as fits. */
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: calc(100vh - 150px);
+  border-radius: 6px;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+  touch-action: none;
+  cursor: crosshair;
+}
+.sketch-canvas.tool-eraser {
+  cursor: cell;
+}
+.sketch-loading {
+  color: var(--text-faint);
+}
+
+/* A sketch in a note, with its Edit button on hover. */
+.cm-sketch {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+.cm-sketch .cm-image {
+  background: #fff;
+}
+.cm-sketch-edit {
+  position: absolute;
+  top: 16px;
+  right: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms var(--ease);
+}
+.cm-sketch:hover .cm-sketch-edit,
+.cm-sketch-edit:focus-visible {
+  opacity: 1;
+}
