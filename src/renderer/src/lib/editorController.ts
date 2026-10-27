@@ -121,6 +121,17 @@ function currentText(path: string): string | null {
   return s ? stateOf(s).doc.toString() : (files.get(path)?.saved ?? null)
 }
 
+/** A note's text as it is right now, unsaved edits included (null if it isn't loaded). */
+export const noteTextNow = currentText
+
+const editListeners = new Set<(path: string) => void>()
+
+/** Calls `fn` with a note's path whenever its text changes (typing, another pane, or disk). */
+export function onNoteEdited(fn: (path: string) => void): () => void {
+  editListeners.add(fn)
+  return () => editListeners.delete(fn)
+}
+
 // CodeMirror uses \n internally; normalise so comparisons with disk content are meaningful.
 const normalize = (text: string): string => text.replace(/^﻿/, '').replace(/\r\n?/g, '\n')
 const countWords = (text: string): number => text.match(/[\p{L}\p{N}'’-]+/gu)?.length ?? 0
@@ -235,6 +246,7 @@ const onUpdate = EditorView.updateListener.of((update) => {
     if (current !== useEditor.getState().currentHeading) useEditor.setState({ currentHeading: current })
   }
   if (!update.docChanged) return
+  for (const fn of editListeners) fn(path)
   if (inActivePane) {
     clearTimeout(statsTimer)
     statsTimer = setTimeout(refreshStats, 200)

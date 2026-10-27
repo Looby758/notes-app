@@ -32,6 +32,8 @@ import FileViewer from './FileViewer'
 import ConflictsPage from '../Conflicts/ConflictsPage'
 import AiPage from '../Ai/AiPage'
 import FlashcardsPage from '../Flashcards/FlashcardsPage'
+import MindMap from '../MindMap/MindMap'
+import { isMindMap, useUI } from '../../store/ui'
 import { needsUnlock, useLock } from '../../lib/lock/session'
 import { IS_MAC, showKeys } from '@shared/platform'
 
@@ -60,6 +62,7 @@ export default function Pane({ pane }: { pane: string }) {
   const [zone, setZone] = useState<DropZone | null>(null)
   const lockedNote = useLock((s) => isNoteTab(active) && needsUnlock(active, s))
   const showingNote = isNoteTab(active) && !lockedNote
+  const mindMap = useUI((s) => showingNote && isMindMap(s, pane, active))
 
   useEffect(() => mountPane(pane, host.current!), [pane])
 
@@ -114,7 +117,8 @@ export default function Pane({ pane }: { pane: string }) {
             </button>
           </div>
         )}
-        <div ref={host} className={`editor-host ${showingNote ? '' : 'hidden'}`} />
+        <div ref={host} className={`editor-host ${showingNote && !mindMap ? '' : 'hidden'}`} />
+        {mindMap && <MindMap key={active} pane={pane} path={active!} />}
         {lockedNote && <LockScreen key={active} path={active!} autoFocus={isActivePane} />}
         {isFileTab(active) && <FileViewer key={active} path={fileOfTab(active)} />}
         {isBlankTab(active) && <NewTabPage key={active} autoFocus={isActivePane} />}
