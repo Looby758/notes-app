@@ -3235,6 +3235,118 @@ body.resizing-rows * {
   margin: 0;
 }
 
+/* ---------- Dictionary (right-click a word → its meaning) ---------- */
+
+.definition-card {
+  position: fixed;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  width: min(380px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-raised);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  animation: pop 120ms var(--ease);
+  font-size: 13px;
+}
+.definition-card header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 12px 10px 8px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.definition-card header .icon-btn {
+  margin-left: auto;
+  align-self: center;
+}
+.definition-icon {
+  flex-shrink: 0;
+  align-self: center;
+  color: var(--accent);
+}
+.definition-card h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.definition-from {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.definition-body {
+  overflow-y: auto;
+  padding: 4px 14px 12px;
+}
+.definition-body h3 {
+  margin: 10px 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-strong);
+}
+.definition-body ol {
+  margin: 0;
+  padding-left: 20px;
+}
+.definition-body li {
+  margin: 0 0 8px;
+  color: var(--text);
+  line-height: 1.45;
+}
+.definition-body li::marker {
+  color: var(--text-faint);
+}
+.definition-example {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+.definition-synonyms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+.definition-synonyms button,
+.definition-synonyms span {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.definition-synonyms button {
+  cursor: pointer;
+}
+.definition-synonyms button:hover {
+  border-color: var(--accent-dim);
+  background: var(--accent-soft);
+  color: var(--text-strong);
+}
+.definition-more {
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 12.5px;
+}
+.definition-more:hover {
+  text-decoration: underline;
+}
+.definition-card footer {
+  padding: 6px 14px 8px;
+  border-top: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
 /* ---------- Unlinked mentions (under Backlinks) ---------- */
 
 .mentions {
