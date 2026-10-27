@@ -208,7 +208,7 @@ function openVault(path: string | null): void {
 const IMAGE_TYPES = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.avif'])
 const AUDIO_TYPES = new Set(['.webm', '.mp3', '.m4a', '.wav', '.ogg', '.oga', '.aac', '.flac', '.opus'])
 /** Shown in their own tab from the file list. */
-const VIEWER_TYPES = new Set(['.mp4', '.mov', '.m4v', '.ogv', '.pdf', '.ico'])
+const VIEWER_TYPES = new Set(['.mp4', '.mov', '.m4v', '.ogv', '.pdf', '.ico', '.xlsx', '.xlsm', '.csv', '.tsv'])
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'vault', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }
