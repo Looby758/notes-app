@@ -26,17 +26,18 @@ describe('normalizeShortcut', () => {
 })
 
 describe('shortcutFromEvent', () => {
+  // Windows rules (on a Mac, Ctrl means ⌘; see below).
   it('uses the physical key so Shift does not change the letter', () => {
-    expect(shortcutFromEvent(ev('K', 'KeyK', { ctrl: true, shift: true }))).toBe('Ctrl+Shift+K')
-    expect(shortcutFromEvent(ev('+', 'Equal', { ctrl: true, shift: true }))).toBe('Ctrl+Shift+=')
-    expect(shortcutFromEvent(ev('!', 'Digit1', { ctrl: true, shift: true }))).toBe('Ctrl+Shift+1')
+    expect(shortcutFromEvent(ev('K', 'KeyK', { ctrl: true, shift: true }), false)).toBe('Ctrl+Shift+K')
+    expect(shortcutFromEvent(ev('+', 'Equal', { ctrl: true, shift: true }), false)).toBe('Ctrl+Shift+=')
+    expect(shortcutFromEvent(ev('!', 'Digit1', { ctrl: true, shift: true }), false)).toBe('Ctrl+Shift+1')
   })
 
   it('names special keys', () => {
-    expect(shortcutFromEvent(ev('\\', 'Backslash', { ctrl: true }))).toBe('Ctrl+\\')
-    expect(shortcutFromEvent(ev('ArrowLeft', 'ArrowLeft', { alt: true }))).toBe('Alt+Left')
-    expect(shortcutFromEvent(ev('Tab', 'Tab', { ctrl: true }))).toBe('Ctrl+Tab')
-    expect(shortcutFromEvent(ev(',', 'Comma', { ctrl: true }))).toBe('Ctrl+,')
+    expect(shortcutFromEvent(ev('\\', 'Backslash', { ctrl: true }), false)).toBe('Ctrl+\\')
+    expect(shortcutFromEvent(ev('ArrowLeft', 'ArrowLeft', { alt: true }), false)).toBe('Alt+Left')
+    expect(shortcutFromEvent(ev('Tab', 'Tab', { ctrl: true }), false)).toBe('Ctrl+Tab')
+    expect(shortcutFromEvent(ev(',', 'Comma', { ctrl: true }), false)).toBe('Ctrl+,')
   })
 
   it("leaves the Mac's Control-key text editing alone (Ctrl means ⌘ there)", () => {
