@@ -3,6 +3,7 @@ import { notify } from '../../store/notify'
 import { noteTitle } from '../paths'
 import { setNoteLock } from '../editorController'
 import { isLocked, lockNow, needsUnlock, useLock } from './session'
+import { lockVault, usePasswords } from '../passwords/session'
 
 /** What the commands and menus do with locked notes, and which lock dialog is showing. */
 
@@ -65,14 +66,18 @@ export async function removeLock(path: string): Promise<void> {
   }
 }
 
+/** Locks locked notes and the password vault. */
 export function lockAllNow(): void {
   const s = useLock.getState()
+  const passwords = usePasswords.getState().unlocked
+  lockVault()
   if (!s.unlocked && s.ownOpen.length === 0) {
-    notify(s.setUp ? 'Your locked notes are already locked.' : 'No notes are locked yet. Use “Lock this note” to lock one.', 'info')
+    if (passwords) notify('Your passwords are locked.', 'info')
+    else notify(s.setUp ? 'Your locked notes are already locked.' : 'No notes are locked yet. Use “Lock this note” to lock one.', 'info')
     return
   }
   lockNow()
-    .then(() => notify('Locked notes are locked again.', 'info'))
+    .then(() => notify(passwords ? 'Locked notes and passwords are locked again.' : 'Locked notes are locked again.', 'info'))
     .catch(notify)
 }
 

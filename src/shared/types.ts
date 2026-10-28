@@ -90,6 +90,70 @@ export interface CalendarSourcesStatus {
   canEncrypt: boolean
 }
 
+/** The Google sign-in, as the Email page sees it. */
+export interface GoogleAuthStatus {
+  /** A client ID and secret are saved (Settings → Calendar). */
+  configured: boolean
+  connected: boolean
+  email?: string
+  /** The sign-in includes Gmail. */
+  gmail: boolean
+  error?: string
+  canEncrypt: boolean
+}
+
+export interface EmailAddress {
+  name: string
+  email: string
+}
+
+/** One email in a list. */
+export interface EmailSummary {
+  id: string
+  threadId: string
+  from: EmailAddress
+  subject: string
+  /** Google's short preview of the text. */
+  snippet: string
+  /** ISO instant. */
+  date: string
+  unread: boolean
+  starred: boolean
+  hasAttachments: boolean
+}
+
+/** An opened email. */
+export interface EmailMessage extends EmailSummary {
+  to: EmailAddress[]
+  cc: EmailAddress[]
+  replyTo?: EmailAddress
+  /** The Message-ID header, for replies. */
+  messageId?: string
+  references?: string
+  text?: string
+  html?: string
+  attachments: { name: string; size: number }[]
+  /** Opens it in Gmail in your browser. */
+  webUrl: string
+}
+
+export type EmailFolder = 'inbox' | 'unread' | 'starred' | 'sent' | 'all'
+
+export interface EmailList {
+  emails: EmailSummary[]
+  /** Pass back to get the next page. */
+  next?: string
+}
+
+export interface OutgoingEmail {
+  to: string
+  cc?: string
+  subject: string
+  body: string
+  /** Replying: keeps it in the same conversation. */
+  replyTo?: { threadId: string; messageId?: string; references?: string }
+}
+
 export interface ConfirmOptions {
   message: string
   detail?: string
@@ -137,6 +201,8 @@ export interface AiChat {
 export interface NotesApi {
   /** A native yes/no dialog; resolves true if the user picked `ok`. */
   confirm(options: ConfirmOptions): Promise<boolean>
+  /** Copies a password; the clipboard empties itself after `seconds` (and when Notes quits) if it still holds it. */
+  copySecret(text: string, seconds: number): Promise<void>
 
   getPrefs(): Promise<Prefs>
   /** Saves some preferences; resolves with the full, validated preferences. */
@@ -188,6 +254,16 @@ export interface NotesApi {
   /** A web page's title (for pasted links); null if it can't be read quickly. */
   webTitle(url: string): Promise<string | null>
 
+  // The web browser tab
+  /** Signs you out of every website and forgets what the web tabs stored. */
+  clearWebData(): Promise<void>
+  /** The app's shortcuts, so they still work while a web page has focus. */
+  setWebShortcuts(shortcuts: string[]): void
+  /** A web page opened a link in a new window: open it in a new web tab. */
+  onWebOpen(callback: (url: string) => void): () => void
+  /** One of the app's shortcuts was pressed while a web page had focus. */
+  onWebShortcut(callback: (shortcut: string) => void): () => void
+
   // Updates
   updateStatus(): Promise<UpdateStatus>
   /** Looks for a newer version now. */
@@ -202,11 +278,15 @@ export interface NotesApi {
   /** Turns a complete HTML page into a PDF (A4). */
   printToPdf(html: string): Promise<Uint8Array>
   /** Asks where to save one exported file and writes it; resolves with its path, or null if cancelled. */
-  exportFile(defaultName: string, format: 'pdf' | 'docx' | 'html', data: Uint8Array | string): Promise<string | null>
+  exportFile(defaultName: string, format: SaveFormat, data: Uint8Array | string): Promise<string | null>
   /** Asks for a folder and writes several exported files into a new folder inside it; resolves with that folder, or null. */
   exportFiles(folderName: string, files: { name: string; data: Uint8Array | string }[]): Promise<string | null>
   /** Shows a file in File Explorer / Finder. */
   showExported(path: string): Promise<void>
+
+  // File converter
+  /** An iPhone photo (HEIC/HEIF) as plain pixels: RGBA, 4 bytes a pixel. */
+  decodeHeic(data: Uint8Array): Promise<{ width: number; height: number; data: Uint8Array }>
 
   // Quick capture
   /** Opens the quick capture window. */
@@ -234,6 +314,19 @@ export interface NotesApi {
   removeCalendarFeed(id: string): Promise<CalendarSourcesStatus>
   /** Events between two instants from every enabled calendar (cached ones if offline). */
   fetchCalendarEvents(from: string, to: string): Promise<{ events: CalEvent[]; errors: string[]; offline: boolean }>
+  // Email (Gmail, using the Google sign-in above)
+  emailStatus(): Promise<GoogleAuthStatus>
+  /** Signs in to Google in your browser, asking for email access too. */
+  emailConnect(): Promise<GoogleAuthStatus>
+  /** A page of emails; `query` is a Gmail search like "from:sam invoice". */
+  emailList(folder: EmailFolder, query: string, next?: string): Promise<EmailList>
+  emailGet(id: string): Promise<EmailMessage>
+  emailSend(email: OutgoingEmail): Promise<void>
+  emailMarkRead(id: string, read: boolean): Promise<void>
+  emailStar(id: string, starred: boolean): Promise<void>
+  emailArchive(id: string): Promise<void>
+  /** Moves it to Gmail's Bin (Gmail deletes it for good after 30 days). */
+  emailTrash(id: string): Promise<void>
   /** A .gsheet file's sheet, fetched from Google with the sign-in above. */
   readGoogleSheet(path: string): Promise<GoogleSheetResult>
   aiStatus(): Promise<AiStatus>
@@ -244,11 +337,24 @@ export interface NotesApi {
   /** A quick capture is tidied as one list item; a note can get headings and lists. */
   aiTidy(text: string, kind: 'note' | 'capture'): Promise<string>
   aiAsk(question: string, notes: AiNote[], history: AiAskTurn[]): Promise<string>
+  // Terminal tab
+  /** Starts the command line in the notes folder (or carries on with the one already running). */
+  terminalStart(cols: number, rows: number): Promise<TerminalStart>
+  /** Ends the command line (and whatever is running in it). */
+  terminalStop(): Promise<void>
+  /** What you typed or pasted into the Terminal tab. */
+  terminalInput(data: string): void
+  terminalResize(cols: number, rows: number): void
+  onTerminalData(callback: (data: string) => void): () => void
+  /** The command line ended (you typed exit, or it closed). */
+  onTerminalExit(callback: (code: number) => void): () => void
   /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */
   aiChat(messages: AiChatMessage[]): Promise<string>
   /** Saved chats, kept in the settings folder on this computer. */
   aiLoadChats(): Promise<AiChat[]>
   aiSaveChats(chats: AiChat[]): Promise<void>
+  /** The writing in a picture of a sketch (a PNG), read by the AI helper or offline on this computer. */
+  readHandwriting(png: Uint8Array, reader: 'ai' | 'offline'): Promise<string>
   /** The last-opened vault, or null if none is set or the folder no longer exists. */
   getVault(): Promise<string | null>
   /** Opens a folder picker; returns the chosen vault path, or null if cancelled. */
@@ -329,6 +435,9 @@ export interface AppleNote {
   modified: string
   locked: boolean
 }
+/** How starting the Terminal tab's command line went. */
+export type TerminalStart = { ok: true; name: string; resumed: boolean } | { ok: false; error: string }
+
 /** A Google Sheet (.gsheet file) fetched for the spreadsheet viewer, or why it couldn't be. */
 export type GoogleSheetResult =
   | { sheets: Sheet[]; webUrl: string }
@@ -338,3 +447,5 @@ export type GoogleSheetResult =
       /** What would fix it: set Google up in Settings, sign in (again), switch the Sheets API on, or just try later. */
       fix?: 'setup' | 'connect' | 'enable-api' | 'retry'
     }
+/** The kinds of file Notes can save (exports and converted files). */
+export type SaveFormat = 'pdf' | 'docx' | 'html' | 'md' | 'txt' | 'jpg' | 'png' | 'webp' | 'mp3' | 'wav'

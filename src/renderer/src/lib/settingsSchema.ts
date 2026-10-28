@@ -268,6 +268,21 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'typewriter focus dim paragraph line'
   },
   {
+    key: 'handwritingReader',
+    section: 'editor',
+    group: 'Sketches',
+    type: 'choice',
+    options: [
+      { value: 'auto', label: 'AI helper if set up' },
+      { value: 'ai', label: 'AI helper' },
+      { value: 'offline', label: 'Offline' }
+    ],
+    label: 'Turn handwriting into text with',
+    description:
+      'The sketch pad’s “Turn into text” button. The AI helper reads messy and joined-up writing well, but sends that sketch to Anthropic (about a cent each time). Offline stays on this computer and needs no key, but works best with neat printed letters.',
+    keywords: 'handwriting ocr recognise recognize text sketch pen convert'
+  },
+  {
     key: 'focusMinutes',
     section: 'editor',
     group: 'Focus timer',
@@ -302,6 +317,15 @@ export const SETTINGS: SettingDef[] = [
     label: 'Open notes in a new tab',
     description: `Off: opening a note changes the current tab (pinned tabs are left alone). Either way, middle-click a note (or right-click → Open in new tab) to open it in a new tab.`,
     keywords: 'tab replace reuse open'
+  },
+  {
+    key: 'openLinksInApp',
+    section: 'editor',
+    group: 'Tabs',
+    type: 'toggle',
+    label: 'Open web links in a web tab beside the note',
+    description: 'Off: web links open in your usual browser instead. Either way, a web tab’s ↗ button opens its page in your browser.',
+    keywords: 'web browser link url website internet split external chrome safari edge'
   },
   {
     key: 'homeOnStart',
@@ -397,7 +421,7 @@ export const SETTINGS: SettingDef[] = [
     ...RANGES.autoLockMinutes,
     format: (v) => (v === 0 ? 'Never' : `${v} min`),
     label: 'Lock again after',
-    description: 'Unlocked notes lock again after this long without using Notes. (Also Ctrl+K → “Lock all notes now”, and they always lock when Notes closes.)',
+    description: 'Unlocked notes and passwords lock again after this long without using Notes. (Passwords still lock after 30 min if this is “Never”. Also Ctrl+K → “Lock all notes and passwords now”, and they always lock when Notes closes.)',
     keywords: 'lock password encrypt private secure auto timeout'
   },
 

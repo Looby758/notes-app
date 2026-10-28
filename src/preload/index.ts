@@ -3,6 +3,7 @@ import type { NotesApi } from '@shared/types'
 
 const api: NotesApi = {
   confirm: (options) => ipcRenderer.invoke('app:confirm', options),
+  copySecret: (text, seconds) => ipcRenderer.invoke('clipboard:copySecret', text, seconds),
 
   getPrefs: () => ipcRenderer.invoke('prefs:get'),
   setPrefs: (patch) => ipcRenderer.invoke('prefs:set', patch),
@@ -47,6 +48,18 @@ const api: NotesApi = {
     return () => ipcRenderer.removeListener('dictionary:replace', handler)
   },
   webTitle: (url) => ipcRenderer.invoke('web:title', url),
+  clearWebData: () => ipcRenderer.invoke('web:clear'),
+  setWebShortcuts: (shortcuts) => ipcRenderer.send('web:shortcuts', shortcuts),
+  onWebOpen: (callback) => {
+    const handler = (_e: unknown, url: string): void => callback(url)
+    ipcRenderer.on('web:open', handler)
+    return () => ipcRenderer.removeListener('web:open', handler)
+  },
+  onWebShortcut: (callback) => {
+    const handler = (_e: unknown, shortcut: string): void => callback(shortcut)
+    ipcRenderer.on('web:shortcut', handler)
+    return () => ipcRenderer.removeListener('web:shortcut', handler)
+  },
   pickImport: (kind, extensions) => ipcRenderer.invoke('import:pick', kind, extensions),
   listImport: (root) => ipcRenderer.invoke('import:list', root),
   readImport: (path) => ipcRenderer.invoke('import:read', path),
@@ -72,6 +85,7 @@ const api: NotesApi = {
   exportFile: (name, format, data) => ipcRenderer.invoke('export:file', name, format, data),
   exportFiles: (folderName, files) => ipcRenderer.invoke('export:files', folderName, files),
   showExported: (path) => ipcRenderer.invoke('export:show', path),
+  decodeHeic: (data) => ipcRenderer.invoke('convert:heic', data),
 
   openCapture: () => ipcRenderer.invoke('capture:open'),
   closeCapture: () => ipcRenderer.invoke('capture:close'),
@@ -98,6 +112,15 @@ const api: NotesApi = {
   addCalendarFeed: (name, url) => ipcRenderer.invoke('cal:addFeed', name, url),
   removeCalendarFeed: (id) => ipcRenderer.invoke('cal:removeFeed', id),
   fetchCalendarEvents: (from, to) => ipcRenderer.invoke('cal:events', from, to),
+  emailStatus: () => ipcRenderer.invoke('email:status'),
+  emailConnect: () => ipcRenderer.invoke('email:connect'),
+  emailList: (folder, query, next) => ipcRenderer.invoke('email:list', folder, query, next),
+  emailGet: (id) => ipcRenderer.invoke('email:get', id),
+  emailSend: (email) => ipcRenderer.invoke('email:send', email),
+  emailMarkRead: (id, read) => ipcRenderer.invoke('email:markRead', id, read),
+  emailStar: (id, starred) => ipcRenderer.invoke('email:star', id, starred),
+  emailArchive: (id) => ipcRenderer.invoke('email:archive', id),
+  emailTrash: (id) => ipcRenderer.invoke('email:trash', id),
   readGoogleSheet: (path) => ipcRenderer.invoke('gsheet:read', path),
   aiStatus: () => ipcRenderer.invoke('ai:status'),
   aiSetKey: (key) => ipcRenderer.invoke('ai:setKey', key),
@@ -105,9 +128,24 @@ const api: NotesApi = {
   aiSummarise: (title, text) => ipcRenderer.invoke('ai:summarise', title, text),
   aiTidy: (text, kind) => ipcRenderer.invoke('ai:tidy', text, kind),
   aiAsk: (question, notes, history) => ipcRenderer.invoke('ai:ask', question, notes, history),
+  terminalStart: (cols, rows) => ipcRenderer.invoke('term:start', cols, rows),
+  terminalStop: () => ipcRenderer.invoke('term:stop'),
+  terminalInput: (data) => ipcRenderer.send('term:input', data),
+  terminalResize: (cols, rows) => ipcRenderer.send('term:resize', cols, rows),
+  onTerminalData: (callback) => {
+    const handler = (_e: unknown, data: string): void => callback(data)
+    ipcRenderer.on('term:data', handler)
+    return () => ipcRenderer.removeListener('term:data', handler)
+  },
+  onTerminalExit: (callback) => {
+    const handler = (_e: unknown, code: number): void => callback(code)
+    ipcRenderer.on('term:exit', handler)
+    return () => ipcRenderer.removeListener('term:exit', handler)
+  },
   aiChat: (messages) => ipcRenderer.invoke('ai:chat', messages),
   aiLoadChats: () => ipcRenderer.invoke('ai:loadChats'),
   aiSaveChats: (chats) => ipcRenderer.invoke('ai:saveChats', chats),
+  readHandwriting: (png, reader) => ipcRenderer.invoke('handwriting:read', png, reader),
   getVault: () => ipcRenderer.invoke('vault:get'),
   pickVault: () => ipcRenderer.invoke('vault:pick'),
   closeVault: () => ipcRenderer.invoke('vault:close'),

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  ArrowRightLeft,
   ChevronDown,
   Command as CommandIcon,
   FolderOpen,
@@ -8,13 +9,18 @@ import {
   LogOut,
   MessageSquare,
   Orbit,
+  Mail,
   BookOpen,
   Dices,
+  KeyRound,
+  Globe,
   Moon,
   PenLine,
   PanelLeft,
   PanelRight,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  SquareTerminal,
+  PoundSterling
 } from 'lucide-react'
 import { useVault } from '../store/vault'
 import { useEditor, type SaveStatus } from '../store/editor'
@@ -23,20 +29,26 @@ import { setPrefs, usePrefs } from '../store/prefs'
 import { showSearch, toggleZen, useUI } from '../store/ui'
 import { countNotes, parentOf } from '../lib/paths'
 import { FILE_MANAGER, IS_MAC, showKeys } from '@shared/platform'
-import { commandForKey } from '../lib/commands'
+import { appShortcuts, commandForKey, commandForShortcut } from '../lib/commands'
 import {
   handleExternalChanges,
   init as initEditor,
   isNoteTab,
   openNote,
   openSpecialTab,
+  openWebTab,
   refreshEmbeds,
   refreshLinkDecorations,
   remeasure,
   SETTINGS_TAB,
   GRAPH_TAB,
+  TERMINAL_TAB,
+  PASSWORDS_TAB,
+  EMAIL_TAB,
   CHAT_TAB,
   HOME_TAB,
+  MONEY_TAB,
+  CONVERT_TAB,
   setZenEditor
 } from '../lib/editorController'
 import { openLink, openWikiLink } from '../lib/openLink'
@@ -206,6 +218,19 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // The same shortcuts while a web page has focus (the page gets every other key), and links the
+  // page opens in a new window go to a new web tab.
+  const shortcutPrefs = usePrefs((s) => s.prefs.shortcuts)
+  useEffect(() => window.api.setWebShortcuts(appShortcuts()), [shortcutPrefs])
+  useEffect(() => {
+    const offShortcut = window.api.onWebShortcut((shortcut) => commandForShortcut(shortcut)?.run())
+    const offOpen = window.api.onWebOpen((url) => openWebTab(url))
+    return () => {
+      offShortcut()
+      offOpen()
+    }
+  }, [])
+
   useEffect(() => {
     if (!menuOpen) return
     const onDown = (e: MouseEvent) => {
@@ -277,9 +302,27 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         <button className="icon-btn" onClick={() => openSpecialTab(GRAPH_TAB)} title={`Graph (${showKeys('Ctrl+Shift+G')})`}>
           <Orbit size={15} />
         </button>
+        <button className="icon-btn" onClick={() => openSpecialTab(EMAIL_TAB)} title={`Email (${showKeys('Ctrl+Shift+A')})`}>
+          <Mail size={15} />
+        </button>
         <FlashcardsButton />
+        <button className="icon-btn" onClick={() => openSpecialTab(TERMINAL_TAB)} title={`Terminal (${showKeys('Ctrl+Alt+T')})`} data-terminal-button>
+          <SquareTerminal size={15} />
+        </button>
+        <button className="icon-btn" onClick={() => openSpecialTab(PASSWORDS_TAB)} title={`Passwords (${showKeys('Ctrl+Alt+K')})`} data-passwords-button>
+          <KeyRound size={15} />
+        </button>
+        <button className="icon-btn" onClick={() => openSpecialTab(MONEY_TAB)} title={`Money (${showKeys('Ctrl+Shift+B')})`} data-money-button>
+          <PoundSterling size={15} />
+        </button>
+        <button className="icon-btn" onClick={() => openWebTab('', { beside: true })} title={`Web browser (${showKeys('Ctrl+Shift+I')})`} data-web-button>
+          <Globe size={15} />
+        </button>
         <button className="icon-btn" onClick={() => openSpecialTab(CHAT_TAB)} title="Chat with Claude" data-chat-button>
           <MessageSquare size={15} />
+        </button>
+        <button className="icon-btn" onClick={() => openSpecialTab(CONVERT_TAB)} title="Convert files" data-convert-button>
+          <ArrowRightLeft size={15} />
         </button>
         <LayoutMenu />
         <button className="icon-btn" onClick={() => useUI.setState({ modal: 'commands' })} title={`All commands (${showKeys('Ctrl+K')})`}>

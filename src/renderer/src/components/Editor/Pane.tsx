@@ -18,7 +18,13 @@ import {
   AI_TAB,
   CHAT_TAB,
   FLASHCARDS_TAB,
+  TERMINAL_TAB,
+  PASSWORDS_TAB,
+  EMAIL_TAB,
+  isWebTab,
   HOME_TAB,
+  MONEY_TAB,
+  CONVERT_TAB,
   SETTINGS_TAB,
   splitPane
 } from '../../lib/editorController'
@@ -37,8 +43,14 @@ import ConflictsPage from '../Conflicts/ConflictsPage'
 import AiPage from '../Ai/AiPage'
 import ChatPage from '../Ai/ChatPage'
 import FlashcardsPage from '../Flashcards/FlashcardsPage'
+import TerminalPage from '../Terminal/TerminalPage'
+import PasswordsPage from '../Passwords/PasswordsPage'
+import EmailPage from '../Email/EmailPage'
 import HomePage from '../Home/HomePage'
+import MoneyPage from '../Money/MoneyPage'
+import ConvertPage from '../Convert/ConvertPage'
 import MindMap from '../MindMap/MindMap'
+import WebPage from '../Web/WebPage'
 import { isMindMap, useUI } from '../../store/ui'
 import { needsUnlock, useLock } from '../../lib/lock/session'
 
@@ -46,6 +58,7 @@ import { needsUnlock, useLock } from '../../lib/lock/session'
 export default function Pane({ pane }: { pane: string }) {
   const host = useRef<HTMLDivElement>(null)
   const active = useEditor((s) => s.panes[pane]?.active ?? null)
+  const tabs = useEditor((s) => s.panes[pane]?.tabs)
   const isActivePane = useEditor((s) => s.activePane === pane)
   const multiple = useEditor((s) => Object.keys(s.panes).length > 1)
   const conflict = useEditor((s) => (active ? s.status[active] === 'conflict' : false))
@@ -117,6 +130,8 @@ export default function Pane({ pane }: { pane: string }) {
             <FileViewer key={active} path={fileOfTab(active)} />
           ))}
         {isBlankTab(active) && <NewTabPage key={active} autoFocus={isActivePane} />}
+        {/* Web pages stay loaded while you look at another tab, like in a browser. */}
+        {tabs?.filter(isWebTab).map((t) => <WebPage key={t} tab={t} hidden={t !== active} autoFocus={isActivePane} />)}
         {active === SETTINGS_TAB && <SettingsPage />}
         {active === CALENDAR_TAB && <CalendarPage />}
         {active === GRAPH_TAB && <GraphPage />}
@@ -125,7 +140,12 @@ export default function Pane({ pane }: { pane: string }) {
         {active === AI_TAB && <AiPage autoFocus={isActivePane} />}
         {active === CHAT_TAB && <ChatPage autoFocus={isActivePane} />}
         {active === FLASHCARDS_TAB && <FlashcardsPage />}
+        {active === TERMINAL_TAB && <TerminalPage />}
+        {active === PASSWORDS_TAB && <PasswordsPage autoFocus={isActivePane} />}
+        {active === EMAIL_TAB && <EmailPage />}
         {(active === HOME_TAB || !active) && <HomePage />}
+        {active === MONEY_TAB && <MoneyPage />}
+        {active === CONVERT_TAB && <ConvertPage />}
         {zone && <div className={`drop-zone ${zone}`} />}
       </div>
     </div>

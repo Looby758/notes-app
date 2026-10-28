@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   ipcMain,
   Menu,
@@ -19,7 +20,7 @@ import { existsSync, statSync } from 'fs'
 import { readFile } from 'fs/promises'
 import { basename, extname, join } from 'path'
 import { pathToFileURL } from 'url'
-import type { AiAskTurn, AiChat, AiChatMessage, AiNote, ConfirmOptions } from '@shared/types'
+import type { AiAskTurn, AiChat, AiChatMessage, AiNote, ConfirmOptions, EmailFolder, OutgoingEmail } from '@shared/types'
 import { normalizePrefs, type Prefs } from '@shared/prefs'
 import { activeThemeId, getTheme } from '@shared/themes'
 import { loadSettings, saveSettings, settingsFile, watchSettingsFile } from './settings'
@@ -28,17 +29,22 @@ import { startWatching, stopWatching } from './watcher'
 import * as calendars from './calendarSources'
 import { readGoogleSheet } from './googleSheets'
 import * as ai from './ai'
+import * as email from './email'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
 import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
+import { setupConverter } from './converter'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
 import { dictionaryMenu, setupDictionary } from './dictionary'
 import { setupWebTitle } from './webTitle'
+import { setupBrowser } from './browser'
 import { setupImporter } from './importer'
+import { setupTerminal } from './terminal'
 import { applyIconOutsideApp } from './appIcon'
 import { CODE_SANDBOX_SCHEME, registerCodeSandbox } from './codeSandbox'
+import { readHandwritingOffline } from './handwriting'
 
 let vault: Vault | null = null
 const shownReminders = new Set<Electron.Notification>()
@@ -273,7 +279,9 @@ function createWindow(): BrowserWindow {
       nodeIntegration: false,
       sandbox: true,
       // Chromium's PDF viewer, for PDFs opened from the file list.
-      plugins: true
+      plugins: true,
+      // The web browser tab (browser.ts locks each page down as it's created).
+      webviewTag: true
     }
   })
 
@@ -455,9 +463,11 @@ function registerIpc(): void {
   setupDictionary()
   setupWebTitle()
   setupImporter()
+  setupTerminal(() => vault?.root ?? null)
   // The Mac asks once whether Notes may use the microphone.
   ipcMain.handle('voice:access', async () => (IS_MAC ? systemPreferences.askForMediaAccess('microphone') : true))
   ipcMain.handle('app:fullscreen', (event, on: boolean) => BrowserWindow.fromWebContents(event.sender)?.setFullScreen(on))
+  ipcMain.handle('clipboard:copySecret', (_e, text: string, seconds: number) => copySecret(text, seconds))
   ipcMain.handle('app:showLog', () => {
     const log = join(app.getPath('userData'), 'notes.log')
     if (existsSync(log)) shell.showItemInFolder(log)
@@ -524,6 +534,15 @@ function registerIpc(): void {
   ipcMain.handle('cal:addFeed', (_e, name: string, url: string) => calendars.addFeed(name, url))
   ipcMain.handle('cal:removeFeed', (_e, id: string) => calendars.removeFeed(id))
   ipcMain.handle('cal:events', (_e, from: string, to: string) => calendars.fetchEvents(from, to))
+  ipcMain.handle('email:status', () => email.status())
+  ipcMain.handle('email:connect', () => email.connect())
+  ipcMain.handle('email:list', (_e, folder: EmailFolder, query: string, next?: string) => email.list(folder, query, next))
+  ipcMain.handle('email:get', (_e, id: string) => email.get(id))
+  ipcMain.handle('email:send', (_e, message: OutgoingEmail) => email.send(message))
+  ipcMain.handle('email:markRead', (_e, id: string, read: boolean) => email.markRead(id, read))
+  ipcMain.handle('email:star', (_e, id: string, starred: boolean) => email.star(id, starred))
+  ipcMain.handle('email:archive', (_e, id: string) => email.archive(id))
+  ipcMain.handle('email:trash', (_e, id: string) => email.trash(id))
   ipcMain.handle('gsheet:read', (_e, rel: string) => readGoogleSheet(currentVault().abs(rel)))
   ipcMain.handle('ai:status', () => ai.status())
   ipcMain.handle('ai:setKey', (_e, key: string) => ai.setKey(key))
@@ -534,6 +553,7 @@ function registerIpc(): void {
   ipcMain.handle('ai:chat', (_e, messages: AiChatMessage[]) => ai.chat(messages))
   ipcMain.handle('ai:loadChats', () => ai.loadChats())
   ipcMain.handle('ai:saveChats', (_e, chats: AiChat[]) => ai.saveChats(chats))
+  ipcMain.handle('handwriting:read', (_e, png: Uint8Array, reader: 'ai' | 'offline') => (reader === 'ai' ? ai.readHandwriting(png) : readHandwritingOffline(png)))
 
   ipcMain.handle('vault:readAppData', (_e, name: string) => currentVault().readAppData(name))
   ipcMain.handle('vault:writeAppData', (_e, name: string, content: string) => currentVault().writeAppData(name, content))
@@ -662,7 +682,9 @@ app.whenReady().then(async () => {
   registerVaultProtocol()
   registerCodeSandbox()
   registerIpc()
+  safely('web browser', setupBrowser)
   safely('export', setupExport)
+  safely('converter', setupConverter)
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))
   mainWindow = createWindow()
@@ -672,10 +694,27 @@ app.whenReady().then(async () => {
   safely('updates', () => setupUpdater(() => currentPrefs().checkForUpdates))
 })
 
+// A copied password: the clipboard is emptied after a while, unless you've copied something else since.
+let copiedSecret: string | null = null
+let clearTimer: NodeJS.Timeout | undefined
+function clearSecret(): void {
+  if (copiedSecret !== null && clipboard.readText() === copiedSecret) clipboard.clear()
+  copiedSecret = null
+}
+function copySecret(text: string, seconds: number): void {
+  clearTimeout(clearTimer)
+  clipboard.writeText(text)
+  copiedSecret = text
+  clearTimer = setTimeout(clearSecret, Math.min(Math.max(seconds, 5), 300) * 1000)
+}
+
 app.on('before-quit', () => {
   quitting = true
 })
-app.on('will-quit', () => teardownCapture())
+app.on('will-quit', () => {
+  teardownCapture()
+  clearSecret()
+})
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

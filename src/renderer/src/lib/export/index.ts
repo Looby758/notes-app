@@ -38,7 +38,7 @@ export function notesFor(req: Pick<ExportRequest, 'target' | 'isFolder' | 'subfo
   return notesUnder(all, req.target, req.isFolder, req.subfolders)
 }
 
-function blobToDataUrl(blob: Blob): Promise<string> {
+export function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader()
     r.onload = () => resolve(r.result as string)
@@ -69,7 +69,7 @@ async function loadImage(path: string): Promise<{ blob: Blob } | null> {
 }
 
 /** Word only takes PNG, JPEG and GIF; anything else (SVG, WebP…) is redrawn as a PNG. */
-async function forWord(blob: Blob): Promise<DocxImage | null> {
+export async function forWord(blob: Blob): Promise<DocxImage | null> {
   try {
     const img = new Image()
     // A data: URL (the page's security rules don't allow blob: images).

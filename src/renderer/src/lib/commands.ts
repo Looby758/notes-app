@@ -11,8 +11,13 @@ import {
   REPLACE_TAB,
   CONFLICTS_TAB,
   FLASHCARDS_TAB,
+  TERMINAL_TAB,
+  PASSWORDS_TAB,
+  EMAIL_TAB,
   CHAT_TAB,
   HOME_TAB,
+  MONEY_TAB,
+  CONVERT_TAB,
   closePane,
   closeTabUnlessPinned,
   cycleTab,
@@ -21,6 +26,7 @@ import {
   isNoteTab,
   newTab,
   openSpecialTab,
+  openWebTab,
   runEditorCommand,
   saveNow,
   SETTINGS_TAB,
@@ -29,7 +35,8 @@ import {
 } from './editorController'
 import { toggleStar } from '../store/starred'
 import { openToday, stepDaily } from './daily'
-import { matchesShortcut } from './shortcuts'
+import { matchesShortcut, normalizeShortcut } from './shortcuts'
+import { clearBrowsingData } from '../components/Web/WebPage'
 import { FILE_MANAGER } from '@shared/platform'
 import { openRandomNote } from './random'
 import { notify } from '../store/notify'
@@ -152,14 +159,16 @@ export const commands: Command[] = [
       if (path) removeLock(path)
     }
   },
-  { id: 'lock.now', group: 'Locked notes', title: 'Lock all notes now', shortcut: 'Ctrl+Alt+L', run: lockAllNow },
+  { id: 'lock.now', group: 'Locked notes', title: 'Lock all notes and passwords now', shortcut: 'Ctrl+Alt+L', run: lockAllNow },
   { id: 'lock.password', group: 'Locked notes', title: 'Change notes password…', run: changeNotesPassword },
+  { id: 'passwords.open', group: 'Passwords', title: 'Open passwords', shortcut: 'Ctrl+Alt+K', run: () => openSpecialTab(PASSWORDS_TAB) },
 
   { id: 'capture.open', group: 'Notes', title: 'Quick capture…', run: () => window.api.openCapture() },
   { id: 'daily.today', group: 'Calendar', title: "Open today's note", shortcut: 'Ctrl+Shift+D', run: () => openToday() },
   { id: 'daily.prev', group: 'Calendar', title: 'Previous daily note', run: () => stepDaily(-1) },
   { id: 'daily.next', group: 'Calendar', title: 'Next daily note', run: () => stepDaily(1) },
   { id: 'calendar.open', group: 'Calendar', title: 'Open calendar', shortcut: 'Ctrl+Shift+C', run: () => openSpecialTab(CALENDAR_TAB) },
+  { id: 'email.open', group: 'Navigation', title: 'Open email', shortcut: 'Ctrl+Shift+A', run: () => openSpecialTab(EMAIL_TAB) },
   { id: 'calendar.panel', group: 'Calendar', title: 'Show calendar in the side panel', run: () => showRightView('calendar') },
 
   ...EDITOR_COMMANDS.map(
@@ -232,6 +241,12 @@ export const commands: Command[] = [
   { id: 'graph.open', group: 'Navigation', title: 'Open graph', shortcut: 'Ctrl+Shift+G', run: () => openSpecialTab(GRAPH_TAB) },
   { id: 'home.open', group: 'Navigation', title: 'Go to Home', shortcut: 'Ctrl+Shift+J', run: () => openSpecialTab(HOME_TAB) },
   { id: 'flashcards.open', group: 'Navigation', title: 'Review flashcards', shortcut: 'Ctrl+Shift+Y', run: () => openSpecialTab(FLASHCARDS_TAB) },
+  { id: 'terminal.open', group: 'Navigation', title: 'Open terminal (command line in the notes folder)', shortcut: 'Ctrl+Alt+T', run: () => openSpecialTab(TERMINAL_TAB) },
+  { id: 'money.open', group: 'Navigation', title: 'Open money tracker', shortcut: 'Ctrl+Shift+B', run: () => openSpecialTab(MONEY_TAB) },
+  { id: 'convert.open', group: 'Navigation', title: 'Convert files (photos, Word, audio…)', run: () => openSpecialTab(CONVERT_TAB) },
+  { id: 'web.open', group: 'Web', title: 'Open a web page', shortcut: 'Ctrl+Shift+I', run: () => openWebTab() },
+  { id: 'web.beside', group: 'Web', title: 'Open a web page beside this note', run: () => openWebTab('', { beside: true }) },
+  { id: 'web.clear', group: 'Web', title: 'Clear browsing data (sign out of all websites)', run: () => void clearBrowsingData() },
   {
     id: 'view.mindmap',
     group: 'View',
@@ -284,6 +299,19 @@ export const commands: Command[] = [
 
 /** A command's current shortcut, taking your Settings into account. */
 export const shortcutFor = (cmd: Command): string | null => effectiveShortcut(cmd.id, cmd.shortcut)
+
+/** The app-wide commands' shortcuts (so they also work while a web page has focus). */
+export function appShortcuts(): string[] {
+  return commands.flatMap((c) => {
+    const shortcut = c.scope === 'editor' ? null : shortcutFor(c)
+    return shortcut ? [normalizeShortcut(shortcut)] : []
+  })
+}
+
+/** The app-wide command bound to a shortcut like "Ctrl+W", if any. */
+export function commandForShortcut(shortcut: string): Command | undefined {
+  return commands.find((c) => c.scope !== 'editor' && normalizeShortcut(shortcutFor(c) ?? '') === shortcut)
+}
 
 /** The app-wide command (not an editor one) bound to this key press, if any. */
 export function commandForKey(e: KeyboardEvent): Command | undefined {

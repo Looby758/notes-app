@@ -44,6 +44,24 @@ While the project is in Google's "Testing" mode, Google ends the sign-in after 7
 
 Your sign-in, client secret and calendar links are stored encrypted with the system's own protection (Windows' data protection, or the Mac Keychain) in `calendars.json` in the settings folder (see below). Events are refreshed every 10 minutes and when you come back to the app; the last copy is kept so they still show when you're offline.
 
+## Email (Gmail)
+
+The **Email** page (Ctrl+Shift+A, or the envelope at the top) shows your Gmail inbox inside Notes. It uses the same Google sign-in as the calendar, so set that up first (above). Then, once:
+
+1. Open the [Gmail API page](https://console.cloud.google.com/apis/library/gmail.googleapis.com) in the same Google Cloud project and press **Enable**.
+2. On the Email page, press **Connect Gmail**. Google says it hasn't verified the app (it's your own project, so that's expected): press **Continue**, tick the Gmail box, and continue.
+
+What you can do:
+
+- Read your Inbox, Unread, Starred, Sent or All mail, and search everything with Gmail's own search words (`from:sam invoice`, `has:attachment`…).
+- **Reply**, **Reply all**, **Forward** and **Write** new emails (plain text; Ctrl+Enter sends).
+- Star, mark unread, archive, or move to Gmail's Bin.
+- **Save as note** makes a note in the `Emails` folder with who sent it, when, a link back to it in Gmail, and the message.
+- **Add to calendar** puts it in that day's note under Schedule. Notes fills in the date and time when the email mentions one ("Friday at 7pm"); change them before you add it.
+- Unread emails also show on the **Home** page.
+
+Emails are fetched from Google while you look at them and aren't saved on your computer. Pictures in emails are hidden until you choose to show them, so senders can't tell when you've opened one. Notes can't delete email for good: the Bin is emptied by Gmail after 30 days.
+
 ## AI helper (optional)
 
 Notes can use Claude, made by Anthropic, to help with your notes. It's off until you add your own Anthropic API key in **Settings → AI helper** (sign up at [console.anthropic.com](https://console.anthropic.com/settings/keys), add a little credit, create a key, paste it in). Anthropic bills your account directly, usually a cent or two each time.
@@ -88,7 +106,12 @@ Nothing is sent unless you press one of these. Then only what's needed goes to A
 - **Reading mode** (Ctrl+Shift+R) — every note in every tab becomes read-only until you switch back; links open with a plain click.
 - **Find and replace in all notes** (Ctrl+Alt+F) — match case, whole words, regular expressions, a single folder; untick matches you want to keep, and undo afterwards.
 - **Bulk actions** — Ctrl/⌘-click or Shift-click several notes (or tick search results) to move, delete, star, tag, set a property or export them together.
+- **Email** (Ctrl+Shift+A) — your Gmail inbox: read, reply, write, and turn an email into a note or a calendar event in one click. See *Email (Gmail)* above.
 - **Flashcards** (Ctrl+Shift+Y, or the cards button at the top) — write `Question :: Answer` on its own line (or as a list item) in any note and it becomes a card. The Flashcards page shows how many are due today; review them all or one note's cards: *Show answer* (Space), then **Again**, **Hard**, **Good** or **Easy** (1–4). Cards you know come back less and less often (tomorrow, a few days, a week…); ones you miss come back in the same session. Your notes aren't changed: progress is saved in your notes folder (`.notesapp/flashcards.json`) so it syncs too, and follows notes you rename or move. Changing a card's question makes it a new card.
+- **Terminal** (Ctrl+Alt+T, or the terminal button at the top) — a command line in its own tab, starting in your notes folder: PowerShell on Windows, your usual shell on a Mac. It keeps running while you switch tabs; closing the tab ends it. Copy and paste work as usual (on Windows, Ctrl+C copies when text is selected and otherwise stops the running command). It only runs what you type into it.
+- **Passwords** (Ctrl+Alt+K, or the key button at the top) — a password vault in its own tab. Save logins (name, username, password, website, notes), search them, copy a username or password with one click, and make strong random passwords (pick the length and which characters). Everything is encrypted with AES-256 under a **master password** of its own (separate from the locked-notes password, never saved), with an optional recovery key, and kept in your notes folder (`.notesapp/passwords.json`) so it syncs. Copied passwords clear from the clipboard after 30 seconds. The vault locks with locked notes (Ctrl+Alt+L, the auto-lock time, or closing Notes); if auto-lock is set to Never, passwords still lock after 30 minutes. It warns when the same password is used for more than one login. Passwords never appear in search, links, the AI helper or exports. If you forget the master password and have no recovery key, the passwords can't be recovered.
+- **Convert files** (the ⇄ button at the top, or *Convert files* in Ctrl+K) — drop in pictures, sound files and documents and turn them into other kinds: iPhone photos (HEIC) to JPG, PNG or WebP (and make them smaller), WAV, M4A and other sound files to MP3 or WAV, Word documents to PDF, Markdown or plain text, and Markdown, text or web pages to PDF or Word. Convert lots at once and save them all into one folder. It all happens on your computer, nothing is uploaded, and your original files aren't changed. Word documents keep their text, headings, lists, tables and pictures, but fancy layouts (columns, text boxes) won't look exactly the same. Videos and PDFs can't be converted.
+- **Web browser tab** (Ctrl+Shift+I, or the globe at the top) — browse the web beside a note in split view, with an address bar (type an address or a search), back, forward and reload. Ctrl/⌘-click a web link in a note and it opens in a web tab next to the note (turn this off in Settings → Editor → Tabs to use your usual browser). Pages run walled off from your notes and the app; links that open a new window open a new web tab. Sign-ins are remembered, separately from your normal browser, until you choose *Clear browsing data* in a web tab's ⋯ menu. It's a simple browser: no extensions, some video sites won't play protected films, and Google sometimes refuses to sign in inside other apps (use the ↗ button to open the page in your usual browser).
 - **Random note**, **related notes** (under Backlinks, with the reason), and **on this day** (notes from this date in past months and years, in the calendar panel).
 - **Banners and icons** — give a note a banner image or colour and an emoji icon, shown above the title and in the file list.
 - **App icon** — pick from several designs (including green) in Settings → Appearance. On Windows it also goes on the Start menu, desktop and pinned taskbar shortcuts.
@@ -97,6 +120,7 @@ Nothing is sent unless you press one of these. Then only what's needed goes to A
 - **Voice notes** — record with `/voice`, right-click → *Record a voice note*, or the mic in quick capture. The recording is saved in your attachments folder and plays in the note.
 - **Sketch notes** — draw with `/sketch` or right-click → *Draw a sketch*: pen (pressure-sensitive), highlighter, eraser, colours, squared or lined paper. Sketches are saved as pictures in your attachments folder; hover one in a note and click *Edit sketch* to add to it.
 - **Canvas boards** — an endless board for laying out ideas: click the board button at the top of the file list (or right-click a folder → *New canvas board*). Drag notes and pictures in from the sidebar, double-click the board for a sticky note, or use the toolbar to add a note, a picture, a sketch or a group. Drag from the dot on a card's edge to another card to draw an arrow (let go on empty space for a new sticky note); double-click an arrow to label it. Drag the board to move around and scroll to zoom. Double-click a note card to open it. Right-click anything for more, and pick colours from the bar that appears. Boards are `.canvas` files in your notes folder, in the same open format as Obsidian, and cards keep up when you rename or move notes.
+- **Handwriting to text** — in the sketch pad, *Turn into text* reads what you wrote with the pen and shows it as typed text to check and fix, then adds it to your note (with or without the drawing). It's read either by the AI helper, which copes with messy and joined-up writing, or offline on your computer (best with neat printed letters); pick in Settings → Editor → Sketches.
 - **Locked notes** — Ctrl+K → *Lock this note* (or right-click a note). Locked notes are encrypted (AES-256) with your notes password, or a password of their own, and need it to open. Set a recovery key in case you forget the password. They lock again after a while away (Settings → Files) or with Ctrl+Alt+L, and stay out of search, links and the graph. **There's no way in without the password or recovery key.**
 - **Formatting menu and toolbar** — select text and right-click for bold, italic, highlight colours, links, headings, lists, quotes, callouts and *Clear formatting*; a small toolbar also appears above selected text. With text selected, typing `*` `=` `~` or ``` wraps it instead of replacing it.
 - **Text snippets** — save bits of text in Settings → Editor; type `;name` and a space to insert one (`{{date}}` and friends work in them).
@@ -120,6 +144,7 @@ All of these can be changed in **Settings → Shortcuts**. On a Mac, Ctrl is **�
 | Ctrl+Tab / Ctrl+Shift+Tab | Next / previous tab |
 | Ctrl+Shift+F | Search all notes |
 | Ctrl+Shift+E | Show files |
+| Ctrl+Shift+A | Open email |
 | Ctrl+Shift+O | Show outline |
 | Ctrl+\\ | Focus mode (hide both sidebars) |
 | Ctrl+= / Ctrl+- / Ctrl+0 | Bigger / smaller / reset text |
@@ -169,7 +194,7 @@ GitHub Actions (`.github/workflows/release.yml`) then builds the Windows and Mac
 
 Project layout:
 
-- `src/main` — the Electron main process: file access (`vault.ts`), file watching, settings, window, the tray and quick capture (`capture.ts`), Google Calendar and calendar links (`calendarSources.ts`), updates (`updater.ts`).
+- `src/main` — the Electron main process: file access (`vault.ts`), file watching, settings, window, the tray and quick capture (`capture.ts`), Google Calendar and calendar links (`calendarSources.ts`), Gmail (`email.ts`, with the email format itself in `mail.ts`), updates (`updater.ts`).
 - `src/shared` — types and logic used by both sides: preferences (`prefs.ts`), themes, the iCal reader (`ics.ts`), Windows/Mac differences (`platform.ts`).
 - `src/preload` — the small, typed bridge between the main process and the UI.
 - `src/renderer` — the React UI. The editor is CodeMirror 6 (`components/Editor`); `lib/editorController.ts` handles panes, tabs and saving; `store/noteIndex.ts` keeps the link, tag, calendar and search index; `lib/settingsSchema.ts` describes every setting.

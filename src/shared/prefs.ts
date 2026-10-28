@@ -50,6 +50,8 @@ export interface Prefs {
   showWordCount: boolean
   /** Opening a note adds a tab instead of changing the current one. */
   openInNewTab: boolean
+  /** Web links in notes open in a web tab beside the note, instead of your usual browser. */
+  openLinksInApp: boolean
   /** Notes starts on the Home page (today, reminders, recent notes). */
   homeOnStart: boolean
   /** Every note opens read-only (links open with a plain click) until you switch back to writing. */
@@ -65,6 +67,8 @@ export interface Prefs {
   typewriterDimUnit: 'paragraph' | 'line'
   /** How the graph tab draws your notes. */
   graphStyle: 'neighbourhood' | 'constellation'
+  /** What reads handwriting in a sketch: the AI helper when a key is saved (else offline), or always one of them. */
+  handwritingReader: 'auto' | 'ai' | 'offline'
 
   // Focus timer (zen mode)
   focusMinutes: number
@@ -162,6 +166,7 @@ export const DEFAULT_PREFS: Prefs = {
   cursorBlink: true,
   showWordCount: true,
   openInNewTab: false,
+  openLinksInApp: true,
   homeOnStart: true,
   readingMode: false,
   randomIncludeDaily: false,
@@ -170,6 +175,7 @@ export const DEFAULT_PREFS: Prefs = {
   typewriterDim: false,
   typewriterDimUnit: 'paragraph',
   graphStyle: 'neighbourhood',
+  handwritingReader: 'auto',
 
   focusMinutes: 25,
   breakMinutes: 5,
@@ -230,6 +236,7 @@ const CHOICES = {
   captureTarget: ['daily', 'inbox'],
   typewriterDimUnit: ['paragraph', 'line'],
   graphStyle: ['neighbourhood', 'constellation'],
+  handwritingReader: ['auto', 'ai', 'offline'],
   appIcon: ['default', 'green', 'forest', 'ocean', 'sunset', 'light', 'midnight'],
   captureShortcut: IS_MAC
     ? ['Control+Alt+Space', 'Alt+Space', 'Control+Shift+Space', 'Super+Alt+N', '']

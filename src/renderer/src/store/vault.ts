@@ -1,4 +1,5 @@
 import { loadLock } from '../lib/lock/session'
+import { loadPasswords } from '../lib/passwords/session'
 import { loadSnippets } from './snippets'
 import { loadSavedSearches } from './savedSearches'
 import { fixFileLinks } from '../lib/fileLinks'
@@ -12,6 +13,7 @@ import { notify } from './notify'
 import { resetIndex, syncIndex } from './noteIndex'
 import { loadStarred, remapStars, removeStarsWithin } from './starred'
 import { loadFlashcards, remapFlashcards, removeFlashcardsWithin } from './flashcards'
+import { loadMoney } from './money'
 
 interface VaultState {
   vault: string
@@ -101,10 +103,12 @@ export const useVault = create<VaultState>((set, get) => {
       set({ vault, tree: [], expanded: loadExpanded(vault), selected: null, renaming: null })
       resetIndex()
       void loadLock()
+      void loadPasswords()
       void loadSnippets()
       void loadSavedSearches()
       loadStarred()
       void loadFlashcards()
+      void loadMoney()
       get().refresh()
     },
 
