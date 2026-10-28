@@ -41,6 +41,7 @@ import { dictionaryMenu, setupDictionary } from './dictionary'
 import { setupWebTitle } from './webTitle'
 import { setupPlaces } from './places'
 import { setupBrowser } from './browser'
+import { closeYouTube, setupYouTube } from './youtube'
 import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
 import { applyIconOutsideApp } from './appIcon'
@@ -345,6 +346,8 @@ function createWindow(): BrowserWindow {
     const maximized = win.isMaximized()
     const b = maximized ? win.getNormalBounds() : win.getBounds()
     saveSettings({ window: { ...b, maximized } })
+    // The notes window is really closing: the YouTube mini window goes with it.
+    if (win === mainWindow) closeYouTube()
   })
   ipcMain.removeHandler('app:ready-to-close')
   ipcMain.handle('app:ready-to-close', () => {
@@ -685,6 +688,7 @@ app.whenReady().then(async () => {
   registerCodeSandbox()
   registerIpc()
   safely('web browser', setupBrowser)
+  safely('YouTube mini window', () => setupYouTube(currentPrefs))
   safely('export', setupExport)
   safely('converter', setupConverter)
   // Hand edits to settings.json apply straight away.

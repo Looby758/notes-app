@@ -63,6 +63,18 @@ const api: NotesApi = {
     ipcRenderer.on('web:shortcut', handler)
     return () => ipcRenderer.removeListener('web:shortcut', handler)
   },
+  openYouTube: (url) => ipcRenderer.invoke('youtube:open', url),
+  youTubeState: () => ipcRenderer.invoke('youtube:state'),
+  rememberYouTube: (url) => ipcRenderer.invoke('youtube:remember', url),
+  pinYouTube: (on) => ipcRenderer.invoke('youtube:pin', on),
+  setYouTubeVideoOnly: (on) => ipcRenderer.invoke('youtube:videoOnly', on),
+  minimizeYouTube: () => ipcRenderer.invoke('youtube:minimize'),
+  closeYouTube: () => ipcRenderer.invoke('youtube:close'),
+  onYouTubeLoad: (callback) => {
+    const handler = (_e: unknown, url: string): void => callback(url)
+    ipcRenderer.on('youtube:load', handler)
+    return () => ipcRenderer.removeListener('youtube:load', handler)
+  },
   pickImport: (kind, extensions) => ipcRenderer.invoke('import:pick', kind, extensions),
   listImport: (root) => ipcRenderer.invoke('import:list', root),
   readImport: (path) => ipcRenderer.invoke('import:read', path),

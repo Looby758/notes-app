@@ -7094,6 +7094,82 @@ body.resizing-rows .web-view {
   display: flex;
 }
 
+/* ---------- YouTube mini window ---------- */
+
+body.youtube-window {
+  background: var(--bg);
+}
+.yt-mini {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* The bar is what you drag the window around by. */
+.yt-bar {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  height: 32px;
+  flex-shrink: 0;
+  padding: 0 4px;
+  border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+.yt-bar .icon-btn {
+  width: 26px;
+  height: 26px;
+}
+.yt-bar .icon-btn.yt-on {
+  color: var(--accent);
+}
+.yt-search {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  margin: 0 4px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  -webkit-app-region: no-drag;
+  user-select: text;
+}
+.yt-search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.yt-search::placeholder {
+  color: var(--text-faint);
+}
+.yt-search-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-faint);
+  cursor: text;
+  text-align: left;
+  overflow: hidden;
+}
+.yt-search-button span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.yt-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  background: #000;
+}
+.yt-view {
+  flex: 1;
+}
+
 /* ---------- Home page ---------- */
 .pane-body > .home-page {
   flex: 1;

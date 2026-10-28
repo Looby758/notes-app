@@ -20,6 +20,11 @@ export interface Settings {
   toldAboutTray?: boolean
   /** Mac: you chose not to be asked again about moving Notes into Applications. */
   keepOutsideApplications?: boolean
+  /** The YouTube mini window: where it was left, what was playing, and how it was set. */
+  youtubeWindow?: WindowBounds
+  youtubeUrl?: string
+  youtubePinned?: boolean
+  youtubeVideoOnly?: boolean
 }
 
 export interface CaptureStatus {
@@ -199,6 +204,12 @@ export interface AiChat {
   messages: AiChatMessage[]
 }
 
+export interface YouTubeState {
+  url: string
+  pinned: boolean
+  videoOnly: boolean
+}
+
 export interface NotesApi {
   /** A native yes/no dialog; resolves true if the user picked `ok`. */
   confirm(options: ConfirmOptions): Promise<boolean>
@@ -270,6 +281,22 @@ export interface NotesApi {
   onWebOpen(callback: (url: string) => void): () => void
   /** One of the app's shortcuts was pressed while a web page had focus. */
   onWebShortcut(callback: (shortcut: string) => void): () => void
+
+  // The YouTube mini window
+  /** Opens the floating YouTube window (or brings it back), playing `url` if it's a YouTube link. */
+  openYouTube(url?: string): Promise<void>
+  /** In the mini window: what to show first, and how you left it set. */
+  youTubeState(): Promise<YouTubeState>
+  /** In the mini window: the page showing now, so it carries on there next time. */
+  rememberYouTube(url: string): Promise<void>
+  /** In the mini window: float over other windows, or not. */
+  pinYouTube(on: boolean): Promise<void>
+  /** In the mini window: show only the video on a video's page, or the whole YouTube page. */
+  setYouTubeVideoOnly(on: boolean): Promise<void>
+  minimizeYouTube(): Promise<void>
+  closeYouTube(): Promise<void>
+  /** In the mini window: play this page (opened from the notes window). */
+  onYouTubeLoad(callback: (url: string) => void): () => void
 
   // Updates
   updateStatus(): Promise<UpdateStatus>
