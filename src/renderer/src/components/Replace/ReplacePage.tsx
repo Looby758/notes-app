@@ -63,14 +63,17 @@ export default function ReplacePage() {
   }, [query, replacement])
   // The last replace (kept in the notes folder, so Undo survives a restart).
   useEffect(() => {
-    window.api.readAppData(UNDO_FILE).then((raw) => {
-      try {
-        const saved = raw ? (JSON.parse(raw) as UndoEntry[]) : null
-        setUndo(saved?.length ? saved : null)
-      } catch {
-        setUndo(null)
-      }
-    })
+    window.api
+      .readAppData(UNDO_FILE)
+      .then((raw) => {
+        try {
+          const saved = raw ? (JSON.parse(raw) as UndoEntry[]) : null
+          setUndo(saved?.length ? saved : null)
+        } catch {
+          setUndo(null)
+        }
+      })
+      .catch(() => setUndo(null))
   }, [])
 
   const pattern = useMemo(() => buildPattern(debounced.query, opts), [debounced.query, opts])

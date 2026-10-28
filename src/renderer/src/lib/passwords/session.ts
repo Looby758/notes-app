@@ -100,6 +100,11 @@ export function masterPasswordProblem(password: string, again: string): string |
 /** Makes the vault. Returns the recovery key, if one was asked for. */
 export async function setUpVault(master: string, withRecovery: boolean): Promise<string | undefined> {
   if (file) throw new Error('A password vault already exists in this notes folder.')
+  // Read again: a vault that synced in (or couldn't be read at start-up) must never be replaced.
+  if ((await window.api.readAppData(FILE)) !== null) {
+    await loadPasswords()
+    throw new Error('This notes folder already has a password vault (it may have just synced). Unlock it with its master password.')
+  }
   const made = await createLock(master, withRecovery)
   await write({ v: 1, lock: made.lock, logins: await encryptText(made.notesKey, '[]') })
   vaultKey = made.notesKey

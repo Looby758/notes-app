@@ -1,5 +1,6 @@
 import { Annotation, ChangeSet, EditorState, Transaction, type ChangeSpec } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
+import { autocompletion } from '@codemirror/autocomplete'
 import { createState, prefsCompartment, prefsExtensions, zenCompartment, zenExtensions } from '../components/Editor/setup'
 import { attachmentLink } from '../components/Editor/attachments'
 import { linksChanged, notePath, paneCompartment, paneFacet, pathCompartment } from '../components/Editor/facets'
@@ -438,6 +439,12 @@ async function getSession(pane: string, path: string): Promise<Session | null | 
   return s
 }
 
+/**
+ * What a pane shows while no note is open. It keeps autocomplete's slot: closing an open
+ * suggestion list on blur happens a moment later, after the note may already be swapped out.
+ */
+const blankState = (): EditorState => EditorState.create({ extensions: autocompletion() })
+
 /** Saves a pane's on-screen state back into its session before the view shows something else. */
 function stash(pane: string): void {
   const pv = views.get(pane)
@@ -452,7 +459,7 @@ async function show(pane: string, id: string | null, focus = true): Promise<void
   stash(pane)
   if (!isNoteTab(id)) {
     pv.shown = null
-    pv.view.setState(EditorState.create())
+    pv.view.setState(blankState())
     if (pane === activePane()) clearStats()
     return
   }
@@ -467,7 +474,7 @@ async function show(pane: string, id: string | null, focus = true): Promise<void
   if (s === 'locked') {
     // The pane shows the lock screen; this tab is shown again once it's unlocked.
     now.shown = null
-    now.view.setState(EditorState.create())
+    now.view.setState(blankState())
     if (pane === activePane()) clearStats()
     return
   }
@@ -486,7 +493,7 @@ async function show(pane: string, id: string | null, focus = true): Promise<void
 export function mountPane(pane: string, parent: HTMLElement): () => void {
   // Moving a pane into a split remounts it; keep anything the old view hadn't stashed yet.
   stash(pane)
-  const pv: PaneView = { view: new EditorView({ parent, state: EditorState.create() }), shown: null }
+  const pv: PaneView = { view: new EditorView({ parent, state: blankState() }), shown: null }
   views.set(pane, pv)
   show(pane, paneState(pane).active, false)
   return () => {
@@ -1203,7 +1210,7 @@ onBeforeLock(async () => {
       const pv = views.get(s.pane)
       if (pv && pv.shown === s.path) {
         pv.shown = null
-        pv.view.setState(EditorState.create())
+        pv.view.setState(blankState())
       }
       sessions.delete(keyOf(s.pane, s.path))
     }

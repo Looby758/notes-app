@@ -39,6 +39,15 @@ describe('shortcutFromEvent', () => {
     expect(shortcutFromEvent(ev(',', 'Comma', { ctrl: true }))).toBe('Ctrl+,')
   })
 
+  it("leaves the Mac's Control-key text editing alone (Ctrl means ⌘ there)", () => {
+    const cmd = (key: string, code: string) => ({ ...ev(key, code), metaKey: true })
+    expect(shortcutFromEvent(cmd('n', 'KeyN'), true)).toBe('Ctrl+N')
+    expect(shortcutFromEvent(ev('n', 'KeyN', { ctrl: true }), true)).toBeNull()
+    expect(shortcutFromEvent(ev('k', 'KeyK', { ctrl: true }), true)).toBeNull()
+    expect(shortcutFromEvent(ev('Tab', 'Tab', { ctrl: true }), true)).toBe('Ctrl+Tab')
+    expect(shortcutFromEvent(ev('n', 'KeyN', { ctrl: true }), false)).toBe('Ctrl+N')
+  })
+
   it('ignores modifier-only presses', () => {
     expect(shortcutFromEvent(ev('Control', 'ControlLeft', { ctrl: true }))).toBeNull()
   })
