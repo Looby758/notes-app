@@ -105,6 +105,20 @@ const api: NotesApi = {
   aiSummarise: (title, text) => ipcRenderer.invoke('ai:summarise', title, text),
   aiTidy: (text, kind) => ipcRenderer.invoke('ai:tidy', text, kind),
   aiAsk: (question, notes, history) => ipcRenderer.invoke('ai:ask', question, notes, history),
+  terminalStart: (cols, rows) => ipcRenderer.invoke('term:start', cols, rows),
+  terminalStop: () => ipcRenderer.invoke('term:stop'),
+  terminalInput: (data) => ipcRenderer.send('term:input', data),
+  terminalResize: (cols, rows) => ipcRenderer.send('term:resize', cols, rows),
+  onTerminalData: (callback) => {
+    const handler = (_e: unknown, data: string): void => callback(data)
+    ipcRenderer.on('term:data', handler)
+    return () => ipcRenderer.removeListener('term:data', handler)
+  },
+  onTerminalExit: (callback) => {
+    const handler = (_e: unknown, code: number): void => callback(code)
+    ipcRenderer.on('term:exit', handler)
+    return () => ipcRenderer.removeListener('term:exit', handler)
+  },
   aiChat: (messages) => ipcRenderer.invoke('ai:chat', messages),
   aiLoadChats: () => ipcRenderer.invoke('ai:loadChats'),
   aiSaveChats: (chats) => ipcRenderer.invoke('ai:saveChats', chats),

@@ -37,6 +37,7 @@ import { formatMenuFor, setupMenus } from './menus'
 import { dictionaryMenu, setupDictionary } from './dictionary'
 import { setupWebTitle } from './webTitle'
 import { setupImporter } from './importer'
+import { setupTerminal } from './terminal'
 import { applyIconOutsideApp } from './appIcon'
 import { CODE_SANDBOX_SCHEME, registerCodeSandbox } from './codeSandbox'
 
@@ -455,6 +456,7 @@ function registerIpc(): void {
   setupDictionary()
   setupWebTitle()
   setupImporter()
+  setupTerminal(() => vault?.root ?? null)
   // The Mac asks once whether Notes may use the microphone.
   ipcMain.handle('voice:access', async () => (IS_MAC ? systemPreferences.askForMediaAccess('microphone') : true))
   ipcMain.handle('app:fullscreen', (event, on: boolean) => BrowserWindow.fromWebContents(event.sender)?.setFullScreen(on))

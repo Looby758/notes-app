@@ -244,6 +244,17 @@ export interface NotesApi {
   /** A quick capture is tidied as one list item; a note can get headings and lists. */
   aiTidy(text: string, kind: 'note' | 'capture'): Promise<string>
   aiAsk(question: string, notes: AiNote[], history: AiAskTurn[]): Promise<string>
+  // Terminal tab
+  /** Starts the command line in the notes folder (or carries on with the one already running). */
+  terminalStart(cols: number, rows: number): Promise<TerminalStart>
+  /** Ends the command line (and whatever is running in it). */
+  terminalStop(): Promise<void>
+  /** What you typed or pasted into the Terminal tab. */
+  terminalInput(data: string): void
+  terminalResize(cols: number, rows: number): void
+  onTerminalData(callback: (data: string) => void): () => void
+  /** The command line ended (you typed exit, or it closed). */
+  onTerminalExit(callback: (code: number) => void): () => void
   /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */
   aiChat(messages: AiChatMessage[]): Promise<string>
   /** Saved chats, kept in the settings folder on this computer. */
@@ -329,6 +340,9 @@ export interface AppleNote {
   modified: string
   locked: boolean
 }
+/** How starting the Terminal tab's command line went. */
+export type TerminalStart = { ok: true; name: string; resumed: boolean } | { ok: false; error: string }
+
 /** A Google Sheet (.gsheet file) fetched for the spreadsheet viewer, or why it couldn't be. */
 export type GoogleSheetResult =
   | { sheets: Sheet[]; webUrl: string }

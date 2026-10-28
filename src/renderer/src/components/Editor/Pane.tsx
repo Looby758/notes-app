@@ -18,6 +18,7 @@ import {
   AI_TAB,
   CHAT_TAB,
   FLASHCARDS_TAB,
+  TERMINAL_TAB,
   HOME_TAB,
   SETTINGS_TAB,
   splitPane
@@ -37,6 +38,7 @@ import ConflictsPage from '../Conflicts/ConflictsPage'
 import AiPage from '../Ai/AiPage'
 import ChatPage from '../Ai/ChatPage'
 import FlashcardsPage from '../Flashcards/FlashcardsPage'
+import TerminalPage from '../Terminal/TerminalPage'
 import HomePage from '../Home/HomePage'
 import MindMap from '../MindMap/MindMap'
 import { isMindMap, useUI } from '../../store/ui'
@@ -125,6 +127,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === AI_TAB && <AiPage autoFocus={isActivePane} />}
         {active === CHAT_TAB && <ChatPage autoFocus={isActivePane} />}
         {active === FLASHCARDS_TAB && <FlashcardsPage />}
+        {active === TERMINAL_TAB && <TerminalPage />}
         {(active === HOME_TAB || !active) && <HomePage />}
         {zone && <div className={`drop-zone ${zone}`} />}
       </div>

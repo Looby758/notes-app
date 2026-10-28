@@ -11,6 +11,7 @@ import {
   REPLACE_TAB,
   CONFLICTS_TAB,
   FLASHCARDS_TAB,
+  TERMINAL_TAB,
   CHAT_TAB,
   HOME_TAB,
   closePane,
@@ -232,6 +233,7 @@ export const commands: Command[] = [
   { id: 'graph.open', group: 'Navigation', title: 'Open graph', shortcut: 'Ctrl+Shift+G', run: () => openSpecialTab(GRAPH_TAB) },
   { id: 'home.open', group: 'Navigation', title: 'Go to Home', shortcut: 'Ctrl+Shift+J', run: () => openSpecialTab(HOME_TAB) },
   { id: 'flashcards.open', group: 'Navigation', title: 'Review flashcards', shortcut: 'Ctrl+Shift+Y', run: () => openSpecialTab(FLASHCARDS_TAB) },
+  { id: 'terminal.open', group: 'Navigation', title: 'Open terminal (command line in the notes folder)', shortcut: 'Ctrl+Alt+T', run: () => openSpecialTab(TERMINAL_TAB) },
   {
     id: 'view.mindmap',
     group: 'View',
