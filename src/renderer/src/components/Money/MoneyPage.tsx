@@ -37,6 +37,8 @@ import {
 } from '../../lib/money'
 import { notify } from '../../store/notify'
 import { addHomeCard } from '../../lib/home'
+import { readWorkbook } from '../../lib/sheets'
+import { statementFromPdf } from '../../lib/pdfStatement'
 import MoneyHomeCard from './MoneyHomeCard'
 
 addHomeCard({ id: 'money', order: 25, Card: MoneyHomeCard })
@@ -466,6 +468,27 @@ function Entries({ month, edit }: { month: string; edit: (e: MoneyEntry) => void
   )
 }
 
+/** A statement file as rows of cells, whatever kind of file it is. */
+async function statementRows(file: File, pdfPassword?: string): Promise<string[][]> {
+  const ext = file.name.slice(file.name.lastIndexOf('.') + 1).toLowerCase()
+  if (ext === 'pdf') {
+    const { pdfPages } = await import('../../lib/pdfText')
+    const rows = statementFromPdf(await pdfPages(await file.arrayBuffer(), pdfPassword))
+    if (!rows.length)
+      throw new Error(
+        "Couldn't find any payments in that PDF. If it's a scan or photo of a statement, there's no text in it to read."
+      )
+    return rows
+  }
+  if (ext === 'xls') throw new Error('That is an old-style Excel file. Open it in Excel and save it as .xlsx or CSV first.')
+  if (ext === 'xlsx' || ext === 'xlsm') {
+    const sheets = await readWorkbook(await file.arrayBuffer())
+    const sheet = sheets.find((s) => !s.hidden) ?? sheets[0]
+    return sheet.rows.map((r) => r.map((c) => c.text.trim())).filter((r) => r.some((c) => c))
+  }
+  return parseCsv(await file.text())
+}
+
 interface Preview {
   name: string
   rows: string[][]
@@ -481,16 +504,27 @@ function Import({ done }: { done: () => void }) {
   const [picked, setPicked] = useState<Record<number, string>>({})
   const [skipped, setSkipped] = useState<Set<number>>(new Set())
   const fileInput = useRef<HTMLInputElement>(null)
+  const [reading, setReading] = useState(false)
+  /** A PDF waiting for its password. */
+  const [locked, setLocked] = useState<{ file: File; wrong: boolean } | null>(null)
+  const [password, setPassword] = useState('')
 
-  const open = async (file: File): Promise<void> => {
+  const open = async (file: File, pdfPassword?: string): Promise<void> => {
+    setReading(true)
     try {
-      const rows = parseCsv(await file.text())
+      const rows = await statementRows(file, pdfPassword)
       if (!rows.length) throw new Error('That file is empty.')
       setPreview({ name: file.name, rows, cols: detectColumns(rows) })
       setPicked({})
       setSkipped(new Set())
+      setLocked(null)
+      setPassword('')
     } catch (err) {
-      notify(err)
+      const { PdfPasswordError } = await import('../../lib/pdfText')
+      if (err instanceof PdfPasswordError) setLocked({ file, wrong: err.wrong })
+      else notify(err)
+    } finally {
+      setReading(false)
     }
   }
 
@@ -542,7 +576,7 @@ function Import({ done }: { done: () => void }) {
       <input
         ref={fileInput}
         type="file"
-        accept=".csv,.txt,text/csv"
+        accept=".csv,.tsv,.txt,.xlsx,.xlsm,.pdf,text/csv,application/pdf"
         hidden
         onChange={(e) => {
           const file = e.target.files?.[0]
@@ -550,18 +584,50 @@ function Import({ done }: { done: () => void }) {
           e.target.value = ''
         }}
       />
-      {!preview ? (
+      {locked ? (
+        <form
+          className="money-import-start"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (password) void open(locked.file, password)
+          }}
+        >
+          <p>
+            <strong>{locked.file.name}</strong> is protected with a password. Banks often use something like your date of
+            birth or part of your account number; the letter or email that came with it usually says which.
+          </p>
+          {locked.wrong && <p className="money-hint">That password didn't work. Try again?</p>}
+          <div className="money-new-cat">
+            <input
+              className="text-input"
+              type="password"
+              placeholder="PDF password"
+              autoFocus
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <button className="btn btn-primary" type="submit" disabled={!password || reading}>
+              Open
+            </button>
+            <button className="btn" type="button" onClick={() => setLocked(null)}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : !preview ? (
         <div className="money-import-start">
           <p>
-            Most banks let you download a statement as a <strong>CSV</strong> file (sometimes called "spreadsheet" or
-            "Excel") from their website or app. Choose that file here and check the entries before they're added.
+            Choose a statement you've downloaded from your bank's website or app: a <strong>PDF</strong>, a{' '}
+            <strong>CSV</strong> file or an <strong>Excel</strong> spreadsheet. You'll see the entries to check before
+            they're added.
           </p>
           <p className="money-hint">
-            Anything you've imported before is skipped, so it's fine to import overlapping statements. Categories are
-            guessed from the shop's name, and when you change one, it's remembered for next time.
+            Statements are read on this computer and never sent anywhere. Anything you've imported before is skipped, so
+            it's fine to import overlapping statements. Categories are guessed from the shop's name, and when you change
+            one, it's remembered for next time.
           </p>
-          <button className="btn btn-primary" onClick={() => fileInput.current?.click()}>
-            <Upload size={14} /> Choose a statement…
+          <button className="btn btn-primary" disabled={reading} onClick={() => fileInput.current?.click()}>
+            <Upload size={14} /> {reading ? 'Reading statement…' : 'Choose a statement…'}
           </button>
         </div>
       ) : (

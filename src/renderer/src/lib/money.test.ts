@@ -41,6 +41,7 @@ describe('parseDate', () => {
     expect(parseDate('5 January 2024')).toBe('2024-01-05')
     expect(parseDate('2024-01-05T10:22:00Z')).toBe('2024-01-05')
     expect(parseDate('05/01/2024 10:22:00')).toBe('2024-01-05')
+    expect(parseDate('Jan 5, 2024')).toBe('2024-01-05')
   })
   it('refuses things that are not dates', () => {
     expect(parseDate('31/02/2024')).toBeNull()
