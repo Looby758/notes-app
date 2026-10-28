@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ArrowRightLeft, CalendarDays, Columns2, FileDown, FolderSearch, GitCompare, House, KeyRound, Layers, Mail, MessageSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
+import { ArrowRightLeft, CalendarDays, Columns2, Copy, ExternalLink, FileDown, FolderSearch, GitCompare, Globe, House, KeyRound, Layers, Mail, MessageSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
 import { useEditor } from '../../store/editor'
 import { toggleStar, useStarred } from '../../store/starred'
 import { useNoteIndex } from '../../store/noteIndex'
@@ -26,9 +26,11 @@ import {
   isBlankTab,
   isFileTab,
   isNoteTab,
+  isWebTab,
   moveTab,
   newTab,
   openNote,
+  openWebTab,
   SETTINGS_TAB,
   splitPane,
   togglePin
@@ -39,10 +41,13 @@ import { getDrag, setDrag } from '../../lib/dnd'
 import { noteTitle } from '../../lib/paths'
 import ContextMenu, { type MenuItem } from '../ContextMenu'
 import FileIcon from '../FileIcon'
+import { useWeb, type WebPage } from '../../store/web'
+import { displayUrl } from '@shared/web'
 import { FILE_MANAGER, showKeys } from '@shared/platform'
 
-function tabTitle(id: string): string {
+function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (isBlankTab(id)) return 'New tab'
+  if (isWebTab(id)) return web[id]?.title || (web[id]?.url ? displayUrl(web[id].url) : 'New web tab')
   if (id === SETTINGS_TAB) return 'Settings'
   if (id === CALENDAR_TAB) return 'Calendar'
   if (id === GRAPH_TAB) return 'Graph'
@@ -71,6 +76,7 @@ export default function TabBar({ pane }: { pane: string }) {
   const pinned = useEditor((s) => s.panes[pane]?.pinned ?? NO_PINS)
   const mindMap = useUI((s) => isMindMap(s, pane, active))
   const starred = useStarred((s) => s.paths)
+  const web = useWeb((s) => s.pages)
   // Notes' emoji icons, shown before their names.
   const notesIndex = useNoteIndex((s) => s.notes)
   const icons = new Map(tabs.map((t) => [t, notesIndex.get(t)?.icon]))
@@ -154,6 +160,15 @@ export default function TabBar({ pane }: { pane: string }) {
         { label: 'Move to new pane below', onClick: () => splitPane('down', { pane, tab: id, moveFrom: pane }) }
       )
     }
+    const page = isWebTab(id) ? web[id]?.url : ''
+    if (page) {
+      items.push(
+        'separator',
+        { label: 'Open in your browser', icon: <ExternalLink size={15} />, onClick: () => window.open(page) },
+        { label: 'Copy address', icon: <Copy size={15} />, onClick: () => void navigator.clipboard.writeText(page) },
+        { label: 'Duplicate', icon: <Globe size={15} />, onClick: () => openWebTab(page) }
+      )
+    }
     if (isNoteTab(id)) {
       items.push('separator', {
         label: `Show in ${FILE_MANAGER}`,
@@ -183,7 +198,7 @@ export default function TabBar({ pane }: { pane: string }) {
             <div
               key={id}
               className={`tab ${id === active ? 'active' : ''} ${unsaved ? 'unsaved' : ''} ${isBlankTab(id) ? 'blank' : ''} ${isTabPinned ? 'pinned' : ''} ${dropIndex === i ? 'drop-before' : ''}`}
-              title={`${isFileTab(id) ? fileOfTab(id) : (id as string).includes(':') ? tabTitle(id) : id}${isTabPinned ? ' (pinned)' : ''}`}
+              title={`${isFileTab(id) ? fileOfTab(id) : isWebTab(id) ? web[id]?.url || tabTitle(id, web) : (id as string).includes(':') ? tabTitle(id, web) : id}${isTabPinned ? ' (pinned)' : ''}`}
               draggable
               onDragStart={(e) => {
                 setDrag({ kind: 'tab', pane, id })
@@ -214,12 +229,13 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === TERMINAL_TAB && <SquareTerminal size={13} className="tab-icon" />}
               {id === PASSWORDS_TAB && <KeyRound size={13} className="tab-icon" />}
               {id === EMAIL_TAB && <Mail size={13} className="tab-icon" />}
+              {isWebTab(id) && <Globe size={13} className="tab-icon" />}
               {id === HOME_TAB && <House size={13} className="tab-icon" />}
               {id === MONEY_TAB && <PoundSterling size={13} className="tab-icon" />}
               {id === CONVERT_TAB && <ArrowRightLeft size={13} className="tab-icon" />}
               {isFileTab(id) && <FileIcon path={fileOfTab(id)} size={13} className="tab-icon" />}
               {icons.get(id) && <span className="tab-emoji">{icons.get(id)}</span>}
-              <span className="tab-title">{tabTitle(id)}</span>
+              <span className="tab-title">{tabTitle(id, web)}</span>
               {isTabPinned ? (
                 // Pinned tabs show a pin instead of ✕; clicking it unpins.
                 <button

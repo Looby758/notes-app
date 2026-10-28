@@ -319,6 +319,15 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'tab replace reuse open'
   },
   {
+    key: 'openLinksInApp',
+    section: 'editor',
+    group: 'Tabs',
+    type: 'toggle',
+    label: 'Open web links in a web tab beside the note',
+    description: 'Off: web links open in your usual browser instead. Either way, a web tab’s ↗ button opens its page in your browser.',
+    keywords: 'web browser link url website internet split external chrome safari edge'
+  },
+  {
     key: 'homeOnStart',
     section: 'editor',
     group: 'Tabs',

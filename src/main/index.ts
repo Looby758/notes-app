@@ -39,6 +39,7 @@ import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
 import { dictionaryMenu, setupDictionary } from './dictionary'
 import { setupWebTitle } from './webTitle'
+import { setupBrowser } from './browser'
 import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
 import { applyIconOutsideApp } from './appIcon'
@@ -278,7 +279,9 @@ function createWindow(): BrowserWindow {
       nodeIntegration: false,
       sandbox: true,
       // Chromium's PDF viewer, for PDFs opened from the file list.
-      plugins: true
+      plugins: true,
+      // The web browser tab (browser.ts locks each page down as it's created).
+      webviewTag: true
     }
   })
 
@@ -679,6 +682,7 @@ app.whenReady().then(async () => {
   registerVaultProtocol()
   registerCodeSandbox()
   registerIpc()
+  safely('web browser', setupBrowser)
   safely('export', setupExport)
   safely('converter', setupConverter)
   // Hand edits to settings.json apply straight away.

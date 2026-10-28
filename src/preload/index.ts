@@ -48,6 +48,18 @@ const api: NotesApi = {
     return () => ipcRenderer.removeListener('dictionary:replace', handler)
   },
   webTitle: (url) => ipcRenderer.invoke('web:title', url),
+  clearWebData: () => ipcRenderer.invoke('web:clear'),
+  setWebShortcuts: (shortcuts) => ipcRenderer.send('web:shortcuts', shortcuts),
+  onWebOpen: (callback) => {
+    const handler = (_e: unknown, url: string): void => callback(url)
+    ipcRenderer.on('web:open', handler)
+    return () => ipcRenderer.removeListener('web:open', handler)
+  },
+  onWebShortcut: (callback) => {
+    const handler = (_e: unknown, shortcut: string): void => callback(shortcut)
+    ipcRenderer.on('web:shortcut', handler)
+    return () => ipcRenderer.removeListener('web:shortcut', handler)
+  },
   pickImport: (kind, extensions) => ipcRenderer.invoke('import:pick', kind, extensions),
   listImport: (root) => ipcRenderer.invoke('import:list', root),
   readImport: (path) => ipcRenderer.invoke('import:read', path),
