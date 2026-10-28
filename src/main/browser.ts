@@ -3,7 +3,7 @@ import { app, clipboard, ipcMain, Menu, session, shell, webContents, type MenuIt
 import { firefoxUserAgent, isGoogleSignIn, isWebUrl, plainUserAgent, searchUrl, WEB_PARTITION } from '@shared/web'
 import { isMessagesUrl, MESSAGES_PARTITION } from '@shared/messages'
 import { shortcutFromEvent } from '@shared/shortcuts'
-import { isAdRequest, YOUTUBE_AD_CSS, YOUTUBE_AD_SCRIPT } from '@shared/adblock'
+import { isAdRequest, PAGE_AD_CSS, YOUTUBE_AD_CSS, YOUTUBE_AD_SCRIPT } from '@shared/adblock'
 import { isYouTubeUrl } from '@shared/youtube'
 import { logError } from './log'
 
@@ -49,7 +49,7 @@ export function setupBrowser(quiet: () => boolean = () => false): void {
     })
     if (contents.getType() === 'webview') {
       guardPage(contents, () => (contents.hostWebContents && !contents.hostWebContents.isDestroyed() ? contents.hostWebContents : null))
-      blockYouTubeAds(contents)
+      blockAds(contents)
     }
   })
 
@@ -65,8 +65,8 @@ export function setupBrowser(quiet: () => boolean = () => false): void {
     const headers = Object.fromEntries(Object.entries(details.requestHeaders).filter(([name]) => !/^sec-ch-ua/i.test(name)))
     callback({ requestHeaders: { ...headers, 'User-Agent': SIGN_IN_AGENT } })
   })
-  // The ad blocker: requests for ads are refused (YouTube's page side is in blockYouTubeAds).
-  web.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, callback) => callback({ cancel: isAdRequest(details.url) }))
+  // The ad blocker: requests for ads and trackers are refused (the page side is in blockAds).
+  web.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, callback) => callback({ cancel: isAdRequest(details.url, details.resourceType) }))
 
   const messages = session.fromPartition(MESSAGES_PARTITION)
   messages.registerPreloadScript(pagePreload)
@@ -91,10 +91,12 @@ export function setupBrowser(quiet: () => boolean = () => false): void {
   })
 }
 
-/** Each YouTube page (in a web tab or the mini window) gets the ad blocker's CSS and script. */
-function blockYouTubeAds(page: WebContents): void {
+/** Each web page gets the ad blocker's CSS; YouTube (in a web tab or the mini window) its script too. */
+function blockAds(page: WebContents): void {
   page.on('dom-ready', () => {
-    if (page.session !== session.fromPartition(WEB_PARTITION) || !isYouTubeUrl(page.getURL())) return
+    if (page.session !== session.fromPartition(WEB_PARTITION)) return
+    page.insertCSS(PAGE_AD_CSS).catch(() => undefined)
+    if (!isYouTubeUrl(page.getURL())) return
     page.insertCSS(YOUTUBE_AD_CSS).catch(() => undefined)
     page.executeJavaScript(YOUTUBE_AD_SCRIPT).catch((err) => logError('youtube ad blocker', err))
   })

@@ -1,26 +1,63 @@
 /**
- * The ad blocker for YouTube (in the mini window and the web tabs). Two parts:
- *  - requests to ad servers (and YouTube's own ad and ad-tracking addresses) are refused outright;
- *  - YouTube pages get a little script that takes the ads out of what the player is told to play,
- *    skips any that still start, and CSS that hides the ad boxes in the feed and beside videos.
+ * The ad blocker for the web tabs and the YouTube mini window. Three parts:
+ *  - requests to ad and tracking servers (and YouTube's own ad addresses) are refused outright;
+ *  - every page gets CSS that hides the usual ad boxes (and the gaps they'd leave);
+ *  - YouTube pages also get a little script that takes the ads out of what the player is told to
+ *    play, skips any that still start, and CSS that hides the ad boxes in the feed and beside videos.
  */
 
-/** Ad servers: nothing from these is ever loaded, on any page. */
-const AD_HOSTS = /(^|\.)(doubleclick\.net|googlesyndication\.com|googleadservices\.com|adservice\.google\.com|imasdk\.googleapis\.com)$/i
+/** Ad and tracking servers: nothing from these (or their subdomains) is ever loaded, on any page. */
+const AD_HOSTS = new Set([
+  // Google
+  'doubleclick.net', 'googlesyndication.com', 'googleadservices.com', 'adservice.google.com', 'imasdk.googleapis.com',
+  'google-analytics.com', 'googletagservices.com', 'googletagmanager.com',
+  // Ad exchanges and networks
+  'adnxs.com', 'adsrvr.org', 'rubiconproject.com', 'pubmatic.com', 'openx.net', 'casalemedia.com', 'criteo.com',
+  'criteo.net', 'amazon-adsystem.com', 'advertising.com', 'adform.net', 'smartadserver.com', 'yieldmo.com',
+  'sharethrough.com', 'teads.tv', 'triplelift.com', '3lift.com', 'indexww.com', 'bidswitch.net', 'contextweb.com',
+  'adroll.com', 'media.net', 'moatads.com', 'serving-sys.com', 'zedo.com', 'yieldlab.net', 'spotxchange.com',
+  'adition.com', 'adsafeprotected.com', 'doubleverify.com', 'adtech.de', 'popads.net', 'popcash.net',
+  'propellerads.com', 'adcash.com', 'exoclick.com', 'juicyads.com', 'trafficjunky.net', 'mgid.com',
+  // "Recommended for you" link farms
+  'taboola.com', 'outbrain.com', 'revcontent.com', 'zergnet.com',
+  // Trackers
+  'scorecardresearch.com', 'quantserve.com', 'hotjar.com', 'mouseflow.com', 'crazyegg.com', 'chartbeat.com',
+  'chartbeat.net', 'bluekai.com', 'demdex.net', 'krxd.net', 'exelator.com', 'agkn.com', 'rlcdn.com', 'tapad.com',
+  'mathtag.com', 'adsymptotic.com', 'everesttech.net', 'omtrdc.net', 'ads-twitter.com', 'ads.linkedin.com',
+  'analytics.tiktok.com', 'bat.bing.com'
+])
+
+function isAdHost(hostname: string): boolean {
+  const parts = hostname.toLowerCase().split('.')
+  for (let i = 0; i < parts.length - 1; i++) if (AD_HOSTS.has(parts.slice(i).join('.'))) return true
+  return false
+}
 
 /** YouTube's own addresses that only serve or count ads. */
 const YOUTUBE_AD_PATHS = /^\/(pagead\/|api\/stats\/ads|get_midroll_|ptracking|pcs\/activeview)/i
 
-/** Whether a page's request is for an ad, so it's refused. */
-export function isAdRequest(url: string): boolean {
+/**
+ * Whether a page's request is for an ad or tracker, so it's refused. A page you open yourself
+ * (`mainFrame`, such as clicking an ad) still loads, so a link never just goes blank.
+ */
+export function isAdRequest(url: string, resourceType = ''): boolean {
+  if (resourceType === 'mainFrame') return false
   try {
     const { hostname, pathname } = new URL(url)
-    if (AD_HOSTS.test(hostname)) return true
+    if (isAdHost(hostname)) return true
     return /(^|\.)youtube\.com$/i.test(hostname) && YOUTUBE_AD_PATHS.test(pathname)
   } catch {
     return false
   }
 }
+
+/** Hides the usual ad boxes on any site (the gaps left where a blocked ad would have been). */
+export const PAGE_AD_CSS = `
+ins.adsbygoogle, iframe[src*="doubleclick.net"], iframe[src*="googlesyndication.com"], iframe[id^="google_ads_iframe"],
+div[id^="div-gpt-ad"], div[id^="google_ads_"], [data-google-query-id], .GoogleActiveViewElement, .adsbygoogle,
+.trc_rbox_container, .OUTBRAIN, [data-widget-id^="AR_"], #taboola-below-article-thumbnails, amp-ad, amp-embed[type="taboola"]
+{ display: none !important; }
+`
 
 /** Hides the ad boxes on YouTube's pages (home feed, search, beside and under a video). */
 export const YOUTUBE_AD_CSS = `
