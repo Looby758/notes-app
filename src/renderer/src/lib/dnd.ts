@@ -16,6 +16,8 @@ let current: DragPayload | null = null
 export const getDrag = (): DragPayload | null => current
 export const setDrag = (payload: DragPayload | null): void => {
   current = payload
+  // Web pages would swallow the drag (they're separate pages): see theme.css.
+  document.body.classList.toggle('dragging', !!payload)
 }
 
 export type DropZone = Side | 'center'

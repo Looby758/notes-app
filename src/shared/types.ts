@@ -172,6 +172,16 @@ export interface NotesApi {
   /** A web page's title (for pasted links); null if it can't be read quickly. */
   webTitle(url: string): Promise<string | null>
 
+  // The web browser tab
+  /** Signs you out of every website and forgets what the web tabs stored. */
+  clearWebData(): Promise<void>
+  /** The app's shortcuts, so they still work while a web page has focus. */
+  setWebShortcuts(shortcuts: string[]): void
+  /** A web page opened a link in a new window: open it in a new web tab. */
+  onWebOpen(callback: (url: string) => void): () => void
+  /** One of the app's shortcuts was pressed while a web page had focus. */
+  onWebShortcut(callback: (shortcut: string) => void): () => void
+
   // Updates
   updateStatus(): Promise<UpdateStatus>
   /** Looks for a newer version now. */

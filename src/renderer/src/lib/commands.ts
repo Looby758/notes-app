@@ -19,6 +19,7 @@ import {
   isNoteTab,
   newTab,
   openSpecialTab,
+  openWebTab,
   runEditorCommand,
   saveNow,
   SETTINGS_TAB,
@@ -27,7 +28,8 @@ import {
 } from './editorController'
 import { toggleStar } from '../store/starred'
 import { openToday, stepDaily } from './daily'
-import { matchesShortcut } from './shortcuts'
+import { matchesShortcut, normalizeShortcut } from './shortcuts'
+import { clearBrowsingData } from '../components/Web/WebPage'
 import { FILE_MANAGER } from '@shared/platform'
 import { openRandomNote } from './random'
 import { notify } from '../store/notify'
@@ -229,6 +231,9 @@ export const commands: Command[] = [
   { id: 'backlinks', group: 'Navigation', title: 'Show backlinks', run: () => showRightView('backlinks') },
   { id: 'graph.open', group: 'Navigation', title: 'Open graph', shortcut: 'Ctrl+Shift+G', run: () => openSpecialTab(GRAPH_TAB) },
   { id: 'flashcards.open', group: 'Navigation', title: 'Review flashcards', shortcut: 'Ctrl+Shift+Y', run: () => openSpecialTab(FLASHCARDS_TAB) },
+  { id: 'web.open', group: 'Web', title: 'Open a web page', shortcut: 'Ctrl+Shift+B', run: () => openWebTab() },
+  { id: 'web.beside', group: 'Web', title: 'Open a web page beside this note', run: () => openWebTab('', { beside: true }) },
+  { id: 'web.clear', group: 'Web', title: 'Clear browsing data (sign out of all websites)', run: () => void clearBrowsingData() },
   {
     id: 'view.mindmap',
     group: 'View',
@@ -280,6 +285,19 @@ export const commands: Command[] = [
 
 /** A command's current shortcut, taking your Settings into account. */
 export const shortcutFor = (cmd: Command): string | null => effectiveShortcut(cmd.id, cmd.shortcut)
+
+/** The app-wide commands' shortcuts (so they also work while a web page has focus). */
+export function appShortcuts(): string[] {
+  return commands.flatMap((c) => {
+    const shortcut = c.scope === 'editor' ? null : shortcutFor(c)
+    return shortcut ? [normalizeShortcut(shortcut)] : []
+  })
+}
+
+/** The app-wide command bound to a shortcut like "Ctrl+W", if any. */
+export function commandForShortcut(shortcut: string): Command | undefined {
+  return commands.find((c) => c.scope !== 'editor' && normalizeShortcut(shortcutFor(c) ?? '') === shortcut)
+}
 
 /** The app-wide command (not an editor one) bound to this key press, if any. */
 export function commandForKey(e: KeyboardEvent): Command | undefined {

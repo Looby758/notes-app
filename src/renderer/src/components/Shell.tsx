@@ -8,6 +8,7 @@ import {
   Orbit,
   BookOpen,
   Dices,
+  Globe,
   Moon,
   PenLine,
   PanelLeft,
@@ -21,13 +22,14 @@ import { setPrefs, usePrefs } from '../store/prefs'
 import { showSearch, toggleZen, useUI } from '../store/ui'
 import { countNotes, parentOf } from '../lib/paths'
 import { FILE_MANAGER, IS_MAC, showKeys } from '@shared/platform'
-import { commandForKey } from '../lib/commands'
+import { appShortcuts, commandForKey, commandForShortcut } from '../lib/commands'
 import {
   handleExternalChanges,
   init as initEditor,
   isNoteTab,
   openNote,
   openSpecialTab,
+  openWebTab,
   refreshEmbeds,
   refreshLinkDecorations,
   remeasure,
@@ -202,6 +204,19 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // The same shortcuts while a web page has focus (the page gets every other key), and links the
+  // page opens in a new window go to a new web tab.
+  const shortcutPrefs = usePrefs((s) => s.prefs.shortcuts)
+  useEffect(() => window.api.setWebShortcuts(appShortcuts()), [shortcutPrefs])
+  useEffect(() => {
+    const offShortcut = window.api.onWebShortcut((shortcut) => commandForShortcut(shortcut)?.run())
+    const offOpen = window.api.onWebOpen((url) => openWebTab(url))
+    return () => {
+      offShortcut()
+      offOpen()
+    }
+  }, [])
+
   useEffect(() => {
     if (!menuOpen) return
     const onDown = (e: MouseEvent) => {
@@ -270,6 +285,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
           <Orbit size={15} />
         </button>
         <FlashcardsButton />
+        <button className="icon-btn" onClick={() => openWebTab('', { beside: true })} title={`Web browser (${showKeys('Ctrl+Shift+B')})`} data-web-button>
+          <Globe size={15} />
+        </button>
         <LayoutMenu />
         <button className="icon-btn" onClick={() => useUI.setState({ modal: 'commands' })} title={`All commands (${showKeys('Ctrl+K')})`}>
           <CommandIcon size={15} />

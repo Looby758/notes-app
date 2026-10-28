@@ -17,6 +17,7 @@ import {
   CONFLICTS_TAB,
   AI_TAB,
   FLASHCARDS_TAB,
+  isWebTab,
   SETTINGS_TAB,
   splitPane
 } from '../../lib/editorController'
@@ -35,6 +36,7 @@ import ConflictsPage from '../Conflicts/ConflictsPage'
 import AiPage from '../Ai/AiPage'
 import FlashcardsPage from '../Flashcards/FlashcardsPage'
 import MindMap from '../MindMap/MindMap'
+import WebPage from '../Web/WebPage'
 import { isMindMap, useUI } from '../../store/ui'
 import { needsUnlock, useLock } from '../../lib/lock/session'
 import { IS_MAC, showKeys } from '@shared/platform'
@@ -58,6 +60,7 @@ function Keys({ s }: { s: string }) {
 export default function Pane({ pane }: { pane: string }) {
   const host = useRef<HTMLDivElement>(null)
   const active = useEditor((s) => s.panes[pane]?.active ?? null)
+  const tabs = useEditor((s) => s.panes[pane]?.tabs)
   const isActivePane = useEditor((s) => s.activePane === pane)
   const multiple = useEditor((s) => Object.keys(s.panes).length > 1)
   const conflict = useEditor((s) => (active ? s.status[active] === 'conflict' : false))
@@ -129,6 +132,8 @@ export default function Pane({ pane }: { pane: string }) {
             <FileViewer key={active} path={fileOfTab(active)} />
           ))}
         {isBlankTab(active) && <NewTabPage key={active} autoFocus={isActivePane} />}
+        {/* Web pages stay loaded while you look at another tab, like in a browser. */}
+        {tabs?.filter(isWebTab).map((t) => <WebPage key={t} tab={t} hidden={t !== active} autoFocus={isActivePane} />)}
         {active === SETTINGS_TAB && <SettingsPage />}
         {active === CALENDAR_TAB && <CalendarPage />}
         {active === GRAPH_TAB && <GraphPage />}

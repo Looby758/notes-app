@@ -6760,3 +6760,118 @@ body.theme-light .flashcard-grade.grade-easy span {
 .canvas-swatch:hover {
   box-shadow: 0 0 0 2px var(--text-muted);
 }
+
+/* ---------- Web browser tab ---------- */
+
+.web-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.web-page.hidden {
+  display: none;
+}
+.web-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.web-address {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  margin: 0 6px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  user-select: text;
+}
+.web-address:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.web-address::placeholder {
+  color: var(--text-faint);
+}
+.web-menu-wrap {
+  position: relative;
+}
+.web-menu {
+  left: auto;
+  right: 0;
+  min-width: 300px;
+}
+.web-progress {
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  height: 2px;
+  width: 40%;
+  background: var(--accent);
+  animation: web-loading 1.1s var(--ease) infinite;
+}
+@keyframes web-loading {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+.web-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.web-view {
+  flex: 1;
+  background: #fff;
+}
+/* A web page is a separate page that would swallow drags and resizes passing over it. */
+body.dragging .web-view,
+body.resizing .web-view,
+body.resizing-rows .web-view {
+  pointer-events: none;
+}
+.web-start,
+.web-failed {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+  color: var(--text-faint);
+}
+.web-start p,
+.web-failed p {
+  margin: 0;
+  color: var(--text);
+  font-weight: 500;
+}
+.web-start span {
+  max-width: 420px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.web-failed {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+}
+.web-failed div {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}

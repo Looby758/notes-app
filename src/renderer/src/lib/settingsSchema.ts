@@ -303,6 +303,15 @@ export const SETTINGS: SettingDef[] = [
     description: `Off: opening a note changes the current tab (pinned tabs are left alone). Either way, middle-click a note (or right-click → Open in new tab) to open it in a new tab.`,
     keywords: 'tab replace reuse open'
   },
+  {
+    key: 'openLinksInApp',
+    section: 'editor',
+    group: 'Tabs',
+    type: 'toggle',
+    label: 'Open web links in a web tab beside the note',
+    description: 'Off: web links open in your usual browser instead. Either way, a web tab’s ↗ button opens its page in your browser.',
+    keywords: 'web browser link url website internet split external chrome safari edge'
+  },
 
   {
     key: 'tabSize',

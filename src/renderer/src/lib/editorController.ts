@@ -22,6 +22,7 @@ import { isWithin, replacePrefix } from './paths'
 import { noteLockState, onBeforeLock, openText, remapLock, sealText, useLock, type NoteLock } from './lock/session'
 import { currentHeadingIndex, extractHeadings } from './outline'
 import { flushBoards } from './boards'
+import { forgetWebPage, loadInWebTab, setWebPage } from '../store/web'
 import {
   isValidLayout,
   newId,
@@ -63,6 +64,10 @@ export const FILE_TAB = 'file:'
 export const fileTab = (path: string): string => FILE_TAB + path
 export const isFileTab = (id: string | null): id is string => !!id && id.startsWith(FILE_TAB)
 export const fileOfTab = (id: string): string => id.slice(FILE_TAB.length)
+/** A web page in a tab: "web:1712345abc" (its address and title are in store/web). Open as many as you like. */
+export const WEB_TAB = 'web:'
+export const isWebTab = (id: string | null): id is string => !!id && id.startsWith(WEB_TAB)
+const webId = (): string => `${WEB_TAB}${Date.now()}${Math.random().toString(36).slice(2, 5)}`
 const blankId = (): string => `blank:${Date.now()}${Math.random().toString(36).slice(2, 5)}`
 
 // ---------- state ----------
@@ -505,7 +510,8 @@ export function splitPane(side: Side, opts: { pane?: string; tab?: string; moveF
     moveTab(tab, opts.moveFrom, id)
   } else {
     // Settings and other pages aren't duplicated; the new pane gets a blank tab instead.
-    const first = tab && isNoteTab(tab) ? tab : blankId()
+    // (A web tab goes there only when it's a new one, from openWebTab.)
+    const first = tab && (isNoteTab(tab) || (isWebTab(tab) && !paneWithTab(tab))) ? tab : blankId()
     updatePane(id, { tabs: [first], active: first })
   }
   persist()
@@ -515,7 +521,10 @@ export function splitPane(side: Side, opts: { pane?: string; tab?: string; moveF
 export async function closePane(pane: string): Promise<void> {
   const { panes } = useEditor.getState()
   if (Object.keys(panes).length <= 1 || !panes[pane]) return
-  for (const tab of [...panes[pane].tabs]) await releaseSession(pane, tab)
+  for (const tab of [...panes[pane].tabs]) {
+    await releaseSession(pane, tab)
+    if (isWebTab(tab)) forgetWebPage(tab)
+  }
   removePane(pane)
 }
 
@@ -723,6 +732,16 @@ export function newTab(pane = activePane()): void {
   persist()
 }
 
+/** Adds a tab after the current one in `pane` and switches to it. */
+function addTab(pane: string, id: string): void {
+  const p = paneState(pane)
+  const at = p.active ? p.tabs.indexOf(p.active) + 1 : p.tabs.length
+  const tabs = [...p.tabs]
+  tabs.splice(at, 0, id)
+  updatePane(pane, { tabs })
+  activateTab(id, pane)
+}
+
 /** Opens (or switches to) a special page like Settings. There's only ever one of each. */
 export function openSpecialTab(id: string): void {
   const existing = paneWithTab(id)
@@ -730,13 +749,50 @@ export function openSpecialTab(id: string): void {
     activateTab(id, existing)
     return
   }
-  const pane = activePane()
-  const p = paneState(pane)
-  const at = p.active ? p.tabs.indexOf(p.active) + 1 : p.tabs.length
-  const tabs = [...p.tabs]
-  tabs.splice(at, 0, id)
-  updatePane(pane, { tabs })
-  activateTab(id, pane)
+  addTab(activePane(), id)
+}
+
+/**
+ * Opens a web page in a tab (with no address: an empty one to type it in). `beside` keeps your note
+ * in view: the page goes in the pane next to this one (into its web tab, if it's showing one), or
+ * a new pane on the right.
+ */
+export function openWebTab(url = '', { beside = false }: { beside?: boolean } = {}): void {
+  const here = activePane()
+  // With nothing open there's no note to keep in view: the page just goes here.
+  const current = paneState(here).active
+  if (beside && current && !isBlankTab(current)) {
+    const order = paneOrder(useEditor.getState().layout)
+    const i = order.indexOf(here)
+    const other = order[i + 1] ?? order[i - 1]
+    if (!other) {
+      const id = webId()
+      setWebPage(id, { url, title: '' })
+      splitPane('right', { pane: here, tab: id })
+      return
+    }
+    const showing = paneState(other).active
+    if (url && isWebTab(showing)) {
+      loadInWebTab(showing, url)
+      focusPane(other)
+      return
+    }
+    const id = webId()
+    setWebPage(id, { url, title: '' })
+    addTab(other, id)
+    return
+  }
+  const id = webId()
+  setWebPage(id, { url, title: '' })
+  // A blank tab waiting for something to show gets the web page.
+  const p = paneState(here)
+  if (isBlankTab(p.active)) {
+    setPanes((s) => ({ panes: { ...s.panes, [here]: { ...p, tabs: p.tabs.map((t) => (t === p.active ? id : t)), active: id } } }))
+    show(here, id)
+    persist()
+    return
+  }
+  addTab(here, id)
 }
 
 /** Switches to an existing tab (note or page). */
@@ -819,6 +875,7 @@ export async function closeTab(id: string, pane = paneWithTab(id) ?? activePane(
   const p = paneState(pane)
   const i = p.tabs.indexOf(id)
   if (i === -1) return
+  if (isWebTab(id)) forgetWebPage(id)
   const tabs = p.tabs.filter((t) => t !== id)
   // Closing a pane's last tab closes the pane too (unless it's the only one).
   if (tabs.length === 0 && Object.keys(useEditor.getState().panes).length > 1) {

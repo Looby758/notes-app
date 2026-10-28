@@ -1,14 +1,16 @@
 import { useVault } from '../store/vault'
 import { useNoteIndex } from '../store/noteIndex'
 import { notify } from '../store/notify'
-import { openNote } from './editorController'
+import { usePrefs } from '../store/prefs'
+import { openNote, openWebTab } from './editorController'
 import { parseWikiInner } from './links'
 import { findNode, parentOf, resolveRelative } from './paths'
 
-/** Opens a markdown link clicked in a note: web links in the browser, relative links as notes. */
+/** Opens a markdown link clicked in a note: web links in a web tab (or the browser), relative links as notes. */
 export function openLink(href: string, fromNote: string): void {
   if (/^[a-z][a-z0-9+.-]*:/i.test(href)) {
-    if (/^(https?|mailto):/i.test(href)) window.open(href)
+    if (/^https?:/i.test(href) && usePrefs.getState().prefs.openLinksInApp) openWebTab(href, { beside: true })
+    else if (/^(https?|mailto):/i.test(href)) window.open(href)
     return
   }
   let target = href.split('#')[0]
