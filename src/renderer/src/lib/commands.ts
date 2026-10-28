@@ -161,7 +161,7 @@ export const commands: Command[] = [
   { id: 'daily.prev', group: 'Calendar', title: 'Previous daily note', run: () => stepDaily(-1) },
   { id: 'daily.next', group: 'Calendar', title: 'Next daily note', run: () => stepDaily(1) },
   { id: 'calendar.open', group: 'Calendar', title: 'Open calendar', shortcut: 'Ctrl+Shift+C', run: () => openSpecialTab(CALENDAR_TAB) },
-  { id: 'email.open', group: 'Navigation', title: 'Open email', shortcut: 'Ctrl+Shift+B', run: () => openSpecialTab(EMAIL_TAB) },
+  { id: 'email.open', group: 'Navigation', title: 'Open email', shortcut: 'Ctrl+Shift+A', run: () => openSpecialTab(EMAIL_TAB) },
   { id: 'calendar.panel', group: 'Calendar', title: 'Show calendar in the side panel', run: () => showRightView('calendar') },
 
   ...EDITOR_COMMANDS.map(
