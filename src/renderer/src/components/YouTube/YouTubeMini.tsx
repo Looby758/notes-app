@@ -4,6 +4,7 @@ import { ArrowLeft, House, Minus, Pin, PinOff, Scan, Search, X } from 'lucide-re
 import { WEB_PARTITION } from '@shared/web'
 import { isYouTubeUrl, toYouTubeUrl, YOUTUBE_HOME, youTubeVideoId, youTubeWatchUrl } from '@shared/youtube'
 import type { YouTubeState } from '@shared/types'
+import { playVideoFrom, POP_VIDEO, POP_VIDEO_CSS, UNPOP_VIDEO } from '@shared/video'
 
 /**
  * On a video's page, only the video: the player fills the window and the rest of YouTube (the
@@ -45,20 +46,24 @@ export default function YouTubeMini() {
   const input = useRef<HTMLInputElement>(null)
   const ready = useRef(false)
   const cssKey = useRef<string | null>(null)
+  // A video popped out from another website: play it from here once its page has loaded.
+  const playFrom = useRef<number | null>(null)
 
   useEffect(() => {
     window.api.youTubeState().then(
       (s) => {
         setState(s)
         setUrl(s.url)
+        if (!isYouTubeUrl(s.url)) playFrom.current = s.startAt ?? 0
       },
       () => setState({ url: YOUTUBE_HOME, pinned: true, videoOnly: true })
     )
   }, [])
 
-  const load = (next: string): void => {
+  const load = (next: string, seconds = 0): void => {
     const el = view.current
     if (!next || !el) return
+    playFrom.current = isYouTubeUrl(next) ? null : seconds
     setSearching(false)
     if (ready.current) void el.loadURL(next)
     else el.src = next
@@ -76,26 +81,28 @@ export default function YouTubeMini() {
 
   const videoOnly = state?.videoOnly ?? true
   const onVideo = !!youTubeVideoId(url) && /\/watch\b/.test(url)
+  // Another website's page (a video popped out of a web tab): video-only shows just its video.
+  const otherSite = /^https?:/i.test(url) && !isYouTubeUrl(url)
 
   // Video-only: the CSS goes on while a video's page shows, and comes off again elsewhere.
   useEffect(() => {
     const el = view.current
     if (!el || !ready.current) return
-    const want = videoOnly && onVideo
+    const want = videoOnly && (onVideo || otherSite)
     if (want && !cssKey.current) {
-      el.insertCSS(VIDEO_ONLY_CSS).then(
+      el.insertCSS(otherSite ? POP_VIDEO_CSS : VIDEO_ONLY_CSS).then(
         (key) => {
           cssKey.current = key
-          void el.executeJavaScript(NUDGE_PLAYER).catch(() => undefined)
+          void el.executeJavaScript(otherSite ? POP_VIDEO : NUDGE_PLAYER).catch(() => undefined)
         },
         () => undefined
       )
     } else if (!want && cssKey.current) {
       const key = cssKey.current
       cssKey.current = null
-      el.removeInsertedCSS(key).then(() => el.executeJavaScript(NUDGE_PLAYER), () => undefined).catch(() => undefined)
+      el.removeInsertedCSS(key).then(() => el.executeJavaScript(`${UNPOP_VIDEO}; ${NUDGE_PLAYER}`), () => undefined).catch(() => undefined)
     }
-  }, [videoOnly, onVideo, loads])
+  }, [videoOnly, onVideo, otherSite, loads])
 
   useEffect(() => {
     const el = view.current
@@ -107,6 +114,11 @@ export default function YouTubeMini() {
       cssKey.current = null
       setUrl(el.getURL())
       setLoads((n) => n + 1)
+      if (playFrom.current !== null) {
+        // As if you'd clicked play, so the site lets it start with sound.
+        void el.executeJavaScript(playVideoFrom(playFrom.current), true).catch(() => undefined)
+        playFrom.current = null
+      }
     }
     const onNavigate = (e: Event): void => {
       const { url: next, isMainFrame } = e as Event & { url: string; isMainFrame?: boolean }

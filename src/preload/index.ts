@@ -74,7 +74,7 @@ const api: NotesApi = {
     ipcRenderer.on('web:shortcut', handler)
     return () => ipcRenderer.removeListener('web:shortcut', handler)
   },
-  openYouTube: (url) => ipcRenderer.invoke('youtube:open', url),
+  openYouTube: (url, seconds) => ipcRenderer.invoke('youtube:open', url, seconds),
   youTubeState: () => ipcRenderer.invoke('youtube:state'),
   rememberYouTube: (url) => ipcRenderer.invoke('youtube:remember', url),
   pinYouTube: (on) => ipcRenderer.invoke('youtube:pin', on),
@@ -82,7 +82,7 @@ const api: NotesApi = {
   minimizeYouTube: () => ipcRenderer.invoke('youtube:minimize'),
   closeYouTube: () => ipcRenderer.invoke('youtube:close'),
   onYouTubeLoad: (callback) => {
-    const handler = (_e: unknown, url: string): void => callback(url)
+    const handler = (_e: unknown, url: string, seconds?: number): void => callback(url, Number(seconds) || 0)
     ipcRenderer.on('youtube:load', handler)
     return () => ipcRenderer.removeListener('youtube:load', handler)
   },
