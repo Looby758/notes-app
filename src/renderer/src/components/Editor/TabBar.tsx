@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ArrowRightLeft, CalendarDays, Columns2, Copy, ExternalLink, FileDown, FolderSearch, GitCompare, Globe, House, KeyRound, Layers, Mail, MessageSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
+import { ArrowRightLeft, CalendarDays, Columns2, Copy, ExternalLink, FileDown, FolderSearch, GitCompare, Globe, Grid3x3, House, KeyRound, Layers, Mail, MessageSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
 import { useEditor } from '../../store/editor'
 import { toggleStar, useStarred } from '../../store/starred'
 import { useNoteIndex } from '../../store/noteIndex'
@@ -19,6 +19,7 @@ import {
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
+  SUDOKU_TAB,
   closePane,
   closeTab,
   closeTabUnlessPinned,
@@ -62,6 +63,7 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === HOME_TAB) return 'Home'
   if (id === MONEY_TAB) return 'Money'
   if (id === CONVERT_TAB) return 'Convert files'
+  if (id === SUDOKU_TAB) return 'Sudoku'
   if (isFileTab(id)) return fileOfTab(id).slice(fileOfTab(id).lastIndexOf('/') + 1).replace(/\.canvas$/i, '')
   return noteTitle(id)
 }
@@ -233,6 +235,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === HOME_TAB && <House size={13} className="tab-icon" />}
               {id === MONEY_TAB && <PoundSterling size={13} className="tab-icon" />}
               {id === CONVERT_TAB && <ArrowRightLeft size={13} className="tab-icon" />}
+              {id === SUDOKU_TAB && <Grid3x3 size={13} className="tab-icon" />}
               {isFileTab(id) && <FileIcon path={fileOfTab(id)} size={13} className="tab-icon" />}
               {icons.get(id) && <span className="tab-emoji">{icons.get(id)}</span>}
               <span className="tab-title">{tabTitle(id, web)}</span>
