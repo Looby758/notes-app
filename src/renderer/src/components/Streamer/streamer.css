@@ -24,7 +24,9 @@
   pointer-events: none;
 }
 
-.private-area:not(.hidden) {
+.private-area:not(.hidden),
+.private-area:not(.hidden) > .private-area-content {
+  /* Both wrappers step aside, so the page inside still fills its pane (Messages, an email). */
   display: contents;
 }
 .private-area.hidden {
