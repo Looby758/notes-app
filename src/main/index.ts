@@ -43,7 +43,7 @@ import { dictionaryMenu, setupDictionary } from './dictionary'
 import { setupWebTitle } from './webTitle'
 import { setupPlaces } from './places'
 import { setupWeather } from './weather'
-import { setupBrowser } from './browser'
+import { releaseMessages, setupBrowser } from './browser'
 import { closeYouTube, setupYouTube } from './youtube'
 import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
@@ -58,6 +58,8 @@ const shownReminders = new Set<Electron.Notification>()
 let mainWindow: BrowserWindow | null = null
 /** True once you've chosen Quit (from the tray), so closing really closes instead of hiding. */
 let quitting = false
+/** The messages hub closing its pages before the window closes. */
+let hubReleased: Promise<void> = Promise.resolve()
 
 logCrashes()
 
@@ -341,6 +343,7 @@ function createWindow(): BrowserWindow {
     }
     if (!readyToClose) {
       e.preventDefault()
+      if (win === mainWindow) hubReleased = releaseMessages()
       win.webContents.send('app:before-close')
       setTimeout(() => {
         readyToClose = true
@@ -355,7 +358,9 @@ function createWindow(): BrowserWindow {
     if (win === mainWindow) closeYouTube()
   })
   ipcMain.removeHandler('app:ready-to-close')
-  ipcMain.handle('app:ready-to-close', () => {
+  ipcMain.handle('app:ready-to-close', async () => {
+    // WhatsApp and Discord save their sign-ins as their pages close (see releaseMessages).
+    await hubReleased
     readyToClose = true
     win.close()
     // Closing the window cancels a quit that was in progress; carry it on now everything's saved.
@@ -733,6 +738,9 @@ function copySecret(text: string, seconds: number): void {
   copiedSecret = text
   clearTimer = setTimeout(clearSecret, Math.min(Math.max(seconds, 5), 300) * 1000)
 }
+
+// Stopping Notes from the terminal (Ctrl+C) quits it properly, so everything is saved first.
+for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => app.quit())
 
 app.on('before-quit', () => {
   quitting = true

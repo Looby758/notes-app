@@ -282,6 +282,8 @@ export interface NotesApi {
   clearWebData(): Promise<void>
   /** Signs you out of WhatsApp and Discord in the messages hub. */
   clearMessagesData(): Promise<void>
+  /** Closes WhatsApp and Discord properly before the Messages tab goes, so they stay signed in. */
+  releaseMessages(): Promise<void>
   /** The app's shortcuts, so they still work while a web page has focus. */
   setWebShortcuts(shortcuts: string[]): void
   /** A web page opened a link in a new window: open it in a new web tab. */

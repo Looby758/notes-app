@@ -903,6 +903,8 @@ export function closeTabUnlessPinned(id: string, pane = paneWithTab(id) ?? activ
 
 export async function closeTab(id: string, pane = paneWithTab(id) ?? activePane()): Promise<void> {
   await releaseSession(pane, id)
+  // Discord only saves your sign-in as its page closes, so the hub's pages close properly first.
+  if (id === MESSAGES_TAB) await window.api.releaseMessages().catch(() => undefined)
   const p = paneState(pane)
   const i = p.tabs.indexOf(id)
   if (i === -1) return
