@@ -118,6 +118,21 @@ export interface AiAskTurn {
   answer: string
 }
 
+/** A message in the AI chat. */
+export interface AiChatMessage {
+  role: 'user' | 'assistant'
+  text: string
+}
+
+/** A saved AI chat conversation. */
+export interface AiChat {
+  id: string
+  title: string
+  /** When it was last added to (ISO time), so the newest chats come first. */
+  updated: string
+  messages: AiChatMessage[]
+}
+
 export interface NotesApi {
   /** A native yes/no dialog; resolves true if the user picked `ok`. */
   confirm(options: ConfirmOptions): Promise<boolean>
@@ -226,6 +241,11 @@ export interface NotesApi {
   /** A quick capture is tidied as one list item; a note can get headings and lists. */
   aiTidy(text: string, kind: 'note' | 'capture'): Promise<string>
   aiAsk(question: string, notes: AiNote[], history: AiAskTurn[]): Promise<string>
+  /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */
+  aiChat(messages: AiChatMessage[]): Promise<string>
+  /** Saved chats, kept in the settings folder on this computer. */
+  aiLoadChats(): Promise<AiChat[]>
+  aiSaveChats(chats: AiChat[]): Promise<void>
   /** The last-opened vault, or null if none is set or the folder no longer exists. */
   getVault(): Promise<string | null>
   /** Opens a folder picker; returns the chosen vault path, or null if cancelled. */

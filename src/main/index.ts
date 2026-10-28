@@ -19,7 +19,7 @@ import { existsSync, statSync } from 'fs'
 import { readFile } from 'fs/promises'
 import { basename, extname, join } from 'path'
 import { pathToFileURL } from 'url'
-import type { AiAskTurn, AiNote, ConfirmOptions } from '@shared/types'
+import type { AiAskTurn, AiChat, AiChatMessage, AiNote, ConfirmOptions } from '@shared/types'
 import { normalizePrefs, type Prefs } from '@shared/prefs'
 import { activeThemeId, getTheme } from '@shared/themes'
 import { loadSettings, saveSettings, settingsFile, watchSettingsFile } from './settings'
@@ -527,6 +527,9 @@ function registerIpc(): void {
   ipcMain.handle('ai:summarise', (_e, title: string, text: string) => ai.summarise(title, text))
   ipcMain.handle('ai:tidy', (_e, text: string, kind: 'note' | 'capture') => ai.tidy(text, kind === 'capture' ? 'capture' : 'note'))
   ipcMain.handle('ai:ask', (_e, question: string, notes: AiNote[], history: AiAskTurn[]) => ai.askNotes(question, notes, history))
+  ipcMain.handle('ai:chat', (_e, messages: AiChatMessage[]) => ai.chat(messages))
+  ipcMain.handle('ai:loadChats', () => ai.loadChats())
+  ipcMain.handle('ai:saveChats', (_e, chats: AiChat[]) => ai.saveChats(chats))
 
   ipcMain.handle('vault:readAppData', (_e, name: string) => currentVault().readAppData(name))
   ipcMain.handle('vault:writeAppData', (_e, name: string, content: string) => currentVault().writeAppData(name, content))

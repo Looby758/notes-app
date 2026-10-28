@@ -5,6 +5,7 @@ import {
   FolderOpen,
   FolderSync,
   LogOut,
+  MessageSquare,
   Orbit,
   BookOpen,
   Dices,
@@ -33,6 +34,7 @@ import {
   remeasure,
   SETTINGS_TAB,
   GRAPH_TAB,
+  CHAT_TAB,
   setZenEditor
 } from '../lib/editorController'
 import { openLink, openWikiLink } from '../lib/openLink'
@@ -270,6 +272,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
           <Orbit size={15} />
         </button>
         <FlashcardsButton />
+        <button className="icon-btn" onClick={() => openSpecialTab(CHAT_TAB)} title="Chat with Claude" data-chat-button>
+          <MessageSquare size={15} />
+        </button>
         <LayoutMenu />
         <button className="icon-btn" onClick={() => useUI.setState({ modal: 'commands' })} title={`All commands (${showKeys('Ctrl+K')})`}>
           <CommandIcon size={15} />
