@@ -101,7 +101,7 @@ export async function releaseMessages(): Promise<void> {
  * What a web page may do: stay on the web, and open new windows as new web tabs. `host` is the
  * app window it belongs to.
  */
-function guardPage(page: WebContents, host: () => WebContents | null): void {
+export function guardPage(page: WebContents, host: () => WebContents | null): void {
   const openInTab = (url: string): void => {
     if (isWebUrl(url)) host()?.send('web:open', url)
   }

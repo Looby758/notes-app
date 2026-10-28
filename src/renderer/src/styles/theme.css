@@ -544,7 +544,7 @@ body.hide-statusbar .statusbar {
 .editor-area {
   flex: 1;
   min-width: 0;
-  display: flex;
+  position: relative;
 }
 
 /* ---------- Settings page ---------- */
@@ -2964,37 +2964,25 @@ body.dragging-note .starred-empty {
 
 /* ---------- Panes and splits ---------- */
 
-.split {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-}
-.split.row {
-  flex-direction: row;
-}
-.split.column {
-  flex-direction: column;
-}
 .split-child {
-  flex-basis: 0;
-  flex-shrink: 1;
+  position: absolute;
   min-width: 0;
   min-height: 0;
   display: flex;
 }
 .divider {
-  position: relative;
-  flex-shrink: 0;
+  position: absolute;
   background: var(--border);
   z-index: 4;
 }
 .divider.row {
   width: 1px;
+  margin-left: -1px;
   cursor: col-resize;
 }
 .divider.column {
   height: 1px;
+  margin-top: -1px;
   cursor: row-resize;
 }
 /* A wider invisible grab area around the 1px line */
@@ -4856,6 +4844,11 @@ body.zen .divider,
 body.zen .split-child:not(:has(.active-pane)),
 body.zen .pane:not(.active-pane) {
   display: none !important;
+}
+body.zen .split-child:has(.active-pane) {
+  inset: 0 !important;
+  width: auto !important;
+  height: auto !important;
 }
 body.zen .pane-body {
   background: var(--bg);
