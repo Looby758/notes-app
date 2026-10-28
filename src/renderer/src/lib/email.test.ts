@@ -64,3 +64,11 @@ describe('guessing an event', () => {
     expect(g.start).toBeUndefined()
   })
 })
+
+describe('guessing an event with the time in the message', () => {
+  it('prefers a date with a time', () => {
+    const g = guessEvent(email({ subject: 'Dinner on Friday?', date: new Date(2026, 9, 27, 9).toISOString() }), 'Are you free Friday at 7pm?', new Date(2026, 9, 27, 12))
+    expect(g.date).toEqual(new Date(2026, 9, 30))
+    expect(g.start).toBe('19:00')
+  })
+})

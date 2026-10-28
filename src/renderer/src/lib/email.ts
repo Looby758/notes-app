@@ -81,14 +81,14 @@ export function guessEvent(email: EmailMessage, text: string, now = new Date()):
   const title = noteName(email.subject) === 'Email' ? `Email from ${shortName(email.from)}` : email.subject.replace(/^((re|fwd?|fw):\s*)+/i, '').trim()
   const received = new Date(email.date)
   const from = received > now ? now : received
-  const subjectWhen = findWhen(email.subject, from)
-  // Only a written date counts in the body: a lone "at 5" in a long email is too often something else.
-  const bodyWhen = text
-    .slice(0, 3000)
-    .split(/\n+|(?<=[.!?])\s+/)
-    .map((line) => findWhen(line, from))
-    .find((w) => w?.hasDate)
-  const when = subjectWhen?.hasDate ? subjectWhen : (bodyWhen ?? subjectWhen)
+  // The subject first, then each sentence near the start of the message. Only a written date counts
+  // in the message: a lone "at 5" in a long email is too often something else.
+  const found = [email.subject, ...text.slice(0, 3000).split(/\n+|(?<=[.!?])\s+/)]
+    .map((line, i) => ({ when: findWhen(line, from), subject: i === 0 }))
+    .filter((f) => f.when && (f.subject || f.when.hasDate))
+    .map((f) => f.when!)
+  // "Dinner on Friday?" with "Friday at 7pm" in the message: the one with a time wins.
+  const when = found.find((w) => w.hasDate && w.time) ?? found.find((w) => w.hasDate) ?? found[0]
   if (!when) return { date: new Date(received.getFullYear(), received.getMonth(), received.getDate()), title }
   return { date: when.date, start: when.time, title }
 }

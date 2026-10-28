@@ -251,10 +251,9 @@ function Toolbar() {
           </button>
         )}
       </form>
-      <button className="icon-btn" title="Check for new email" disabled={loading} onClick={() => loadEmails()}>
+      <button className="icon-btn" title={`Check for new email${email ? ` (${email})` : ''}`} disabled={loading} onClick={() => loadEmails()}>
         <RefreshCw size={15} className={loading ? 'spin' : ''} />
       </button>
-      {email && <span className="email-account" title="Signed in to Gmail">{email}</span>}
     </div>
   )
 }
@@ -309,7 +308,7 @@ function EmailList() {
           <div className="email-row-top">
             <span className="email-row-from">{shortName(e.from)}</span>
             {e.hasAttachments && <Paperclip size={11} className="email-row-icon" />}
-            {e.starred && <Star size={11} className="email-row-icon starred" />}
+            {e.starred && <Star size={11} className="email-row-icon email-star-on" />}
             <span className="email-row-date">{shortDate(e.date)}</span>
           </div>
           <div className="email-row-subject">{e.subject}</div>
@@ -405,7 +404,7 @@ function Reader() {
         </button>
         <span className="email-actions-gap" />
         <button className="icon-btn" title={email.starred ? 'Unstar' : 'Star'} onClick={() => setStarred(email.id, !email.starred)}>
-          <Star size={15} className={email.starred ? 'starred' : ''} />
+          <Star size={15} className={email.starred ? 'email-star-on' : ''} />
         </button>
         <button className="icon-btn" title="Mark as unread" onClick={() => setRead(email.id, false)}>
           <Mail size={15} />
