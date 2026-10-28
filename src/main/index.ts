@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   ipcMain,
   Menu,
@@ -460,6 +461,7 @@ function registerIpc(): void {
   // The Mac asks once whether Notes may use the microphone.
   ipcMain.handle('voice:access', async () => (IS_MAC ? systemPreferences.askForMediaAccess('microphone') : true))
   ipcMain.handle('app:fullscreen', (event, on: boolean) => BrowserWindow.fromWebContents(event.sender)?.setFullScreen(on))
+  ipcMain.handle('clipboard:copySecret', (_e, text: string, seconds: number) => copySecret(text, seconds))
   ipcMain.handle('app:showLog', () => {
     const log = join(app.getPath('userData'), 'notes.log')
     if (existsSync(log)) shell.showItemInFolder(log)
@@ -674,10 +676,27 @@ app.whenReady().then(async () => {
   safely('updates', () => setupUpdater(() => currentPrefs().checkForUpdates))
 })
 
+// A copied password: the clipboard is emptied after a while, unless you've copied something else since.
+let copiedSecret: string | null = null
+let clearTimer: NodeJS.Timeout | undefined
+function clearSecret(): void {
+  if (copiedSecret !== null && clipboard.readText() === copiedSecret) clipboard.clear()
+  copiedSecret = null
+}
+function copySecret(text: string, seconds: number): void {
+  clearTimeout(clearTimer)
+  clipboard.writeText(text)
+  copiedSecret = text
+  clearTimer = setTimeout(clearSecret, Math.min(Math.max(seconds, 5), 300) * 1000)
+}
+
 app.on('before-quit', () => {
   quitting = true
 })
-app.on('will-quit', () => teardownCapture())
+app.on('will-quit', () => {
+  teardownCapture()
+  clearSecret()
+})
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

@@ -137,6 +137,8 @@ export interface AiChat {
 export interface NotesApi {
   /** A native yes/no dialog; resolves true if the user picked `ok`. */
   confirm(options: ConfirmOptions): Promise<boolean>
+  /** Copies a password; the clipboard empties itself after `seconds` (and when Notes quits) if it still holds it. */
+  copySecret(text: string, seconds: number): Promise<void>
 
   getPrefs(): Promise<Prefs>
   /** Saves some preferences; resolves with the full, validated preferences. */

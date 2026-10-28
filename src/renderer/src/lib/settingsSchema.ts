@@ -397,7 +397,7 @@ export const SETTINGS: SettingDef[] = [
     ...RANGES.autoLockMinutes,
     format: (v) => (v === 0 ? 'Never' : `${v} min`),
     label: 'Lock again after',
-    description: 'Unlocked notes lock again after this long without using Notes. (Also Ctrl+K → “Lock all notes now”, and they always lock when Notes closes.)',
+    description: 'Unlocked notes and passwords lock again after this long without using Notes. (Passwords still lock after 30 min if this is “Never”. Also Ctrl+K → “Lock all notes and passwords now”, and they always lock when Notes closes.)',
     keywords: 'lock password encrypt private secure auto timeout'
   },
 
