@@ -27,6 +27,8 @@ export interface Prefs {
   reduceMotion: boolean
   /** Pressing Play on the Games page shows a short title card with the game's art while it starts. */
   gameLaunchAnimation: boolean
+  /** Animated game covers (from SteamGridDB): moving all the time, only under the pointer, or never. */
+  gameAnimatedCovers: 'always' | 'hover' | 'off'
   /** Which app icon design to use (taskbar / Dock / window). */
   appIcon: string
 
@@ -155,6 +157,7 @@ export const DEFAULT_PREFS: Prefs = {
   showStatusBar: true,
   reduceMotion: false,
   gameLaunchAnimation: true,
+  gameAnimatedCovers: 'always',
   appIcon: 'default',
 
   livePreview: true,
@@ -241,6 +244,7 @@ export const RANGES = {
 const CHOICES = {
   noteWidth: ['narrow', 'medium', 'wide', 'full'],
   density: ['compact', 'comfortable'],
+  gameAnimatedCovers: ['always', 'hover', 'off'],
   timeFormat: ['24h', '12h'],
   captureTarget: ['daily', 'inbox'],
   typewriterDimUnit: ['paragraph', 'line'],

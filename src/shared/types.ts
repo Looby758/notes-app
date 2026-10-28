@@ -4,7 +4,7 @@ import type { Sheet } from './sheet'
 import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
 import type { MusicAction, MusicDevice, MusicItem, MusicQueue, MusicSearchResults, MusicState, MusicStatus } from './spotify'
-import type { GamesList, LaunchArt } from './games'
+import type { CoversStatus, GamesList, LaunchArt } from './games'
 
 export interface WindowBounds {
   x?: number
@@ -420,6 +420,13 @@ export interface NotesApi {
   /** Takes a game you added off the list. */
   gamesRemove(id: string): Promise<void>
   gamesReveal(id: string): Promise<void>
+  /** Whether a SteamGridDB key is saved, for animated covers. */
+  gamesCoversStatus(): Promise<CoversStatus>
+  /** Checks the key with SteamGridDB, then stores it encrypted. */
+  gamesSetCoversKey(key: string): Promise<CoversStatus>
+  gamesClearCoversKey(): Promise<CoversStatus>
+  /** Animated covers for these games, by id; games without one are left out. */
+  gamesCovers(ids: string[]): Promise<Record<string, string>>
   /** A game started or stopped, or more time was counted. */
   onGamesChanged(callback: () => void): () => void
   // Terminal tab

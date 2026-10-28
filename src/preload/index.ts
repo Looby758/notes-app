@@ -171,6 +171,10 @@ const api: NotesApi = {
   gamesAdd: () => ipcRenderer.invoke('games:add'),
   gamesRemove: (id) => ipcRenderer.invoke('games:remove', id),
   gamesReveal: (id) => ipcRenderer.invoke('games:reveal', id),
+  gamesCoversStatus: () => ipcRenderer.invoke('games:coversStatus'),
+  gamesSetCoversKey: (key) => ipcRenderer.invoke('games:setCoversKey', key),
+  gamesClearCoversKey: () => ipcRenderer.invoke('games:clearCoversKey'),
+  gamesCovers: (ids) => ipcRenderer.invoke('games:covers', ids),
   onGamesChanged: (callback) => {
     const handler = (): void => callback()
     ipcRenderer.on('games:changed', handler)

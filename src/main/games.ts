@@ -284,6 +284,9 @@ async function addedGame(path: string): Promise<Found | null> {
 
 let found: Found[] = []
 let lastScan = 0
+
+/** A game the last scan found, by id (for its animated cover). */
+export const foundGame = (id: string): { id: string; name: string } | null => found.find((g) => g.id === id) ?? null
 let scanning: Promise<void> | null = null
 let installed = { steam: false, epic: false }
 
