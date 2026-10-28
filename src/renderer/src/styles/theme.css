@@ -6968,6 +6968,22 @@ body.theme-light .flashcard-grade.grade-easy span {
 .passwords-card {
   margin-bottom: 16px;
   padding: 16px 18px;
+/* ---------- money ---------- */
+.pane-body > .money-page {
+  flex: 1;
+.money-page {
+.money-inner {
+  max-width: 820px;
+.money-head {
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+.money-head h2 {
+  margin: 0;
+  margin-right: auto;
+.money-form {
+  flex-wrap: wrap;
+  padding: 12px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--bg-panel);
@@ -7268,4 +7284,237 @@ a.passwords-text:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 16px;
+.money-form.editing {
+  border-color: var(--accent-dim);
+.money-form .btn {
+  padding: 6px 14px;
+.money-inner .btn:disabled {
+.money-amount {
+.money-amount .text-input {
+  width: 96px;
+  font-variant-numeric: tabular-nums;
+.money-category-select {
+  min-width: 140px;
+.money-date {
+  width: 150px;
+.money-note {
+  min-width: 160px;
+.money-month {
+  margin: 18px 0 6px;
+.money-month strong {
+  min-width: 140px;
+  text-align: center;
+.money-tiles {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 12px 0 8px;
+.money-tile {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-panel);
+.money-tile span {
+  font-size: 12.5px;
+.money-tile strong {
+  font-size: 22px;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+.money-section {
+  margin-top: 22px;
+.money-section h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: var(--text-strong);
+.money-hint {
+.money-hint .link-button {
+.money-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+.money-swatch.spent {
+  background: var(--money-spent);
+.money-swatch.received {
+  background: var(--money-received);
+.money-budgets,
+.money-bars,
+.money-cats,
+.money-day ul {
+.money-budgets li {
+  --budget-color: var(--accent);
+.money-budgets li.budget-near {
+  --budget-color: #f5a524;
+.money-budgets li.budget-over {
+  --budget-color: #f97066;
+.money-budget-row {
+  margin-bottom: 6px;
+.money-budget-figures {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+.money-budget-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg-raised);
+.money-budget-bar div {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--budget-color);
+.money-budget-left {
+  margin-top: 4px;
+.budget-near .money-budget-left svg,
+.budget-over .money-budget-left svg {
+  color: var(--budget-color);
+.budget-over .money-budget-left {
+.money-bars li {
+  grid-template-columns: 150px 1fr 130px;
+  padding: 5px 0;
+.money-bar-name {
+.money-bar-track {
+  height: 12px;
+.money-bar-fill {
+  display: block;
+  height: 100%;
+  min-width: 3px;
+  border-radius: 0 4px 4px 0;
+.money-bar-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+.money-bar-value small {
+  display: inline-block;
+  min-width: 34px;
+.money-page {
+  --money-spent: #3987e5;
+  --money-received: #199e70;
+.money-chart {
+  position: relative;
+.money-chart svg {
+  display: block;
+  height: auto;
+  overflow: visible;
+.money-legend {
+  gap: 16px;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+.money-legend > span {
+.money-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+.money-axis {
+  fill: var(--text-faint);
+  font-size: 11px;
+.money-col {
+.money-col.current .money-axis {
+  fill: var(--text-strong);
+.money-hit {
+  fill: transparent;
+.money-col:hover .money-hit {
+  fill: var(--bg-hover);
+.money-spent {
+  fill: var(--money-spent);
+.money-received {
+  fill: var(--money-received);
+.money-tooltip {
+  position: absolute;
+  top: 24px;
+  transform: translateX(-50%);
+  gap: 2px;
+  border-radius: 8px;
+  background: var(--bg-raised);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+.money-filters {
+  margin-bottom: 10px;
+.money-filters .select {
+  min-width: 170px;
+.money-undo {
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--bg-raised);
+.money-day h4 {
+  margin: 14px 0 4px;
+.money-entry {
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+.money-entry-note {
+  user-select: text;
+.money-entry-note em {
+.money-entry .select {
+  height: 26px;
+  min-width: 130px;
+  font-size: 12.5px;
+.money-entry-amount {
+  min-width: 84px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+.money-entry-amount.in {
+  color: #4ade80;
+.money-import-start p {
+  max-width: 600px;
+.money-import-head {
+  margin-bottom: 10px;
+.money-columns {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-panel);
+.money-columns summary {
+.money-columns-grid {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+.money-columns-grid label {
+.money-columns-grid .select {
+.money-columns-grid label.money-flip {
+  flex-direction: row;
+.money-import-table {
+  max-height: 420px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+.money-import-table table {
+  border-collapse: collapse;
+.money-import-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+.money-import-table tr.skipped td,
+.money-import-table tr.already td {
+  opacity: 0.45;
+.money-import-table .select {
+  height: 26px;
+  min-width: 130px;
+  font-size: 12.5px;
+.money-import-date {
+.money-import-desc {
+  user-select: text;
+.money-import-actions {
+.money-cats li {
+  gap: 10px;
+  padding: 5px 0;
+.money-color {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  background: none;
+.money-cat-name {
+  width: 200px;
+.money-new-cat {
+.money-new-cat .btn {
+  padding: 6px 14px;
+.money-home {
+  align-items: baseline;
+.money-home strong {
+  font-size: 22px;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+.money-home span {
+.money-home-warn {
+  margin-top: 6px;
+  font-size: 12.5px;
+.money-home-warn.budget-near svg {
+  color: #f5a524;
+.money-home-warn.budget-over svg {
+  color: #f97066;
 }

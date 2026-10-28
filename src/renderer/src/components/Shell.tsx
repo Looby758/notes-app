@@ -17,6 +17,7 @@ import {
   PanelRight,
   Settings as SettingsIcon,
   SquareTerminal
+  PoundSterling
 } from 'lucide-react'
 import { useVault } from '../store/vault'
 import { useEditor, type SaveStatus } from '../store/editor'
@@ -41,6 +42,7 @@ import {
   PASSWORDS_TAB,
   CHAT_TAB,
   HOME_TAB,
+  MONEY_TAB,
   setZenEditor
 } from '../lib/editorController'
 import { openLink, openWikiLink } from '../lib/openLink'
@@ -287,6 +289,8 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         </button>
         <button className="icon-btn" onClick={() => openSpecialTab(PASSWORDS_TAB)} title={`Passwords (${showKeys('Ctrl+Alt+K')})`} data-passwords-button>
           <KeyRound size={15} />
+        <button className="icon-btn" onClick={() => openSpecialTab(MONEY_TAB)} title={`Money (${showKeys('Ctrl+Shift+B')})`} data-money-button>
+          <PoundSterling size={15} />
         </button>
         <button className="icon-btn" onClick={() => openSpecialTab(CHAT_TAB)} title="Chat with Claude" data-chat-button>
           <MessageSquare size={15} />

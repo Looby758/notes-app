@@ -62,6 +62,7 @@ export const FLASHCARDS_TAB = 'flashcards:'
 export const TERMINAL_TAB = 'terminal:'
 export const PASSWORDS_TAB = 'passwords:'
 export const HOME_TAB = 'home:'
+export const MONEY_TAB = 'money:'
 /** A picture, recording, PDF… from the notes folder, shown in a tab: "file:attachments/a.png". */
 export const FILE_TAB = 'file:'
 export const fileTab = (path: string): string => FILE_TAB + path

@@ -21,6 +21,7 @@ import {
   TERMINAL_TAB,
   PASSWORDS_TAB,
   HOME_TAB,
+  MONEY_TAB,
   SETTINGS_TAB,
   splitPane
 } from '../../lib/editorController'
@@ -42,6 +43,7 @@ import FlashcardsPage from '../Flashcards/FlashcardsPage'
 import TerminalPage from '../Terminal/TerminalPage'
 import PasswordsPage from '../Passwords/PasswordsPage'
 import HomePage from '../Home/HomePage'
+import MoneyPage from '../Money/MoneyPage'
 import MindMap from '../MindMap/MindMap'
 import { isMindMap, useUI } from '../../store/ui'
 import { needsUnlock, useLock } from '../../lib/lock/session'
@@ -132,6 +134,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === TERMINAL_TAB && <TerminalPage />}
         {active === PASSWORDS_TAB && <PasswordsPage autoFocus={isActivePane} />}
         {(active === HOME_TAB || !active) && <HomePage />}
+        {active === MONEY_TAB && <MoneyPage />}
         {zone && <div className={`drop-zone ${zone}`} />}
       </div>
     </div>
