@@ -45,7 +45,7 @@ async function passwordKey(password: string, salt: Bytes, iterations: number): P
 
 const aesKey = (raw: Bytes): Promise<CryptoKey> => subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt'])
 
-interface Sealed {
+export interface Sealed {
   iv: string
   data: string
 }
@@ -58,6 +58,20 @@ async function seal(key: CryptoKey, plain: Bytes): Promise<Sealed> {
 
 async function open(key: CryptoKey, s: Sealed): Promise<Bytes> {
   return new Uint8Array(await subtle.decrypt({ name: 'AES-GCM', iv: fromB64(s.iv) }, key, fromB64(s.data)))
+}
+
+/** Encrypts text with a raw 256-bit key (a fresh random IV each time). */
+export async function encryptText(key: Bytes, text: string): Promise<Sealed> {
+  return seal(await aesKey(key), utf8.encode(text))
+}
+
+/** Decrypts what encryptText made. Throws WrongPassword if the key is wrong or the data was changed. */
+export async function decryptText(key: Bytes, sealed: Sealed): Promise<string> {
+  try {
+    return fromUtf8.decode(await open(await aesKey(key), sealed))
+  } catch {
+    throw new WrongPassword()
+  }
 }
 
 // ---------- the notes password (lock.json) ----------

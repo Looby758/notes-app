@@ -8,6 +8,7 @@ import {
   Orbit,
   BookOpen,
   Dices,
+  KeyRound,
   Moon,
   PenLine,
   PanelLeft,
@@ -33,6 +34,7 @@ import {
   remeasure,
   SETTINGS_TAB,
   GRAPH_TAB,
+  PASSWORDS_TAB,
   setZenEditor
 } from '../lib/editorController'
 import { openLink, openWikiLink } from '../lib/openLink'
@@ -270,6 +272,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
           <Orbit size={15} />
         </button>
         <FlashcardsButton />
+        <button className="icon-btn" onClick={() => openSpecialTab(PASSWORDS_TAB)} title={`Passwords (${showKeys('Ctrl+Alt+K')})`} data-passwords-button>
+          <KeyRound size={15} />
+        </button>
         <LayoutMenu />
         <button className="icon-btn" onClick={() => useUI.setState({ modal: 'commands' })} title={`All commands (${showKeys('Ctrl+K')})`}>
           <CommandIcon size={15} />

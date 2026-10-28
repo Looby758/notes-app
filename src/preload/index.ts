@@ -3,6 +3,7 @@ import type { NotesApi } from '@shared/types'
 
 const api: NotesApi = {
   confirm: (options) => ipcRenderer.invoke('app:confirm', options),
+  copySecret: (text, seconds) => ipcRenderer.invoke('clipboard:copySecret', text, seconds),
 
   getPrefs: () => ipcRenderer.invoke('prefs:get'),
   setPrefs: (patch) => ipcRenderer.invoke('prefs:set', patch),

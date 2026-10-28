@@ -11,6 +11,7 @@ import {
   REPLACE_TAB,
   CONFLICTS_TAB,
   FLASHCARDS_TAB,
+  PASSWORDS_TAB,
   closePane,
   closeTabUnlessPinned,
   cycleTab,
@@ -150,8 +151,9 @@ export const commands: Command[] = [
       if (path) removeLock(path)
     }
   },
-  { id: 'lock.now', group: 'Locked notes', title: 'Lock all notes now', shortcut: 'Ctrl+Alt+L', run: lockAllNow },
+  { id: 'lock.now', group: 'Locked notes', title: 'Lock all notes and passwords now', shortcut: 'Ctrl+Alt+L', run: lockAllNow },
   { id: 'lock.password', group: 'Locked notes', title: 'Change notes password…', run: changeNotesPassword },
+  { id: 'passwords.open', group: 'Passwords', title: 'Open passwords', shortcut: 'Ctrl+Alt+K', run: () => openSpecialTab(PASSWORDS_TAB) },
 
   { id: 'capture.open', group: 'Notes', title: 'Quick capture…', run: () => window.api.openCapture() },
   { id: 'daily.today', group: 'Calendar', title: "Open today's note", shortcut: 'Ctrl+Shift+D', run: () => openToday() },

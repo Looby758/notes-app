@@ -1,4 +1,5 @@
 import { loadLock } from '../lib/lock/session'
+import { loadPasswords } from '../lib/passwords/session'
 import { loadSnippets } from './snippets'
 import { loadSavedSearches } from './savedSearches'
 import { fixFileLinks } from '../lib/fileLinks'
@@ -101,6 +102,7 @@ export const useVault = create<VaultState>((set, get) => {
       set({ vault, tree: [], expanded: loadExpanded(vault), selected: null, renaming: null })
       resetIndex()
       void loadLock()
+      void loadPasswords()
       void loadSnippets()
       void loadSavedSearches()
       loadStarred()

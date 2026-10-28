@@ -160,7 +160,7 @@ function SetUp({ then, close }: { then?: () => Promise<void>; close: () => void 
   )
 }
 
-function ShowRecoveryKey({ recoveryKey, done }: { recoveryKey: string; done: () => Promise<void> }) {
+export function ShowRecoveryKey({ recoveryKey, done, what = 'your notes' }: { recoveryKey: string; done: () => Promise<void>; what?: string }) {
   const [saved, setSaved] = useState(false)
   const [copied, setCopied] = useState(false)
   return (
@@ -169,7 +169,7 @@ function ShowRecoveryKey({ recoveryKey, done }: { recoveryKey: string; done: () 
         <KeyRound size={16} /> Your recovery key
       </h3>
       <p className="lock-intro">
-        If you forget your password, this key unlocks your notes. Keep it somewhere safe, away from your notes (a password manager, or on paper). It won’t be
+        If you forget your password, this key unlocks {what}. Keep it somewhere safe, away from your notes (a password manager, or on paper). It won’t be
         shown again.
       </p>
       <div className="lock-key" data-recovery-key>
