@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
-import { Music, Pause, Play, SkipBack, SkipForward } from 'lucide-react'
+import { Music, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from 'lucide-react'
 import { currentPosition, musicControl, musicSeek, setMusicOpen, useMusic, watchMusic } from '../../store/music'
 import { HomeBox } from '../Home/HomePage'
+import { LikeButton, VolumeSlider } from './MusicPlayer'
 
-/** The Home page's "Now playing" box: nothing until Spotify can be controlled (the Mac app, or your account). */
+/** The Home page's "Now playing" box: nothing until there's music to control (Spotify on this Mac or your account, or your own songs). */
 export default function MusicHomeCard() {
   const status = useMusic((s) => s.status)
-  const usable = !!status && (status.appControl || status.connected)
+  const local = useMusic((s) => s.local)
+  const usable = local || (!!status && (status.appControl || status.connected))
   useEffect(() => (usable ? watchMusic() : undefined), [usable])
   if (!usable) return null
   return (
@@ -66,8 +68,9 @@ function Playing() {
         <div className="music-home-art">{track.art ? <img src={track.art} alt="" /> : <Music size={22} />}</div>
         <div className="music-home-text">
           <strong title={track.name}>{track.name}</strong>
-          <span title={track.artist}>{[track.artist, state.device].filter(Boolean).join(' · ')}</span>
+          <span title={track.artist}>{track.artist}</span>
         </div>
+        {track.uri && <LikeButton uri={track.uri} />}
         <div className="music-controls">
           <button className="icon-btn" onClick={() => musicControl('previous')} title="Previous">
             <SkipBack size={15} />
@@ -81,6 +84,22 @@ function Playing() {
         </div>
       </div>
       <HomeProgress />
+      <div className="music-home-footer">
+        {state.volume !== undefined ? <VolumeSlider volume={state.volume} /> : <span />}
+        <div className="music-modes">
+          <button className={`icon-btn music-shuffle ${state.shuffle ? 'active' : ''}`} onClick={() => musicControl('shuffle')} title={state.shuffle ? 'Shuffle is on' : 'Shuffle'}>
+            <Shuffle size={13} />
+          </button>
+          <button
+            className={`icon-btn music-shuffle ${state.repeat && state.repeat !== 'off' ? 'active' : ''}`}
+            onClick={() => musicControl('repeat')}
+            title={state.repeat === 'track' ? 'Repeating this song' : state.repeat === 'context' ? 'Repeating all' : 'Repeat'}
+          >
+            {state.repeat === 'track' ? <Repeat1 size={13} /> : <Repeat size={13} />}
+          </button>
+        </div>
+        <span className="music-home-source">{state.source === 'local' ? 'My music' : state.source === 'app' ? 'Spotify on this computer' : state.device ?? 'Spotify'}</span>
+      </div>
       {(error || state.error) && <p className="music-error">{error ?? state.error}</p>}
     </>
   )
