@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   ArrowRightLeft,
   Grid3x3,
+  Bomb,
   ChevronDown,
   Command as CommandIcon,
   FolderOpen,
@@ -56,6 +57,7 @@ import {
   MONEY_TAB,
   CONVERT_TAB,
   SUDOKU_TAB,
+  MINESWEEPER_TAB,
   GAMES_TAB,
   setZenEditor
 } from '../lib/editorController'
@@ -353,6 +355,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         </button>
         <button className="icon-btn" onClick={() => openSpecialTab(SUDOKU_TAB)} title="Sudoku (a quick break)" data-sudoku-button>
           <Grid3x3 size={15} />
+        </button>
+        <button className="icon-btn" onClick={() => openSpecialTab(MINESWEEPER_TAB)} title="Minesweeper (a quick break)" data-minesweeper-button>
+          <Bomb size={15} />
         </button>
         <button className={`icon-btn ${musicOpen ? 'active' : ''}`} onClick={toggleMusic} title="Music player (Spotify)" data-music-button>
           <Music size={15} />

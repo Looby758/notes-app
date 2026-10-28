@@ -26,6 +26,7 @@ import {
   MONEY_TAB,
   CONVERT_TAB,
   SUDOKU_TAB,
+  MINESWEEPER_TAB,
   MESSAGES_TAB,
   GAMES_TAB,
   SETTINGS_TAB,
@@ -54,6 +55,7 @@ import HomePage from '../Home/HomePage'
 import MoneyPage from '../Money/MoneyPage'
 import ConvertPage from '../Convert/ConvertPage'
 import SudokuPage from '../Sudoku/SudokuPage'
+import MinesweeperPage from '../Minesweeper/MinesweeperPage'
 import GamesPage from '../Games/GamesPage'
 import MindMap from '../MindMap/MindMap'
 import WebPage from '../Web/WebPage'
@@ -179,6 +181,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === MONEY_TAB && <MoneyPage />}
         {active === CONVERT_TAB && <ConvertPage />}
         {active === SUDOKU_TAB && <SudokuPage />}
+        {active === MINESWEEPER_TAB && <MinesweeperPage />}
         {active === GAMES_TAB && <GamesPage />}
         {zone && <div className={`drop-zone ${zone}`} />}
       </div>

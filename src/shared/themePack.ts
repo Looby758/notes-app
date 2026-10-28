@@ -50,6 +50,7 @@ export const THEME_PAGES: Record<string, string> = {
   ai: 'Ask AI',
   chat: 'AI chat',
   sudoku: 'Sudoku',
+  minesweeper: 'Minesweeper',
   convert: 'File converter',
   graph: 'Graph',
   settings: 'Settings',
