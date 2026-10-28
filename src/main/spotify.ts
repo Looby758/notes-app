@@ -44,7 +44,10 @@ const SCOPE = [
   'playlist-read-collaborative',
   'user-library-read',
   'user-library-modify',
-  'user-read-recently-played'
+  'user-read-recently-played',
+  // For making and editing playlists (asked for now so you only connect again once).
+  'playlist-modify-private',
+  'playlist-modify-public'
 ].join(' ')
 // Overridable for tests, which point these at a local fake Spotify.
 const AUTH_URL = process.env.NOTES_SPOTIFY_AUTH_URL ?? 'https://accounts.spotify.com/authorize'
