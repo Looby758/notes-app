@@ -1,3 +1,4 @@
+import { join } from 'path'
 import { app, clipboard, ipcMain, Menu, session, shell, webContents, type MenuItemConstructorOptions, type WebContents } from 'electron'
 import { firefoxUserAgent, isGoogleSignIn, isWebUrl, plainUserAgent, searchUrl, WEB_PARTITION } from '@shared/web'
 import { isMessagesUrl, MESSAGES_PARTITION } from '@shared/messages'
@@ -52,7 +53,10 @@ export function setupBrowser(quiet: () => boolean = () => false): void {
     }
   })
 
+  // Every web page gets the passkey guard (see src/preload/web.ts) before its own code runs.
+  const pagePreload = { type: 'frame' as const, filePath: join(__dirname, '../preload/web.js') }
   const web = session.fromPartition(WEB_PARTITION)
+  web.registerPreloadScript(pagePreload)
   web.setUserAgent(plainUserAgent(web.getUserAgent()))
   web.setPermissionRequestHandler((_wc, permission, callback) => callback(WEB_PERMISSIONS.has(permission)))
   web.setPermissionCheckHandler((_wc, permission) => WEB_PERMISSIONS.has(permission))
@@ -65,6 +69,7 @@ export function setupBrowser(quiet: () => boolean = () => false): void {
   web.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, callback) => callback({ cancel: isAdRequest(details.url) }))
 
   const messages = session.fromPartition(MESSAGES_PARTITION)
+  messages.registerPreloadScript(pagePreload)
   messages.setUserAgent(plainUserAgent(messages.getUserAgent()))
   const allowed = (permission: string): boolean => MESSAGES_PERMISSIONS.has(permission) && !(permission === 'notifications' && quiet())
   messages.setPermissionRequestHandler((_wc, permission, callback) => callback(allowed(permission)))

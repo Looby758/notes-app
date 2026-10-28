@@ -12,7 +12,9 @@ export default defineConfig({
   },
   preload: {
     plugins: [externalizeDepsPlugin()],
-    resolve: { alias: shared }
+    resolve: { alias: shared },
+    // index: the app's own windows. web: every web page (see src/preload/web.ts).
+    build: { rollupOptions: { input: { index: resolve(__dirname, 'src/preload/index.ts'), web: resolve(__dirname, 'src/preload/web.ts') } } }
   },
   renderer: {
     plugins: [react()],
