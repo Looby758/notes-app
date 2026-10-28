@@ -8782,6 +8782,43 @@ p.games-none {
   height: 72%;
   object-fit: contain;
 }
+/* Still covers drift in a little under the pointer; animated ones fade in over them once loaded. */
+.game-art {
+  overflow: hidden;
+}
+.game-art > img:not(.game-icon) {
+  transition: transform 0.8s var(--ease);
+}
+.game-card:hover .game-art > img:not(.game-icon) {
+  transform: scale(1.04);
+}
+/* Motion on Subtle (or the system asking for less motion) keeps covers still. */
+:root:not([data-motion='full']) .game-card:hover .game-art > img {
+  transform: none;
+}
+.game-art img.game-cover-live {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.5s var(--ease), transform 0.8s var(--ease);
+}
+.game-art img.game-cover-live.shown {
+  opacity: 1;
+}
+.game-playing {
+  z-index: 1;
+}
+.games-covers {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-panel);
+}
+.games-covers > p {
+  margin: 0 0 10px;
+  color: var(--text-muted);
+}
 .game-letter {
   color: var(--text-muted);
   font-size: 40px;
