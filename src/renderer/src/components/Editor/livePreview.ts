@@ -575,7 +575,7 @@ function buildInline(view: EditorView): DecorationSet {
     for (const m of text.matchAll(/(?:⏰️?|\bremind:)\s*(?:\d{4}-\d{2}-\d{2}\s+)?\d{1,2}:\d{2}/gu)) {
       const from = range.from + m.index
       if (/Code/.test(syntaxTree(state).resolveInner(from, 1).name)) continue
-      out.push(Decoration.mark({ class: 'cm-reminder', attributes: { title: 'Reminder: Notes will show a notification at this time' } }).range(from, from + m[0].length))
+      out.push(Decoration.mark({ class: 'cm-reminder', attributes: { title: 'Reminder: Orbit will show a notification at this time' } }).range(from, from + m[0].length))
     }
   }
 

@@ -66,6 +66,9 @@ let hubReleased: Promise<void> = Promise.resolve()
 
 logCrashes()
 
+// The app used to be called Notes: keep its data folder so settings and sign-ins carry over.
+app.setPath('userData', join(app.getPath('appData'), 'Notes'))
+
 // Windows shows notifications under this app id (it matches the installer's).
 if (process.platform === 'win32') app.setAppUserModelId('com.notesapp.desktop')
 
@@ -498,7 +501,7 @@ function registerIpc(): void {
     }
     // Streamer mode: the reminder itself could be private, so the notification only says there is one.
     const quiet = currentPrefs().streamerMode
-    const n = new Notification({ title: quiet ? 'Reminder' : r.title, body: quiet ? 'Click to see it in Notes.' : r.body, silent: false })
+    const n = new Notification({ title: quiet ? 'Reminder' : r.title, body: quiet ? 'Click to see it in Orbit.' : r.body, silent: false })
     // Windows reports some failures (e.g. notifications switched off for Notes) here.
     n.on('failed', (_ev, error) => logError('reminder notification', new Error(error)))
     n.on('click', () => {
@@ -731,9 +734,9 @@ async function offerMoveToApplications(): Promise<boolean> {
     buttons: ['Move to Applications', 'Not now'],
     defaultId: 0,
     cancelId: 1,
-    message: 'Move Notes to your Applications folder?',
+    message: 'Move Orbit to your Applications folder?',
     detail:
-      'Notes is running from the disk image or your Downloads folder. From there it can stop working (for example when the disk image is ejected) and can’t be kept in the Dock properly. Notes will restart from Applications.',
+      'Orbit is running from the disk image or your Downloads folder. From there it can stop working (for example when the disk image is ejected) and can’t be kept in the Dock properly. Orbit will restart from Applications.',
     checkboxLabel: 'Don’t ask again'
   })
   if (response !== 0) {

@@ -64,7 +64,8 @@ const saved = ((): Partial<UIState> => {
 
 export const useUI = create<UIState>(() => ({
   leftOpen: saved.leftOpen ?? true,
-  rightOpen: saved.rightOpen ?? true,
+  // The side panel starts closed each launch; it opens when asked for.
+  rightOpen: false,
   leftWidth: saved.leftWidth ?? 260,
   rightWidth: saved.rightWidth ?? 280,
   sidebarView: saved.sidebarView ?? 'files',

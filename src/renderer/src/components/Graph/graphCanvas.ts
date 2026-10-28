@@ -42,7 +42,7 @@ function readColours(): Colours {
     text: v('--text', '#d7d9e0'),
     muted: v('--text-muted', '#9a9caa'),
     faint: v('--text-faint', '#6b6e7d'),
-    accent: v('--accent', '#8b7cf6'),
+    accent: v('--accent', '#4ade80'),
     border: v('--border', '#2a2b36')
   }
 }

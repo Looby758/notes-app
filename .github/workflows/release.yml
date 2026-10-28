@@ -34,7 +34,7 @@ jobs:
         run: |
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --target "$GITHUB_SHA" \
-              --title "Notes ${TAG#v}" --generate-notes
+              --title "Orbit ${TAG#v}" --generate-notes
 
   build:
     name: Build (${{ matrix.name }})

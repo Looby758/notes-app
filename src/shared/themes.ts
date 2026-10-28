@@ -32,7 +32,7 @@ export const THEMES: Theme[] = [
   {
     id: 'midnight',
     name: 'Midnight',
-    accent: '#8b7cf6',
+    accent: '#4ade80',
     colors: {
       bg: '#16171d',
       bgPanel: '#1b1c23',

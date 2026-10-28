@@ -307,7 +307,7 @@ export async function toDocx(opts: DocxOptions): Promise<Uint8Array> {
 
   const doc = new Document({
     title: opts.title,
-    creator: 'Notes',
+    creator: 'Orbit',
     styles: {
       default: { document: { run: { font: 'Calibri', size: 22 }, paragraph: { spacing: { line: 300 } } } }
     },

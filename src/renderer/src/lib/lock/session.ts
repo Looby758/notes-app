@@ -143,7 +143,7 @@ export function remapLock(from: string, to: string): void {
 export async function setUpPassword(password: string, withRecovery: boolean): Promise<string | undefined> {
   // Replacing an existing key file would leave every locked note unreadable for good.
   if (lockFile || (await window.api.readAppData(FILE)) !== null)
-    throw new Error('A notes password already exists in this notes folder. Close Notes and open it again to use it.')
+    throw new Error('A notes password already exists in this notes folder. Close Orbit and open it again to use it.')
   const made = await createLock(password, withRecovery)
   await window.api.writeAppData(FILE, JSON.stringify(made.lock, null, 2))
   lockFile = made.lock

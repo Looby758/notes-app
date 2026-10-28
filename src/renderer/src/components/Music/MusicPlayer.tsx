@@ -176,7 +176,7 @@ function NowPlaying({ state }: { state: MusicState }) {
     return (
       <div className="music-empty">
         <span>
-          Let Notes control Spotify: in <strong>Privacy &amp; Security → Automation</strong>, turn on <strong>Spotify</strong> under Notes (or Electron, if you started Notes with npm run dev).
+          Let Orbit control Spotify: in <strong>Privacy &amp; Security → Automation</strong>, turn on <strong>Spotify</strong> under Notes (or Electron, if you started Notes with npm run dev).
         </span>
         <button className="btn" onClick={() => window.api.musicOpen('automation')}>
           Open

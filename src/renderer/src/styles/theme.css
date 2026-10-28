@@ -11,7 +11,7 @@
   --text-muted: #8a8e9a;
   --text-faint: #5e6270;
   /* Colours are defaults: Settings → Appearance overrides them on <html> (see lib/appearance.ts). */
-  --accent: #8b7cf6;
+  --accent: #4ade80;
   --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
   --accent-dim: color-mix(in srgb, var(--accent) 45%, transparent);
   --accent-strong: color-mix(in srgb, var(--accent) 82%, white);

@@ -26,7 +26,7 @@ export function Visualiser({ playing }: { playing: boolean }) {
       g.setTransform(dpr, 0, 0, dpr, 0, 0)
       g.clearRect(0, 0, w, h)
       analyser.getByteFrequencyData(data)
-      const accent = getComputedStyle(el).getPropertyValue('--accent').trim() || '#8b7cf6'
+      const accent = getComputedStyle(el).getPropertyValue('--accent').trim() || '#4ade80'
       const gap = 2
       const barW = (w - gap * (BARS - 1)) / BARS
       // Spread the bars over the notes we hear most of (the top of the range is mostly empty).

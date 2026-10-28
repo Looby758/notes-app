@@ -53,7 +53,7 @@ export async function readGoogleSheet(file: string): Promise<GoogleSheetResult> 
   }
   const owner =
     link.email && access.email && link.email.toLowerCase() !== access.email.toLowerCase()
-      ? ` It belongs to ${link.email}, but Notes is signed in as ${access.email}.`
+      ? ` It belongs to ${link.email}, but Orbit is signed in as ${access.email}.`
       : ''
   if (res.status === 404) return { webUrl, error: `Google can’t find this sheet. It may have been deleted.${owner}` }
   if (res.status === 403) return { webUrl, error: `Your Google account can’t open this sheet.${owner}` }

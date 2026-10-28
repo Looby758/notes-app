@@ -75,7 +75,7 @@ async function check(): Promise<void> {
       path: missed[0].path,
       line: missed[0].line
     })
-    notify(`Missed while Notes was closed: ${names}${missed.length > 4 ? '…' : ''}`, 'info')
+    notify(`Missed while Orbit was closed: ${names}${missed.length > 4 ? '…' : ''}`, 'info')
     for (const r of missed) fired.add(r.key)
   }
   await saveFired()

@@ -130,7 +130,7 @@ function UpdateStatusRow() {
           : status.state === 'downloading'
             ? `Downloading ${status.version}… ${status.percent ?? 0}%`
             : status.state === 'ready'
-              ? `${status.version} is ready. Restart Notes to update.`
+              ? `${status.version} is ready. Restart Orbit to update.`
               : status.state === 'available'
                 ? `${status.version} is out.`
                 : null

@@ -1,5 +1,5 @@
 appId: com.notesapp.desktop
-productName: Notes
+productName: Orbit
 directories:
   buildResources: build
   output: dist
@@ -43,8 +43,8 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Notes
-  artifactName: Notes-Setup-${version}.${ext}
+  shortcutName: Orbit
+  artifactName: Orbit-Setup-${version}.${ext}
   # Keep your settings if you uninstall and reinstall. Your notes are never touched either way.
   deleteAppDataOnUninstall: false
 mac:
@@ -64,15 +64,15 @@ mac:
   hardenedRuntime: false
   # Asked the first time you record a voice note.
   extendInfo:
-    NSMicrophoneUsageDescription: Notes uses the microphone to record voice notes.
-    # Asked when you import from Apple Notes (Notes reads them from the Notes app), and when the
+    NSMicrophoneUsageDescription: Orbit uses the microphone to record voice notes.
+    # Asked when you import from Apple Notes (Orbit reads them from the Notes app), and when the
     # music player first controls the Spotify app.
-    NSAppleEventsUsageDescription: Notes reads your Apple Notes to import them, and controls Spotify for the music player.
+    NSAppleEventsUsageDescription: Orbit reads your Apple Notes to import them, and controls Spotify for the music player.
   notarize: false
   # Used by the zip; the dmg (the one to download) gets the simpler name below.
-  artifactName: Notes-${version}-${arch}-mac.${ext}
+  artifactName: Orbit-${version}-${arch}-mac.${ext}
 dmg:
-  artifactName: Notes-${version}-${arch}.${ext}
+  artifactName: Orbit-${version}-${arch}.${ext}
 afterPack: build/adhoc-sign.cjs
 # Installers and update files go to this repository's GitHub Releases.
 publish:

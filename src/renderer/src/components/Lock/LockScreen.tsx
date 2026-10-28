@@ -39,7 +39,7 @@ export default function LockScreen({ path, autoFocus }: { path: string; autoFocu
       {missing ? (
         <p>
           This note was locked with a notes password, but the password settings (<code>.notesapp/lock.json</code> in your notes folder) are missing. If
-          they’re still syncing, reopen Notes once they’ve arrived.
+          they’re still syncing, reopen Orbit once they’ve arrived.
         </p>
       ) : (
         <>

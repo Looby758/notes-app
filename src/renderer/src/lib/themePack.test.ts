@@ -61,7 +61,7 @@ describe('readThemeManifest', () => {
     expect(read({ name: 'X' })).toEqual({ error: 'The theme has no colours.' })
     const result = read({ name: 'X', colors: { ...colors, bg: 'red', text: undefined } })
     expect('error' in result && result.error).toMatch(/bg, text/)
-    expect(read({ name: 'X', colors, format: 99 })).toEqual({ error: 'This theme needs a newer version of Notes.' })
+    expect(read({ name: 'X', colors, format: 99 })).toEqual({ error: 'This theme needs a newer version of Orbit.' })
     expect(read('nonsense')).toEqual({ error: 'theme.json isn’t a theme.' })
   })
 

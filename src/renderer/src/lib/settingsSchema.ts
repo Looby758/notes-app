@@ -55,7 +55,7 @@ export const SETTINGS: SettingDef[] = [
     type: 'appIcon',
     label: 'App icon',
     description: IS_MAC
-      ? 'Shown in the Dock while Notes runs.'
+      ? 'Shown in the Dock while Orbit runs.'
       : 'Shown on the window, the taskbar (also when pinned), the Start menu and the desktop shortcut. Windows can take a moment to catch up; if a pinned icon doesn’t change, unpin and pin Notes again.',
     keywords: 'icon logo dock taskbar green'
   },
@@ -620,7 +620,7 @@ export const SETTINGS: SettingDef[] = [
     type: 'choice',
     options: CAPTURE_SHORTCUTS.map((value) => ({ value, label: value ? acceleratorLabel(value) : 'Off' })),
     label: 'Shortcut',
-    description: `Works from any app, as long as Notes is running (it can wait in the ${TRAY_NAME}).`,
+    description: `Works from any app, as long as Orbit is running (it can wait in the ${TRAY_NAME}).`,
     keywords: 'capture hotkey global win key'
   },
   {
@@ -682,7 +682,7 @@ export const SETTINGS: SettingDef[] = [
     section: 'capture',
     group: IS_MAC ? 'Menu bar' : 'Tray',
     type: 'toggle',
-    label: IS_MAC ? 'Open Notes when you log in' : 'Start Notes when Windows starts',
+    label: IS_MAC ? 'Open Orbit when you log in' : 'Start Orbit when Windows starts',
     description: IS_MAC ? 'Only in the installed app.' : 'It starts quietly in the tray.',
     keywords: 'startup login boot'
   },
@@ -696,7 +696,7 @@ export const SETTINGS: SettingDef[] = [
     label: 'Check for updates automatically',
     description: IS_MAC
       ? 'Notes tells you when a new version is out and opens its download page.'
-      : 'New versions download in the background and install when you restart Notes.',
+      : 'New versions download in the background and install when you restart Orbit.',
     keywords: 'update upgrade version new release'
   }
 ]
@@ -714,7 +714,7 @@ export const SECTIONS: { id: SectionId; label: string }[] = [
 ]
 
 /** Accent colours offered as one-click swatches. */
-export const ACCENT_SWATCHES = ['#8b7cf6', '#5ea8ff', '#3ccfcf', '#4ade80', '#e0a458', '#f97066', '#f472b6', '#c4b5fd']
+export const ACCENT_SWATCHES = ['#4ade80', '#8b7cf6', '#5ea8ff', '#3ccfcf', '#e0a458', '#f97066', '#f472b6', '#c4b5fd']
 
 export function matchesSearch(def: SettingDef, query: string): boolean {
   const haystack = `${def.label} ${def.description ?? ''} ${def.keywords ?? ''} ${def.group}`.toLowerCase()
