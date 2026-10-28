@@ -228,6 +228,13 @@ export interface YouTubeState {
   videoOnly: boolean
 }
 
+/** Something shared with a phone over the local Wi-Fi: `url` goes in the QR code. */
+export interface PhoneShare {
+  token: string
+  url: string
+  expiresAt: number
+}
+
 export interface NotesApi {
   /** A native yes/no dialog; resolves true if the user picked `ok`. */
   confirm(options: ConfirmOptions): Promise<boolean>
@@ -529,6 +536,13 @@ export interface NotesApi {
   trashMany(paths: string[]): Promise<string[]>
   /** Shows the item selected in File Explorer / Finder. */
   reveal(path: string): Promise<void>
+  /** Sends a vault file, or a web link, to a phone on the same Wi-Fi: returns the address for its QR code. */
+  phoneShareFile(path: string): Promise<PhoneShare>
+  phoneShareLink(url: string): Promise<PhoneShare>
+  /** Ends a share early (the QR code stops working). */
+  phoneStop(token: string): Promise<void>
+  /** The phone has the file (or opened the link). */
+  onPhoneDelivered(callback: (token: string) => void): () => void
   /** Reads/writes a small app file kept in the vault's hidden ".notesapp" folder (synced with your notes). */
   readAppData(name: string): Promise<string | null>
   writeAppData(name: string, content: string): Promise<void>

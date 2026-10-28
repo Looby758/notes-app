@@ -132,6 +132,10 @@ A theme file only holds looks (colours, pictures, fonts and a few words), never 
 
 **Making one:** a theme is a folder with a `theme.json` and its pictures and fonts. [src/shared/themePack.ts](src/shared/themePack.ts) describes every field and which parts of the app can have a picture. Pack the folder into a theme file with `npm run pack-theme -- path/to/folder`.
 
+## Send to phone
+
+Right-click a note or file in the sidebar → **Send to phone…**, or press the phone button in a web tab. A QR code appears; point your phone's camera at it and tap the link. The file downloads (or the web page opens) straight from this computer over your Wi-Fi: nothing to install on the phone, no account, and nothing goes through the internet. The phone needs to be on the same Wi-Fi. Each code stops working after 10 minutes, or when you close it. The first time, Windows or macOS asks whether Notes may accept incoming connections: allow it on private networks.
+
 ## Features
 
 - **Live preview editor** — markdown renders as you type; the raw syntax shows only on the line you're editing. Headings, bold/italic/strike, code blocks with highlighting, tables, checkboxes, quotes, images, links.

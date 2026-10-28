@@ -66,6 +66,7 @@ import LayoutMenu from './Editor/LayoutMenu'
 import RightPanel from './Panels/RightPanel'
 import Modals from './Picker/Modals'
 import LockDialog from './Lock/LockDialog'
+import SendToPhone from './Phone/SendToPhone'
 import { startFormatMenu } from '../lib/formatMenu'
 import { startDictionary } from '../lib/dictionary'
 import { EventDetails } from './Calendar/shared'
@@ -429,6 +430,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
 
       <Modals />
       <LockDialog />
+      <SendToPhone />
       <EventDetails />
       <UpdateToast />
       <MusicPlayer />

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { WebviewTag } from 'electron'
-import { ArrowLeft, ArrowRight, Eraser, ExternalLink, Globe, MonitorPlay, MoreHorizontal, RotateCw, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Eraser, ExternalLink, Globe, MonitorPlay, MoreHorizontal, RotateCw, Smartphone, X } from 'lucide-react'
 import { displayUrl, toWebUrl, WEB_PARTITION } from '@shared/web'
 import { youTubeVideoId, youTubeWatchUrl } from '@shared/youtube'
 import { loadInWebTab, setWebPage, useWeb, webviews } from '../../store/web'
 import { notify } from '../../store/notify'
+import { sendToPhone } from '../../store/phone'
 import { CLICK_MOD } from '@shared/platform'
 
 /** Signs you out of every website, after asking. */
@@ -36,6 +37,7 @@ interface Failure {
  */
 export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidden: boolean; autoFocus: boolean }) {
   const url = useWeb((s) => s.pages[tab]?.url ?? '')
+  const pageTitle = useWeb((s) => s.pages[tab]?.title)
   // The page the webview starts on; after that it navigates itself (or through loadInWebTab).
   const [src, setSrc] = useState(url)
   // React knows <webview> as a plain element; Electron gives it the methods (WebviewTag).
@@ -189,6 +191,9 @@ export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidde
             <MonitorPlay size={14} />
           </button>
         )}
+        <button type="button" className="icon-btn" title="Send to phone (scan a QR code)" disabled={!url} onClick={() => sendToPhone({ kind: 'link', url, title: pageTitle })}>
+          <Smartphone size={14} />
+        </button>
         <button type="button" className="icon-btn" title="Open in your browser" disabled={!url} onClick={() => window.open(url)}>
           <ExternalLink size={14} />
         </button>
