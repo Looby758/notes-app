@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
-import { Eye, EyeOff, FolderOpen, Gamepad2, Loader2, MoreHorizontal, Play, Plus, RefreshCw, Search, Trash2 } from 'lucide-react'
-import { describeLastPlayed, describePlayed, sortGames, type Game, type GameSort, type GameSource, type GamesList } from '@shared/games'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { Eye, EyeOff, FolderOpen, Gamepad2, Loader2, MoreHorizontal, Play, Plus, RefreshCw, Search, Sparkles, Trash2 } from 'lucide-react'
+import { describeLastPlayed, describePlayed, sortGames, type AnimatedCovers, type CoversStatus, type Game, type GameSort, type GameSource, type GamesList } from '@shared/games'
 import { FILE_MANAGER, IS_MAC } from '@shared/platform'
 import ContextMenu, { type MenuItem } from '../ContextMenu'
 import LaunchAnimation from './LaunchAnimation'
+import CoversSetup from './CoversSetup'
 import { usePrefs } from '../../store/prefs'
 import { notify } from '../../store/notify'
 
@@ -14,6 +15,19 @@ const SORTS: { value: GameSort; label: string }[] = [
   { value: 'most', label: 'Most played' },
   { value: 'name', label: 'A to Z' }
 ]
+
+/** Whether the system asks for less motion (as well as the Reduce motion setting). */
+function useSystemReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(() => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false)
+  useEffect(() => {
+    const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)')
+    if (!mq) return
+    const update = (): void => setReduced(mq.matches)
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+  return reduced
+}
 
 const savedSort = (): GameSort => {
   try {
@@ -36,6 +50,11 @@ export default function GamesPage() {
   const [menu, setMenu] = useState<{ x: number; y: number; game: Game } | null>(null)
   const [launching, setLaunching] = useState<Game | null>(null)
   const animate = usePrefs((s) => s.prefs.gameLaunchAnimation && !s.prefs.reduceMotion)
+  const systemReduced = useSystemReducedMotion()
+  const coverMode = usePrefs((s): AnimatedCovers => (s.prefs.reduceMotion || systemReduced ? 'off' : s.prefs.gameAnimatedCovers))
+  const [coversStatus, setCoversStatus] = useState<CoversStatus | null>(null)
+  const [covers, setCovers] = useState<Record<string, string>>({})
+  const [coversOpen, setCoversOpen] = useState(false)
 
   const load = useCallback(async (rescan: boolean) => {
     if (rescan) setRefreshing(true)
@@ -85,6 +104,21 @@ export default function GamesPage() {
   }
 
   const games = data?.games ?? []
+
+  useEffect(() => {
+    void window.api.gamesCoversStatus().then(setCoversStatus)
+  }, [])
+
+  // Animated covers are looked up once the list is in (remembered, so this is quick after the first time).
+  const coverIds = useMemo(() => games.filter((g) => !g.hidden).map((g) => g.id).join('\n'), [games])
+  useEffect(() => {
+    if (coverMode === 'off' || !coversStatus?.hasKey || !coverIds) return
+    let live = true
+    void window.api.gamesCovers(coverIds.split('\n')).then((c) => live && setCovers(c))
+    return () => {
+      live = false
+    }
+  }, [coverIds, coverMode, coversStatus?.hasKey])
   const sources = useMemo(() => [...new Set(games.map((g) => g.source))], [games])
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -138,11 +172,26 @@ export default function GamesPage() {
             <button className="btn" onClick={() => void load(true)} disabled={refreshing} title="Look for newly installed games" data-games-refresh>
               {refreshing ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />} Refresh
             </button>
+            <button className={`btn ${coversOpen ? 'active' : ''}`} onClick={() => setCoversOpen(!coversOpen)} title="Covers that move, from SteamGridDB" data-games-covers>
+              <Sparkles size={14} /> Animated covers
+            </button>
             <button className="btn" onClick={() => void add()} title={IS_MAC ? 'Pick a game from Applications that isn’t on the list' : 'Pick a game that isn’t on the list'} data-games-add>
               <Plus size={14} /> Add a game
             </button>
           </div>
         </div>
+
+        {coversOpen && coversStatus && (
+          <CoversSetup
+            status={coversStatus}
+            mode={coverMode}
+            found={Object.keys(covers).length}
+            onChange={(st) => {
+              setCoversStatus(st)
+              if (!st.hasKey) setCovers({})
+            }}
+          />
+        )}
 
         {games.length > 0 && (
           <div className="games-tools">
@@ -191,7 +240,7 @@ export default function GamesPage() {
 
         <div className="games-grid" data-games-grid>
           {shown.map((g) => (
-            <GameCard key={g.id} game={g} now={now} starting={starting === g.id} onPlay={() => void play(g)} onMenu={(e) => openMenu(e, g)} />
+            <GameCard key={g.id} game={g} cover={coverMode === 'off' ? null : covers[g.id] ?? null} coverMode={coverMode} now={now} starting={starting === g.id} onPlay={() => void play(g)} onMenu={(e) => openMenu(e, g)} />
           ))}
         </div>
 
@@ -222,18 +271,41 @@ export default function GamesPage() {
   )
 }
 
-function GameCard({ game: g, now, starting, onPlay, onMenu }: { game: Game; now: Date; starting: boolean; onPlay: () => void; onMenu: (e: MouseEvent) => void }) {
+interface CardProps {
+  game: Game
+  /** An animated cover, shown over the still one once it has loaded. */
+  cover: string | null
+  coverMode: AnimatedCovers
+  now: Date
+  starting: boolean
+  onPlay: () => void
+  onMenu: (e: MouseEvent) => void
+}
+
+function GameCard({ game: g, cover, coverMode, now, starting, onPlay, onMenu }: CardProps) {
   const [artFailed, setArtFailed] = useState(false)
   const art = g.art && !artFailed ? g.art : null
+  const live = useLiveCover(cover, coverMode)
   return (
-    <div className={`game-card ${g.running ? 'running' : ''}`} onContextMenu={onMenu} onDoubleClick={onPlay} data-game={g.id}>
-      <div className="game-art">
+    <div className={`game-card ${g.running ? 'running' : ''}`} onContextMenu={onMenu} onDoubleClick={onPlay} onMouseEnter={live.enter} onMouseLeave={live.leave} data-game={g.id}>
+      <div className="game-art" ref={live.ref}>
         {art ? (
           <img src={art} alt="" draggable={false} onError={() => setArtFailed(true)} />
         ) : g.icon ? (
           <img className="game-icon" src={g.icon} alt="" draggable={false} />
         ) : (
           <span className="game-letter">{g.name.slice(0, 1).toUpperCase()}</span>
+        )}
+        {live.show && cover && (
+          <img
+            className={`game-cover-live ${live.loaded ? 'shown' : ''}`}
+            src={cover}
+            alt=""
+            draggable={false}
+            onLoad={live.onLoad}
+            onError={live.onError}
+            data-game-cover-live
+          />
         )}
         {g.running && <span className="game-playing">Playing now</span>}
       </div>
@@ -260,4 +332,48 @@ function GameCard({ game: g, now, starting, onPlay, onMenu }: { game: Game; now:
       </div>
     </div>
   )
+}
+
+/**
+ * When a card's animated cover plays: only while the card is on screen (so a long list isn't
+ * all moving at once), and in "On hover" mode only while the pointer is on it. If the picture
+ * can't be loaded, the still one simply stays.
+ */
+function useLiveCover(cover: string | null, mode: AnimatedCovers) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [visible, setVisible] = useState(false)
+  const [hovered, setHovered] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    setLoaded(false)
+    setFailed(false)
+  }, [cover])
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el || !cover || mode === 'off') return
+    if (typeof IntersectionObserver === 'undefined') {
+      setVisible(true)
+      return
+    }
+    const io = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { rootMargin: '100px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [cover, mode])
+
+  const show = !!cover && !failed && visible && (mode === 'always' || (mode === 'hover' && hovered))
+  return {
+    ref,
+    show,
+    loaded,
+    enter: () => setHovered(true),
+    leave: () => {
+      setHovered(false)
+      if (mode === 'hover') setLoaded(false)
+    },
+    onLoad: () => setLoaded(true),
+    onError: () => setFailed(true)
+  }
 }

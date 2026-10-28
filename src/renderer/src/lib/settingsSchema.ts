@@ -180,6 +180,20 @@ export const SETTINGS: SettingDef[] = [
     description: 'Pressing Play on the Games page shows the game’s art and logo for a few seconds while it starts. Click or press Esc to skip it. Off while Reduce motion is on.',
     keywords: 'games play launch start animation intro splash steam epic cinematic'
   },
+  {
+    key: 'gameAnimatedCovers',
+    section: 'appearance',
+    group: 'Interface',
+    type: 'choice',
+    options: [
+      { value: 'always', label: 'Always' },
+      { value: 'hover', label: 'On hover' },
+      { value: 'off', label: 'Off' }
+    ],
+    label: 'Animated game covers',
+    description: 'Covers on the Games page that move, from SteamGridDB (add a free key on the Games page). Still pictures are shown when a game has none, and while Reduce motion is on.',
+    keywords: 'games covers art animated moving living gif webp steamgriddb grid'
+  },
 
   // ---------- Editor ----------
   {
@@ -432,6 +446,26 @@ export const SETTINGS: SettingDef[] = [
     label: 'Lock again after',
     description: 'Unlocked notes and passwords lock again after this long without using Notes. (Passwords still lock after 30 min if this is “Never”. Also Ctrl+K → “Lock all notes and passwords now”, and they always lock when Notes closes.)',
     keywords: 'lock password encrypt private secure auto timeout'
+  },
+
+  // ---------- Music ----------
+  {
+    key: 'musicSongPopup',
+    section: 'music',
+    group: 'Player',
+    type: 'toggle',
+    label: 'Show a pop-up when the song changes',
+    description: 'The song’s name, artist and picture appear in the corner for a few seconds when the next one starts.',
+    keywords: 'music song now playing popup notification toast spotify'
+  },
+  {
+    key: 'musicVisualiser',
+    section: 'music',
+    group: 'Player',
+    type: 'toggle',
+    label: 'Visualiser for your own music',
+    description: 'Moving bars in the player while your own music files play (Spotify doesn’t let other apps see its sound). Also the bars button under the player.',
+    keywords: 'music visualizer visualiser bars waves equaliser animation'
   },
 
   // ---------- Calendar ----------

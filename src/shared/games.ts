@@ -332,3 +332,77 @@ export function steamCachePaths(cache: string, appId: string, image: SteamImage,
 
 /** How long the launch animation plays (ms) before it fades out by itself. */
 export const LAUNCH_ANIMATION_MS = 3200
+
+// ---------- animated covers ----------
+
+/** SteamGridDB, where people share game art, including covers that move (animated WebP or PNG). */
+export const STEAMGRIDDB_API = 'https://www.steamgriddb.com/api/v2'
+
+/** Same shape as the cards: Steam's banner size, and the same at double size. */
+const COVER_SIZES = ['460x215', '920x430']
+
+/** Animated covers only, card-shaped, and nothing that flashes, is explicit or is a joke. */
+export const ANIMATED_COVER_QUERY = `types=animated&dimensions=${COVER_SIZES.join(',')}&nsfw=false&epilepsy=false&humor=false`
+
+/** One cover as SteamGridDB describes it (only the parts used here). */
+export interface SgdbGrid {
+  url: string
+  width: number
+  height: number
+  mime?: string
+  nsfw?: boolean
+  epilepsy?: boolean
+}
+
+/**
+ * The cover to use from SteamGridDB's list (it comes best-voted first): the first animated picture
+ * the card can show, preferring the smaller size since the cards are small. Null if none suits.
+ */
+export function pickAnimatedCover(grids: SgdbGrid[]): string | null {
+  const ok = grids.filter(
+    (g) =>
+      g &&
+      typeof g.url === 'string' &&
+      /^https:\/\//.test(g.url) &&
+      !g.nsfw &&
+      !g.epilepsy &&
+      (g.mime ? /^image\/(webp|png|gif)$/.test(g.mime) : /\.(webp|png|gif)$/i.test(g.url)) &&
+      Math.abs(g.width / g.height - 460 / 215) < 0.05
+  )
+  return (ok.find((g) => g.width <= 460) ?? ok[0])?.url ?? null
+}
+
+const simpleName = (name: string): string =>
+  name
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[™®©]/g, '')
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '')
+
+/**
+ * For games that aren't on Steam, SteamGridDB is searched by name. Only a result with the same
+ * name (ignoring case, accents and punctuation) is used, so a game never gets someone else's cover.
+ */
+export function matchSgdbGame(name: string, results: { id: number; name: string }[]): number | null {
+  const want = simpleName(name)
+  if (!want) return null
+  return results.find((r) => r && typeof r.id === 'number' && simpleName(String(r.name)) === want)?.id ?? null
+}
+
+/** How long a lookup is remembered: a cover found for a month, "none yet" for a week (people add new ones). */
+export function coverLookupFresh(entry: { url: string | null; checked: number } | undefined, now: number): boolean {
+  if (!entry) return false
+  const days = entry.url ? 30 : 7
+  return now - entry.checked < days * 24 * 3600 * 1000
+}
+
+/** Whether game covers move: all the time, only while the pointer is on one, or never. */
+export type AnimatedCovers = 'always' | 'hover' | 'off'
+
+export interface CoversStatus {
+  hasKey: boolean
+  /** False if the system can't encrypt the key (it is then not saved). */
+  canEncrypt: boolean
+}
