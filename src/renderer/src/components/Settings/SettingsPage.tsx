@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CalendarDays, FileJson, FolderCog, Info, Keyboard, Palette, PenLine, RefreshCw, RotateCcw, ScrollText, Search, Sparkles, X, Zap } from 'lucide-react'
+import { CalendarDays, FileJson, Music, FolderCog, Info, Keyboard, Palette, PenLine, RefreshCw, RotateCcw, ScrollText, Search, Sparkles, X, Zap } from 'lucide-react'
 import { checkForUpdates, useUpdates, watchUpdates } from '../../store/updates'
 import { DEFAULT_PREFS } from '@shared/prefs'
 import type { CaptureStatus } from '@shared/types'
@@ -12,6 +12,7 @@ import SnippetsEditor from './SnippetsEditor'
 import PlaceholderHelp from './PlaceholderHelp'
 import RemindersSettings from './RemindersSettings'
 import AiSettings from '../Ai/AiSettings'
+import MusicSettings from '../Music/MusicSettings'
 import { useUI } from '../../store/ui'
 import pkg from '../../../../../package.json'
 import { showKeys, TRAY_NAME } from '@shared/platform'
@@ -23,6 +24,7 @@ const ICONS: Record<SectionId, typeof Palette> = {
   calendar: CalendarDays,
   capture: Zap,
   ai: Sparkles,
+  music: Music,
   shortcuts: Keyboard,
   about: Info
 }
@@ -275,6 +277,7 @@ export default function SettingsPage() {
                   {section === 'calendar' && <CalendarSources />}
                   {section === 'capture' && <CaptureShortcutStatus />}
                   {section === 'ai' && <AiSettings />}
+                  {section === 'music' && <MusicSettings />}
                 </>
               )}
             </>

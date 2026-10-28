@@ -42,6 +42,7 @@ import { openRandomNote } from './random'
 import { notify } from '../store/notify'
 import { newBoard } from './boards'
 import { openAsk, runNoteJob } from '../store/ai'
+import { musicControl, toggleMusic } from '../store/music'
 import { changeNotesPassword, lockAllNow, lockNote, lockNoteOwn, removeLock } from './lock/actions'
 
 export interface Command {
@@ -176,6 +177,10 @@ export const commands: Command[] = [
   { id: 'calendar.open', group: 'Calendar', title: 'Open calendar', shortcut: 'Ctrl+Shift+C', run: () => openSpecialTab(CALENDAR_TAB) },
   { id: 'email.open', group: 'Navigation', title: 'Open email', shortcut: 'Ctrl+Shift+A', run: () => openSpecialTab(EMAIL_TAB) },
   { id: 'calendar.panel', group: 'Calendar', title: 'Show calendar in the side panel', run: () => showRightView('calendar') },
+  { id: 'music.player', group: 'Music', title: 'Show or hide the music player', shortcut: 'Ctrl+Alt+M', run: toggleMusic },
+  { id: 'music.toggle', group: 'Music', title: 'Music: play / pause', run: () => void musicControl('toggle') },
+  { id: 'music.next', group: 'Music', title: 'Music: next song', run: () => void musicControl('next') },
+  { id: 'music.previous', group: 'Music', title: 'Music: previous song', run: () => void musicControl('previous') },
 
   ...EDITOR_COMMANDS.map(
     (c): Command => ({ id: c.id, group: 'Formatting', title: c.title, shortcut: c.shortcut, scope: 'editor', run: () => runEditorCommand(c.id) })

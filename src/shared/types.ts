@@ -2,6 +2,7 @@ import type { Prefs } from './prefs'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
 import type { Place } from './places'
+import type { MusicAction, MusicItem, MusicSearchResults, MusicState, MusicStatus } from './spotify'
 
 export interface WindowBounds {
   x?: number
@@ -334,6 +335,23 @@ export interface NotesApi {
   emailTrash(id: string): Promise<void>
   /** A .gsheet file's sheet, fetched from Google with the sign-in above. */
   readGoogleSheet(path: string): Promise<GoogleSheetResult>
+  // Music player (Spotify: the Mac app directly, or your account)
+  musicStatus(): Promise<MusicStatus>
+  /** Saves your Spotify developer app's client ID ('' to remove it). */
+  musicSetClient(clientId: string): Promise<MusicStatus>
+  /** Signs in to Spotify in your browser. */
+  musicConnect(): Promise<MusicStatus>
+  musicDisconnect(): Promise<MusicStatus>
+  musicNowPlaying(): Promise<MusicState>
+  musicControl(action: MusicAction): Promise<void>
+  musicSeek(ms: number): Promise<void>
+  /** Plays a spotify: URI; a song can be played within a playlist or album (`context`). */
+  musicPlay(uri: string, context?: string): Promise<void>
+  /** Needs your account. */
+  musicSearch(query: string): Promise<MusicSearchResults>
+  musicPlaylists(): Promise<MusicItem[]>
+  /** Opens the Spotify app, or (Mac) where you let Notes control it in System Settings. */
+  musicOpen(what: 'app' | 'automation'): Promise<void>
   aiStatus(): Promise<AiStatus>
   /** Checks the key with Anthropic, then stores it encrypted. */
   aiSetKey(key: string): Promise<AiStatus>
