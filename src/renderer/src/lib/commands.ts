@@ -19,6 +19,7 @@ import {
   MONEY_TAB,
   CONVERT_TAB,
   SUDOKU_TAB,
+  MESSAGES_TAB,
   closePane,
   closeTabUnlessPinned,
   cycleTab,
@@ -38,6 +39,7 @@ import { toggleStar } from '../store/starred'
 import { openToday, stepDaily } from './daily'
 import { matchesShortcut, normalizeShortcut } from './shortcuts'
 import { clearBrowsingData } from '../components/Web/WebPage'
+import { showMessages } from '../store/messages'
 import { FILE_MANAGER } from '@shared/platform'
 import { openRandomNote } from './random'
 import { notify } from '../store/notify'
@@ -175,6 +177,25 @@ export const commands: Command[] = [
   { id: 'daily.prev', group: 'Calendar', title: 'Previous daily note', run: () => stepDaily(-1) },
   { id: 'daily.next', group: 'Calendar', title: 'Next daily note', run: () => stepDaily(1) },
   { id: 'calendar.open', group: 'Calendar', title: 'Open calendar', shortcut: 'Ctrl+Shift+C', run: () => openSpecialTab(CALENDAR_TAB) },
+  { id: 'messages.open', group: 'Navigation', title: 'Open messages (WhatsApp, Discord)', run: () => openSpecialTab(MESSAGES_TAB) },
+  {
+    id: 'messages.whatsapp',
+    group: 'Navigation',
+    title: 'Open WhatsApp',
+    run: () => {
+      showMessages('whatsapp')
+      openSpecialTab(MESSAGES_TAB)
+    }
+  },
+  {
+    id: 'messages.discord',
+    group: 'Navigation',
+    title: 'Open Discord',
+    run: () => {
+      showMessages('discord')
+      openSpecialTab(MESSAGES_TAB)
+    }
+  },
   { id: 'email.open', group: 'Navigation', title: 'Open email', shortcut: 'Ctrl+Shift+A', run: () => openSpecialTab(EMAIL_TAB) },
   { id: 'calendar.panel', group: 'Calendar', title: 'Show calendar in the side panel', run: () => showRightView('calendar') },
 

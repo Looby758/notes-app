@@ -70,6 +70,7 @@ import VoiceRecorder from './VoiceRecorder'
 import DefinitionCard from './DefinitionCard'
 import SketchPad from './Sketch/SketchPad'
 import { FlashcardsButton } from './Flashcards/FlashcardsPage'
+import { MessagesButton } from './Messages/MessagesPage'
 import { openRandomNote } from '../lib/random'
 import { startReminders, stopReminders } from '../lib/reminderScheduler'
 
@@ -307,6 +308,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         <button className="icon-btn" onClick={() => openSpecialTab(EMAIL_TAB)} title={`Email (${showKeys('Ctrl+Shift+A')})`}>
           <Mail size={15} />
         </button>
+        <MessagesButton />
         <FlashcardsButton />
         <button className="icon-btn" onClick={() => openSpecialTab(TERMINAL_TAB)} title={`Terminal (${showKeys('Ctrl+Alt+T')})`} data-terminal-button>
           <SquareTerminal size={15} />

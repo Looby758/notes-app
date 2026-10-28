@@ -67,6 +67,8 @@ export const HOME_TAB = 'home:'
 export const MONEY_TAB = 'money:'
 export const CONVERT_TAB = 'convert:'
 export const SUDOKU_TAB = 'sudoku:'
+/** WhatsApp and Discord in one tab (components/Messages). */
+export const MESSAGES_TAB = 'messages:'
 /** A picture, recording, PDF… from the notes folder, shown in a tab: "file:attachments/a.png". */
 export const FILE_TAB = 'file:'
 export const fileTab = (path: string): string => FILE_TAB + path
