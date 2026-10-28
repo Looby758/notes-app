@@ -25,6 +25,7 @@ import {
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
+  GAMES_TAB,
   SETTINGS_TAB,
   splitPane
 } from '../../lib/editorController'
@@ -49,6 +50,7 @@ import EmailPage from '../Email/EmailPage'
 import HomePage from '../Home/HomePage'
 import MoneyPage from '../Money/MoneyPage'
 import ConvertPage from '../Convert/ConvertPage'
+import GamesPage from '../Games/GamesPage'
 import MindMap from '../MindMap/MindMap'
 import WebPage from '../Web/WebPage'
 import { isMindMap, useUI } from '../../store/ui'
@@ -146,6 +148,7 @@ export default function Pane({ pane }: { pane: string }) {
         {(active === HOME_TAB || !active) && <HomePage />}
         {active === MONEY_TAB && <MoneyPage />}
         {active === CONVERT_TAB && <ConvertPage />}
+        {active === GAMES_TAB && <GamesPage />}
         {zone && <div className={`drop-zone ${zone}`} />}
       </div>
     </div>

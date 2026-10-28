@@ -43,6 +43,7 @@ import { setupPlaces } from './places'
 import { setupBrowser } from './browser'
 import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
+import { setupGames } from './games'
 import { applyIconOutsideApp } from './appIcon'
 import { CODE_SANDBOX_SCHEME, registerCodeSandbox } from './codeSandbox'
 import { readHandwritingOffline } from './handwriting'
@@ -465,6 +466,7 @@ function registerIpc(): void {
   setupWebTitle()
   setupPlaces()
   setupImporter()
+  setupGames()
   setupTerminal(() => vault?.root ?? null)
   // The Mac asks once whether Notes may use the microphone.
   ipcMain.handle('voice:access', async () => (IS_MAC ? systemPreferences.askForMediaAccess('microphone') : true))

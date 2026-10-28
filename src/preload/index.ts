@@ -130,6 +130,17 @@ const api: NotesApi = {
   aiSummarise: (title, text) => ipcRenderer.invoke('ai:summarise', title, text),
   aiTidy: (text, kind) => ipcRenderer.invoke('ai:tidy', text, kind),
   aiAsk: (question, notes, history) => ipcRenderer.invoke('ai:ask', question, notes, history),
+  gamesList: (rescan) => ipcRenderer.invoke('games:list', rescan),
+  gamesPlay: (id) => ipcRenderer.invoke('games:play', id),
+  gamesSetHidden: (id, hidden) => ipcRenderer.invoke('games:setHidden', id, hidden),
+  gamesAdd: () => ipcRenderer.invoke('games:add'),
+  gamesRemove: (id) => ipcRenderer.invoke('games:remove', id),
+  gamesReveal: (id) => ipcRenderer.invoke('games:reveal', id),
+  onGamesChanged: (callback) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('games:changed', handler)
+    return () => ipcRenderer.removeListener('games:changed', handler)
+  },
   terminalStart: (cols, rows) => ipcRenderer.invoke('term:start', cols, rows),
   terminalStop: () => ipcRenderer.invoke('term:stop'),
   terminalInput: (data) => ipcRenderer.send('term:input', data),

@@ -8074,3 +8074,221 @@ a.passwords-text:hover {
   align-items: center;
   gap: 4px;
 }
+
+/* ---------- games ---------- */
+.pane-body > .games-page {
+  flex: 1;
+}
+.games-page {
+  overflow-y: auto;
+  min-height: 0;
+}
+.games-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px 32px 60px;
+}
+.games-inner h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+.games-intro {
+  margin: 0 0 18px;
+  max-width: 720px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.games-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-panel);
+}
+.games-summary strong {
+  font-size: 18px;
+}
+.games-summary span {
+  color: var(--text-muted);
+}
+.games-summary .games-now {
+  color: var(--accent-strong);
+}
+.games-summary-buttons {
+  display: flex;
+  gap: 8px;
+}
+.games-inner .btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.games-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.games-search {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-faint);
+}
+.games-search:focus-within {
+  border-color: var(--accent);
+}
+.games-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+.games-none {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.games-none p {
+  margin: 0;
+}
+.games-none ul {
+  margin: 4px 0 0;
+  padding-left: 20px;
+}
+p.games-none {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.games-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+}
+.game-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-panel);
+  transition: border-color 0.15s var(--ease), transform 0.15s var(--ease);
+}
+.game-card:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+.game-card.running {
+  border-color: var(--accent);
+}
+.game-art {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 460 / 215;
+  background: linear-gradient(135deg, var(--bg-raised), var(--accent-soft));
+}
+.game-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.game-art img.game-icon {
+  width: auto;
+  height: 72%;
+  object-fit: contain;
+}
+.game-letter {
+  color: var(--text-muted);
+  font-size: 40px;
+  font-weight: 600;
+}
+.game-playing {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.game-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px 4px;
+  min-width: 0;
+}
+.game-name {
+  overflow: hidden;
+  color: var(--text-strong);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.game-meta {
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.game-meta.faint {
+  color: var(--text-faint);
+}
+.game-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding: 8px 12px 12px;
+}
+.game-actions .btn {
+  flex: 1;
+  justify-content: center;
+  padding: 5px 12px;
+  font-size: 12.5px;
+}
+.games-hidden {
+  margin-top: 24px;
+  color: var(--text-muted);
+}
+.games-hidden ul {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.games-hidden li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.games-hidden-source {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.games-hidden .btn {
+  padding: 4px 10px;
+  font-size: 12px;
+}
