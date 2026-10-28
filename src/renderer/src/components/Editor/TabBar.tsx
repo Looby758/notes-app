@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ArrowRightLeft, CalendarDays, Columns2, Copy, ExternalLink, FileDown, FolderSearch, GitCompare, Globe, Grid3x3, House, KeyRound, Layers, Mail, MessageSquare, MessagesSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
+import { ArrowRightLeft, CalendarDays, Columns2, Copy, ExternalLink, FileDown, FolderSearch, Gamepad2, GitCompare, Globe, Grid3x3, House, KeyRound, Layers, Mail, MessageSquare, MessagesSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
 import { useEditor } from '../../store/editor'
 import { toggleStar, useStarred } from '../../store/starred'
 import { useNoteIndex } from '../../store/noteIndex'
@@ -21,6 +21,7 @@ import {
   CONVERT_TAB,
   SUDOKU_TAB,
   MESSAGES_TAB,
+  GAMES_TAB,
   closePane,
   closeTab,
   closeTabUnlessPinned,
@@ -67,6 +68,7 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === CONVERT_TAB) return 'Convert files'
   if (id === SUDOKU_TAB) return 'Sudoku'
   if (id === MESSAGES_TAB) return 'Messages'
+  if (id === GAMES_TAB) return 'Games'
   if (isFileTab(id)) return fileOfTab(id).slice(fileOfTab(id).lastIndexOf('/') + 1).replace(/\.canvas$/i, '')
   return noteTitle(id)
 }
@@ -240,6 +242,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === CONVERT_TAB && <ArrowRightLeft size={13} className="tab-icon" />}
               {id === SUDOKU_TAB && <Grid3x3 size={13} className="tab-icon" />}
               {id === MESSAGES_TAB && <MessagesSquare size={13} className="tab-icon" />}
+              {id === GAMES_TAB && <Gamepad2 size={13} className="tab-icon" />}
               {isFileTab(id) && <FileIcon path={fileOfTab(id)} size={13} className="tab-icon" />}
               {icons.get(id) && <span className="tab-emoji">{icons.get(id)}</span>}
               <span className="tab-title">{tabTitle(id, web)}</span>

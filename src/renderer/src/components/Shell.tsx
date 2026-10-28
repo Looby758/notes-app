@@ -6,6 +6,7 @@ import {
   Command as CommandIcon,
   FolderOpen,
   FolderSync,
+  Gamepad2,
   House,
   LogOut,
   MessageSquare,
@@ -53,6 +54,7 @@ import {
   MONEY_TAB,
   CONVERT_TAB,
   SUDOKU_TAB,
+  GAMES_TAB,
   setZenEditor
 } from '../lib/editorController'
 import { openLink, openWikiLink } from '../lib/openLink'
@@ -341,6 +343,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         </button>
         <button className={`icon-btn ${musicOpen ? 'active' : ''}`} onClick={toggleMusic} title="Music player (Spotify)" data-music-button>
           <Music size={15} />
+        </button>
+        <button className="icon-btn" onClick={() => openSpecialTab(GAMES_TAB)} title="Games" data-games-button>
+          <Gamepad2 size={15} />
         </button>
         <LayoutMenu />
         <button className="icon-btn" onClick={() => useUI.setState({ modal: 'commands' })} title={`All commands (${showKeys('Ctrl+K')})`}>

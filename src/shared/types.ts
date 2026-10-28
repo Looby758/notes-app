@@ -4,6 +4,7 @@ import type { Sheet } from './sheet'
 import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
 import type { MusicAction, MusicItem, MusicSearchResults, MusicState, MusicStatus } from './spotify'
+import type { GamesList } from './games'
 
 export interface WindowBounds {
   x?: number
@@ -394,6 +395,19 @@ export interface NotesApi {
   /** A quick capture is tidied as one list item; a note can get headings and lists. */
   aiTidy(text: string, kind: 'note' | 'capture'): Promise<string>
   aiAsk(question: string, notes: AiNote[], history: AiAskTurn[]): Promise<string>
+  // Games
+  /** The games installed on this computer, with time played; `rescan` looks for new ones first. */
+  gamesList(rescan: boolean): Promise<GamesList>
+  /** Starts a game; resolves to a message if it couldn't. */
+  gamesPlay(id: string): Promise<string | null>
+  gamesSetHidden(id: string, hidden: boolean): Promise<void>
+  /** Asks for an app to add as a game; resolves to its id, or null if cancelled. */
+  gamesAdd(): Promise<string | null>
+  /** Takes a game you added off the list. */
+  gamesRemove(id: string): Promise<void>
+  gamesReveal(id: string): Promise<void>
+  /** A game started or stopped, or more time was counted. */
+  onGamesChanged(callback: () => void): () => void
   // Terminal tab
   /** Starts the command line in the notes folder (or carries on with the one already running). */
   terminalStart(cols: number, rows: number): Promise<TerminalStart>
