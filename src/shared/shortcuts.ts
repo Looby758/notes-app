@@ -75,8 +75,12 @@ export function normalizeShortcut(shortcut: string): string {
   return [...MODIFIERS.filter((m) => mods.has(m)), key].join('+')
 }
 
-/** The shortcut a key press represents, or null while only modifier keys are held. */
-export function shortcutFromEvent(e: Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'altKey' | 'shiftKey' | 'metaKey'>): string | null {
+/**
+ * The shortcut a key press represents, or null while only modifier keys are held. On a Mac, Ctrl
+ * means ⌘: the real Control key only counts with Tab, because Control+K, Control+N, Control+P and
+ * Control+T are the Mac's own text-editing keys (delete to end of line, next line…).
+ */
+export function shortcutFromEvent(e: Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'altKey' | 'shiftKey' | 'metaKey'>, mac = IS_MAC): string | null {
   if (['Control', 'Alt', 'Shift', 'Meta', 'AltGraph'].includes(e.key)) return null
   let key: string
   const code = e.code ?? ''
@@ -87,6 +91,7 @@ export function shortcutFromEvent(e: Pick<KeyboardEvent, 'key' | 'code' | 'ctrlK
   else key = canonicalKey(e.key ?? '')
   // Some synthetic or unusual key events carry no key name at all.
   if (!key || key === 'Unidentified') return null
+  if (mac && e.ctrlKey && !e.metaKey && key !== 'Tab') return null
   return normalizeShortcut([e.ctrlKey || e.metaKey ? 'Ctrl' : '', e.altKey ? 'Alt' : '', e.shiftKey ? 'Shift' : '', key].filter(Boolean).join('+').replace(/\+\+$/, '+Plus'))
 }
 

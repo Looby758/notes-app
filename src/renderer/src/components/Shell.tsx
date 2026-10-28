@@ -301,7 +301,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         <button
           className={`icon-btn ${reading ? 'active' : ''}`}
           onClick={() => setPrefs({ readingMode: !reading })}
-          title={` (${showKeys('Ctrl+Shift+R')})`}
+          title={`${reading ? 'Back to writing' : 'Reading mode'} (${showKeys('Ctrl+Shift+R')})`}
           data-reading-toggle
         >
           {reading ? <PenLine size={15} /> : <BookOpen size={15} />}

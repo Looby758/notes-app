@@ -22,6 +22,8 @@ const isMarkdown = (name: string): boolean => name.toLowerCase().endsWith('.md')
 const isBoard = (name: string): boolean => name.toLowerCase().endsWith('.canvas')
 
 const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024
+/** Daily copies kept of each app data file (money, passwords…). */
+const APP_DATA_BACKUPS = 7
 
 /** Makes any file name safe for Windows: bad characters become "-". */
 function safeFileName(name: string): string {
@@ -169,20 +171,52 @@ export class Vault {
    * Small app files kept inside the vault (in ".notesapp/", hidden from the tree) so they sync
    * with your notes, e.g. starred notes. Only simple names like "starred.json" are allowed.
    */
+  /**
+   * The file's text, or null only when there's no such file. Any other failure (Google Drive still
+   * downloading it, a lock) throws, so a missing file and an unreadable one aren't confused.
+   */
   async readAppData(name: string): Promise<string | null> {
     try {
       return await fs.readFile(this.appDataPath(name), 'utf8')
-    } catch {
-      return null
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
+      throw err
     }
   }
 
   async writeAppData(name: string, content: string): Promise<void> {
     const file = this.appDataPath(name)
     await fs.mkdir(dirname(file), { recursive: true })
+    await this.backUpAppData(name, file)
     const tmp = `${file}.${tempSuffix()}.tmp`
     await fs.writeFile(tmp, content, 'utf8')
     await renameWithRetry(tmp, file)
+  }
+
+  /**
+   * Before the first change each day, copies the file to .notesapp/backups/<name>-<date>.json, and
+   * keeps the newest few. If the money tracker or passwords ever start empty by mistake (a file
+   * half-synced from another computer), yesterday's copy is still there.
+   */
+  private async backUpAppData(name: string, file: string): Promise<void> {
+    const day = new Date().toISOString().slice(0, 10)
+    const stem = name.replace(/\.json$/, '')
+    const dir = join(this.root, '.notesapp', 'backups')
+    const backup = join(dir, `${stem}-${day}.json`)
+    try {
+      if (await exists(backup)) return
+      const current = await fs.readFile(file, 'utf8').catch(() => null)
+      if (!current?.trim()) return
+      await fs.mkdir(dir, { recursive: true })
+      await fs.writeFile(backup, current, 'utf8')
+      const old = (await fs.readdir(dir))
+        .filter((f) => f.startsWith(`${stem}-`) && /^\d{4}-\d{2}-\d{2}\.json$/.test(f.slice(stem.length + 1)))
+        .sort()
+        .slice(0, -APP_DATA_BACKUPS)
+      await Promise.all(old.map((f) => fs.rm(join(dir, f), { force: true })))
+    } catch {
+      // A backup that can't be made never stops the save itself.
+    }
   }
 
   private appDataPath(name: string): string {
