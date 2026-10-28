@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { CalendarDays, GitCompare, Columns2, FileDown, Layers, Network, Orbit, Replace, FolderSearch, Pin, PinOff, Plus, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
+import { CalendarDays, GitCompare, Columns2, FileDown, Layers, Network, Orbit, Replace, FolderSearch, House, Pin, PinOff, Plus, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
 import { useEditor } from '../../store/editor'
 import { toggleStar, useStarred } from '../../store/starred'
 import { useNoteIndex } from '../../store/noteIndex'
@@ -13,6 +13,7 @@ import {
   CONFLICTS_TAB,
   FLASHCARDS_TAB,
   TERMINAL_TAB,
+  HOME_TAB,
   closePane,
   closeTab,
   closeTabUnlessPinned,
@@ -45,6 +46,7 @@ function tabTitle(id: string): string {
   if (id === AI_TAB) return 'Ask my notes'
   if (id === FLASHCARDS_TAB) return 'Flashcards'
   if (id === TERMINAL_TAB) return 'Terminal'
+  if (id === HOME_TAB) return 'Home'
   if (isFileTab(id)) return fileOfTab(id).slice(fileOfTab(id).lastIndexOf('/') + 1).replace(/\.canvas$/i, '')
   return noteTitle(id)
 }
@@ -199,6 +201,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === AI_TAB && <Sparkles size={13} className="tab-icon" />}
               {id === FLASHCARDS_TAB && <Layers size={13} className="tab-icon" />}
               {id === TERMINAL_TAB && <SquareTerminal size={13} className="tab-icon" />}
+              {id === HOME_TAB && <House size={13} className="tab-icon" />}
               {isFileTab(id) && <FileIcon path={fileOfTab(id)} size={13} className="tab-icon" />}
               {icons.get(id) && <span className="tab-emoji">{icons.get(id)}</span>}
               <span className="tab-title">{tabTitle(id)}</span>
