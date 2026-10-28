@@ -108,6 +108,10 @@ export interface Prefs {
   timeFormat: '24h' | '12h'
   /** Heading in daily notes whose list items are events. */
   scheduleHeading: string
+  /** Today's weather and the week ahead on the Home page. */
+  weatherHome: boolean
+  /** The forecast beside outdoor events (walks, football, BBQs…) and on each day of the calendar. */
+  weatherCalendar: boolean
 
   // Quick capture and the tray
   /** System-wide shortcut (an Electron accelerator) that opens quick capture; '' for none. */
@@ -198,6 +202,8 @@ export const DEFAULT_PREFS: Prefs = {
   weekStart: 1,
   timeFormat: '24h',
   scheduleHeading: 'Schedule',
+  weatherHome: true,
+  weatherCalendar: true,
 
   // ⌘⇧N is taken by Finder and browsers on a Mac, so it gets ⌃⌥Space instead.
   captureShortcut: IS_MAC ? 'Control+Alt+Space' : 'Super+Shift+N',

@@ -1,19 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ArrowRightLeft,
+  Grid3x3,
   ChevronDown,
   Command as CommandIcon,
   FolderOpen,
   FolderSync,
+  Gamepad2,
   House,
   LogOut,
   MessageSquare,
+  Music,
   Orbit,
   Mail,
   BookOpen,
   Dices,
   KeyRound,
   Globe,
+  MonitorPlay,
   Moon,
   PenLine,
   PanelLeft,
@@ -49,6 +53,8 @@ import {
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
+  SUDOKU_TAB,
+  GAMES_TAB,
   setZenEditor
 } from '../lib/editorController'
 import { openLink, openWikiLink } from '../lib/openLink'
@@ -63,11 +69,14 @@ import { startDictionary } from '../lib/dictionary'
 import { EventDetails } from './Calendar/shared'
 import Resizer from './Resizer'
 import UpdateToast from './UpdateToast'
+import MusicPlayer from './Music/MusicPlayer'
+import { toggleMusic, useMusic } from '../store/music'
 import ZenBar, { StatusTimer } from './ZenBar'
 import VoiceRecorder from './VoiceRecorder'
 import DefinitionCard from './DefinitionCard'
 import SketchPad from './Sketch/SketchPad'
 import { FlashcardsButton } from './Flashcards/FlashcardsPage'
+import { MessagesButton } from './Messages/MessagesPage'
 import { openRandomNote } from '../lib/random'
 import { startReminders, stopReminders } from '../lib/reminderScheduler'
 
@@ -100,6 +109,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
   const showWordCount = usePrefs((s) => s.prefs.showWordCount)
   const reading = usePrefs((s) => s.prefs.readingMode)
   const zen = useUI((s) => s.zen)
+  const musicOpen = useMusic((s) => s.open)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const tree = useVault((s) => s.tree)
@@ -305,6 +315,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         <button className="icon-btn" onClick={() => openSpecialTab(EMAIL_TAB)} title={`Email (${showKeys('Ctrl+Shift+A')})`}>
           <Mail size={15} />
         </button>
+        <MessagesButton />
         <FlashcardsButton />
         <button className="icon-btn" onClick={() => openSpecialTab(TERMINAL_TAB)} title={`Terminal (${showKeys('Ctrl+Alt+T')})`} data-terminal-button>
           <SquareTerminal size={15} />
@@ -318,11 +329,23 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         <button className="icon-btn" onClick={() => openWebTab('', { beside: true })} title={`Web browser (${showKeys('Ctrl+Shift+I')})`} data-web-button>
           <Globe size={15} />
         </button>
+        <button className="icon-btn" onClick={() => void window.api.openYouTube()} title={`YouTube mini window (${showKeys('Ctrl+Alt+Y')})`} data-youtube-button>
+          <MonitorPlay size={15} />
+        </button>
         <button className="icon-btn" onClick={() => openSpecialTab(CHAT_TAB)} title="Chat with Claude" data-chat-button>
           <MessageSquare size={15} />
         </button>
         <button className="icon-btn" onClick={() => openSpecialTab(CONVERT_TAB)} title="Convert files" data-convert-button>
           <ArrowRightLeft size={15} />
+        </button>
+        <button className="icon-btn" onClick={() => openSpecialTab(SUDOKU_TAB)} title="Sudoku (a quick break)" data-sudoku-button>
+          <Grid3x3 size={15} />
+        </button>
+        <button className={`icon-btn ${musicOpen ? 'active' : ''}`} onClick={toggleMusic} title="Music player (Spotify)" data-music-button>
+          <Music size={15} />
+        </button>
+        <button className="icon-btn" onClick={() => openSpecialTab(GAMES_TAB)} title="Games" data-games-button>
+          <Gamepad2 size={15} />
         </button>
         <LayoutMenu />
         <button className="icon-btn" onClick={() => useUI.setState({ modal: 'commands' })} title={`All commands (${showKeys('Ctrl+K')})`}>
@@ -387,6 +410,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <LockDialog />
       <EventDetails />
       <UpdateToast />
+      <MusicPlayer />
       <ZenBar />
       <VoiceRecorder />
       <DefinitionCard />

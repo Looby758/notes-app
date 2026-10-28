@@ -6,6 +6,7 @@ import { addDays, dayKey, formatDate, fromDayKey, monthGrid, startOfWeek } from 
 import { addEvent, displayTime, openDaily } from '../../lib/daily'
 import { openNote } from '../../lib/editorController'
 import { DayList, ExternalStatus, QuickAdd, showEventDetails, useExternalRange, useItemsByDay, weekdayNames } from './shared'
+import { DayWeather, EventWeather } from '../Weather/Weather'
 
 const HOUR_PX = 44
 const MONTH_MAX_ITEMS = 3
@@ -162,6 +163,7 @@ function MonthView({ anchor, weekStart, onAdd }: { anchor: Date; weekStart: 0 | 
             >
               {d.getDate()}
             </button>
+            <DayWeather date={key} />
             <DayList local={items} external={ext} compact limit={MONTH_MAX_ITEMS} />
             {extra > 0 && (
               <button
@@ -187,6 +189,7 @@ interface Block {
   start: string
   end?: string
   title: string
+  date: string
   color?: string
   done?: boolean
   onClick: (e: MouseEvent) => void
@@ -237,6 +240,7 @@ function WeekView({ first, onAdd }: { first: Date; weekStart: 0 | 1; onAdd: (e: 
         start: i.start!,
         end: i.end,
         title: i.title,
+        date: key,
         done: i.done,
         onClick: () => openNote(i.path, { line: i.line })
       })),
@@ -247,6 +251,7 @@ function WeekView({ first, onAdd }: { first: Date; weekStart: 0 | 1; onAdd: (e: 
         start: x.start!,
         end: x.end,
         title: x.event.title,
+        date: key,
         color: x.event.color,
         onClick: (e: MouseEvent) => showEventDetails(x, e.clientX, e.clientY)
       }))
@@ -280,6 +285,7 @@ function WeekView({ first, onAdd }: { first: Date; weekStart: 0 | 1; onAdd: (e: 
             >
               <span>{formatDate(d, 'ddd')}</span>
               <strong className={daily ? 'has-daily' : ''}>{d.getDate()}</strong>
+              <DayWeather date={key} />
             </button>
           )
         })}
@@ -340,7 +346,10 @@ function WeekView({ first, onAdd }: { first: Date; weekStart: 0 | 1; onAdd: (e: 
                   onClick={(e) => item.onClick(e)}
                   title={`${displayTime(item.start)}${item.end ? '–' + displayTime(item.end) : ''} ${item.title}`}
                 >
-                  <span className="cal-event-time">{displayTime(item.start)}</span>
+                  <span className="cal-event-time">
+                    {displayTime(item.start)}
+                    <EventWeather title={item.title} date={item.date} start={item.start} compact />
+                  </span>
                   <span className="cal-event-title">{item.title}</span>
                 </button>
               ))}

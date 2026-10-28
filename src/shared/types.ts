@@ -2,6 +2,9 @@ import type { Prefs } from './prefs'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
 import type { Place } from './places'
+import type { WeatherPlace, WeatherState } from './weather'
+import type { MusicAction, MusicItem, MusicSearchResults, MusicState, MusicStatus } from './spotify'
+import type { GamesList } from './games'
 
 export interface WindowBounds {
   x?: number
@@ -20,6 +23,11 @@ export interface Settings {
   toldAboutTray?: boolean
   /** Mac: you chose not to be asked again about moving Notes into Applications. */
   keepOutsideApplications?: boolean
+  /** The YouTube mini window: where it was left, what was playing, and how it was set. */
+  youtubeWindow?: WindowBounds
+  youtubeUrl?: string
+  youtubePinned?: boolean
+  youtubeVideoOnly?: boolean
 }
 
 export interface CaptureStatus {
@@ -199,6 +207,12 @@ export interface AiChat {
   messages: AiChatMessage[]
 }
 
+export interface YouTubeState {
+  url: string
+  pinned: boolean
+  videoOnly: boolean
+}
+
 export interface NotesApi {
   /** A native yes/no dialog; resolves true if the user picked `ok`. */
   confirm(options: ConfirmOptions): Promise<boolean>
@@ -258,16 +272,38 @@ export interface NotesApi {
   searchPlaces(query: string): Promise<{ places: Place[]; error?: string }>
   /** One square of a map preview as a data: URL; null if it couldn't be fetched. */
   mapTile(z: number, x: number, y: number): Promise<string | null>
+  /** Your town and its forecast (from Open-Meteo), fetched again if it's old or `force`. */
+  weather(force?: boolean): Promise<WeatherState>
+  /** Sets (or, with null, forgets) the town the weather is for, and fetches its forecast. */
+  setWeatherPlace(place: WeatherPlace | null): Promise<WeatherState>
 
   // The web browser tab
   /** Signs you out of every website and forgets what the web tabs stored. */
   clearWebData(): Promise<void>
+  /** Signs you out of WhatsApp and Discord in the messages hub. */
+  clearMessagesData(): Promise<void>
   /** The app's shortcuts, so they still work while a web page has focus. */
   setWebShortcuts(shortcuts: string[]): void
   /** A web page opened a link in a new window: open it in a new web tab. */
   onWebOpen(callback: (url: string) => void): () => void
   /** One of the app's shortcuts was pressed while a web page had focus. */
   onWebShortcut(callback: (shortcut: string) => void): () => void
+
+  // The YouTube mini window
+  /** Opens the floating YouTube window (or brings it back), playing `url` if it's a YouTube link. */
+  openYouTube(url?: string): Promise<void>
+  /** In the mini window: what to show first, and how you left it set. */
+  youTubeState(): Promise<YouTubeState>
+  /** In the mini window: the page showing now, so it carries on there next time. */
+  rememberYouTube(url: string): Promise<void>
+  /** In the mini window: float over other windows, or not. */
+  pinYouTube(on: boolean): Promise<void>
+  /** In the mini window: show only the video on a video's page, or the whole YouTube page. */
+  setYouTubeVideoOnly(on: boolean): Promise<void>
+  minimizeYouTube(): Promise<void>
+  closeYouTube(): Promise<void>
+  /** In the mini window: play this page (opened from the notes window). */
+  onYouTubeLoad(callback: (url: string) => void): () => void
 
   // Updates
   updateStatus(): Promise<UpdateStatus>
@@ -334,6 +370,23 @@ export interface NotesApi {
   emailTrash(id: string): Promise<void>
   /** A .gsheet file's sheet, fetched from Google with the sign-in above. */
   readGoogleSheet(path: string): Promise<GoogleSheetResult>
+  // Music player (Spotify: the Mac app directly, or your account)
+  musicStatus(): Promise<MusicStatus>
+  /** Saves your Spotify developer app's client ID ('' to remove it). */
+  musicSetClient(clientId: string): Promise<MusicStatus>
+  /** Signs in to Spotify in your browser. */
+  musicConnect(): Promise<MusicStatus>
+  musicDisconnect(): Promise<MusicStatus>
+  musicNowPlaying(): Promise<MusicState>
+  musicControl(action: MusicAction): Promise<void>
+  musicSeek(ms: number): Promise<void>
+  /** Plays a spotify: URI; a song can be played within a playlist or album (`context`). */
+  musicPlay(uri: string, context?: string): Promise<void>
+  /** Needs your account. */
+  musicSearch(query: string): Promise<MusicSearchResults>
+  musicPlaylists(): Promise<MusicItem[]>
+  /** Opens the Spotify app, or (Mac) where you let Notes control it in System Settings. */
+  musicOpen(what: 'app' | 'automation'): Promise<void>
   aiStatus(): Promise<AiStatus>
   /** Checks the key with Anthropic, then stores it encrypted. */
   aiSetKey(key: string): Promise<AiStatus>
@@ -342,6 +395,19 @@ export interface NotesApi {
   /** A quick capture is tidied as one list item; a note can get headings and lists. */
   aiTidy(text: string, kind: 'note' | 'capture'): Promise<string>
   aiAsk(question: string, notes: AiNote[], history: AiAskTurn[]): Promise<string>
+  // Games
+  /** The games installed on this computer, with time played; `rescan` looks for new ones first. */
+  gamesList(rescan: boolean): Promise<GamesList>
+  /** Starts a game; resolves to a message if it couldn't. */
+  gamesPlay(id: string): Promise<string | null>
+  gamesSetHidden(id: string, hidden: boolean): Promise<void>
+  /** Asks for an app to add as a game; resolves to its id, or null if cancelled. */
+  gamesAdd(): Promise<string | null>
+  /** Takes a game you added off the list. */
+  gamesRemove(id: string): Promise<void>
+  gamesReveal(id: string): Promise<void>
+  /** A game started or stopped, or more time was counted. */
+  onGamesChanged(callback: () => void): () => void
   // Terminal tab
   /** Starts the command line in the notes folder (or carries on with the one already running). */
   terminalStart(cols: number, rows: number): Promise<TerminalStart>

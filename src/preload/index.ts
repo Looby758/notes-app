@@ -50,7 +50,10 @@ const api: NotesApi = {
   webTitle: (url) => ipcRenderer.invoke('web:title', url),
   searchPlaces: (query) => ipcRenderer.invoke('places:search', query),
   mapTile: (z, x, y) => ipcRenderer.invoke('places:tile', z, x, y),
+  weather: (force) => ipcRenderer.invoke('weather:get', force),
+  setWeatherPlace: (place) => ipcRenderer.invoke('weather:setPlace', place),
   clearWebData: () => ipcRenderer.invoke('web:clear'),
+  clearMessagesData: () => ipcRenderer.invoke('messages:clear'),
   setWebShortcuts: (shortcuts) => ipcRenderer.send('web:shortcuts', shortcuts),
   onWebOpen: (callback) => {
     const handler = (_e: unknown, url: string): void => callback(url)
@@ -61,6 +64,18 @@ const api: NotesApi = {
     const handler = (_e: unknown, shortcut: string): void => callback(shortcut)
     ipcRenderer.on('web:shortcut', handler)
     return () => ipcRenderer.removeListener('web:shortcut', handler)
+  },
+  openYouTube: (url) => ipcRenderer.invoke('youtube:open', url),
+  youTubeState: () => ipcRenderer.invoke('youtube:state'),
+  rememberYouTube: (url) => ipcRenderer.invoke('youtube:remember', url),
+  pinYouTube: (on) => ipcRenderer.invoke('youtube:pin', on),
+  setYouTubeVideoOnly: (on) => ipcRenderer.invoke('youtube:videoOnly', on),
+  minimizeYouTube: () => ipcRenderer.invoke('youtube:minimize'),
+  closeYouTube: () => ipcRenderer.invoke('youtube:close'),
+  onYouTubeLoad: (callback) => {
+    const handler = (_e: unknown, url: string): void => callback(url)
+    ipcRenderer.on('youtube:load', handler)
+    return () => ipcRenderer.removeListener('youtube:load', handler)
   },
   pickImport: (kind, extensions) => ipcRenderer.invoke('import:pick', kind, extensions),
   listImport: (root) => ipcRenderer.invoke('import:list', root),
@@ -124,12 +139,34 @@ const api: NotesApi = {
   emailArchive: (id) => ipcRenderer.invoke('email:archive', id),
   emailTrash: (id) => ipcRenderer.invoke('email:trash', id),
   readGoogleSheet: (path) => ipcRenderer.invoke('gsheet:read', path),
+  musicStatus: () => ipcRenderer.invoke('music:status'),
+  musicSetClient: (id) => ipcRenderer.invoke('music:setClient', id),
+  musicConnect: () => ipcRenderer.invoke('music:connect'),
+  musicDisconnect: () => ipcRenderer.invoke('music:disconnect'),
+  musicNowPlaying: () => ipcRenderer.invoke('music:nowPlaying'),
+  musicControl: (action) => ipcRenderer.invoke('music:control', action),
+  musicSeek: (ms) => ipcRenderer.invoke('music:seek', ms),
+  musicPlay: (uri, context) => ipcRenderer.invoke('music:play', uri, context),
+  musicSearch: (query) => ipcRenderer.invoke('music:search', query),
+  musicPlaylists: () => ipcRenderer.invoke('music:playlists'),
+  musicOpen: (what) => ipcRenderer.invoke('music:open', what),
   aiStatus: () => ipcRenderer.invoke('ai:status'),
   aiSetKey: (key) => ipcRenderer.invoke('ai:setKey', key),
   aiClearKey: () => ipcRenderer.invoke('ai:clearKey'),
   aiSummarise: (title, text) => ipcRenderer.invoke('ai:summarise', title, text),
   aiTidy: (text, kind) => ipcRenderer.invoke('ai:tidy', text, kind),
   aiAsk: (question, notes, history) => ipcRenderer.invoke('ai:ask', question, notes, history),
+  gamesList: (rescan) => ipcRenderer.invoke('games:list', rescan),
+  gamesPlay: (id) => ipcRenderer.invoke('games:play', id),
+  gamesSetHidden: (id, hidden) => ipcRenderer.invoke('games:setHidden', id, hidden),
+  gamesAdd: () => ipcRenderer.invoke('games:add'),
+  gamesRemove: (id) => ipcRenderer.invoke('games:remove', id),
+  gamesReveal: (id) => ipcRenderer.invoke('games:reveal', id),
+  onGamesChanged: (callback) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('games:changed', handler)
+    return () => ipcRenderer.removeListener('games:changed', handler)
+  },
   terminalStart: (cols, rows) => ipcRenderer.invoke('term:start', cols, rows),
   terminalStop: () => ipcRenderer.invoke('term:stop'),
   terminalInput: (data) => ipcRenderer.send('term:input', data),

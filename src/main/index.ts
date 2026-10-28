@@ -21,6 +21,7 @@ import { readFile } from 'fs/promises'
 import { basename, extname, join } from 'path'
 import { pathToFileURL } from 'url'
 import type { AiAskTurn, AiChat, AiChatMessage, AiNote, ConfirmOptions, EmailFolder, OutgoingEmail } from '@shared/types'
+import type { MusicAction } from '@shared/spotify'
 import { normalizePrefs, type Prefs } from '@shared/prefs'
 import { activeThemeId, getTheme } from '@shared/themes'
 import { loadSettings, saveSettings, settingsFile, watchSettingsFile } from './settings'
@@ -30,6 +31,7 @@ import * as calendars from './calendarSources'
 import { readGoogleSheet } from './googleSheets'
 import * as ai from './ai'
 import * as email from './email'
+import * as spotify from './spotify'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
 import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
@@ -40,9 +42,12 @@ import { formatMenuFor, setupMenus } from './menus'
 import { dictionaryMenu, setupDictionary } from './dictionary'
 import { setupWebTitle } from './webTitle'
 import { setupPlaces } from './places'
+import { setupWeather } from './weather'
 import { setupBrowser } from './browser'
+import { closeYouTube, setupYouTube } from './youtube'
 import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
+import { setupGames } from './games'
 import { applyIconOutsideApp } from './appIcon'
 import { CODE_SANDBOX_SCHEME, registerCodeSandbox } from './codeSandbox'
 import { readHandwritingOffline } from './handwriting'
@@ -345,6 +350,8 @@ function createWindow(): BrowserWindow {
     const maximized = win.isMaximized()
     const b = maximized ? win.getNormalBounds() : win.getBounds()
     saveSettings({ window: { ...b, maximized } })
+    // The notes window is really closing: the YouTube mini window goes with it.
+    if (win === mainWindow) closeYouTube()
   })
   ipcMain.removeHandler('app:ready-to-close')
   ipcMain.handle('app:ready-to-close', () => {
@@ -464,7 +471,9 @@ function registerIpc(): void {
   setupDictionary()
   setupWebTitle()
   setupPlaces()
+  setupWeather()
   setupImporter()
+  setupGames()
   setupTerminal(() => vault?.root ?? null)
   // The Mac asks once whether Notes may use the microphone.
   ipcMain.handle('voice:access', async () => (IS_MAC ? systemPreferences.askForMediaAccess('microphone') : true))
@@ -546,6 +555,18 @@ function registerIpc(): void {
   ipcMain.handle('email:archive', (_e, id: string) => email.archive(id))
   ipcMain.handle('email:trash', (_e, id: string) => email.trash(id))
   ipcMain.handle('gsheet:read', (_e, rel: string) => readGoogleSheet(currentVault().abs(rel)))
+  ipcMain.handle('music:status', () => spotify.status())
+  ipcMain.handle('music:setClient', (_e, id: string) => spotify.setClient(id))
+  ipcMain.handle('music:connect', () => spotify.connect())
+  ipcMain.handle('music:disconnect', () => spotify.disconnect())
+  ipcMain.handle('music:nowPlaying', () => spotify.nowPlaying())
+  ipcMain.handle('music:control', (_e, action: MusicAction) => spotify.control(action))
+  ipcMain.handle('music:seek', (_e, ms: number) => spotify.seek(ms))
+  ipcMain.handle('music:play', (_e, uri: string, context?: string) => spotify.play(uri, context))
+  ipcMain.handle('music:search', (_e, query: string) => spotify.search(query))
+  ipcMain.handle('music:playlists', () => spotify.playlists())
+  ipcMain.handle('music:open', (_e, what: 'app' | 'automation') => spotify.open(what === 'automation' ? 'automation' : 'app'))
+
   ipcMain.handle('ai:status', () => ai.status())
   ipcMain.handle('ai:setKey', (_e, key: string) => ai.setKey(key))
   ipcMain.handle('ai:clearKey', () => ai.clearKey())
@@ -685,6 +706,7 @@ app.whenReady().then(async () => {
   registerCodeSandbox()
   registerIpc()
   safely('web browser', setupBrowser)
+  safely('YouTube mini window', () => setupYouTube(currentPrefs))
   safely('export', setupExport)
   safely('converter', setupConverter)
   // Hand edits to settings.json apply straight away.

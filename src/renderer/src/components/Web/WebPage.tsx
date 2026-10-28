@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { WebviewTag } from 'electron'
-import { ArrowLeft, ArrowRight, Eraser, ExternalLink, Globe, MoreHorizontal, RotateCw, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Eraser, ExternalLink, Globe, MonitorPlay, MoreHorizontal, RotateCw, X } from 'lucide-react'
 import { displayUrl, toWebUrl, WEB_PARTITION } from '@shared/web'
+import { youTubeVideoId, youTubeWatchUrl } from '@shared/youtube'
 import { loadInWebTab, setWebPage, useWeb, webviews } from '../../store/web'
 import { notify } from '../../store/notify'
 import { CLICK_MOD } from '@shared/platform'
@@ -132,6 +133,19 @@ export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidde
 
   const ready = (): WebviewTag | null => (src ? view.current : null)
 
+  // A YouTube video carries on in the mini window from where it's got to, and stops here.
+  const videoId = youTubeVideoId(url)
+  const popOut = async (): Promise<void> => {
+    if (!videoId) return
+    let seconds = 0
+    try {
+      seconds = Number(await ready()?.executeJavaScript(`(() => { const v = document.querySelector('video'); if (!v) return 0; v.pause(); return v.currentTime })()`)) || 0
+    } catch {
+      // The page isn't ready: start from the beginning.
+    }
+    void window.api.openYouTube(youTubeWatchUrl(videoId, seconds))
+  }
+
   return (
     <div className={`web-page ${hidden ? 'hidden' : ''}`} data-web-tab={tab}>
       <form className="web-bar" onSubmit={go}>
@@ -170,6 +184,11 @@ export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidde
           }}
           data-web-address
         />
+        {videoId && (
+          <button type="button" className="icon-btn" title="Play in the YouTube mini window (floats over everything)" onClick={() => void popOut()}>
+            <MonitorPlay size={14} />
+          </button>
+        )}
         <button type="button" className="icon-btn" title="Open in your browser" disabled={!url} onClick={() => window.open(url)}>
           <ExternalLink size={14} />
         </button>

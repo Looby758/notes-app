@@ -18,6 +18,9 @@ import {
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
+  SUDOKU_TAB,
+  MESSAGES_TAB,
+  GAMES_TAB,
   closePane,
   closeTabUnlessPinned,
   cycleTab,
@@ -37,11 +40,13 @@ import { toggleStar } from '../store/starred'
 import { openToday, stepDaily } from './daily'
 import { matchesShortcut, normalizeShortcut } from './shortcuts'
 import { clearBrowsingData } from '../components/Web/WebPage'
+import { showMessages } from '../store/messages'
 import { FILE_MANAGER } from '@shared/platform'
 import { openRandomNote } from './random'
 import { notify } from '../store/notify'
 import { newBoard } from './boards'
 import { openAsk, runNoteJob } from '../store/ai'
+import { musicControl, toggleMusic } from '../store/music'
 import { changeNotesPassword, lockAllNow, lockNote, lockNoteOwn, removeLock } from './lock/actions'
 
 export interface Command {
@@ -174,8 +179,31 @@ export const commands: Command[] = [
   { id: 'daily.prev', group: 'Calendar', title: 'Previous daily note', run: () => stepDaily(-1) },
   { id: 'daily.next', group: 'Calendar', title: 'Next daily note', run: () => stepDaily(1) },
   { id: 'calendar.open', group: 'Calendar', title: 'Open calendar', shortcut: 'Ctrl+Shift+C', run: () => openSpecialTab(CALENDAR_TAB) },
+  { id: 'messages.open', group: 'Navigation', title: 'Open messages (WhatsApp, Discord)', run: () => openSpecialTab(MESSAGES_TAB) },
+  {
+    id: 'messages.whatsapp',
+    group: 'Navigation',
+    title: 'Open WhatsApp',
+    run: () => {
+      showMessages('whatsapp')
+      openSpecialTab(MESSAGES_TAB)
+    }
+  },
+  {
+    id: 'messages.discord',
+    group: 'Navigation',
+    title: 'Open Discord',
+    run: () => {
+      showMessages('discord')
+      openSpecialTab(MESSAGES_TAB)
+    }
+  },
   { id: 'email.open', group: 'Navigation', title: 'Open email', shortcut: 'Ctrl+Shift+A', run: () => openSpecialTab(EMAIL_TAB) },
   { id: 'calendar.panel', group: 'Calendar', title: 'Show calendar in the side panel', run: () => showRightView('calendar') },
+  { id: 'music.player', group: 'Music', title: 'Show or hide the music player', shortcut: 'Ctrl+Alt+M', run: toggleMusic },
+  { id: 'music.toggle', group: 'Music', title: 'Music: play / pause', run: () => void musicControl('toggle') },
+  { id: 'music.next', group: 'Music', title: 'Music: next song', run: () => void musicControl('next') },
+  { id: 'music.previous', group: 'Music', title: 'Music: previous song', run: () => void musicControl('previous') },
 
   ...EDITOR_COMMANDS.map(
     (c): Command => ({ id: c.id, group: 'Formatting', title: c.title, shortcut: c.shortcut, scope: 'editor', run: () => runEditorCommand(c.id) })
@@ -250,8 +278,17 @@ export const commands: Command[] = [
   { id: 'terminal.open', group: 'Navigation', title: 'Open terminal (command line in the notes folder)', shortcut: 'Ctrl+Alt+T', run: () => openSpecialTab(TERMINAL_TAB) },
   { id: 'money.open', group: 'Navigation', title: 'Open money tracker', shortcut: 'Ctrl+Shift+B', run: () => openSpecialTab(MONEY_TAB) },
   { id: 'convert.open', group: 'Navigation', title: 'Convert files (photos, Word, audio…)', run: () => openSpecialTab(CONVERT_TAB) },
+  { id: 'sudoku.open', group: 'Navigation', title: 'Play sudoku (take a quick break)', run: () => openSpecialTab(SUDOKU_TAB) },
+  { id: 'games.open', group: 'Navigation', title: 'Games (play your Steam and other games)', run: () => openSpecialTab(GAMES_TAB) },
   { id: 'web.open', group: 'Web', title: 'Open a web page', shortcut: 'Ctrl+Shift+I', run: () => openWebTab() },
   { id: 'web.beside', group: 'Web', title: 'Open a web page beside this note', run: () => openWebTab('', { beside: true }) },
+  {
+    id: 'youtube.open',
+    group: 'Web',
+    title: 'YouTube in a mini window (floats over everything while you work)',
+    shortcut: 'Ctrl+Alt+Y',
+    run: () => void window.api.openYouTube()
+  },
   { id: 'web.clear', group: 'Web', title: 'Clear browsing data (sign out of all websites)', run: () => void clearBrowsingData() },
   {
     id: 'view.mindmap',

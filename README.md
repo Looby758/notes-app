@@ -63,6 +63,30 @@ What you can do:
 
 Emails are fetched from Google while you look at them and aren't saved on your computer. Pictures in emails are hidden until you choose to show them, so senders can't tell when you've opened one. Notes can't delete email for good: the Bin is emptied by Gmail after 30 days.
 
+## Weather
+
+The **Home** page shows the weather where you are: what it's like now, today's high and low, the chance of rain, and the week ahead. The first time, type your town (or postcode) in the Weather box and pick it from the list; *Change town* switches it later.
+
+The calendar shows the forecast too, for the next two weeks: a small picture and the high on each day, and beside anything that sounds like it's outside (a walk, football, a BBQ, parkrun, the beach… or anything with "outside" or "outdoor" in it), the forecast for the hour it starts. Hover for the details.
+
+The forecast comes from [Open-Meteo](https://open-meteo.com), which is free and needs no account. It's checked every half hour while it's on screen, and the last one is kept (in `weather.json` in the settings folder) so it still shows when you're offline. Turn either part off in **Settings → Calendar → Weather**.
+
+## Music player (Spotify)
+
+Press ♫ at the top (or Ctrl+Alt+M) to show a small player in the bottom-left corner. It shows the song that's playing, with play/pause, skip, shuffle and a progress bar you can click to jump. Hiding it doesn't stop the music. Ctrl+K also has *Music: play / pause*, *next* and *previous*, which you can give your own keys in Settings → Shortcuts.
+
+**On a Mac it works straight away** with the Spotify app (free or Premium), no sign-in. The first time, macOS asks whether Notes may control Spotify: press **OK**. (If you pressed *Don't Allow*, turn it back on in *System Settings → Privacy & Security → Automation*.) If Spotify isn't open, the player has an **Open Spotify** button. Under **Link** in the player you can paste a Spotify share link (*Share → Copy link*) to play a song, album or playlist.
+
+**Connect your Spotify account** (Settings → Music) to also **search** Spotify and pick from **your playlists** in the player, and to control Spotify on your phone, speakers or a Windows PC. Spotify only allows this for Premium accounts, and you make a free developer app on Spotify's site once (about 3 minutes):
+
+1. Open the [Spotify developer dashboard](https://developer.spotify.com/dashboard) and log in with your Spotify account.
+2. Press **Create app**, give it any name and description.
+3. Under **Redirect URIs**, add exactly `http://127.0.0.1:43117/callback`.
+4. Tick **Web API**, accept the terms and **Save**.
+5. Copy the **Client ID** into Settings → Music and press **Connect Spotify**, then **Agree** in your browser.
+
+There's no secret to copy. The sign-in is stored encrypted, like the Google one, in `spotify.json` in the settings folder. If Spotify says your account isn't allowed, add your Spotify email under **User Management** in the developer app.
+
 ## AI helper (optional)
 
 Notes can use Claude, made by Anthropic, to help with your notes. It's off until you add your own Anthropic API key in **Settings → AI helper** (sign up at [console.anthropic.com](https://console.anthropic.com/settings/keys), add a little credit, create a key, paste it in). Anthropic bills your account directly, usually a cent or two each time.
@@ -113,7 +137,9 @@ Nothing is sent unless you press one of these. Then only what's needed goes to A
 - **Terminal** (Ctrl+Alt+T, or the terminal button at the top) — a command line in its own tab, starting in your notes folder: PowerShell on Windows, your usual shell on a Mac. It keeps running while you switch tabs; closing the tab ends it. Copy and paste work as usual (on Windows, Ctrl+C copies when text is selected and otherwise stops the running command). It only runs what you type into it.
 - **Passwords** (Ctrl+Alt+K, or the key button at the top) — a password vault in its own tab. Save logins (name, username, password, website, notes), search them, copy a username or password with one click, and make strong random passwords (pick the length and which characters). Everything is encrypted with AES-256 under a **master password** of its own (separate from the locked-notes password, never saved), with an optional recovery key, and kept in your notes folder (`.notesapp/passwords.json`) so it syncs. Copied passwords clear from the clipboard after 30 seconds. The vault locks with locked notes (Ctrl+Alt+L, the auto-lock time, or closing Notes); if auto-lock is set to Never, passwords still lock after 30 minutes. It warns when the same password is used for more than one login. Passwords never appear in search, links, the AI helper or exports. If you forget the master password and have no recovery key, the passwords can't be recovered.
 - **Convert files** (the ⇄ button at the top, or *Convert files* in Ctrl+K) — drop in pictures, sound files and documents and turn them into other kinds: iPhone photos (HEIC) to JPG, PNG or WebP (and make them smaller), WAV, M4A and other sound files to MP3 or WAV, Word documents to PDF, Markdown or plain text, and Markdown, text or web pages to PDF or Word. Convert lots at once and save them all into one folder. It all happens on your computer, nothing is uploaded, and your original files aren't changed. Word documents keep their text, headings, lists, tables and pictures, but fancy layouts (columns, text boxes) won't look exactly the same. Videos and PDFs can't be converted.
+- **Games** (the game controller at the top, or *Games* in Ctrl+K) — all your games in one place with a **Play** button: Steam games, Epic games, and on a Mac any game in Applications (App Store and Apple Arcade games included). Each shows how long you've played it in all, this week, and when you last played; *Recently played*, *Most played* or *A to Z*, and a search. Time is counted while Notes is running (even with its window closed), by spotting the game running; for Steam games, Steam's own count is used when it's higher, so time from before is there too. Click **Add a game** for anything that isn't found by itself, and use a game's ⋯ menu to hide it or show it in Finder. Times are kept on this computer only.
 - **Web browser tab** (Ctrl+Shift+I, or the globe at the top) — browse the web beside a note in split view, with an address bar (type an address or a search), back, forward and reload. Ctrl/⌘-click a web link in a note and it opens in a web tab next to the note (turn this off in Settings → Editor → Tabs to use your usual browser). Pages run walled off from your notes and the app; links that open a new window open a new web tab. Sign-ins are remembered, separately from your normal browser, until you choose *Clear browsing data* in a web tab's ⋯ menu. It's a simple browser: no extensions, some video sites won't play protected films, and Google sometimes refuses to sign in inside other apps (use the ↗ button to open the page in your usual browser).
+- **YouTube mini window** (Ctrl+Alt+Y, or the screen-with-a-play-button at the top) — YouTube in a small window that floats over everything (other apps too), so a video keeps playing in the corner while you work. Drag it by its top bar and resize it from the edges. Search or paste a link at the top; on a video it shows just the video (the square button switches back to the whole page), and the pin button stops it floating on top. You're signed in to YouTube if you are in the web tabs. Watching a YouTube video in a web tab? Its play button carries it on in the mini window from where you were. Closing the window remembers the video and the spot, so it picks up there next time.
 - **Random note**, **related notes** (under Backlinks, with the reason), and **on this day** (notes from this date in past months and years, in the calendar panel).
 - **Banners and icons** — give a note a banner image or colour and an emoji icon, shown above the title and in the file list.
 - **App icon** — pick from several designs (including green) in Settings → Appearance. On Windows it also goes on the Start menu, desktop and pinned taskbar shortcuts.
@@ -156,6 +182,7 @@ All of these can be changed in **Settings → Shortcuts**. On a Mac, Ctrl is **�
 | Ctrl+Shift+D | Today's daily note |
 | Ctrl+Shift+C | Calendar |
 | Ctrl+Shift+G | Graph |
+| Ctrl+Alt+Y | YouTube mini window |
 | Ctrl+Shift+P | Export the current note |
 | Ctrl+Alt+\\ / Ctrl+Alt+- | Split right / split down |
 | Ctrl+Alt+→ / Ctrl+Alt+← | Next / previous pane |
