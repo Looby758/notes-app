@@ -25,6 +25,8 @@ export interface Prefs {
   zoom: number
   showStatusBar: boolean
   reduceMotion: boolean
+  /** Pressing Play on the Games page shows a short title card with the game's art while it starts. */
+  gameLaunchAnimation: boolean
   /** Which app icon design to use (taskbar / Dock / window). */
   appIcon: string
 
@@ -152,6 +154,7 @@ export const DEFAULT_PREFS: Prefs = {
   zoom: 1,
   showStatusBar: true,
   reduceMotion: false,
+  gameLaunchAnimation: true,
   appIcon: 'default',
 
   livePreview: true,

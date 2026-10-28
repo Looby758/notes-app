@@ -158,6 +158,7 @@ const api: NotesApi = {
   aiAsk: (question, notes, history) => ipcRenderer.invoke('ai:ask', question, notes, history),
   gamesList: (rescan) => ipcRenderer.invoke('games:list', rescan),
   gamesPlay: (id) => ipcRenderer.invoke('games:play', id),
+  gamesLaunchArt: (id) => ipcRenderer.invoke('games:launchArt', id),
   gamesSetHidden: (id, hidden) => ipcRenderer.invoke('games:setHidden', id, hidden),
   gamesAdd: () => ipcRenderer.invoke('games:add'),
   gamesRemove: (id) => ipcRenderer.invoke('games:remove', id),

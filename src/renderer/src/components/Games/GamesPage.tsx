@@ -3,6 +3,8 @@ import { Eye, EyeOff, FolderOpen, Gamepad2, Loader2, MoreHorizontal, Play, Plus,
 import { describeLastPlayed, describePlayed, sortGames, type Game, type GameSort, type GameSource, type GamesList } from '@shared/games'
 import { FILE_MANAGER, IS_MAC } from '@shared/platform'
 import ContextMenu, { type MenuItem } from '../ContextMenu'
+import LaunchAnimation from './LaunchAnimation'
+import { usePrefs } from '../../store/prefs'
 import { notify } from '../../store/notify'
 
 const SOURCE_NAMES: Record<GameSource, string> = { steam: 'Steam', epic: 'Epic Games', app: IS_MAC ? 'Mac app' : 'App', added: 'Added by you' }
@@ -32,6 +34,8 @@ export default function GamesPage() {
   const [showHidden, setShowHidden] = useState(false)
   const [starting, setStarting] = useState<string | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; game: Game } | null>(null)
+  const [launching, setLaunching] = useState<Game | null>(null)
+  const animate = usePrefs((s) => s.prefs.gameLaunchAnimation && !s.prefs.reduceMotion)
 
   const load = useCallback(async (rescan: boolean) => {
     if (rescan) setRefreshing(true)
@@ -58,10 +62,17 @@ export default function GamesPage() {
 
   const play = async (g: Game): Promise<void> => {
     setStarting(g.id)
+    // The animation plays while the game starts; it doesn't hold the game back.
+    if (animate) setLaunching(g)
     const error = await window.api.gamesPlay(g.id)
-    if (error) notify(error)
+    if (error) {
+      setLaunching(null)
+      notify(error)
+    }
     setTimeout(() => setStarting((s) => (s === g.id ? null : s)), 4000)
   }
+
+  const endLaunch = useCallback(() => setLaunching(null), [])
 
   const setHidden = async (g: Game, hidden: boolean): Promise<void> => {
     await window.api.gamesSetHidden(g.id, hidden)
@@ -206,6 +217,7 @@ export default function GamesPage() {
         )}
       </div>
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems(menu.game)} onClose={() => setMenu(null)} />}
+      {launching && <LaunchAnimation key={launching.id} game={launching} onDone={endLaunch} />}
     </div>
   )
 }
