@@ -58,6 +58,7 @@ export const REPLACE_TAB = 'replace:'
 export const CONFLICTS_TAB = 'conflicts:'
 export const AI_TAB = 'ai:'
 export const FLASHCARDS_TAB = 'flashcards:'
+export const CONVERT_TAB = 'convert:'
 /** A picture, recording, PDF… from the notes folder, shown in a tab: "file:attachments/a.png". */
 export const FILE_TAB = 'file:'
 export const fileTab = (path: string): string => FILE_TAB + path

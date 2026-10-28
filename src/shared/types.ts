@@ -186,11 +186,15 @@ export interface NotesApi {
   /** Turns a complete HTML page into a PDF (A4). */
   printToPdf(html: string): Promise<Uint8Array>
   /** Asks where to save one exported file and writes it; resolves with its path, or null if cancelled. */
-  exportFile(defaultName: string, format: 'pdf' | 'docx' | 'html', data: Uint8Array | string): Promise<string | null>
+  exportFile(defaultName: string, format: SaveFormat, data: Uint8Array | string): Promise<string | null>
   /** Asks for a folder and writes several exported files into a new folder inside it; resolves with that folder, or null. */
   exportFiles(folderName: string, files: { name: string; data: Uint8Array | string }[]): Promise<string | null>
   /** Shows a file in File Explorer / Finder. */
   showExported(path: string): Promise<void>
+
+  // File converter
+  /** An iPhone photo (HEIC/HEIF) as plain pixels: RGBA, 4 bytes a pixel. */
+  decodeHeic(data: Uint8Array): Promise<{ width: number; height: number; data: Uint8Array }>
 
   // Quick capture
   /** Opens the quick capture window. */
@@ -306,3 +310,5 @@ export interface AppleNote {
   modified: string
   locked: boolean
 }
+/** The kinds of file Notes can save (exports and converted files). */
+export type SaveFormat = 'pdf' | 'docx' | 'html' | 'md' | 'txt' | 'jpg' | 'png' | 'webp' | 'mp3' | 'wav'

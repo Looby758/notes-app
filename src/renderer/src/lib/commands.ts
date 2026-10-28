@@ -11,6 +11,7 @@ import {
   REPLACE_TAB,
   CONFLICTS_TAB,
   FLASHCARDS_TAB,
+  CONVERT_TAB,
   closePane,
   closeTabUnlessPinned,
   cycleTab,
@@ -229,6 +230,7 @@ export const commands: Command[] = [
   { id: 'backlinks', group: 'Navigation', title: 'Show backlinks', run: () => showRightView('backlinks') },
   { id: 'graph.open', group: 'Navigation', title: 'Open graph', shortcut: 'Ctrl+Shift+G', run: () => openSpecialTab(GRAPH_TAB) },
   { id: 'flashcards.open', group: 'Navigation', title: 'Review flashcards', shortcut: 'Ctrl+Shift+Y', run: () => openSpecialTab(FLASHCARDS_TAB) },
+  { id: 'convert.open', group: 'Navigation', title: 'Convert files (photos, Word, audio…)', run: () => openSpecialTab(CONVERT_TAB) },
   {
     id: 'view.mindmap',
     group: 'View',

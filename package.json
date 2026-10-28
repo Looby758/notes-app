@@ -21,6 +21,7 @@
     "electron-updater": "^6.8.11"
   },
   "devDependencies": {
+    "@breezystack/lamejs": "^1.2.7",
     "@codemirror/autocomplete": "^6.20.4",
     "@codemirror/commands": "^6.11.1",
     "@codemirror/lang-markdown": "^6.5.2",
@@ -43,7 +44,9 @@
     "electron-vite": "^3.1.0",
     "jszip": "^3.10.2",
     "katex": "^0.16.47",
+    "libheif-js": "^1.23.5",
     "lucide-react": "^0.511.0",
+    "mammoth": "^1.13.0",
     "marked": "^15.0.12",
     "mermaid": "^11.17.2",
     "minisearch": "^7.2.0",

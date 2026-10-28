@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  ArrowRightLeft,
   ChevronDown,
   Command as CommandIcon,
   FolderOpen,
@@ -33,6 +34,7 @@ import {
   remeasure,
   SETTINGS_TAB,
   GRAPH_TAB,
+  CONVERT_TAB,
   setZenEditor
 } from '../lib/editorController'
 import { openLink, openWikiLink } from '../lib/openLink'
@@ -270,6 +272,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
           <Orbit size={15} />
         </button>
         <FlashcardsButton />
+        <button className="icon-btn" onClick={() => openSpecialTab(CONVERT_TAB)} title="Convert files" data-convert-button>
+          <ArrowRightLeft size={15} />
+        </button>
         <LayoutMenu />
         <button className="icon-btn" onClick={() => useUI.setState({ modal: 'commands' })} title={`All commands (${showKeys('Ctrl+K')})`}>
           <CommandIcon size={15} />

@@ -6760,3 +6760,150 @@ body.theme-light .flashcard-grade.grade-easy span {
 .canvas-swatch:hover {
   box-shadow: 0 0 0 2px var(--text-muted);
 }
+
+/* ---------- file converter ---------- */
+.pane-body > .convert-page {
+  flex: 1;
+}
+.convert-page {
+  overflow-y: auto;
+  min-height: 0;
+}
+.convert-inner {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 28px 32px 60px;
+}
+.convert-inner h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+.convert-intro {
+  margin: 0 0 18px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.convert-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 28px 20px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: 12px;
+  background: var(--bg-panel);
+  color: var(--text);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease), background 0.15s var(--ease);
+}
+.convert-drop:hover,
+.convert-drop.over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.convert-drop svg {
+  color: var(--text-muted);
+}
+.convert-drop span {
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.convert-list {
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.convert-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.convert-kind {
+  flex: none;
+  color: var(--text-muted);
+}
+.convert-name {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.convert-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.convert-name small {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.convert-item.failed .convert-name small {
+  color: #e0524a;
+}
+.convert-to {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.convert-to .select {
+  min-width: 110px;
+}
+.convert-status {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 84px;
+}
+.convert-status .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  font-size: 12.5px;
+}
+.convert-working {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.convert-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  color: var(--text-muted);
+}
+.convert-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+.convert-spacer {
+  flex: 1;
+}
+.convert-inner .btn:disabled,
+.convert-item .icon-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.convert-saved {
+  margin: 14px 0 0;
+  color: var(--text-muted);
+}
+.convert-saved .link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

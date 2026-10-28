@@ -241,3 +241,23 @@ ${notes}
 </html>
 `
 }
+
+/** Any HTML (a Word document's text, say) as a page ready to print, styled like exported notes. */
+export function toPrintablePage(title: string, bodyHtml: string): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>${esc(title)}</title>
+<style>${CSS}${PRINT}</style>
+</head>
+<body>
+<main>
+<article class="note">
+${bodyHtml}
+</article>
+</main>
+</body>
+</html>
+`
+}

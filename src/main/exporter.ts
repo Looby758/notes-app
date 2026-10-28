@@ -2,18 +2,24 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { existsSync } from 'fs'
 import { mkdir, rm, writeFile } from 'fs/promises'
 import { join } from 'path'
+import type { SaveFormat } from '@shared/types'
 
 /**
  * Export: saving exported files where you choose, and printing pages to PDF (in a hidden window
  * that runs no scripts).
  */
 
-type Format = 'pdf' | 'docx' | 'html'
-
-const FILTERS: Record<Format, Electron.FileFilter> = {
+const FILTERS: Record<SaveFormat, Electron.FileFilter> = {
   pdf: { name: 'PDF', extensions: ['pdf'] },
   docx: { name: 'Word document', extensions: ['docx'] },
-  html: { name: 'Web page', extensions: ['html'] }
+  html: { name: 'Web page', extensions: ['html'] },
+  md: { name: 'Markdown', extensions: ['md'] },
+  txt: { name: 'Text', extensions: ['txt'] },
+  jpg: { name: 'JPG picture', extensions: ['jpg', 'jpeg'] },
+  png: { name: 'PNG picture', extensions: ['png'] },
+  webp: { name: 'WebP picture', extensions: ['webp'] },
+  mp3: { name: 'MP3 audio', extensions: ['mp3'] },
+  wav: { name: 'WAV audio', extensions: ['wav'] }
 }
 
 /** The folder you last exported to, so the next export starts there. */
@@ -40,12 +46,12 @@ async function printToPdf(html: string): Promise<Uint8Array> {
 export function setupExport(): void {
   ipcMain.handle('export:pdf', (_e, html: string) => printToPdf(html))
 
-  ipcMain.handle('export:file', async (event, defaultName: string, format: Format, data: Uint8Array | string) => {
+  ipcMain.handle('export:file', async (event, defaultName: string, format: SaveFormat, data: Uint8Array | string) => {
     const win = BrowserWindow.fromWebContents(event.sender)!
     const result = await dialog.showSaveDialog(win, {
-      title: 'Export',
+      title: 'Save',
       defaultPath: join(lastFolder ?? app.getPath('documents'), defaultName),
-      filters: [FILTERS[format]]
+      filters: [FILTERS[format] ?? FILTERS.pdf]
     })
     if (result.canceled || !result.filePath) return null
     await writeFile(result.filePath, toBytes(data))

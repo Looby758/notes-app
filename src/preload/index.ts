@@ -72,6 +72,7 @@ const api: NotesApi = {
   exportFile: (name, format, data) => ipcRenderer.invoke('export:file', name, format, data),
   exportFiles: (folderName, files) => ipcRenderer.invoke('export:files', folderName, files),
   showExported: (path) => ipcRenderer.invoke('export:show', path),
+  decodeHeic: (data) => ipcRenderer.invoke('convert:heic', data),
 
   openCapture: () => ipcRenderer.invoke('capture:open'),
   closeCapture: () => ipcRenderer.invoke('capture:close'),
