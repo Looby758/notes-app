@@ -126,3 +126,29 @@ describe('readSpreadsheet', () => {
     expect(sheet.rows[1][1].num).toBe(true)
   })
 })
+
+describe('saving edits', () => {
+  it('writes CSV with formulas and quoting', async () => {
+    const { writeDelimited } = await import('./sheets')
+    const csv = writeDelimited({ name: 'S', cols: 3, rows: [[{ text: 'a,b' }, { text: 'say "hi"' }, { text: '', formula: 'SUM(A2:A3)' }], [{ text: '1' }]] })
+    expect(csv).toBe('a,b,"say ""hi""",=SUM(A2:A3)\r\n1\r\n'.replace('a,b', '"a,b"'))
+  })
+
+  it('round-trips a workbook through the reader', async () => {
+    const { writeWorkbook } = await import('./sheets')
+    const data = await writeWorkbook(
+      [
+        { name: 'Costs', cols: 2, rows: [[{ text: 'Rent' }, { text: '£1,200.00', value: 1200, format: '"£"#,##0.00', num: true }], [{ text: 'Total' }, { text: '', formula: 'SUM(B1:B1)', format: '"£"#,##0.00' }]], widths: [20] },
+        { name: 'Two & more', cols: 1, rows: [[{ text: 'TRUE' }]] }
+      ],
+      (s, r, c) => (s === 0 && r === 1 && c === 1 ? 1200 : '')
+    )
+    const sheets = await readWorkbook(data)
+    expect(sheets.map((s) => s.name)).toEqual(['Costs', 'Two & more'])
+    expect(texts(sheets[0].rows)).toEqual([['Rent', '£1,200.00'], ['Total', '£1,200.00']])
+    expect(sheets[0].rows[1][1].formula).toBe('SUM(B1:B1)')
+    expect(sheets[0].rows[0][1].value).toBe(1200)
+    expect(sheets[0].widths?.[0]).toBe(20)
+    expect(texts(sheets[1].rows)).toEqual([['TRUE']])
+  })
+})

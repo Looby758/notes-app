@@ -46,6 +46,7 @@ import { FILE_MANAGER } from '@shared/platform'
 import { openRandomNote } from './random'
 import { notify } from '../store/notify'
 import { newBoard } from './boards'
+import { newSpreadsheet } from './newSheet'
 import { openAsk, runNoteJob } from '../store/ai'
 import { musicControl, musicToggleLike, setMusicMini, shareSongToNote, toggleMusic, useMusic } from '../store/music'
 import { changeNotesPassword, lockAllNow, lockNote, lockNoteOwn, removeLock } from './lock/actions'
@@ -77,6 +78,7 @@ export const commands: Command[] = [
   { id: 'note.new', group: 'Notes', title: 'New note', shortcut: 'Ctrl+N', run: () => useVault.getState().newNote() },
   { id: 'folder.new', group: 'Notes', title: 'New folder', shortcut: 'Ctrl+Shift+N', run: () => useVault.getState().newFolder() },
   { id: 'board.new', group: 'Notes', title: 'New canvas board', run: () => newBoard() },
+  { id: 'sheet.new', group: 'Notes', title: 'New spreadsheet', run: () => newSpreadsheet() },
   { id: 'note.fromTemplate', group: 'Notes', title: 'New note from template…', shortcut: 'Ctrl+Alt+N', run: () => useUI.setState({ modal: 'template' }) },
   {
     id: 'note.rename',

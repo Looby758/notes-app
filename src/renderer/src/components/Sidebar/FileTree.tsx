@@ -15,6 +15,7 @@ import {
   FolderPlus,
   FolderSearch,
   LayoutDashboard,
+  Sheet,
   Lock,
   LockOpen,
   Pencil,
@@ -41,6 +42,7 @@ import { usePrefs } from '../../store/prefs'
 import { fileKind, openAttachment, openExternally } from '../../lib/fileKinds'
 import FileIcon from '../FileIcon'
 import { newBoard } from '../../lib/boards'
+import { newSpreadsheet } from '../../lib/newSheet'
 import { isBoard } from '../../lib/canvas'
 import { useLock, isLocked } from '../../lib/lock/session'
 import { lockNote, removeLock } from '../../lib/lock/actions'
@@ -125,6 +127,7 @@ export default function FileTree() {
     const create: MenuItem[] = [
       { label: 'New note', icon: <FilePlus size={15} />, onClick: () => newNote(node?.path ?? '') },
       { label: 'New canvas board', icon: <LayoutDashboard size={15} />, onClick: () => newBoard(node?.path ?? '') },
+      { label: 'New spreadsheet', icon: <Sheet size={15} />, onClick: () => newSpreadsheet(node?.path ?? '') },
       { label: 'New folder', icon: <FolderPlus size={15} />, onClick: () => newFolder(node?.path ?? '') }
     ]
     if (!node)
