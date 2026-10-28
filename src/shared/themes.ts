@@ -1,5 +1,7 @@
 /** Colour themes. Shared so the main process can colour the native title-bar buttons to match. */
 
+import type { ThemePack } from './themePack'
+
 export interface ThemeColors {
   bg: string
   bgPanel: string
@@ -22,6 +24,8 @@ export interface Theme {
   accent: string
   /** A light theme (dark text on a light background). */
   light?: boolean
+  /** Set for a theme you imported (see themePack.ts): its pictures, words and icons. */
+  pack?: ThemePack
 }
 
 export const THEMES: Theme[] = [
@@ -184,6 +188,16 @@ export function activeThemeId(p: { theme: string; followSystem: boolean; lightTh
   return systemDark ? p.darkTheme : p.lightTheme
 }
 
+/** Themes you imported from theme files. They don't come with the app; each process loads its own copy. */
+let imported: Theme[] = []
+
+export function setImportedThemes(themes: Theme[]): void {
+  imported = themes
+}
+
+/** The built-in themes, then the ones you imported. */
+export const allThemes = (): Theme[] => [...THEMES, ...imported]
+
 export function getTheme(id: string): Theme {
-  return THEMES.find((t) => t.id === id) ?? THEMES[0]
+  return allThemes().find((t) => t.id === id) ?? THEMES[0]
 }

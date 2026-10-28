@@ -59,6 +59,8 @@ import MindMap from '../MindMap/MindMap'
 import WebPage from '../Web/WebPage'
 import { isMindMap, useUI } from '../../store/ui'
 import { needsUnlock, useLock } from '../../lib/lock/session'
+import ThemePicture, { usePageAccent } from '../Theme/ThemePicture'
+import { pageOfTab } from '@shared/themePack'
 import { useNoteHidden } from '../../store/streamer'
 import NoteCover from '../Streamer/NoteCover'
 import { isRestoring, replay } from '../../lib/motion'
@@ -70,6 +72,9 @@ const seenPanes = new Set<string>()
 export default function Pane({ pane }: { pane: string }) {
   const host = useRef<HTMLDivElement>(null)
   const active = useEditor((s) => s.panes[pane]?.active ?? null)
+  // An imported theme can put a picture (and its own accent) behind each part of the app.
+  const page = pageOfTab(active)
+  const pageAccent = usePageAccent(page)
   const tabs = useEditor((s) => s.panes[pane]?.tabs)
   const isActivePane = useEditor((s) => s.activePane === pane)
   const multiple = useEditor((s) => Object.keys(s.panes).length > 1)
@@ -120,6 +125,7 @@ export default function Pane({ pane }: { pane: string }) {
     <div
       className={`pane ${isActivePane && multiple ? 'focused' : ''} ${isActivePane ? 'active-pane' : ''} ${isNew ? 'pane-new' : ''}`}
       data-pane={pane}
+      style={pageAccent}
       onMouseDownCapture={() => focusPane(pane)}
       onFocusCapture={() => focusPane(pane)}
     >
@@ -130,6 +136,7 @@ export default function Pane({ pane }: { pane: string }) {
         onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setZone(null)}
         onDrop={onDrop}
       >
+        <ThemePicture page={page} />
         {conflict && active && (
           <div className="conflict-banner">
             <AlertTriangle size={15} />

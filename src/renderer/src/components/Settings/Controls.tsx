@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { Check, ChevronDown, X } from 'lucide-react'
-import { activeThemeId, THEMES } from '@shared/themes'
+import { Check, ChevronDown, Upload, X } from 'lucide-react'
+import { activeThemeId, allThemes, getTheme, type Theme } from '@shared/themes'
+import { pictureFor, themeFileUrl } from '@shared/themePack'
+import { importTheme, removeTheme, useThemes } from '../../store/themes'
 import { DEFAULT_PREFS, type Prefs } from '@shared/prefs'
 import { SYSTEM_NAME } from '@shared/platform'
 import { setPrefs, usePrefs } from '../../store/prefs'
@@ -170,40 +172,72 @@ function FolderInput({ def, value }: { def: Extract<SettingDef, { type: 'folder'
 
 function ThemePicker() {
   const p = usePrefs((s) => s.prefs)
+  useThemes((s) => s.themes) // redraw when a theme is imported or removed
+  const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null)
   // Matching the system: a light and a dark theme are both chosen, one from each group.
   const chosen = (id: string, light: boolean): boolean => (p.followSystem ? (light ? p.lightTheme : p.darkTheme) === id : p.theme === id)
   const pick = (id: string, light: boolean): void => {
     if (!p.followSystem) set('theme', id)
     else set(light ? 'lightTheme' : 'darkTheme', id)
   }
+  const doImport = async (): Promise<void> => {
+    const result = await importTheme()
+    if (result.error) setMessage({ text: `Couldn’t import that theme: ${result.error}`, error: true })
+    if (result.theme) {
+      setMessage({ text: `Imported ${result.theme.name}.` })
+      pick(result.theme.id, !!result.theme.light)
+    }
+  }
+  const remove = async (t: Theme): Promise<void> => {
+    const ok = await window.api.confirm({ message: `Remove the ${t.name} theme?`, detail: 'You can import its theme file again later.', ok: 'Remove' })
+    if (!ok) return
+    await removeTheme(t.id)
+    setMessage({ text: `Removed ${t.name}.` })
+  }
   const group = (light: boolean) => (
     <div className="theme-grid" data-theme-group={light ? 'light' : 'dark'}>
-      {THEMES.filter((t) => !!t.light === light).map((t) => {
-        const c = t.colors
-        const on = chosen(t.id, light)
-        return (
-          <button key={t.id} className={`theme-card ${on ? 'selected' : ''}`} onClick={() => pick(t.id, light)} aria-pressed={on} data-theme-id={t.id}>
-            {/* A tiny picture of the app in this theme */}
-            <span className="theme-preview" style={{ background: c.bg, borderColor: c.border }}>
-              <span className="theme-preview-side" style={{ background: c.bgPanel, borderColor: c.border }}>
-                <span style={{ background: c.textFaint }} />
-                <span style={{ background: p.accent || t.accent }} />
-                <span style={{ background: c.textFaint }} />
-              </span>
-              <span className="theme-preview-main">
-                <span style={{ background: c.textStrong, width: '55%', height: 5 }} />
-                <span style={{ background: c.textMuted }} />
-                <span style={{ background: p.accent || t.accent, width: '35%' }} />
-                <span style={{ background: c.textMuted, width: '70%' }} />
-              </span>
-            </span>
-            <span className="theme-name">
-              {on && <Check size={12} />}
-              {t.name}
-            </span>
-          </button>
-        )
-      })}
+      {allThemes()
+        .filter((t) => !!t.light === light)
+        .map((t) => {
+          const c = t.colors
+          const on = chosen(t.id, light)
+          const picture = pictureFor(t.pack, 'home') ?? (t.pack?.loading?.picture ? { file: t.pack.loading.picture, position: 'center' } : undefined)
+          return (
+            <div key={t.id} className="theme-card-wrap">
+              <button className={`theme-card ${on ? 'selected' : ''}`} onClick={() => pick(t.id, light)} aria-pressed={on} data-theme-id={t.id}>
+                {/* A tiny picture of the app in this theme */}
+                <span className="theme-preview" style={{ background: c.bg, borderColor: c.border }}>
+                  <span className="theme-preview-side" style={{ background: c.bgPanel, borderColor: c.border }}>
+                    <span style={{ background: c.textFaint }} />
+                    <span style={{ background: p.accent || t.accent }} />
+                    <span style={{ background: c.textFaint }} />
+                  </span>
+                  <span className="theme-preview-main">
+                    {picture && (
+                      <span
+                        className="theme-preview-picture"
+                        style={{ backgroundImage: `url("${themeFileUrl(t.id, picture.file)}")`, backgroundPosition: picture.position }}
+                      />
+                    )}
+                    <span style={{ background: c.textStrong, width: '55%', height: 5 }} />
+                    <span style={{ background: c.textMuted }} />
+                    <span style={{ background: p.accent || t.accent, width: '35%' }} />
+                    <span style={{ background: c.textMuted, width: '70%' }} />
+                  </span>
+                </span>
+                <span className="theme-name">
+                  {on && <Check size={12} />}
+                  {t.name}
+                </span>
+              </button>
+              {t.pack && (
+                <button className="theme-remove" onClick={() => remove(t)} title={`Remove ${t.name}`} aria-label={`Remove ${t.name}`}>
+                  <X size={11} />
+                </button>
+              )}
+            </div>
+          )
+        })}
     </div>
   )
   return (
@@ -212,6 +246,14 @@ function ThemePicker() {
       {group(false)}
       <span className="theme-group-label">Light{p.followSystem && ' (when your system is in light mode)'}</span>
       {group(true)}
+      <div className="theme-import">
+        <button className="btn" onClick={doImport} data-theme-import>
+          <Upload size={13} /> Import a theme…
+        </button>
+        <span className="theme-import-hint">
+          {message ? <span className={message.error ? 'theme-import-error' : ''}>{message.text}</span> : 'A theme file (.notestheme) can change the colours, fonts, pictures and icons.'}
+        </span>
+      </div>
     </div>
   )
 }
@@ -219,7 +261,7 @@ function AccentPicker() {
   const accent = usePrefs((s) => s.prefs.accent)
   // The theme showing now (matching the system picks your light or dark one).
   const themeId = usePrefs((s) => activeThemeId(s.prefs, window.matchMedia('(prefers-color-scheme: dark)').matches))
-  const themeAccent = THEMES.find((t) => t.id === themeId)?.accent ?? ACCENT_SWATCHES[0]
+  const themeAccent = getTheme(themeId).accent ?? ACCENT_SWATCHES[0]
   const current = accent || themeAccent
   return (
     <div className="accent-picker">

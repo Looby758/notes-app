@@ -12,6 +12,7 @@ import TagsPane from './TagsPane'
 import BulkBar from './BulkBar'
 import { showKeys } from '@shared/platform'
 import { newBoard } from '../../lib/boards'
+import ThemePicture from '../Theme/ThemePicture'
 
 const VIEWS: { id: SidebarView; title: string; icon: typeof Search }[] = [
   { id: 'files', title: `Files (${showKeys('Ctrl+Shift+E')})`, icon: FolderTree },
@@ -27,6 +28,7 @@ export default function Sidebar() {
 
   return (
     <div className="sidebar-inner">
+      <ThemePicture page="sidebar" exact />
       <div className="panel-header">
         <div className="view-switch">
           {VIEWS.map(({ id, title, icon: Icon }) => (

@@ -55,6 +55,7 @@ import { SongPopup } from './SongPopup'
 import { setPrefs, usePrefs } from '../../store/prefs'
 import { addHomeCard } from '../../lib/home'
 import MusicHomeCard from './MusicHomeCard'
+import ThemePicture from '../Theme/ThemePicture'
 
 addHomeCard({ id: 'music', order: 35, title: 'Now playing', Card: MusicHomeCard })
 
@@ -94,6 +95,7 @@ function Player() {
 
   return (
     <div className="music-player" data-music-player>
+      <ThemePicture page="music" exact />
       {tab && (
         <div className="music-panel">
           <div className="music-tabs">

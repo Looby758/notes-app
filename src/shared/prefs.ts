@@ -1,4 +1,4 @@
-import { THEMES } from './themes'
+import { allThemes } from './themes'
 import { IS_MAC } from './platform'
 
 /**
@@ -44,6 +44,9 @@ export interface Prefs {
   streamerHideNotes: boolean
   /** In streamer mode, note names (file list, tabs, recent notes) are blurred too. */
   streamerHideNames: boolean
+
+  /** Use an imported theme's own app icon while that theme is on. */
+  themeAppIcon: boolean
 
   // Editor
   livePreview: boolean
@@ -182,6 +185,7 @@ export const DEFAULT_PREFS: Prefs = {
   streamerMode: false,
   streamerHideNotes: true,
   streamerHideNames: true,
+  themeAppIcon: true,
 
   livePreview: true,
   spellcheck: true,
@@ -330,9 +334,10 @@ export function normalizePrefs(raw: unknown): Prefs {
 
   // Before Motion had three levels it was a "Reduce motion" switch.
   if (input.motion === undefined && input.reduceMotion === true) out.motion = 'off'
-  if (typeof input.theme === 'string' && THEMES.some((t) => t.id === input.theme)) out.theme = input.theme
-  if (typeof input.lightTheme === 'string' && THEMES.some((t) => t.id === input.lightTheme && t.light)) out.lightTheme = input.lightTheme
-  if (typeof input.darkTheme === 'string' && THEMES.some((t) => t.id === input.darkTheme && !t.light)) out.darkTheme = input.darkTheme
+  const themes = allThemes()
+  if (typeof input.theme === 'string' && themes.some((t) => t.id === input.theme)) out.theme = input.theme
+  if (typeof input.lightTheme === 'string' && themes.some((t) => t.id === input.lightTheme && t.light)) out.lightTheme = input.lightTheme
+  if (typeof input.darkTheme === 'string' && themes.some((t) => t.id === input.darkTheme && !t.light)) out.darkTheme = input.darkTheme
   if (input.accent === '' || isHex(input.accent)) out.accent = (input.accent as string).toLowerCase()
   out.uiFont = cleanFont(input.uiFont)
   out.editorFont = cleanFont(input.editorFont)

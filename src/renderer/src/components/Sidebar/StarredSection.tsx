@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ChevronRight, Columns2, FileText, Star, StarOff } from 'lucide-react'
+import { ChevronRight, Columns2, FileText, StarOff } from 'lucide-react'
 import Private from '../Streamer/Private'
 import { useHideNames } from '../../store/streamer'
 import { useStarred, placeStar, toggleStar, justStarred } from '../../store/starred'
@@ -10,6 +10,7 @@ import { notePaths, noteTitle, parentOf } from '../../lib/paths'
 import { openNote, splitPane } from '../../lib/editorController'
 import { getDrag, setDrag } from '../../lib/dnd'
 import ContextMenu, { type MenuItem } from '../ContextMenu'
+import StarIcon from '../Theme/StarIcon'
 
 /** Starred notes at the top of the Files view. Drag to reorder; drop a note from the tree here to star it. */
 export default function StarredSection() {
@@ -84,7 +85,7 @@ export default function StarredSection() {
         onDragLeave={() => setDropIndex(null)}
         onDrop={onDrop}
       >
-        <Star size={12} /> Drop a note here to star it
+        <StarIcon size={12} /> Drop a note here to star it
       </div>
     )
   }
@@ -117,7 +118,7 @@ export default function StarredSection() {
               onAuxClick={(e) => e.button === 1 && openNote(path, { newTab: true })}
               onContextMenu={(e) => onContextMenu(e, path)}
             >
-              <Star size={13} className={`tree-icon starred-icon ${justStarred(path) ? 'pop' : ''}`} />
+              <StarIcon size={13} className={`tree-icon starred-icon ${justStarred(path) ? 'pop' : ''}`} />
               <span className="tree-label">
                 <Private when={hideNames}>{noteTitle(path)}</Private>
               </span>

@@ -46,6 +46,7 @@ import { useLock, isLocked } from '../../lib/lock/session'
 import { lockNote, removeLock } from '../../lib/lock/actions'
 import { motionLevel, slideFrom, snapshot, usePresence } from '../../lib/motion'
 import EmptyArt from '../Motion/EmptyArt'
+import StarIcon from '../Theme/StarIcon'
 
 const INDENT = 14
 const AUTO_EXPAND_MS = 600
@@ -435,7 +436,7 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
             <Private when={hideNames}>{displayName(node)}</Private>
           </span>}
         {locked && !isRenaming && <Lock size={11} className="tree-lock" aria-label="Locked" />}
-        {starred && !isRenaming && <Star size={11} className={`tree-star ${justStarred(node.path) ? 'pop' : ''}`} aria-label="Starred" />}
+        {starred && !isRenaming && <StarIcon size={11} className={`tree-star ${justStarred(node.path) ? 'pop' : ''}`} />}
       </div>
       {children.mounted && (
         <div

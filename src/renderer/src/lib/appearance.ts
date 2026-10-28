@@ -1,5 +1,6 @@
 import type { Prefs } from '@shared/prefs'
-import { activeThemeId, getTheme, type ThemeColors } from '@shared/themes'
+import { activeThemeId, getTheme, type Theme, type ThemeColors } from '@shared/themes'
+import { themeFileUrl } from '@shared/themePack'
 import { effectiveMotion, watchSystemMotion } from './motion'
 
 // -apple-system / SF Mono are the Mac's own; Windows skips them.
@@ -40,8 +41,14 @@ function paint(p: Prefs, themeId: string): void {
     root.setProperty(cssVar(key), value)
   }
   root.setProperty('--accent', p.accent || theme.accent)
-  root.setProperty('--font-ui', fontStack(p.uiFont, UI_FALLBACK))
-  root.setProperty('--font-editor', fontStack(p.editorFont, p.uiFont ? `'${p.uiFont}', ${UI_FALLBACK}` : UI_FALLBACK))
+  // Fonts you picked win over a theme's fonts, which win over the built-in ones.
+  const fonts = themeFonts(theme)
+  const uiFont = p.uiFont || fonts.ui || ''
+  root.setProperty('--font-ui', fontStack(uiFont, UI_FALLBACK))
+  root.setProperty('--font-editor', fontStack(p.editorFont || fonts.editor || '', uiFont ? `'${uiFont}', ${UI_FALLBACK}` : UI_FALLBACK))
+  root.setProperty('--font-headings', fonts.headings ? `'${fonts.headings}', var(--font-editor)` : 'var(--font-editor)')
+  root.setProperty('--font-loading', fonts.loading ? `'${fonts.loading}', var(--font-headings)` : 'var(--font-headings)')
+  root.setProperty('--picture-strength', String(theme.pack?.pictureStrength ?? 0))
   root.setProperty('--font-mono', fontStack(p.codeFont, MONO_FALLBACK))
   root.setProperty('--editor-font-size', `${p.editorFontSize}px`)
   root.setProperty('--editor-line-height', String(p.lineHeight))
@@ -51,12 +58,35 @@ function paint(p: Prefs, themeId: string): void {
 
   const body = document.body.classList
   body.toggle('theme-light', !!theme.light)
+  body.toggle('theme-headings', !!fonts.headings)
+  body.toggle('theme-star-icon', !!theme.pack?.starIcon)
   body.toggle('density-compact', p.density === 'compact')
   body.toggle('hide-statusbar', !p.showStatusBar)
 }
 
+/** Fonts in imported themes, loaded once each; resolves to the family names to use. */
+const loadedFonts = new Map<string, FontFace>()
+
+type ThemeFonts = Partial<Record<'ui' | 'headings' | 'editor' | 'loading', string>>
+
+function themeFonts(theme: Theme): ThemeFonts {
+  const out: ThemeFonts = {}
+  for (const [role, path] of Object.entries(theme.pack?.fonts ?? {}) as [keyof ThemeFonts, string][]) {
+    const url = themeFileUrl(theme.id, path)
+    // A family name of plain characters, the same each time for the same file.
+    const family = `Theme ${theme.id} ${path}`.replace(/[^\w -]/g, ' ')
+    if (!loadedFonts.has(url) && typeof FontFace !== 'undefined') {
+      const face = new FontFace(family, `url("${url}")`)
+      loadedFonts.set(url, face)
+      face.load().then((f) => document.fonts.add(f)).catch((err) => console.error('[theme font]', path, err))
+    }
+    out[role] = family
+  }
+  return out
+}
+
 const darkQuery = typeof window !== 'undefined' ? window.matchMedia('(prefers-color-scheme: dark)') : null
-const systemDark = (): boolean => darkQuery?.matches ?? true
+export const systemDark = (): boolean => darkQuery?.matches ?? true
 
 /** Re-applies the look when the system switches between light and dark (for "match my system"). */
 export function watchSystemTheme(current: () => Prefs): () => void {

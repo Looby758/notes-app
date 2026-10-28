@@ -47,7 +47,7 @@ export const SETTINGS: SettingDef[] = [
     description: 'Pick one dark and one light theme below; Notes switches between them when your system does.',
     keywords: 'light dark mode system auto automatic appearance night day'
   },
-  { key: 'theme', section: 'appearance', group: 'Theme', type: 'theme', label: 'Theme', keywords: 'colour color dark light white paper sepia black nord blue' },
+  { key: 'theme', section: 'appearance', group: 'Theme', type: 'theme', label: 'Theme', keywords: 'colour color dark light white paper sepia black nord blue import imported theme file notestheme pictures' },
   {
     key: 'appIcon',
     section: 'appearance',
@@ -58,6 +58,15 @@ export const SETTINGS: SettingDef[] = [
       ? 'Shown in the Dock while Notes runs.'
       : 'Shown on the window, the taskbar (also when pinned), the Start menu and the desktop shortcut. Windows can take a moment to catch up; if a pinned icon doesn’t change, unpin and pin Notes again.',
     keywords: 'icon logo dock taskbar green'
+  },
+  {
+    key: 'themeAppIcon',
+    section: 'appearance',
+    group: 'App icon',
+    type: 'toggle',
+    label: 'Use a theme’s own icon',
+    description: 'When a theme you imported comes with its own app icon, it’s used while that theme is on.',
+    keywords: 'icon logo dock taskbar theme imported'
   },
   {
     key: 'accent',
