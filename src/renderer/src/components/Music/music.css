@@ -72,7 +72,8 @@ body.zen .music-player {
   width: 26px;
   height: 26px;
 }
-.music-player .music-shuffle.active {
+.music-player .music-shuffle.active,
+.music-home-footer .music-shuffle.active {
   color: var(--accent);
 }
 .music-play {
@@ -777,4 +778,24 @@ body.reduce-motion .music-popup.leaving {
   flex-shrink: 0;
   padding: 5px 12px;
   font-size: 12.5px;
+}
+.music-home-footer {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.music-home-footer .music-modes .icon-btn {
+  width: 26px;
+  height: 26px;
+}
+.music-home-source {
+  justify-self: end;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
