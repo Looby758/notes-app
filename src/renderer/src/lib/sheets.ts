@@ -1,10 +1,12 @@
 import JSZip from 'jszip'
 import { finishSheet as finish, type Cell, type Sheet } from '@shared/sheet'
+import { formatValue, isError, numberFrom, type Value } from './formulas'
 
 /**
  * Reads spreadsheets (.xlsx/.xlsm workbooks, .csv and .tsv files) into plain grids of display text,
- * for viewing them in a tab. Workbooks are zipped XML, so this needs nothing beyond JSZip. Formulas show
- * the result Excel saved with the file; nothing is recalculated.
+ * for viewing and editing them in a tab. Workbooks are zipped XML, so this needs nothing beyond JSZip. Each
+ * cell keeps its formula, so the editor can work it out again (see formulas.ts), and the writers below save
+ * the edits back as CSV or as a plain workbook.
  */
 
 export type { Cell, Sheet }
@@ -259,6 +261,12 @@ function readWorksheet(xml: string, strings: string[], formats: (string | undefi
         const n = Number(value)
         cell = isNaN(n) ? { text: value } : { text: formatNumber(n, format, date1904), num: true }
       }
+      const formula = /<(?:\w+:)?f(?:\s[^>]*)?>([\s\S]*?)<\/(?:\w+:)?f>/.exec(c.inner)?.[1]
+      if (cell && formula) cell.formula = unescapeXml(formula)
+      if (cell?.num && type === 'n') {
+        cell.value = Number(value)
+        if (format) cell.format = format
+      }
       if (cell) cells[col] = cell
     }
     rows[r] = Array.from(cells, (c) => c ?? { text: '' })
@@ -325,3 +333,92 @@ export async function readSpreadsheet(name: string, data: ArrayBuffer): Promise<
   }
   return readWorkbook(data)
 }
+
+// ---------- saving ----------
+
+/** What a cell holds as typed: its formula with the "=", or its text. */
+export const cellInput = (cell: Cell | undefined): string => (cell?.formula !== undefined ? `=${cell.formula}` : (cell?.text ?? ''))
+
+/** A sheet as CSV (or TSV), formulas included as "=..." so Excel works them out on opening. */
+export function writeDelimited(sheet: Sheet, delimiter = ','): string {
+  const quote = (t: string): string => (/["\r\n]/.test(t) || t.includes(delimiter) ? `"${t.replace(/"/g, '""')}"` : t)
+  return finish(sheet).rows.map((r) => r.map((c) => quote(cellInput(c))).join(delimiter)).join('\r\n') + '\r\n'
+}
+
+const escapeXml = (s: string): string =>
+  s.replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]!).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '')
+
+const sheetXmlName = (name: string): string => escapeXml(name.replace(/[\\/?*[\]:]/g, ' ').slice(0, 31) || 'Sheet')
+
+/**
+ * A plain .xlsx of `sheets`: values, formulas (with `result` saved as each one's answer), number formats,
+ * column widths and sheet names. Colours, fonts and the like aren't kept.
+ */
+export async function writeWorkbook(sheets: Sheet[], result: (sheet: number, row: number, col: number) => Value): Promise<Uint8Array> {
+  const formats = ['General']
+  const style = (format: string | undefined): string => {
+    if (!format || /^general$/i.test(format)) return ''
+    let i = formats.indexOf(format)
+    if (i < 0) i = formats.push(format) - 1
+    return ` s="${i}"`
+  }
+  const zip = new JSZip()
+  sheets.forEach((sheet, si) => {
+    const rows = sheet.rows
+      .map((row, r) => {
+        const cells = row
+          .map((cell, c) => {
+            const ref = `${columnName(c)}${r + 1}`
+            if (cell.formula !== undefined) {
+              const v = result(si, r, c)
+              const f = `<f>${escapeXml(cell.formula)}</f>`
+              if (typeof v === 'number') return `<c r="${ref}"${style(cell.format)}>${f}<v>${v}</v></c>`
+              if (typeof v === 'boolean') return `<c r="${ref}" t="b">${f}<v>${v ? 1 : 0}</v></c>`
+              return `<c r="${ref}" t="${isError(v) ? 'e' : 'str'}">${f}<v>${escapeXml(formatValue(v))}</v></c>`
+            }
+            if (!cell.text) return ''
+            const n = cell.value ?? numberFrom(cell.text)
+            if (n !== null) return `<c r="${ref}"${style(cell.format)}><v>${n}</v></c>`
+            if (/^(true|false)$/i.test(cell.text)) return `<c r="${ref}" t="b"><v>${/^t/i.test(cell.text) ? 1 : 0}</v></c>`
+            return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${escapeXml(cell.text)}</t></is></c>`
+          })
+          .join('')
+        return cells ? `<row r="${r + 1}">${cells}</row>` : ''
+      })
+      .join('')
+    const cols = (sheet.widths ?? []).map((w, c) => (w ? `<col min="${c + 1}" max="${c + 1}" width="${w}" customWidth="1"/>` : '')).join('')
+    zip.file(`xl/worksheets/sheet${si + 1}.xml`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet ${XLSX_NS}>${cols ? `<cols>${cols}</cols>` : ''}<sheetData>${rows}</sheetData></worksheet>`)
+  })
+  // Custom formats take ids from 164, as Excel's own do; every style is just "this number format".
+  const numFmts = formats.slice(1).map((f, i) => `<numFmt numFmtId="${164 + i}" formatCode="${escapeXml(f)}"/>`).join('')
+  const xfs = formats.map((_, i) => `<xf numFmtId="${i ? 163 + i : 0}" fontId="0" fillId="0" borderId="0"${i ? ' applyNumberFormat="1"' : ''}/>`).join('')
+  zip.file(
+    'xl/styles.xml',
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<styleSheet xmlns="${MAIN_NS}">${numFmts ? `<numFmts count="${formats.length - 1}">${numFmts}</numFmts>` : ''}<fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${formats.length}">${xfs}</cellXfs></styleSheet>`
+  )
+  zip.file(
+    'xl/workbook.xml',
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook ${XLSX_NS}><sheets>${sheets
+      .map((s, i) => `<sheet name="${sheetXmlName(s.name)}" sheetId="${i + 1}"${s.hidden ? ' state="hidden"' : ''} r:id="rId${i + 1}"/>`)
+      .join('')}</sheets><calcPr fullCalcOnLoad="1"/></workbook>`
+  )
+  zip.file(
+    'xl/_rels/workbook.xml.rels',
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="${PKG_REL_NS}">${sheets
+      .map((_, i) => `<Relationship Id="rId${i + 1}" Type="${REL_NS}/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`)
+      .join('')}<Relationship Id="rIdS" Type="${REL_NS}/styles" Target="styles.xml"/></Relationships>`
+  )
+  zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="${PKG_REL_NS}"><Relationship Id="rId1" Type="${REL_NS}/officeDocument" Target="xl/workbook.xml"/></Relationships>`)
+  zip.file(
+    '[Content_Types].xml',
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheets
+      .map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`)
+      .join('')}</Types>`
+  )
+  return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' })
+}
+
+const MAIN_NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
+const REL_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+const PKG_REL_NS = 'http://schemas.openxmlformats.org/package/2006/relationships'
+const XLSX_NS = `xmlns="${MAIN_NS}" xmlns:r="${REL_NS}"`

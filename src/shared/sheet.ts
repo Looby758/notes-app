@@ -4,6 +4,12 @@ export interface Cell {
   text: string
   /** Numbers (and dates) line up on the right, as in Excel. */
   num?: boolean
+  /** The formula in the cell, without its "=" (from a workbook, or typed in the editor). */
+  formula?: string
+  /** The number a workbook stored, where `text` is that number formatted (dates are Excel serial numbers). */
+  value?: number
+  /** The number format a workbook gave the cell, like "0.00%" or "d-mmm-yy". */
+  format?: string
 }
 
 export interface Sheet {
@@ -20,7 +26,7 @@ export interface Sheet {
 export function finishSheet(sheet: Sheet): Sheet {
   const rows = sheet.rows.map((r) => {
     let end = r.length
-    while (end > 0 && !r[end - 1]?.text) end--
+    while (end > 0 && !r[end - 1]?.text && r[end - 1]?.formula === undefined) end--
     return r.slice(0, end)
   })
   let last = rows.length

@@ -642,6 +642,7 @@ function registerIpc(): void {
   ipcMain.handle('vault:readAppData', (_e, name: string) => currentVault().readAppData(name))
   ipcMain.handle('vault:writeAppData', (_e, name: string, content: string) => currentVault().writeAppData(name, content))
   ipcMain.handle('fs:writeSketch', (_e, path: string, svg: string) => currentVault().writeSketch(path, svg))
+  ipcMain.handle('fs:writeSheet', (_e, path: string, data: Uint8Array) => currentVault().writeSheet(path, data))
   ipcMain.handle('fs:saveAttachment', (_e, folder: string, name: string, data: Uint8Array) =>
     currentVault().saveAttachment(folder, name, data)
   )

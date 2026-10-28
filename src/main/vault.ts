@@ -250,6 +250,22 @@ export class Vault {
     }
   }
 
+  /** Saves an edited spreadsheet over its .xlsx, .xlsm, .csv or .tsv (only an existing one, as with sketches). */
+  async writeSheet(rel: string, data: Uint8Array): Promise<void> {
+    const full = this.abs(rel)
+    if (!['.xlsx', '.xlsm', '.csv', '.tsv'].includes(extname(full).toLowerCase())) throw new Error('Only spreadsheets can be saved this way.')
+    if (!(await exists(full))) throw new Error('That spreadsheet is no longer in the notes folder.')
+    if (data.byteLength > MAX_ATTACHMENT_BYTES) throw new Error('That spreadsheet is too big to save.')
+    const tmp = join(dirname(full), `.${basename(full)}.${tempSuffix()}.tmp`)
+    await fs.writeFile(tmp, data)
+    try {
+      await renameWithRetry(tmp, full)
+    } catch (err) {
+      await fs.rm(tmp, { force: true })
+      throw err
+    }
+  }
+
   /** Copies a file from anywhere on disk into `folderRel` (for "insert image" from a file picker). */
   async copyAttachment(folderRel: string, source: string): Promise<string> {
     if ((await fs.stat(source)).size > MAX_ATTACHMENT_BYTES) throw new Error('That file is too big to attach (over 100 MB).')

@@ -533,6 +533,8 @@ export interface NotesApi {
   readAppData(name: string): Promise<string | null>
   writeAppData(name: string, content: string): Promise<void>
   /** Saves pasted/dropped file data into a vault folder; returns the new file's path. */
+  /** Saves an edited spreadsheet (.xlsx, .xlsm, .csv or .tsv) over the file. */
+  writeSheet(path: string, data: Uint8Array): Promise<void>
   saveAttachment(folder: string, name: string, data: Uint8Array): Promise<string>
   /** Saves an edited sketch over its existing .svg. */
   writeSketch(path: string, svg: string): Promise<void>

@@ -256,6 +256,7 @@ const api: NotesApi = {
   readAppData: (name) => ipcRenderer.invoke('vault:readAppData', name),
   writeAppData: (name, content) => ipcRenderer.invoke('vault:writeAppData', name, content),
   writeSketch: (path, svg) => ipcRenderer.invoke('fs:writeSketch', path, svg),
+  writeSheet: (path, data) => ipcRenderer.invoke('fs:writeSheet', path, data),
   saveAttachment: (folder, name, data) => ipcRenderer.invoke('fs:saveAttachment', folder, name, data),
   pickAttachment: (folder, imagesOnly) => ipcRenderer.invoke('fs:pickAttachment', folder, imagesOnly),
   openFile: (path) => ipcRenderer.invoke('fs:openFile', path),
