@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { displayUrl, isWebUrl, plainUserAgent, toWebUrl } from './web'
+import { displayUrl, firefoxUserAgent, isGoogleSignIn, isWebUrl, plainUserAgent, toWebUrl } from './web'
 
 describe('toWebUrl', () => {
   it('opens addresses', () => {
@@ -41,5 +41,20 @@ describe('plainUserAgent', () => {
   it('leaves out the app and Electron', () => {
     const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) notesapp/1.5.0 Chrome/138.0.0.0 Electron/37.2.0 Safari/537.36'
     expect(plainUserAgent(ua)).toBe('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36')
+  })
+})
+
+describe('Google sign-in', () => {
+  it('spots Google sign-in pages', () => {
+    expect(isGoogleSignIn('https://accounts.google.com/v3/signin/identifier?continue=x')).toBe(true)
+    expect(isGoogleSignIn('https://www.google.com/search?q=accounts.google.com')).toBe(false)
+    expect(isGoogleSignIn('https://accounts.google.com.evil.example/')).toBe(false)
+    expect(isGoogleSignIn('not a url')).toBe(false)
+  })
+
+  it('names Firefox for each system', () => {
+    expect(firefoxUserAgent('win32')).toBe('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0')
+    expect(firefoxUserAgent('darwin')).toContain('Macintosh')
+    expect(firefoxUserAgent('linux')).toContain('Linux')
   })
 })

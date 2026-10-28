@@ -49,3 +49,23 @@ export function plainUserAgent(agent: string): string {
     .replace(/\s{2,}/g, ' ')
     .trim()
 }
+
+/**
+ * Google turns away sign-ins from browsers built into other apps ("This browser or app may not be
+ * secure" / "unsupported browser"), judging by the browser's name. Its sign-in pages are told the
+ * browser is Firefox, which Google accepts.
+ */
+export function isGoogleSignIn(url: string): boolean {
+  try {
+    return new URL(url).hostname === 'accounts.google.com'
+  } catch {
+    return false
+  }
+}
+
+/** Firefox's browser name on this kind of computer. */
+export function firefoxUserAgent(platform: string): string {
+  const system =
+    platform === 'darwin' ? 'Macintosh; Intel Mac OS X 10.15' : platform === 'win32' ? 'Windows NT 10.0; Win64; x64' : 'X11; Linux x86_64'
+  return `Mozilla/5.0 (${system}; rv:140.0) Gecko/20100101 Firefox/140.0`
+}
