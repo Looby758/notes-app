@@ -322,14 +322,7 @@ export const editorTheme = EditorView.theme(
     // lists and tasks
     '.cm-bullet': { color: 'var(--text-faint)', display: 'inline-block', width: '1ch', fontWeight: '700' },
     '.cm-list-number': { color: 'var(--text-faint)' },
-    '.cm-task-checkbox': {
-      width: '15px',
-      height: '15px',
-      margin: '0 8px 0 0',
-      verticalAlign: '-2px',
-      accentColor: 'var(--accent)',
-      cursor: 'pointer'
-    },
+    // The task checkbox is drawn in styles/motion.css, so its tick can animate.
     '.cm-task-done': { color: 'var(--text-faint)', textDecoration: 'line-through' },
 
     // images and tables

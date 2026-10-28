@@ -59,6 +59,10 @@ import MindMap from '../MindMap/MindMap'
 import WebPage from '../Web/WebPage'
 import { isMindMap, useUI } from '../../store/ui'
 import { needsUnlock, useLock } from '../../lib/lock/session'
+import { isRestoring, replay } from '../../lib/motion'
+
+/** Panes that have been on screen, so only a brand-new one slides open (splitting remounts the old one). */
+const seenPanes = new Set<string>()
 
 /** One pane: its tab bar, and whatever its active tab shows (a note, a blank tab's picker, Settings…). */
 export default function Pane({ pane }: { pane: string }) {
@@ -74,6 +78,15 @@ export default function Pane({ pane }: { pane: string }) {
   const mindMap = useUI((s) => showingNote && isMindMap(s, pane, active))
 
   useEffect(() => mountPane(pane, host.current!), [pane])
+
+  const [isNew] = useState(() => !seenPanes.has(pane) && !isRestoring())
+  seenPanes.add(pane)
+
+  // Switching to another note keeps the same editor, so its fade-in is played again by hand.
+  const noteShown = showingNote && !mindMap
+  useEffect(() => {
+    if (noteShown) replay(host.current, 'page-enter')
+  }, [active, noteShown])
 
   const onDragOver = (e: DragEvent<HTMLDivElement>): void => {
     // Files from the list are dropped into the note (the editor handles that).
@@ -102,7 +115,7 @@ export default function Pane({ pane }: { pane: string }) {
 
   return (
     <div
-      className={`pane ${isActivePane && multiple ? 'focused' : ''} ${isActivePane ? 'active-pane' : ''}`}
+      className={`pane ${isActivePane && multiple ? 'focused' : ''} ${isActivePane ? 'active-pane' : ''} ${isNew ? 'pane-new' : ''}`}
       data-pane={pane}
       onMouseDownCapture={() => focusPane(pane)}
       onFocusCapture={() => focusPane(pane)}

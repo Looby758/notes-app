@@ -106,9 +106,10 @@ body.density-compact {
 body.density-compact .panel-header {
   height: 32px;
 }
-body.reduce-motion *,
-body.reduce-motion *::before,
-body.reduce-motion *::after {
+/* Settings → Motion → Off (more in motion.css). */
+[data-motion='off'] *,
+[data-motion='off'] *::before,
+[data-motion='off'] *::after {
   animation: none !important;
   transition: none !important;
 }

@@ -35,7 +35,7 @@ export default function GamesPage() {
   const [starting, setStarting] = useState<string | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; game: Game } | null>(null)
   const [launching, setLaunching] = useState<Game | null>(null)
-  const animate = usePrefs((s) => s.prefs.gameLaunchAnimation && !s.prefs.reduceMotion)
+  const animate = usePrefs((s) => s.prefs.gameLaunchAnimation && s.prefs.motion !== 'off')
 
   const load = useCallback(async (rescan: boolean) => {
     if (rescan) setRefreshing(true)

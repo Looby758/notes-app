@@ -6,6 +6,7 @@ import YouTubeMini from './components/YouTube/YouTubeMini'
 import { loadPrefs } from './store/prefs'
 import { IS_MAC } from '@shared/platform'
 import './styles/theme.css'
+import './styles/motion.css'
 
 // Mac and Windows differ in a few places (window buttons, key symbols); CSS can check this.
 document.documentElement.dataset.platform = IS_MAC ? 'mac' : 'win'

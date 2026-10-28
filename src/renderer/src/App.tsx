@@ -4,6 +4,7 @@ import Shell from './components/Shell'
 import { flushAll } from './lib/editorController'
 import { loadPrefs } from './store/prefs'
 import { saveCapture } from './lib/capture'
+import StartupLogo from './components/Motion/StartupLogo'
 
 export default function App() {
   // undefined = still loading, null = no vault chosen yet
@@ -49,6 +50,11 @@ export default function App() {
   }, [])
 
   if (vault === undefined) return <div className="app-loading" />
-  if (vault === null) return <WelcomeScreen onPick={pickVault} />
-  return <Shell vault={vault} onSwitchVault={pickVault} onCloseVault={closeVault} />
+  return (
+    <>
+      {vault === null ? <WelcomeScreen onPick={pickVault} /> : <Shell vault={vault} onSwitchVault={pickVault} onCloseVault={closeVault} />}
+      {/* After the settings have loaded, so it knows whether you've turned motion off. */}
+      <StartupLogo />
+    </>
+  )
 }

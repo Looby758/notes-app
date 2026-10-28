@@ -40,6 +40,7 @@ import { addHomeCard } from '../../lib/home'
 import { readWorkbook } from '../../lib/sheets'
 import { statementFromPdf } from '../../lib/pdfStatement'
 import MoneyHomeCard from './MoneyHomeCard'
+import EmptyArt from '../Motion/EmptyArt'
 
 addHomeCard({ id: 'money', order: 25, Card: MoneyHomeCard })
 
@@ -309,7 +310,10 @@ function Overview({ month, setMonth, showBudgets }: { month: string; setMonth: (
             ))}
           </ul>
         ) : (
-          <p className="money-hint">Nothing spent in {monthName(month)} yet. Add what you spend above, or import a bank statement.</p>
+          <div className="empty-with-art">
+            <EmptyArt kind="coins" />
+            <p className="money-hint">Nothing spent in {monthName(month)} yet. Add what you spend above, or import a bank statement.</p>
+          </div>
         )}
       </section>
 

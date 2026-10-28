@@ -28,6 +28,7 @@ import {
 } from '../../lib/passwords/generate'
 import { ShowRecoveryKey } from '../Lock/LockDialog'
 import { notify } from '../../store/notify'
+import EmptyArt from '../Motion/EmptyArt'
 
 /** Seconds a copied password stays on the clipboard. */
 const CLEAR_AFTER = 30
@@ -335,7 +336,12 @@ function Vault() {
               </li>
             ))}
           </ul>
-          {count === 0 && <p className="passwords-none">No logins yet. Press “New login” to add one.</p>}
+          {count === 0 && (
+            <div className="empty-with-art">
+              <EmptyArt kind="key" />
+              <p className="passwords-none">No logins yet. Press “New login” to add one.</p>
+            </div>
+          )}
           {count > 0 && shown.length === 0 && <p className="passwords-none">Nothing matches “{query}”.</p>}
         </div>
         <div className="passwords-detail">

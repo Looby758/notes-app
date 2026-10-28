@@ -1,12 +1,13 @@
 import './ai.css'
 import { useEffect, useRef, useState } from 'react'
-import { ArrowUp, Loader2, RotateCcw, Sparkles } from 'lucide-react'
+import { ArrowUp, Loader2, RotateCcw } from 'lucide-react'
 import { askNotes, clearAsk, refreshAiStatus, useAi } from '../../store/ai'
 import { useNoteIndex } from '../../store/noteIndex'
 import { notify } from '../../store/notify'
 import { openNote, openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
 import { answerParts } from '../../lib/ai'
 import { openAiSettings } from './AiSettings'
+import EmptyArt from '../Motion/EmptyArt'
 
 const EXAMPLES = ['What did I decide about the trip?', 'What’s still on my to-do lists?', 'When is the dentist appointment?']
 
@@ -59,7 +60,7 @@ export default function AiPage({ autoFocus }: { autoFocus: boolean }) {
     return (
       <div className="ai-page" data-ai-page>
         <div className="ai-empty">
-          <Sparkles size={30} strokeWidth={1.4} />
+          <EmptyArt kind="sparkle" size={64} />
           <h2>Ask my notes</h2>
           <p>Ask a question in your own words and Claude answers from your notes, with links to the notes it used.</p>
           <p>To start, add your Anthropic API key in Settings.</p>
@@ -82,7 +83,7 @@ export default function AiPage({ autoFocus }: { autoFocus: boolean }) {
       <div className="ai-turns">
         {turns.length === 0 && (
           <div className="ai-empty">
-            <Sparkles size={30} strokeWidth={1.4} />
+            <EmptyArt kind="sparkle" size={64} />
             <h2>Ask my notes</h2>
             <p>Ask anything about what you’ve written. Claude reads the notes that best match your question and answers from them.</p>
             <div className="ai-examples">

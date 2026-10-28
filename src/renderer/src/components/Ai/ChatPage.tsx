@@ -10,6 +10,7 @@ import { notify } from '../../store/notify'
 import { openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
 import { chatAsNote, chatHtml, freeNoteName } from '../../lib/chat'
 import { openAiSettings } from './AiSettings'
+import EmptyArt from '../Motion/EmptyArt'
 
 const EXAMPLES = ['Explain how compound interest works', 'Help me plan a week of healthy dinners', 'Write a polite email asking for a deadline extension']
 
@@ -146,7 +147,7 @@ export default function ChatPage({ autoFocus }: { autoFocus: boolean }) {
     return (
       <div className="ai-page" data-chat-page>
         <div className="ai-empty">
-          <MessageSquare size={30} strokeWidth={1.4} />
+          <EmptyArt kind="chat" size={64} />
           <h2>Chat with Claude</h2>
           <p>Ask Claude anything: questions, explanations, writing help, ideas. Your chats are kept so you can come back to them.</p>
           <p>To start, add your Anthropic API key in Settings.</p>
@@ -180,7 +181,7 @@ export default function ChatPage({ autoFocus }: { autoFocus: boolean }) {
         <div className="ai-turns">
           {messages.length === 0 && (
             <div className="ai-empty">
-              <MessageSquare size={30} strokeWidth={1.4} />
+              <EmptyArt kind="chat" size={64} />
               <h2>Chat with Claude</h2>
               <p>Ask anything at all. For questions about what you’ve written, use “Ask my notes” instead.</p>
               <div className="ai-examples">

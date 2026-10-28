@@ -8,6 +8,7 @@ import { dayKeyOf } from '../../lib/when'
 import { isWithin, noteTitle } from '../../lib/paths'
 import { FLASHCARDS_TAB, openNote, openSpecialTab } from '../../lib/editorController'
 import { showKeys } from '@shared/platform'
+import EmptyArt from '../Motion/EmptyArt'
 
 const GRADE_LABELS: Record<Grade, string> = { again: 'Again', hard: 'Hard', good: 'Good', easy: 'Easy' }
 
@@ -123,7 +124,10 @@ function Overview({
         miss come back soon.
       </p>
       {cards.length === 0 ? (
-        <p className="flashcards-none">No cards yet. Add a line with a question, “ :: ” and the answer to any note, and it shows up here.</p>
+        <div className="empty-with-art">
+          <EmptyArt kind="cards" />
+          <p className="flashcards-none">No cards yet. Add a line with a question, “ :: ” and the answer to any note, and it shows up here.</p>
+        </div>
       ) : (
         <>
           <div className="flashcards-summary">

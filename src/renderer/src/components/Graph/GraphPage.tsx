@@ -7,6 +7,7 @@ import { setPrefs, usePrefs } from '../../store/prefs'
 import { buildGraph } from '../../lib/graph'
 import { openNote } from '../../lib/editorController'
 import { GraphCanvas } from './graphCanvas'
+import EmptyArt from '../Motion/EmptyArt'
 
 /**
  * The graph tab. Two ways to look at how your notes connect:
@@ -152,7 +153,12 @@ export default function GraphPage() {
         <button className="icon-btn graph-fit" title="Show everything (or double-click the background)" onClick={() => engine.current?.fit()}>
           <Maximize size={14} />
         </button>
-        {graph.nodes.length === 0 && <div className="graph-empty">No notes yet. Notes and the links between them show up here.</div>}
+        {graph.nodes.length === 0 && (
+          <div className="graph-empty">
+            <EmptyArt kind="graph" size={64} />
+            No notes yet. Notes and the links between them show up here.
+          </div>
+        )}
         {legend.length > 0 && (
           <div className="graph-legend">
             <span>

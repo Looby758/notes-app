@@ -51,6 +51,10 @@ function save(paths: string[]): void {
 
 export const isStarred = (path: string): boolean => useStarred.getState().paths.includes(path)
 
+/** When each note was starred in this session, so its star can pop as it appears. */
+const starredAt = new Map<string, number>()
+export const justStarred = (path: string): boolean => performance.now() - (starredAt.get(path) ?? -Infinity) < 600
+
 /** Stars a note (at `index`, default the end) or, if it's starred already, unstars it. */
 export function toggleStar(path: string, index?: number): void {
   const { paths } = useStarred.getState()
@@ -58,6 +62,7 @@ export function toggleStar(path: string, index?: number): void {
   else {
     const next = [...paths]
     next.splice(index ?? next.length, 0, path)
+    starredAt.set(path, performance.now())
     save(next)
   }
 }
@@ -65,6 +70,7 @@ export function toggleStar(path: string, index?: number): void {
 /** Puts a note at position `index` in the starred list (starring it if needed). */
 export function placeStar(path: string, index: number): void {
   const without = useStarred.getState().paths.filter((p) => p !== path)
+  if (!isStarred(path)) starredAt.set(path, performance.now())
   const at = Math.max(0, Math.min(index, without.length))
   without.splice(at, 0, path)
   save(without)

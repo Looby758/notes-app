@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useEditor } from '../../store/editor'
 import { isNoteTab, jumpTo } from '../../lib/editorController'
+import EmptyArt from '../Motion/EmptyArt'
 
 /** Headings of the open note; click one to jump there. The one you're in is highlighted. */
 export default function Outline() {
@@ -17,6 +18,7 @@ export default function Outline() {
   if (outline.length === 0) {
     return (
       <div className="panel-empty">
+        <EmptyArt kind="outline" size={44} />
         No headings yet. Start a line with <code>#</code>, <code>##</code> or <code>###</code> to add one.
       </div>
     )
