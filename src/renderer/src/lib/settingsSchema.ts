@@ -714,7 +714,7 @@ export const SECTIONS: { id: SectionId; label: string }[] = [
 ]
 
 /** Accent colours offered as one-click swatches. */
-export const ACCENT_SWATCHES = ['#8b7cf6', '#5ea8ff', '#3ccfcf', '#4ade80', '#e0a458', '#f97066', '#f472b6', '#c4b5fd']
+export const ACCENT_SWATCHES = ['#4ade80', '#8b7cf6', '#5ea8ff', '#3ccfcf', '#e0a458', '#f97066', '#f472b6', '#c4b5fd']
 
 export function matchesSearch(def: SettingDef, query: string): boolean {
   const haystack = `${def.label} ${def.description ?? ''} ${def.keywords ?? ''} ${def.group}`.toLowerCase()
