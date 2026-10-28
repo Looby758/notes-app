@@ -6,6 +6,7 @@ import {
   FolderSync,
   LogOut,
   Orbit,
+  Mail,
   BookOpen,
   Dices,
   Moon,
@@ -33,6 +34,7 @@ import {
   remeasure,
   SETTINGS_TAB,
   GRAPH_TAB,
+  EMAIL_TAB,
   setZenEditor
 } from '../lib/editorController'
 import { openLink, openWikiLink } from '../lib/openLink'
@@ -268,6 +270,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         </button>
         <button className="icon-btn" onClick={() => openSpecialTab(GRAPH_TAB)} title={`Graph (${showKeys('Ctrl+Shift+G')})`}>
           <Orbit size={15} />
+        </button>
+        <button className="icon-btn" onClick={() => openSpecialTab(EMAIL_TAB)} title={`Email (${showKeys('Ctrl+Shift+J')})`}>
+          <Mail size={15} />
         </button>
         <FlashcardsButton />
         <LayoutMenu />

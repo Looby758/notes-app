@@ -19,7 +19,7 @@ import { existsSync, statSync } from 'fs'
 import { readFile } from 'fs/promises'
 import { basename, extname, join } from 'path'
 import { pathToFileURL } from 'url'
-import type { AiAskTurn, AiNote, ConfirmOptions } from '@shared/types'
+import type { AiAskTurn, AiNote, ConfirmOptions, EmailFolder, OutgoingEmail } from '@shared/types'
 import { normalizePrefs, type Prefs } from '@shared/prefs'
 import { activeThemeId, getTheme } from '@shared/themes'
 import { loadSettings, saveSettings, settingsFile, watchSettingsFile } from './settings'
@@ -27,6 +27,7 @@ import { Vault } from './vault'
 import { startWatching, stopWatching } from './watcher'
 import * as calendars from './calendarSources'
 import * as ai from './ai'
+import * as email from './email'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
 import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
@@ -521,6 +522,15 @@ function registerIpc(): void {
   ipcMain.handle('cal:addFeed', (_e, name: string, url: string) => calendars.addFeed(name, url))
   ipcMain.handle('cal:removeFeed', (_e, id: string) => calendars.removeFeed(id))
   ipcMain.handle('cal:events', (_e, from: string, to: string) => calendars.fetchEvents(from, to))
+  ipcMain.handle('email:status', () => email.status())
+  ipcMain.handle('email:connect', () => email.connect())
+  ipcMain.handle('email:list', (_e, folder: EmailFolder, query: string, next?: string) => email.list(folder, query, next))
+  ipcMain.handle('email:get', (_e, id: string) => email.get(id))
+  ipcMain.handle('email:send', (_e, message: OutgoingEmail) => email.send(message))
+  ipcMain.handle('email:markRead', (_e, id: string, read: boolean) => email.markRead(id, read))
+  ipcMain.handle('email:star', (_e, id: string, starred: boolean) => email.star(id, starred))
+  ipcMain.handle('email:archive', (_e, id: string) => email.archive(id))
+  ipcMain.handle('email:trash', (_e, id: string) => email.trash(id))
   ipcMain.handle('ai:status', () => ai.status())
   ipcMain.handle('ai:setKey', (_e, key: string) => ai.setKey(key))
   ipcMain.handle('ai:clearKey', () => ai.clearKey())

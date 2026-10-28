@@ -17,6 +17,7 @@ import {
   CONFLICTS_TAB,
   AI_TAB,
   FLASHCARDS_TAB,
+  EMAIL_TAB,
   SETTINGS_TAB,
   splitPane
 } from '../../lib/editorController'
@@ -34,6 +35,7 @@ import { isBoard } from '../../lib/canvas'
 import ConflictsPage from '../Conflicts/ConflictsPage'
 import AiPage from '../Ai/AiPage'
 import FlashcardsPage from '../Flashcards/FlashcardsPage'
+import EmailPage from '../Email/EmailPage'
 import MindMap from '../MindMap/MindMap'
 import { isMindMap, useUI } from '../../store/ui'
 import { needsUnlock, useLock } from '../../lib/lock/session'
@@ -136,6 +138,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === CONFLICTS_TAB && <ConflictsPage />}
         {active === AI_TAB && <AiPage autoFocus={isActivePane} />}
         {active === FLASHCARDS_TAB && <FlashcardsPage />}
+        {active === EMAIL_TAB && <EmailPage />}
         {!active && (
           <div className="editor-empty">
             <FileText size={36} strokeWidth={1.2} />

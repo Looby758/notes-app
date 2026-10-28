@@ -3,7 +3,7 @@ import { createHash, randomBytes } from 'crypto'
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { createServer, type Server } from 'http'
 import { join } from 'path'
-import type { CalEvent, CalendarSourcesStatus } from '@shared/types'
+import type { CalEvent, CalendarSourcesStatus, GoogleAuthStatus } from '@shared/types'
 import { parseIcs } from '@shared/ics'
 
 /**
@@ -13,10 +13,13 @@ import { parseIcs } from '@shared/ics'
  *
  * Google sign-in uses the standard desktop flow: your browser opens Google's page, you approve,
  * and Google sends a one-time code to a temporary address on this computer (127.0.0.1). The app
- * only ever asks for read-only access to your calendars.
+ * only asks for read-only access to your calendars, plus access to Gmail once you turn on the
+ * Email page (see email.ts), which shares this sign-in.
  */
 
 const SCOPE = 'https://www.googleapis.com/auth/calendar.readonly openid email'
+/** Read, label, archive and send email (not delete forever). */
+export const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.modify'
 // Overridable for tests, which point these at a local fake Google server.
 const AUTH_URL = process.env.NOTES_GOOGLE_AUTH_URL ?? 'https://accounts.google.com/o/oauth2/v2/auth'
 const TOKEN_URL = process.env.NOTES_GOOGLE_TOKEN_URL ?? 'https://oauth2.googleapis.com/token'
@@ -32,6 +35,10 @@ interface Stored {
   /** Encrypted refresh token. */
   refreshToken?: string
   email?: string
+  /** The permissions Google granted with the saved sign-in (space-separated). */
+  scopes?: string
+  /** You turned on the Email page, so signing in again asks for Gmail too. */
+  gmail?: boolean
   /** Google calendars you've switched off. */
   disabled: string[]
   calendars: { id: string; name: string; color: string }[]
@@ -90,6 +97,7 @@ export function setClient(clientId: string, clientSecret: string): CalendarSourc
     // A different app: the old sign-in doesn't apply any more.
     s.refreshToken = undefined
     s.email = undefined
+    s.scopes = undefined
     s.calendars = []
     accessToken = null
   }
@@ -168,7 +176,26 @@ function listenForCode(state: string): Promise<{ server: Server; port: number; c
   })
 }
 
-export async function connect(): Promise<CalendarSourcesStatus> {
+/** Who's signed in and whether Gmail is allowed, for the Email page. */
+export function authStatus(): GoogleAuthStatus {
+  const s = load()
+  return {
+    configured: !!s.clientId && !!s.clientSecret,
+    connected: !!s.refreshToken,
+    email: s.email,
+    gmail: !!s.refreshToken && hasGmail(),
+    error: googleError,
+    canEncrypt: safeStorage.isEncryptionAvailable()
+  }
+}
+
+export const hasGmail = (): boolean => (load().scopes ?? '').split(' ').includes(GMAIL_SCOPE)
+
+/**
+ * Signs in to Google in your browser. `withGmail` also asks for email access (from the Email page);
+ * once you've allowed it, signing in again from Settings keeps asking for it.
+ */
+export async function connect(withGmail = false): Promise<CalendarSourcesStatus> {
   const s = load()
   if (!safeStorage.isEncryptionAvailable()) throw new Error('Windows can’t protect a saved sign-in on this computer, so Google can’t be connected.')
   if (!s.clientId || !s.clientSecret) throw new Error('Add your Google client ID and secret first.')
@@ -183,7 +210,7 @@ export async function connect(): Promise<CalendarSourcesStatus> {
       client_id: s.clientId,
       redirect_uri: redirect,
       response_type: 'code',
-      scope: SCOPE,
+      scope: withGmail || s.gmail ? `${SCOPE} ${GMAIL_SCOPE}` : SCOPE,
       code_challenge: challenge,
       code_challenge_method: 'S256',
       state,
@@ -206,10 +233,16 @@ export async function connect(): Promise<CalendarSourcesStatus> {
     if (typeof tokens.refresh_token !== 'string') throw new Error('Google didn’t allow offline access. Try connecting again.')
     s.refreshToken = encrypt(tokens.refresh_token)
     s.email = emailFromIdToken(tokens.id_token)
+    s.scopes = typeof tokens.scope === 'string' ? tokens.scope : SCOPE
+    if (withGmail) s.gmail = true
     accessToken = { token: String(tokens.access_token), expires: Date.now() + Number(tokens.expires_in ?? 3600) * 1000 }
     googleError = undefined
     save()
-    await refreshCalendarList()
+    if (withGmail && !hasGmail()) throw new Error('Google didn’t give Notes access to your email. Connect again and tick the Gmail box.')
+    // Connecting from the Email page shouldn't fail just because the calendar isn't set up.
+    await refreshCalendarList().catch((err) => {
+      if (!withGmail) throw err
+    })
     return status()
   } finally {
     server.close()
@@ -224,6 +257,8 @@ export async function disconnect(): Promise<CalendarSourcesStatus> {
   }
   s.refreshToken = undefined
   s.email = undefined
+  s.scopes = undefined
+  s.gmail = undefined
   s.calendars = []
   accessToken = null
   googleError = undefined
@@ -231,7 +266,7 @@ export async function disconnect(): Promise<CalendarSourcesStatus> {
   return status()
 }
 
-async function getAccessToken(): Promise<string | null> {
+export async function getAccessToken(): Promise<string | null> {
   const s = load()
   if (!s.refreshToken || !s.clientSecret) return null
   if (accessToken && accessToken.expires > Date.now() + 60_000) return accessToken.token
