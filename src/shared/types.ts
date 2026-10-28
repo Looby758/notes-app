@@ -3,7 +3,7 @@ import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
 import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
-import type { MusicAction, MusicItem, MusicSearchResults, MusicState, MusicStatus } from './spotify'
+import type { MusicAction, MusicDevice, MusicItem, MusicQueue, MusicSearchResults, MusicState, MusicStatus } from './spotify'
 import type { GamesList, LaunchArt } from './games'
 
 export interface WindowBounds {
@@ -385,6 +385,18 @@ export interface NotesApi {
   /** Needs your account. */
   musicSearch(query: string): Promise<MusicSearchResults>
   musicPlaylists(): Promise<MusicItem[]>
+  /** 0–100. */
+  musicSetVolume(percent: number): Promise<void>
+  /** Whether a song is in your Liked Songs (needs your account). */
+  musicIsLiked(uri: string): Promise<boolean>
+  musicSetLiked(uri: string, liked: boolean): Promise<void>
+  /** Needs your account, like everything below. */
+  musicQueue(): Promise<MusicQueue>
+  musicAddToQueue(uri: string): Promise<void>
+  musicRecent(): Promise<MusicItem[]>
+  /** Where your account can play. */
+  musicDevices(): Promise<MusicDevice[]>
+  musicTransfer(deviceId: string): Promise<void>
   /** Opens the Spotify app, or (Mac) where you let Notes control it in System Settings. */
   musicOpen(what: 'app' | 'automation'): Promise<void>
   aiStatus(): Promise<AiStatus>

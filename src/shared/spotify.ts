@@ -6,7 +6,8 @@
  *   Spotify link. macOS asks once whether Notes may control Spotify.
  * - Your Spotify account (Spotify's Web API), which adds searching and your playlists, and controls
  *   Spotify on any device (phone, speaker, Windows). Spotify only lets personal apps use it with
- *   Premium, and you make your own free Spotify developer app for it, like the Google sign-in.
+ *   Premium, and you make your own free Spotify developer app for it, like the Google sign-in. Liking
+ *   songs, the queue, recently played and choosing where it plays need it too.
  *
  * This file is the part both sides share: the shapes the UI sees, and turning what Spotify says into them.
  */
@@ -40,6 +41,7 @@ export interface MusicState {
   track?: MusicTrack
   positionMs: number
   shuffle?: boolean
+  repeat?: MusicRepeat
   /** 0–100. */
   volume?: number
   /** Where it's playing, for your account ("Kitchen speaker"). */
@@ -48,6 +50,9 @@ export interface MusicState {
   error?: string
 }
 
+/** Off, the whole playlist/album, or just this song (the Mac app only has off and on). */
+export type MusicRepeat = 'off' | 'context' | 'track'
+
 export interface MusicStatus {
   /** The Spotify app can be controlled directly (Macs). */
   appControl: boolean
@@ -55,13 +60,31 @@ export interface MusicStatus {
   connected: boolean
   /** Your Spotify display name. */
   name?: string
+  /** Connected before Notes asked for liking songs and recently played: connect again for those. */
+  needsReconnect?: boolean
   error?: string
   /** Paste this into your Spotify developer app. */
   redirectUri: string
   canEncrypt: boolean
 }
 
-export type MusicAction = 'toggle' | 'next' | 'previous' | 'shuffle'
+export type MusicAction = 'toggle' | 'next' | 'previous' | 'shuffle' | 'repeat'
+
+/** Somewhere your account can play: this computer, your phone, a speaker. */
+export interface MusicDevice {
+  id: string
+  name: string
+  /** Computer, Smartphone, Speaker, TV… */
+  type: string
+  active: boolean
+  volume?: number
+}
+
+/** What's playing and what plays after it. */
+export interface MusicQueue {
+  current?: MusicItem
+  next: MusicItem[]
+}
 
 /** A search result or playlist you can play. */
 export interface MusicItem {
@@ -99,12 +122,12 @@ export const uriKind = (uri: string): string => uri.split(':')[1] ?? ''
 
 /**
  * What the Mac's Spotify app reported (see APP_STATE_SCRIPT in the main process): "stopped", or
- * state, name, artist, album, artwork, uri, duration (ms), position (ms), shuffling, volume.
+ * state, name, artist, album, artwork, uri, duration (ms), position (ms), shuffling, volume, repeating.
  */
 export function parseAppState(output: string): MusicState {
   const fields = output.replace(/\r?\n$/, '').split(APP_FIELD_SEP)
   if (fields.length < 10) return { source: 'app', playing: false, positionMs: 0 }
-  const [state, name, artist, album, art, uri, duration, position, shuffle, volume] = fields
+  const [state, name, artist, album, art, uri, duration, position, shuffle, volume, repeating] = fields
   const num = (s: string): number => {
     const n = Number(s.replace(',', '.'))
     return Number.isFinite(n) ? n : 0
@@ -122,6 +145,7 @@ export function parseAppState(output: string): MusicState {
     },
     positionMs: Math.round(num(position)),
     shuffle: shuffle === 'true',
+    repeat: repeating === 'true' ? 'context' : 'off',
     volume: Math.round(num(volume))
   }
 }
@@ -168,12 +192,15 @@ export function parseAccountState(body: unknown): MusicState {
       : undefined,
     positionMs: Number(p.progress_ms) || 0,
     shuffle: p.shuffle_state === true,
+    repeat: p.repeat_state === 'track' || p.repeat_state === 'context' ? (p.repeat_state as MusicRepeat) : 'off',
     volume: typeof device.volume_percent === 'number' ? device.volume_percent : undefined,
     device: str(device.name) || undefined
   }
 }
 
 function trackItem(t: Json): MusicItem {
+  // Podcast episodes can turn up in the queue and recently played.
+  if (t.type === 'episode') return { kind: 'track', name: str(t.name), detail: str(obj(t.show).name), art: picture(t.images ?? obj(t.show).images), uri: str(t.uri) }
   return { kind: 'track', name: str(t.name), detail: names(t.artists), art: picture(obj(t.album).images), uri: str(t.uri) }
 }
 
@@ -203,6 +230,44 @@ export function parseSearch(body: unknown): MusicSearchResults {
 
 /** GET /me/playlists */
 export const parsePlaylists = (body: unknown): MusicItem[] => usable(obj(body).items).map(playlistItem)
+
+/** GET /me/player/queue */
+export function parseQueue(body: unknown): MusicQueue {
+  const b = obj(body)
+  const current = usable([b.currently_playing])
+  return { current: current.length ? trackItem(current[0]) : undefined, next: usable(b.queue).map(trackItem) }
+}
+
+/** GET /me/player/recently-played: newest first, each song once. */
+export function parseRecent(body: unknown): MusicItem[] {
+  const seen = new Set<string>()
+  const items: MusicItem[] = []
+  for (const t of usable(arr(obj(body).items).map((i) => obj(i).track))) {
+    if (seen.has(str(t.uri))) continue
+    seen.add(str(t.uri))
+    items.push(trackItem(t))
+  }
+  return items
+}
+
+/** GET /me/player/devices, leaving out ones Spotify won't let anything control. */
+export function parseDevices(body: unknown): MusicDevice[] {
+  return arr(obj(body).devices)
+    .map(obj)
+    .filter((d) => str(d.id) && d.is_restricted !== true)
+    .map((d) => ({
+      id: str(d.id),
+      name: str(d.name) || 'Unknown device',
+      type: str(d.type),
+      active: d.is_active === true,
+      volume: typeof d.volume_percent === 'number' ? d.volume_percent : undefined
+    }))
+}
+
+/** What the repeat button goes to next: off → whole playlist → this song → off. */
+export function nextRepeat(now: MusicRepeat | undefined): MusicRepeat {
+  return now === 'context' ? 'track' : now === 'track' ? 'off' : 'context'
+}
 
 /** The body for PUT /me/player/play: a song on its own or within a playlist/album, or a whole playlist/album. */
 export function playBody(uri: string, context?: string): Json {
