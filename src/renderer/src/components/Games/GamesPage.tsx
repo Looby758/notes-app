@@ -147,7 +147,7 @@ export default function GamesPage() {
         </h2>
         <p className="games-intro">
           Your Steam{data?.epic ? ', Epic' : ''}
-          {IS_MAC ? ' and Mac' : ''} games in one place. Time played is counted while Notes is running, even with its window closed; Steam
+          {IS_MAC ? ' and Mac' : ''} games in one place. Time played is counted while Orbit is running, even with its window closed; Steam
           games also include the time Steam itself has counted.
         </p>
 

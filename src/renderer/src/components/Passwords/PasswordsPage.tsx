@@ -407,7 +407,7 @@ function Show({ login, reused, edit }: { login: Login; reused: boolean; edit: ()
   const remove = async (): Promise<void> => {
     const ok = await window.api.confirm({
       message: `Delete the login “${login.title || siteName(login.url) || 'Untitled'}”?`,
-      detail: 'Its password will be gone from Notes for good.',
+      detail: 'Its password will be gone from Orbit for good.',
       ok: 'Delete',
       cancel: 'Keep it'
     })

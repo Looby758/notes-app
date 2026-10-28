@@ -231,13 +231,13 @@ function listenForCode(state: string): Promise<{ server: Server; code: Promise<s
         )
       }
       if (url.searchParams.get('state') !== state) {
-        page('Something went wrong', 'This sign-in link doesn’t match. Please try connecting again from Notes.')
+        page('Something went wrong', 'This sign-in link doesn’t match. Please try connecting again from Orbit.')
         fail(new Error('Sign-in was interrupted. Please try again.'))
       } else if (url.searchParams.get('error')) {
-        page('Not connected', 'You can close this tab and return to Notes.')
+        page('Not connected', 'You can close this tab and return to Orbit.')
         fail(new Error('Spotify didn’t give access, so nothing was connected.'))
       } else {
-        page('Connected to Notes ✓', 'You can close this tab and return to Notes.')
+        page('Connected to Orbit ✓', 'You can close this tab and return to Orbit.')
         deliver(url.searchParams.get('code') ?? '')
       }
     })
@@ -362,7 +362,7 @@ async function api(path: string, init: { method?: string; body?: unknown } = {})
       throw new SpotifyError('Spotify only lets Notes control your music with Spotify Premium.', 403, 'PREMIUM_REQUIRED')
     }
     if (res.status === 403 && /scope/i.test(err.message ?? '')) {
-      throw new SpotifyError('Notes needs a little more permission for this. Connect Spotify again in Settings → Music (Disconnect, then Connect).', 403)
+      throw new SpotifyError('Orbit needs a little more permission for this. Connect Spotify again in Settings → Music (Disconnect, then Connect).', 403)
     }
     if (res.status === 403 && /user.*(not|registered)|developer/i.test(err.message ?? '')) {
       throw new SpotifyError('Spotify says your account isn’t allowed to use your developer app. Add your Spotify email under User Management in the Spotify dashboard.', 403)

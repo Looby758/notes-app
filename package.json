@@ -1,6 +1,6 @@
 {
   "name": "notesapp",
-  "productName": "Notes",
+  "productName": "Orbit",
   "version": "1.7.0",
   "description": "A dark, fast markdown notes app",
   "main": "./out/main/index.js",

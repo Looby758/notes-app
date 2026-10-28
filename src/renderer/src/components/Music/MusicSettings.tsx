@@ -141,7 +141,7 @@ export default function MusicSettings() {
       )}
       {status.connected && status.needsReconnect && (
         <p className="setting-warning" data-music-reconnect>
-          To like songs and see what you’ve played recently, Notes needs a little more permission: press <strong>Disconnect</strong>, then connect again.
+          To like songs and see what you’ve played recently, Orbit needs a little more permission: press <strong>Disconnect</strong>, then connect again.
         </p>
       )}
       {status.error && !error && <p className="setting-warning">{status.error}</p>}

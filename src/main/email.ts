@@ -24,7 +24,7 @@ export async function connect(): Promise<GoogleAuthStatus> {
 }
 
 async function gmail(path: string, init: { method?: string; params?: Record<string, string | string[]>; body?: unknown } = {}): Promise<Record<string, unknown>> {
-  if (!google.hasGmail()) throw new Error('Notes doesn’t have access to your email yet. Connect Gmail first.')
+  if (!google.hasGmail()) throw new Error('Orbit doesn’t have access to your email yet. Connect Gmail first.')
   const token = await google.getAccessToken()
   if (!token) throw new Error(google.authStatus().error ?? 'Not connected to Google.')
   const url = new URL(API_URL + path)
@@ -43,7 +43,7 @@ async function gmail(path: string, init: { method?: string; params?: Record<stri
     if (/SERVICE_DISABLED|accessNotConfigured|has not been used in project/i.test(text)) {
       throw new Error(`${API_OFF} Turn it on, wait a minute, then try again.`)
     }
-    if (res.status === 403 && /insufficient|scope/i.test(text)) throw new Error('Notes doesn’t have permission to do that in Gmail. Connect Gmail again.')
+    if (res.status === 403 && /insufficient|scope/i.test(text)) throw new Error('Orbit doesn’t have permission to do that in Gmail. Connect Gmail again.')
     if (res.status === 404) throw new Error('That email isn’t there any more.')
     if (res.status === 401) throw new Error('Your Google sign-in has ended. Connect Gmail again.')
     throw new Error(`Gmail said ${res.status}${err.message ? `: ${err.message}` : ''}`)
