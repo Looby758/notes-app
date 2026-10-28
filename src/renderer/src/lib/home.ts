@@ -7,7 +7,7 @@ import type { ComponentType } from 'react'
  */
 export interface HomeCard {
   id: string
-  /** Lower comes first. The built-in boxes use 10 (today), 30 (flashcards), 40 (recent notes). */
+  /** Lower comes first. The built-in boxes use 10 (today), 20 (weather), 30 (flashcards), 40 (recent notes). */
   order: number
   Card: ComponentType
 }

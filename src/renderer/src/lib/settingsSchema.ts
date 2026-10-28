@@ -508,6 +508,24 @@ export const SETTINGS: SettingDef[] = [
     description: 'In daily notes, list items under this heading are events, like "- 09:30-10:30 Standup".',
     keywords: 'schedule agenda events'
   },
+  {
+    key: 'weatherHome',
+    section: 'calendar',
+    group: 'Weather',
+    type: 'toggle',
+    label: 'Show the weather on the Home page',
+    description: 'Today’s weather and the week ahead. Pick your town on the Home page; the forecast is from Open-Meteo, so there’s nothing to sign up for.',
+    keywords: 'weather forecast rain sun temperature town city location home'
+  },
+  {
+    key: 'weatherCalendar',
+    section: 'calendar',
+    group: 'Weather',
+    type: 'toggle',
+    label: 'Show the forecast on the calendar',
+    description: 'A small forecast beside outdoor events (walks, football, a BBQ… or anything with “outside” in it), and on each day of the next two weeks.',
+    keywords: 'weather forecast rain outdoor outside event calendar'
+  },
 
   // ---------- Quick capture & tray ----------
   {

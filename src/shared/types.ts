@@ -2,6 +2,7 @@ import type { Prefs } from './prefs'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
 import type { Place } from './places'
+import type { WeatherPlace, WeatherState } from './weather'
 
 export interface WindowBounds {
   x?: number
@@ -269,6 +270,10 @@ export interface NotesApi {
   searchPlaces(query: string): Promise<{ places: Place[]; error?: string }>
   /** One square of a map preview as a data: URL; null if it couldn't be fetched. */
   mapTile(z: number, x: number, y: number): Promise<string | null>
+  /** Your town and its forecast (from Open-Meteo), fetched again if it's old or `force`. */
+  weather(force?: boolean): Promise<WeatherState>
+  /** Sets (or, with null, forgets) the town the weather is for, and fetches its forecast. */
+  setWeatherPlace(place: WeatherPlace | null): Promise<WeatherState>
 
   // The web browser tab
   /** Signs you out of every website and forgets what the web tabs stored. */

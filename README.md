@@ -63,6 +63,14 @@ What you can do:
 
 Emails are fetched from Google while you look at them and aren't saved on your computer. Pictures in emails are hidden until you choose to show them, so senders can't tell when you've opened one. Notes can't delete email for good: the Bin is emptied by Gmail after 30 days.
 
+## Weather
+
+The **Home** page shows the weather where you are: what it's like now, today's high and low, the chance of rain, and the week ahead. The first time, type your town (or postcode) in the Weather box and pick it from the list; *Change town* switches it later.
+
+The calendar shows the forecast too, for the next two weeks: a small picture and the high on each day, and beside anything that sounds like it's outside (a walk, football, a BBQ, parkrun, the beach… or anything with "outside" or "outdoor" in it), the forecast for the hour it starts. Hover for the details.
+
+The forecast comes from [Open-Meteo](https://open-meteo.com), which is free and needs no account. It's checked every half hour while it's on screen, and the last one is kept (in `weather.json` in the settings folder) so it still shows when you're offline. Turn either part off in **Settings → Calendar → Weather**.
+
 ## AI helper (optional)
 
 Notes can use Claude, made by Anthropic, to help with your notes. It's off until you add your own Anthropic API key in **Settings → AI helper** (sign up at [console.anthropic.com](https://console.anthropic.com/settings/keys), add a little credit, create a key, paste it in). Anthropic bills your account directly, usually a cent or two each time.

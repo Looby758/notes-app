@@ -7,6 +7,7 @@ import { openNote } from '../../lib/editorController'
 import { addEvent, displayTime, toggleCalendarTask } from '../../lib/daily'
 import { formatDate, fromDayKey } from '../../lib/dates'
 import type { DatedItem } from '../../lib/schedule'
+import { EventWeather } from '../Weather/Weather'
 
 /** Calendar items by day, recomputed whenever any note changes. */
 export function useItemsByDay(): Map<string, DatedItem[]> {
@@ -62,6 +63,8 @@ export function ItemRow({ item, compact = false }: { item: DatedItem; compact?: 
         <span className="cal-title">{item.kind === 'daily' ? 'Daily note' : item.title}</span>
         {item.kind === 'note' && item.due && !compact && <span className="cal-badge">due</span>}
       </button>
+      {/* Small calendar cells have no room: the day's own forecast shows there instead. */}
+      {item.kind !== 'daily' && !compact && <EventWeather title={item.title} date={item.date} start={item.start} />}
     </div>
   )
 }
@@ -110,6 +113,7 @@ export function ExternalRow({ item, compact = false }: { item: ExternalItem; com
         )}
         <span className="cal-title">{e.title}</span>
       </button>
+      {!compact && <EventWeather title={e.title} date={item.date} start={item.allDay ? undefined : item.start} />}
     </div>
   )
 }
