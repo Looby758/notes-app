@@ -210,6 +210,26 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'games covers art animated moving living gif webp steamgriddb grid'
   },
   {
+    key: 'screensaver',
+    section: 'appearance',
+    group: 'Screensaver',
+    type: 'toggle',
+    label: 'Screensaver',
+    description: 'After a while without using Notes, the app fades into a slowly moving screen with the time, the weather and what’s playing. Any key, click or mouse movement brings it back. It waits while a video plays, and hides your town in streamer mode. With Motion on Subtle or Off it holds still.',
+    keywords: 'screensaver screen saver idle away clock time weather music now playing ambient standby'
+  },
+  {
+    key: 'screensaverMinutes',
+    section: 'appearance',
+    group: 'Screensaver',
+    type: 'slider',
+    ...RANGES.screensaverMinutes,
+    format: (v) => `${v} min`,
+    label: 'Start after',
+    description: 'How long Notes waits without you using it before the screensaver starts.',
+    keywords: 'screensaver screen saver idle timeout minutes delay'
+  },
+  {
     key: 'streamerMode',
     section: 'appearance',
     group: 'Streamer mode',

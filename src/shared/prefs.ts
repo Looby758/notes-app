@@ -36,6 +36,10 @@ export interface Prefs {
   musicSongPopup: boolean
   /** Moving bars in the music player while your own music files play. */
   musicVisualiser: boolean
+  /** After a while without using Notes, show the time, weather and what's playing on a moving screen. */
+  screensaver: boolean
+  /** Minutes without using Notes before the screensaver starts. */
+  screensaverMinutes: number
 
   // Streamer mode
   /** Blur private things (your town, email, money, passwords, messages, events) until you click them, for sharing your screen. */
@@ -181,6 +185,8 @@ export const DEFAULT_PREFS: Prefs = {
   appIcon: 'default',
   musicSongPopup: true,
   musicVisualiser: true,
+  screensaver: true,
+  screensaverMinutes: 5,
 
   streamerMode: false,
   streamerHideNotes: true,
@@ -267,7 +273,8 @@ export const RANGES = {
   breakMinutes: { min: 1, max: 60, step: 1 },
   longBreakMinutes: { min: 1, max: 90, step: 1 },
   focusRounds: { min: 1, max: 12, step: 1 },
-  autoLockMinutes: { min: 0, max: 120, step: 5 }
+  autoLockMinutes: { min: 0, max: 120, step: 5 },
+  screensaverMinutes: { min: 1, max: 60, step: 1 }
 } as const
 
 const CHOICES = {
