@@ -8,14 +8,18 @@ import { IS_MAC } from '@shared/platform'
 import {
   APP_FIELD_SEP,
   parseAccountState,
+  moveBody,
   nextRepeat,
   parseAppState,
   parseDevices,
+  parsePlaylist,
   parsePlaylists,
+  parsePlaylistSongs,
   parseQueue,
   parseRecent,
   parseSearch,
   playBody,
+  playlistId,
   type MusicAction,
   type MusicDevice,
   type MusicItem,
@@ -60,6 +64,8 @@ interface Stored {
   /** Encrypted. */
   refreshToken?: string
   name?: string
+  /** Your Spotify user id, to tell which playlists are yours. */
+  userId?: string
   /** What Spotify let Notes do (space-separated), to spot sign-ins from before Notes asked for more. */
   scope?: string
 }
@@ -278,6 +284,7 @@ export async function connect(): Promise<MusicStatus> {
     save()
     const me = await api('/me').catch(() => ({}) as Record<string, unknown>)
     s.name = typeof me.display_name === 'string' ? me.display_name : undefined
+    s.userId = typeof me.id === 'string' ? me.id : undefined
     save()
     return status()
   } finally {
@@ -397,6 +404,7 @@ export async function control(action: MusicAction): Promise<void> {
   if (await appRunning()) {
     const commands: Record<MusicAction, string> = {
       toggle: 'playpause',
+      pause: 'pause',
       next: 'next track',
       previous: 'previous track',
       shuffle: 'set shuffling to not shuffling',
@@ -415,7 +423,9 @@ export async function control(action: MusicAction): Promise<void> {
     const now = parseAccountState(await api('/me/player'))
     if (action === 'shuffle') await api(`/me/player/shuffle?state=${!now.shuffle}`, { method: 'PUT' })
     else if (action === 'repeat') await api(`/me/player/repeat?state=${nextRepeat(now.repeat)}`, { method: 'PUT' })
-    else await api(now.playing ? '/me/player/pause' : '/me/player/play', { method: 'PUT' })
+    else if (action === 'pause') {
+      if (now.playing) await api('/me/player/pause', { method: 'PUT' })
+    } else await api(now.playing ? '/me/player/pause' : '/me/player/play', { method: 'PUT' })
   }
 }
 
@@ -465,8 +475,79 @@ export async function search(query: string): Promise<MusicSearchResults> {
   return parseSearch(await api(`/search?${new URLSearchParams({ q, type: 'track,playlist,album', limit: '10' })}`))
 }
 
+/** Your Spotify user id (asked for once, for sign-ins from before Notes kept it). */
+async function myId(): Promise<string | undefined> {
+  const s = load()
+  if (!s.userId) {
+    const me = await api('/me')
+    if (typeof me.id === 'string') {
+      s.userId = me.id
+      save()
+    }
+  }
+  return s.userId
+}
+
 export async function playlists(): Promise<MusicItem[]> {
-  return parsePlaylists(await api('/me/playlists?limit=50'))
+  const me = await myId().catch(() => undefined)
+  return parsePlaylists(await api('/me/playlists?limit=50'), me)
+}
+
+function idOf(uri: string): string {
+  const id = playlistId(uri)
+  if (!id) throw new Error('That isn’t one of your playlists.')
+  return id
+}
+
+/** A playlist's songs, in order (only for playlists you own or can edit, which is all Spotify allows). */
+export async function playlistSongs(uri: string): Promise<MusicItem[]> {
+  const id = idOf(uri)
+  const songs: MusicItem[] = []
+  // 50 at a time; a very long playlist stops at 1,000.
+  for (let offset = 0; offset < 1000; offset += 50) {
+    const page = await api(`/playlists/${id}/items?limit=50&offset=${offset}&additional_types=track,episode`)
+    songs.push(...parsePlaylistSongs(page))
+    if (!page.next) break
+  }
+  return songs
+}
+
+/** Makes a new private playlist. */
+export async function createPlaylist(name: string): Promise<MusicItem> {
+  const n = name.trim()
+  if (!n) throw new Error('Give the playlist a name.')
+  return parsePlaylist(await api('/me/playlists', { method: 'POST', body: { name: n.slice(0, 100), public: false } }), await myId().catch(() => undefined))
+}
+
+export async function renamePlaylist(uri: string, name: string): Promise<void> {
+  const n = name.trim()
+  if (!n) throw new Error('Give the playlist a name.')
+  await api(`/playlists/${idOf(uri)}`, { method: 'PUT', body: { name: n.slice(0, 100) } })
+}
+
+/** Removes a playlist from your library (for one you made, that's deleting it, as in the Spotify app). */
+export async function deletePlaylist(uri: string): Promise<void> {
+  idOf(uri)
+  await api(`/me/library?${new URLSearchParams({ uris: uri })}`, { method: 'DELETE' })
+}
+
+/** Adds songs to the end of a playlist. */
+export async function addToPlaylist(uri: string, songs: string[]): Promise<void> {
+  const uris = songs.filter((u) => SONG_URI.test(u)).slice(0, 100)
+  if (!uris.length) throw new Error('Only songs can be added to a playlist.')
+  await api(`/playlists/${idOf(uri)}/items`, { method: 'POST', body: { uris } })
+}
+
+/** Takes a song out of a playlist (every time it's in there, which is how Spotify does it). */
+export async function removeFromPlaylist(uri: string, song: string): Promise<void> {
+  if (!SONG_URI.test(song)) throw new Error('That isn’t a song.')
+  await api(`/playlists/${idOf(uri)}/items`, { method: 'DELETE', body: { items: [{ uri: song }] } })
+}
+
+/** Moves the song at position `from` to position `to` (both counting from 0). */
+export async function moveInPlaylist(uri: string, from: number, to: number): Promise<void> {
+  if (![from, to].every((n) => Number.isInteger(n) && n >= 0) || from === to) return
+  await api(`/playlists/${idOf(uri)}/items`, { method: 'PUT', body: moveBody(from, to) })
 }
 
 

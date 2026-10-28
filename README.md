@@ -73,7 +73,7 @@ The forecast comes from [Open-Meteo](https://open-meteo.com), which is free and 
 
 ## Music player (Spotify)
 
-Press ♫ at the top (or Ctrl+Alt+M) to show a small player in the bottom-left corner. It shows the song that's playing, with play/pause, skip, a progress bar you can click to jump, and underneath it a volume slider, shuffle and repeat (press repeat again to repeat just this song). Hiding it doesn't stop the music. Ctrl+K also has *Music: play / pause*, *next* and *previous*, which you can give your own keys in Settings → Shortcuts.
+Press ♫ at the top (or Ctrl+Alt+M) to show a small player in the bottom-left corner. It shows the song that's playing, with play/pause, skip, a progress bar you can click to jump, and underneath it a volume slider, shuffle, repeat (press repeat again to repeat just this song) and a **sleep timer** (the moon) that pauses the music after 15 minutes to 1.5 hours, or at the end of the song. Hiding it doesn't stop the music. Ctrl+K also has *Music: play / pause*, *next* and *previous*, which you can give your own keys in Settings → Shortcuts.
 
 **On a Mac it works straight away** with the Spotify app (free or Premium), no sign-in. The first time, macOS asks whether Notes may control Spotify: press **OK**. (If you pressed *Don't Allow*, turn it back on in *System Settings → Privacy & Security → Automation*.) If Spotify isn't open, the player has an **Open Spotify** button. Under **Link** in the player you can paste a Spotify share link (*Share → Copy link*) to play a song, album or playlist.
 
@@ -82,6 +82,7 @@ Press ♫ at the top (or Ctrl+Alt+M) to show a small player in the bottom-left c
 - **♥ Like** a song to save it to your Liked Songs.
 - **Up next** shows what's queued. The **+** next to a song in Search or Recent adds it to the queue.
 - **Recent** shows what you've played lately, to get back to it quickly.
+- **Make and change playlists**: under Playlists, press **New playlist**, or the **›** next to one of yours to rename or delete it, add songs (search right there, or add the song that's playing), take songs out with **×**, and drag songs into a new order.
 - **Choose where it plays**: press the device name at the bottom right of the player and pick this computer, your phone or a speaker. The music moves there and carries on.
 
 Spotify only allows this for Premium accounts, and you make a free developer app on Spotify's site once (about 3 minutes):
@@ -92,7 +93,11 @@ Spotify only allows this for Premium accounts, and you make a free developer app
 4. Tick **Web API**, accept the terms and **Save**.
 5. Copy the **Client ID** into Settings → Music and press **Connect Spotify**, then **Agree** in your browser.
 
-There's no secret to copy. The sign-in is stored encrypted, like the Google one, in `spotify.json` in the settings folder. If Spotify says your account isn't allowed, add your Spotify email under **User Management** in the developer app. If you connected before liking and Recent were added, Settings → Music asks you to connect once more (Disconnect, then Connect) so Notes gets permission for them.
+There's no secret to copy. The sign-in is stored encrypted, like the Google one, in `spotify.json` in the settings folder. If Spotify says your account isn't allowed, add your Spotify email under **User Management** in the developer app. If you connected before liking, Recent and playlist editing were added, Settings → Music asks you to connect once more (Disconnect, then Connect) so Notes gets permission for them.
+
+### Your own music files
+
+**My music** in the player plays music files on your computer (MP3, M4A, FLAC, WAV, OGG), with no Spotify or account needed. The first time, press **Choose music folder**. Notes reads each song's name, artist, album and picture from the file (or from its name, like `01 - Artist - Title.mp3`). Find songs by typing, press one to play it and the rest of the list after it, or press **Shuffle all**. Volume, shuffle, repeat, skip, Up next, the sleep timer and your keyboard's play/pause keys all work the same. Playing something on Spotify stops your music, and **Back to Spotify** at the bottom right of the player hands it back. The folder you chose and what was read from your files are kept in `local-music.json` in the settings folder, so only new or changed files are read again (press ↻ to look for new ones).
 
 ## AI helper (optional)
 

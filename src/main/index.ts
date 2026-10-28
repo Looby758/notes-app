@@ -32,6 +32,7 @@ import { readGoogleSheet } from './googleSheets'
 import * as ai from './ai'
 import * as email from './email'
 import * as spotify from './spotify'
+import * as localMusic from './localMusic'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
 import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
@@ -231,9 +232,19 @@ protocol.registerSchemesAsPrivileged([
 ])
 
 function registerVaultProtocol(): void {
-  protocol.handle('vault', (request) => {
+  protocol.handle('vault', async (request) => {
     try {
-      const rel = decodeURIComponent(new URL(request.url).pathname.slice(1))
+      const url = new URL(request.url)
+      // Your own music files (vault://music/…) and their album pictures (vault://musicart/…), from your music folder.
+      if (url.host === 'music' || url.host === 'musicart') {
+        const rel = decodeURIComponent(url.pathname.slice(1))
+        const full = localMusic.musicFile(rel)
+        if (!full || !AUDIO_TYPES.has(extname(full).toLowerCase())) return new Response('Not allowed', { status: 403 })
+        if (url.host === 'music') return net.fetch(pathToFileURL(full).toString(), { headers: request.headers })
+        const pic = await localMusic.cover(rel)
+        return pic ? new Response(Buffer.from(pic.data), { headers: { 'Content-Type': pic.type, 'Cache-Control': 'max-age=3600' } }) : new Response('No picture', { status: 404 })
+      }
+      const rel = decodeURIComponent(url.pathname.slice(1))
       const full = currentVault().abs(rel)
       const ext = extname(full).toLowerCase()
       if (!IMAGE_TYPES.has(ext) && !AUDIO_TYPES.has(ext) && !VIEWER_TYPES.has(ext)) return new Response('Not allowed', { status: 403 })
@@ -472,6 +483,7 @@ function registerIpc(): void {
   setupWebTitle()
   setupPlaces()
   setupWeather()
+  localMusic.setupLocalMusic()
   setupImporter()
   setupGames()
   setupTerminal(() => vault?.root ?? null)
@@ -572,6 +584,13 @@ function registerIpc(): void {
   ipcMain.handle('music:addToQueue', (_e, uri: string) => spotify.addToQueue(String(uri)))
   ipcMain.handle('music:recent', () => spotify.recent())
   ipcMain.handle('music:devices', () => spotify.devices())
+  ipcMain.handle('music:playlistSongs', (_e, uri: string) => spotify.playlistSongs(String(uri)))
+  ipcMain.handle('music:createPlaylist', (_e, name: string) => spotify.createPlaylist(String(name)))
+  ipcMain.handle('music:renamePlaylist', (_e, uri: string, name: string) => spotify.renamePlaylist(String(uri), String(name)))
+  ipcMain.handle('music:deletePlaylist', (_e, uri: string) => spotify.deletePlaylist(String(uri)))
+  ipcMain.handle('music:addToPlaylist', (_e, uri: string, songs: string[]) => spotify.addToPlaylist(String(uri), Array.isArray(songs) ? songs.map(String) : []))
+  ipcMain.handle('music:removeFromPlaylist', (_e, uri: string, song: string) => spotify.removeFromPlaylist(String(uri), String(song)))
+  ipcMain.handle('music:moveInPlaylist', (_e, uri: string, from: number, to: number) => spotify.moveInPlaylist(String(uri), Number(from), Number(to)))
   ipcMain.handle('music:transfer', (_e, deviceId: string) => spotify.transfer(String(deviceId)))
   ipcMain.handle('music:open', (_e, what: 'app' | 'automation') => spotify.open(what === 'automation' ? 'automation' : 'app'))
 

@@ -3,6 +3,7 @@ import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
 import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
+import type { LocalLibrary } from './localMusic'
 import type { MusicAction, MusicDevice, MusicItem, MusicQueue, MusicSearchResults, MusicState, MusicStatus } from './spotify'
 import type { GamesList, LaunchArt } from './games'
 
@@ -397,6 +398,20 @@ export interface NotesApi {
   /** Where your account can play. */
   musicDevices(): Promise<MusicDevice[]>
   musicTransfer(deviceId: string): Promise<void>
+  /** Your own music files; `fresh` looks through the folder again. */
+  localMusicLibrary(fresh?: boolean): Promise<LocalLibrary>
+  /** Asks which folder your music is in, then lists it. */
+  localMusicChooseFolder(): Promise<LocalLibrary>
+  // Your playlists (`uri` is spotify:playlist:…; songs only for playlists you can edit)
+  musicPlaylistSongs(uri: string): Promise<MusicItem[]>
+  /** Makes a private playlist. */
+  musicCreatePlaylist(name: string): Promise<MusicItem>
+  musicRenamePlaylist(uri: string, name: string): Promise<void>
+  musicDeletePlaylist(uri: string): Promise<void>
+  musicAddToPlaylist(uri: string, songs: string[]): Promise<void>
+  musicRemoveFromPlaylist(uri: string, song: string): Promise<void>
+  /** Positions count from 0. */
+  musicMoveInPlaylist(uri: string, from: number, to: number): Promise<void>
   /** Opens the Spotify app, or (Mac) where you let Notes control it in System Settings. */
   musicOpen(what: 'app' | 'automation'): Promise<void>
   aiStatus(): Promise<AiStatus>

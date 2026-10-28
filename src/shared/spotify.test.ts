@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { APP_FIELD_SEP, formatTime, nextRepeat, parseAccountState, parseAppState, parseDevices, parsePlaylists, parseQueue, parseRecent, parseSearch, playBody, spotifyUri } from './spotify'
+import { APP_FIELD_SEP, formatTime, moveBody, nextRepeat, parsePlaylistSongs, playlistId, parseAccountState, parseAppState, parseDevices, parsePlaylists, parseQueue, parseRecent, parseSearch, playBody, spotifyUri } from './spotify'
 
 describe('spotifyUri', () => {
   it('reads share links and URIs', () => {
@@ -108,6 +108,43 @@ describe('queue, recently played and devices', () => {
     expect(nextRepeat('off')).toBe('context')
     expect(nextRepeat('context')).toBe('track')
     expect(nextRepeat('track')).toBe('off')
+  })
+})
+
+describe('playlists you can change', () => {
+  it('marks the playlists that are yours (or shared with you to edit)', () => {
+    const list = parsePlaylists(
+      {
+        items: [
+          { name: 'Mine', uri: 'spotify:playlist:1', owner: { id: 'me' } },
+          { name: 'Theirs', uri: 'spotify:playlist:2', owner: { id: 'them' } },
+          { name: 'Shared', uri: 'spotify:playlist:3', owner: { id: 'them' }, collaborative: true }
+        ]
+      },
+      'me'
+    )
+    expect(list.map((p) => p.editable)).toEqual([true, undefined, true])
+  })
+  it('reads the songs (now under `item`, or the old `track`), leaving out local files', () => {
+    const songs = parsePlaylistSongs({
+      items: [
+        { item: { type: 'track', name: 'New', uri: 'spotify:track:1', artists: [], album: {} } },
+        { track: { type: 'track', name: 'Old', uri: 'spotify:track:2', artists: [], album: {} } },
+        { item: { type: 'track', name: 'Local', uri: 'spotify:local:a:b:c:1' } },
+        { item: null }
+      ]
+    })
+    expect(songs.map((s) => s.name)).toEqual(['New', 'Old'])
+  })
+  it('moves songs where you drop them', () => {
+    // Spotify's insert_before counts positions before the song is taken out.
+    expect(moveBody(0, 2)).toEqual({ range_start: 0, insert_before: 3 })
+    expect(moveBody(3, 1)).toEqual({ range_start: 3, insert_before: 1 })
+  })
+  it('playlistId', () => {
+    expect(playlistId('spotify:playlist:37i9dQZF1DXcBWIGoYBM5M')).toBe('37i9dQZF1DXcBWIGoYBM5M')
+    expect(playlistId('spotify:album:1')).toBeNull()
+    expect(playlistId('spotify:playlist:../me')).toBeNull()
   })
 })
 

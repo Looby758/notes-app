@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { nextRepeat, type MusicAction, type MusicState, type MusicStatus } from '@shared/spotify'
 import { errorMessage } from '../lib/paths'
 import { useUI } from './ui'
+import { localNext, localPause, localPrevious, localRepeat, localSeek, localShuffle, localToggle, localVolume, stopLocal } from './localMusic'
 
 /** The music player in the corner: what's playing (asked for every couple of seconds while it's open). */
 
@@ -15,6 +16,10 @@ interface MusicStore {
   error: string | null
   /** Whether the song playing is in your Liked Songs (only known with your account connected). */
   liked: { uri: string; liked: boolean } | null
+  /** Your own music files are playing (store/localMusic.ts), not Spotify. */
+  local: boolean
+  /** The sleep timer: pause at a time, or when this song ends. */
+  sleep: { until: number } | { song: string } | null
 }
 
 const OPEN_KEY = 'musicOpen'
@@ -26,7 +31,7 @@ const wasOpen = ((): boolean => {
   }
 })()
 
-export const useMusic = create<MusicStore>(() => ({ open: wasOpen, state: null, at: 0, status: null, error: null, liked: null }))
+export const useMusic = create<MusicStore>(() => ({ open: wasOpen, state: null, at: 0, status: null, error: null, liked: null, sleep: null, local: false }))
 
 export function setMusicOpen(open: boolean): void {
   useMusic.setState({ open, error: null })
@@ -50,10 +55,12 @@ export async function refreshMusicStatus(): Promise<MusicStatus> {
 
 let asking = false
 export async function refreshMusic(): Promise<void> {
-  if (asking) return
+  if (asking || useMusic.getState().local) return
   asking = true
   try {
     const state = await window.api.musicNowPlaying()
+    // Your own music may have started while Spotify was being asked.
+    if (useMusic.getState().local) return
     useMusic.setState({ state, at: Date.now() })
     void checkLiked(state.track?.uri)
   } catch (err) {
@@ -95,9 +102,32 @@ async function run(job: () => Promise<void>): Promise<boolean> {
   }
 }
 
+/** Your own music's version of each button. */
+const LOCAL_ACTIONS: Record<MusicAction, () => unknown> = {
+  toggle: localToggle,
+  pause: localPause,
+  next: localNext,
+  previous: localPrevious,
+  shuffle: localShuffle,
+  repeat: localRepeat
+}
+
 export function musicControl(action: MusicAction): Promise<boolean> {
-  const { state, at } = useMusic.getState()
+  const { state, at, local } = useMusic.getState()
+  if (local) {
+    useMusic.setState({ error: null })
+    return Promise.resolve(LOCAL_ACTIONS[action]()).then(
+      () => true,
+      (err) => {
+        useMusic.setState({ error: errorMessage(err) })
+        return false
+      }
+    )
+  }
   // Show the change straight away.
+  if (action === 'pause' && state?.track) {
+    useMusic.setState({ state: { ...state, playing: false, positionMs: currentPosition(state, at) }, at: Date.now() })
+  }
   if (action === 'toggle' && state?.track) {
     useMusic.setState({ state: { ...state, playing: !state.playing, positionMs: currentPosition(state, at) }, at: Date.now() })
   }
@@ -110,15 +140,27 @@ export function musicControl(action: MusicAction): Promise<boolean> {
 }
 
 export function musicSeek(ms: number): Promise<boolean> {
-  const { state } = useMusic.getState()
+  const { state, local } = useMusic.getState()
+  if (local) {
+    localSeek(ms)
+    return Promise.resolve(true)
+  }
   if (state) useMusic.setState({ state: { ...state, positionMs: ms }, at: Date.now() })
   return run(() => window.api.musicSeek(ms))
 }
 
-export const musicPlay = (uri: string, context?: string): Promise<boolean> => run(() => window.api.musicPlay(uri, context))
+/** Plays something on Spotify (stopping your own music if it's playing). */
+export function musicPlay(uri: string, context?: string): Promise<boolean> {
+  if (useMusic.getState().local) stopLocal()
+  return run(() => window.api.musicPlay(uri, context))
+}
 
 export function musicSetVolume(percent: number): Promise<boolean> {
-  const { state } = useMusic.getState()
+  const { state, local } = useMusic.getState()
+  if (local) {
+    localVolume(percent)
+    return Promise.resolve(true)
+  }
   if (state) useMusic.setState({ state: { ...state, volume: percent } })
   return run(() => window.api.musicSetVolume(percent))
 }
@@ -149,16 +191,48 @@ export function currentPosition(state: MusicState, at: number, now = Date.now())
   return Math.min(pos, state.track?.durationMs || pos)
 }
 
-/** Keeps the player up to date: often while it's open and you're looking, otherwise not at all. */
+/** Pauses after `minutes`, or at the end of the song playing ('song'); null turns it off. */
+export function setSleepTimer(when: number | 'song' | null): void {
+  const uri = useMusic.getState().state?.track?.uri
+  if (when === 'song') useMusic.setState({ sleep: uri ? { song: uri } : null })
+  else useMusic.setState({ sleep: when ? { until: Date.now() + when * 60_000 } : null })
+}
+
+/** How long until the sleep timer pauses the music, in ms (null if it's off or waiting for the song to end). */
+export function sleepLeft(now = Date.now()): number | null {
+  const { sleep } = useMusic.getState()
+  return sleep && 'until' in sleep ? Math.max(0, sleep.until - now) : null
+}
+
+function checkSleep(): void {
+  const { sleep, state, at } = useMusic.getState()
+  if (!sleep) return
+  let due = false
+  if ('until' in sleep) due = Date.now() >= sleep.until
+  else if (state?.track) {
+    // Pause just before the song ends so the next one doesn't start (or as soon as it has, if Spotify got there first).
+    const left = (state.track.durationMs || Infinity) - currentPosition(state, at)
+    due = state.track.uri !== sleep.song || (state.playing && left < 900)
+  }
+  if (!due) return
+  useMusic.setState({ sleep: null })
+  void musicControl('pause')
+}
+
+/** Keeps the player up to date: often while it's open and you're looking (or a sleep timer is waiting), otherwise not at all. */
 export function startMusic(): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined
+  const sleepTimer = setInterval(checkSleep, 400)
   const tick = async (): Promise<void> => {
-    const { open, state } = useMusic.getState()
-    if (open && document.visibilityState === 'visible') await refreshMusic()
+    const { open, state, sleep } = useMusic.getState()
+    if ((open && document.visibilityState === 'visible') || sleep) await refreshMusic()
     // The Mac app answers instantly; your account is asked a little less often.
     timer = setTimeout(tick, state?.source === 'account' ? 3000 : 1500)
   }
   void refreshMusicStatus().catch(() => undefined)
   void tick()
-  return () => clearTimeout(timer)
+  return () => {
+    clearTimeout(timer)
+    clearInterval(sleepTimer)
+  }
 }
