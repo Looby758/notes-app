@@ -218,7 +218,7 @@ function Progress({ state }: { state: MusicState }) {
   )
 }
 
-function LikeButton({ uri }: { uri: string }) {
+export function LikeButton({ uri }: { uri: string }) {
   const liked = useMusic((s) => s.liked)
   const connected = useMusic((s) => !!s.status?.connected)
   const on = liked?.uri === uri && liked.liked
@@ -264,7 +264,7 @@ function Footer({ state, devicesOpen, onDevices }: { state: MusicState; devicesO
   )
 }
 
-function VolumeSlider({ volume }: { volume: number }) {
+export function VolumeSlider({ volume }: { volume: number }) {
   // While you drag, the slider follows your hand rather than what Spotify last said.
   const [dragging, setDragging] = useState<number | null>(null)
   const [beforeMute, setBeforeMute] = useState(50)
