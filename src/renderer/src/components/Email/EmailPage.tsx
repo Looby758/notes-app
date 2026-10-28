@@ -707,4 +707,4 @@ function EmailHomeCard() {
   )
 }
 
-addHomeCard({ id: 'email', order: 20, Card: EmailHomeCard })
+addHomeCard({ id: 'email', order: 20, title: 'Email', Card: EmailHomeCard })

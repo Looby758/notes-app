@@ -53,6 +53,10 @@ import { LocalMusic, LocalUpNext } from './LocalMusic'
 import { Visualiser } from './Visualiser'
 import { SongPopup } from './SongPopup'
 import { setPrefs, usePrefs } from '../../store/prefs'
+import { addHomeCard } from '../../lib/home'
+import MusicHomeCard from './MusicHomeCard'
+
+addHomeCard({ id: 'music', order: 35, title: 'Now playing', Card: MusicHomeCard })
 
 type Tab = 'playlists' | 'search' | 'queue' | 'recent' | 'local' | 'link' | 'devices' | 'sleep'
 

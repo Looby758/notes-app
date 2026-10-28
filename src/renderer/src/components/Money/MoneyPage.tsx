@@ -43,7 +43,7 @@ import { statementFromPdf } from '../../lib/pdfStatement'
 import MoneyHomeCard from './MoneyHomeCard'
 import EmptyArt from '../Motion/EmptyArt'
 
-addHomeCard({ id: 'money', order: 25, Card: MoneyHomeCard })
+addHomeCard({ id: 'money', order: 25, title: 'Spending this month', Card: MoneyHomeCard })
 
 type View = 'overview' | 'entries' | 'import' | 'budgets'
 const VIEWS: [View, string][] = [

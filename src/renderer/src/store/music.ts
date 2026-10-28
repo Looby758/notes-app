@@ -48,6 +48,18 @@ export function setMusicOpen(open: boolean): void {
   if (open) void refreshMusic()
 }
 
+/** Other places showing what's playing (the Home page's box), so it's kept up to date while the player is hidden. */
+let watchers = 0
+
+/** Keeps "now playing" fresh until the returned function is called. */
+export function watchMusic(): () => void {
+  watchers++
+  void refreshMusic()
+  return () => {
+    watchers--
+  }
+}
+
 export const toggleMusic = (): void => setMusicOpen(!useMusic.getState().open)
 
 export const openMusicSettings = (): void => useUI.setState({ settingsSection: 'music' })
@@ -224,13 +236,13 @@ function checkSleep(): void {
   void musicControl('pause')
 }
 
-/** Keeps the player up to date: often while it's open and you're looking (or a sleep timer is waiting), otherwise not at all. */
+/** Keeps the player up to date: often while it (or the Home box) is showing and you're looking (or a sleep timer is waiting), otherwise not at all. */
 export function startMusic(): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined
   const sleepTimer = setInterval(checkSleep, 400)
   const tick = async (): Promise<void> => {
     const { open, state, sleep, miniOpen } = useMusic.getState()
-    if ((open && document.visibilityState === 'visible') || sleep || miniOpen) await refreshMusic()
+    if (((open || watchers > 0) && document.visibilityState === 'visible') || sleep || miniOpen) await refreshMusic()
     // The Mac app answers instantly; your account is asked a little less often.
     timer = setTimeout(tick, state?.source === 'account' ? 3000 : 1500)
   }

@@ -7299,6 +7299,82 @@ body.youtube-window {
   text-align: center;
 }
 
+.home-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.home-head h2 {
+  margin-right: auto;
+}
+.home-head .btn {
+  padding: 5px 14px;
+  font-size: 12.5px;
+}
+.home-customise {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.home-customise:hover {
+  color: var(--text);
+}
+/* Customising: each box gets a dashed outline and controls in its corner, and its insides stop reacting to clicks. */
+.home-cell-edit {
+  position: relative;
+  border-radius: 10px;
+  outline: 1px dashed var(--border-strong);
+  outline-offset: 3px;
+  cursor: grab;
+  transition: opacity 0.12s;
+}
+.home-cell-edit.dragging {
+  opacity: 0.4;
+}
+.home-cell-edit.drop-here {
+  outline: 2px solid var(--accent);
+}
+.home-edit-bar {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 2px 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg-raised);
+  color: var(--text-faint);
+}
+.home-edit-bar .icon-btn {
+  width: 24px;
+  height: 24px;
+}
+.home-edit-bar .icon-btn:disabled {
+  opacity: 0.3;
+}
+.home-cell-body {
+  pointer-events: none;
+}
+.home-cell-body:empty::before {
+  content: attr(data-empty);
+  display: block;
+  padding: 14px 120px 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-panel);
+  color: var(--text-faint);
+  font-size: 13px;
+}
+.home-cell-edit.off .home-cell-body {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
 /* ---------- passwords ---------- */
 .passwords-page {
   overflow-y: auto;
