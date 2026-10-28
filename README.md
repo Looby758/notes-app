@@ -49,7 +49,8 @@ Your sign-in, client secret and calendar links are stored encrypted with the sys
 The **Email** page (Ctrl+Shift+A, or the envelope at the top) shows your Gmail inbox inside Notes. It uses the same Google sign-in as the calendar, so set that up first (above). Then, once:
 
 1. Open the [Gmail API page](https://console.cloud.google.com/apis/library/gmail.googleapis.com) in the same Google Cloud project and press **Enable**.
-2. On the Email page, press **Connect Gmail**. Google says it hasn't verified the app (it's your own project, so that's expected): press **Continue**, tick the Gmail box, and continue.
+2. On the [Audience page](https://console.cloud.google.com/auth/audience), make sure your Gmail address is listed under **Test users** (*Add users* if not). Without it, Google says "Access blocked: Notes has not completed the Google verification process".
+3. On the Email page, press **Connect Gmail**. Google says it hasn't verified the app (it's your own project, so that's expected): press **Continue**, tick the Gmail box, and continue.
 
 What you can do:
 
