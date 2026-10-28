@@ -29,6 +29,10 @@ export interface Prefs {
   gameLaunchAnimation: boolean
   /** Which app icon design to use (taskbar / Dock / window). */
   appIcon: string
+  /** A pop-up with the song's name and picture when the music player moves on to a new song. */
+  musicSongPopup: boolean
+  /** Moving bars in the music player while your own music files play. */
+  musicVisualiser: boolean
 
   // Editor
   livePreview: boolean
@@ -156,6 +160,8 @@ export const DEFAULT_PREFS: Prefs = {
   reduceMotion: false,
   gameLaunchAnimation: true,
   appIcon: 'default',
+  musicSongPopup: true,
+  musicVisualiser: true,
 
   livePreview: true,
   spellcheck: true,

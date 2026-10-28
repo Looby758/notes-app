@@ -50,6 +50,8 @@ function player(): HTMLAudioElement {
   if (audio) return audio
   audio = new Audio()
   audio.preload = 'auto'
+  // Lets the visualiser read the sound (vault:// answers with the header this needs).
+  audio.crossOrigin = 'anonymous'
   try {
     const v = Number(localStorage.getItem(VOLUME_KEY))
     if (localStorage.getItem(VOLUME_KEY) !== null && Number.isFinite(v)) audio.volume = Math.min(1, Math.max(0, v / 100))
@@ -210,6 +212,27 @@ export function localRepeat(): void {
   publish()
 }
 
+let analyser: AnalyserNode | null = null
+/** The sound of your own music, for the visualiser (set up the first time it's asked for). */
+export function localAnalyser(): AnalyserNode | null {
+  if (analyser || !audio) return analyser
+  try {
+    const ctx = new AudioContext()
+    const source = ctx.createMediaElementSource(audio)
+    analyser = ctx.createAnalyser()
+    analyser.fftSize = 256
+    analyser.smoothingTimeConstant = 0.78
+    source.connect(analyser)
+    analyser.connect(ctx.destination)
+    // Browsers start an AudioContext paused until something's been clicked.
+    if (ctx.state === 'suspended') void ctx.resume()
+    audio.addEventListener('play', () => ctx.state === 'suspended' && void ctx.resume())
+  } catch {
+    analyser = null
+  }
+  return analyser
+}
+
 /** Skips to a song further along the queue. */
 export const localJump = (index: number): Promise<void> => start(index)
 
@@ -240,4 +263,13 @@ if (typeof navigator !== 'undefined' && 'mediaSession' in navigator) {
       // Not every action is supported everywhere.
     }
   }
+}
+
+/** Plays one of your files by its path in the music folder (from a song card in a note). */
+export async function playLocalPath(path: string): Promise<void> {
+  if (!useLocalMusic.getState().library) await loadLocalLibrary()
+  const songs = useLocalMusic.getState().library?.songs ?? []
+  const song = songs.find((s) => s.path === path)
+  if (!song) throw new Error('That song isn’t in your music folder any more (or the folder has changed).')
+  await playLocal([song], 0)
 }

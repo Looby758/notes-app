@@ -357,7 +357,7 @@ body.zen .music-player {
   height: 24px;
 }
 .music-volume input[type='range'] {
-  width: 96px;
+  width: 76px;
   height: 4px;
   margin: 0;
   border-radius: 2px;
@@ -609,4 +609,107 @@ body.zen .music-player {
   display: block;
   box-sizing: border-box;
   width: calc(100% - 16px);
+}
+
+/* The floating mini player (its own window): drag it by the background. */
+body.music-window {
+  background: var(--bg-raised);
+  overflow: hidden;
+}
+.music-mini {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 100vh;
+  padding: 0 14px 0 16px;
+  box-sizing: border-box;
+  font-size: 12.5px;
+  -webkit-app-region: drag;
+  user-select: none;
+}
+.music-mini button,
+.music-mini .music-bar {
+  -webkit-app-region: no-drag;
+}
+.music-mini .music-art {
+  width: 60px;
+  height: 60px;
+}
+.music-mini .music-text {
+  gap: 3px;
+}
+.music-mini .music-bar {
+  flex: none;
+  margin-top: 6px;
+}
+.music-mini-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px !important;
+  height: 20px !important;
+  opacity: 0;
+}
+.music-mini:hover .music-mini-close {
+  opacity: 1;
+}
+
+.music-visualiser {
+  display: block;
+  width: calc(100% - 24px);
+  height: 34px;
+  margin: -2px 12px 8px;
+}
+
+/* The "Now playing" pop-up */
+.music-popup {
+  position: fixed;
+  top: 52px;
+  right: 16px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 300px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 6px 10px 10px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-raised);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  font-size: 12.5px;
+  cursor: pointer;
+  animation: music-popup-in 0.22s ease-out;
+}
+.music-popup.leaving {
+  animation: music-popup-out 0.2s ease-in forwards;
+}
+.music-popup .music-popup-label {
+  color: var(--accent);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.music-popup > .icon-btn {
+  align-self: flex-start;
+  width: 22px;
+  height: 22px;
+}
+@keyframes music-popup-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+@keyframes music-popup-out {
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+body.reduce-motion .music-popup.leaving {
+  display: none;
 }

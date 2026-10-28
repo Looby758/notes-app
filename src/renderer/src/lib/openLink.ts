@@ -4,10 +4,18 @@ import { notify } from '../store/notify'
 import { usePrefs } from '../store/prefs'
 import { openNote, openWebTab } from './editorController'
 import { parseWikiInner } from './links'
+import { songTarget } from '@shared/songLinks'
+import { playSongTarget } from '../store/music'
 import { findNode, parentOf, resolveRelative } from './paths'
 
 /** Opens a markdown link clicked in a note: web links in a web tab (or the browser), relative links as notes. */
 export function openLink(href: string, fromNote: string): void {
+  // Spotify and your own music play in the music player.
+  const song = songTarget(href)
+  if (song) {
+    void playSongTarget(song)
+    return
+  }
   if (/^[a-z][a-z0-9+.-]*:/i.test(href)) {
     if (/^https?:/i.test(href) && usePrefs.getState().prefs.openLinksInApp) openWebTab(href, { beside: true })
     else if (/^(https?|mailto):/i.test(href)) window.open(href)

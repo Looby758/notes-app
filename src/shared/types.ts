@@ -29,7 +29,20 @@ export interface Settings {
   youtubeUrl?: string
   youtubePinned?: boolean
   youtubeVideoOnly?: boolean
+  /** The floating mini music player: where it was left, and whether it was showing. */
+  musicMiniWindow?: WindowBounds
+  musicMiniOpen?: boolean
 }
+
+/** What the notes window's music player tells the floating mini player. */
+export interface MusicMiniState {
+  state: MusicState | null
+  /** When `state` arrived (for the progress bar). */
+  at: number
+}
+
+/** A button pressed in the floating mini player, for the notes window to carry out. */
+export type MusicMiniCommand = { action: MusicAction } | { seek: number }
 
 export interface CaptureStatus {
   /** e.g. "Win+Shift+N", or '' if none is set or it couldn't be registered. */
@@ -398,6 +411,19 @@ export interface NotesApi {
   /** Where your account can play. */
   musicDevices(): Promise<MusicDevice[]>
   musicTransfer(deviceId: string): Promise<void>
+  // The floating mini music player
+  setMusicMini(open: boolean): Promise<boolean>
+  isMusicMiniOpen(): Promise<boolean>
+  /** It was showing when Notes last closed. */
+  musicMiniWasOpen(): Promise<boolean>
+  onMusicMiniOpen(callback: (open: boolean) => void): () => void
+  /** Notes window → mini player. */
+  pushMusicMini(state: MusicMiniState): void
+  musicMiniLast(): Promise<MusicMiniState | null>
+  onMusicMiniState(callback: (state: MusicMiniState) => void): () => void
+  /** Mini player → notes window. */
+  sendMusicMiniCommand(command: MusicMiniCommand): void
+  onMusicMiniCommand(callback: (command: MusicMiniCommand) => void): () => void
   /** Your own music files; `fresh` looks through the folder again. */
   localMusicLibrary(fresh?: boolean): Promise<LocalLibrary>
   /** Asks which folder your music is in, then lists it. */

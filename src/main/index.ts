@@ -33,6 +33,7 @@ import * as ai from './ai'
 import * as email from './email'
 import * as spotify from './spotify'
 import * as localMusic from './localMusic'
+import { closeMusicMini, setupMusicMini } from './musicMini'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
 import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
@@ -227,7 +228,8 @@ const AUDIO_TYPES = new Set(['.webm', '.mp3', '.m4a', '.wav', '.ogg', '.oga', '.
 const VIEWER_TYPES = new Set(['.mp4', '.mov', '.m4v', '.ogv', '.pdf', '.ico', '.xlsx', '.xlsm', '.csv', '.tsv'])
 
 protocol.registerSchemesAsPrivileged([
-  { scheme: 'vault', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
+  // corsEnabled: your own music plays through the Web Audio visualiser, which needs it.
+  { scheme: 'vault', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
   CODE_SANDBOX_SCHEME
 ])
 
@@ -240,7 +242,12 @@ function registerVaultProtocol(): void {
         const rel = decodeURIComponent(url.pathname.slice(1))
         const full = localMusic.musicFile(rel)
         if (!full || !AUDIO_TYPES.has(extname(full).toLowerCase())) return new Response('Not allowed', { status: 403 })
-        if (url.host === 'music') return net.fetch(pathToFileURL(full).toString(), { headers: request.headers })
+        if (url.host === 'music') {
+          const res = await net.fetch(pathToFileURL(full).toString(), { headers: request.headers })
+          const headers = new Headers(res.headers)
+          headers.set('Access-Control-Allow-Origin', '*')
+          return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+        }
         const pic = await localMusic.cover(rel)
         return pic ? new Response(Buffer.from(pic.data), { headers: { 'Content-Type': pic.type, 'Cache-Control': 'max-age=3600' } }) : new Response('No picture', { status: 404 })
       }
@@ -362,7 +369,10 @@ function createWindow(): BrowserWindow {
     const b = maximized ? win.getNormalBounds() : win.getBounds()
     saveSettings({ window: { ...b, maximized } })
     // The notes window is really closing: the YouTube mini window goes with it.
-    if (win === mainWindow) closeYouTube()
+    if (win === mainWindow) {
+      closeYouTube()
+      closeMusicMini()
+    }
   })
   ipcMain.removeHandler('app:ready-to-close')
   ipcMain.handle('app:ready-to-close', () => {
@@ -734,6 +744,7 @@ app.whenReady().then(async () => {
   registerIpc()
   safely('web browser', setupBrowser)
   safely('YouTube mini window', () => setupYouTube(currentPrefs))
+  safely('Music mini player', () => setupMusicMini(currentPrefs, () => mainWindow))
   safely('export', setupExport)
   safely('converter', setupConverter)
   // Hand edits to settings.json apply straight away.

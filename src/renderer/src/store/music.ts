@@ -2,7 +2,10 @@ import { create } from 'zustand'
 import { nextRepeat, type MusicAction, type MusicState, type MusicStatus } from '@shared/spotify'
 import { errorMessage } from '../lib/paths'
 import { useUI } from './ui'
-import { localNext, localPause, localPrevious, localRepeat, localSeek, localShuffle, localToggle, localVolume, stopLocal } from './localMusic'
+import { songMarkdown, type SongTarget } from '@shared/songLinks'
+import { insertBlockIntoActiveNote } from '../lib/editorController'
+import { notify } from './notify'
+import { playLocalPath, localNext, localPause, localPrevious, localRepeat, localSeek, localShuffle, localToggle, localVolume, stopLocal } from './localMusic'
 
 /** The music player in the corner: what's playing (asked for every couple of seconds while it's open). */
 
@@ -18,6 +21,8 @@ interface MusicStore {
   liked: { uri: string; liked: boolean } | null
   /** Your own music files are playing (store/localMusic.ts), not Spotify. */
   local: boolean
+  /** The floating mini player is showing (it's sent what's playing). */
+  miniOpen: boolean
   /** The sleep timer: pause at a time, or when this song ends. */
   sleep: { until: number } | { song: string } | null
 }
@@ -31,7 +36,7 @@ const wasOpen = ((): boolean => {
   }
 })()
 
-export const useMusic = create<MusicStore>(() => ({ open: wasOpen, state: null, at: 0, status: null, error: null, liked: null, sleep: null, local: false }))
+export const useMusic = create<MusicStore>(() => ({ open: wasOpen, state: null, at: 0, status: null, error: null, liked: null, sleep: null, local: false, miniOpen: false }))
 
 export function setMusicOpen(open: boolean): void {
   useMusic.setState({ open, error: null })
@@ -224,15 +229,76 @@ export function startMusic(): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined
   const sleepTimer = setInterval(checkSleep, 400)
   const tick = async (): Promise<void> => {
-    const { open, state, sleep } = useMusic.getState()
-    if ((open && document.visibilityState === 'visible') || sleep) await refreshMusic()
+    const { open, state, sleep, miniOpen } = useMusic.getState()
+    if ((open && document.visibilityState === 'visible') || sleep || miniOpen) await refreshMusic()
     // The Mac app answers instantly; your account is asked a little less often.
     timer = setTimeout(tick, state?.source === 'account' ? 3000 : 1500)
   }
   void refreshMusicStatus().catch(() => undefined)
   void tick()
+  const stopMini = startMini()
   return () => {
     clearTimeout(timer)
     clearInterval(sleepTimer)
+    stopMini()
   }
+}
+
+// ---------- The floating mini player ----------
+
+export const setMusicMini = (open: boolean): Promise<boolean> => window.api.setMusicMini(open)
+
+/** Sends what's playing to the mini player while it's showing, and does what its buttons ask. */
+function startMini(): () => void {
+  const push = (): void => {
+    const { state, at, miniOpen } = useMusic.getState()
+    if (miniOpen) window.api.pushMusicMini({ state, at })
+  }
+  const offOpen = window.api.onMusicMiniOpen((miniOpen) => {
+    useMusic.setState({ miniOpen })
+    if (miniOpen) void refreshMusic().then(push)
+  })
+  const offCommand = window.api.onMusicMiniCommand((command) => {
+    if ('seek' in command) void musicSeek(command.seek)
+    else void musicControl(command.action)
+  })
+  const offState = useMusic.subscribe((now, before) => {
+    if (now.state !== before.state || now.at !== before.at || (now.miniOpen && !before.miniOpen)) push()
+  })
+  // It comes back if it was showing when Notes closed.
+  void window.api.musicMiniWasOpen().then((was) => was && setMusicMini(true))
+  return () => {
+    offOpen()
+    offCommand()
+    offState()
+  }
+}
+
+// ---------- Songs shared into notes ----------
+
+/** Plays a song card's song, and shows the player. */
+export async function playSongTarget(target: SongTarget): Promise<void> {
+  setMusicOpen(true)
+  if (target.kind === 'spotify') {
+    await musicPlay(target.uri)
+    return
+  }
+  try {
+    await playLocalPath(target.path)
+  } catch (err) {
+    useMusic.setState({ error: errorMessage(err) })
+  }
+}
+
+/** Puts a card for what's playing into the note you're writing; says why not if it can't. */
+export function shareSongToNote(): void {
+  const track = useMusic.getState().state?.track
+  const md = track?.uri ? songMarkdown(track.name, track.artist, track.uri, track.art?.startsWith('https://') ? track.art : undefined) : null
+  if (!md) {
+    useMusic.setState({ error: 'Play a song first, then add it to a note.' })
+    return
+  }
+  // A blank line after it, so the card shows straight away (the link shows while the cursor's on its line).
+  if (!insertBlockIntoActiveNote(`${md}\n`)) useMusic.setState({ error: 'Open a note first, then press this to add the song to it.' })
+  else notify(`Added “${track!.name}” to the note.`, 'info')
 }

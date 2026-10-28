@@ -434,6 +434,26 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'lock password encrypt private secure auto timeout'
   },
 
+  // ---------- Music ----------
+  {
+    key: 'musicSongPopup',
+    section: 'music',
+    group: 'Player',
+    type: 'toggle',
+    label: 'Show a pop-up when the song changes',
+    description: 'The song’s name, artist and picture appear in the corner for a few seconds when the next one starts.',
+    keywords: 'music song now playing popup notification toast spotify'
+  },
+  {
+    key: 'musicVisualiser',
+    section: 'music',
+    group: 'Player',
+    type: 'toggle',
+    label: 'Visualiser for your own music',
+    description: 'Moving bars in the player while your own music files play (Spotify doesn’t let other apps see its sound). Also the bars button under the player.',
+    keywords: 'music visualizer visualiser bars waves equaliser animation'
+  },
+
   // ---------- Calendar ----------
   {
     key: 'dailyFolder',

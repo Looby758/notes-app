@@ -1,12 +1,15 @@
 import './music.css'
 import { useEffect, useRef, useState } from 'react'
 import {
+  AudioLines,
   Heart,
   Laptop,
   Link2,
   ListMusic,
   Music,
+  NotebookPen,
   Pause,
+  PictureInPicture2,
   Play,
   Repeat,
   Repeat1,
@@ -34,7 +37,9 @@ import {
   openMusicSettings,
   refreshMusic,
   refreshMusicStatus,
+  setMusicMini,
   setMusicOpen,
+  shareSongToNote,
   startMusic,
   useMusic
 } from '../../store/music'
@@ -45,6 +50,9 @@ import { ItemList } from './ItemList'
 import { Playlists } from './Playlists'
 import { SleepButton, SleepTimer } from './SleepTimer'
 import { LocalMusic, LocalUpNext } from './LocalMusic'
+import { Visualiser } from './Visualiser'
+import { SongPopup } from './SongPopup'
+import { setPrefs, usePrefs } from '../../store/prefs'
 
 type Tab = 'playlists' | 'search' | 'queue' | 'recent' | 'local' | 'link' | 'devices' | 'sleep'
 
@@ -62,8 +70,12 @@ const setUp = (): void => {
 export default function MusicPlayer() {
   const open = useMusic((s) => s.open)
   useEffect(() => startMusic(), [])
-  if (!open) return null
-  return <Player />
+  return (
+    <>
+      <SongPopup />
+      {open && <Player />}
+    </>
+  )
 }
 
 function Player() {
@@ -71,6 +83,7 @@ function Player() {
   const error = useMusic((s) => s.error)
   const status = useMusic((s) => s.status)
   const local = useMusic((s) => s.local)
+  const visualiser = usePrefs((s) => s.prefs.musicVisualiser)
   const [tab, setTab] = useState<Tab | null>(null)
 
   const toggleTab = (t: Tab): void => setTab(tab === t ? null : t)
@@ -134,6 +147,7 @@ function Player() {
           </button>
         </div>
       </div>
+      {state?.source === 'local' && visualiser && <Visualiser playing={state.playing} />}
       {state?.track && <Progress state={state} />}
       {state?.track && <Footer state={state} panel={tab} onPanel={toggleTab} />}
       {(error || state?.error) && <p className="music-error">{error ?? state?.error}</p>}
@@ -258,6 +272,8 @@ export function LikeButton({ uri }: { uri: string }) {
 /** Volume, shuffle and repeat, and where it's playing. */
 function Footer({ state, panel, onPanel }: { state: MusicState; panel: Tab | null; onPanel: (tab: Tab) => void }) {
   const connected = useMusic((s) => !!s.status?.connected)
+  const miniOpen = useMusic((s) => s.miniOpen)
+  const visualiser = usePrefs((s) => s.prefs.musicVisualiser)
   return (
     <div className="music-footer">
       {state.volume !== undefined && <VolumeSlider volume={state.volume} />}
@@ -274,11 +290,32 @@ function Footer({ state, panel, onPanel }: { state: MusicState; panel: Tab | nul
           {state.repeat === 'track' ? <Repeat1 size={13} /> : <Repeat size={13} />}
         </button>
         <SleepButton open={panel === 'sleep'} onClick={() => onPanel('sleep')} />
+        {state.source === 'local' && (
+          <button
+            className={`icon-btn music-shuffle ${visualiser ? 'active' : ''}`}
+            onClick={() => setPrefs({ musicVisualiser: !visualiser })}
+            title={visualiser ? 'Hide the visualiser' : 'Show the visualiser'}
+            data-music-visualiser-toggle
+          >
+            <AudioLines size={13} />
+          </button>
+        )}
+        <button className="icon-btn" onClick={shareSongToNote} title="Add this song to the note you’re writing (as a card that plays it)" data-music-share>
+          <NotebookPen size={13} />
+        </button>
+        <button
+          className={`icon-btn music-shuffle ${miniOpen ? 'active' : ''}`}
+          onClick={() => setMusicMini(!miniOpen)}
+          title={miniOpen ? 'Close the floating mini player' : 'Floating mini player: stays on top of other apps'}
+          data-music-mini-toggle
+        >
+          <PictureInPicture2 size={13} />
+        </button>
       </div>
       {state.source === 'local' ? (
         <button className="music-device" onClick={backToSpotify} title="Stop your music and go back to Spotify" data-music-back-to-spotify>
           <Music size={12} />
-          <span>Back to Spotify</span>
+          <span>Spotify</span>
         </button>
       ) : (connected || state.device) && (
         <button className={`music-device ${panel === 'devices' ? 'active' : ''}`} onClick={() => onPanel('devices')} title="Choose where it plays" data-music-devices>
