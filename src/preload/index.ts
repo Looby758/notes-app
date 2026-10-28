@@ -98,6 +98,7 @@ const api: NotesApi = {
   addCalendarFeed: (name, url) => ipcRenderer.invoke('cal:addFeed', name, url),
   removeCalendarFeed: (id) => ipcRenderer.invoke('cal:removeFeed', id),
   fetchCalendarEvents: (from, to) => ipcRenderer.invoke('cal:events', from, to),
+  readGoogleSheet: (path) => ipcRenderer.invoke('gsheet:read', path),
   aiStatus: () => ipcRenderer.invoke('ai:status'),
   aiSetKey: (key) => ipcRenderer.invoke('ai:setKey', key),
   aiClearKey: () => ipcRenderer.invoke('ai:clearKey'),
@@ -118,6 +119,9 @@ const api: NotesApi = {
     ipcRenderer.on('term:exit', handler)
     return () => ipcRenderer.removeListener('term:exit', handler)
   },
+  aiChat: (messages) => ipcRenderer.invoke('ai:chat', messages),
+  aiLoadChats: () => ipcRenderer.invoke('ai:loadChats'),
+  aiSaveChats: (chats) => ipcRenderer.invoke('ai:saveChats', chats),
   getVault: () => ipcRenderer.invoke('vault:get'),
   pickVault: () => ipcRenderer.invoke('vault:pick'),
   closeVault: () => ipcRenderer.invoke('vault:close'),

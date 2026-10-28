@@ -13,7 +13,8 @@ export function fileKind(path: string): FileKind {
   if (['mp4', 'mov', 'm4v', 'ogv'].includes(ext)) return 'video'
   if (ext === 'pdf') return 'pdf'
   // Old binary .xls and .ods files still open in their usual app.
-  if (['xlsx', 'xlsm', 'csv', 'tsv'].includes(ext)) return 'sheet'
+  // .gsheet is Google Drive's link to a Google Sheet; it's fetched from Google to show it.
+  if (['xlsx', 'xlsm', 'csv', 'tsv', 'gsheet'].includes(ext)) return 'sheet'
   // Canvas boards made here (or in Obsidian).
   if (ext === 'canvas') return 'board'
   return 'other'

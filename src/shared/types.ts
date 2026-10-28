@@ -1,5 +1,6 @@
 import type { Prefs } from './prefs'
 import type { DictionaryEntry } from './dictionary'
+import type { Sheet } from './sheet'
 
 export interface WindowBounds {
   x?: number
@@ -118,6 +119,21 @@ export interface AiAskTurn {
   answer: string
 }
 
+/** A message in the AI chat. */
+export interface AiChatMessage {
+  role: 'user' | 'assistant'
+  text: string
+}
+
+/** A saved AI chat conversation. */
+export interface AiChat {
+  id: string
+  title: string
+  /** When it was last added to (ISO time), so the newest chats come first. */
+  updated: string
+  messages: AiChatMessage[]
+}
+
 export interface NotesApi {
   /** A native yes/no dialog; resolves true if the user picked `ok`. */
   confirm(options: ConfirmOptions): Promise<boolean>
@@ -218,6 +234,8 @@ export interface NotesApi {
   removeCalendarFeed(id: string): Promise<CalendarSourcesStatus>
   /** Events between two instants from every enabled calendar (cached ones if offline). */
   fetchCalendarEvents(from: string, to: string): Promise<{ events: CalEvent[]; errors: string[]; offline: boolean }>
+  /** A .gsheet file's sheet, fetched from Google with the sign-in above. */
+  readGoogleSheet(path: string): Promise<GoogleSheetResult>
   aiStatus(): Promise<AiStatus>
   /** Checks the key with Anthropic, then stores it encrypted. */
   aiSetKey(key: string): Promise<AiStatus>
@@ -237,6 +255,11 @@ export interface NotesApi {
   onTerminalData(callback: (data: string) => void): () => void
   /** The command line ended (you typed exit, or it closed). */
   onTerminalExit(callback: (code: number) => void): () => void
+  /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */
+  aiChat(messages: AiChatMessage[]): Promise<string>
+  /** Saved chats, kept in the settings folder on this computer. */
+  aiLoadChats(): Promise<AiChat[]>
+  aiSaveChats(chats: AiChat[]): Promise<void>
   /** The last-opened vault, or null if none is set or the folder no longer exists. */
   getVault(): Promise<string | null>
   /** Opens a folder picker; returns the chosen vault path, or null if cancelled. */
@@ -319,3 +342,13 @@ export interface AppleNote {
 }
 /** How starting the Terminal tab's command line went. */
 export type TerminalStart = { ok: true; name: string; resumed: boolean } | { ok: false; error: string }
+
+/** A Google Sheet (.gsheet file) fetched for the spreadsheet viewer, or why it couldn't be. */
+export type GoogleSheetResult =
+  | { sheets: Sheet[]; webUrl: string }
+  | {
+      error: string
+      webUrl?: string
+      /** What would fix it: set Google up in Settings, sign in (again), switch the Sheets API on, or just try later. */
+      fix?: 'setup' | 'connect' | 'enable-api' | 'retry'
+    }

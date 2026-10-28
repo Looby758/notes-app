@@ -1,15 +1,26 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from 'react'
-import { Search } from 'lucide-react'
+import { ExternalLink, LogIn, RefreshCw, Search, Settings } from 'lucide-react'
 import { columnName, readSpreadsheet, type Sheet } from '../../lib/sheets'
+import { SETTINGS_TAB, openSpecialTab } from '../../lib/editorController'
 import { notify } from '../../store/notify'
 import { IS_MAC } from '@shared/platform'
+import { ENABLE_SHEETS_API_URL } from '@shared/sheet'
+import type { GoogleSheetResult } from '@shared/types'
 
 /** Rows drawn at once; more come in on request, so a huge sheet still opens quickly. */
 const PAGE = 1000
 const ROW_NUMBER_WIDTH = 48
 const DEFAULT_WIDTH = 110
 
-type Loaded = { sheets: Sheet[] } | { error: string } | null
+type Loaded = { sheets: Sheet[]; webUrl?: string } | (Extract<GoogleSheetResult, { error: string }> & { sheets?: undefined }) | null
+
+/** Excel and CSV files are read from the notes folder; a .gsheet is only a link, so the sheet comes from Google. */
+async function load(path: string, url: string, name: string): Promise<NonNullable<Loaded>> {
+  if (/\.gsheet$/i.test(name)) return window.api.readGoogleSheet(path)
+  const r = await fetch(url, { cache: 'no-store' })
+  if (!r.ok) throw new Error('This file can’t be read.')
+  return { sheets: await readSpreadsheet(name, await r.arrayBuffer()) }
+}
 
 /** A spreadsheet laid out like Excel, read-only: one tab per sheet, a sticky header, and a filter. */
 export default function SheetView({ path, url, name }: { path: string; url: string; name: string }) {
@@ -22,23 +33,19 @@ export default function SheetView({ path, url, name }: { path: string; url: stri
 
   useEffect(() => {
     let live = true
-    fetch(url, { cache: 'no-store' })
-      .then((r) => {
-        if (!r.ok) throw new Error('This file can’t be read.')
-        return r.arrayBuffer()
-      })
-      .then((data) => readSpreadsheet(name, data))
-      .then((sheets) => live && setLoaded({ sheets }))
-      .catch((err: unknown) => live && setLoaded({ error: err instanceof Error ? err.message : String(err) }))
+    load(path, url, name)
+      .then((result) => live && setLoaded(result))
+      .catch((err: unknown) => live && setLoaded({ error: `${err instanceof Error ? err.message : String(err)} Open it in its usual app instead.` }))
     return () => {
       live = false
     }
-  }, [url, name, reload])
+  }, [path, url, name, reload])
 
   // Show the new version when the file changes on disk (saved from Excel, or synced from another computer).
   useEffect(() => window.api.onVaultChanged((paths) => paths.includes(path) && setReload((n) => n + 1)), [path])
 
-  const sheets = loaded && 'sheets' in loaded ? loaded.sheets : []
+  const sheets = loaded?.sheets ?? []
+  const isGoogle = /\.gsheet$/i.test(name)
   const sheet = sheets[Math.min(active, sheets.length - 1)] as Sheet | undefined
 
   const rowIndexes = useMemo(() => {
@@ -51,7 +58,7 @@ export default function SheetView({ path, url, name }: { path: string; url: stri
   }, [sheet, query])
 
   if (!loaded) return <p className="file-viewer-failed">Opening…</p>
-  if ('error' in loaded) return <p className="file-viewer-failed">{loaded.error} Open it in its usual app instead.</p>
+  if (!loaded.sheets) return <SheetProblem problem={loaded} retry={() => setReload((n) => n + 1)} />
   if (!sheet) return null
 
   const pickedCell = picked ? sheet.rows[picked.row]?.[picked.col] : undefined
@@ -97,6 +104,16 @@ export default function SheetView({ path, url, name }: { path: string; url: stri
         <span className="sheet-value" title={pickedCell?.text}>
           {pickedCell?.text ?? <span className="sheet-hint">Click a cell to see all of it. {IS_MAC ? '⌘' : 'Ctrl+'}C copies it.</span>}
         </span>
+        {isGoogle && (
+          <button className="btn sheet-refresh" title="Get the latest version from Google" onClick={() => setReload((n) => n + 1)}>
+            <RefreshCw size={13} /> Refresh
+          </button>
+        )}
+        {loaded.webUrl && (
+          <button className="btn sheet-refresh" onClick={() => window.open(loaded.webUrl)}>
+            <ExternalLink size={13} /> Open in Google Sheets
+          </button>
+        )}
         <label className="sheet-filter">
           <Search size={13} />
           <input
@@ -170,6 +187,51 @@ export default function SheetView({ path, url, name }: { path: string; url: stri
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+/** Why a sheet can't be shown, with the button that fixes it where there is one. */
+function SheetProblem({ problem, retry }: { problem: Extract<GoogleSheetResult, { error: string }>; retry: () => void }) {
+  const [connecting, setConnecting] = useState(false)
+  const connect = (): void => {
+    setConnecting(true)
+    window.api
+      .googleConnect()
+      .then(retry)
+      .catch(notify)
+      .finally(() => setConnecting(false))
+  }
+  return (
+    <div className="sheet-problem">
+      <p className="file-viewer-failed">{problem.error}</p>
+      <div className="sheet-problem-actions">
+        {problem.fix === 'setup' && (
+          <button className="btn btn-primary" onClick={() => openSpecialTab(SETTINGS_TAB)}>
+            <Settings size={13} /> Open Settings
+          </button>
+        )}
+        {problem.fix === 'connect' && (
+          <button className="btn btn-primary" disabled={connecting} onClick={connect}>
+            <LogIn size={13} /> {connecting ? 'Waiting for you in your browser…' : 'Connect Google'}
+          </button>
+        )}
+        {problem.fix === 'enable-api' && (
+          <button className="btn btn-primary" onClick={() => window.open(ENABLE_SHEETS_API_URL)}>
+            <ExternalLink size={13} /> Switch on the Sheets API
+          </button>
+        )}
+        {(problem.fix === 'enable-api' || problem.fix === 'retry') && (
+          <button className="btn" onClick={retry}>
+            <RefreshCw size={13} /> Try again
+          </button>
+        )}
+        {problem.webUrl && (
+          <button className="btn" onClick={() => window.open(problem.webUrl)}>
+            <ExternalLink size={13} /> Open in Google Sheets
+          </button>
+        )}
+      </div>
     </div>
   )
 }

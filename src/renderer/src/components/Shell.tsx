@@ -6,6 +6,7 @@ import {
   FolderSync,
   House,
   LogOut,
+  MessageSquare,
   Orbit,
   BookOpen,
   Dices,
@@ -36,6 +37,7 @@ import {
   SETTINGS_TAB,
   GRAPH_TAB,
   TERMINAL_TAB,
+  CHAT_TAB,
   HOME_TAB,
   setZenEditor
 } from '../lib/editorController'
@@ -280,6 +282,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         <FlashcardsButton />
         <button className="icon-btn" onClick={() => openSpecialTab(TERMINAL_TAB)} title={`Terminal (${showKeys('Ctrl+Alt+T')})`} data-terminal-button>
           <SquareTerminal size={15} />
+        </button>
+        <button className="icon-btn" onClick={() => openSpecialTab(CHAT_TAB)} title="Chat with Claude" data-chat-button>
+          <MessageSquare size={15} />
         </button>
         <LayoutMenu />
         <button className="icon-btn" onClick={() => useUI.setState({ modal: 'commands' })} title={`All commands (${showKeys('Ctrl+K')})`}>
