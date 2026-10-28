@@ -557,7 +557,8 @@ function buildInline(view: EditorView): DecorationSet {
       if (/Code/.test(syntaxTree(state).resolveInner(from, 1).name)) continue
       const openEnd = from + m[0].indexOf('>') + 1
       const closeStart = to - '</mark>'.length
-      out.push(mark(`cm-hl cm-hl-${m[1]}`).range(openEnd, closeStart))
+      // Empty while you're about to type into it (the slash menu's "Highlight green").
+      if (closeStart > openEnd) out.push(mark(`cm-hl cm-hl-${m[1]}`).range(openEnd, closeStart))
       if (!isActive(from)) {
         out.push(hidden.range(from, openEnd))
         out.push(hidden.range(closeStart, to))
