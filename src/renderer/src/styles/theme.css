@@ -106,9 +106,10 @@ body.density-compact {
 body.density-compact .panel-header {
   height: 32px;
 }
-body.reduce-motion *,
-body.reduce-motion *::before,
-body.reduce-motion *::after {
+/* Settings → Motion → Off (more in motion.css). */
+[data-motion='off'] *,
+[data-motion='off'] *::before,
+[data-motion='off'] *::after {
   animation: none !important;
   transition: none !important;
 }
@@ -8791,13 +8792,9 @@ p.games-none {
 .game-card:hover .game-art > img:not(.game-icon) {
   transform: scale(1.04);
 }
-body.reduce-motion .game-card:hover .game-art > img {
+/* Motion on Subtle (or the system asking for less motion) keeps covers still. */
+:root:not([data-motion='full']) .game-card:hover .game-art > img {
   transform: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  .game-card:hover .game-art > img {
-    transform: none;
-  }
 }
 .game-art img.game-cover-live {
   position: absolute;

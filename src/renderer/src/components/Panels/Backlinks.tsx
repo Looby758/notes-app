@@ -18,6 +18,7 @@ import { isNoteTab, openNote } from '../../lib/editorController'
 import { editNote } from '../../lib/daily'
 import { linkMentions, type Mention } from '../../lib/mentions'
 import { noteTitle, parentOf } from '../../lib/paths'
+import EmptyArt from '../Motion/EmptyArt'
 
 const CONTEXT = 60
 
@@ -119,6 +120,7 @@ export default function Backlinks() {
         {!active && <div className="panel-empty">Open a note to see what links to it.</div>}
         {active && groups.length === 0 && (
           <div className="panel-empty">
+            <EmptyArt kind="link" size={44} />
             No notes link here yet. Link to this note from another one with <code>[[{noteTitle(active)}]]</code>.
           </div>
         )}

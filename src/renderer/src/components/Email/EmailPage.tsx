@@ -9,7 +9,6 @@ import {
   Image,
   Loader2,
   Mail,
-  MailOpen,
   Paperclip,
   Pencil,
   RefreshCw,
@@ -61,6 +60,7 @@ import {
   showAddress,
   tidyText
 } from '../../lib/email'
+import EmptyArt from '../Motion/EmptyArt'
 
 const FOLDERS: { id: EmailFolder; label: string }[] = [
   { id: 'inbox', label: 'Inbox' },
@@ -367,7 +367,7 @@ function Reader() {
   if (!openId) {
     return (
       <div className="email-empty">
-        <MailOpen size={30} strokeWidth={1.2} />
+        <EmptyArt kind="mail" size={64} />
         <span>Pick an email to read it</span>
       </div>
     )

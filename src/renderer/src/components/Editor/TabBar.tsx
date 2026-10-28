@@ -48,6 +48,14 @@ import { UnreadBadge } from '../Messages/MessagesPage'
 import { useWeb, type WebPage } from '../../store/web'
 import { displayUrl } from '@shared/web'
 import { FILE_MANAGER, showKeys } from '@shared/platform'
+import { animateOut } from '../../lib/motion'
+
+/** Closing with the mouse lets the tab shrink away first. (Ctrl+W stays instant, so it can be pressed quickly.) */
+function closeWithAnimation(el: HTMLElement | null, id: string, pane: string, unlessPinned = false): void {
+  // Shrink from the tab's real width, not its 200px limit.
+  if (el) el.style.maxWidth = `${el.offsetWidth}px`
+  animateOut(el, 'closing', () => (unlessPinned ? closeTabUnlessPinned(id, pane) : closeTab(id, pane)))
+}
 
 function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (isBlankTab(id)) return 'New tab'
@@ -221,7 +229,8 @@ export default function TabBar({ pane }: { pane: string }) {
               onMouseDown={(e) => {
                 if (e.button === 1) {
                   e.preventDefault()
-                  closeTabUnlessPinned(id, pane)
+                  if (isTabPinned) closeTabUnlessPinned(id, pane)
+                  else closeWithAnimation(e.currentTarget, id, pane, true)
                 }
               }}
             >
@@ -266,7 +275,7 @@ export default function TabBar({ pane }: { pane: string }) {
                   title={`Close (${showKeys('Ctrl+W')})`}
                   onClick={(e) => {
                     e.stopPropagation()
-                    closeTab(id, pane)
+                    closeWithAnimation(e.currentTarget.closest<HTMLElement>('.tab'), id, pane)
                   }}
                 >
                   <span className="tab-dot" />

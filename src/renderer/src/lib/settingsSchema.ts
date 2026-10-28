@@ -163,13 +163,19 @@ export const SETTINGS: SettingDef[] = [
   },
   { key: 'showStatusBar', section: 'appearance', group: 'Interface', type: 'toggle', label: 'Show status bar', description: 'The strip at the bottom with save status and counts.' },
   {
-    key: 'reduceMotion',
+    key: 'motion',
     section: 'appearance',
     group: 'Interface',
-    type: 'toggle',
-    label: 'Reduce motion',
-    description: 'Turns off animations and transitions.',
-    keywords: 'animation accessibility'
+    type: 'choice',
+    options: [
+      { value: 'full', label: 'Full' },
+      { value: 'subtle', label: 'Subtle' },
+      { value: 'off', label: 'Off' }
+    ],
+    label: 'Motion',
+    description:
+      'Full: pages slide in, tabs grow, ticks and stars pop. Subtle: things fade instead of moving. Off: no animations at all. If your system is set to reduce motion, Full acts like Subtle.',
+    keywords: 'animation animations reduce motion accessibility transitions effects fade slide'
   },
   {
     key: 'gameLaunchAnimation',
@@ -177,7 +183,7 @@ export const SETTINGS: SettingDef[] = [
     group: 'Interface',
     type: 'toggle',
     label: 'Launch animation for games',
-    description: 'Pressing Play on the Games page shows the game’s art and logo for a few seconds while it starts. Click or press Esc to skip it. Off while Reduce motion is on.',
+    description: 'Pressing Play on the Games page shows the game’s art and logo for a few seconds while it starts. Click or press Esc to skip it. Off while Motion is Off.',
     keywords: 'games play launch start animation intro splash steam epic cinematic'
   },
   {
@@ -191,7 +197,7 @@ export const SETTINGS: SettingDef[] = [
       { value: 'off', label: 'Off' }
     ],
     label: 'Animated game covers',
-    description: 'Covers on the Games page that move, from SteamGridDB (add a free key on the Games page). Still pictures are shown when a game has none, and while Reduce motion is on.',
+    description: 'Covers on the Games page that move, from SteamGridDB (add a free key on the Games page). Still pictures are shown when a game has none, and while Motion is on Subtle or Off.',
     keywords: 'games covers art animated moving living gif webp steamgriddb grid'
   },
 

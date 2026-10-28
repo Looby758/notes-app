@@ -47,6 +47,9 @@ class BulletWidget extends WidgetType {
   }
 }
 
+/** When a task was last ticked by a click, so the new tick can be drawn in (styles/motion.css). */
+let tickedAt = -Infinity
+
 class CheckboxWidget extends WidgetType {
   constructor(readonly checked: boolean) {
     super()
@@ -58,7 +61,7 @@ class CheckboxWidget extends WidgetType {
     const box = document.createElement('input')
     box.type = 'checkbox'
     box.checked = this.checked
-    box.className = 'cm-task-checkbox'
+    box.className = this.checked && performance.now() - tickedAt < 300 ? 'cm-task-checkbox cm-task-pop' : 'cm-task-checkbox'
     box.tabIndex = -1
     return box
   }
@@ -645,6 +648,7 @@ const clickHandlers = EditorView.domEventHandlers({
     if (target.matches('.cm-task-checkbox')) {
       const pos = view.posAtDOM(target)
       const current = view.state.sliceDoc(pos + 1, pos + 2)
+      if (current === ' ') tickedAt = performance.now()
       view.dispatch({ changes: { from: pos + 1, to: pos + 2, insert: current === ' ' ? 'x' : ' ' } })
       e.preventDefault()
       return true

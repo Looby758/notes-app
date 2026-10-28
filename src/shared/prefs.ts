@@ -24,7 +24,8 @@ export interface Prefs {
   density: 'compact' | 'comfortable'
   zoom: number
   showStatusBar: boolean
-  reduceMotion: boolean
+  /** How much the app animates. The system's reduce-motion setting turns Full down to Subtle (see lib/motion.ts). */
+  motion: 'full' | 'subtle' | 'off'
   /** Pressing Play on the Games page shows a short title card with the game's art while it starts. */
   gameLaunchAnimation: boolean
   /** Animated game covers (from SteamGridDB): moving all the time, only under the pointer, or never. */
@@ -155,7 +156,7 @@ export const DEFAULT_PREFS: Prefs = {
   density: 'comfortable',
   zoom: 1,
   showStatusBar: true,
-  reduceMotion: false,
+  motion: 'full',
   gameLaunchAnimation: true,
   gameAnimatedCovers: 'always',
   appIcon: 'default',
@@ -244,6 +245,7 @@ export const RANGES = {
 const CHOICES = {
   noteWidth: ['narrow', 'medium', 'wide', 'full'],
   density: ['compact', 'comfortable'],
+  motion: ['full', 'subtle', 'off'],
   gameAnimatedCovers: ['always', 'hover', 'off'],
   timeFormat: ['24h', '12h'],
   captureTarget: ['daily', 'inbox'],
@@ -298,6 +300,8 @@ export function normalizePrefs(raw: unknown): Prefs {
     }
   }
 
+  // Before Motion had three levels it was a "Reduce motion" switch.
+  if (input.motion === undefined && input.reduceMotion === true) out.motion = 'off'
   if (typeof input.theme === 'string' && THEMES.some((t) => t.id === input.theme)) out.theme = input.theme
   if (typeof input.lightTheme === 'string' && THEMES.some((t) => t.id === input.lightTheme && t.light)) out.lightTheme = input.lightTheme
   if (typeof input.darkTheme === 'string' && THEMES.some((t) => t.id === input.darkTheme && !t.light)) out.darkTheme = input.darkTheme

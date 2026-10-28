@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
 import { ChevronRight, Columns2, FileText, Star, StarOff } from 'lucide-react'
-import { useStarred, placeStar, toggleStar } from '../../store/starred'
+import { useStarred, placeStar, toggleStar, justStarred } from '../../store/starred'
 import { useVault } from '../../store/vault'
 import { useEditor } from '../../store/editor'
 import { useUI } from '../../store/ui'
@@ -114,7 +114,7 @@ export default function StarredSection() {
               onAuxClick={(e) => e.button === 1 && openNote(path, { newTab: true })}
               onContextMenu={(e) => onContextMenu(e, path)}
             >
-              <Star size={13} className="tree-icon starred-icon" />
+              <Star size={13} className={`tree-icon starred-icon ${justStarred(path) ? 'pop' : ''}`} />
               <span className="tree-label">{noteTitle(path)}</span>
               {parentOf(path) && <span className="starred-folder">{parentOf(path)}</span>}
             </div>

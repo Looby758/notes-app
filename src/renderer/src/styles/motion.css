@@ -1,0 +1,768 @@
+/*
+ * Motion: the app-wide animations, and Settings → Appearance → Motion.
+ *
+ * <html data-motion> is "full", "subtle" or "off" (lib/motion.ts; the system's reduce-motion
+ * setting turns Full into Subtle). Animations here use two dials so Subtle needs few overrides:
+ *   --m-move  1 = things slide, grow and pop; 0 = they only fade
+ *   --m-time  scales durations
+ * Off turns every animation and transition off (theme.css).
+ */
+
+:root {
+  --m-move: 1;
+  --m-time: 1;
+  --m-ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --m-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+:root[data-motion='subtle'] {
+  --m-move: 0;
+  --m-time: 0.8;
+}
+
+@keyframes m-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes m-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* ---------- Theme changes cross-fade (lib/appearance.ts starts a view transition) ---------- */
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 320ms;
+  animation-timing-function: ease;
+}
+:root[data-motion='subtle']::view-transition-old(root),
+:root[data-motion='subtle']::view-transition-new(root) {
+  animation-duration: 220ms;
+}
+
+/* ---------- Pages slide up into place ---------- */
+
+@keyframes m-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(10px * var(--m-move)));
+  }
+}
+/* Every page a tab can show (Calendar, Email, Settings…), and the note editor when you switch note.
+   Web pages and Messages hold live web views, so they just appear. */
+.pane-body > :not(.editor-host, .web-page, .messages-page, .drop-zone, .conflict-banner),
+.editor-host.page-enter {
+  animation: m-page-in calc(260ms * var(--m-time)) var(--m-ease-out) backwards;
+}
+
+/* ---------- Tabs grow in and shrink away ---------- */
+
+@keyframes m-tab-in {
+  from {
+    max-width: calc(200px - 200px * var(--m-move));
+    padding-left: calc(12px - 12px * var(--m-move));
+    padding-right: calc(6px - 6px * var(--m-move));
+    opacity: 0;
+  }
+}
+@keyframes m-tab-out {
+  to {
+    max-width: calc(200px - 200px * var(--m-move));
+    padding-left: calc(12px - 12px * var(--m-move));
+    padding-right: calc(6px - 6px * var(--m-move));
+    opacity: 0;
+  }
+}
+.tab {
+  overflow: hidden;
+  animation: m-tab-in calc(200ms * var(--m-time)) var(--m-ease-out) backwards;
+}
+.tab.closing {
+  pointer-events: none;
+  animation: m-tab-out calc(170ms * var(--m-time)) var(--m-ease-out) forwards;
+}
+
+/* ---------- A new split pane slides open ---------- */
+
+@keyframes m-split-open {
+  from {
+    flex-grow: 0;
+  }
+}
+.split-child:has(> .pane-new) {
+  animation: m-split-open 300ms var(--m-ease-out) backwards;
+}
+:root[data-motion='subtle'] .split-child:has(> .pane-new) {
+  animation: none;
+}
+.pane-new {
+  animation: m-fade-in calc(300ms * var(--m-time)) ease-out backwards;
+}
+
+/* ---------- Ticking a task draws the tick, with a little burst ---------- */
+
+.cm-content .cm-task-checkbox {
+  appearance: none;
+  position: relative;
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  margin: 0 8px 0 0;
+  vertical-align: -2px;
+  border: 1.5px solid var(--text-faint);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 140ms var(--ease), border-color 140ms var(--ease);
+}
+.cm-content .cm-task-checkbox:hover {
+  border-color: var(--accent);
+}
+.cm-content .cm-task-checkbox:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+/* The tick: the bottom and right edges of a small box, turned 45°. */
+.cm-content .cm-task-checkbox::after {
+  content: '';
+  position: absolute;
+  left: 3.5px;
+  top: 0.5px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--bg);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  opacity: 0;
+}
+.cm-content .cm-task-checkbox:checked::after {
+  opacity: 1;
+}
+
+@keyframes m-tick-draw {
+  /* Short stroke first (along the bottom), then the long one (up the side). */
+  0% {
+    clip-path: inset(calc(100% - 2px) 100% 0 0);
+  }
+  40% {
+    clip-path: inset(calc(100% - 2px) 0 0 0);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes m-tick-pop {
+  50% {
+    transform: scale(calc(1 + 0.25 * var(--m-move)));
+  }
+}
+@keyframes m-burst {
+  from {
+    transform: scale(0.3);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+.cm-content .cm-task-pop {
+  animation: m-tick-pop calc(280ms * var(--m-time)) var(--m-ease-out);
+}
+.cm-content .cm-task-pop::after {
+  animation: m-tick-draw calc(260ms * var(--m-time)) ease-out 40ms backwards;
+}
+/* Eight specks flying outwards: one dot, copied around a circle with box-shadows. */
+.cm-content .cm-task-pop::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 3px;
+  margin: -1.5px 0 0 -1.5px;
+  border-radius: 50%;
+  pointer-events: none;
+  color: var(--accent);
+  box-shadow:
+    13px 0 currentColor,
+    9px 9px currentColor,
+    0 13px currentColor,
+    -9px 9px currentColor,
+    -13px 0 currentColor,
+    -9px -9px currentColor,
+    0 -13px currentColor,
+    9px -9px currentColor;
+  opacity: 0;
+  animation: m-burst 420ms var(--m-ease-out);
+}
+:root[data-motion='subtle'] .cm-content .cm-task-pop::before {
+  display: none;
+}
+
+/* ---------- Starring a note pops its star ---------- */
+
+@keyframes m-star-pop {
+  0% {
+    transform: scale(calc(1 - 0.7 * var(--m-move))) rotate(calc(-40deg * var(--m-move)));
+    opacity: 0;
+  }
+  60% {
+    transform: scale(calc(1 + 0.35 * var(--m-move))) rotate(calc(10deg * var(--m-move)));
+    opacity: 1;
+  }
+}
+.tree-star.pop,
+.starred-icon.pop {
+  animation: m-star-pop calc(420ms * var(--m-time)) var(--m-ease-out);
+}
+@keyframes m-row-in {
+  from {
+    opacity: 0;
+    transform: translateX(calc(-12px * var(--m-move)));
+  }
+}
+.starred-row:has(.starred-icon.pop) {
+  animation: m-row-in calc(260ms * var(--m-time)) var(--m-ease-out);
+}
+
+/* ---------- Folders open and close smoothly ---------- */
+
+.tree-children {
+  interpolate-size: allow-keywords;
+}
+@keyframes m-folder-open {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+}
+@keyframes m-folder-close {
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+.tree-children.opening {
+  overflow: hidden;
+  animation: m-folder-open 200ms var(--m-ease-out);
+}
+.tree-children.leaving {
+  overflow: hidden;
+  pointer-events: none;
+  animation: m-folder-close 170ms var(--m-ease-out) forwards;
+}
+:root[data-motion='subtle'] .tree-children.opening {
+  animation: m-fade-in 160ms ease-out;
+}
+:root[data-motion='subtle'] .tree-children.leaving {
+  animation: m-fade-out 140ms ease-out forwards;
+}
+
+/* ---------- Buttons, cards and covers lift and glow on hover ---------- */
+
+.btn {
+  transition:
+    background 120ms var(--ease),
+    border-color 160ms var(--ease),
+    transform 160ms var(--ease),
+    box-shadow 160ms var(--ease);
+}
+.btn:hover:not(:disabled) {
+  transform: translateY(calc(-1px * var(--m-move)));
+  box-shadow: 0 3px 12px -4px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.btn:active:not(:disabled) {
+  transform: translateY(0) scale(calc(1 - 0.02 * var(--m-move)));
+  box-shadow: none;
+}
+
+.home-box,
+.theme-card,
+.money-tile,
+.game-card {
+  transition:
+    border-color 180ms var(--ease),
+    transform 180ms var(--ease),
+    box-shadow 180ms var(--ease);
+}
+.home-box:hover,
+.theme-card:hover,
+.money-tile:hover,
+.game-card:hover {
+  transform: translateY(calc(-3px * var(--m-move)));
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border-strong));
+  box-shadow:
+    0 10px 24px -14px rgb(0 0 0 / 0.6),
+    0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent),
+    0 6px 22px -10px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.home-box:hover {
+  transform: translateY(calc(-2px * var(--m-move)));
+}
+
+/* ---------- Home cards float in one after another ---------- */
+
+@keyframes m-float-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(16px * var(--m-move))) scale(calc(1 - 0.02 * var(--m-move)));
+  }
+}
+.home-grid > .home-cell {
+  animation: m-float-in calc(420ms * var(--m-time)) var(--m-ease-out) backwards;
+}
+.home-grid > .home-cell:nth-child(2) {
+  animation-delay: 50ms;
+}
+.home-grid > .home-cell:nth-child(3) {
+  animation-delay: 100ms;
+}
+.home-grid > .home-cell:nth-child(4) {
+  animation-delay: 150ms;
+}
+.home-grid > .home-cell:nth-child(5) {
+  animation-delay: 200ms;
+}
+.home-grid > .home-cell:nth-child(6) {
+  animation-delay: 250ms;
+}
+.home-grid > .home-cell:nth-child(7) {
+  animation-delay: 300ms;
+}
+.home-grid > .home-cell:nth-child(n + 8) {
+  animation-delay: 350ms;
+}
+
+/* ---------- The logo at start-up (components/Motion/StartupLogo.tsx) ---------- */
+
+.startup-logo {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  pointer-events: none;
+}
+.startup-logo.leaving {
+  animation: m-fade-out calc(320ms * var(--m-time)) ease-in forwards;
+}
+.startup-tile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 80%, white), color-mix(in srgb, var(--accent) 85%, black));
+  box-shadow: 0 18px 50px -16px color-mix(in srgb, var(--accent) 70%, transparent);
+  animation: m-logo-tile calc(560ms * var(--m-time)) var(--m-spring) backwards;
+}
+/* A soft ring that spreads from the tile as it lands. */
+.startup-tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 2px solid var(--accent);
+  opacity: 0;
+  animation: m-logo-ring 900ms ease-out 260ms;
+}
+:root[data-motion='subtle'] .startup-tile::after {
+  display: none;
+}
+.startup-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 46px;
+  height: 58px;
+  padding: 18px 8px 0;
+  border-radius: 6px;
+  background: #1c1d23;
+  clip-path: polygon(0 0, 72% 0, 100% 22%, 100% 100%, 0 100%);
+  animation: m-logo-page calc(420ms * var(--m-time)) var(--m-ease-out) 120ms backwards;
+}
+.startup-page i {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: #636774;
+  transform-origin: left;
+  animation: m-logo-line calc(260ms * var(--m-time)) var(--m-ease-out) backwards;
+}
+.startup-page i:nth-child(1) {
+  width: 55%;
+  background: var(--accent);
+  animation-delay: 320ms;
+}
+.startup-page i:nth-child(2) {
+  width: 85%;
+  animation-delay: 400ms;
+}
+.startup-page i:nth-child(3) {
+  width: 72%;
+  animation-delay: 480ms;
+}
+.startup-page i:nth-child(4) {
+  width: 45%;
+  animation-delay: 560ms;
+}
+@keyframes m-logo-tile {
+  from {
+    opacity: 0;
+    transform: scale(calc(1 - 0.4 * var(--m-move))) rotate(calc(-8deg * var(--m-move)));
+  }
+}
+@keyframes m-logo-ring {
+  from {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+@keyframes m-logo-page {
+  from {
+    opacity: 0;
+    transform: translateY(calc(10px * var(--m-move)));
+  }
+}
+@keyframes m-logo-line {
+  from {
+    transform: scaleX(calc(1 - var(--m-move)));
+    opacity: 0;
+  }
+}
+
+/* ---------- Drawings on empty screens (components/Motion/EmptyArt.tsx) ---------- */
+
+.empty-art {
+  display: block;
+  flex-shrink: 0;
+  overflow: visible;
+  animation: m-fade-in 300ms ease-out backwards;
+}
+.empty-art * {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.empty-art .ea-line {
+  stroke: var(--text-muted);
+}
+.empty-art .ea-soft {
+  stroke: var(--text-faint);
+}
+.empty-art .ea-accent {
+  stroke: var(--accent);
+}
+.empty-art .ea-bg {
+  fill: var(--bg-raised);
+}
+.empty-art .ea-accent-fill {
+  fill: var(--accent);
+  stroke: none;
+}
+.empty-art .ea-soft-fill {
+  fill: var(--text-faint);
+  stroke: none;
+}
+.panel-empty .empty-art {
+  margin: 4px auto 8px;
+}
+.tree-empty .empty-art {
+  margin: 4px 0 -2px;
+}
+.graph-empty {
+  grid-auto-flow: row;
+  justify-items: center;
+  align-content: center;
+  gap: 10px;
+}
+.empty-with-art {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+.empty-with-art p {
+  margin-top: 0;
+}
+
+/* The loops. Each is slow and small; Subtle keeps the drawings still. */
+.ea-write {
+  stroke-dasharray: 14;
+  animation: ea-write 2.6s ease-in-out infinite;
+}
+.ea-pencil {
+  animation: ea-pencil 2.6s ease-in-out infinite;
+}
+.ea-bob {
+  animation: ea-bob 3s ease-in-out infinite;
+}
+.ea-peek {
+  animation: ea-peek 3s ease-in-out infinite;
+}
+.ea-dot {
+  animation: ea-dot 1.4s ease-in-out infinite;
+}
+.ea-dot:nth-of-type(2) {
+  animation-delay: 0.18s;
+}
+.ea-dot:nth-of-type(3) {
+  animation-delay: 0.36s;
+}
+.ea-twinkle {
+  animation: ea-twinkle 2.4s ease-in-out infinite;
+}
+.ea-twinkle:nth-of-type(2) {
+  animation-delay: 0.6s;
+}
+.ea-twinkle:nth-of-type(3) {
+  animation-delay: 1.2s;
+}
+.ea-float {
+  animation: ea-float 3.4s ease-in-out infinite;
+}
+.ea-pulse {
+  animation: ea-pulse 2.2s ease-in-out infinite;
+}
+.ea-orbit {
+  transform-box: view-box;
+  transform-origin: 32px 32px;
+  animation: ea-orbit 6s linear infinite;
+}
+.ea-look {
+  animation: ea-look 4s ease-in-out infinite;
+}
+.ea-swing {
+  transform-origin: 20px 16px;
+  transform-box: view-box;
+  animation: ea-swing 2.8s ease-in-out infinite;
+}
+.ea-grow {
+  stroke-dasharray: 30;
+  animation: ea-grow 3.2s ease-out infinite;
+}
+.ea-g2 {
+  animation-delay: 0.2s;
+}
+.ea-g3 {
+  animation-delay: 0.4s;
+}
+.ea-g4 {
+  animation-delay: 0.6s;
+}
+.ea-link-a {
+  animation: ea-link-a 2.6s ease-in-out infinite;
+}
+.ea-link-b {
+  animation: ea-link-b 2.6s ease-in-out infinite;
+}
+.ea-flip {
+  animation: ea-flip 3.6s ease-in-out infinite;
+}
+.ea-wiggle {
+  transform-origin: 22px 32px;
+  transform-box: view-box;
+  animation: ea-wiggle 3s ease-in-out infinite;
+}
+.ea-drop {
+  animation: ea-drop 2.4s cubic-bezier(0.5, 0, 0.6, 1) infinite;
+}
+:root[data-motion='subtle'] .empty-art *,
+:root[data-motion='subtle'] .empty-art {
+  animation: none;
+}
+
+@keyframes ea-write {
+  0% {
+    stroke-dashoffset: 14;
+  }
+  55%,
+  85% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: 14;
+    opacity: 0;
+  }
+}
+@keyframes ea-pencil {
+  0% {
+    transform: translateX(-14px);
+  }
+  55%,
+  85% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-14px);
+  }
+}
+@keyframes ea-bob {
+  50% {
+    transform: translateY(-3px);
+  }
+}
+@keyframes ea-peek {
+  0%,
+  20%,
+  100% {
+    transform: translateY(8px);
+  }
+  50%,
+  70% {
+    transform: translateY(0);
+  }
+}
+@keyframes ea-dot {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+@keyframes ea-twinkle {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(0.6);
+    opacity: 0.5;
+  }
+}
+@keyframes ea-float {
+  50% {
+    transform: translate(-2px, -4px) rotate(-3deg);
+  }
+}
+@keyframes ea-pulse {
+  50% {
+    transform: scale(1.3);
+  }
+}
+@keyframes ea-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes ea-look {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(4px, -2px);
+  }
+  50% {
+    transform: translate(2px, 4px);
+  }
+  75% {
+    transform: translate(-3px, 1px);
+  }
+}
+@keyframes ea-swing {
+  0%,
+  100% {
+    transform: rotate(-8deg);
+  }
+  50% {
+    transform: rotate(8deg);
+  }
+}
+@keyframes ea-grow {
+  0% {
+    stroke-dashoffset: 30;
+  }
+  40%,
+  85% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+@keyframes ea-link-a {
+  50% {
+    transform: translateX(-4px);
+  }
+}
+@keyframes ea-link-b {
+  50% {
+    transform: translateX(4px);
+  }
+}
+@keyframes ea-flip {
+  0%,
+  35% {
+    transform: rotateY(0);
+  }
+  50%,
+  85% {
+    transform: rotateY(180deg);
+  }
+  100% {
+    transform: rotateY(360deg);
+  }
+}
+@keyframes ea-wiggle {
+  0%,
+  60%,
+  100% {
+    transform: rotate(0);
+  }
+  70% {
+    transform: rotate(-12deg);
+  }
+  80% {
+    transform: rotate(10deg);
+  }
+  90% {
+    transform: rotate(-4deg);
+  }
+}
+@keyframes ea-drop {
+  0% {
+    transform: translateY(-12px);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  55% {
+    transform: translateY(12px);
+  }
+  65% {
+    transform: translateY(8px);
+  }
+  75%,
+  90% {
+    transform: translateY(12px);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+}

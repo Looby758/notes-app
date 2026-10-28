@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react'
 import {
   ChevronRight,
   ExternalLink,
@@ -22,7 +22,7 @@ import {
   StarOff,
   Trash2
 } from 'lucide-react'
-import { isStarred, toggleStar, useStarred } from '../../store/starred'
+import { isStarred, justStarred, toggleStar, useStarred } from '../../store/starred'
 import type { FileNode } from '@shared/types'
 import { useVault } from '../../store/vault'
 import { displayName, isWithin, parentOf } from '../../lib/paths'
@@ -42,6 +42,8 @@ import { newBoard } from '../../lib/boards'
 import { isBoard } from '../../lib/canvas'
 import { useLock, isLocked } from '../../lib/lock/session'
 import { lockNote, removeLock } from '../../lib/lock/actions'
+import { motionLevel, slideFrom, snapshot, usePresence } from '../../lib/motion'
+import EmptyArt from '../Motion/EmptyArt'
 
 const INDENT = 14
 const AUTO_EXPAND_MS = 600
@@ -89,6 +91,23 @@ export default function FileTree() {
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const closeMenu = useCallback(() => setMenu(null), [])
+
+  // When notes are moved, renamed, added or sorted, rows slide to their new places. The old places
+  // are measured as the store changes, before React redraws the tree.
+  const root = useRef<HTMLDivElement>(null)
+  const before = useRef<Map<string, number> | null>(null)
+  useEffect(
+    () =>
+      useVault.subscribe((s, prev) => {
+        if (s.tree !== prev.tree && root.current && motionLevel() === 'full') before.current = snapshot(root.current, '.tree-row', 'data-path')
+      }),
+    []
+  )
+  useLayoutEffect(() => {
+    const old = before.current
+    before.current = null
+    if (old && root.current) slideFrom(root.current, '.tree-row', 'data-path', old, (p) => p.slice(p.lastIndexOf('/') + 1))
+  }, [tree])
 
   const openMenu = (e: MouseEvent, node: FileNode | null): void => {
     e.preventDefault()
@@ -249,6 +268,7 @@ export default function FileTree() {
 
   return (
     <div
+      ref={root}
       className={`tree ${dropTarget === '' ? 'drop-root' : ''}`}
       tabIndex={0}
       onKeyDown={onKeyDown}
@@ -260,6 +280,7 @@ export default function FileTree() {
     >
       {tree.length === 0 ? (
         <div className="tree-empty">
+          <EmptyArt kind="notes" />
           <p>No notes yet</p>
           <button className="btn" onClick={() => newNote('')}>
             <FilePlus size={15} /> Create a note
@@ -303,6 +324,15 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
   const locked = useLock((s) => !isFolder && node.path in s.locked)
   const { toggle, expand, select, startRename } = useVault.getState()
   const expandTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  // Folders open and close smoothly: the children stay a moment while closing, and only a folder
+  // opened just now (not one that was already open at start-up) animates open.
+  const children = usePresence(isFolder && expanded, 180)
+  const wasExpanded = useRef(expanded)
+  const opening = useRef(false)
+  if (wasExpanded.current !== expanded) {
+    opening.current = expanded
+    wasExpanded.current = expanded
+  }
 
   // Files accept drops on behalf of the folder they're in.
   const folder = isFolder ? node.path : parentOf(node.path)
@@ -400,10 +430,13 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
         )}
         {isRenaming ? <RenameInput node={node} /> : <span className="tree-label">{displayName(node)}</span>}
         {locked && !isRenaming && <Lock size={11} className="tree-lock" aria-label="Locked" />}
-        {starred && !isRenaming && <Star size={11} className="tree-star" aria-label="Starred" />}
+        {starred && !isRenaming && <Star size={11} className={`tree-star ${justStarred(node.path) ? 'pop' : ''}`} aria-label="Starred" />}
       </div>
-      {isFolder && expanded && (
-        <div className="tree-children" style={{ ['--guide-x' as string]: `${15 + depth * INDENT}px` }}>
+      {children.mounted && (
+        <div
+          className={`tree-children ${children.leaving ? 'leaving' : opening.current ? 'opening' : ''}`}
+          style={{ ['--guide-x' as string]: `${15 + depth * INDENT}px` }}
+        >
           {node.children?.map((child) => (
             <TreeNode
               key={child.path}

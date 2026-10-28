@@ -7,6 +7,7 @@ import { searchNotes, useNoteIndex, type SearchHit } from '../../store/noteIndex
 import { openNote } from '../../lib/editorController'
 import { noteTitle, parentOf } from '../../lib/paths'
 import { clearSelection, selectRange, setSelection, toggleSelected, useSelection } from '../../store/selection'
+import EmptyArt from '../Motion/EmptyArt'
 
 function Snippet({ hit }: { hit: SearchHit }) {
   const parts: ReactNode[] = []
@@ -86,6 +87,7 @@ export default function SearchPane() {
         {!query.trim() && <SavedSearches compact />}
         {!query.trim() && (
           <div className="panel-empty">
+            <EmptyArt kind="search" size={44} />
             Search the text of every note. Use <code>#tag</code> to filter by tag, e.g. <code>#work meeting</code>.
           </div>
         )}
