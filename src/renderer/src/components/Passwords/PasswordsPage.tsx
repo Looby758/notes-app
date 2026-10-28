@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
-import { AlertTriangle, Check, Copy, Dices, ExternalLink, Eye, EyeOff, KeyRound, Lock, Pencil, Plus, Search, ShieldCheck, Trash2 } from 'lucide-react'
+import { AlertTriangle, Check, Copy, Dices, ExternalLink, Eye, EyeOff, FolderLock, KeyRound, Lock, Pencil, Plus, Search, ShieldCheck, Trash2 } from 'lucide-react'
 import Private from '../Streamer/Private'
 import {
   autoLockMinutes,
@@ -30,6 +30,7 @@ import {
 import { ShowRecoveryKey } from '../Lock/LockDialog'
 import { notify } from '../../store/notify'
 import EmptyArt from '../Motion/EmptyArt'
+import FilesVault from './FilesVault'
 
 /** Seconds a copied password stays on the clipboard. */
 const CLEAR_AFTER = 30
@@ -302,12 +303,16 @@ function Vault() {
   const count = logins.filter((l) => !l.deleted).length
   const current = view.kind === 'show' ? logins.find((l) => l.id === view.id && !l.deleted) : undefined
   const selectedId = view.kind === 'show' ? view.id : view.kind === 'edit' ? view.login.id : null
+  const [files, setFiles] = useState(false)
 
   return (
     <>
       <div className="passwords-top">
         <Heading />
         <div className="passwords-actions">
+          <button className={`btn ${files ? 'btn-primary' : ''}`} onClick={() => setFiles(!files)} title="Photos and files locked with your master password" data-files-vault-open>
+            {files ? <KeyRound size={14} /> : <FolderLock size={14} />} {files ? 'Logins' : 'Files'}
+          </button>
           <button className="btn" onClick={() => setView({ kind: 'generator' })} data-passwords-generator-open>
             <Dices size={14} /> Make a password
           </button>
@@ -319,6 +324,9 @@ function Vault() {
           </button>
         </div>
       </div>
+      {files ? (
+        <FilesVault />
+      ) : (
       <div className="passwords-body">
         <div className="passwords-list">
           <div className="passwords-search">
@@ -366,6 +374,7 @@ function Vault() {
           )}
         </div>
       </div>
+      )}
     </>
   )
 }

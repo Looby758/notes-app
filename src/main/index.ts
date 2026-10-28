@@ -18,6 +18,7 @@ import {
 } from 'electron'
 import { existsSync, statSync } from 'fs'
 import { readFile } from 'fs/promises'
+import * as fsp from 'fs/promises'
 import { basename, extname, join } from 'path'
 import { pathToFileURL } from 'url'
 import type { AiAskTurn, AiChat, AiChatMessage, AiNote, ConfirmOptions, EmailFolder, OutgoingEmail } from '@shared/types'
@@ -239,6 +240,9 @@ function openVault(path: string | null): void {
 }
 
 // Images (and voice notes) in notes load through vault://local/<path>, served only from inside the open vault.
+/** Biggest file the file vault takes (it's read into memory to encrypt). */
+const SAFE_MAX_BYTES = 100 * 1024 * 1024
+const safePicked = new Set<string>()
 const IMAGE_TYPES = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.avif'])
 const AUDIO_TYPES = new Set(['.webm', '.mp3', '.m4a', '.wav', '.ogg', '.oga', '.aac', '.flac', '.opus'])
 /** Shown in their own tab from the file list. */
@@ -641,6 +645,35 @@ function registerIpc(): void {
 
   ipcMain.handle('vault:readAppData', (_e, name: string) => currentVault().readAppData(name))
   ipcMain.handle('vault:writeAppData', (_e, name: string, content: string) => currentVault().writeAppData(name, content))
+  ipcMain.handle('safe:read', (_e, id: string) => currentVault().readSafeFile(id))
+  ipcMain.handle('safe:write', (_e, id: string, data: Uint8Array) => currentVault().writeSafeFile(id, data))
+  ipcMain.handle('safe:remove', (_e, id: string) => currentVault().removeSafeFile(id))
+  // Files picked to lock away. Only these paths may later be sent to the Bin by safe:trashOriginals.
+  ipcMain.handle('safe:pick', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)!
+    const result = await dialog.showOpenDialog(win, { title: 'Add to file vault', properties: ['openFile', 'multiSelections'] })
+    if (result.canceled) return []
+    const picked = []
+    for (const path of result.filePaths) {
+      if ((await fsp.stat(path)).size > SAFE_MAX_BYTES) throw new Error(`"${basename(path)}" is too big for the file vault (over 100 MB).`)
+      picked.push({ path, name: basename(path), data: new Uint8Array(await fsp.readFile(path)) })
+      safePicked.add(path)
+    }
+    return picked
+  })
+  ipcMain.handle('safe:trashOriginals', async (_e, paths: string[]) => {
+    for (const p of paths) {
+      if (!safePicked.delete(p)) continue
+      await shell.trashItem(p).catch((err) => logError('vault original', err))
+    }
+  })
+  ipcMain.handle('safe:saveCopy', async (event, name: string, data: Uint8Array) => {
+    const win = BrowserWindow.fromWebContents(event.sender)!
+    const result = await dialog.showSaveDialog(win, { title: 'Save a copy', defaultPath: join(app.getPath('downloads'), basename(name)) })
+    if (result.canceled || !result.filePath) return false
+    await fsp.writeFile(result.filePath, data)
+    return true
+  })
   ipcMain.handle('fs:writeSketch', (_e, path: string, svg: string) => currentVault().writeSketch(path, svg))
   ipcMain.handle('fs:writeSheet', (_e, path: string, data: Uint8Array) => currentVault().writeSheet(path, data))
   ipcMain.handle('fs:saveAttachment', (_e, folder: string, name: string, data: Uint8Array) =>
