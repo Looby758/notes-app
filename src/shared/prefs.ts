@@ -36,6 +36,10 @@ export interface Prefs {
   musicSongPopup: boolean
   /** Moving bars in the music player while your own music files play. */
   musicVisualiser: boolean
+  /** Soft clicks and whooshes as you use the app (lib/sounds.ts). */
+  interfaceSounds: boolean
+  /** How loud they are, 0 to 1. */
+  interfaceSoundsVolume: number
 
   // Streamer mode
   /** Blur private things (your town, email, money, passwords, messages, events) until you click them, for sharing your screen. */
@@ -181,6 +185,8 @@ export const DEFAULT_PREFS: Prefs = {
   appIcon: 'default',
   musicSongPopup: true,
   musicVisualiser: true,
+  interfaceSounds: true,
+  interfaceSoundsVolume: 0.5,
 
   streamerMode: false,
   streamerHideNotes: true,
@@ -260,6 +266,7 @@ export const RANGES = {
   editorFontSize: { min: 12, max: 28, step: 1 },
   lineHeight: { min: 1.2, max: 2.2, step: 0.02 },
   zoom: { min: 0.8, max: 1.5, step: 0.05 },
+  interfaceSoundsVolume: { min: 0, max: 1, step: 0.05 },
   autosaveDelay: { min: 300, max: 5000, step: 100 },
   tabSize: { min: 2, max: 8, step: 1 },
   weekStart: { min: 0, max: 1, step: 1 },

@@ -51,11 +51,13 @@ import { useWeb, type WebPage } from '../../store/web'
 import { displayUrl } from '@shared/web'
 import { FILE_MANAGER, showKeys } from '@shared/platform'
 import { animateOut } from '../../lib/motion'
+import { playSound } from '../../lib/sounds'
 
 /** Closing with the mouse lets the tab shrink away first. (Ctrl+W stays instant, so it can be pressed quickly.) */
 function closeWithAnimation(el: HTMLElement | null, id: string, pane: string, unlessPinned = false): void {
   // Shrink from the tab's real width, not its 200px limit.
   if (el) el.style.maxWidth = `${el.offsetWidth}px`
+  playSound('whooshOut')
   animateOut(el, 'closing', () => (unlessPinned ? closeTabUnlessPinned(id, pane) : closeTab(id, pane)))
 }
 
