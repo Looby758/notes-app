@@ -1,11 +1,17 @@
 # Builds the Windows and Mac installers and publishes them as a GitHub Release.
-# Runs when a version tag is pushed, e.g. `git tag v1.2.0 && git push --tags`.
+# Runs when a version tag is pushed, e.g. `git tag v1.2.0 && git push --tags`, or from the Actions
+# tab ("Run workflow" on main), which releases the version in package.json and makes its tag.
 # The installed apps check these releases for updates.
 name: Release
 
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+
+env:
+  # The release's tag: the pushed tag, or v<package.json version> when started by hand.
+  TAG: ${{ github.event_name == 'push' && github.ref_name || '' }}
 
 permissions:
   contents: write
@@ -14,14 +20,21 @@ jobs:
   draft:
     name: Create draft release
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
+      - uses: actions/checkout@v4
+      - name: Work out the tag
+        id: tag
+        run: echo "tag=${TAG:-v$(node -p 'require("./package.json").version')}" >> "$GITHUB_OUTPUT"
       - name: Create the release (hidden until the builds finish)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
         run: |
-          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
-            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft \
-              --title "Notes ${GITHUB_REF_NAME#v}" --generate-notes
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --target "$GITHUB_SHA" \
+              --title "Notes ${TAG#v}" --generate-notes
 
   build:
     name: Build (${{ matrix.name }})
@@ -56,10 +69,11 @@ jobs:
 
   publish:
     name: Publish release
-    needs: build
+    needs: [draft, build]
     runs-on: ubuntu-latest
     steps:
       - name: Make the release public
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          TAG: ${{ needs.draft.outputs.tag }}
+        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
