@@ -46,7 +46,7 @@ Your sign-in, client secret and calendar links are stored encrypted with the sys
 
 ## Email (Gmail)
 
-The **Email** page (Ctrl+Shift+J, or the envelope at the top) shows your Gmail inbox inside Notes. It uses the same Google sign-in as the calendar, so set that up first (above). Then, once:
+The **Email** page (Ctrl+Shift+B, or the envelope at the top) shows your Gmail inbox inside Notes. It uses the same Google sign-in as the calendar, so set that up first (above). Then, once:
 
 1. Open the [Gmail API page](https://console.cloud.google.com/apis/library/gmail.googleapis.com) in the same Google Cloud project and press **Enable**.
 2. On the Email page, press **Connect Gmail**. Google says it hasn't verified the app (it's your own project, so that's expected): press **Continue**, tick the Gmail box, and continue.
@@ -69,8 +69,9 @@ Notes can use Claude, made by Anthropic, to help with your notes. It's off until
 - **Summarise** (hover over a note → *Summarise*): a short summary you can add to the top of the note or copy.
 - **Tidy up** (hover over a note → *Tidy up*, or ✨ in quick capture): fixes typos and adds headings, bullets and checkboxes. You see the result first, and Ctrl+Z (or ↶ in quick capture) undoes it.
 - **Ask my notes** (Ctrl+K → *AI helper: ask my notes*): ask a question in your own words; Claude answers from the notes that best match it, with links to them.
+- **Chat** (the speech bubble at the top, or Ctrl+K → *AI helper: chat with Claude*): ask Claude anything, like a normal chat. Your chats are listed on the side so you can go back to one, rename or delete it, and any chat can be saved as a note. Chats are kept in `ai-chats.json` in the settings folder, on this computer only. Chat doesn't see your notes.
 
-Nothing is sent unless you press one of these. Then only what's needed goes to Anthropic: the note you're working on, or for a question, the best-matching notes. Locked notes are never sent. The key is stored encrypted, like calendar sign-ins, in `ai.json` in the settings folder.
+Nothing is sent unless you press one of these. Then only what's needed goes to Anthropic: the note you're working on, for a question the best-matching notes, or in Chat the conversation so far. Locked notes are never sent. The key is stored encrypted, like calendar sign-ins, in `ai.json` in the settings folder.
 
 ## Features
 
@@ -105,7 +106,7 @@ Nothing is sent unless you press one of these. Then only what's needed goes to A
 - **Reading mode** (Ctrl+Shift+R) — every note in every tab becomes read-only until you switch back; links open with a plain click.
 - **Find and replace in all notes** (Ctrl+Alt+F) — match case, whole words, regular expressions, a single folder; untick matches you want to keep, and undo afterwards.
 - **Bulk actions** — Ctrl/⌘-click or Shift-click several notes (or tick search results) to move, delete, star, tag, set a property or export them together.
-- **Email** (Ctrl+Shift+J) — your Gmail inbox: read, reply, write, and turn an email into a note or a calendar event in one click. See *Email (Gmail)* above.
+- **Email** (Ctrl+Shift+B) — your Gmail inbox: read, reply, write, and turn an email into a note or a calendar event in one click. See *Email (Gmail)* above.
 - **Flashcards** (Ctrl+Shift+Y, or the cards button at the top) — write `Question :: Answer` on its own line (or as a list item) in any note and it becomes a card. The Flashcards page shows how many are due today; review them all or one note's cards: *Show answer* (Space), then **Again**, **Hard**, **Good** or **Easy** (1–4). Cards you know come back less and less often (tomorrow, a few days, a week…); ones you miss come back in the same session. Your notes aren't changed: progress is saved in your notes folder (`.notesapp/flashcards.json`) so it syncs too, and follows notes you rename or move. Changing a card's question makes it a new card.
 - **Random note**, **related notes** (under Backlinks, with the reason), and **on this day** (notes from this date in past months and years, in the calendar panel).
 - **Banners and icons** — give a note a banner image or colour and an emoji icon, shown above the title and in the file list.
@@ -138,7 +139,7 @@ All of these can be changed in **Settings → Shortcuts**. On a Mac, Ctrl is **�
 | Ctrl+Tab / Ctrl+Shift+Tab | Next / previous tab |
 | Ctrl+Shift+F | Search all notes |
 | Ctrl+Shift+E | Show files |
-| Ctrl+Shift+J | Open email |
+| Ctrl+Shift+B | Open email |
 | Ctrl+Shift+O | Show outline |
 | Ctrl+\\ | Focus mode (hide both sidebars) |
 | Ctrl+= / Ctrl+- / Ctrl+0 | Bigger / smaller / reset text |

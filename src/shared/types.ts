@@ -1,5 +1,6 @@
 import type { Prefs } from './prefs'
 import type { DictionaryEntry } from './dictionary'
+import type { Sheet } from './sheet'
 
 export interface WindowBounds {
   x?: number
@@ -182,6 +183,21 @@ export interface AiAskTurn {
   answer: string
 }
 
+/** A message in the AI chat. */
+export interface AiChatMessage {
+  role: 'user' | 'assistant'
+  text: string
+}
+
+/** A saved AI chat conversation. */
+export interface AiChat {
+  id: string
+  title: string
+  /** When it was last added to (ISO time), so the newest chats come first. */
+  updated: string
+  messages: AiChatMessage[]
+}
+
 export interface NotesApi {
   /** A native yes/no dialog; resolves true if the user picked `ok`. */
   confirm(options: ConfirmOptions): Promise<boolean>
@@ -295,6 +311,8 @@ export interface NotesApi {
   emailArchive(id: string): Promise<void>
   /** Moves it to Gmail's Bin (Gmail deletes it for good after 30 days). */
   emailTrash(id: string): Promise<void>
+  /** A .gsheet file's sheet, fetched from Google with the sign-in above. */
+  readGoogleSheet(path: string): Promise<GoogleSheetResult>
   aiStatus(): Promise<AiStatus>
   /** Checks the key with Anthropic, then stores it encrypted. */
   aiSetKey(key: string): Promise<AiStatus>
@@ -303,6 +321,11 @@ export interface NotesApi {
   /** A quick capture is tidied as one list item; a note can get headings and lists. */
   aiTidy(text: string, kind: 'note' | 'capture'): Promise<string>
   aiAsk(question: string, notes: AiNote[], history: AiAskTurn[]): Promise<string>
+  /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */
+  aiChat(messages: AiChatMessage[]): Promise<string>
+  /** Saved chats, kept in the settings folder on this computer. */
+  aiLoadChats(): Promise<AiChat[]>
+  aiSaveChats(chats: AiChat[]): Promise<void>
   /** The last-opened vault, or null if none is set or the folder no longer exists. */
   getVault(): Promise<string | null>
   /** Opens a folder picker; returns the chosen vault path, or null if cancelled. */
@@ -383,3 +406,12 @@ export interface AppleNote {
   modified: string
   locked: boolean
 }
+/** A Google Sheet (.gsheet file) fetched for the spreadsheet viewer, or why it couldn't be. */
+export type GoogleSheetResult =
+  | { sheets: Sheet[]; webUrl: string }
+  | {
+      error: string
+      webUrl?: string
+      /** What would fix it: set Google up in Settings, sign in (again), switch the Sheets API on, or just try later. */
+      fix?: 'setup' | 'connect' | 'enable-api' | 'retry'
+    }

@@ -12,6 +12,7 @@ import {
   CONFLICTS_TAB,
   FLASHCARDS_TAB,
   EMAIL_TAB,
+  CHAT_TAB,
   HOME_TAB,
   closePane,
   closeTabUnlessPinned,
@@ -160,7 +161,7 @@ export const commands: Command[] = [
   { id: 'daily.prev', group: 'Calendar', title: 'Previous daily note', run: () => stepDaily(-1) },
   { id: 'daily.next', group: 'Calendar', title: 'Next daily note', run: () => stepDaily(1) },
   { id: 'calendar.open', group: 'Calendar', title: 'Open calendar', shortcut: 'Ctrl+Shift+C', run: () => openSpecialTab(CALENDAR_TAB) },
-  { id: 'email.open', group: 'Navigation', title: 'Open email', shortcut: 'Ctrl+Shift+J', run: () => openSpecialTab(EMAIL_TAB) },
+  { id: 'email.open', group: 'Navigation', title: 'Open email', shortcut: 'Ctrl+Shift+B', run: () => openSpecialTab(EMAIL_TAB) },
   { id: 'calendar.panel', group: 'Calendar', title: 'Show calendar in the side panel', run: () => showRightView('calendar') },
 
   ...EDITOR_COMMANDS.map(
@@ -245,6 +246,7 @@ export const commands: Command[] = [
   },
   { id: 'outline', group: 'Navigation', title: 'Show outline', shortcut: 'Ctrl+Shift+O', run: () => showRightView('outline') },
 
+  { id: 'ai.chat', group: 'AI helper', title: 'AI helper: chat with Claude', run: () => openSpecialTab(CHAT_TAB) },
   { id: 'ai.ask', group: 'AI helper', title: 'AI helper: ask my notes', run: () => openAsk() },
   { id: 'ai.summarise', group: 'AI helper', title: 'AI helper: summarise this note', run: () => activeNote() && runNoteJob('summary') },
   { id: 'ai.tidy', group: 'AI helper', title: 'AI helper: tidy up this note', run: () => activeNote() && runNoteJob('tidy') },
