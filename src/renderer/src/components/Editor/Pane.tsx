@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
-import { AlertTriangle, FileText } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import { useEditor } from '../../store/editor'
 import {
   focusPane,
@@ -16,7 +16,9 @@ import {
   REPLACE_TAB,
   CONFLICTS_TAB,
   AI_TAB,
+  CHAT_TAB,
   FLASHCARDS_TAB,
+  HOME_TAB,
   CONVERT_TAB,
   SETTINGS_TAB,
   splitPane
@@ -34,27 +36,13 @@ import CanvasBoard from '../Canvas/CanvasBoard'
 import { isBoard } from '../../lib/canvas'
 import ConflictsPage from '../Conflicts/ConflictsPage'
 import AiPage from '../Ai/AiPage'
+import ChatPage from '../Ai/ChatPage'
 import FlashcardsPage from '../Flashcards/FlashcardsPage'
+import HomePage from '../Home/HomePage'
 import ConvertPage from '../Convert/ConvertPage'
 import MindMap from '../MindMap/MindMap'
 import { isMindMap, useUI } from '../../store/ui'
 import { needsUnlock, useLock } from '../../lib/lock/session'
-import { IS_MAC, showKeys } from '@shared/platform'
-
-/** A shortcut as keycaps: "Ctrl" "P" on Windows, "⌘P" on a Mac. */
-function Keys({ s }: { s: string }) {
-  if (IS_MAC) return <kbd>{showKeys(s)}</kbd>
-  return (
-    <>
-      {s.split('+').map((k, i) => (
-        <span key={i}>
-          {i > 0 && ' '}
-          <kbd>{k}</kbd>
-        </span>
-      ))}
-    </>
-  )
-}
 
 /** One pane: its tab bar, and whatever its active tab shows (a note, a blank tab's picker, Settings…). */
 export default function Pane({ pane }: { pane: string }) {
@@ -137,20 +125,10 @@ export default function Pane({ pane }: { pane: string }) {
         {active === REPLACE_TAB && <ReplacePage />}
         {active === CONFLICTS_TAB && <ConflictsPage />}
         {active === AI_TAB && <AiPage autoFocus={isActivePane} />}
+        {active === CHAT_TAB && <ChatPage autoFocus={isActivePane} />}
         {active === FLASHCARDS_TAB && <FlashcardsPage />}
         {active === CONVERT_TAB && <ConvertPage />}
-        {!active && (
-          <div className="editor-empty">
-            <FileText size={36} strokeWidth={1.2} />
-            <p>No note open</p>
-            <span>
-              <Keys s="Ctrl+P" /> open a note · <Keys s="Ctrl+T" /> new tab · <Keys s="Ctrl+N" /> new note
-            </span>
-            <span>
-              <Keys s="Ctrl+K" /> all commands · <Keys s="Ctrl+\" /> focus mode
-            </span>
-          </div>
-        )}
+        {(active === HOME_TAB || !active) && <HomePage />}
         {zone && <div className={`drop-zone ${zone}`} />}
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ArrowRightLeft, CalendarDays, GitCompare, Columns2, FileDown, Layers, Network, Orbit, Replace, FolderSearch, Pin, PinOff, Plus, Rows2, Settings, Sparkles, Star, StarOff, X } from 'lucide-react'
+import { ArrowRightLeft, CalendarDays, MessageSquare, GitCompare, Columns2, FileDown, Layers, Network, Orbit, Replace, FolderSearch, House, Pin, PinOff, Plus, Rows2, Settings, Sparkles, Star, StarOff, X } from 'lucide-react'
 import { useEditor } from '../../store/editor'
 import { toggleStar, useStarred } from '../../store/starred'
 import { useNoteIndex } from '../../store/noteIndex'
@@ -7,11 +7,13 @@ import { isMindMap, openExport, toggleMindMap, useUI } from '../../store/ui'
 import {
   activateTab,
   AI_TAB,
+  CHAT_TAB,
   CALENDAR_TAB,
   GRAPH_TAB,
   REPLACE_TAB,
   CONFLICTS_TAB,
   FLASHCARDS_TAB,
+  HOME_TAB,
   CONVERT_TAB,
   closePane,
   closeTab,
@@ -43,7 +45,9 @@ function tabTitle(id: string): string {
   if (id === REPLACE_TAB) return 'Find & replace'
   if (id === CONFLICTS_TAB) return 'Sync copies'
   if (id === AI_TAB) return 'Ask my notes'
+  if (id === CHAT_TAB) return 'Chat'
   if (id === FLASHCARDS_TAB) return 'Flashcards'
+  if (id === HOME_TAB) return 'Home'
   if (id === CONVERT_TAB) return 'Convert files'
   if (isFileTab(id)) return fileOfTab(id).slice(fileOfTab(id).lastIndexOf('/') + 1).replace(/\.canvas$/i, '')
   return noteTitle(id)
@@ -197,7 +201,9 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === REPLACE_TAB && <Replace size={13} className="tab-icon" />}
               {id === CONFLICTS_TAB && <GitCompare size={13} className="tab-icon" />}
               {id === AI_TAB && <Sparkles size={13} className="tab-icon" />}
+              {id === CHAT_TAB && <MessageSquare size={13} className="tab-icon" />}
               {id === FLASHCARDS_TAB && <Layers size={13} className="tab-icon" />}
+              {id === HOME_TAB && <House size={13} className="tab-icon" />}
               {id === CONVERT_TAB && <ArrowRightLeft size={13} className="tab-icon" />}
               {isFileTab(id) && <FileIcon path={fileOfTab(id)} size={13} className="tab-icon" />}
               {icons.get(id) && <span className="tab-emoji">{icons.get(id)}</span>}

@@ -48,7 +48,8 @@ export default function CalendarSources() {
         <h3>Google Calendar</h3>
         <p className="cal-sources-intro">
           See your Google Calendar events next to your notes (read-only). Sign-in happens in your own browser; Notes only
-          gets permission to <em>read</em> your calendars, and the sign-in is stored encrypted on this computer.
+          gets permission to <em>read</em> your calendars (and your Google Sheets, so .gsheet files in your notes folder open
+          right in Notes), and the sign-in is stored encrypted on this computer.
         </p>
 
         {g.connected ? (
@@ -75,7 +76,8 @@ export default function CalendarSources() {
                   Go to <button className="link-btn" onClick={() => window.open('https://console.cloud.google.com/apis/credentials')}>Google Cloud Console → Credentials <ExternalLink size={11} /></button> and create a project (any name).
                 </li>
                 <li>
-                  Enable the <strong>Google Calendar API</strong> for it (APIs &amp; Services → Library).
+                  Enable the <strong>Google Calendar API</strong> for it (APIs &amp; Services → Library). Enable the{' '}
+                  <strong>Google Sheets API</strong> too if you want to see Google Sheets (.gsheet files) in Notes.
                 </li>
                 <li>
                   Under <strong>OAuth consent screen</strong>, choose “External”, fill in the app name, and add your own Google

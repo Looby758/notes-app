@@ -209,6 +209,64 @@ export const editorTheme = EditorView.theme(
       paddingBottom: '6px !important'
     },
     '.cm-code-fence': { color: 'var(--text-faint)' },
+    // ▶ Run on JavaScript blocks, and what the code printed under the block.
+    '.cm-run-anchor': { position: 'relative', height: '0' },
+    '.cm-run-button': {
+      position: 'absolute',
+      right: '8px',
+      top: '5px',
+      zIndex: '2',
+      font: '500 11.5px var(--font-ui, inherit)',
+      padding: '2px 9px',
+      borderRadius: '6px',
+      border: '1px solid var(--border)',
+      backgroundColor: 'var(--bg)',
+      color: 'var(--text-muted)',
+      cursor: 'pointer'
+    },
+    '.cm-run-button:hover:not(:disabled)': { color: 'var(--accent)', borderColor: 'var(--accent-dim)' },
+    '.cm-run-button:disabled': { cursor: 'default', opacity: '0.7' },
+    '.cm-run-output': {
+      margin: '6px 0 10px',
+      border: '1px solid var(--border)',
+      borderLeft: '3px solid var(--accent-dim)',
+      borderRadius: '8px',
+      overflow: 'hidden'
+    },
+    '.cm-run-output-head': {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '3px 6px 3px 12px',
+      fontSize: '11.5px',
+      color: 'var(--text-faint)'
+    },
+    '.cm-run-clear': {
+      border: 'none',
+      background: 'none',
+      color: 'var(--text-faint)',
+      cursor: 'pointer',
+      fontSize: '12px',
+      padding: '2px 6px',
+      borderRadius: '4px'
+    },
+    '.cm-run-clear:hover': { color: 'var(--text-strong)' },
+    '.cm-run-lines': {
+      margin: '0',
+      padding: '4px 12px 8px',
+      fontFamily: 'var(--font-mono)',
+      fontSize: '0.84em',
+      whiteSpace: 'pre-wrap',
+      wordBreak: 'break-word',
+      maxHeight: '320px',
+      overflowY: 'auto',
+      userSelect: 'text'
+    },
+    '.cm-run-line': { color: 'var(--text)' },
+    '.cm-run-result': { color: 'var(--accent)' },
+    '.cm-run-warn': { color: '#d9a43b' },
+    '.cm-run-error': { color: '#e5534b' },
+    '.cm-run-empty': { color: 'var(--text-faint)', fontStyle: 'italic' },
     '.cm-hr': {
       display: 'inline-block',
       width: '100%',
@@ -240,6 +298,13 @@ export const editorTheme = EditorView.theme(
       lineHeight: '1.5'
     },
     '.cm-table-wrap th': { backgroundColor: 'var(--bg-raised)', fontWeight: '600' },
+    '.cm-table-total': { color: 'var(--accent)', fontWeight: '600' },
+
+    // the inline calculator
+    '.cm-calc': { marginLeft: '0.6em', color: 'var(--text-faint)', cursor: 'pointer', whiteSpace: 'nowrap' },
+    '.cm-calc-value': { color: 'var(--accent)', fontWeight: '600', padding: '1px 6px', borderRadius: '4px', backgroundColor: 'var(--bg-raised)' },
+    '.cm-calc:hover .cm-calc-value': { textDecoration: 'underline' },
+    '.cm-calc-copied .cm-calc-value': { fontWeight: '400' },
 
     // maths and diagrams
     '.cm-math': { cursor: 'text' },

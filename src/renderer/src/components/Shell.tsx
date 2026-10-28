@@ -5,7 +5,9 @@ import {
   Command as CommandIcon,
   FolderOpen,
   FolderSync,
+  House,
   LogOut,
+  MessageSquare,
   Orbit,
   BookOpen,
   Dices,
@@ -34,6 +36,8 @@ import {
   remeasure,
   SETTINGS_TAB,
   GRAPH_TAB,
+  CHAT_TAB,
+  HOME_TAB,
   CONVERT_TAB,
   setZenEditor
 } from '../lib/editorController'
@@ -257,6 +261,10 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
 
         <div className="titlebar-spacer" />
 
+        <button className="icon-btn" onClick={() => openSpecialTab(HOME_TAB)} title={`Home (${showKeys('Ctrl+Shift+J')})`} data-home-button>
+          <House size={15} />
+        </button>
+
         <button
           className={`icon-btn ${reading ? 'active' : ''}`}
           onClick={() => setPrefs({ readingMode: !reading })}
@@ -272,6 +280,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
           <Orbit size={15} />
         </button>
         <FlashcardsButton />
+        <button className="icon-btn" onClick={() => openSpecialTab(CHAT_TAB)} title="Chat with Claude" data-chat-button>
+          <MessageSquare size={15} />
+        </button>
         <button className="icon-btn" onClick={() => openSpecialTab(CONVERT_TAB)} title="Convert files" data-convert-button>
           <ArrowRightLeft size={15} />
         </button>
