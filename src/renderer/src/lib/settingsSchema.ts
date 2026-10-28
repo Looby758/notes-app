@@ -187,6 +187,26 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'animation animations reduce motion accessibility transitions effects fade slide'
   },
   {
+    key: 'interfaceSounds',
+    section: 'appearance',
+    group: 'Interface',
+    type: 'toggle',
+    label: 'Interface sounds',
+    description: 'Soft clicks when you press buttons, a whoosh as panels and dialogs open and close, and a tick when you tick off a task.',
+    keywords: 'sound sounds audio click clicks whoosh noise feedback mute quiet'
+  },
+  {
+    key: 'interfaceSoundsVolume',
+    section: 'appearance',
+    group: 'Interface',
+    type: 'slider',
+    ...RANGES.interfaceSoundsVolume,
+    format: pct,
+    label: 'Interface sounds volume',
+    description: 'How loud the interface sounds are.',
+    keywords: 'sound sounds audio volume loud quiet'
+  },
+  {
     key: 'gameLaunchAnimation',
     section: 'appearance',
     group: 'Interface',
