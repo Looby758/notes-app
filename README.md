@@ -71,6 +71,22 @@ The calendar shows the forecast too, for the next two weeks: a small picture and
 
 The forecast comes from [Open-Meteo](https://open-meteo.com), which is free and needs no account. It's checked every half hour while it's on screen, and the last one is kept (in `weather.json` in the settings folder) so it still shows when you're offline. Turn either part off in **Settings → Calendar → Weather**.
 
+## Music player (Spotify)
+
+Press ♫ at the top (or Ctrl+Alt+M) to show a small player in the bottom-left corner. It shows the song that's playing, with play/pause, skip, shuffle and a progress bar you can click to jump. Hiding it doesn't stop the music. Ctrl+K also has *Music: play / pause*, *next* and *previous*, which you can give your own keys in Settings → Shortcuts.
+
+**On a Mac it works straight away** with the Spotify app (free or Premium), no sign-in. The first time, macOS asks whether Notes may control Spotify: press **OK**. (If you pressed *Don't Allow*, turn it back on in *System Settings → Privacy & Security → Automation*.) If Spotify isn't open, the player has an **Open Spotify** button. Under **Link** in the player you can paste a Spotify share link (*Share → Copy link*) to play a song, album or playlist.
+
+**Connect your Spotify account** (Settings → Music) to also **search** Spotify and pick from **your playlists** in the player, and to control Spotify on your phone, speakers or a Windows PC. Spotify only allows this for Premium accounts, and you make a free developer app on Spotify's site once (about 3 minutes):
+
+1. Open the [Spotify developer dashboard](https://developer.spotify.com/dashboard) and log in with your Spotify account.
+2. Press **Create app**, give it any name and description.
+3. Under **Redirect URIs**, add exactly `http://127.0.0.1:43117/callback`.
+4. Tick **Web API**, accept the terms and **Save**.
+5. Copy the **Client ID** into Settings → Music and press **Connect Spotify**, then **Agree** in your browser.
+
+There's no secret to copy. The sign-in is stored encrypted, like the Google one, in `spotify.json` in the settings folder. If Spotify says your account isn't allowed, add your Spotify email under **User Management** in the developer app.
+
 ## AI helper (optional)
 
 Notes can use Claude, made by Anthropic, to help with your notes. It's off until you add your own Anthropic API key in **Settings → AI helper** (sign up at [console.anthropic.com](https://console.anthropic.com/settings/keys), add a little credit, create a key, paste it in). Anthropic bills your account directly, usually a cent or two each time.

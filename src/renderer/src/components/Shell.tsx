@@ -9,6 +9,7 @@ import {
   House,
   LogOut,
   MessageSquare,
+  Music,
   Orbit,
   Mail,
   BookOpen,
@@ -66,6 +67,8 @@ import { startDictionary } from '../lib/dictionary'
 import { EventDetails } from './Calendar/shared'
 import Resizer from './Resizer'
 import UpdateToast from './UpdateToast'
+import MusicPlayer from './Music/MusicPlayer'
+import { toggleMusic, useMusic } from '../store/music'
 import ZenBar, { StatusTimer } from './ZenBar'
 import VoiceRecorder from './VoiceRecorder'
 import DefinitionCard from './DefinitionCard'
@@ -104,6 +107,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
   const showWordCount = usePrefs((s) => s.prefs.showWordCount)
   const reading = usePrefs((s) => s.prefs.readingMode)
   const zen = useUI((s) => s.zen)
+  const musicOpen = useMusic((s) => s.open)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const tree = useVault((s) => s.tree)
@@ -335,6 +339,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         <button className="icon-btn" onClick={() => openSpecialTab(SUDOKU_TAB)} title="Sudoku (a quick break)" data-sudoku-button>
           <Grid3x3 size={15} />
         </button>
+        <button className={`icon-btn ${musicOpen ? 'active' : ''}`} onClick={toggleMusic} title="Music player (Spotify)" data-music-button>
+          <Music size={15} />
+        </button>
         <LayoutMenu />
         <button className="icon-btn" onClick={() => useUI.setState({ modal: 'commands' })} title={`All commands (${showKeys('Ctrl+K')})`}>
           <CommandIcon size={15} />
@@ -398,6 +405,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <LockDialog />
       <EventDetails />
       <UpdateToast />
+      <MusicPlayer />
       <ZenBar />
       <VoiceRecorder />
       <DefinitionCard />
