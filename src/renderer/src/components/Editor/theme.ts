@@ -240,6 +240,13 @@ export const editorTheme = EditorView.theme(
       lineHeight: '1.5'
     },
     '.cm-table-wrap th': { backgroundColor: 'var(--bg-raised)', fontWeight: '600' },
+    '.cm-table-total': { color: 'var(--accent)', fontWeight: '600' },
+
+    // the inline calculator
+    '.cm-calc': { marginLeft: '0.6em', color: 'var(--text-faint)', cursor: 'pointer', whiteSpace: 'nowrap' },
+    '.cm-calc-value': { color: 'var(--accent)', fontWeight: '600', padding: '1px 6px', borderRadius: '4px', backgroundColor: 'var(--bg-raised)' },
+    '.cm-calc:hover .cm-calc-value': { textDecoration: 'underline' },
+    '.cm-calc-copied .cm-calc-value': { fontWeight: '400' },
 
     // maths and diagrams
     '.cm-math': { cursor: 'text' },

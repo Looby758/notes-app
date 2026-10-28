@@ -92,6 +92,7 @@ const ITEMS: SlashItem[] = [
     detail: '$$',
     apply: block('$$\n${E = mc^2}\n$$\n${}')
   },
+  { label: 'Calculation', keywords: 'calculator calc sum add total convert units maths', section: 'Insert', detail: '= 2 + 2', apply: linePrefix('= ') },
   { label: 'Maths in a sentence', keywords: 'math inline formula equation latex tex', section: 'Insert', detail: '$x$', apply: tpl('$${x^2}$') },
   {
     label: 'Diagram',
