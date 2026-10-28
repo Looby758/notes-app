@@ -262,6 +262,8 @@ export interface NotesApi {
   // The web browser tab
   /** Signs you out of every website and forgets what the web tabs stored. */
   clearWebData(): Promise<void>
+  /** Signs you out of WhatsApp and Discord in the messages hub. */
+  clearMessagesData(): Promise<void>
   /** The app's shortcuts, so they still work while a web page has focus. */
   setWebShortcuts(shortcuts: string[]): void
   /** A web page opened a link in a new window: open it in a new web tab. */

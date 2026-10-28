@@ -51,6 +51,7 @@ const api: NotesApi = {
   searchPlaces: (query) => ipcRenderer.invoke('places:search', query),
   mapTile: (z, x, y) => ipcRenderer.invoke('places:tile', z, x, y),
   clearWebData: () => ipcRenderer.invoke('web:clear'),
+  clearMessagesData: () => ipcRenderer.invoke('messages:clear'),
   setWebShortcuts: (shortcuts) => ipcRenderer.send('web:shortcuts', shortcuts),
   onWebOpen: (callback) => {
     const handler = (_e: unknown, url: string): void => callback(url)

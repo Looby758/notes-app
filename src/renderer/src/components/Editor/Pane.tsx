@@ -25,6 +25,7 @@ import {
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
+  MESSAGES_TAB,
   SETTINGS_TAB,
   splitPane
 } from '../../lib/editorController'
@@ -46,6 +47,7 @@ import FlashcardsPage from '../Flashcards/FlashcardsPage'
 import TerminalPage from '../Terminal/TerminalPage'
 import PasswordsPage from '../Passwords/PasswordsPage'
 import EmailPage from '../Email/EmailPage'
+import MessagesPage from '../Messages/MessagesPage'
 import HomePage from '../Home/HomePage'
 import MoneyPage from '../Money/MoneyPage'
 import ConvertPage from '../Convert/ConvertPage'
@@ -132,6 +134,8 @@ export default function Pane({ pane }: { pane: string }) {
         {isBlankTab(active) && <NewTabPage key={active} autoFocus={isActivePane} />}
         {/* Web pages stay loaded while you look at another tab, like in a browser. */}
         {tabs?.filter(isWebTab).map((t) => <WebPage key={t} tab={t} hidden={t !== active} autoFocus={isActivePane} />)}
+        {/* So do WhatsApp and Discord, so their unread counts keep coming in. */}
+        {tabs?.includes(MESSAGES_TAB) && <MessagesPage hidden={active !== MESSAGES_TAB} autoFocus={isActivePane} />}
         {active === SETTINGS_TAB && <SettingsPage />}
         {active === CALENDAR_TAB && <CalendarPage />}
         {active === GRAPH_TAB && <GraphPage />}
