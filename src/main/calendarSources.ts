@@ -164,7 +164,7 @@ function listenForCode(state: string): Promise<{ server: Server; port: number; c
         fail(new Error('Sign-in was interrupted. Please try again.'))
       } else if (url.searchParams.get('error')) {
         page('Not connected', 'You can close this tab and return to Notes.')
-        fail(new Error(url.searchParams.get('error') === 'access_denied' ? 'You declined access, so nothing was connected.' : 'Google sign-in failed.'))
+        fail(new Error(url.searchParams.get('error') === 'access_denied' ? 'Google didn’t give access, so nothing was connected. If it said “Access blocked”, add your Google account under Test users on the Audience page of your Google Cloud project.' : 'Google sign-in failed.'))
       } else {
         page('Connected to Notes ✓', 'You can close this tab and return to Notes.')
         deliver(url.searchParams.get('code') ?? '')
@@ -221,7 +221,15 @@ export async function connect(withGmail = false): Promise<CalendarSourcesStatus>
     }).toString()
     await shell.openExternal(auth.toString())
     const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Sign-in timed out. Try connecting again.')), SIGN_IN_TIMEOUT_MS)
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              'Sign-in timed out. If Google said “Access blocked”, add your Google account under Test users on the Audience page of your Google Cloud project, then connect again.'
+            )
+          ),
+        SIGN_IN_TIMEOUT_MS
+      )
     )
     const authCode = await Promise.race([code, timeout])
     const tokens = await postForm(TOKEN_URL, {

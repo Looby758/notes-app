@@ -71,6 +71,8 @@ const FOLDERS: { id: EmailFolder; label: string }[] = [
 ]
 
 const GMAIL_API_PAGE = 'https://console.cloud.google.com/apis/library/gmail.googleapis.com'
+/** Where Google keeps the list of accounts allowed to sign in while a project is in "Testing". */
+const AUDIENCE_PAGE = 'https://console.cloud.google.com/auth/audience'
 
 /** "09:14" today, "Tue" this week, "28 Oct" this year, otherwise "28/10/2025". */
 function shortDate(iso: string): string {
@@ -177,6 +179,23 @@ function EmailSetup() {
                 </button>
                 , check the project name at the top is the one you made for your calendar, and press <strong>Enable</strong>.
                 (If it says “Manage”, it’s already on.)
+              </li>
+              <li>
+                <strong>Add yourself as a test user.</strong> Open{' '}
+                <button className="link-btn" onClick={() => window.open(AUDIENCE_PAGE)}>
+                  the Audience page <ExternalLink size={11} />
+                </button>
+                {status.email ? (
+                  <>
+                    , and under <strong>Test users</strong> check <strong>{status.email}</strong> is listed. If it isn’t, press{' '}
+                    <strong>Add users</strong>, type it in and press <strong>Save</strong>.
+                  </>
+                ) : (
+                  <>
+                    , press <strong>Add users</strong> under <strong>Test users</strong>, type your Gmail address and press <strong>Save</strong>.
+                  </>
+                )}{' '}
+                Without this, Google says <em>“Access blocked”</em>.
               </li>
               <li>
                 <strong>Press Connect Gmail below.</strong> Your browser opens Google’s sign-in page.
