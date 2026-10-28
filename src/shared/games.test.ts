@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
   addPlay,
+  ANIMATED_COVER_QUERY,
+  coverLookupFresh,
   describeLastPlayed,
   describePlayed,
   epicGameFromManifest,
   epicLaunchUrl,
   isInside,
   macGameFromPlist,
+  matchSgdbGame,
   parseVdf,
+  pickAnimatedCover,
   playedInWeek,
   sortGames,
   steamAppFromManifest,
@@ -169,5 +173,46 @@ describe('launch animation art', () => {
 
   it("looks in both of Steam's cache layouts, then its subfolders", () => {
     expect(steamCachePaths('/c', '620', 'logo.png', ['abc'])).toEqual(['/c/620/logo.png', '/c/620_logo.png', '/c/620/abc/logo.png'])
+  })
+})
+
+describe('animated covers', () => {
+  const grid = (url: string, width = 460, height = 215, extra = {}) => ({ url, width, height, mime: 'image/webp', ...extra })
+
+  it('asks only for safe, card-shaped animated covers', () => {
+    expect(ANIMATED_COVER_QUERY).toContain('types=animated')
+    expect(ANIMATED_COVER_QUERY).toContain('dimensions=460x215,920x430')
+    expect(ANIMATED_COVER_QUERY).toContain('epilepsy=false')
+    expect(ANIMATED_COVER_QUERY).toContain('nsfw=false')
+  })
+
+  it('picks the best-voted small cover, else a big one, never an unsafe or odd-shaped one', () => {
+    expect(pickAnimatedCover([grid('https://cdn/a.webp', 920, 430), grid('https://cdn/b.webp')])).toBe('https://cdn/b.webp')
+    expect(pickAnimatedCover([grid('https://cdn/a.webp', 920, 430)])).toBe('https://cdn/a.webp')
+    expect(pickAnimatedCover([grid('https://cdn/a.webp', 600, 900), grid('https://cdn/b.webp', 460, 215, { epilepsy: true }), grid('https://cdn/c.webp', 460, 215, { nsfw: true })])).toBeNull()
+    expect(pickAnimatedCover([grid('http://cdn/a.webp'), grid('https://cdn/b.webm', 460, 215, { mime: 'video/webm' })])).toBeNull()
+    expect(pickAnimatedCover([{ url: 'https://cdn/a.png', width: 460, height: 215 }])).toBe('https://cdn/a.png')
+    expect(pickAnimatedCover([])).toBeNull()
+  })
+
+  it('only uses a search result with the same name', () => {
+    const results = [
+      { id: 1, name: 'Portal 2' },
+      { id: 2, name: 'Portal' }
+    ]
+    expect(matchSgdbGame('Portal', results)).toBe(2)
+    expect(matchSgdbGame('PORTAL™', results)).toBe(2)
+    expect(matchSgdbGame('Pokémon & Friends', [{ id: 3, name: 'Pokemon and Friends' }])).toBe(3)
+    expect(matchSgdbGame('Portal 3', results)).toBeNull()
+    expect(matchSgdbGame('!!!', results)).toBeNull()
+  })
+
+  it('remembers a cover for a month and "none" for a week', () => {
+    const day = 24 * 3600 * 1000
+    expect(coverLookupFresh(undefined, 0)).toBe(false)
+    expect(coverLookupFresh({ url: 'https://x', checked: 0 }, 29 * day)).toBe(true)
+    expect(coverLookupFresh({ url: 'https://x', checked: 0 }, 31 * day)).toBe(false)
+    expect(coverLookupFresh({ url: null, checked: 0 }, 6 * day)).toBe(true)
+    expect(coverLookupFresh({ url: null, checked: 0 }, 8 * day)).toBe(false)
   })
 })
