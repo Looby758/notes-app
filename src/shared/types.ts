@@ -1,5 +1,6 @@
 import type { Prefs } from './prefs'
 import type { DictionaryEntry } from './dictionary'
+import type { Sheet } from './sheet'
 
 export interface WindowBounds {
   x?: number
@@ -118,6 +119,21 @@ export interface AiAskTurn {
   answer: string
 }
 
+/** A message in the AI chat. */
+export interface AiChatMessage {
+  role: 'user' | 'assistant'
+  text: string
+}
+
+/** A saved AI chat conversation. */
+export interface AiChat {
+  id: string
+  title: string
+  /** When it was last added to (ISO time), so the newest chats come first. */
+  updated: string
+  messages: AiChatMessage[]
+}
+
 export interface NotesApi {
   /** A native yes/no dialog; resolves true if the user picked `ok`. */
   confirm(options: ConfirmOptions): Promise<boolean>
@@ -218,6 +234,8 @@ export interface NotesApi {
   removeCalendarFeed(id: string): Promise<CalendarSourcesStatus>
   /** Events between two instants from every enabled calendar (cached ones if offline). */
   fetchCalendarEvents(from: string, to: string): Promise<{ events: CalEvent[]; errors: string[]; offline: boolean }>
+  /** A .gsheet file's sheet, fetched from Google with the sign-in above. */
+  readGoogleSheet(path: string): Promise<GoogleSheetResult>
   aiStatus(): Promise<AiStatus>
   /** Checks the key with Anthropic, then stores it encrypted. */
   aiSetKey(key: string): Promise<AiStatus>
@@ -228,6 +246,11 @@ export interface NotesApi {
   aiAsk(question: string, notes: AiNote[], history: AiAskTurn[]): Promise<string>
   /** The writing in a picture of a sketch (a PNG), read by the AI helper or offline on this computer. */
   readHandwriting(png: Uint8Array, reader: 'ai' | 'offline'): Promise<string>
+  /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */
+  aiChat(messages: AiChatMessage[]): Promise<string>
+  /** Saved chats, kept in the settings folder on this computer. */
+  aiLoadChats(): Promise<AiChat[]>
+  aiSaveChats(chats: AiChat[]): Promise<void>
   /** The last-opened vault, or null if none is set or the folder no longer exists. */
   getVault(): Promise<string | null>
   /** Opens a folder picker; returns the chosen vault path, or null if cancelled. */
@@ -243,6 +266,8 @@ export interface NotesApi {
   createNote(folder: string): Promise<string>
   /** Creates a note at an exact path, making folders as needed; returns its path. */
   createNoteAt(path: string): Promise<string>
+  /** Creates an empty "Untitled board" (a .canvas file) in the folder; returns its path. */
+  createBoard(folder: string): Promise<string>
   /** Every note's path and text (for the link index). */
   readAllNotes(): Promise<{ path: string; content: string }[]>
   /** Creates a "New folder" in the folder; returns its path. */
@@ -270,7 +295,7 @@ export interface NotesApi {
   openFile(path: string): Promise<void>
   /** Reads a note's markdown. */
   readNote(path: string): Promise<string>
-  /** Saves a note atomically. */
+  /** Saves a note (or a .canvas board) atomically. */
   writeNote(path: string, content: string): Promise<void>
 
   /** Called with the changed paths whenever files in the vault change on disk. Returns an unsubscribe function. */
@@ -306,3 +331,12 @@ export interface AppleNote {
   modified: string
   locked: boolean
 }
+/** A Google Sheet (.gsheet file) fetched for the spreadsheet viewer, or why it couldn't be. */
+export type GoogleSheetResult =
+  | { sheets: Sheet[]; webUrl: string }
+  | {
+      error: string
+      webUrl?: string
+      /** What would fix it: set Google up in Settings, sign in (again), switch the Sheets API on, or just try later. */
+      fix?: 'setup' | 'connect' | 'enable-api' | 'retry'
+    }

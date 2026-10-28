@@ -2,7 +2,7 @@ import { app, safeStorage } from 'electron'
 import { readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import Anthropic from '@anthropic-ai/sdk'
-import type { AiAskTurn, AiNote, AiStatus } from '@shared/types'
+import type { AiAskTurn, AiChat, AiChatMessage, AiNote, AiStatus } from '@shared/types'
 
 /**
  * The AI helper: summarise a note, tidy a quick capture, answer questions from your notes and read
@@ -37,10 +37,14 @@ function load(): Stored {
   return stored!
 }
 
+function writeJson(name: string, data: unknown): void {
+  const tmp = file(`${name}.tmp`)
+  writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8')
+  renameSync(tmp, file(name))
+}
+
 function save(): void {
-  const tmp = file('ai.json.tmp')
-  writeFileSync(tmp, JSON.stringify(stored, null, 2), 'utf8')
-  renameSync(tmp, file('ai.json'))
+  writeJson('ai.json', stored)
 }
 
 const encrypt = (text: string): string => safeStorage.encryptString(text).toString('base64')
@@ -160,6 +164,36 @@ export function askNotes(question: string, notes: AiNote[], history: AiAskTurn[]
   }
   messages.push({ role: 'user', content: `<notes>\n${context}\n</notes>\n\n${question}` })
   return ask(askSystem(), messages, 'medium')
+}
+
+const chatSystem = (): string => `You are Claude, chatting with someone inside their notes app. Help with whatever they ask: questions, explanations, writing, ideas, planning, maths, code.
+Be clear and friendly, and match the length of your answer to the question. Use markdown (headings, lists, tables, code blocks) when it makes an answer easier to read.
+You can't see their notes or browse the web here, so if they need something from their notes, suggest the "Ask my notes" page.
+Today's date is ${new Date().toISOString().slice(0, 10)}.`
+
+/** The AI chat page: Claude's reply to a conversation that can be about anything. */
+export function chat(messages: AiChatMessage[]): Promise<string> {
+  return ask(
+    chatSystem(),
+    messages.map((m) => ({ role: m.role, content: m.text })),
+    'medium'
+  )
+}
+
+// Chats are kept in the settings folder (not the notes folder), so they stay on this computer.
+const CHATS = 'ai-chats.json'
+
+export function loadChats(): AiChat[] {
+  try {
+    const data = JSON.parse(readFileSync(file(CHATS), 'utf8')) as { chats?: AiChat[] }
+    return Array.isArray(data.chats) ? data.chats : []
+  } catch {
+    return []
+  }
+}
+
+export function saveChats(chats: AiChat[]): void {
+  writeJson(CHATS, { chats })
 }
 
 const NO_WRITING = '(no writing)'

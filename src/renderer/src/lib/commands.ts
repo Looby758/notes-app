@@ -11,6 +11,8 @@ import {
   REPLACE_TAB,
   CONFLICTS_TAB,
   FLASHCARDS_TAB,
+  CHAT_TAB,
+  HOME_TAB,
   closePane,
   closeTabUnlessPinned,
   cycleTab,
@@ -31,6 +33,7 @@ import { matchesShortcut } from './shortcuts'
 import { FILE_MANAGER } from '@shared/platform'
 import { openRandomNote } from './random'
 import { notify } from '../store/notify'
+import { newBoard } from './boards'
 import { openAsk, runNoteJob } from '../store/ai'
 import { changeNotesPassword, lockAllNow, lockNote, lockNoteOwn, removeLock } from './lock/actions'
 
@@ -60,6 +63,7 @@ const changeFontSize = (step: number | null): void => {
 export const commands: Command[] = [
   { id: 'note.new', group: 'Notes', title: 'New note', shortcut: 'Ctrl+N', run: () => useVault.getState().newNote() },
   { id: 'folder.new', group: 'Notes', title: 'New folder', shortcut: 'Ctrl+Shift+N', run: () => useVault.getState().newFolder() },
+  { id: 'board.new', group: 'Notes', title: 'New canvas board', run: () => newBoard() },
   { id: 'note.fromTemplate', group: 'Notes', title: 'New note from template…', shortcut: 'Ctrl+Alt+N', run: () => useUI.setState({ modal: 'template' }) },
   {
     id: 'note.rename',
@@ -226,6 +230,7 @@ export const commands: Command[] = [
   { id: 'tags', group: 'Navigation', title: 'Show tags', run: () => showSidebarView('tags') },
   { id: 'backlinks', group: 'Navigation', title: 'Show backlinks', run: () => showRightView('backlinks') },
   { id: 'graph.open', group: 'Navigation', title: 'Open graph', shortcut: 'Ctrl+Shift+G', run: () => openSpecialTab(GRAPH_TAB) },
+  { id: 'home.open', group: 'Navigation', title: 'Go to Home', shortcut: 'Ctrl+Shift+J', run: () => openSpecialTab(HOME_TAB) },
   { id: 'flashcards.open', group: 'Navigation', title: 'Review flashcards', shortcut: 'Ctrl+Shift+Y', run: () => openSpecialTab(FLASHCARDS_TAB) },
   {
     id: 'view.mindmap',
@@ -239,6 +244,7 @@ export const commands: Command[] = [
   },
   { id: 'outline', group: 'Navigation', title: 'Show outline', shortcut: 'Ctrl+Shift+O', run: () => showRightView('outline') },
 
+  { id: 'ai.chat', group: 'AI helper', title: 'AI helper: chat with Claude', run: () => openSpecialTab(CHAT_TAB) },
   { id: 'ai.ask', group: 'AI helper', title: 'AI helper: ask my notes', run: () => openAsk() },
   { id: 'ai.summarise', group: 'AI helper', title: 'AI helper: summarise this note', run: () => activeNote() && runNoteJob('summary') },
   { id: 'ai.tidy', group: 'AI helper', title: 'AI helper: tidy up this note', run: () => activeNote() && runNoteJob('tidy') },

@@ -318,6 +318,15 @@ export const SETTINGS: SettingDef[] = [
     description: `Off: opening a note changes the current tab (pinned tabs are left alone). Either way, middle-click a note (or right-click → Open in new tab) to open it in a new tab.`,
     keywords: 'tab replace reuse open'
   },
+  {
+    key: 'homeOnStart',
+    section: 'editor',
+    group: 'Tabs',
+    type: 'toggle',
+    label: 'Show Home when Notes starts',
+    description: `Home shows today's plans, reminders, flashcards to review and your recent notes. You can always open it from the house button at the top.`,
+    keywords: 'home start dashboard today startup'
+  },
 
   {
     key: 'tabSize',

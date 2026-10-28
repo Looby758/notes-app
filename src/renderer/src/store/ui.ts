@@ -27,8 +27,8 @@ interface UIState {
   zen: boolean
   /** The voice-note recorder is open. */
   voiceOpen: boolean
-  /** The sketch pad is open: a new sketch (path null) or editing a saved one. */
-  sketch: { path: string | null } | null
+  /** The sketch pad is open: a new sketch (path null) or editing a saved one. A new sketch goes into the note at the cursor, or to `onSaved` (a board) if given. */
+  sketch: { path: string | null; onSaved?: (path: string) => void } | null
   /** Graph tab: how many steps out the neighbourhood reaches, and whether unlinked notes show. */
   graphDepth: 1 | 2
   graphOrphans: boolean
