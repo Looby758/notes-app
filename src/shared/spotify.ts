@@ -35,8 +35,8 @@ export type MusicHint =
   | 'setup'
 
 export interface MusicState {
-  /** What's being controlled: the Spotify app on this Mac, or your account (any device). */
-  source: 'app' | 'account' | 'none'
+  /** What's being controlled: the Spotify app on this Mac, your account (any device), or your own music files. */
+  source: 'app' | 'account' | 'local' | 'none'
   playing: boolean
   track?: MusicTrack
   positionMs: number
@@ -68,7 +68,8 @@ export interface MusicStatus {
   canEncrypt: boolean
 }
 
-export type MusicAction = 'toggle' | 'next' | 'previous' | 'shuffle' | 'repeat'
+/** `pause` only ever pauses (for the sleep timer), unlike `toggle`. */
+export type MusicAction = 'toggle' | 'pause' | 'next' | 'previous' | 'shuffle' | 'repeat'
 
 /** Somewhere your account can play: this computer, your phone, a speaker. */
 export interface MusicDevice {
@@ -94,6 +95,8 @@ export interface MusicItem {
   detail: string
   art?: string
   uri: string
+  /** Playlists: you own it (or it's shared with you to edit), so its songs can be listed and changed. */
+  editable?: boolean
 }
 
 export interface MusicSearchResults {
@@ -204,11 +207,13 @@ function trackItem(t: Json): MusicItem {
   return { kind: 'track', name: str(t.name), detail: names(t.artists), art: picture(obj(t.album).images), uri: str(t.uri) }
 }
 
-function playlistItem(p: Json): MusicItem {
+function playlistItem(p: Json, me?: string): MusicItem {
   const count = Number(obj(p.items).total ?? obj(p.tracks).total)
   const owner = str(obj(p.owner).display_name)
   const songs = Number.isFinite(count) ? `${count} ${count === 1 ? 'song' : 'songs'}` : ''
-  return { kind: 'playlist', name: str(p.name), detail: [owner, songs].filter(Boolean).join(' · '), art: picture(p.images), uri: str(p.uri) }
+  const item: MusicItem = { kind: 'playlist', name: str(p.name), detail: [owner, songs].filter(Boolean).join(' · '), art: picture(p.images), uri: str(p.uri) }
+  if (me && (str(obj(p.owner).id) === me || p.collaborative === true)) item.editable = true
+  return item
 }
 
 function albumItem(a: Json): MusicItem {
@@ -223,13 +228,34 @@ export function parseSearch(body: unknown): MusicSearchResults {
   const b = obj(body)
   return {
     tracks: usable(obj(b.tracks).items).map(trackItem),
-    playlists: usable(obj(b.playlists).items).map(playlistItem),
+    playlists: usable(obj(b.playlists).items).map((p) => playlistItem(p)),
     albums: usable(obj(b.albums).items).map(albumItem)
   }
 }
 
-/** GET /me/playlists */
-export const parsePlaylists = (body: unknown): MusicItem[] => usable(obj(body).items).map(playlistItem)
+/** GET /me/playlists; `me` (your Spotify user id) marks the ones you can edit. */
+export const parsePlaylists = (body: unknown, me?: string): MusicItem[] => usable(obj(body).items).map((p) => playlistItem(p, me))
+
+/** A playlist made or renamed in Notes (POST /me/playlists answers with the playlist). */
+export const parsePlaylist = (body: unknown, me?: string): MusicItem => playlistItem(obj(body), me)
+
+/** GET /playlists/{id}/items: its songs in order (Spotify now calls each one `item`; it used to be `track`). Local files are left out. */
+export function parsePlaylistSongs(body: unknown): MusicItem[] {
+  return usable(arr(obj(body).items).map((e) => obj(e).item ?? obj(e).track))
+    .filter((t) => !str(t.uri).startsWith('spotify:local:'))
+    .map(trackItem)
+}
+
+/** The id in spotify:playlist:<id>, or null. */
+export function playlistId(uri: string): string | null {
+  const m = /^spotify:playlist:([A-Za-z0-9]+)$/.exec(uri)
+  return m ? m[1] : null
+}
+
+/** The body for PUT /playlists/{id}/items that moves the song at `from` so it ends up at `to`. */
+export function moveBody(from: number, to: number): Json {
+  return { range_start: from, insert_before: to > from ? to + 1 : to }
+}
 
 /** GET /me/player/queue */
 export function parseQueue(body: unknown): MusicQueue {

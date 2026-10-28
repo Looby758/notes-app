@@ -1,12 +1,15 @@
 import './music.css'
 import { useEffect, useRef, useState } from 'react'
 import {
+  AudioLines,
   Heart,
   Laptop,
+  Link2,
   ListMusic,
-  ListPlus,
   Music,
+  NotebookPen,
   Pause,
+  PictureInPicture2,
   Play,
   Repeat,
   Repeat1,
@@ -25,7 +28,6 @@ import { formatTime, spotifyUri, type MusicDevice, type MusicItem, type MusicQue
 import { IS_MAC } from '@shared/platform'
 import {
   currentPosition,
-  musicAddToQueue,
   musicControl,
   musicPlay,
   musicSeek,
@@ -33,33 +35,55 @@ import {
   musicToggleLike,
   musicTransfer,
   openMusicSettings,
+  refreshMusic,
   refreshMusicStatus,
+  setMusicMini,
   setMusicOpen,
+  shareSongToNote,
   startMusic,
   useMusic
 } from '../../store/music'
+import { stopLocal } from '../../store/localMusic'
 import { openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
 import { errorMessage } from '../../lib/paths'
+import { ItemList } from './ItemList'
+import { Playlists } from './Playlists'
+import { SleepButton, SleepTimer } from './SleepTimer'
+import { LocalMusic, LocalUpNext } from './LocalMusic'
+import { Visualiser } from './Visualiser'
+import { SongPopup } from './SongPopup'
+import { setPrefs, usePrefs } from '../../store/prefs'
 
-type Tab = 'playlists' | 'search' | 'queue' | 'recent' | 'link' | 'devices'
+type Tab = 'playlists' | 'search' | 'queue' | 'recent' | 'local' | 'link' | 'devices' | 'sleep'
+
+const backToSpotify = (): void => {
+  stopLocal()
+  void refreshMusic()
+}
 
 const setUp = (): void => {
   openSpecialTab(SETTINGS_TAB)
   openMusicSettings()
 }
 
-/** The small Spotify player in the bottom-left corner (♫ at the top shows and hides it). */
+/** The small music player in the bottom-left corner (♫ at the top shows and hides it): Spotify, or your own music files. */
 export default function MusicPlayer() {
   const open = useMusic((s) => s.open)
   useEffect(() => startMusic(), [])
-  if (!open) return null
-  return <Player />
+  return (
+    <>
+      <SongPopup />
+      {open && <Player />}
+    </>
+  )
 }
 
 function Player() {
   const state = useMusic((s) => s.state)
   const error = useMusic((s) => s.error)
   const status = useMusic((s) => s.status)
+  const local = useMusic((s) => s.local)
+  const visualiser = usePrefs((s) => s.prefs.musicVisualiser)
   const [tab, setTab] = useState<Tab | null>(null)
 
   const toggleTab = (t: Tab): void => setTab(tab === t ? null : t)
@@ -81,12 +105,21 @@ function Player() {
             <button className={tab === 'recent' ? 'active' : ''} onClick={() => setTab('recent')} data-music-tab="recent">
               Recent
             </button>
-            <button className={tab === 'link' ? 'active' : ''} onClick={() => setTab('link')}>
-              Link
+            <button className={tab === 'local' ? 'active' : ''} onClick={() => setTab('local')} data-music-tab="local">
+              My music
+            </button>
+            <button className={tab === 'link' ? 'active' : ''} onClick={() => setTab('link')} title="Play a Spotify link">
+              <Link2 size={13} />
             </button>
           </div>
           {tab === 'link' ? (
             <LinkBox />
+          ) : tab === 'sleep' ? (
+            <SleepTimer onPicked={() => setTab(null)} />
+          ) : tab === 'local' ? (
+            <LocalMusic />
+          ) : tab === 'queue' && local ? (
+            <LocalUpNext />
           ) : !status?.connected ? (
             <NeedsAccount />
           ) : tab === 'search' ? (
@@ -106,7 +139,7 @@ function Player() {
       <div className="music-main">
         {state ? <NowPlaying state={state} /> : <div className="music-empty">Looking for Spotify…</div>}
         <div className="music-side">
-          <button className={`icon-btn ${tab ? 'active' : ''}`} onClick={() => toggleTab(tab ?? 'playlists')} title="Playlists, search and links" data-music-browse>
+          <button className={`icon-btn ${tab ? 'active' : ''}`} onClick={() => toggleTab(tab ?? (status?.connected || !local ? 'playlists' : 'local'))} title="Playlists, search and your music" data-music-browse>
             <ListMusic size={15} />
           </button>
           <button className="icon-btn" onClick={() => setMusicOpen(false)} title="Hide the player (music keeps playing)">
@@ -114,8 +147,9 @@ function Player() {
           </button>
         </div>
       </div>
+      {state?.source === 'local' && visualiser && <Visualiser playing={state.playing} />}
       {state?.track && <Progress state={state} />}
-      {state?.track && <Footer state={state} devicesOpen={tab === 'devices'} onDevices={() => toggleTab('devices')} />}
+      {state?.track && <Footer state={state} panel={tab} onPanel={toggleTab} />}
       {(error || state?.error) && <p className="music-error">{error ?? state?.error}</p>}
     </div>
   )
@@ -236,8 +270,10 @@ export function LikeButton({ uri }: { uri: string }) {
 }
 
 /** Volume, shuffle and repeat, and where it's playing. */
-function Footer({ state, devicesOpen, onDevices }: { state: MusicState; devicesOpen: boolean; onDevices: () => void }) {
+function Footer({ state, panel, onPanel }: { state: MusicState; panel: Tab | null; onPanel: (tab: Tab) => void }) {
   const connected = useMusic((s) => !!s.status?.connected)
+  const miniOpen = useMusic((s) => s.miniOpen)
+  const visualiser = usePrefs((s) => s.prefs.musicVisualiser)
   return (
     <div className="music-footer">
       {state.volume !== undefined && <VolumeSlider volume={state.volume} />}
@@ -253,9 +289,36 @@ function Footer({ state, devicesOpen, onDevices }: { state: MusicState; devicesO
         >
           {state.repeat === 'track' ? <Repeat1 size={13} /> : <Repeat size={13} />}
         </button>
+        <SleepButton open={panel === 'sleep'} onClick={() => onPanel('sleep')} />
+        {state.source === 'local' && (
+          <button
+            className={`icon-btn music-shuffle ${visualiser ? 'active' : ''}`}
+            onClick={() => setPrefs({ musicVisualiser: !visualiser })}
+            title={visualiser ? 'Hide the visualiser' : 'Show the visualiser'}
+            data-music-visualiser-toggle
+          >
+            <AudioLines size={13} />
+          </button>
+        )}
+        <button className="icon-btn" onClick={shareSongToNote} title="Add this song to the note you’re writing (as a card that plays it)" data-music-share>
+          <NotebookPen size={13} />
+        </button>
+        <button
+          className={`icon-btn music-shuffle ${miniOpen ? 'active' : ''}`}
+          onClick={() => setMusicMini(!miniOpen)}
+          title={miniOpen ? 'Close the floating mini player' : 'Floating mini player: stays on top of other apps'}
+          data-music-mini-toggle
+        >
+          <PictureInPicture2 size={13} />
+        </button>
       </div>
-      {(connected || state.device) && (
-        <button className={`music-device ${devicesOpen ? 'active' : ''}`} onClick={onDevices} title="Choose where it plays" data-music-devices>
+      {state.source === 'local' ? (
+        <button className="music-device" onClick={backToSpotify} title="Stop your music and go back to Spotify" data-music-back-to-spotify>
+          <Music size={12} />
+          <span>Spotify</span>
+        </button>
+      ) : (connected || state.device) && (
+        <button className={`music-device ${panel === 'devices' ? 'active' : ''}`} onClick={() => onPanel('devices')} title="Choose where it plays" data-music-devices>
           {state.source === 'app' ? <Laptop size={12} /> : deviceIcon(state.device ?? '')}
           <span>{state.source === 'app' ? 'This computer' : state.device ?? 'Choose a device'}</span>
         </button>
@@ -405,65 +468,13 @@ function NeedsAccount() {
   return (
     <div className="music-panel-note">
       <p>To search Spotify, see your playlists, what’s up next and what you’ve played, and choose where it plays, connect your Spotify account (Spotify only allows this with Premium).</p>
+      <p>Your own music files play without Spotify: see My music.</p>
       <button className="btn btn-primary" onClick={setUp}>
         Set up
       </button>
-      {IS_MAC && <p>You can still paste a Spotify link under Link.</p>}
+      {IS_MAC && <p>You can still paste a Spotify link with the link button (the chain).</p>}
     </div>
   )
-}
-
-/** `queueable`: songs get a + to play them next. */
-function ItemList({ items, queueable }: { items: MusicItem[]; queueable?: boolean }) {
-  const [playing, setPlaying] = useState<string | null>(null)
-  const [queued, setQueued] = useState<string[]>([])
-  return (
-    <ul className="music-items">
-      {items.map((item, i) => (
-        // The queue can hold the same song twice.
-        <li key={`${item.uri}:${i}`}>
-          <button
-            className={playing === item.uri ? 'active' : ''}
-            onClick={async () => {
-              setPlaying(item.uri)
-              await musicPlay(item.uri)
-            }}
-            title={`Play ${item.name}`}
-          >
-            <span className="music-item-art">{item.art ? <img src={item.art} alt="" /> : <Music size={14} />}</span>
-            <span className="music-item-text">
-              <strong>{item.name}</strong>
-              <span>{item.detail}</span>
-            </span>
-          </button>
-          {queueable && item.kind === 'track' && (
-            <button
-              className={`icon-btn music-queue-add ${queued.includes(item.uri) ? 'done' : ''}`}
-              onClick={async () => {
-                if (await musicAddToQueue(item.uri)) setQueued((q) => [...q, item.uri])
-              }}
-              title={queued.includes(item.uri) ? 'Added to the queue' : 'Play next (add to the queue)'}
-              data-music-queue-add
-            >
-              <ListPlus size={14} />
-            </button>
-          )}
-        </li>
-      ))}
-    </ul>
-  )
-}
-
-function Playlists() {
-  const [items, setItems] = useState<MusicItem[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  useEffect(() => {
-    window.api.musicPlaylists().then(setItems, (err) => setError(errorMessage(err)))
-  }, [])
-  if (error) return <p className="music-panel-note">{error}</p>
-  if (!items) return <p className="music-panel-note">Loading your playlists…</p>
-  if (!items.length) return <p className="music-panel-note">You don’t have any playlists yet.</p>
-  return <ItemList items={items} />
 }
 
 function SearchBox() {

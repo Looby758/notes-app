@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { NotesApi } from '@shared/types'
+import type { MusicMiniCommand, MusicMiniState, NotesApi } from '@shared/types'
 
 const api: NotesApi = {
   confirm: (options) => ipcRenderer.invoke('app:confirm', options),
@@ -157,6 +157,36 @@ const api: NotesApi = {
   musicAddToQueue: (uri) => ipcRenderer.invoke('music:addToQueue', uri),
   musicRecent: () => ipcRenderer.invoke('music:recent'),
   musicDevices: () => ipcRenderer.invoke('music:devices'),
+  musicPlaylistSongs: (uri) => ipcRenderer.invoke('music:playlistSongs', uri),
+  musicCreatePlaylist: (name) => ipcRenderer.invoke('music:createPlaylist', name),
+  musicRenamePlaylist: (uri, name) => ipcRenderer.invoke('music:renamePlaylist', uri, name),
+  musicDeletePlaylist: (uri) => ipcRenderer.invoke('music:deletePlaylist', uri),
+  musicAddToPlaylist: (uri, songs) => ipcRenderer.invoke('music:addToPlaylist', uri, songs),
+  musicRemoveFromPlaylist: (uri, song) => ipcRenderer.invoke('music:removeFromPlaylist', uri, song),
+  musicMoveInPlaylist: (uri, from, to) => ipcRenderer.invoke('music:moveInPlaylist', uri, from, to),
+  localMusicLibrary: (fresh) => ipcRenderer.invoke('localMusic:library', fresh),
+  localMusicChooseFolder: () => ipcRenderer.invoke('localMusic:chooseFolder'),
+  setMusicMini: (open) => ipcRenderer.invoke('musicMini:set', open),
+  isMusicMiniOpen: () => ipcRenderer.invoke('musicMini:isOpen'),
+  musicMiniWasOpen: () => ipcRenderer.invoke('musicMini:wasOpen'),
+  onMusicMiniOpen: (callback) => {
+    const handler = (_e: unknown, open: boolean): void => callback(open)
+    ipcRenderer.on('musicMini:open', handler)
+    return () => ipcRenderer.removeListener('musicMini:open', handler)
+  },
+  pushMusicMini: (state) => ipcRenderer.send('musicMini:push', state),
+  musicMiniLast: () => ipcRenderer.invoke('musicMini:last'),
+  onMusicMiniState: (callback) => {
+    const handler = (_e: unknown, state: MusicMiniState): void => callback(state)
+    ipcRenderer.on('musicMini:state', handler)
+    return () => ipcRenderer.removeListener('musicMini:state', handler)
+  },
+  sendMusicMiniCommand: (command) => ipcRenderer.send('musicMini:command', command),
+  onMusicMiniCommand: (callback) => {
+    const handler = (_e: unknown, command: MusicMiniCommand): void => callback(command)
+    ipcRenderer.on('musicMini:command', handler)
+    return () => ipcRenderer.removeListener('musicMini:command', handler)
+  },
   musicTransfer: (deviceId) => ipcRenderer.invoke('music:transfer', deviceId),
   musicOpen: (what) => ipcRenderer.invoke('music:open', what),
   aiStatus: () => ipcRenderer.invoke('ai:status'),

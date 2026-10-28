@@ -47,7 +47,7 @@ import { openRandomNote } from './random'
 import { notify } from '../store/notify'
 import { newBoard } from './boards'
 import { openAsk, runNoteJob } from '../store/ai'
-import { musicControl, toggleMusic } from '../store/music'
+import { musicControl, musicToggleLike, setMusicMini, shareSongToNote, toggleMusic, useMusic } from '../store/music'
 import { changeNotesPassword, lockAllNow, lockNote, lockNoteOwn, removeLock } from './lock/actions'
 
 export interface Command {
@@ -205,6 +205,9 @@ export const commands: Command[] = [
   { id: 'music.toggle', group: 'Music', title: 'Music: play / pause', run: () => void musicControl('toggle') },
   { id: 'music.next', group: 'Music', title: 'Music: next song', run: () => void musicControl('next') },
   { id: 'music.previous', group: 'Music', title: 'Music: previous song', run: () => void musicControl('previous') },
+  { id: 'music.mini', group: 'Music', title: 'Music: floating mini player (on top of other apps)', run: () => void setMusicMini(!useMusic.getState().miniOpen) },
+  { id: 'music.share', group: 'Music', title: 'Music: add the song playing to this note', run: shareSongToNote },
+  { id: 'music.like', group: 'Music', title: 'Music: like the song playing (Liked Songs)', run: () => void musicToggleLike() },
 
   ...EDITOR_COMMANDS.map(
     (c): Command => ({ id: c.id, group: 'Formatting', title: c.title, shortcut: c.shortcut, scope: 'editor', run: () => runEditorCommand(c.id) })

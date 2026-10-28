@@ -29,6 +29,7 @@ import { smartPaste } from './smartPaste'
 import { noteFont } from './noteFont'
 import { embedDepth, embeds, setEmbedStateFactory } from './embeds'
 import { places } from './places'
+import { songs } from './songs'
 import { toCodeMirrorKey } from '../../lib/shortcuts'
 import { typewriter } from './typewriter'
 import { calculator } from './calculator'
@@ -87,6 +88,7 @@ const base: Extension = [
   attachmentHandlers,
   embeds,
   places,
+  songs,
   calculator,
   codeRunner,
   editorTheme,

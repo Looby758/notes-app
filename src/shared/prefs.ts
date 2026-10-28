@@ -32,6 +32,10 @@ export interface Prefs {
   gameAnimatedCovers: 'always' | 'hover' | 'off'
   /** Which app icon design to use (taskbar / Dock / window). */
   appIcon: string
+  /** A pop-up with the song's name and picture when the music player moves on to a new song. */
+  musicSongPopup: boolean
+  /** Moving bars in the music player while your own music files play. */
+  musicVisualiser: boolean
 
   // Streamer mode
   /** Blur private things (your town, email, money, passwords, messages, events) until you click them, for sharing your screen. */
@@ -168,6 +172,8 @@ export const DEFAULT_PREFS: Prefs = {
   gameLaunchAnimation: true,
   gameAnimatedCovers: 'always',
   appIcon: 'default',
+  musicSongPopup: true,
+  musicVisualiser: true,
 
   streamerMode: false,
   streamerHideNotes: true,
