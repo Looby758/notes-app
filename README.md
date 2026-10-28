@@ -136,6 +136,21 @@ A theme file only holds looks (colours, pictures, fonts and a few words), never 
 
 Right-click a note or file in the sidebar → **Send to phone…**, or press the phone button in a web tab. A QR code appears; point your phone's camera at it and tap the link. The file downloads (or the web page opens) straight from this computer over your Wi-Fi: nothing to install on the phone, no account, and nothing goes through the internet. The phone needs to be on the same Wi-Fi. Each code stops working after 10 minutes, or when you close it. The first time, Windows or macOS asks whether Notes may accept incoming connections: allow it on private networks.
 
+## Your phone and Notes
+
+Press the phone button at the top (or Ctrl+K → *Phone: connect your phone*) and scan the code with your phone's camera. Your phone gets a page with:
+
+- **Send**: photos, videos and files go into the note you have open (or the attachments folder).
+- **Clipboard**: see what's copied on the computer and copy it to the phone, or paste something on the phone and send it to the computer's clipboard.
+- **Remote**: play/pause and skip music, and control the YouTube mini window (±10 seconds, play/pause, next).
+- **Touchpad**: drag to move the pointer, tap to click, two fingers to right-click or scroll, and type on the computer from the phone's keyboard. On a Mac, allow Notes under System Settings → Privacy & Security → Accessibility the first time.
+- **Talk**: tap the microphone on the phone's keyboard and talk; the words appear in the open note as you speak.
+- **Scan**: take a photo of a page, drag the corners onto it, and it's straightened and cleaned up into the open note. **Add receipt to Money** reads the shop, total and date and adds it as spending.
+
+On an iPhone, tap Share → **Add to Home Screen** to keep the page: it reconnects by itself whenever Notes is open. **New code** or **Forget phone** in the same window stops the old one working. Everything goes over your own Wi-Fi, never the internet, so anyone on the same Wi-Fi who had the code could use it: only pair on networks you trust.
+
+**Wi-Fi for guests** (Ctrl+K → *Phone: Wi-Fi QR code for guests*) shows a code guests scan to join your Wi-Fi without typing the password. Notes fills in the network and password (a Mac asks for your Keychain first); you can change them.
+
 ## Features
 
 - **Live preview editor** — markdown renders as you type; the raw syntax shows only on the line you're editing. Headings, bold/italic/strike, code blocks with highlighting, tables, checkboxes, quotes, images, links.

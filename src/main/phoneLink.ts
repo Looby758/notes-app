@@ -23,7 +23,7 @@ export type SessionHandler = (req: IncomingMessage, res: ServerResponse, rest: s
 
 interface Session {
   handler: SessionHandler
-  timer: ReturnType<typeof setTimeout>
+  timer?: ReturnType<typeof setTimeout>
 }
 
 const SHARE_MINUTES = 10
@@ -31,23 +31,28 @@ const sessions = new Map<string, Session>()
 let server: Server | null = null
 let listening: Promise<number> | null = null
 
-function start(): Promise<number> {
+/** Starts the server, on `preferredPort` if it's free (so a saved phone link keeps working), else any free port. */
+function start(preferredPort = 0): Promise<number> {
   listening ??= new Promise<number>((resolve, reject) => {
-    const s = createServer((req, res) => void route(req, res))
-    s.on('error', (err) => {
-      logError('phone link', err)
-      server = null
-      listening = null
-      reject(err)
-    })
-    // Every interface, so the phone can reach it over Wi-Fi; port 0 lets the system pick a free one.
-    s.listen(0, '0.0.0.0', () => resolve((s.address() as { port: number }).port))
-    server = s
+    const listen = (port: number): void => {
+      const s = createServer((req, res) => void route(req, res))
+      s.on('error', (err: NodeJS.ErrnoException) => {
+        if (port !== 0 && err.code === 'EADDRINUSE') return listen(0)
+        logError('phone link', err)
+        server = null
+        listening = null
+        reject(err)
+      })
+      // Every interface, so the phone can reach it over Wi-Fi.
+      s.listen(port, '0.0.0.0', () => resolve((s.address() as { port: number }).port))
+      server = s
+    }
+    listen(preferredPort)
   })
   return listening
 }
 
-function endSession(token: string): void {
+export function endSession(token: string): void {
   const s = sessions.get(token)
   if (!s) return
   clearTimeout(s.timer)
@@ -75,14 +80,37 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   }
 }
 
+export interface SessionOptions {
+  /** How long it lasts; null for as long as Notes is open (until `close`). */
+  minutes?: number | null
+  /** Reuse a token (a phone that's already paired); otherwise a new one is made. */
+  token?: string
+  preferredPort?: number
+}
+
 /** Starts a session; its address is what goes in the QR code. Ends after `minutes`, or when `close` is called. */
-export async function openSession(handler: SessionHandler, minutes = SHARE_MINUTES): Promise<PhoneShare & { close: () => void }> {
+export async function openSession(handler: SessionHandler, options: SessionOptions = {}): Promise<PhoneShare & { port: number; close: () => void }> {
+  const address = lanAddress()
+  const port = await start(options.preferredPort)
+  const token = options.token ?? newToken()
+  const minutes = options.minutes === undefined ? SHARE_MINUTES : options.minutes
+  clearTimeout(sessions.get(token)?.timer)
+  sessions.set(token, { handler, timer: minutes === null ? undefined : setTimeout(() => endSession(token), minutes * 60_000) })
+  return {
+    token,
+    url: `http://${address}:${port}/s/${token}`,
+    expiresAt: minutes === null ? 0 : Date.now() + minutes * 60_000,
+    port,
+    close: () => endSession(token)
+  }
+}
+
+export const newToken = (): string => randomBytes(16).toString('base64url')
+
+export function lanAddress(): string {
   const address = pickLanAddress(networkInterfaces())
   if (!address) throw new Error('This computer isn’t on a Wi-Fi or local network, so a phone can’t reach it.')
-  const port = await start()
-  const token = randomBytes(16).toString('base64url')
-  sessions.set(token, { handler, timer: setTimeout(() => endSession(token), minutes * 60_000) })
-  return { token, url: `http://${address}:${port}/s/${token}`, expiresAt: Date.now() + minutes * 60_000, close: () => endSession(token) }
+  return address
 }
 
 /** A plain, phone-sized page. `above` and `below` are trusted HTML around the (escaped) title and text. */

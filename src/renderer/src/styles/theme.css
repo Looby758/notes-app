@@ -9398,3 +9398,33 @@ body.reduce-motion .theme-loading-text {
   display: flex;
   justify-content: center;
 }
+.phone-actions {
+  gap: 8px;
+}
+.phone-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.phone-fields input {
+  width: 100%;
+}
+.phone-password {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.phone-btn {
+  position: relative;
+}
+.phone-btn.connected::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}

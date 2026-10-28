@@ -261,6 +261,14 @@ const api: NotesApi = {
     ipcRenderer.on('phone:delivered', handler)
     return () => ipcRenderer.removeListener('phone:delivered', handler)
   },
+  phonePair: (fresh) => ipcRenderer.invoke('phone:pair', fresh),
+  phoneForget: () => ipcRenderer.invoke('phone:forget'),
+  onPhoneEvent: (callback) => {
+    const handler = (_e: unknown, event: Parameters<typeof callback>[0]): void => callback(event)
+    ipcRenderer.on('phone:event', handler)
+    return () => ipcRenderer.removeListener('phone:event', handler)
+  },
+  phoneWifi: () => ipcRenderer.invoke('phone:wifi'),
   readAppData: (name) => ipcRenderer.invoke('vault:readAppData', name),
   writeAppData: (name, content) => ipcRenderer.invoke('vault:writeAppData', name, content),
   writeSketch: (path, svg) => ipcRenderer.invoke('fs:writeSketch', path, svg),

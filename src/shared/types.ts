@@ -4,6 +4,7 @@ import type { Sheet } from './sheet'
 import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
 import type { LocalLibrary } from './localMusic'
+import type { WifiNetwork } from './wifi'
 import type { MusicAction, MusicDevice, MusicItem, MusicQueue, MusicSearchResults, MusicState, MusicStatus } from './spotify'
 import type { CoversStatus, GamesList, LaunchArt } from './games'
 import type { Theme } from './themes'
@@ -33,6 +34,9 @@ export interface Settings {
   /** The floating mini music player: where it was left, and whether it was showing. */
   musicMiniWindow?: WindowBounds
   musicMiniOpen?: boolean
+  /** The paired phone's link (its token, and the port it was on), so the phone reconnects by itself. */
+  phoneToken?: string
+  phonePort?: number
 }
 
 /** What the notes window's music player tells the floating mini player. */
@@ -234,6 +238,19 @@ export interface PhoneShare {
   url: string
   expiresAt: number
 }
+
+/** The paired phone's QR address, and how many phones have its page open now. */
+export interface PhonePairing {
+  url: string
+  connected: number
+}
+
+/** Something the paired phone did, for the notes window to carry out. */
+export type PhoneEvent =
+  | { type: 'connected'; count: number }
+  | { type: 'file'; path: string; into: 'note' | 'folder' }
+  | { type: 'receipt'; path: string; text: string }
+  | { type: 'dictate'; id: string; text: string; done: boolean }
 
 export interface NotesApi {
   /** A native yes/no dialog; resolves true if the user picked `ok`. */
@@ -543,6 +560,12 @@ export interface NotesApi {
   phoneStop(token: string): Promise<void>
   /** The phone has the file (or opened the link). */
   onPhoneDelivered(callback: (token: string) => void): () => void
+  /** Pairs a phone (or shows the code again); `fresh` makes a new code, so the old one stops working. */
+  phonePair(fresh?: boolean): Promise<PhonePairing>
+  phoneForget(): Promise<void>
+  onPhoneEvent(callback: (event: PhoneEvent) => void): () => void
+  /** The Wi-Fi this computer is on, for a guest QR code (blank where it can't be read). */
+  phoneWifi(): Promise<WifiNetwork>
   /** Reads/writes a small app file kept in the vault's hidden ".notesapp" folder (synced with your notes). */
   readAppData(name: string): Promise<string | null>
   writeAppData(name: string, content: string): Promise<void>

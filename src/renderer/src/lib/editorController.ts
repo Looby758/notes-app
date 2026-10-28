@@ -237,6 +237,30 @@ export function insertBlockIntoActiveNote(text: string | ((note: string) => stri
   return true
 }
 
+const live = new Map<string, { view: EditorView; from: number; length: number }>()
+
+/**
+ * Text that keeps changing as it arrives (talking into the phone): the first piece goes in at the
+ * cursor of the note you're in, and each later one replaces it. `done` ends that piece.
+ */
+export function liveTypeIntoActiveNote(id: string, text: string, done: boolean): boolean {
+  let at = live.get(id)
+  if (!at || at.from + at.length > at.view.state.doc.length) {
+    const pv = views.get(activePane())
+    if (!pv?.shown || !isNoteTab(pv.shown)) return false
+    const head = pv.view.state.selection.main.head
+    // Start after a space if the cursor is right after a word.
+    const before = head > 0 && /\S/.test(pv.view.state.sliceDoc(head - 1, head)) ? ' ' : ''
+    if (before) pv.view.dispatch({ changes: { from: head, insert: before } })
+    at = { view: pv.view, from: head + before.length, length: 0 }
+    live.set(id, at)
+  }
+  at.view.dispatch({ changes: { from: at.from, to: at.from + at.length, insert: text }, selection: { anchor: at.from + text.length } })
+  at.length = text.length
+  if (done) live.delete(id)
+  return true
+}
+
 // ---------- stats for the active pane ----------
 
 function updateStats(state: EditorState): void {
