@@ -18,6 +18,7 @@ import {
   AI_TAB,
   FLASHCARDS_TAB,
   HOME_TAB,
+  MONEY_TAB,
   SETTINGS_TAB,
   splitPane
 } from '../../lib/editorController'
@@ -36,6 +37,7 @@ import ConflictsPage from '../Conflicts/ConflictsPage'
 import AiPage from '../Ai/AiPage'
 import FlashcardsPage from '../Flashcards/FlashcardsPage'
 import HomePage from '../Home/HomePage'
+import MoneyPage from '../Money/MoneyPage'
 import MindMap from '../MindMap/MindMap'
 import { isMindMap, useUI } from '../../store/ui'
 import { needsUnlock, useLock } from '../../lib/lock/session'
@@ -123,6 +125,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === AI_TAB && <AiPage autoFocus={isActivePane} />}
         {active === FLASHCARDS_TAB && <FlashcardsPage />}
         {(active === HOME_TAB || !active) && <HomePage />}
+        {active === MONEY_TAB && <MoneyPage />}
         {zone && <div className={`drop-zone ${zone}`} />}
       </div>
     </div>

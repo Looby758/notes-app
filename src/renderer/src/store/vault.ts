@@ -12,6 +12,7 @@ import { notify } from './notify'
 import { resetIndex, syncIndex } from './noteIndex'
 import { loadStarred, remapStars, removeStarsWithin } from './starred'
 import { loadFlashcards, remapFlashcards, removeFlashcardsWithin } from './flashcards'
+import { loadMoney } from './money'
 
 interface VaultState {
   vault: string
@@ -105,6 +106,7 @@ export const useVault = create<VaultState>((set, get) => {
       void loadSavedSearches()
       loadStarred()
       void loadFlashcards()
+      void loadMoney()
       get().refresh()
     },
 
