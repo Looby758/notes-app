@@ -14,6 +14,7 @@ import {
   Dices,
   KeyRound,
   Globe,
+  MonitorPlay,
   Moon,
   PenLine,
   PanelLeft,
@@ -317,6 +318,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         </button>
         <button className="icon-btn" onClick={() => openWebTab('', { beside: true })} title={`Web browser (${showKeys('Ctrl+Shift+I')})`} data-web-button>
           <Globe size={15} />
+        </button>
+        <button className="icon-btn" onClick={() => void window.api.openYouTube()} title={`YouTube mini window (${showKeys('Ctrl+Alt+Y')})`} data-youtube-button>
+          <MonitorPlay size={15} />
         </button>
         <button className="icon-btn" onClick={() => openSpecialTab(CHAT_TAB)} title="Chat with Claude" data-chat-button>
           <MessageSquare size={15} />

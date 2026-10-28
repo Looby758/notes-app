@@ -252,6 +252,13 @@ export const commands: Command[] = [
   { id: 'convert.open', group: 'Navigation', title: 'Convert files (photos, Word, audio…)', run: () => openSpecialTab(CONVERT_TAB) },
   { id: 'web.open', group: 'Web', title: 'Open a web page', shortcut: 'Ctrl+Shift+I', run: () => openWebTab() },
   { id: 'web.beside', group: 'Web', title: 'Open a web page beside this note', run: () => openWebTab('', { beside: true }) },
+  {
+    id: 'youtube.open',
+    group: 'Web',
+    title: 'YouTube in a mini window (floats over everything while you work)',
+    shortcut: 'Ctrl+Alt+Y',
+    run: () => void window.api.openYouTube()
+  },
   { id: 'web.clear', group: 'Web', title: 'Clear browsing data (sign out of all websites)', run: () => void clearBrowsingData() },
   {
     id: 'view.mindmap',
