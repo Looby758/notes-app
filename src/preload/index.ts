@@ -54,6 +54,7 @@ const api: NotesApi = {
   setWeatherPlace: (place) => ipcRenderer.invoke('weather:setPlace', place),
   clearWebData: () => ipcRenderer.invoke('web:clear'),
   clearMessagesData: () => ipcRenderer.invoke('messages:clear'),
+  releaseMessages: () => ipcRenderer.invoke('messages:release'),
   setWebShortcuts: (shortcuts) => ipcRenderer.send('web:shortcuts', shortcuts),
   onWebOpen: (callback) => {
     const handler = (_e: unknown, url: string): void => callback(url)
