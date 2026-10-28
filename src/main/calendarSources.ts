@@ -13,10 +13,12 @@ import { parseIcs } from '@shared/ics'
  *
  * Google sign-in uses the standard desktop flow: your browser opens Google's page, you approve,
  * and Google sends a one-time code to a temporary address on this computer (127.0.0.1). The app
- * only ever asks for read-only access to your calendars.
+ * only ever asks for read-only access to your calendars, and to your Google Sheets so .gsheet files in
+ * the notes folder can be shown (see googleSheets.ts).
  */
 
-const SCOPE = 'https://www.googleapis.com/auth/calendar.readonly openid email'
+export const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly'
+const SCOPE = `https://www.googleapis.com/auth/calendar.readonly ${SHEETS_SCOPE} openid email`
 // Overridable for tests, which point these at a local fake Google server.
 const AUTH_URL = process.env.NOTES_GOOGLE_AUTH_URL ?? 'https://accounts.google.com/o/oauth2/v2/auth'
 const TOKEN_URL = process.env.NOTES_GOOGLE_TOKEN_URL ?? 'https://oauth2.googleapis.com/token'
@@ -32,6 +34,8 @@ interface Stored {
   /** Encrypted refresh token. */
   refreshToken?: string
   email?: string
+  /** What the sign-in was allowed (Google lets you untick some). Missing for sign-ins from before Sheets. */
+  scopes?: string
   /** Google calendars you've switched off. */
   disabled: string[]
   calendars: { id: string; name: string; color: string }[]
@@ -206,6 +210,7 @@ export async function connect(): Promise<CalendarSourcesStatus> {
     if (typeof tokens.refresh_token !== 'string') throw new Error('Google didn’t allow offline access. Try connecting again.')
     s.refreshToken = encrypt(tokens.refresh_token)
     s.email = emailFromIdToken(tokens.id_token)
+    s.scopes = typeof tokens.scope === 'string' ? tokens.scope : undefined
     accessToken = { token: String(tokens.access_token), expires: Date.now() + Number(tokens.expires_in ?? 3600) * 1000 }
     googleError = undefined
     save()
@@ -224,6 +229,7 @@ export async function disconnect(): Promise<CalendarSourcesStatus> {
   }
   s.refreshToken = undefined
   s.email = undefined
+  s.scopes = undefined
   s.calendars = []
   accessToken = null
   googleError = undefined
@@ -256,6 +262,18 @@ async function getAccessToken(): Promise<string | null> {
     }
     return null
   }
+}
+
+/** For other Google APIs: an access token if you're signed in and allowed `scope`, otherwise why not. */
+export async function googleToken(scope: string): Promise<{ token: string; email?: string } | { missing: 'setup' | 'connect' | 'scope' | 'offline'; error?: string }> {
+  const s = load()
+  if (!s.clientId || !s.clientSecret) return { missing: 'setup' }
+  if (!s.refreshToken) return { missing: 'connect', error: googleError }
+  if (!(s.scopes ?? '').split(' ').includes(scope)) return { missing: 'scope' }
+  const token = await getAccessToken()
+  if (token) return { token, email: s.email }
+  // An expired sign-in is cleared by getAccessToken; anything else is Google being out of reach.
+  return { missing: s.refreshToken ? 'offline' : 'connect', error: googleError }
 }
 
 async function googleGet(path: string, params: Record<string, string> = {}): Promise<Record<string, unknown>> {

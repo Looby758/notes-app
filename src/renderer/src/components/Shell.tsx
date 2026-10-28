@@ -6,6 +6,7 @@ import {
   FolderSync,
   House,
   LogOut,
+  MessageSquare,
   Orbit,
   BookOpen,
   Dices,
@@ -35,6 +36,7 @@ import {
   remeasure,
   SETTINGS_TAB,
   GRAPH_TAB,
+  CHAT_TAB,
   HOME_TAB,
   MONEY_TAB,
   setZenEditor
@@ -280,6 +282,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         <FlashcardsButton />
         <button className="icon-btn" onClick={() => openSpecialTab(MONEY_TAB)} title={`Money (${showKeys('Ctrl+Shift+B')})`} data-money-button>
           <PoundSterling size={15} />
+        </button>
+        <button className="icon-btn" onClick={() => openSpecialTab(CHAT_TAB)} title="Chat with Claude" data-chat-button>
+          <MessageSquare size={15} />
         </button>
         <LayoutMenu />
         <button className="icon-btn" onClick={() => useUI.setState({ modal: 'commands' })} title={`All commands (${showKeys('Ctrl+K')})`}>
