@@ -98,6 +98,7 @@ const api: NotesApi = {
   addCalendarFeed: (name, url) => ipcRenderer.invoke('cal:addFeed', name, url),
   removeCalendarFeed: (id) => ipcRenderer.invoke('cal:removeFeed', id),
   fetchCalendarEvents: (from, to) => ipcRenderer.invoke('cal:events', from, to),
+  readGoogleSheet: (path) => ipcRenderer.invoke('gsheet:read', path),
   aiStatus: () => ipcRenderer.invoke('ai:status'),
   aiSetKey: (key) => ipcRenderer.invoke('ai:setKey', key),
   aiClearKey: () => ipcRenderer.invoke('ai:clearKey'),

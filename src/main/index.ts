@@ -26,6 +26,7 @@ import { loadSettings, saveSettings, settingsFile, watchSettingsFile } from './s
 import { Vault } from './vault'
 import { startWatching, stopWatching } from './watcher'
 import * as calendars from './calendarSources'
+import { readGoogleSheet } from './googleSheets'
 import * as ai from './ai'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
 import { setupUpdater } from './updater'
@@ -521,6 +522,7 @@ function registerIpc(): void {
   ipcMain.handle('cal:addFeed', (_e, name: string, url: string) => calendars.addFeed(name, url))
   ipcMain.handle('cal:removeFeed', (_e, id: string) => calendars.removeFeed(id))
   ipcMain.handle('cal:events', (_e, from: string, to: string) => calendars.fetchEvents(from, to))
+  ipcMain.handle('gsheet:read', (_e, rel: string) => readGoogleSheet(currentVault().abs(rel)))
   ipcMain.handle('ai:status', () => ai.status())
   ipcMain.handle('ai:setKey', (_e, key: string) => ai.setKey(key))
   ipcMain.handle('ai:clearKey', () => ai.clearKey())

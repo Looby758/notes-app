@@ -1,4 +1,5 @@
 import JSZip from 'jszip'
+import { finishSheet as finish, type Cell, type Sheet } from '@shared/sheet'
 
 /**
  * Reads spreadsheets (.xlsx/.xlsm workbooks, .csv and .tsv files) into plain grids of display text,
@@ -6,21 +7,7 @@ import JSZip from 'jszip'
  * the result Excel saved with the file; nothing is recalculated.
  */
 
-export interface Cell {
-  text: string
-  /** Numbers (and dates) line up on the right, as in Excel. */
-  num?: boolean
-}
-
-export interface Sheet {
-  name: string
-  rows: Cell[][]
-  /** How many columns the widest row has. */
-  cols: number
-  /** Column widths in characters, where the workbook sets them. */
-  widths?: (number | undefined)[]
-  hidden?: boolean
-}
+export type { Cell, Sheet }
 
 // ---------- CSV / TSV ----------
 
@@ -210,20 +197,6 @@ export function formatNumber(value: number, code: string | undefined, date1904 =
   }).format(Math.abs(n))
   const negative = n < 0 && digits.replace(/[^1-9]/g, '') !== ''
   return `${negative ? '-' : ''}${formatPrefix(code)}${digits}${percent ? '%' : ''}`
-}
-
-/** Drops empty rows and columns from the bottom and right, and counts the columns left. */
-function finish(sheet: Sheet): Sheet {
-  const rows = sheet.rows.map((r) => {
-    let end = r.length
-    while (end > 0 && !r[end - 1]?.text) end--
-    return r.slice(0, end)
-  })
-  let last = rows.length
-  while (last > 0 && rows[last - 1].length === 0) last--
-  rows.length = last
-  const cols = rows.reduce((max, r) => Math.max(max, r.length), 0)
-  return { ...sheet, rows, cols }
 }
 
 async function zipText(zip: JSZip, path: string): Promise<string | null> {
