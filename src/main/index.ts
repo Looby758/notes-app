@@ -455,7 +455,9 @@ function registerIpc(): void {
       logError('reminder', new Error('Notifications aren’t supported on this system.'))
       return false
     }
-    const n = new Notification({ title: r.title, body: r.body, silent: false })
+    // Streamer mode: the reminder itself could be private, so the notification only says there is one.
+    const quiet = currentPrefs().streamerMode
+    const n = new Notification({ title: quiet ? 'Reminder' : r.title, body: quiet ? 'Click to see it in Notes.' : r.body, silent: false })
     // Windows reports some failures (e.g. notifications switched off for Notes) here.
     n.on('failed', (_ev, error) => logError('reminder notification', new Error(error)))
     n.on('click', () => {
@@ -707,7 +709,7 @@ app.whenReady().then(async () => {
   registerVaultProtocol()
   registerCodeSandbox()
   registerIpc()
-  safely('web browser', setupBrowser)
+  safely('web browser', () => setupBrowser(() => currentPrefs().streamerMode))
   safely('YouTube mini window', () => setupYouTube(currentPrefs))
   safely('export', setupExport)
   safely('converter', setupConverter)

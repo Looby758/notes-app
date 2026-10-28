@@ -6,6 +6,8 @@ import { usePrefs } from '../../store/prefs'
 import { retryWeather, setWeatherPlace, useForecast } from '../../store/weather'
 import { dayKey, formatDate, fromDayKey } from '../../lib/dates'
 import { HomeBox } from '../Home/HomePage'
+import Private from '../Streamer/Private'
+import { useStreamerOn } from '../../store/streamer'
 
 export function WeatherIcon({ code, size = 14, night = false }: { code: number; size?: number; night?: boolean }) {
   const kind: WeatherKind = describeWeather(code).kind
@@ -32,6 +34,7 @@ export function WeatherIcon({ code, size = 14, night = false }: { code: number; 
 
 /** Finding your town: OpenStreetMap's search, as typing pauses. */
 function TownSearch({ onDone }: { onDone?: () => void }) {
+  const streamer = useStreamerOn()
   const [query, setQuery] = useState('')
   const [found, setFound] = useState<Place[]>([])
   const [error, setError] = useState('')
@@ -71,6 +74,9 @@ function TownSearch({ onDone }: { onDone?: () => void }) {
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={(e) => e.key === 'Escape' && onDone?.()}
         placeholder="Your town or postcode, e.g. Leeds"
+        // Streamer mode: what you type stays as dots.
+        type={streamer ? 'password' : 'text'}
+        autoComplete="off"
         aria-label="Your town"
       />
       {searching && <p className="home-empty">Searching…</p>}
@@ -87,8 +93,12 @@ function TownSearch({ onDone }: { onDone?: () => void }) {
           <span className="home-row-icon">
             <MapPin size={13} />
           </span>
-          <span className="home-row-title">{p.name}</span>
-          <span className="home-row-folder weather-search-address">{p.address}</span>
+          <span className="home-row-title">
+            <Private>{p.name}</Private>
+          </span>
+          <span className="home-row-folder weather-search-address">
+            <Private>{p.address}</Private>
+          </span>
         </button>
       ))}
       {onDone && (
@@ -108,7 +118,13 @@ export function WeatherHomeBox() {
   const { place, forecast, error, loaded } = useForecast(on)
   const [changing, setChanging] = useState(false)
   if (!on || !loaded) return null
-  const title = place ? `Weather in ${place.name}` : 'Weather'
+  const title = place ? (
+    <>
+      Weather in <Private>{place.name}</Private>
+    </>
+  ) : (
+    'Weather'
+  )
   const action = place && !changing && (
     <button className="link-button home-box-action" onClick={() => setChanging(true)}>
       Change town

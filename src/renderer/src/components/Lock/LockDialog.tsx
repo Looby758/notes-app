@@ -1,5 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Check, Copy, KeyRound, Lock } from 'lucide-react'
+import Private from '../Streamer/Private'
 import { useLockDialog, openLockDialog, type LockDialog as Dialog } from '../../lib/lock/actions'
 import {
   changePassword,
@@ -173,7 +174,7 @@ export function ShowRecoveryKey({ recoveryKey, done, what = 'your notes' }: { re
         shown again.
       </p>
       <div className="lock-key" data-recovery-key>
-        {recoveryKey}
+        <Private>{recoveryKey}</Private>
       </div>
       <button
         type="button"

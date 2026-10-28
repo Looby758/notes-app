@@ -32,6 +32,14 @@ export interface Prefs {
   /** Which app icon design to use (taskbar / Dock / window). */
   appIcon: string
 
+  // Streamer mode
+  /** Blur private things (your town, email, money, passwords, messages, events) until you click them, for sharing your screen. */
+  streamerMode: boolean
+  /** In streamer mode, a note you open stays hidden until you click Show. */
+  streamerHideNotes: boolean
+  /** In streamer mode, note names (file list, tabs, recent notes) are blurred too. */
+  streamerHideNames: boolean
+
   // Editor
   livePreview: boolean
   spellcheck: boolean
@@ -159,6 +167,10 @@ export const DEFAULT_PREFS: Prefs = {
   gameLaunchAnimation: true,
   gameAnimatedCovers: 'always',
   appIcon: 'default',
+
+  streamerMode: false,
+  streamerHideNotes: true,
+  streamerHideNames: true,
 
   livePreview: true,
   spellcheck: true,

@@ -22,6 +22,8 @@ import {
   StarOff,
   Trash2
 } from 'lucide-react'
+import Private from '../Streamer/Private'
+import { useHideNames } from '../../store/streamer'
 import { isStarred, toggleStar, useStarred } from '../../store/starred'
 import type { FileNode } from '@shared/types'
 import { useVault } from '../../store/vault'
@@ -293,6 +295,7 @@ interface NodeProps {
 }
 
 function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMenu }: NodeProps) {
+  const hideNames = useHideNames()
   const isFolder = node.type === 'folder'
   const expanded = useVault((s) => s.expanded.has(node.path))
   const isSelected = useVault((s) => s.selected === node.path)
@@ -398,7 +401,9 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
             <FileText size={15} className="tree-icon" />
           )
         )}
-        {isRenaming ? <RenameInput node={node} /> : <span className="tree-label">{displayName(node)}</span>}
+        {isRenaming ? <RenameInput node={node} /> : <span className="tree-label">
+            <Private when={hideNames}>{displayName(node)}</Private>
+          </span>}
         {locked && !isRenaming && <Lock size={11} className="tree-lock" aria-label="Locked" />}
         {starred && !isRenaming && <Star size={11} className="tree-star" aria-label="Starred" />}
       </div>

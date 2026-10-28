@@ -44,6 +44,7 @@ import { notify } from '../../store/notify'
 import { EMAIL_TAB, openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
 import { addHomeCard } from '../../lib/home'
 import { HomeBox } from '../Home/HomePage'
+import Private, { usePrivateTitle } from '../Streamer/Private'
 import { addEvent } from '../../lib/daily'
 import { dayKey, fromDayKey } from '../../lib/dates'
 import { htmlToMarkdown } from '../../lib/import/html'
@@ -187,7 +188,7 @@ function EmailSetup() {
                 </button>
                 {status.email ? (
                   <>
-                    , and under <strong>Test users</strong> check <strong>{status.email}</strong> is listed. If it isn’t, press{' '}
+                    , and under <strong>Test users</strong> check <strong><Private>{status.email}</Private></strong> is listed. If it isn’t, press{' '}
                     <strong>Add users</strong>, type it in and press <strong>Save</strong>.
                   </>
                 ) : (
@@ -212,7 +213,7 @@ function EmailSetup() {
             <button className="btn btn-primary" disabled={busy || !status.canEncrypt} onClick={connect}>
               <Mail size={14} /> {busy ? 'Waiting for you in your browser…' : 'Connect Gmail'}
             </button>
-            {status.connected && status.email && <p className="email-setup-note">You’re signed in to the calendar as {status.email}; this adds email to that same sign-in.</p>}
+            {status.connected && status.email && <p className="email-setup-note">You’re signed in to the calendar as <Private>{status.email}</Private>; this adds email to that same sign-in.</p>}
           </>
         )}
         {(error ?? status.error) && <p className="setting-warning">{error ?? status.error}</p>}
@@ -229,6 +230,7 @@ function Toolbar() {
   const loading = useEmail((s) => s.loading)
   const email = useEmail((s) => s.status?.email)
   const [text, setText] = useState(query)
+  const privateTitle = usePrivateTitle()
   useEffect(() => setText(query), [query])
 
   const search = (e: FormEvent): void => {
@@ -270,7 +272,7 @@ function Toolbar() {
           </button>
         )}
       </form>
-      <button className="icon-btn" title={`Check for new email${email ? ` (${email})` : ''}`} disabled={loading} onClick={() => loadEmails()}>
+      <button className="icon-btn" title={privateTitle(`Check for new email${email ? ` (${email})` : ''}`) ?? 'Check for new email'} disabled={loading} onClick={() => loadEmails()}>
         <RefreshCw size={15} className={loading ? 'spin' : ''} />
       </button>
     </div>
@@ -324,14 +326,16 @@ function EmailList() {
           onClick={() => openEmail(e.id)}
           data-email={e.id}
         >
-          <div className="email-row-top">
-            <span className="email-row-from">{shortName(e.from)}</span>
-            {e.hasAttachments && <Paperclip size={11} className="email-row-icon" />}
-            {e.starred && <Star size={11} className="email-row-icon email-star-on" />}
-            <span className="email-row-date">{shortDate(e.date)}</span>
-          </div>
-          <div className="email-row-subject">{e.subject}</div>
-          <div className="email-row-snippet">{e.snippet}</div>
+          <Private className="block">
+            <div className="email-row-top">
+              <span className="email-row-from">{shortName(e.from)}</span>
+              {e.hasAttachments && <Paperclip size={11} className="email-row-icon" />}
+              {e.starred && <Star size={11} className="email-row-icon email-star-on" />}
+              <span className="email-row-date">{shortDate(e.date)}</span>
+            </div>
+            <div className="email-row-subject">{e.subject}</div>
+            <div className="email-row-snippet">{e.snippet}</div>
+          </Private>
         </button>
       ))}
       {loading && (
@@ -444,34 +448,36 @@ function Reader() {
 
       {adding && <AddToCalendar email={email} onDone={() => setAdding(false)} />}
 
-      <div className="email-head">
-        <h2>{email.subject}</h2>
-        <div className="email-head-row">
-          <span className="email-head-from">{showAddress(email.from)}</span>
-          <span className="email-head-date">{new Date(email.date).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span>
-        </div>
-        {email.to.length > 0 && <div className="email-head-to">To: {email.to.map(showAddress).join(', ')}</div>}
-        {email.cc.length > 0 && <div className="email-head-to">Cc: {email.cc.map(showAddress).join(', ')}</div>}
-        {email.attachments.length > 0 && (
-          <div className="email-attachments">
-            <Paperclip size={12} />
-            {email.attachments.map((a, i) => (
-              <span key={i} className="email-attachment">
-                {a.name}
-              </span>
-            ))}
-            <button className="link-btn" onClick={() => window.open(email.webUrl)}>
-              Open in Gmail to download
-            </button>
+      <Private cover key={email.id} label="This email is hidden for streamer mode">
+        <div className="email-head">
+          <h2>{email.subject}</h2>
+          <div className="email-head-row">
+            <span className="email-head-from">{showAddress(email.from)}</span>
+            <span className="email-head-date">{new Date(email.date).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span>
           </div>
-        )}
-        {email.html && !pictures && /<img\b/i.test(email.html) && (
-          <button className="email-pictures" onClick={() => setPictures(true)}>
-            <Image size={12} /> Pictures are hidden so senders can’t tell you’ve opened this. Show pictures
-          </button>
-        )}
-      </div>
-      <EmailBody email={email} pictures={pictures} />
+          {email.to.length > 0 && <div className="email-head-to">To: {email.to.map(showAddress).join(', ')}</div>}
+          {email.cc.length > 0 && <div className="email-head-to">Cc: {email.cc.map(showAddress).join(', ')}</div>}
+          {email.attachments.length > 0 && (
+            <div className="email-attachments">
+              <Paperclip size={12} />
+              {email.attachments.map((a, i) => (
+                <span key={i} className="email-attachment">
+                  {a.name}
+                </span>
+              ))}
+              <button className="link-btn" onClick={() => window.open(email.webUrl)}>
+                Open in Gmail to download
+              </button>
+            </div>
+          )}
+          {email.html && !pictures && /<img\b/i.test(email.html) && (
+            <button className="email-pictures" onClick={() => setPictures(true)}>
+              <Image size={12} /> Pictures are hidden so senders can’t tell you’ve opened this. Show pictures
+            </button>
+          )}
+        </div>
+        <EmailBody email={email} pictures={pictures} />
+      </Private>
     </div>
   )
 }
@@ -634,6 +640,7 @@ function EmailHomeCard() {
   const status = useEmail((s) => s.status)
   const [unread, setUnread] = useState<EmailSummary[] | null>(null)
   const [more, setMore] = useState(false)
+  const privateTitle = usePrivateTitle()
 
   useEffect(() => {
     refreshEmailStatus().catch(() => undefined)
@@ -680,12 +687,16 @@ function EmailHomeCard() {
           <ul className="home-list">
             {unread.slice(0, HOME_SHOWN).map((e) => (
               <li key={e.id}>
-                <button className="home-row" onClick={() => open(e.id)} title={e.subject}>
+                <button className="home-row" onClick={() => open(e.id)} title={privateTitle(e.subject)}>
                   <span className="home-row-icon">
                     <Mail size={13} />
                   </span>
-                  <span className="home-row-title">{e.subject}</span>
-                  <span className="home-row-folder">{shortName(e.from)}</span>
+                  <span className="home-row-title">
+                    <Private>{e.subject}</Private>
+                  </span>
+                  <span className="home-row-folder">
+                    <Private>{shortName(e.from)}</Private>
+                  </span>
                 </button>
               </li>
             ))}

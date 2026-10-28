@@ -71,6 +71,14 @@ The calendar shows the forecast too, for the next two weeks: a small picture and
 
 The forecast comes from [Open-Meteo](https://open-meteo.com), which is free and needs no account. It's checked every half hour while it's on screen, and the last one is kept (in `weather.json` in the settings folder) so it still shows when you're offline. Turn either part off in **Settings → Calendar → Weather**.
 
+## Streamer mode
+
+For sharing your screen with friends or on a stream. Turn it on with the eye at the top, **Ctrl+Alt+B**, or **Settings → Appearance → Streamer mode**; a red **LIVE** badge in the corner shows it's on (click it to turn it off).
+
+While it's on, private things are blurred until you click them: your weather town, email senders, subjects and the email you're reading, money amounts and the Money page, your saved logins (the password vault also locks), WhatsApp and Discord, calendar events, note names in the file list, tabs and recent notes, and the notes folder's path. Clicking something blurred only shows it, so you never open an email or a note by accident; click again to open it. Notes you open stay covered until you press **Show note**, and close the tab to hide it again. Reminder pop-ups just say "Reminder", and WhatsApp and Discord can't pop up notifications.
+
+Turning streamer mode off and on again hides everything again. Whether notes and note names are hidden can be changed in Settings.
+
 ## Music player (Spotify)
 
 Press ♫ at the top (or Ctrl+Alt+M) to show a small player in the bottom-left corner. It shows the song that's playing, with play/pause, skip, shuffle and a progress bar you can click to jump. Hiding it doesn't stop the music. Ctrl+K also has *Music: play / pause*, *next* and *previous*, which you can give your own keys in Settings → Shortcuts.
@@ -173,6 +181,7 @@ All of these can be changed in **Settings → Shortcuts**. On a Mac, Ctrl is **�
 | Ctrl+Shift+F | Search all notes |
 | Ctrl+Shift+E | Show files |
 | Ctrl+Shift+A | Open email |
+| Ctrl+Alt+B | Streamer mode on / off |
 | Ctrl+Shift+O | Show outline |
 | Ctrl+\\ | Focus mode (hide both sidebars) |
 | Ctrl+= / Ctrl+- / Ctrl+0 | Bigger / smaller / reset text |

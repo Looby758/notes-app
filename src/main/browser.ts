@@ -24,7 +24,11 @@ let appShortcuts = new Set<string>()
 /** What Google's sign-in pages are told the browser is (see isGoogleSignIn). */
 const SIGN_IN_AGENT = firefoxUserAgent(process.platform)
 
-export function setupBrowser(): void {
+/**
+ * `quiet`: streamer mode is on, so WhatsApp and Discord may not pop up notifications (they'd show
+ * who wrote and what, on top of whatever you're sharing).
+ */
+export function setupBrowser(quiet: () => boolean = () => false): void {
   app.on('web-contents-created', (_e, contents) => {
     // However a web page tab is asked for, it gets the same walled-off setup.
     contents.on('will-attach-webview', (event, prefs, params) => {
@@ -57,8 +61,9 @@ export function setupBrowser(): void {
 
   const messages = session.fromPartition(MESSAGES_PARTITION)
   messages.setUserAgent(plainUserAgent(messages.getUserAgent()))
-  messages.setPermissionRequestHandler((_wc, permission, callback) => callback(MESSAGES_PERMISSIONS.has(permission)))
-  messages.setPermissionCheckHandler((_wc, permission) => MESSAGES_PERMISSIONS.has(permission))
+  const allowed = (permission: string): boolean => MESSAGES_PERMISSIONS.has(permission) && !(permission === 'notifications' && quiet())
+  messages.setPermissionRequestHandler((_wc, permission, callback) => callback(allowed(permission)))
+  messages.setPermissionCheckHandler((_wc, permission) => allowed(permission))
 
   ipcMain.handle('messages:clear', async () => {
     await messages.clearStorageData()

@@ -59,6 +59,8 @@ import MindMap from '../MindMap/MindMap'
 import WebPage from '../Web/WebPage'
 import { isMindMap, useUI } from '../../store/ui'
 import { needsUnlock, useLock } from '../../lib/lock/session'
+import { useNoteHidden } from '../../store/streamer'
+import NoteCover from '../Streamer/NoteCover'
 
 /** One pane: its tab bar, and whatever its active tab shows (a note, a blank tab's picker, Settings…). */
 export default function Pane({ pane }: { pane: string }) {
@@ -70,7 +72,8 @@ export default function Pane({ pane }: { pane: string }) {
   const conflict = useEditor((s) => (active ? s.status[active] === 'conflict' : false))
   const [zone, setZone] = useState<DropZone | null>(null)
   const lockedNote = useLock((s) => isNoteTab(active) && needsUnlock(active, s))
-  const showingNote = isNoteTab(active) && !lockedNote
+  const streamerHidden = useNoteHidden(isNoteTab(active) && !lockedNote ? active : null)
+  const showingNote = isNoteTab(active) && !lockedNote && !streamerHidden
   const mindMap = useUI((s) => showingNote && isMindMap(s, pane, active))
 
   useEffect(() => mountPane(pane, host.current!), [pane])
@@ -128,6 +131,7 @@ export default function Pane({ pane }: { pane: string }) {
         )}
         <div ref={host} className={`editor-host ${showingNote && !mindMap ? '' : 'hidden'}`} />
         {mindMap && <MindMap key={active} pane={pane} path={active!} />}
+        {streamerHidden && <NoteCover key={active} path={active!} autoFocus={isActivePane} />}
         {lockedNote && <LockScreen key={active} path={active!} autoFocus={isActivePane} />}
         {isFileTab(active) &&
           (isBoard(active) ? (
