@@ -312,6 +312,15 @@ export const SETTINGS: SettingDef[] = [
     description: 'Off: web links open in your usual browser instead. Either way, a web tab’s ↗ button opens its page in your browser.',
     keywords: 'web browser link url website internet split external chrome safari edge'
   },
+  {
+    key: 'homeOnStart',
+    section: 'editor',
+    group: 'Tabs',
+    type: 'toggle',
+    label: 'Show Home when Notes starts',
+    description: `Home shows today's plans, reminders, flashcards to review and your recent notes. You can always open it from the house button at the top.`,
+    keywords: 'home start dashboard today startup'
+  },
 
   {
     key: 'tabSize',

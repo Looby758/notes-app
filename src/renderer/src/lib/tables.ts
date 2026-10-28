@@ -101,3 +101,57 @@ export const setCell = (t: TableData, row: number, column: number, value: string
   row < 0
     ? { ...t, header: t.header.map((h, i) => (i === column ? value : h)) }
     : { ...t, rows: t.rows.map((r, ri) => (ri === row ? r.map((c, ci) => (ci === column ? value : c)) : r)) }
+
+// ---------- totals ----------
+
+/** A row labelled Total (or Sum, Average…) in its first cell, and what it works out. */
+const TOTAL_LABEL = /^(?:(total|totals|sum|subtotal|grand total)|(average|avg|mean))\s*:?$/i
+
+/** "£1,200.50" → { prefix: "£", value: 1200.5, suffix: "", decimals: 2, grouped: true } */
+function readNumber(cell: string): { prefix: string; value: number; suffix: string; decimals: number; grouped: boolean } | null {
+  const s = cell.replace(/\*\*|__|`/g, '').trim()
+  const m = /^([$£€¥₹]?)\s*(-?)\s*([$£€¥₹]?)(\d{1,3}(?:,\d{3})+|\d*)(?:\.(\d+))?\s*(%|[A-Za-z]{0,6})$/.exec(s)
+  if (!m || (!m[4] && !m[5])) return null
+  return {
+    prefix: m[1] || m[3],
+    value: parseFloat(`${m[2]}${m[4].replace(/,/g, '') || '0'}.${m[5] ?? '0'}`),
+    suffix: m[6],
+    decimals: m[5]?.length ?? 0,
+    grouped: m[4].includes(',')
+  }
+}
+
+/**
+ * Totals for rows labelled Total, Sum or Average: each empty cell in such a row gets the sum (or
+ * average) of the numbers above it in its column, written the way they are (£, %, decimal places).
+ * Only columns where every filled cell is a number count. Returns, by row, the text to show in each cell.
+ */
+export function tableTotals(t: TableData): Map<number, (string | null)[]> {
+  const out = new Map<number, (string | null)[]>()
+  t.rows.forEach((row, ri) => {
+    const label = TOTAL_LABEL.exec((row[0] ?? '').replace(/\*\*|__|\*|_/g, '').trim())
+    if (!label) return
+    const average = Boolean(label[2])
+    const above = t.rows.slice(0, ri).filter((r) => !TOTAL_LABEL.test((r[0] ?? '').replace(/\*\*|__|\*|_/g, '').trim()))
+    const cells = row.map((cell, ci): string | null => {
+      if (ci === 0 || cell.trim()) return null
+      const filled = above.map((r) => r[ci] ?? '').filter((c) => c.trim())
+      const nums = filled.map(readNumber)
+      if (!nums.length || nums.some((n) => n === null)) return null
+      const ok = nums as NonNullable<ReturnType<typeof readNumber>>[]
+      const sum = ok.reduce((a, n) => a + n.value, 0)
+      const value = average ? sum / ok.length : sum
+      const decimals = Math.max(...ok.map((n) => n.decimals), average && !Number.isInteger(value) ? 2 : 0)
+      const prefix = ok.every((n) => n.prefix === ok[0].prefix) ? ok[0].prefix : ''
+      const suffix = ok.every((n) => n.suffix === ok[0].suffix) ? ok[0].suffix : ''
+      const text = Math.abs(value).toLocaleString('en-GB', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+        useGrouping: ok.some((n) => n.grouped) || Math.abs(value) >= 10000
+      })
+      return `${value < 0 ? '-' : ''}${prefix}${text}${suffix && suffix !== '%' ? ' ' : ''}${suffix}`
+    })
+    if (cells.some((c) => c !== null)) out.set(ri, cells)
+  })
+  return out
+}

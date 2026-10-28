@@ -30,6 +30,7 @@ import { noteFont } from './noteFont'
 import { embedDepth, embeds, setEmbedStateFactory } from './embeds'
 import { toCodeMirrorKey } from '../../lib/shortcuts'
 import { typewriter } from './typewriter'
+import { calculator } from './calculator'
 import { codeRunner } from './codeRunner'
 import { usePrefs } from '../../store/prefs'
 
@@ -84,6 +85,7 @@ const base: Extension = [
   noteFont,
   attachmentHandlers,
   embeds,
+  calculator,
   codeRunner,
   editorTheme,
   placeholder('Start writing…'),

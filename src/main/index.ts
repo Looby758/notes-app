@@ -19,13 +19,14 @@ import { existsSync, statSync } from 'fs'
 import { readFile } from 'fs/promises'
 import { basename, extname, join } from 'path'
 import { pathToFileURL } from 'url'
-import type { AiAskTurn, AiNote, ConfirmOptions } from '@shared/types'
+import type { AiAskTurn, AiChat, AiChatMessage, AiNote, ConfirmOptions } from '@shared/types'
 import { normalizePrefs, type Prefs } from '@shared/prefs'
 import { activeThemeId, getTheme } from '@shared/themes'
 import { loadSettings, saveSettings, settingsFile, watchSettingsFile } from './settings'
 import { Vault } from './vault'
 import { startWatching, stopWatching } from './watcher'
 import * as calendars from './calendarSources'
+import { readGoogleSheet } from './googleSheets'
 import * as ai from './ai'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
 import { setupUpdater } from './updater'
@@ -526,12 +527,16 @@ function registerIpc(): void {
   ipcMain.handle('cal:addFeed', (_e, name: string, url: string) => calendars.addFeed(name, url))
   ipcMain.handle('cal:removeFeed', (_e, id: string) => calendars.removeFeed(id))
   ipcMain.handle('cal:events', (_e, from: string, to: string) => calendars.fetchEvents(from, to))
+  ipcMain.handle('gsheet:read', (_e, rel: string) => readGoogleSheet(currentVault().abs(rel)))
   ipcMain.handle('ai:status', () => ai.status())
   ipcMain.handle('ai:setKey', (_e, key: string) => ai.setKey(key))
   ipcMain.handle('ai:clearKey', () => ai.clearKey())
   ipcMain.handle('ai:summarise', (_e, title: string, text: string) => ai.summarise(title, text))
   ipcMain.handle('ai:tidy', (_e, text: string, kind: 'note' | 'capture') => ai.tidy(text, kind === 'capture' ? 'capture' : 'note'))
   ipcMain.handle('ai:ask', (_e, question: string, notes: AiNote[], history: AiAskTurn[]) => ai.askNotes(question, notes, history))
+  ipcMain.handle('ai:chat', (_e, messages: AiChatMessage[]) => ai.chat(messages))
+  ipcMain.handle('ai:loadChats', () => ai.loadChats())
+  ipcMain.handle('ai:saveChats', (_e, chats: AiChat[]) => ai.saveChats(chats))
 
   ipcMain.handle('vault:readAppData', (_e, name: string) => currentVault().readAppData(name))
   ipcMain.handle('vault:writeAppData', (_e, name: string, content: string) => currentVault().writeAppData(name, content))

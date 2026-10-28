@@ -4,7 +4,9 @@ import {
   Command as CommandIcon,
   FolderOpen,
   FolderSync,
+  House,
   LogOut,
+  MessageSquare,
   Orbit,
   BookOpen,
   Dices,
@@ -35,6 +37,8 @@ import {
   remeasure,
   SETTINGS_TAB,
   GRAPH_TAB,
+  CHAT_TAB,
+  HOME_TAB,
   setZenEditor
 } from '../lib/editorController'
 import { openLink, openWikiLink } from '../lib/openLink'
@@ -270,6 +274,10 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
 
         <div className="titlebar-spacer" />
 
+        <button className="icon-btn" onClick={() => openSpecialTab(HOME_TAB)} title={`Home (${showKeys('Ctrl+Shift+J')})`} data-home-button>
+          <House size={15} />
+        </button>
+
         <button
           className={`icon-btn ${reading ? 'active' : ''}`}
           onClick={() => setPrefs({ readingMode: !reading })}
@@ -287,6 +295,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         <FlashcardsButton />
         <button className="icon-btn" onClick={() => openWebTab('', { beside: true })} title={`Web browser (${showKeys('Ctrl+Shift+I')})`} data-web-button>
           <Globe size={15} />
+        </button>
+        <button className="icon-btn" onClick={() => openSpecialTab(CHAT_TAB)} title="Chat with Claude" data-chat-button>
+          <MessageSquare size={15} />
         </button>
         <LayoutMenu />
         <button className="icon-btn" onClick={() => useUI.setState({ modal: 'commands' })} title={`All commands (${showKeys('Ctrl+K')})`}>
