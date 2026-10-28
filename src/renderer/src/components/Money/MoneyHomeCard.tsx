@@ -3,6 +3,7 @@ import { useMoney } from '../../store/money'
 import { budgetState, formatPounds, monthName, monthOf, monthTotals } from '../../lib/money'
 import { MONEY_TAB, openSpecialTab } from '../../lib/editorController'
 import { HomeBox } from '../Home/HomePage'
+import Private from '../Streamer/Private'
 
 /** The Home page's "spending this month" box: nothing until the money tracker has something in it. */
 export default function MoneyHomeCard() {
@@ -27,18 +28,31 @@ export default function MoneyHomeCard() {
       }
     >
       <div className="money-home">
-        <strong>{formatPounds(totals.spent)}</strong>
+        <strong>
+          <Private>{formatPounds(totals.spent)}</Private>
+        </strong>
         <span>
           spent in {monthName(month).split(' ')[0]}
-          {totals.received > 0 && `, ${formatPounds(totals.received)} received`}
+          {totals.received > 0 && (
+            <>
+              , <Private>{formatPounds(totals.received)}</Private> received
+            </>
+          )}
         </span>
       </div>
       {warnings.map(({ cat, spent, budget }) => (
         <div key={cat.id} className={`money-home-warn budget-${budgetState(spent, budget)}`}>
           <AlertTriangle size={12} />
-          {spent > budget
-            ? `${cat.name}: ${formatPounds(spent - budget)} over budget`
-            : `${cat.name}: only ${formatPounds(budget - spent)} left`}
+          {cat.name}:{' '}
+          {spent > budget ? (
+            <>
+              <Private>{formatPounds(spent - budget)}</Private> over budget
+            </>
+          ) : (
+            <>
+              only <Private>{formatPounds(budget - spent)}</Private> left
+            </>
+          )}
         </div>
       ))}
     </HomeBox>

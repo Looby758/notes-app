@@ -200,6 +200,33 @@ export const SETTINGS: SettingDef[] = [
     description: 'Covers on the Games page that move, from SteamGridDB (add a free key on the Games page). Still pictures are shown when a game has none, and while Motion is on Subtle or Off.',
     keywords: 'games covers art animated moving living gif webp steamgriddb grid'
   },
+  {
+    key: 'streamerMode',
+    section: 'appearance',
+    group: 'Streamer mode',
+    type: 'toggle',
+    label: 'Streamer mode',
+    description: `For sharing your screen: your town, email, money, passwords, messages, calendar events and the notes folder’s path are blurred until you click them. Also the eye at the top, or ${showKeys('Ctrl+Alt+B')}.`,
+    keywords: 'streamer streaming screenshare screen share sharing discord obs privacy private hide blur postcode'
+  },
+  {
+    key: 'streamerHideNotes',
+    section: 'appearance',
+    group: 'Streamer mode',
+    type: 'toggle',
+    label: 'Hide notes until I click Show',
+    description: 'A note you open in streamer mode stays covered until you choose to show it. Closing its tab hides it again.',
+    keywords: 'streamer streaming screenshare privacy private hide notes cover'
+  },
+  {
+    key: 'streamerHideNames',
+    section: 'appearance',
+    group: 'Streamer mode',
+    type: 'toggle',
+    label: 'Blur note names',
+    description: 'In streamer mode, note names in the file list, tabs and recent notes are blurred too. Click one to see it; click again to open it.',
+    keywords: 'streamer streaming screenshare privacy private hide names titles file list tabs'
+  },
 
   // ---------- Editor ----------
   {

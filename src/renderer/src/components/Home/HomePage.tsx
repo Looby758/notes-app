@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { CalendarDays, Clock, FileText, Layers, Plus } from 'lucide-react'
+import Private from '../Streamer/Private'
+import { useHideNames } from '../../store/streamer'
 import { useEditor } from '../../store/editor'
 import { useNoteIndex } from '../../store/noteIndex'
 import { useVault } from '../../store/vault'
@@ -29,7 +31,7 @@ function greeting(now: Date): string {
 }
 
 /** One box on the Home page. */
-export function HomeBox({ icon, title, action, children }: { icon: ReactNode; title: string; action?: ReactNode; children: ReactNode }) {
+export function HomeBox({ icon, title, action, children }: { icon: ReactNode; title: ReactNode; action?: ReactNode; children: ReactNode }) {
   return (
     <section className="home-box">
       <header>
@@ -94,6 +96,7 @@ function RecentBox() {
   const lookup = useNoteIndex((s) => s.lookup)
   const icons = useNoteIndex((s) => s.notes)
   const newNote = useVault((s) => s.newNote)
+  const hideNames = useHideNames()
   const existing = useMemo(() => new Set(lookup.paths), [lookup])
   const shown = recent.filter((p) => isNoteTab(p) && existing.has(p)).slice(0, RECENT_SHOWN)
   return (
@@ -112,10 +115,16 @@ function RecentBox() {
         <ul className="home-list">
           {shown.map((p) => (
             <li key={p}>
-              <button className="home-row" onClick={() => openNote(p)} title={p}>
+              <button className="home-row" onClick={() => openNote(p)} title={hideNames ? undefined : p}>
                 <span className="home-row-icon">{icons.get(p)?.icon ?? <FileText size={13} />}</span>
-                <span className="home-row-title">{noteTitle(p)}</span>
-                {parentOf(p) && <span className="home-row-folder">{parentOf(p)}</span>}
+                <span className="home-row-title">
+                  <Private when={hideNames}>{noteTitle(p)}</Private>
+                </span>
+                {parentOf(p) && (
+                  <span className="home-row-folder">
+                    <Private when={hideNames}>{parentOf(p)}</Private>
+                  </span>
+                )}
               </button>
             </li>
           ))}

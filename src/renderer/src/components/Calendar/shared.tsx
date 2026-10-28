@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { CalendarDays, CalendarPlus, Clock, ExternalLink, FileText, Flag } from 'lucide-react'
+import Private, { usePrivateTitle } from '../Streamer/Private'
 import { itemsByDay, useNoteIndex } from '../../store/noteIndex'
 import { usePrefs } from '../../store/prefs'
 import { ensureRange, useExternal, type ExternalItem } from '../../store/externalEvents'
@@ -33,8 +34,9 @@ export function ItemRow({ item, compact = false }: { item: DatedItem; compact?: 
   usePrefs((s) => s.prefs.timeFormat) // re-render when the time format changes
   const open = (): void => openNote(item.path, item.kind === 'daily' || item.kind === 'note' ? {} : { line: item.line })
   const isTask = item.done !== undefined
+  const privateTitle = usePrivateTitle()
   return (
-    <div className={`cal-item ${item.kind} ${item.done ? 'done' : ''} ${compact ? 'compact' : ''}`} title={`${item.title}\n${item.path}`}>
+    <div className={`cal-item ${item.kind} ${item.done ? 'done' : ''} ${compact ? 'compact' : ''}`} title={privateTitle(`${item.title}\n${item.path}`)}>
       {isTask ? (
         <input
           type="checkbox"
@@ -60,7 +62,7 @@ export function ItemRow({ item, compact = false }: { item: DatedItem; compact?: 
       <button className="cal-item-text" onClick={open}>
         {/* In small calendar cells only the start time fits next to the title. */}
         {item.start && <span className="cal-time">{compact ? displayTime(item.start) : timeLabel(item)}</span>}
-        <span className="cal-title">{item.kind === 'daily' ? 'Daily note' : item.title}</span>
+        <span className="cal-title">{item.kind === 'daily' ? 'Daily note' : <Private>{item.title}</Private>}</span>
         {item.kind === 'note' && item.due && !compact && <span className="cal-badge">due</span>}
       </button>
       {/* Small calendar cells have no room: the day's own forecast shows there instead. */}
@@ -96,8 +98,9 @@ export function ExternalStatus() {
 export function ExternalRow({ item, compact = false }: { item: ExternalItem; compact?: boolean }) {
   usePrefs((s) => s.prefs.timeFormat)
   const e = item.event
+  const privateTitle = usePrivateTitle()
   return (
-    <div className={`cal-item external ${compact ? 'compact' : ''}`} title={`${e.title}\n${e.calendarName}`}>
+    <div className={`cal-item external ${compact ? 'compact' : ''}`} title={privateTitle(`${e.title}\n${e.calendarName}`)}>
       <span className="cal-ext-bar" style={{ background: e.color }} />
       <button
         className="cal-item-text"
@@ -111,7 +114,9 @@ export function ExternalRow({ item, compact = false }: { item: ExternalItem; com
             {compact || !item.end ? displayTime(item.start) : `${displayTime(item.start)}–${displayTime(item.end)}`}
           </span>
         )}
-        <span className="cal-title">{e.title}</span>
+        <span className="cal-title">
+          <Private>{e.title}</Private>
+        </span>
       </button>
       {!compact && <EventWeather title={e.title} date={item.date} start={item.allDay ? undefined : item.start} />}
     </div>

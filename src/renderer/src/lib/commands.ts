@@ -37,6 +37,7 @@ import {
   togglePin
 } from './editorController'
 import { toggleStar } from '../store/starred'
+import { toggleStreamerMode } from '../store/streamer'
 import { openToday, stepDaily } from './daily'
 import { matchesShortcut, normalizeShortcut } from './shortcuts'
 import { clearBrowsingData } from '../components/Web/WebPage'
@@ -317,6 +318,7 @@ export const commands: Command[] = [
     shortcut: 'Ctrl+Shift+R',
     run: () => setPrefs({ readingMode: !usePrefs.getState().prefs.readingMode })
   },
+  { id: 'view.streamer', group: 'View', title: 'Streamer mode on / off (blur private things)', shortcut: 'Ctrl+Alt+B', run: toggleStreamerMode },
   {
     id: 'typewriter.center',
     group: 'View',

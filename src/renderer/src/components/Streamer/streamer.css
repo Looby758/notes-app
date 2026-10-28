@@ -1,0 +1,113 @@
+/* Streamer mode: private things are blurred until clicked. */
+
+.private:not(.hidden) {
+  display: contents;
+}
+.private.hidden {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: inherit;
+  filter: blur(6px);
+  cursor: pointer;
+  user-select: none;
+  /* Blur leaks less when the shapes underneath are flattened a little. */
+  opacity: 0.85;
+}
+.private.hidden.block {
+  display: block;
+  white-space: normal;
+}
+.private.hidden > * {
+  pointer-events: none;
+}
+
+.private-area:not(.hidden) {
+  display: contents;
+}
+.private-area.hidden {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.private-area.hidden > .private-area-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  filter: blur(14px);
+  user-select: none;
+  pointer-events: none;
+}
+.private-area.hidden.opaque > .private-area-content {
+  visibility: hidden;
+}
+.private-area-cover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 72px 16px 16px;
+  border: none;
+  background: color-mix(in srgb, var(--bg) 35%, transparent);
+  color: var(--text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+.private-area.opaque .private-area-cover {
+  background: var(--bg);
+}
+.private-area-label {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.private-area-label .btn {
+  color: var(--text);
+  font-size: 13px;
+}
+.private-area-cover:hover .btn {
+  background: var(--bg-hover);
+}
+/* Small areas (a box on Home) put the label in the middle. */
+.private-area.compact .private-area-cover {
+  align-items: center;
+  padding: 8px;
+}
+.private-area.compact .private-area-label {
+  flex-direction: row;
+}
+.private-area.compact .private-area-label .btn {
+  padding: 4px 10px;
+}
+
+.streamer-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 999px;
+  background: #d93a3a;
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.streamer-pill .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+}

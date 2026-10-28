@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { AlertTriangle, Check, Copy, Dices, ExternalLink, Eye, EyeOff, KeyRound, Lock, Pencil, Plus, Search, ShieldCheck, Trash2 } from 'lucide-react'
+import Private from '../Streamer/Private'
 import {
   autoLockMinutes,
   changeMasterPassword,
@@ -61,7 +62,9 @@ export default function PasswordsPage({ autoFocus }: { autoFocus: boolean }) {
         ) : mustRenew ? (
           <NewMaster title="Choose a new master password" intro="You unlocked with your recovery key. Pick a new master password; your recovery key keeps working." done={() => setMustRenew(false)} />
         ) : (
-          <Vault />
+          <Private cover label="Your saved logins are hidden for streamer mode">
+            <Vault />
+          </Private>
         )}
       </div>
     </div>

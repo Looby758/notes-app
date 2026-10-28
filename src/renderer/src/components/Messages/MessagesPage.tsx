@@ -5,6 +5,7 @@ import { badgeText, MESSAGES_PARTITION, MESSAGES_SITES, unreadFromTitle, type Me
 import { openSpecialTab, MESSAGES_TAB } from '../../lib/editorController'
 import { setUnread, showMessages, useMessages, useTotalUnread } from '../../store/messages'
 import { notify } from '../../store/notify'
+import Private from '../Streamer/Private'
 
 /** The site pages on screen, so the bar's buttons can reach them. */
 const views = new Map<MessagesService, WebviewTag>()
@@ -106,11 +107,14 @@ export default function MessagesPage({ hidden, autoFocus }: { hidden: boolean; a
           )}
         </div>
       </div>
-      <div className="web-body">
-        {MESSAGES_SITES.filter((s) => used.includes(s.id)).map((s) => (
-          <SiteView key={s.id} site={s} shown={s.id === showing} focus={!hidden && autoFocus && s.id === showing} />
-        ))}
-      </div>
+      {/* Web pages can't be blurred, so streamer mode covers them completely. */}
+      <Private cover opaque label="Your messages are hidden for streamer mode">
+        <div className="web-body">
+          {MESSAGES_SITES.filter((s) => used.includes(s.id)).map((s) => (
+            <SiteView key={s.id} site={s} shown={s.id === showing} focus={!hidden && autoFocus && s.id === showing} />
+          ))}
+        </div>
+      </Private>
     </div>
   )
 }
