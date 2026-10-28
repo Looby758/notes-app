@@ -48,6 +48,8 @@ const api: NotesApi = {
     return () => ipcRenderer.removeListener('dictionary:replace', handler)
   },
   webTitle: (url) => ipcRenderer.invoke('web:title', url),
+  searchPlaces: (query) => ipcRenderer.invoke('places:search', query),
+  mapTile: (z, x, y) => ipcRenderer.invoke('places:tile', z, x, y),
   clearWebData: () => ipcRenderer.invoke('web:clear'),
   setWebShortcuts: (shortcuts) => ipcRenderer.send('web:shortcuts', shortcuts),
   onWebOpen: (callback) => {

@@ -39,6 +39,7 @@ import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
 import { dictionaryMenu, setupDictionary } from './dictionary'
 import { setupWebTitle } from './webTitle'
+import { setupPlaces } from './places'
 import { setupBrowser } from './browser'
 import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
@@ -462,6 +463,7 @@ function registerIpc(): void {
   setupMenus()
   setupDictionary()
   setupWebTitle()
+  setupPlaces()
   setupImporter()
   setupTerminal(() => vault?.root ?? null)
   // The Mac asks once whether Notes may use the microphone.

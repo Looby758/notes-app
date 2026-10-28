@@ -28,6 +28,7 @@ import { selectionToolbar, wrapOnType } from './selectionTools'
 import { smartPaste } from './smartPaste'
 import { noteFont } from './noteFont'
 import { embedDepth, embeds, setEmbedStateFactory } from './embeds'
+import { places } from './places'
 import { toCodeMirrorKey } from '../../lib/shortcuts'
 import { typewriter } from './typewriter'
 import { calculator } from './calculator'
@@ -85,6 +86,7 @@ const base: Extension = [
   noteFont,
   attachmentHandlers,
   embeds,
+  places,
   calculator,
   codeRunner,
   editorTheme,

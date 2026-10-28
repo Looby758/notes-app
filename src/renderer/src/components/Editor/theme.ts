@@ -155,6 +155,51 @@ export const editorTheme = EditorView.theme(
     '.cm-embed-missing': { margin: '0', padding: '10px 14px', color: 'var(--text-faint)', fontStyle: 'italic' },
     '.cm-embed-inline::before': { content: '"↳ "', color: 'var(--text-faint)' },
 
+    // Places (a Google Maps link on its own line)
+    '.cm-place': {
+      maxWidth: '520px',
+      margin: '6px 0',
+      border: '1px solid var(--border)',
+      borderRadius: '8px',
+      backgroundColor: 'var(--bg-panel)',
+      overflow: 'hidden',
+      cursor: 'pointer',
+      fontFamily: 'var(--font-ui)'
+    },
+    '.cm-place:hover': { borderColor: 'var(--accent-dim)' },
+    '.cm-place-map': { position: 'relative', overflow: 'hidden', backgroundColor: '#e8e4dc', borderBottom: '1px solid var(--border)' },
+    '.cm-place-tiles': { position: 'absolute' },
+    '.cm-place-tile': { position: 'absolute', width: '256px', height: '256px', userSelect: 'none', pointerEvents: 'none' },
+    '.cm-place-pin': { position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -100%)', lineHeight: '0', pointerEvents: 'none', filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.35))' },
+    '.cm-place-credit': {
+      position: 'absolute',
+      right: '0',
+      bottom: '0',
+      padding: '1px 5px',
+      fontSize: '10px',
+      color: '#333',
+      backgroundColor: 'rgba(255, 255, 255, 0.75)',
+      borderTopLeftRadius: '4px'
+    },
+    '.cm-place-info': { display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px' },
+    '.cm-place-icon': { fontSize: '16px' },
+    '.cm-place-text': { display: 'flex', flexDirection: 'column', minWidth: '0', flex: '1' },
+    '.cm-place-name': { fontWeight: '600', fontSize: '13.5px', color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+    '.cm-place-address': { fontSize: '12px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+    '.cm-place-actions': { display: 'flex', alignItems: 'center', gap: '4px', flexShrink: '0' },
+    '.cm-place-open': { fontSize: '12px', color: 'var(--accent)' },
+    '.cm-place-edit': {
+      border: 'none',
+      borderRadius: '4px',
+      background: 'none',
+      padding: '1px 6px',
+      font: 'inherit',
+      fontSize: '11.5px',
+      color: 'var(--text-faint)',
+      cursor: 'pointer'
+    },
+    '.cm-place-edit:hover': { backgroundColor: 'var(--bg-hover)', color: 'var(--text)' },
+
     // [[ autocomplete
     '.cm-tooltip': {
       backgroundColor: 'var(--bg-raised)',
