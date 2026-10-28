@@ -90,6 +90,70 @@ export interface CalendarSourcesStatus {
   canEncrypt: boolean
 }
 
+/** The Google sign-in, as the Email page sees it. */
+export interface GoogleAuthStatus {
+  /** A client ID and secret are saved (Settings → Calendar). */
+  configured: boolean
+  connected: boolean
+  email?: string
+  /** The sign-in includes Gmail. */
+  gmail: boolean
+  error?: string
+  canEncrypt: boolean
+}
+
+export interface EmailAddress {
+  name: string
+  email: string
+}
+
+/** One email in a list. */
+export interface EmailSummary {
+  id: string
+  threadId: string
+  from: EmailAddress
+  subject: string
+  /** Google's short preview of the text. */
+  snippet: string
+  /** ISO instant. */
+  date: string
+  unread: boolean
+  starred: boolean
+  hasAttachments: boolean
+}
+
+/** An opened email. */
+export interface EmailMessage extends EmailSummary {
+  to: EmailAddress[]
+  cc: EmailAddress[]
+  replyTo?: EmailAddress
+  /** The Message-ID header, for replies. */
+  messageId?: string
+  references?: string
+  text?: string
+  html?: string
+  attachments: { name: string; size: number }[]
+  /** Opens it in Gmail in your browser. */
+  webUrl: string
+}
+
+export type EmailFolder = 'inbox' | 'unread' | 'starred' | 'sent' | 'all'
+
+export interface EmailList {
+  emails: EmailSummary[]
+  /** Pass back to get the next page. */
+  next?: string
+}
+
+export interface OutgoingEmail {
+  to: string
+  cc?: string
+  subject: string
+  body: string
+  /** Replying: keeps it in the same conversation. */
+  replyTo?: { threadId: string; messageId?: string; references?: string }
+}
+
 export interface ConfirmOptions {
   message: string
   detail?: string
@@ -240,6 +304,19 @@ export interface NotesApi {
   removeCalendarFeed(id: string): Promise<CalendarSourcesStatus>
   /** Events between two instants from every enabled calendar (cached ones if offline). */
   fetchCalendarEvents(from: string, to: string): Promise<{ events: CalEvent[]; errors: string[]; offline: boolean }>
+  // Email (Gmail, using the Google sign-in above)
+  emailStatus(): Promise<GoogleAuthStatus>
+  /** Signs in to Google in your browser, asking for email access too. */
+  emailConnect(): Promise<GoogleAuthStatus>
+  /** A page of emails; `query` is a Gmail search like "from:sam invoice". */
+  emailList(folder: EmailFolder, query: string, next?: string): Promise<EmailList>
+  emailGet(id: string): Promise<EmailMessage>
+  emailSend(email: OutgoingEmail): Promise<void>
+  emailMarkRead(id: string, read: boolean): Promise<void>
+  emailStar(id: string, starred: boolean): Promise<void>
+  emailArchive(id: string): Promise<void>
+  /** Moves it to Gmail's Bin (Gmail deletes it for good after 30 days). */
+  emailTrash(id: string): Promise<void>
   /** A .gsheet file's sheet, fetched from Google with the sign-in above. */
   readGoogleSheet(path: string): Promise<GoogleSheetResult>
   aiStatus(): Promise<AiStatus>

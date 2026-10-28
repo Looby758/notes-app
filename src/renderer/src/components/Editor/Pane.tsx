@@ -20,6 +20,7 @@ import {
   FLASHCARDS_TAB,
   TERMINAL_TAB,
   PASSWORDS_TAB,
+  EMAIL_TAB,
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
@@ -43,6 +44,7 @@ import ChatPage from '../Ai/ChatPage'
 import FlashcardsPage from '../Flashcards/FlashcardsPage'
 import TerminalPage from '../Terminal/TerminalPage'
 import PasswordsPage from '../Passwords/PasswordsPage'
+import EmailPage from '../Email/EmailPage'
 import HomePage from '../Home/HomePage'
 import MoneyPage from '../Money/MoneyPage'
 import ConvertPage from '../Convert/ConvertPage'
@@ -135,6 +137,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === FLASHCARDS_TAB && <FlashcardsPage />}
         {active === TERMINAL_TAB && <TerminalPage />}
         {active === PASSWORDS_TAB && <PasswordsPage autoFocus={isActivePane} />}
+        {active === EMAIL_TAB && <EmailPage />}
         {(active === HOME_TAB || !active) && <HomePage />}
         {active === MONEY_TAB && <MoneyPage />}
         {active === CONVERT_TAB && <ConvertPage />}

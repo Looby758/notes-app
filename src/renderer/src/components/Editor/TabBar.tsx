@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ArrowRightLeft, CalendarDays, Columns2, FileDown, FolderSearch, GitCompare, House, KeyRound, Layers, MessageSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
+import { ArrowRightLeft, CalendarDays, Columns2, FileDown, FolderSearch, GitCompare, House, KeyRound, Layers, Mail, MessageSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
 import { useEditor } from '../../store/editor'
 import { toggleStar, useStarred } from '../../store/starred'
 import { useNoteIndex } from '../../store/noteIndex'
@@ -15,6 +15,7 @@ import {
   FLASHCARDS_TAB,
   TERMINAL_TAB,
   PASSWORDS_TAB,
+  EMAIL_TAB,
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
@@ -52,6 +53,7 @@ function tabTitle(id: string): string {
   if (id === FLASHCARDS_TAB) return 'Flashcards'
   if (id === TERMINAL_TAB) return 'Terminal'
   if (id === PASSWORDS_TAB) return 'Passwords'
+  if (id === EMAIL_TAB) return 'Email'
   if (id === HOME_TAB) return 'Home'
   if (id === MONEY_TAB) return 'Money'
   if (id === CONVERT_TAB) return 'Convert files'
@@ -211,6 +213,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === FLASHCARDS_TAB && <Layers size={13} className="tab-icon" />}
               {id === TERMINAL_TAB && <SquareTerminal size={13} className="tab-icon" />}
               {id === PASSWORDS_TAB && <KeyRound size={13} className="tab-icon" />}
+              {id === EMAIL_TAB && <Mail size={13} className="tab-icon" />}
               {id === HOME_TAB && <House size={13} className="tab-icon" />}
               {id === MONEY_TAB && <PoundSterling size={13} className="tab-icon" />}
               {id === CONVERT_TAB && <ArrowRightLeft size={13} className="tab-icon" />}

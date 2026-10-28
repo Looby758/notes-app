@@ -9,6 +9,7 @@ import {
   LogOut,
   MessageSquare,
   Orbit,
+  Mail,
   BookOpen,
   Dices,
   KeyRound,
@@ -41,6 +42,7 @@ import {
   GRAPH_TAB,
   TERMINAL_TAB,
   PASSWORDS_TAB,
+  EMAIL_TAB,
   CHAT_TAB,
   HOME_TAB,
   MONEY_TAB,
@@ -284,6 +286,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         </button>
         <button className="icon-btn" onClick={() => openSpecialTab(GRAPH_TAB)} title={`Graph (${showKeys('Ctrl+Shift+G')})`}>
           <Orbit size={15} />
+        </button>
+        <button className="icon-btn" onClick={() => openSpecialTab(EMAIL_TAB)} title={`Email (${showKeys('Ctrl+Shift+A')})`}>
+          <Mail size={15} />
         </button>
         <FlashcardsButton />
         <button className="icon-btn" onClick={() => openSpecialTab(TERMINAL_TAB)} title={`Terminal (${showKeys('Ctrl+Alt+T')})`} data-terminal-button>
