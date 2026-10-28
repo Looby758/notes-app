@@ -13,6 +13,8 @@ export interface PdfItem {
   x: number
   y: number
   width: number
+  /** Text height in points. Some banks add tiny invisible labels for screen readers; those are skipped. */
+  size?: number
 }
 
 interface Cell {
@@ -21,7 +23,7 @@ interface Cell {
   x1: number
 }
 
-type ColumnKind = 'date' | 'out' | 'in' | 'amount' | 'balance'
+type ColumnKind = 'date' | 'type' | 'out' | 'in' | 'amount' | 'balance'
 
 interface Column {
   kind: ColumnKind
@@ -31,7 +33,7 @@ interface Column {
 
 /** Groups a page's text into lines (top to bottom) of cells (left to right). */
 export function pageLines(items: PdfItem[]): { y: number; cells: Cell[] }[] {
-  const sorted = items.filter((i) => i.str.trim()).sort((a, b) => a.y - b.y || a.x - b.x)
+  const sorted = items.filter((i) => i.str.trim() && (i.size ?? 10) >= 2).sort((a, b) => a.y - b.y || a.x - b.x)
   const lines: PdfItem[][] = []
   for (const item of sorted) {
     const line = lines[lines.length - 1]
@@ -58,6 +60,7 @@ export function pageLines(items: PdfItem[]): { y: number; cells: Cell[] }[] {
 
 const HEADINGS: [RegExp, ColumnKind][] = [
   [/^(transaction |posting |entry )?date$/i, 'date'],
+  [/^(transaction |payment )?type$/i, 'type'],
   [/^(paid out|money out|withdrawn|withdrawals?|debits?|payments?( out)?|out|spent)( \(?£\)?)?$/i, 'out'],
   [/^(paid in|money in|deposits?|credits?|receipts?|payments? in|in|received)( \(?£\)?)?$/i, 'in'],
   [/^amount( \(?(£|gbp)\)?)?$/i, 'amount'],
@@ -161,7 +164,7 @@ export function statementFromPdf(pages: PdfItem[][], today = new Date()): string
     let best: Column | null = null
     let bestDistance = Infinity
     for (const col of columns) {
-      if (col.kind === 'date') continue
+      if (col.kind === 'date' || col.kind === 'type') continue
       // Amounts and their headings are usually lined up on the right, sometimes centred.
       const distance = Math.min(Math.abs(cell.x1 - col.x1), Math.abs((cell.x0 + cell.x1) / 2 - (col.x0 + col.x1) / 2))
       if (distance < bestDistance) {
@@ -198,14 +201,19 @@ export function statementFromPdf(pages: PdfItem[][], today = new Date()): string
         if (pence !== null) amounts.push({ cell: c, pence })
         else words.push(c)
       }
-      let text = words.map((w) => w.text).join(' ')
+      // A "Type" column holds bank codes (DEB, FPI, DD…) that only clutter the description.
+      const typeCol = columns?.find((c) => c.kind === 'type')
+      let text = words
+        .filter((w) => !(typeCol && Math.abs(w.x0 - typeCol.x0) < 4 && /^[A-Z)]{1,5}$/.test(w.text)))
+        .map((w) => w.text)
+        .join(' ')
       const start = readDateStart(text)
       if (start) {
         date = dateOf(start.when)
         text = start.rest
       }
       if (!amounts.length) {
-        if (date && text && (columns || start) && !/^page \d+( of \d+)?$/i.test(text)) loose.push({ y, text })
+        if (date && text && (columns || start) && !/^(page \d+( of \d+)?|\(?continued\b.*)$/i.test(text)) loose.push({ y, text })
         continue
       }
 
@@ -219,15 +227,17 @@ export function statementFromPdf(pages: PdfItem[][], today = new Date()): string
           else if (col?.kind === 'in') pence = Math.abs(a.pence)
           else if (col?.kind === 'amount') pence = a.pence
         }
+      } else if (!start) {
+        // No column headings yet: only lines that start with a date can be payments (this keeps out
+        // summary boxes like "Money In £339.06 … Balance on 1 October £85.23")…
+        if (amounts.length === 1 && !date) balance = amounts[0].pence
+        continue
       } else if (amounts.length >= 2) {
-        // No headings found: the last amount is the balance when there are two…
+        // …the last amount is the balance when there are two…
         newBalance = amounts[amounts.length - 1].pence
         pence = amounts[amounts.length - 2].pence
-      } else if (date) {
-        pence = amounts[0].pence
       } else {
-        // …and a lone amount before any dates is the opening balance.
-        newBalance = amounts[0].pence
+        pence = amounts[0].pence
       }
 
       if (pence === null || !date || NOT_A_PAYMENT.test(text)) {

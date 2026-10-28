@@ -38,7 +38,13 @@ export async function pdfPages(data: ArrayBuffer, password?: string): Promise<Pd
       for (const item of content.items) {
         if (!('str' in item) || !item.str.trim()) continue
         // PDF positions count up from the bottom of the page; turn them into top-down.
-        items.push({ str: item.str, x: item.transform[4], y: height - item.transform[5], width: item.width })
+        items.push({
+          str: item.str,
+          x: item.transform[4],
+          y: height - item.transform[5],
+          width: item.width,
+          size: Math.hypot(item.transform[2], item.transform[3])
+        })
       }
       pages.push(items)
     }
