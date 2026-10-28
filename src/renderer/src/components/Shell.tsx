@@ -285,7 +285,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
           <Orbit size={15} />
         </button>
         <FlashcardsButton />
-        <button className="icon-btn" onClick={() => openWebTab('', { beside: true })} title={`Web browser (${showKeys('Ctrl+Shift+B')})`} data-web-button>
+        <button className="icon-btn" onClick={() => openWebTab('', { beside: true })} title={`Web browser (${showKeys('Ctrl+Shift+I')})`} data-web-button>
           <Globe size={15} />
         </button>
         <LayoutMenu />
