@@ -56,6 +56,10 @@ export interface Prefs {
   openLinksInApp: boolean
   /** Notes starts on the Home page (today, reminders, recent notes). */
   homeOnStart: boolean
+  /** The Home page's boxes in the order you dragged them into (ids; boxes not listed keep their usual place). */
+  homeOrder: string[]
+  /** Home page boxes you've hidden. */
+  homeHidden: string[]
   /** Every note opens read-only (links open with a plain click) until you switch back to writing. */
   readingMode: boolean
   /** The file list shows pictures, recordings and other files, not just notes. */
@@ -175,6 +179,8 @@ export const DEFAULT_PREFS: Prefs = {
   openInNewTab: false,
   openLinksInApp: true,
   homeOnStart: true,
+  homeOrder: [],
+  homeHidden: [],
   readingMode: false,
   randomIncludeDaily: false,
   showAttachments: true,
@@ -255,6 +261,10 @@ const CHOICES = {
 /** Shortcuts offered for quick capture (system-wide, so they're picked from a safe list). */
 export const CAPTURE_SHORTCUTS = CHOICES.captureShortcut
 
+/** A list of Home box ids: short, simple and each only once. */
+const cleanIds = (v: unknown): string[] =>
+  Array.isArray(v) ? [...new Set(v.filter((id): id is string => typeof id === 'string' && /^[a-z0-9-]{1,40}$/.test(id)))].slice(0, 50) : []
+
 const isHex = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)
 /** Font names are used inside CSS, so keep them to characters a font name can contain. */
 const cleanFont = (v: unknown): string =>
@@ -274,7 +284,7 @@ export function cleanFolder(v: unknown, fallback: string): string {
 /** Turns anything (a hand-edited file, an old version) into valid preferences. */
 export function normalizePrefs(raw: unknown): Prefs {
   const input = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
-  const out: Prefs = { ...DEFAULT_PREFS, shortcuts: {} }
+  const out: Prefs = { ...DEFAULT_PREFS, homeOrder: [], homeHidden: [], shortcuts: {} }
 
   for (const key of Object.keys(DEFAULT_PREFS) as (keyof Prefs)[]) {
     const value = input[key]
@@ -325,6 +335,8 @@ export function normalizePrefs(raw: unknown): Prefs {
   }
   if (typeof input.captureHeading === 'string' && input.captureHeading.length <= 60) out.captureHeading = input.captureHeading.trim()
   out.captureInbox = cleanFolder(input.captureInbox ?? DEFAULT_PREFS.captureInbox, DEFAULT_PREFS.captureInbox) || DEFAULT_PREFS.captureInbox
+  out.homeOrder = cleanIds(input.homeOrder)
+  out.homeHidden = cleanIds(input.homeHidden)
 
   if (input.shortcuts && typeof input.shortcuts === 'object') {
     for (const [id, value] of Object.entries(input.shortcuts as Record<string, unknown>)) {

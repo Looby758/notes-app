@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { CalendarDays, Clock, FileText, Layers, Plus } from 'lucide-react'
+import { ArrowDown, ArrowUp, CalendarDays, Clock, Eye, EyeOff, FileText, GripVertical, Layers, Plus, SlidersHorizontal } from 'lucide-react'
 import { useEditor } from '../../store/editor'
 import { useNoteIndex } from '../../store/noteIndex'
 import { useVault } from '../../store/vault'
 import { CALENDAR_TAB, FLASHCARDS_TAB, isNoteTab, openNote, openSpecialTab } from '../../lib/editorController'
 import { openToday } from '../../lib/daily'
 import { dayKey, formatDate } from '../../lib/dates'
-import { homeCards } from '../../lib/home'
+import { arrangeHome, homeCards, moveId } from '../../lib/home'
+import { setPrefs, usePrefs } from '../../store/prefs'
 import { IS_MAC, showKeys } from '@shared/platform'
 import { noteTitle, parentOf } from '../../lib/paths'
 import { DayList, ExternalStatus, useExternalRange, useItemsByDay } from '../Calendar/shared'
@@ -143,30 +144,139 @@ function Keys({ s }: { s: string }) {
 /** The start page: today's plans (reminders included), the weather, flashcards and recent notes at a glance. */
 export default function HomePage() {
   const now = useNow()
-  const boxes = [
-    { id: 'today', order: 10, node: <TodayBox now={now} /> },
-    { id: 'weather', order: 20, node: <WeatherHomeBox /> },
-    { id: 'flashcards', order: 30, node: <FlashcardsBox /> },
-    { id: 'recent', order: 40, node: <RecentBox /> },
-    ...homeCards().map(({ id, order, Card }) => ({ id, order, node: <Card /> }))
-  ].sort((a, b) => a.order - b.order)
+  const order = usePrefs((s) => s.prefs.homeOrder)
+  const hidden = usePrefs((s) => s.prefs.homeHidden)
+  const [editing, setEditing] = useState(false)
+  const boxes = arrangeHome(
+    [
+      { id: 'today', order: 10, title: 'Today', node: <TodayBox now={now} /> },
+      { id: 'weather', order: 20, title: 'Weather', node: <WeatherHomeBox /> },
+      { id: 'flashcards', order: 30, title: 'Flashcards', node: <FlashcardsBox /> },
+      { id: 'recent', order: 40, title: 'Recent notes', node: <RecentBox /> },
+      ...homeCards().map(({ id, order, title, Card }) => ({ id, order, title, node: <Card /> }))
+    ].sort((a, b) => a.order - b.order),
+    order
+  )
+
+  useEffect(() => {
+    if (!editing) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setEditing(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [editing])
 
   return (
     <div className="home-page" data-home-page>
       <div className="home-inner">
-        <h2>{greeting(now)}</h2>
-        <p className="home-date">{formatDate(now, 'dddd D MMMM YYYY')}</p>
-        <div className="home-grid">
-          {boxes.map((b) => (
-            <div key={b.id} className="home-cell">
-              {b.node}
-            </div>
-          ))}
+        <div className="home-head">
+          <h2>{greeting(now)}</h2>
+          {editing ? (
+            <>
+              {(order.length > 0 || hidden.length > 0) && (
+                <button className="link-button" onClick={() => setPrefs({ homeOrder: [], homeHidden: [] })}>
+                  Reset
+                </button>
+              )}
+              <button className="btn btn-primary" onClick={() => setEditing(false)} data-home-done>
+                Done
+              </button>
+            </>
+          ) : (
+            <button className="link-button home-customise" onClick={() => setEditing(true)} title="Move and hide boxes" data-home-customise>
+              <SlidersHorizontal size={13} /> Customise
+            </button>
+          )}
         </div>
+        <p className="home-date">{editing ? 'Drag boxes to move them, or use the arrows. Hidden boxes stay here until you show them again.' : formatDate(now, 'dddd D MMMM YYYY')}</p>
+        {editing ? (
+          <EditGrid boxes={boxes} hidden={hidden} />
+        ) : (
+          <div className="home-grid">
+            {boxes
+              .filter((b) => !hidden.includes(b.id))
+              .map((b) => (
+                <div key={b.id} className="home-cell">
+                  {b.node}
+                </div>
+              ))}
+          </div>
+        )}
         <p className="home-keys">
           <Keys s="Ctrl+P" /> open a note · <Keys s="Ctrl+N" /> new note · <Keys s="Ctrl+K" /> all commands
         </p>
       </div>
+    </div>
+  )
+}
+
+interface Box {
+  id: string
+  title: string
+  node: ReactNode
+}
+
+/** Customising the Home page: every box, with a handle to drag it, arrows to move it and an eye to hide it. */
+function EditGrid({ boxes, hidden }: { boxes: Box[]; hidden: string[] }) {
+  const [dragging, setDragging] = useState<string | null>(null)
+  const [over, setOver] = useState<string | null>(null)
+  const ids = boxes.map((b) => b.id)
+  const move = (id: string, to: number): void => setPrefs({ homeOrder: moveId(ids, id, to) })
+  const toggle = (id: string): void =>
+    setPrefs({ homeHidden: hidden.includes(id) ? hidden.filter((h) => h !== id) : [...hidden, id] })
+
+  return (
+    <div className="home-grid editing">
+      {boxes.map((b, i) => {
+        const off = hidden.includes(b.id)
+        return (
+          <div
+            key={b.id}
+            className={`home-cell home-cell-edit ${off ? 'off' : ''} ${dragging === b.id ? 'dragging' : ''} ${over === b.id && dragging !== b.id ? 'drop-here' : ''}`}
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.effectAllowed = 'move'
+              e.dataTransfer.setData('text/plain', b.id)
+              setDragging(b.id)
+            }}
+            onDragEnd={() => {
+              setDragging(null)
+              setOver(null)
+            }}
+            onDragOver={(e) => {
+              if (!dragging) return
+              e.preventDefault()
+              e.dataTransfer.dropEffect = 'move'
+              if (over !== b.id) setOver(b.id)
+            }}
+            onDrop={(e) => {
+              e.preventDefault()
+              if (dragging && dragging !== b.id) move(dragging, i)
+              setDragging(null)
+              setOver(null)
+            }}
+            data-home-edit={b.id}
+          >
+            <div className="home-edit-bar">
+              <GripVertical size={14} className="home-edit-grip" />
+              <button className="icon-btn" disabled={i === 0} onClick={() => move(b.id, i - 1)} title="Move earlier">
+                <ArrowUp size={13} />
+              </button>
+              <button className="icon-btn" disabled={i === boxes.length - 1} onClick={() => move(b.id, i + 1)} title="Move later">
+                <ArrowDown size={13} />
+              </button>
+              <button className={`icon-btn ${off ? 'active' : ''}`} onClick={() => toggle(b.id)} title={off ? 'Show this box' : 'Hide this box'} data-home-hide>
+                {off ? <EyeOff size={13} /> : <Eye size={13} />}
+              </button>
+            </div>
+            {/* A box with nothing to show yet still gets a placeholder, so you can place it. */}
+            <div className="home-cell-body" data-empty={`${b.title}: shows up once there’s something in it.`}>
+              {b.node}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

@@ -6,6 +6,10 @@ import { IS_MAC } from '@shared/platform'
 import { currentPosition, musicControl, musicPlay, musicSeek, openMusicSettings, refreshMusicStatus, setMusicOpen, startMusic, useMusic } from '../../store/music'
 import { openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
 import { errorMessage } from '../../lib/paths'
+import { addHomeCard } from '../../lib/home'
+import MusicHomeCard from './MusicHomeCard'
+
+addHomeCard({ id: 'music', order: 35, title: 'Now playing', Card: MusicHomeCard })
 
 type Tab = 'playlists' | 'search' | 'link'
 

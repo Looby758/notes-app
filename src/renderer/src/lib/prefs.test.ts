@@ -26,6 +26,12 @@ describe('normalizePrefs', () => {
     expect(p.accent).toBe('')
   })
 
+  it('keeps the Home page layout as a clean list of box ids', () => {
+    const p = normalizePrefs({ homeOrder: ['recent', 'today', 'recent', 42, 'Bad Id!'], homeHidden: 'weather' })
+    expect(p.homeOrder).toEqual(['recent', 'today'])
+    expect(p.homeHidden).toEqual([])
+  })
+
   it('strips characters that could break CSS from font names', () => {
     expect(normalizePrefs({ editorFont: 'Fira Code"; } body { display: none' }).editorFont).toBe('Fira Code  body  display none')
   })

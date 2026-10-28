@@ -310,3 +310,68 @@ body.zen .music-player {
 .music-redirect code {
   user-select: text;
 }
+
+/* The Home page's "Now playing" box. */
+.music-home {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.music-home-art {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 6px;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  overflow: hidden;
+}
+.music-home-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.music-home-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+.music-home-text strong,
+.music-home-text span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.music-home-text strong {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+.music-home-text span {
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.music-home-bar {
+  margin-top: 12px;
+}
+.home-box .music-error {
+  padding: 8px 0 0;
+  font-size: 12.5px;
+}
+.music-home-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.music-home-empty .btn {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  font-size: 12.5px;
+}
