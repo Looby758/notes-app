@@ -136,11 +136,12 @@ function EntryForm({ editing, done, month }: { editing: MoneyEntry | null; done:
   const [date, setDate] = useState(editing?.date ?? (month === monthOf(new Date()) ? dayOf(new Date()) : `${month}-01`))
   const [note, setNote] = useState(editing?.note ?? '')
   const amountBox = useRef<HTMLInputElement>(null)
+  const categories = useMoney((s) => s.categories)
   const pence = typedPence(amount)
 
   const switchKind = (toIncome: boolean): void => {
     setIncome(toIncome)
-    setCategory(toIncome ? 'pay' : OTHER)
+    setCategory(toIncome ? (categories.find((c) => c.income)?.id ?? OTHER_INCOME) : OTHER)
   }
 
   const submit = (e: FormEvent): void => {
