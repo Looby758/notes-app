@@ -43,6 +43,7 @@ import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
 import { applyIconOutsideApp } from './appIcon'
 import { CODE_SANDBOX_SCHEME, registerCodeSandbox } from './codeSandbox'
+import { readHandwritingOffline } from './handwriting'
 
 let vault: Vault | null = null
 const shownReminders = new Set<Electron.Notification>()
@@ -549,6 +550,7 @@ function registerIpc(): void {
   ipcMain.handle('ai:chat', (_e, messages: AiChatMessage[]) => ai.chat(messages))
   ipcMain.handle('ai:loadChats', () => ai.loadChats())
   ipcMain.handle('ai:saveChats', (_e, chats: AiChat[]) => ai.saveChats(chats))
+  ipcMain.handle('handwriting:read', (_e, png: Uint8Array, reader: 'ai' | 'offline') => (reader === 'ai' ? ai.readHandwriting(png) : readHandwritingOffline(png)))
 
   ipcMain.handle('vault:readAppData', (_e, name: string) => currentVault().readAppData(name))
   ipcMain.handle('vault:writeAppData', (_e, name: string, content: string) => currentVault().writeAppData(name, content))

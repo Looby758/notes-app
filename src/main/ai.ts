@@ -5,9 +5,10 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { AiAskTurn, AiChat, AiChatMessage, AiNote, AiStatus } from '@shared/types'
 
 /**
- * The AI helper: summarise a note, tidy a quick capture, and answer questions from your notes,
- * using Claude with your own Anthropic API key. The key is stored encrypted with the system's own
- * protection (Electron safeStorage, like calendar sign-ins) in `ai.json` in the settings folder.
+ * The AI helper: summarise a note, tidy a quick capture, answer questions from your notes and read
+ * the handwriting in a sketch, using Claude with your own Anthropic API key. The key is stored
+ * encrypted with the system's own protection (Electron safeStorage, like calendar sign-ins) in
+ * `ai.json` in the settings folder.
  *
  * Nothing is sent anywhere unless you ask: each call below runs only when you press a button.
  */
@@ -193,4 +194,31 @@ export function loadChats(): AiChat[] {
 
 export function saveChats(chats: AiChat[]): void {
   writeJson(CHATS, { chats })
+}
+
+const NO_WRITING = '(no writing)'
+
+const HANDWRITING_SYSTEM = `You read the handwriting in a picture of a person's sketch and type it out for their notes.
+Write exactly what they wrote, in the same language, keeping their line breaks. Fix nothing and add nothing, but where a word is hard to read, give your best reading rather than a placeholder.
+Use plain markdown only where the writing already has that shape: "- " for a written list, "- [ ] " for to-do boxes (and "- [x] " for ticked ones), "# " for a clearly underlined or larger title. Write maths as plain text, like 3x + 2 = 11.
+Leave out drawings, arrows and doodles that aren't words. If there's no writing at all, reply with exactly ${NO_WRITING}.
+Reply with only the text.`
+
+export async function readHandwriting(png: Uint8Array): Promise<string> {
+  const image = Buffer.from(png).toString('base64')
+  const text = await ask(
+    HANDWRITING_SYSTEM,
+    [
+      {
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: image } },
+          { type: 'text', text: 'Type out the writing in this sketch.' }
+        ]
+      }
+    ],
+    'low'
+  )
+  if (text === NO_WRITING) throw new Error('Claude couldn’t find any writing in this sketch.')
+  return text
 }

@@ -6375,6 +6375,66 @@ body.theme-light .flashcard-grade.grade-easy span {
   color: var(--text-faint);
 }
 
+.sketch-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.sketch-body .sketch-board {
+  min-width: 0;
+}
+/* "Turn into text": what was read, beside the drawing. */
+.sketch-reading {
+  width: 300px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-left: 1px solid var(--border);
+  user-select: text;
+}
+.sketch-reading-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-strong);
+}
+.sketch-reading-note {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.sketch-reading-note.error {
+  color: var(--text);
+}
+.sketch-reading-text {
+  flex: 1;
+  min-height: 160px;
+  resize: none;
+  padding: 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  color: var(--text-strong);
+  font-family: var(--font-editor);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.sketch-reading-text:focus {
+  outline: none;
+  border-color: var(--accent-dim);
+}
+.sketch-reading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.sketch-reading-other {
+  align-self: flex-start;
+}
+
 /* A sketch in a note, with its Edit button on hover. */
 .cm-sketch {
   position: relative;

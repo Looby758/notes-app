@@ -343,6 +343,8 @@ export interface NotesApi {
   /** Saved chats, kept in the settings folder on this computer. */
   aiLoadChats(): Promise<AiChat[]>
   aiSaveChats(chats: AiChat[]): Promise<void>
+  /** The writing in a picture of a sketch (a PNG), read by the AI helper or offline on this computer. */
+  readHandwriting(png: Uint8Array, reader: 'ai' | 'offline'): Promise<string>
   /** The last-opened vault, or null if none is set or the folder no longer exists. */
   getVault(): Promise<string | null>
   /** Opens a folder picker; returns the chosen vault path, or null if cancelled. */

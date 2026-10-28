@@ -15,11 +15,21 @@ files:
   - '!node_modules/node-pty/binding.gyp'
   - '!node_modules/node-pty/**/*.pdb'
   - '!node_modules/node-addon-api/**'
-# Used as it comes (it's ready-made for Windows and both kinds of Mac), so it isn't rebuilt.
+  # The offline handwriting reader uses the smaller English model (4.0.0_best_int), not this one.
+  - '!node_modules/@tesseract.js-data/eng/4.0.0/**'
+# node-pty is used as it comes (it's ready-made for Windows and both kinds of Mac), so it isn't rebuilt.
 npmRebuild: false
-# Its programs and background helper can't run from inside the app's archive.
+# These can't run from inside the app's archive: node-pty's programs and background helper, and
+# the offline handwriting reader's worker thread and the packages it loads.
 asarUnpack:
   - node_modules/node-pty/**
+  - node_modules/tesseract.js/**
+  - node_modules/tesseract.js-core/**
+  - node_modules/@tesseract.js-data/**
+  - node_modules/regenerator-runtime/**
+  - node_modules/is-url/**
+  - node_modules/wasm-feature-detect/**
+  - node_modules/bmp-js/**
 win:
   target:
     - target: nsis

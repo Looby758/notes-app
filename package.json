@@ -17,9 +17,11 @@
   "//": "Only the main process's runtime packages go in dependencies; everything the renderer uses is bundled by Vite, so it lives in devDependencies and stays out of the installer.",
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",
+    "@tesseract.js-data/eng": "^1.0.0",
     "chokidar": "^4.0.3",
     "electron-updater": "^6.8.11",
-    "node-pty": "1.1.0"
+    "node-pty": "1.1.0",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@breezystack/lamejs": "^1.2.7",

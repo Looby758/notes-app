@@ -133,6 +133,7 @@ const api: NotesApi = {
   aiChat: (messages) => ipcRenderer.invoke('ai:chat', messages),
   aiLoadChats: () => ipcRenderer.invoke('ai:loadChats'),
   aiSaveChats: (chats) => ipcRenderer.invoke('ai:saveChats', chats),
+  readHandwriting: (png, reader) => ipcRenderer.invoke('handwriting:read', png, reader),
   getVault: () => ipcRenderer.invoke('vault:get'),
   pickVault: () => ipcRenderer.invoke('vault:pick'),
   closeVault: () => ipcRenderer.invoke('vault:close'),
