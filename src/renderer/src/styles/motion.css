@@ -84,19 +84,8 @@
   animation: m-tab-out calc(170ms * var(--m-time)) var(--m-ease-out) forwards;
 }
 
-/* ---------- A new split pane slides open ---------- */
+/* ---------- A new split pane fades in ---------- */
 
-@keyframes m-split-open {
-  from {
-    flex-grow: 0;
-  }
-}
-.split-child:has(> .pane-new) {
-  animation: m-split-open 300ms var(--m-ease-out) backwards;
-}
-:root[data-motion='subtle'] .split-child:has(> .pane-new) {
-  animation: none;
-}
 .pane-new {
   animation: m-fade-in calc(300ms * var(--m-time)) ease-out backwards;
 }

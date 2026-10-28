@@ -1,9 +1,11 @@
-import { app, BrowserWindow, ipcMain, nativeTheme, screen, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, screen, shell, type WebContents } from 'electron'
 import { join } from 'path'
 import { activeThemeId, getTheme } from '@shared/themes'
 import type { Prefs } from '@shared/prefs'
 import { IS_MAC } from '@shared/platform'
 import { isYouTubeUrl, YOUTUBE_HOME } from '@shared/youtube'
+import { isGoogleSignIn, WEB_PARTITION } from '@shared/web'
+import { guardPage } from './browser'
 import { loadSettings, saveSettings } from './settings'
 
 /**
@@ -128,6 +130,45 @@ function staysInWindow(url: string): boolean {
   }
 }
 
+/**
+ * Google's sign-in opens in a small window of its own over the mini window, set up like the web
+ * tabs' sign-in pop-ups (which Google accepts), rather than inside YouTube's page. Once it's done
+ * and heads back to YouTube, it closes and the mini window carries on from there, signed in.
+ */
+let signInWin: BrowserWindow | null = null
+
+function openSignIn(url: string, video: WebContents): void {
+  if (signInWin && !signInWin.isDestroyed()) {
+    void signInWin.loadURL(url)
+    signInWin.focus()
+    return
+  }
+  const win = new BrowserWindow({
+    width: 520,
+    height: 720,
+    parent: miniWin ?? undefined,
+    autoHideMenuBar: true,
+    title: 'Sign in',
+    webPreferences: { partition: WEB_PARTITION, sandbox: true, contextIsolation: true, nodeIntegration: false }
+  })
+  signInWin = win
+  guardPage(win.webContents, () => (miniWin && !miniWin.isDestroyed() ? miniWin.webContents : null))
+  let backTo: string | null = null
+  win.webContents.on('did-navigate', (_e, next) => {
+    if (!isYouTubeUrl(next)) return
+    backTo = next
+    win.close()
+  })
+  win.on('closed', () => {
+    signInWin = null
+    if (video.isDestroyed()) return
+    // Back to where YouTube sends you after signing in, or the same page again, now signed in.
+    if (backTo) void video.loadURL(backTo)
+    else video.reload()
+  })
+  void win.loadURL(url)
+}
+
 export function setupYouTube(getPrefs: () => Prefs): void {
   prefs = getPrefs
   // A link out of YouTube (in a video's description, say) opens in your own browser instead.
@@ -135,7 +176,13 @@ export function setupYouTube(getPrefs: () => Prefs): void {
     if (contents.getType() !== 'webview') return
     const inMini = (): boolean => !!miniWin && !miniWin.isDestroyed() && contents.hostWebContents === miniWin.webContents
     const leave = (e: { preventDefault(): void }, url: string): void => {
-      if (!inMini() || staysInWindow(url)) return
+      if (!inMini()) return
+      if (isGoogleSignIn(url)) {
+        e.preventDefault()
+        openSignIn(url, contents)
+        return
+      }
+      if (staysInWindow(url)) return
       e.preventDefault()
       if (/^https?:/i.test(url)) void shell.openExternal(url)
     }
