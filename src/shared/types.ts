@@ -4,7 +4,7 @@ import type { Sheet } from './sheet'
 import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
 import type { MusicAction, MusicItem, MusicSearchResults, MusicState, MusicStatus } from './spotify'
-import type { GamesList } from './games'
+import type { GamesList, LaunchArt } from './games'
 
 export interface WindowBounds {
   x?: number
@@ -400,6 +400,8 @@ export interface NotesApi {
   gamesList(rescan: boolean): Promise<GamesList>
   /** Starts a game; resolves to a message if it couldn't. */
   gamesPlay(id: string): Promise<string | null>
+  /** The backdrop and title logo for a game's launch animation. */
+  gamesLaunchArt(id: string): Promise<LaunchArt>
   gamesSetHidden(id: string, hidden: boolean): Promise<void>
   /** Asks for an app to add as a game; resolves to its id, or null if cancelled. */
   gamesAdd(): Promise<string | null>

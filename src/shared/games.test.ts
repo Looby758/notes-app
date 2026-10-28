@@ -11,6 +11,9 @@ import {
   playedInWeek,
   sortGames,
   steamAppFromManifest,
+  steamAppId,
+  steamCachePaths,
+  steamImageUrl,
   steamLibraryFolders,
   steamPlaytimes,
   type Game
@@ -149,5 +152,22 @@ describe('sortGames and isInside', () => {
     expect(isInside('/Applications/Chess.app2/x', '/Applications/Chess.app', true)).toBe(false)
     expect(isInside('C:\\Games\\Portal 2\\portal2.exe', 'C:\\Games\\Portal 2', true)).toBe(true)
     expect(isInside('/a/b', '', true)).toBe(false)
+  })
+})
+
+describe('launch animation art', () => {
+  it('finds the Steam app id only in Steam game ids', () => {
+    expect(steamAppId('steam:620')).toBe('620')
+    expect(steamAppId('epic:Fortnite')).toBeNull()
+    expect(steamAppId('app:/Applications/steam:1.app')).toBeNull()
+  })
+
+  it("points at Steam's website pictures", () => {
+    expect(steamImageUrl('620', 'library_hero.jpg')).toBe('https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/620/library_hero.jpg')
+    expect(steamImageUrl('620', 'logo.png')).toBe('https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/620/logo.png')
+  })
+
+  it("looks in both of Steam's cache layouts, then its subfolders", () => {
+    expect(steamCachePaths('/c', '620', 'logo.png', ['abc'])).toEqual(['/c/620/logo.png', '/c/620_logo.png', '/c/620/abc/logo.png'])
   })
 })

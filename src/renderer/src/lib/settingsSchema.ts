@@ -171,6 +171,15 @@ export const SETTINGS: SettingDef[] = [
     description: 'Turns off animations and transitions.',
     keywords: 'animation accessibility'
   },
+  {
+    key: 'gameLaunchAnimation',
+    section: 'appearance',
+    group: 'Interface',
+    type: 'toggle',
+    label: 'Launch animation for games',
+    description: 'Pressing Play on the Games page shows the game’s art and logo for a few seconds while it starts. Click or press Esc to skip it. Off while Reduce motion is on.',
+    keywords: 'games play launch start animation intro splash steam epic cinematic'
+  },
 
   // ---------- Editor ----------
   {

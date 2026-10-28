@@ -296,3 +296,39 @@ export function isInside(programPath: string, gamePath: string, caseInsensitive:
   const game = norm(gamePath)
   return !!game && (prog === game || prog.startsWith(game + '/'))
 }
+
+// ---------- the launch animation ----------
+
+/** The pictures the launch animation uses: a wide backdrop and the game's title logo. */
+export interface LaunchArt {
+  /** A web address or data: URL; null when there's none (the card art or icon is used instead). */
+  hero: string | null
+  /** A see-through picture of the title; null to write the name instead. */
+  logo: string | null
+}
+
+/** Steam's pictures for a game, by their file names in its library cache and on its website. */
+export type SteamImage = 'header.jpg' | 'library_hero.jpg' | 'logo.png'
+
+/** The Steam app id in a game id like "steam:620", or null for other games. */
+export function steamAppId(gameId: string): string | null {
+  const m = /^steam:(\d+)$/.exec(gameId)
+  return m ? m[1] : null
+}
+
+/** Where Steam's website keeps a game's pictures. */
+export function steamImageUrl(appId: string, image: SteamImage): string {
+  return `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appId}/${image}`
+}
+
+/**
+ * Where Steam's library cache may already hold a picture, best first: older Steam keeps
+ * "620_logo.png" in the cache folder, newer Steam keeps "620/logo.png", sometimes one folder further down.
+ */
+export function steamCachePaths(cache: string, appId: string, image: SteamImage, subfolders: string[]): string[] {
+  const join = (...parts: string[]): string => parts.join('/')
+  return [join(cache, appId, image), join(cache, `${appId}_${image}`), ...subfolders.map((sub) => join(cache, appId, sub, image))]
+}
+
+/** How long the launch animation plays (ms) before it fades out by itself. */
+export const LAUNCH_ANIMATION_MS = 3200

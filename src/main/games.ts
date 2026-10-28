@@ -13,6 +13,11 @@ import {
   playedInWeek,
   plistString,
   steamAppFromManifest,
+  steamAppId,
+  steamCachePaths,
+  steamImageUrl,
+  type LaunchArt,
+  type SteamImage,
   steamLibraryFolders,
   steamPlaytimes,
   type Game,
@@ -97,22 +102,27 @@ function epicManifestDirs(): string[] {
   return []
 }
 
-/** Steam's own copy of a game's banner, if it has one; otherwise the one on Steam's website. */
-async function steamArt(root: string, appId: string): Promise<string> {
+/** Steam's own copy of one of a game's pictures, as a data: URL, or null if it hasn't saved one. */
+async function steamCached(root: string, appId: string, image: SteamImage): Promise<string | null> {
   const cache = join(root, 'appcache', 'librarycache')
-  const candidates = [join(cache, appId, 'header.jpg'), join(cache, `${appId}_header.jpg`)]
-  // Newer Steam keeps some pictures one folder further down.
-  for (const sub of await list(join(cache, appId))) candidates.push(join(cache, appId, sub, 'header.jpg'))
-  for (const file of candidates) {
+  for (const file of steamCachePaths(cache, appId, image, await list(join(cache, appId)))) {
     try {
       const data = await readFile(file)
-      if (data.length) return `data:image/jpeg;base64,${data.toString('base64')}`
+      if (data.length) return `data:${image.endsWith('.png') ? 'image/png' : 'image/jpeg'};base64,${data.toString('base64')}`
     } catch {
       // not this one
     }
   }
-  return `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appId}/header.jpg`
+  return null
 }
+
+/** Steam's own copy of a game's banner, if it has one; otherwise the one on Steam's website. */
+async function steamArt(root: string, appId: string): Promise<string> {
+  return (await steamCached(root, appId, 'header.jpg')) ?? steamImageUrl(appId, 'header.jpg')
+}
+
+/** Where Steam is installed, once a scan has found it. */
+let steamRoot: string | null = null
 
 async function findSteam(): Promise<{ games: Found[]; installed: boolean }> {
   let root: string | null = null
@@ -120,6 +130,7 @@ async function findSteam(): Promise<{ games: Found[]; installed: boolean }> {
     root = r
     break
   }
+  steamRoot = root
   if (!root) return { games: [], installed: false }
 
   // Time played, from each account that's signed in on this computer.
@@ -436,6 +447,17 @@ export function setupGames(): void {
     // Look again soon, so it shows as playing without waiting a whole minute.
     scheduleTick(15_000)
     return null
+  })
+
+  // The launch animation's pictures, fetched when you press Play (they're too big to send for every game).
+  ipcMain.handle('games:launchArt', async (_e, id: string): Promise<LaunchArt> => {
+    const g = found.find((f) => f.id === id)
+    const appId = steamAppId(id)
+    if (!g || !appId) return { hero: g?.art ?? null, logo: null }
+    const [hero, logo] = steamRoot
+      ? await Promise.all([steamCached(steamRoot, appId, 'library_hero.jpg'), steamCached(steamRoot, appId, 'logo.png')])
+      : [null, null]
+    return { hero: hero ?? steamImageUrl(appId, 'library_hero.jpg'), logo: logo ?? steamImageUrl(appId, 'logo.png') }
   })
 
   ipcMain.handle('games:setHidden', (_e, id: string, hide: boolean) => {

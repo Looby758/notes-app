@@ -8856,3 +8856,184 @@ p.games-none {
   padding: 4px 10px;
   font-size: 12px;
 }
+
+/* ---------- games: launch animation ---------- */
+.launch-anim {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 40%, color-mix(in srgb, var(--accent) 35%, #000), #000 75%);
+  cursor: pointer;
+  animation: launch-in 0.35s var(--ease) both;
+}
+.launch-anim.closing {
+  animation: launch-out 0.4s ease-in both;
+  pointer-events: none;
+}
+.launch-backdrop {
+  position: absolute;
+  inset: 0;
+}
+.launch-backdrop img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transform: scale(1.12);
+  transition: opacity 0.6s ease;
+  animation: launch-drift var(--launch-ms) cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+.launch-backdrop img.loaded {
+  opacity: 1;
+}
+/* A Mac app's icon is far too small to fill the window, so it becomes a soft glow of its colours. */
+.launch-backdrop img.launch-backdrop-icon {
+  filter: blur(60px) saturate(1.4);
+  opacity: 0.55;
+}
+.launch-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(0, 0, 0, 0.55) 100%),
+    linear-gradient(to top, rgba(0, 0, 0, 0.75), transparent 45%);
+}
+.launch-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 9vh;
+  background: #000;
+  animation: launch-bar-top 0.7s var(--ease) both;
+}
+.launch-bar.top {
+  top: 0;
+}
+.launch-bar.bottom {
+  bottom: 0;
+  animation-name: launch-bar-bottom;
+}
+.launch-title {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  max-width: min(640px, 80vw);
+  margin-top: 18vh;
+  animation: launch-title 1s 0.35s var(--ease) both;
+}
+.launch-logo {
+  max-width: 100%;
+  max-height: 26vh;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 24px rgba(0, 0, 0, 0.7));
+}
+.launch-icon {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 24px rgba(0, 0, 0, 0.6));
+}
+.launch-name {
+  color: #fff;
+  font-size: clamp(28px, 5vw, 56px);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  text-align: center;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.7);
+}
+.launch-status {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.launch-progress {
+  width: 180px;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.18);
+}
+.launch-progress span {
+  display: block;
+  height: 100%;
+  background: #fff;
+  transform-origin: left;
+  animation: launch-progress var(--launch-ms) linear both;
+}
+.launch-skip {
+  position: absolute;
+  right: 24px;
+  bottom: calc(9vh + 16px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.85);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  animation: launch-in 0.4s 0.8s both;
+}
+.launch-skip:hover {
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+}
+.launch-skip kbd {
+  padding: 0 5px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  font-size: 11px;
+}
+@keyframes launch-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes launch-out {
+  to {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+}
+@keyframes launch-drift {
+  from {
+    transform: scale(1.12);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+@keyframes launch-bar-top {
+  from {
+    transform: translateY(-100%);
+  }
+}
+@keyframes launch-bar-bottom {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes launch-title {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+    filter: blur(8px);
+  }
+}
+@keyframes launch-progress {
+  from {
+    transform: scaleX(0);
+  }
+}
