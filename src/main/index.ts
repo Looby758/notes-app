@@ -32,6 +32,7 @@ import * as ai from './ai'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
 import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
+import { setupConverter } from './converter'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
@@ -667,6 +668,7 @@ app.whenReady().then(async () => {
   registerCodeSandbox()
   registerIpc()
   safely('export', setupExport)
+  safely('converter', setupConverter)
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))
   mainWindow = createWindow()

@@ -16,6 +16,7 @@ import {
   CHAT_TAB,
   HOME_TAB,
   MONEY_TAB,
+  CONVERT_TAB,
   closePane,
   closeTabUnlessPinned,
   cycleTab,
@@ -238,6 +239,7 @@ export const commands: Command[] = [
   { id: 'flashcards.open', group: 'Navigation', title: 'Review flashcards', shortcut: 'Ctrl+Shift+Y', run: () => openSpecialTab(FLASHCARDS_TAB) },
   { id: 'terminal.open', group: 'Navigation', title: 'Open terminal (command line in the notes folder)', shortcut: 'Ctrl+Alt+T', run: () => openSpecialTab(TERMINAL_TAB) },
   { id: 'money.open', group: 'Navigation', title: 'Open money tracker', shortcut: 'Ctrl+Shift+B', run: () => openSpecialTab(MONEY_TAB) },
+  { id: 'convert.open', group: 'Navigation', title: 'Convert files (photos, Word, audio…)', run: () => openSpecialTab(CONVERT_TAB) },
   {
     id: 'view.mindmap',
     group: 'View',

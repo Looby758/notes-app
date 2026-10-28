@@ -22,6 +22,7 @@ import {
   PASSWORDS_TAB,
   HOME_TAB,
   MONEY_TAB,
+  CONVERT_TAB,
   SETTINGS_TAB,
   splitPane
 } from '../../lib/editorController'
@@ -44,6 +45,7 @@ import TerminalPage from '../Terminal/TerminalPage'
 import PasswordsPage from '../Passwords/PasswordsPage'
 import HomePage from '../Home/HomePage'
 import MoneyPage from '../Money/MoneyPage'
+import ConvertPage from '../Convert/ConvertPage'
 import MindMap from '../MindMap/MindMap'
 import { isMindMap, useUI } from '../../store/ui'
 import { needsUnlock, useLock } from '../../lib/lock/session'
@@ -135,6 +137,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === PASSWORDS_TAB && <PasswordsPage autoFocus={isActivePane} />}
         {(active === HOME_TAB || !active) && <HomePage />}
         {active === MONEY_TAB && <MoneyPage />}
+        {active === CONVERT_TAB && <ConvertPage />}
         {zone && <div className={`drop-zone ${zone}`} />}
       </div>
     </div>

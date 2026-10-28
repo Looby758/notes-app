@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  ArrowRightLeft,
   ChevronDown,
   Command as CommandIcon,
   FolderOpen,
@@ -16,7 +17,7 @@ import {
   PanelLeft,
   PanelRight,
   Settings as SettingsIcon,
-  SquareTerminal
+  SquareTerminal,
   PoundSterling
 } from 'lucide-react'
 import { useVault } from '../store/vault'
@@ -43,6 +44,7 @@ import {
   CHAT_TAB,
   HOME_TAB,
   MONEY_TAB,
+  CONVERT_TAB,
   setZenEditor
 } from '../lib/editorController'
 import { openLink, openWikiLink } from '../lib/openLink'
@@ -289,11 +291,15 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         </button>
         <button className="icon-btn" onClick={() => openSpecialTab(PASSWORDS_TAB)} title={`Passwords (${showKeys('Ctrl+Alt+K')})`} data-passwords-button>
           <KeyRound size={15} />
+        </button>
         <button className="icon-btn" onClick={() => openSpecialTab(MONEY_TAB)} title={`Money (${showKeys('Ctrl+Shift+B')})`} data-money-button>
           <PoundSterling size={15} />
         </button>
         <button className="icon-btn" onClick={() => openSpecialTab(CHAT_TAB)} title="Chat with Claude" data-chat-button>
           <MessageSquare size={15} />
+        </button>
+        <button className="icon-btn" onClick={() => openSpecialTab(CONVERT_TAB)} title="Convert files" data-convert-button>
+          <ArrowRightLeft size={15} />
         </button>
         <LayoutMenu />
         <button className="icon-btn" onClick={() => useUI.setState({ modal: 'commands' })} title={`All commands (${showKeys('Ctrl+K')})`}>

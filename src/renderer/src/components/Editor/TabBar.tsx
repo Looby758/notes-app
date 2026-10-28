@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { CalendarDays, Columns2, FileDown, FolderSearch, GitCompare, House, KeyRound, Layers, MessageSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
+import { ArrowRightLeft, CalendarDays, Columns2, FileDown, FolderSearch, GitCompare, House, KeyRound, Layers, MessageSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
 import { useEditor } from '../../store/editor'
 import { toggleStar, useStarred } from '../../store/starred'
 import { useNoteIndex } from '../../store/noteIndex'
@@ -17,6 +17,7 @@ import {
   PASSWORDS_TAB,
   HOME_TAB,
   MONEY_TAB,
+  CONVERT_TAB,
   closePane,
   closeTab,
   closeTabUnlessPinned,
@@ -53,6 +54,7 @@ function tabTitle(id: string): string {
   if (id === PASSWORDS_TAB) return 'Passwords'
   if (id === HOME_TAB) return 'Home'
   if (id === MONEY_TAB) return 'Money'
+  if (id === CONVERT_TAB) return 'Convert files'
   if (isFileTab(id)) return fileOfTab(id).slice(fileOfTab(id).lastIndexOf('/') + 1).replace(/\.canvas$/i, '')
   return noteTitle(id)
 }
@@ -211,6 +213,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === PASSWORDS_TAB && <KeyRound size={13} className="tab-icon" />}
               {id === HOME_TAB && <House size={13} className="tab-icon" />}
               {id === MONEY_TAB && <PoundSterling size={13} className="tab-icon" />}
+              {id === CONVERT_TAB && <ArrowRightLeft size={13} className="tab-icon" />}
               {isFileTab(id) && <FileIcon path={fileOfTab(id)} size={13} className="tab-icon" />}
               {icons.get(id) && <span className="tab-emoji">{icons.get(id)}</span>}
               <span className="tab-title">{tabTitle(id)}</span>

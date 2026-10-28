@@ -6968,22 +6968,6 @@ body.theme-light .flashcard-grade.grade-easy span {
 .passwords-card {
   margin-bottom: 16px;
   padding: 16px 18px;
-/* ---------- money ---------- */
-.pane-body > .money-page {
-  flex: 1;
-.money-page {
-.money-inner {
-  max-width: 820px;
-.money-head {
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 18px;
-.money-head h2 {
-  margin: 0;
-  margin-right: auto;
-.money-form {
-  flex-wrap: wrap;
-  padding: 12px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--bg-panel);
@@ -7284,237 +7268,635 @@ a.passwords-text:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 16px;
+}
+
+/* ---------- money ---------- */
+.pane-body > .money-page {
+  flex: 1;
+}
+.money-page {
+  overflow-y: auto;
+  min-height: 0;
+}
+.money-inner {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 28px 32px 60px;
+}
+.money-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.money-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  margin-right: auto;
+  font-size: 20px;
+}
+.money-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-panel);
+}
 .money-form.editing {
   border-color: var(--accent-dim);
+}
 .money-form .btn {
   padding: 6px 14px;
+}
 .money-inner .btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 .money-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+}
 .money-amount .text-input {
   width: 96px;
   font-variant-numeric: tabular-nums;
+}
 .money-category-select {
   min-width: 140px;
+}
 .money-date {
   width: 150px;
+}
 .money-note {
+  flex: 1;
   min-width: 160px;
+}
 .money-month {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 18px 0 6px;
+}
 .money-month strong {
   min-width: 140px;
   text-align: center;
+  font-size: 15px;
+}
 .money-tiles {
+  display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   margin: 12px 0 8px;
+}
 .money-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   padding: 14px 16px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--bg-panel);
+}
 .money-tile span {
+  color: var(--text-muted);
   font-size: 12.5px;
+}
 .money-tile strong {
   font-size: 22px;
   color: var(--text-strong);
   font-variant-numeric: tabular-nums;
+}
 .money-section {
   margin-top: 22px;
+}
 .money-section h3 {
   margin: 0 0 10px;
   font-size: 14px;
+  font-weight: 600;
   color: var(--text-strong);
+}
 .money-hint {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
 .money-hint .link-button {
+  padding: 0;
+}
 .money-swatch {
   display: inline-block;
+  flex: none;
   width: 10px;
   height: 10px;
   border-radius: 3px;
+}
 .money-swatch.spent {
   background: var(--money-spent);
+}
 .money-swatch.received {
   background: var(--money-received);
+}
 .money-budgets,
 .money-bars,
 .money-cats,
 .money-day ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 .money-budgets li {
+  padding: 8px 0;
   --budget-color: var(--accent);
+}
 .money-budgets li.budget-near {
   --budget-color: #f5a524;
+}
 .money-budgets li.budget-over {
   --budget-color: #f97066;
+}
 .money-budget-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 6px;
+}
 .money-budget-figures {
   margin-left: auto;
   font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
   font-size: 12.5px;
+}
 .money-budget-bar {
   height: 8px;
   border-radius: 4px;
   background: var(--bg-raised);
+  overflow: hidden;
+}
 .money-budget-bar div {
   height: 100%;
   border-radius: 4px;
   background: var(--budget-color);
+}
 .money-budget-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
 .budget-near .money-budget-left svg,
 .budget-over .money-budget-left svg {
   color: var(--budget-color);
+}
 .budget-over .money-budget-left {
+  color: var(--text);
+  font-weight: 500;
+}
 .money-bars li {
+  display: grid;
   grid-template-columns: 150px 1fr 130px;
+  align-items: center;
+  gap: 12px;
   padding: 5px 0;
+}
 .money-bar-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .money-bar-track {
   height: 12px;
+}
 .money-bar-fill {
   display: block;
   height: 100%;
   min-width: 3px;
   border-radius: 0 4px 4px 0;
+}
 .money-bar-value {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
 .money-bar-value small {
   display: inline-block;
   min-width: 34px;
+  color: var(--text-muted);
+}
 .money-page {
   --money-spent: #3987e5;
   --money-received: #199e70;
+}
 .money-chart {
   position: relative;
+}
 .money-chart svg {
   display: block;
+  width: 100%;
   height: auto;
   overflow: visible;
+}
 .money-legend {
+  display: flex;
   gap: 16px;
   margin-bottom: 6px;
   font-size: 12.5px;
+  color: var(--text-muted);
+}
 .money-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .money-grid {
   stroke: var(--border);
   stroke-width: 1;
+}
 .money-axis {
   fill: var(--text-faint);
   font-size: 11px;
+}
 .money-col {
+  cursor: pointer;
+}
 .money-col.current .money-axis {
   fill: var(--text-strong);
+  font-weight: 600;
+}
 .money-hit {
   fill: transparent;
+}
 .money-col:hover .money-hit {
   fill: var(--bg-hover);
+  opacity: 0.5;
+}
 .money-spent {
   fill: var(--money-spent);
+}
 .money-received {
   fill: var(--money-received);
+}
 .money-tooltip {
   position: absolute;
   top: 24px;
   transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
   gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   background: var(--bg-raised);
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   pointer-events: none;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
 .money-filters {
+  display: flex;
+  gap: 8px;
   margin-bottom: 10px;
+}
 .money-filters .select {
   min-width: 170px;
+}
 .money-undo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 10px;
   padding: 8px 12px;
   border-radius: 8px;
   background: var(--bg-raised);
+  font-size: 13px;
+}
 .money-day h4 {
   margin: 14px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
 .money-entry {
+  display: flex;
+  align-items: center;
   gap: 10px;
   padding: 5px 0;
   border-bottom: 1px solid var(--border);
+}
 .money-entry-note {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   user-select: text;
+}
 .money-entry-note em {
+  color: var(--text-faint);
+}
 .money-entry .select {
   height: 26px;
   min-width: 130px;
   font-size: 12.5px;
+}
 .money-entry-amount {
   min-width: 84px;
   text-align: right;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 .money-entry-amount.in {
   color: #4ade80;
+}
 .money-import-start p {
   max-width: 600px;
+  line-height: 1.6;
+}
 .money-import-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 10px;
+}
 .money-columns {
+  margin-bottom: 12px;
+  padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg-panel);
+}
 .money-columns summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 13px;
+}
 .money-columns-grid {
+  display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 10px;
   margin-top: 10px;
+}
 .money-columns-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
 .money-columns-grid .select {
+  min-width: 0;
+  width: 100%;
+}
 .money-columns-grid label.money-flip {
   flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
 .money-import-table {
   max-height: 420px;
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: 8px;
+}
 .money-import-table table {
+  width: 100%;
   border-collapse: collapse;
+  font-size: 13px;
+}
 .money-import-table td {
   padding: 5px 8px;
   border-bottom: 1px solid var(--border);
+}
 .money-import-table tr.skipped td,
 .money-import-table tr.already td {
   opacity: 0.45;
+}
 .money-import-table .select {
   height: 26px;
   min-width: 130px;
   font-size: 12.5px;
+}
 .money-import-date {
+  white-space: nowrap;
+  color: var(--text-muted);
+}
 .money-import-desc {
+  width: 100%;
   user-select: text;
+}
 .money-import-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
 .money-cats li {
+  display: flex;
+  align-items: center;
   gap: 10px;
   padding: 5px 0;
+}
 .money-color {
   width: 28px;
   height: 28px;
+  padding: 0;
   border: 1px solid var(--border);
+  border-radius: var(--radius);
   background: none;
+  cursor: pointer;
+}
 .money-cat-name {
   width: 200px;
+}
 .money-new-cat {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
 .money-new-cat .btn {
   padding: 6px 14px;
+}
 .money-home {
+  display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .money-home strong {
   font-size: 22px;
   color: var(--text-strong);
   font-variant-numeric: tabular-nums;
+}
 .money-home span {
+  color: var(--text-muted);
+}
 .money-home-warn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-top: 6px;
   font-size: 12.5px;
+}
 .money-home-warn.budget-near svg {
   color: #f5a524;
+}
 .money-home-warn.budget-over svg {
   color: #f97066;
+}
+
+/* ---------- file converter ---------- */
+.pane-body > .convert-page {
+  flex: 1;
+}
+.convert-page {
+  overflow-y: auto;
+  min-height: 0;
+}
+.convert-inner {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 28px 32px 60px;
+}
+.convert-inner h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+.convert-intro {
+  margin: 0 0 18px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.convert-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 28px 20px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: 12px;
+  background: var(--bg-panel);
+  color: var(--text);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease), background 0.15s var(--ease);
+}
+.convert-drop:hover,
+.convert-drop.over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.convert-drop svg {
+  color: var(--text-muted);
+}
+.convert-drop span {
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.convert-list {
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.convert-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.convert-kind {
+  flex: none;
+  color: var(--text-muted);
+}
+.convert-name {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.convert-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.convert-name small {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.convert-item.failed .convert-name small {
+  color: #e0524a;
+}
+.convert-to {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.convert-to .select {
+  min-width: 110px;
+}
+.convert-status {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 84px;
+}
+.convert-status .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  font-size: 12.5px;
+}
+.convert-working {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.convert-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  color: var(--text-muted);
+}
+.convert-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+.convert-spacer {
+  flex: 1;
+}
+.convert-inner .btn:disabled,
+.convert-item .icon-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.convert-saved {
+  margin: 14px 0 0;
+  color: var(--text-muted);
+}
+.convert-saved .link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
