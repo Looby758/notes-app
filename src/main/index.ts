@@ -49,6 +49,7 @@ import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
 import { setupGames } from './games'
 import { applyIconOutsideApp } from './appIcon'
+import { broadcastThemes, loadImportedThemes, setupThemes, THEME_SCHEME, themeFilePath } from './themes'
 import { CODE_SANDBOX_SCHEME, registerCodeSandbox } from './codeSandbox'
 import { readHandwritingOffline } from './handwriting'
 
@@ -106,11 +107,9 @@ let appliedIcon = ''
  * The app icon you picked (Settings → Appearance): the Dock icon on a Mac; on Windows the window's
  * taskbar icon and the tray icon, and (installed app) its shortcuts.
  */
-function applyAppIcon(id: string): void {
-  if (id === appliedIcon) return
-  const candidates = [join(__dirname, '../renderer/icons', `${id}.png`), join(app.getAppPath(), 'src/renderer/public/icons', `${id}.png`)]
-  const file = candidates.find((f) => existsSync(f))
-  if (!file) return
+function applyAppIcon(prefs: Prefs): void {
+  const { id, file } = appIconFile(prefs)
+  if (id === appliedIcon || !file) return
   appliedIcon = id
   const image = nativeImage.createFromPath(file)
   safely('app icon outside the app', () => applyIconOutsideApp(id, file))
@@ -122,10 +121,22 @@ function applyAppIcon(id: string): void {
   }
 }
 
+/** The icon to show: the theme's own (when it has one and you let it), or the one you picked. */
+function appIconFile(prefs: Prefs): { id: string; file?: string } {
+  const theme = currentTheme(prefs)
+  const themeIcon = prefs.themeAppIcon && theme.pack?.appIcon ? themeFilePath(theme.id, theme.pack.appIcon) : null
+  if (themeIcon) {
+    // The file's time is in the id, so updating the theme makes a fresh icon for Windows' shortcuts.
+    return { id: `${theme.id}-${Math.round(statSync(themeIcon).mtimeMs)}`, file: themeIcon }
+  }
+  const candidates = [join(__dirname, '../renderer/icons', `${prefs.appIcon}.png`), join(app.getAppPath(), 'src/renderer/public/icons', `${prefs.appIcon}.png`)]
+  return { id: prefs.appIcon, file: candidates.find((f) => existsSync(f)) }
+}
+
 /** Settings that live outside the app's windows: the capture shortcut, the app icon and starting at login. */
 function applySystemPrefs(prefs: Prefs): void {
   applyCaptureShortcut(prefs.captureShortcut)
-  safely('app icon', () => applyAppIcon(prefs.appIcon))
+  safely('app icon', () => applyAppIcon(prefs))
   // Only the installed app registers itself (in development it would register electron.exe).
   if (!app.isPackaged) return
   if (IS_MAC) app.setLoginItemSettings({ openAtLogin: prefs.launchAtStartup })
@@ -199,7 +210,10 @@ function applyPrefs(win: BrowserWindow, prefs: Prefs): void {
 // The system switched light/dark: windows matching it recolour their title bars.
 nativeTheme.on('updated', () => {
   const prefs = currentPrefs()
-  if (prefs.followSystem) for (const win of BrowserWindow.getAllWindows()) applyPrefs(win, prefs)
+  if (!prefs.followSystem) return
+  for (const win of BrowserWindow.getAllWindows()) applyPrefs(win, prefs)
+  // A theme with its own icon may have just come on or gone off.
+  safely('app icon', () => applyAppIcon(prefs))
 })
 
 function broadcastPrefs(prefs: Prefs): void {
@@ -227,7 +241,8 @@ const VIEWER_TYPES = new Set(['.mp4', '.mov', '.m4v', '.ogv', '.pdf', '.ico', '.
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'vault', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
-  CODE_SANDBOX_SCHEME
+  CODE_SANDBOX_SCHEME,
+  THEME_SCHEME
 ])
 
 function registerVaultProtocol(): void {
@@ -691,6 +706,8 @@ async function offerMoveToApplications(): Promise<boolean> {
 }
 
 app.whenReady().then(async () => {
+  // Imported themes first: settings that use one are only valid once it's known.
+  safely('imported themes', loadImportedThemes)
   if (await offerMoveToApplications()) return
   safely('menu', setAppMenu)
   // The microphone (for voice notes) is allowed; the camera and everything else isn't.
@@ -705,6 +722,15 @@ app.whenReady().then(async () => {
   registerVaultProtocol()
   registerCodeSandbox()
   registerIpc()
+  safely('themes', () =>
+    setupThemes(() => {
+      // A removed theme that was in use falls back to the default.
+      const prefs = normalizePrefs(loadSettings().prefs)
+      if (loadSettings().prefs) saveSettings({ prefs })
+      broadcastThemes()
+      broadcastPrefs(prefs)
+    })
+  )
   safely('web browser', setupBrowser)
   safely('YouTube mini window', () => setupYouTube(currentPrefs))
   safely('export', setupExport)

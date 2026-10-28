@@ -14,6 +14,14 @@ const api: NotesApi = {
   },
   spellcheckLanguages: () => ipcRenderer.invoke('prefs:languages'),
   openSettingsFile: () => ipcRenderer.invoke('prefs:openFile'),
+  listThemes: () => ipcRenderer.invoke('themes:list'),
+  importTheme: () => ipcRenderer.invoke('themes:import'),
+  removeTheme: (id) => ipcRenderer.invoke('themes:remove', id),
+  onThemesChanged: (callback) => {
+    const handler = (_e: unknown, themes: Parameters<typeof callback>[0]): void => callback(themes)
+    ipcRenderer.on('themes:changed', handler)
+    return () => ipcRenderer.removeListener('themes:changed', handler)
+  },
   showLog: () => ipcRenderer.invoke('app:showLog'),
   setFullScreen: (on) => ipcRenderer.invoke('app:fullscreen', on),
   showReminder: (r) => ipcRenderer.invoke('reminder:show', r),

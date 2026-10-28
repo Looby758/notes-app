@@ -1,4 +1,4 @@
-import { THEMES } from './themes'
+import { allThemes } from './themes'
 import { IS_MAC } from './platform'
 
 /**
@@ -27,6 +27,8 @@ export interface Prefs {
   reduceMotion: boolean
   /** Which app icon design to use (taskbar / Dock / window). */
   appIcon: string
+  /** Use an imported theme's own app icon while that theme is on. */
+  themeAppIcon: boolean
 
   // Editor
   livePreview: boolean
@@ -153,6 +155,7 @@ export const DEFAULT_PREFS: Prefs = {
   showStatusBar: true,
   reduceMotion: false,
   appIcon: 'default',
+  themeAppIcon: true,
 
   livePreview: true,
   spellcheck: true,
@@ -291,9 +294,10 @@ export function normalizePrefs(raw: unknown): Prefs {
     }
   }
 
-  if (typeof input.theme === 'string' && THEMES.some((t) => t.id === input.theme)) out.theme = input.theme
-  if (typeof input.lightTheme === 'string' && THEMES.some((t) => t.id === input.lightTheme && t.light)) out.lightTheme = input.lightTheme
-  if (typeof input.darkTheme === 'string' && THEMES.some((t) => t.id === input.darkTheme && !t.light)) out.darkTheme = input.darkTheme
+  const themes = allThemes()
+  if (typeof input.theme === 'string' && themes.some((t) => t.id === input.theme)) out.theme = input.theme
+  if (typeof input.lightTheme === 'string' && themes.some((t) => t.id === input.lightTheme && t.light)) out.lightTheme = input.lightTheme
+  if (typeof input.darkTheme === 'string' && themes.some((t) => t.id === input.darkTheme && !t.light)) out.darkTheme = input.darkTheme
   if (input.accent === '' || isHex(input.accent)) out.accent = (input.accent as string).toLowerCase()
   out.uiFont = cleanFont(input.uiFont)
   out.editorFont = cleanFont(input.editorFont)

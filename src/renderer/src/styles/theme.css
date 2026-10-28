@@ -8856,3 +8856,152 @@ p.games-none {
   padding: 4px 10px;
   font-size: 12px;
 }
+
+/* ---------- Imported themes (lib/appearance.ts, components/Theme) ---------- */
+
+/* A theme's picture sits behind a part of the app, faded into the theme's background. */
+.pane-body,
+.sidebar-inner,
+.music-player {
+  isolation: isolate;
+}
+.theme-picture {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-size: cover;
+  background-repeat: no-repeat;
+  opacity: var(--picture-strength);
+}
+/* So the words in front stay readable, the picture fades out towards the bottom. */
+.theme-picture::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 30%, var(--bg) 100%);
+}
+.sidebar-inner > .theme-picture::after {
+  background: linear-gradient(to bottom, transparent 40%, var(--bg-panel) 100%);
+}
+.music-player > .theme-picture {
+  border-radius: inherit;
+}
+.music-player > .theme-picture::after {
+  background: linear-gradient(to right, var(--bg-raised) 10%, transparent 100%);
+}
+body.theme-headings .cm-h,
+body.theme-headings :is(h1, h2, h3) {
+  font-family: var(--font-headings);
+}
+
+.theme-star {
+  flex-shrink: 0;
+  object-fit: contain;
+}
+.tree-star.theme-star {
+  opacity: 1;
+}
+
+/* Loading screen */
+.theme-loading {
+  position: relative;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  animation: theme-loading-in 500ms var(--ease) both;
+}
+.theme-loading-picture {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.45;
+}
+.theme-loading-picture::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 0%, var(--bg) 85%);
+}
+.theme-loading-text {
+  position: relative;
+  font-family: var(--font-headings);
+  font-size: 56px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text-strong);
+  text-shadow: 0 2px 24px var(--bg);
+}
+@keyframes theme-loading-in {
+  from {
+    opacity: 0;
+  }
+}
+body.reduce-motion .theme-loading {
+  animation: none;
+}
+
+/* Settings: imported themes and the import button */
+.theme-card-wrap {
+  position: relative;
+  display: flex;
+}
+.theme-card-wrap > .theme-card {
+  flex: 1;
+}
+.theme-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms var(--ease);
+}
+.theme-card-wrap:hover .theme-remove,
+.theme-remove:focus-visible {
+  opacity: 1;
+}
+.theme-remove:hover {
+  color: var(--text-strong);
+}
+.theme-preview-main {
+  position: relative;
+}
+.theme-preview .theme-preview-main .theme-preview-picture {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  background-size: cover;
+  opacity: 0.55;
+  border-radius: 0;
+}
+.theme-import {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+.theme-import .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.theme-import-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.theme-import-error {
+  color: #f07178;
+}

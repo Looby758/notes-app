@@ -42,6 +42,7 @@ import { newBoard } from '../../lib/boards'
 import { isBoard } from '../../lib/canvas'
 import { useLock, isLocked } from '../../lib/lock/session'
 import { lockNote, removeLock } from '../../lib/lock/actions'
+import StarIcon from '../Theme/StarIcon'
 
 const INDENT = 14
 const AUTO_EXPAND_MS = 600
@@ -400,7 +401,7 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
         )}
         {isRenaming ? <RenameInput node={node} /> : <span className="tree-label">{displayName(node)}</span>}
         {locked && !isRenaming && <Lock size={11} className="tree-lock" aria-label="Locked" />}
-        {starred && !isRenaming && <Star size={11} className="tree-star" aria-label="Starred" />}
+        {starred && !isRenaming && <StarIcon size={11} className="tree-star" />}
       </div>
       {isFolder && expanded && (
         <div className="tree-children" style={{ ['--guide-x' as string]: `${15 + depth * INDENT}px` }}>

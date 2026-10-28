@@ -5,6 +5,7 @@ import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
 import type { MusicAction, MusicItem, MusicSearchResults, MusicState, MusicStatus } from './spotify'
 import type { GamesList } from './games'
+import type { Theme } from './themes'
 
 export interface WindowBounds {
   x?: number
@@ -228,6 +229,13 @@ export interface NotesApi {
   spellcheckLanguages(): Promise<string[]>
   /** Opens settings.json in your default editor. */
   openSettingsFile(): Promise<void>
+
+  /** Themes imported from theme files (see themePack.ts). */
+  listThemes(): Promise<Theme[]>
+  /** Asks for a theme file and imports it. */
+  importTheme(): Promise<{ theme?: Theme; error?: string; canceled?: boolean }>
+  removeTheme(id: string): Promise<void>
+  onThemesChanged(callback: (themes: Theme[]) => void): () => void
   /** Shows notes.log (problems Notes ran into) in File Explorer / Finder. */
   showLog(): Promise<void>
   /** Puts the window into (or out of) full screen. */

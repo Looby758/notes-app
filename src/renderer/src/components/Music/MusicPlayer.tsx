@@ -6,6 +6,7 @@ import { IS_MAC } from '@shared/platform'
 import { currentPosition, musicControl, musicPlay, musicSeek, openMusicSettings, refreshMusicStatus, setMusicOpen, startMusic, useMusic } from '../../store/music'
 import { openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
 import { errorMessage } from '../../lib/paths'
+import ThemePicture from '../Theme/ThemePicture'
 
 type Tab = 'playlists' | 'search' | 'link'
 
@@ -32,6 +33,7 @@ function Player() {
 
   return (
     <div className="music-player" data-music-player>
+      <ThemePicture page="music" exact />
       {tab && (
         <div className="music-panel">
           <div className="music-tabs">
