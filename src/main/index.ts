@@ -32,6 +32,8 @@ import { readGoogleSheet } from './googleSheets'
 import * as ai from './ai'
 import * as email from './email'
 import * as spotify from './spotify'
+import * as localMusic from './localMusic'
+import { closeMusicMini, setupMusicMini } from './musicMini'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
 import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
@@ -43,13 +45,14 @@ import { dictionaryMenu, setupDictionary } from './dictionary'
 import { setupWebTitle } from './webTitle'
 import { setupPlaces } from './places'
 import { setupWeather } from './weather'
-import { setupBrowser } from './browser'
+import { releaseMessages, setupBrowser } from './browser'
 import { closeYouTube, setupYouTube } from './youtube'
 import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
 import { setupGames } from './games'
 import { setupGameCovers } from './gameCovers'
 import { applyIconOutsideApp } from './appIcon'
+import { broadcastThemes, loadImportedThemes, setupThemes, THEME_SCHEME, themeFilePath } from './themes'
 import { CODE_SANDBOX_SCHEME, registerCodeSandbox } from './codeSandbox'
 import { readHandwritingOffline } from './handwriting'
 
@@ -58,6 +61,8 @@ const shownReminders = new Set<Electron.Notification>()
 let mainWindow: BrowserWindow | null = null
 /** True once you've chosen Quit (from the tray), so closing really closes instead of hiding. */
 let quitting = false
+/** The messages hub closing its pages before the window closes. */
+let hubReleased: Promise<void> = Promise.resolve()
 
 logCrashes()
 
@@ -107,11 +112,9 @@ let appliedIcon = ''
  * The app icon you picked (Settings → Appearance): the Dock icon on a Mac; on Windows the window's
  * taskbar icon and the tray icon, and (installed app) its shortcuts.
  */
-function applyAppIcon(id: string): void {
-  if (id === appliedIcon) return
-  const candidates = [join(__dirname, '../renderer/icons', `${id}.png`), join(app.getAppPath(), 'src/renderer/public/icons', `${id}.png`)]
-  const file = candidates.find((f) => existsSync(f))
-  if (!file) return
+function applyAppIcon(prefs: Prefs): void {
+  const { id, file } = appIconFile(prefs)
+  if (id === appliedIcon || !file) return
   appliedIcon = id
   const image = nativeImage.createFromPath(file)
   safely('app icon outside the app', () => applyIconOutsideApp(id, file))
@@ -123,10 +126,22 @@ function applyAppIcon(id: string): void {
   }
 }
 
+/** The icon to show: the theme's own (when it has one and you let it), or the one you picked. */
+function appIconFile(prefs: Prefs): { id: string; file?: string } {
+  const theme = currentTheme(prefs)
+  const themeIcon = prefs.themeAppIcon && theme.pack?.appIcon ? themeFilePath(theme.id, theme.pack.appIcon) : null
+  if (themeIcon) {
+    // The file's time is in the id, so updating the theme makes a fresh icon for Windows' shortcuts.
+    return { id: `${theme.id}-${Math.round(statSync(themeIcon).mtimeMs)}`, file: themeIcon }
+  }
+  const candidates = [join(__dirname, '../renderer/icons', `${prefs.appIcon}.png`), join(app.getAppPath(), 'src/renderer/public/icons', `${prefs.appIcon}.png`)]
+  return { id: prefs.appIcon, file: candidates.find((f) => existsSync(f)) }
+}
+
 /** Settings that live outside the app's windows: the capture shortcut, the app icon and starting at login. */
 function applySystemPrefs(prefs: Prefs): void {
   applyCaptureShortcut(prefs.captureShortcut)
-  safely('app icon', () => applyAppIcon(prefs.appIcon))
+  safely('app icon', () => applyAppIcon(prefs))
   // Only the installed app registers itself (in development it would register electron.exe).
   if (!app.isPackaged) return
   if (IS_MAC) app.setLoginItemSettings({ openAtLogin: prefs.launchAtStartup })
@@ -200,7 +215,10 @@ function applyPrefs(win: BrowserWindow, prefs: Prefs): void {
 // The system switched light/dark: windows matching it recolour their title bars.
 nativeTheme.on('updated', () => {
   const prefs = currentPrefs()
-  if (prefs.followSystem) for (const win of BrowserWindow.getAllWindows()) applyPrefs(win, prefs)
+  if (!prefs.followSystem) return
+  for (const win of BrowserWindow.getAllWindows()) applyPrefs(win, prefs)
+  // A theme with its own icon may have just come on or gone off.
+  safely('app icon', () => applyAppIcon(prefs))
 })
 
 function broadcastPrefs(prefs: Prefs): void {
@@ -227,14 +245,31 @@ const AUDIO_TYPES = new Set(['.webm', '.mp3', '.m4a', '.wav', '.ogg', '.oga', '.
 const VIEWER_TYPES = new Set(['.mp4', '.mov', '.m4v', '.ogv', '.pdf', '.ico', '.xlsx', '.xlsm', '.csv', '.tsv'])
 
 protocol.registerSchemesAsPrivileged([
-  { scheme: 'vault', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
-  CODE_SANDBOX_SCHEME
+  // corsEnabled: your own music plays through the Web Audio visualiser, which needs it.
+  { scheme: 'vault', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
+  CODE_SANDBOX_SCHEME,
+  THEME_SCHEME
 ])
 
 function registerVaultProtocol(): void {
-  protocol.handle('vault', (request) => {
+  protocol.handle('vault', async (request) => {
     try {
-      const rel = decodeURIComponent(new URL(request.url).pathname.slice(1))
+      const url = new URL(request.url)
+      // Your own music files (vault://music/…) and their album pictures (vault://musicart/…), from your music folder.
+      if (url.host === 'music' || url.host === 'musicart') {
+        const rel = decodeURIComponent(url.pathname.slice(1))
+        const full = localMusic.musicFile(rel)
+        if (!full || !AUDIO_TYPES.has(extname(full).toLowerCase())) return new Response('Not allowed', { status: 403 })
+        if (url.host === 'music') {
+          const res = await net.fetch(pathToFileURL(full).toString(), { headers: request.headers })
+          const headers = new Headers(res.headers)
+          headers.set('Access-Control-Allow-Origin', '*')
+          return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+        }
+        const pic = await localMusic.cover(rel)
+        return pic ? new Response(Buffer.from(pic.data), { headers: { 'Content-Type': pic.type, 'Cache-Control': 'max-age=3600' } }) : new Response('No picture', { status: 404 })
+      }
+      const rel = decodeURIComponent(url.pathname.slice(1))
       const full = currentVault().abs(rel)
       const ext = extname(full).toLowerCase()
       if (!IMAGE_TYPES.has(ext) && !AUDIO_TYPES.has(ext) && !VIEWER_TYPES.has(ext)) return new Response('Not allowed', { status: 403 })
@@ -341,6 +376,7 @@ function createWindow(): BrowserWindow {
     }
     if (!readyToClose) {
       e.preventDefault()
+      if (win === mainWindow) hubReleased = releaseMessages()
       win.webContents.send('app:before-close')
       setTimeout(() => {
         readyToClose = true
@@ -352,10 +388,15 @@ function createWindow(): BrowserWindow {
     const b = maximized ? win.getNormalBounds() : win.getBounds()
     saveSettings({ window: { ...b, maximized } })
     // The notes window is really closing: the YouTube mini window goes with it.
-    if (win === mainWindow) closeYouTube()
+    if (win === mainWindow) {
+      closeYouTube()
+      closeMusicMini()
+    }
   })
   ipcMain.removeHandler('app:ready-to-close')
-  ipcMain.handle('app:ready-to-close', () => {
+  ipcMain.handle('app:ready-to-close', async () => {
+    // WhatsApp and Discord save their sign-ins as their pages close (see releaseMessages).
+    await hubReleased
     readyToClose = true
     win.close()
     // Closing the window cancels a quit that was in progress; carry it on now everything's saved.
@@ -455,7 +496,9 @@ function registerIpc(): void {
       logError('reminder', new Error('Notifications aren’t supported on this system.'))
       return false
     }
-    const n = new Notification({ title: r.title, body: r.body, silent: false })
+    // Streamer mode: the reminder itself could be private, so the notification only says there is one.
+    const quiet = currentPrefs().streamerMode
+    const n = new Notification({ title: quiet ? 'Reminder' : r.title, body: quiet ? 'Click to see it in Notes.' : r.body, silent: false })
     // Windows reports some failures (e.g. notifications switched off for Notes) here.
     n.on('failed', (_ev, error) => logError('reminder notification', new Error(error)))
     n.on('click', () => {
@@ -473,6 +516,7 @@ function registerIpc(): void {
   setupWebTitle()
   setupPlaces()
   setupWeather()
+  localMusic.setupLocalMusic()
   setupImporter()
   setupGames()
   setupGameCovers()
@@ -567,6 +611,21 @@ function registerIpc(): void {
   ipcMain.handle('music:play', (_e, uri: string, context?: string) => spotify.play(uri, context))
   ipcMain.handle('music:search', (_e, query: string) => spotify.search(query))
   ipcMain.handle('music:playlists', () => spotify.playlists())
+  ipcMain.handle('music:setVolume', (_e, percent: number) => spotify.setVolume(Number(percent)))
+  ipcMain.handle('music:isLiked', (_e, uri: string) => spotify.isLiked(String(uri)))
+  ipcMain.handle('music:setLiked', (_e, uri: string, liked: boolean) => spotify.setLiked(String(uri), liked === true))
+  ipcMain.handle('music:queue', () => spotify.queue())
+  ipcMain.handle('music:addToQueue', (_e, uri: string) => spotify.addToQueue(String(uri)))
+  ipcMain.handle('music:recent', () => spotify.recent())
+  ipcMain.handle('music:devices', () => spotify.devices())
+  ipcMain.handle('music:playlistSongs', (_e, uri: string) => spotify.playlistSongs(String(uri)))
+  ipcMain.handle('music:createPlaylist', (_e, name: string) => spotify.createPlaylist(String(name)))
+  ipcMain.handle('music:renamePlaylist', (_e, uri: string, name: string) => spotify.renamePlaylist(String(uri), String(name)))
+  ipcMain.handle('music:deletePlaylist', (_e, uri: string) => spotify.deletePlaylist(String(uri)))
+  ipcMain.handle('music:addToPlaylist', (_e, uri: string, songs: string[]) => spotify.addToPlaylist(String(uri), Array.isArray(songs) ? songs.map(String) : []))
+  ipcMain.handle('music:removeFromPlaylist', (_e, uri: string, song: string) => spotify.removeFromPlaylist(String(uri), String(song)))
+  ipcMain.handle('music:moveInPlaylist', (_e, uri: string, from: number, to: number) => spotify.moveInPlaylist(String(uri), Number(from), Number(to)))
+  ipcMain.handle('music:transfer', (_e, deviceId: string) => spotify.transfer(String(deviceId)))
   ipcMain.handle('music:open', (_e, what: 'app' | 'automation') => spotify.open(what === 'automation' ? 'automation' : 'app'))
 
   ipcMain.handle('ai:status', () => ai.status())
@@ -693,6 +752,8 @@ async function offerMoveToApplications(): Promise<boolean> {
 }
 
 app.whenReady().then(async () => {
+  // Imported themes first: settings that use one are only valid once it's known.
+  safely('imported themes', loadImportedThemes)
   if (await offerMoveToApplications()) return
   safely('menu', setAppMenu)
   // The microphone (for voice notes) is allowed; the camera and everything else isn't.
@@ -707,8 +768,18 @@ app.whenReady().then(async () => {
   registerVaultProtocol()
   registerCodeSandbox()
   registerIpc()
-  safely('web browser', setupBrowser)
+  safely('themes', () =>
+    setupThemes(() => {
+      // A removed theme that was in use falls back to the default.
+      const prefs = normalizePrefs(loadSettings().prefs)
+      if (loadSettings().prefs) saveSettings({ prefs })
+      broadcastThemes()
+      broadcastPrefs(prefs)
+    })
+  )
+  safely('web browser', () => setupBrowser(() => currentPrefs().streamerMode))
   safely('YouTube mini window', () => setupYouTube(currentPrefs))
+  safely('Music mini player', () => setupMusicMini(currentPrefs, () => mainWindow))
   safely('export', setupExport)
   safely('converter', setupConverter)
   // Hand edits to settings.json apply straight away.
@@ -733,6 +804,9 @@ function copySecret(text: string, seconds: number): void {
   copiedSecret = text
   clearTimer = setTimeout(clearSecret, Math.min(Math.max(seconds, 5), 300) * 1000)
 }
+
+// Stopping Notes from the terminal (Ctrl+C) quits it properly, so everything is saved first.
+for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => app.quit())
 
 app.on('before-quit', () => {
   quitting = true

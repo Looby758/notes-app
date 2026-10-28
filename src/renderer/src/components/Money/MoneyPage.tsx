@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, type FormEvent } from 'react'
 import { AlertTriangle, ChevronLeft, ChevronRight, Pencil, Plus, PoundSterling, Trash2, Upload, X } from 'lucide-react'
+import Private from '../Streamer/Private'
 import {
   addCategory,
   addEntry,
@@ -40,8 +41,9 @@ import { addHomeCard } from '../../lib/home'
 import { readWorkbook } from '../../lib/sheets'
 import { statementFromPdf } from '../../lib/pdfStatement'
 import MoneyHomeCard from './MoneyHomeCard'
+import EmptyArt from '../Motion/EmptyArt'
 
-addHomeCard({ id: 'money', order: 25, Card: MoneyHomeCard })
+addHomeCard({ id: 'money', order: 25, title: 'Spending this month', Card: MoneyHomeCard })
 
 type View = 'overview' | 'entries' | 'import' | 'budgets'
 const VIEWS: [View, string][] = [
@@ -65,32 +67,34 @@ export default function MoneyPage() {
   const [editing, setEditing] = useState<MoneyEntry | null>(null)
 
   return (
-    <div className="money-page" data-money-page>
-      <div className="money-inner">
-        <header className="money-head">
-          <h2>
-            <PoundSterling size={18} /> Money
-          </h2>
-          <div className="segmented" role="tablist">
-            {VIEWS.map(([id, label]) => (
-              <button key={id} role="tab" className={view === id ? 'selected' : ''} onClick={() => setView(id)}>
-                {label}
-              </button>
-            ))}
-          </div>
-        </header>
-        {(view === 'overview' || view === 'entries') && (
-          <>
-            <EntryForm key={editing?.id ?? 'new'} editing={editing} done={() => setEditing(null)} month={month} />
-            <MonthNav month={month} setMonth={setMonth} />
-          </>
-        )}
-        {view === 'overview' && <Overview month={month} setMonth={setMonth} showBudgets={() => setView('budgets')} />}
-        {view === 'entries' && <Entries month={month} edit={setEditing} />}
-        {view === 'import' && <Import done={() => setView('entries')} />}
-        {view === 'budgets' && <Budgets />}
+    <Private cover label="Your money is hidden for streamer mode">
+      <div className="money-page" data-money-page>
+        <div className="money-inner">
+          <header className="money-head">
+            <h2>
+              <PoundSterling size={18} /> Money
+            </h2>
+            <div className="segmented" role="tablist">
+              {VIEWS.map(([id, label]) => (
+                <button key={id} role="tab" className={view === id ? 'selected' : ''} onClick={() => setView(id)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </header>
+          {(view === 'overview' || view === 'entries') && (
+            <>
+              <EntryForm key={editing?.id ?? 'new'} editing={editing} done={() => setEditing(null)} month={month} />
+              <MonthNav month={month} setMonth={setMonth} />
+            </>
+          )}
+          {view === 'overview' && <Overview month={month} setMonth={setMonth} showBudgets={() => setView('budgets')} />}
+          {view === 'entries' && <Entries month={month} edit={setEditing} />}
+          {view === 'import' && <Import done={() => setView('entries')} />}
+          {view === 'budgets' && <Budgets />}
+        </div>
       </div>
-    </div>
+    </Private>
   )
 }
 
@@ -309,7 +313,10 @@ function Overview({ month, setMonth, showBudgets }: { month: string; setMonth: (
             ))}
           </ul>
         ) : (
-          <p className="money-hint">Nothing spent in {monthName(month)} yet. Add what you spend above, or import a bank statement.</p>
+          <div className="empty-with-art">
+            <EmptyArt kind="coins" />
+            <p className="money-hint">Nothing spent in {monthName(month)} yet. Add what you spend above, or import a bank statement.</p>
+          </div>
         )}
       </section>
 

@@ -1,4 +1,4 @@
-import { app, clipboard, ipcMain, Menu, session, shell, type MenuItemConstructorOptions, type WebContents } from 'electron'
+import { app, clipboard, ipcMain, Menu, session, shell, webContents, type MenuItemConstructorOptions, type WebContents } from 'electron'
 import { firefoxUserAgent, isGoogleSignIn, isWebUrl, plainUserAgent, searchUrl, WEB_PARTITION } from '@shared/web'
 import { isMessagesUrl, MESSAGES_PARTITION } from '@shared/messages'
 import { shortcutFromEvent } from '@shared/shortcuts'
@@ -24,7 +24,11 @@ let appShortcuts = new Set<string>()
 /** What Google's sign-in pages are told the browser is (see isGoogleSignIn). */
 const SIGN_IN_AGENT = firefoxUserAgent(process.platform)
 
-export function setupBrowser(): void {
+/**
+ * `quiet`: streamer mode is on, so WhatsApp and Discord may not pop up notifications (they'd show
+ * who wrote and what, on top of whatever you're sharing).
+ */
+export function setupBrowser(quiet: () => boolean = () => false): void {
   app.on('web-contents-created', (_e, contents) => {
     // However a web page tab is asked for, it gets the same walled-off setup.
     contents.on('will-attach-webview', (event, prefs, params) => {
@@ -57,9 +61,11 @@ export function setupBrowser(): void {
 
   const messages = session.fromPartition(MESSAGES_PARTITION)
   messages.setUserAgent(plainUserAgent(messages.getUserAgent()))
-  messages.setPermissionRequestHandler((_wc, permission, callback) => callback(MESSAGES_PERMISSIONS.has(permission)))
-  messages.setPermissionCheckHandler((_wc, permission) => MESSAGES_PERMISSIONS.has(permission))
+  const allowed = (permission: string): boolean => MESSAGES_PERMISSIONS.has(permission) && !(permission === 'notifications' && quiet())
+  messages.setPermissionRequestHandler((_wc, permission, callback) => callback(allowed(permission)))
+  messages.setPermissionCheckHandler((_wc, permission) => allowed(permission))
 
+  ipcMain.handle('messages:release', () => releaseMessages())
   ipcMain.handle('messages:clear', async () => {
     await messages.clearStorageData()
     await messages.clearCache()
@@ -73,6 +79,22 @@ export function setupBrowser(): void {
   ipcMain.on('web:shortcuts', (_e, list: unknown) => {
     appShortcuts = new Set(Array.isArray(list) ? list.filter((s): s is string => typeof s === 'string') : [])
   })
+}
+
+/**
+ * Closes the messages hub's pages properly, then writes what they stored to disk. Discord keeps your
+ * sign-in in memory while it's open and only saves it as its page closes, so a page that's simply
+ * thrown away (closing the app or the Messages tab) leaves Discord signed out next time.
+ * Called before the hub's pages go away. Never takes more than a couple of seconds.
+ */
+export async function releaseMessages(): Promise<void> {
+  const hub = session.fromPartition(MESSAGES_PARTITION)
+  const pages = webContents.getAllWebContents().filter((c) => !c.isDestroyed() && c.getType() === 'webview' && c.session === hub)
+  // Leaving the page runs its "page is closing" code, as closing a browser tab would.
+  const leave = (page: WebContents): Promise<unknown> => page.loadURL('about:blank').catch(() => undefined)
+  const timeout = new Promise((resolve) => setTimeout(resolve, 2000))
+  await Promise.race([Promise.all(pages.map(leave)), timeout])
+  hub.flushStorageData()
 }
 
 /**

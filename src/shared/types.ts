@@ -3,8 +3,10 @@ import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
 import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
-import type { MusicAction, MusicItem, MusicSearchResults, MusicState, MusicStatus } from './spotify'
+import type { LocalLibrary } from './localMusic'
+import type { MusicAction, MusicDevice, MusicItem, MusicQueue, MusicSearchResults, MusicState, MusicStatus } from './spotify'
 import type { CoversStatus, GamesList, LaunchArt } from './games'
+import type { Theme } from './themes'
 
 export interface WindowBounds {
   x?: number
@@ -28,7 +30,20 @@ export interface Settings {
   youtubeUrl?: string
   youtubePinned?: boolean
   youtubeVideoOnly?: boolean
+  /** The floating mini music player: where it was left, and whether it was showing. */
+  musicMiniWindow?: WindowBounds
+  musicMiniOpen?: boolean
 }
+
+/** What the notes window's music player tells the floating mini player. */
+export interface MusicMiniState {
+  state: MusicState | null
+  /** When `state` arrived (for the progress bar). */
+  at: number
+}
+
+/** A button pressed in the floating mini player, for the notes window to carry out. */
+export type MusicMiniCommand = { action: MusicAction } | { seek: number }
 
 export interface CaptureStatus {
   /** e.g. "Win+Shift+N", or '' if none is set or it couldn't be registered. */
@@ -228,6 +243,13 @@ export interface NotesApi {
   spellcheckLanguages(): Promise<string[]>
   /** Opens settings.json in your default editor. */
   openSettingsFile(): Promise<void>
+
+  /** Themes imported from theme files (see themePack.ts). */
+  listThemes(): Promise<Theme[]>
+  /** Asks for a theme file and imports it. */
+  importTheme(): Promise<{ theme?: Theme; error?: string; canceled?: boolean }>
+  removeTheme(id: string): Promise<void>
+  onThemesChanged(callback: (themes: Theme[]) => void): () => void
   /** Shows notes.log (problems Notes ran into) in File Explorer / Finder. */
   showLog(): Promise<void>
   /** Puts the window into (or out of) full screen. */
@@ -282,6 +304,8 @@ export interface NotesApi {
   clearWebData(): Promise<void>
   /** Signs you out of WhatsApp and Discord in the messages hub. */
   clearMessagesData(): Promise<void>
+  /** Closes WhatsApp and Discord properly before the Messages tab goes, so they stay signed in. */
+  releaseMessages(): Promise<void>
   /** The app's shortcuts, so they still work while a web page has focus. */
   setWebShortcuts(shortcuts: string[]): void
   /** A web page opened a link in a new window: open it in a new web tab. */
@@ -385,6 +409,45 @@ export interface NotesApi {
   /** Needs your account. */
   musicSearch(query: string): Promise<MusicSearchResults>
   musicPlaylists(): Promise<MusicItem[]>
+  /** 0–100. */
+  musicSetVolume(percent: number): Promise<void>
+  /** Whether a song is in your Liked Songs (needs your account). */
+  musicIsLiked(uri: string): Promise<boolean>
+  musicSetLiked(uri: string, liked: boolean): Promise<void>
+  /** Needs your account, like everything below. */
+  musicQueue(): Promise<MusicQueue>
+  musicAddToQueue(uri: string): Promise<void>
+  musicRecent(): Promise<MusicItem[]>
+  /** Where your account can play. */
+  musicDevices(): Promise<MusicDevice[]>
+  musicTransfer(deviceId: string): Promise<void>
+  // The floating mini music player
+  setMusicMini(open: boolean): Promise<boolean>
+  isMusicMiniOpen(): Promise<boolean>
+  /** It was showing when Notes last closed. */
+  musicMiniWasOpen(): Promise<boolean>
+  onMusicMiniOpen(callback: (open: boolean) => void): () => void
+  /** Notes window → mini player. */
+  pushMusicMini(state: MusicMiniState): void
+  musicMiniLast(): Promise<MusicMiniState | null>
+  onMusicMiniState(callback: (state: MusicMiniState) => void): () => void
+  /** Mini player → notes window. */
+  sendMusicMiniCommand(command: MusicMiniCommand): void
+  onMusicMiniCommand(callback: (command: MusicMiniCommand) => void): () => void
+  /** Your own music files; `fresh` looks through the folder again. */
+  localMusicLibrary(fresh?: boolean): Promise<LocalLibrary>
+  /** Asks which folder your music is in, then lists it. */
+  localMusicChooseFolder(): Promise<LocalLibrary>
+  // Your playlists (`uri` is spotify:playlist:…; songs only for playlists you can edit)
+  musicPlaylistSongs(uri: string): Promise<MusicItem[]>
+  /** Makes a private playlist. */
+  musicCreatePlaylist(name: string): Promise<MusicItem>
+  musicRenamePlaylist(uri: string, name: string): Promise<void>
+  musicDeletePlaylist(uri: string): Promise<void>
+  musicAddToPlaylist(uri: string, songs: string[]): Promise<void>
+  musicRemoveFromPlaylist(uri: string, song: string): Promise<void>
+  /** Positions count from 0. */
+  musicMoveInPlaylist(uri: string, from: number, to: number): Promise<void>
   /** Opens the Spotify app, or (Mac) where you let Notes control it in System Settings. */
   musicOpen(what: 'app' | 'automation'): Promise<void>
   aiStatus(): Promise<AiStatus>

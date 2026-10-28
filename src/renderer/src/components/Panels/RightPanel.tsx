@@ -7,6 +7,7 @@ import { isNoteTab } from '../../lib/editorController'
 import Backlinks from './Backlinks'
 import Outline from './Outline'
 import MiniCalendar from '../Calendar/MiniCalendar'
+import { useNoteHidden } from '../../store/streamer'
 
 const VIEWS: { id: RightView; label: string; icon: typeof Link2 }[] = [
   { id: 'backlinks', label: 'Backlinks', icon: Link2 },
@@ -19,12 +20,14 @@ export default function RightPanel() {
   const active = useEditor((s) => (isNoteTab(s.active) ? s.active : null))
   const version = useNoteIndex((s) => s.version)
   const headings = useEditor((s) => s.outline.length)
+  // Streamer mode: a hidden note's headings and links would give it away.
+  const hidden = useNoteHidden(active)
   // `version` changes whenever any note's links change.
   const backlinkCount = useMemo(
     () => (active ? backlinksTo(active).reduce((n, g) => n + g.links.length, 0) : 0),
     [active, version]
   )
-  const counts: Record<RightView, number> = { backlinks: backlinkCount, outline: active ? headings : 0, calendar: 0 }
+  const counts: Record<RightView, number> = { backlinks: hidden ? 0 : backlinkCount, outline: active && !hidden ? headings : 0, calendar: 0 }
 
   return (
     <div className="sidebar-inner">
@@ -43,8 +46,9 @@ export default function RightPanel() {
           </button>
         ))}
       </div>
-      {view === 'backlinks' && <Backlinks />}
-      {view === 'outline' && <Outline />}
+      {hidden && view !== 'calendar' && <div className="panel-empty">Show the note to see its {view === 'outline' ? 'outline' : 'links'}.</div>}
+      {!hidden && view === 'backlinks' && <Backlinks />}
+      {!hidden && view === 'outline' && <Outline />}
       {view === 'calendar' && <MiniCalendar />}
     </div>
   )

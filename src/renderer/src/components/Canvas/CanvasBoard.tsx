@@ -68,6 +68,7 @@ import ContextMenu, { type MenuItem } from '../ContextMenu'
 import FileIcon from '../FileIcon'
 import Picker, { type PickerItem } from '../Picker/Picker'
 import { showKeys } from '@shared/platform'
+import EmptyArt from '../Motion/EmptyArt'
 
 const SAVE_DELAY = 500
 const MAX_UNDO = 100
@@ -823,7 +824,7 @@ export default function CanvasBoard({ path }: { path: string }) {
         </div>
         {board && board.nodes.length === 0 && (
           <div className="canvas-empty">
-            <StickyNote size={32} strokeWidth={1.2} />
+            <EmptyArt kind="board" size={64} />
             <p>Your board is empty</p>
             <span>Double-click anywhere to add a sticky note, or drag notes and pictures in from the sidebar.</span>
             <span>Drag from the dot on a card’s edge to another card to draw an arrow.</span>

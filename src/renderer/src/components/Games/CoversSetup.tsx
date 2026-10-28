@@ -7,7 +7,7 @@ import { errorMessage } from '../../lib/paths'
 const MODE_NOTE: Record<AnimatedCovers, string> = {
   always: 'They move all the time while they’re on screen.',
   hover: 'They move while the pointer is on them.',
-  off: 'They’re turned off (or Reduce motion is on), so still pictures are shown.'
+  off: 'They’re turned off (or Motion isn’t on Full), so still pictures are shown.'
 }
 
 /** The Games page's "Animated covers" box: your free SteamGridDB key, stored encrypted on this computer. */

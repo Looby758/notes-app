@@ -106,9 +106,10 @@ body.density-compact {
 body.density-compact .panel-header {
   height: 32px;
 }
-body.reduce-motion *,
-body.reduce-motion *::before,
-body.reduce-motion *::after {
+/* Settings → Motion → Off (more in motion.css). */
+[data-motion='off'] *,
+[data-motion='off'] *::before,
+[data-motion='off'] *::after {
   animation: none !important;
   transition: none !important;
 }
@@ -7298,6 +7299,82 @@ body.youtube-window {
   text-align: center;
 }
 
+.home-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.home-head h2 {
+  margin-right: auto;
+}
+.home-head .btn {
+  padding: 5px 14px;
+  font-size: 12.5px;
+}
+.home-customise {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.home-customise:hover {
+  color: var(--text);
+}
+/* Customising: each box gets a dashed outline and controls in its corner, and its insides stop reacting to clicks. */
+.home-cell-edit {
+  position: relative;
+  border-radius: 10px;
+  outline: 1px dashed var(--border-strong);
+  outline-offset: 3px;
+  cursor: grab;
+  transition: opacity 0.12s;
+}
+.home-cell-edit.dragging {
+  opacity: 0.4;
+}
+.home-cell-edit.drop-here {
+  outline: 2px solid var(--accent);
+}
+.home-edit-bar {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 2px 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg-raised);
+  color: var(--text-faint);
+}
+.home-edit-bar .icon-btn {
+  width: 24px;
+  height: 24px;
+}
+.home-edit-bar .icon-btn:disabled {
+  opacity: 0.3;
+}
+.home-cell-body {
+  pointer-events: none;
+}
+.home-cell-body:empty::before {
+  content: attr(data-empty);
+  display: block;
+  padding: 14px 120px 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-panel);
+  color: var(--text-faint);
+  font-size: 13px;
+}
+.home-cell-edit.off .home-cell-body {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
 /* ---------- passwords ---------- */
 .passwords-page {
   overflow-y: auto;
@@ -8791,13 +8868,9 @@ p.games-none {
 .game-card:hover .game-art > img:not(.game-icon) {
   transform: scale(1.04);
 }
-body.reduce-motion .game-card:hover .game-art > img {
+/* Motion on Subtle (or the system asking for less motion) keeps covers still. */
+:root:not([data-motion='full']) .game-card:hover .game-art > img {
   transform: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  .game-card:hover .game-art > img {
-    transform: none;
-  }
 }
 .game-art img.game-cover-live {
   position: absolute;
@@ -9077,4 +9150,167 @@ body.reduce-motion .game-card:hover .game-art > img {
   from {
     transform: scaleX(0);
   }
+}
+
+/* ---------- Imported themes (lib/appearance.ts, components/Theme) ---------- */
+
+/* A theme's picture sits behind a part of the app, faded into the theme's background. */
+.pane-body,
+.sidebar-inner,
+.music-player {
+  isolation: isolate;
+}
+.theme-picture {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-size: cover;
+  background-repeat: no-repeat;
+  opacity: var(--picture-strength);
+}
+/* So the words in front stay readable, the picture fades out towards the bottom. */
+.theme-picture::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 20%, var(--bg) 90%);
+}
+/* Small, busy places: the picture is half as strong and fades sooner. */
+.sidebar-inner > .theme-picture,
+.music-player > .theme-picture {
+  opacity: calc(var(--picture-strength) * 0.5);
+}
+.sidebar-inner > .theme-picture::after {
+  background: linear-gradient(to bottom, transparent 0%, var(--bg-panel) 70%);
+}
+.music-player > .theme-picture {
+  border-radius: inherit;
+}
+.music-player > .theme-picture::after {
+  background: linear-gradient(to right, var(--bg-raised) 10%, transparent 100%);
+}
+body.theme-headings .cm-h,
+body.theme-headings :is(h1, h2, h3) {
+  font-family: var(--font-headings);
+}
+
+.theme-star {
+  flex-shrink: 0;
+  object-fit: contain;
+}
+.tree-star.theme-star {
+  opacity: 1;
+}
+
+/* Loading screen */
+.theme-loading {
+  position: relative;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  animation: theme-loading-in 500ms var(--ease) both;
+}
+.theme-loading-picture {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.45;
+}
+.theme-loading-picture::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 0%, var(--bg) 85%);
+}
+.theme-loading-text {
+  position: relative;
+  font-family: var(--font-loading);
+  font-size: clamp(72px, 11vw, 140px);
+  letter-spacing: 0.06em;
+  color: var(--text-strong);
+  text-shadow: 0 2px 30px var(--bg), 0 0 2px color-mix(in srgb, var(--bg) 60%, transparent);
+  animation: theme-loading-words 900ms var(--ease) 150ms both;
+}
+@keyframes theme-loading-in {
+  from {
+    opacity: 0;
+  }
+}
+/* The words arrive like they're being written: from blurred and slightly larger to sharp. */
+@keyframes theme-loading-words {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: scale(1.08) rotate(-2deg);
+  }
+}
+body.reduce-motion .theme-loading,
+body.reduce-motion .theme-loading-text {
+  animation: none;
+}
+
+/* Settings: imported themes and the import button */
+.theme-card-wrap {
+  position: relative;
+  display: flex;
+}
+.theme-card-wrap > .theme-card {
+  flex: 1;
+}
+.theme-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms var(--ease);
+}
+.theme-card-wrap:hover .theme-remove,
+.theme-remove:focus-visible {
+  opacity: 1;
+}
+.theme-remove:hover {
+  color: var(--text-strong);
+}
+.theme-preview-main {
+  position: relative;
+}
+.theme-preview .theme-preview-main .theme-preview-picture {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  background-size: cover;
+  opacity: 0.55;
+  border-radius: 0;
+}
+.theme-import {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+.theme-import .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.theme-import-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.theme-import-error {
+  color: #f07178;
 }

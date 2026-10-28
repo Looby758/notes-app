@@ -71,13 +71,29 @@ The calendar shows the forecast too, for the next two weeks: a small picture and
 
 The forecast comes from [Open-Meteo](https://open-meteo.com), which is free and needs no account. It's checked every half hour while it's on screen, and the last one is kept (in `weather.json` in the settings folder) so it still shows when you're offline. Turn either part off in **Settings → Calendar → Weather**.
 
+## Streamer mode
+
+For sharing your screen with friends or on a stream. Turn it on with the eye at the top, **Ctrl+Alt+B**, or **Settings → Appearance → Streamer mode**; a red **LIVE** badge in the corner shows it's on (click it to turn it off).
+
+While it's on, private things are blurred until you click them: your weather town, email senders, subjects and the email you're reading, money amounts and the Money page, your saved logins (the password vault also locks), WhatsApp and Discord, calendar events, note names in the file list, tabs and recent notes, and the notes folder's path. Clicking something blurred only shows it, so you never open an email or a note by accident; click again to open it. Notes you open stay covered until you press **Show note**, and close the tab to hide it again. Reminder pop-ups just say "Reminder", and WhatsApp and Discord can't pop up notifications.
+
+Turning streamer mode off and on again hides everything again. Whether notes and note names are hidden can be changed in Settings.
+
 ## Music player (Spotify)
 
-Press ♫ at the top (or Ctrl+Alt+M) to show a small player in the bottom-left corner. It shows the song that's playing, with play/pause, skip, shuffle and a progress bar you can click to jump. Hiding it doesn't stop the music. Ctrl+K also has *Music: play / pause*, *next* and *previous*, which you can give your own keys in Settings → Shortcuts.
+Press ♫ at the top (or Ctrl+Alt+M) to show a small player in the bottom-left corner. It shows the song that's playing, with play/pause, skip, a progress bar you can click to jump, and underneath it a volume slider, shuffle, repeat (press repeat again to repeat just this song) and a **sleep timer** (the moon) that pauses the music after 15 minutes to 1.5 hours, or at the end of the song. Hiding it doesn't stop the music. Ctrl+K also has *Music: play / pause*, *next* and *previous*, which you can give your own keys in Settings → Shortcuts.
 
 **On a Mac it works straight away** with the Spotify app (free or Premium), no sign-in. The first time, macOS asks whether Notes may control Spotify: press **OK**. (If you pressed *Don't Allow*, turn it back on in *System Settings → Privacy & Security → Automation*.) If Spotify isn't open, the player has an **Open Spotify** button. Under **Link** in the player you can paste a Spotify share link (*Share → Copy link*) to play a song, album or playlist.
 
-**Connect your Spotify account** (Settings → Music) to also **search** Spotify and pick from **your playlists** in the player, and to control Spotify on your phone, speakers or a Windows PC. Spotify only allows this for Premium accounts, and you make a free developer app on Spotify's site once (about 3 minutes):
+**Connect your Spotify account** (Settings → Music) to also **search** Spotify and pick from **your playlists** in the player, and to control Spotify on your phone, speakers or a Windows PC. With your account you also get:
+
+- **♥ Like** a song to save it to your Liked Songs.
+- **Up next** shows what's queued. The **+** next to a song in Search or Recent adds it to the queue.
+- **Recent** shows what you've played lately, to get back to it quickly.
+- **Make and change playlists**: under Playlists, press **New playlist**, or the **›** next to one of yours to rename or delete it, add songs (search right there, or add the song that's playing), take songs out with **×**, and drag songs into a new order.
+- **Choose where it plays**: press the device name at the bottom right of the player and pick this computer, your phone or a speaker. The music moves there and carries on.
+
+Spotify only allows this for Premium accounts, and you make a free developer app on Spotify's site once (about 3 minutes):
 
 1. Open the [Spotify developer dashboard](https://developer.spotify.com/dashboard) and log in with your Spotify account.
 2. Press **Create app**, give it any name and description.
@@ -85,7 +101,17 @@ Press ♫ at the top (or Ctrl+Alt+M) to show a small player in the bottom-left c
 4. Tick **Web API**, accept the terms and **Save**.
 5. Copy the **Client ID** into Settings → Music and press **Connect Spotify**, then **Agree** in your browser.
 
-There's no secret to copy. The sign-in is stored encrypted, like the Google one, in `spotify.json` in the settings folder. If Spotify says your account isn't allowed, add your Spotify email under **User Management** in the developer app.
+There's no secret to copy. The sign-in is stored encrypted, like the Google one, in `spotify.json` in the settings folder. If Spotify says your account isn't allowed, add your Spotify email under **User Management** in the developer app. If you connected before liking, Recent and playlist editing were added, Settings → Music asks you to connect once more (Disconnect, then Connect) so Notes gets permission for them.
+
+Also under the player:
+
+- **Floating mini player** (the picture-in-picture button, or Ctrl+K → *Music: floating mini player*): a small window with the song, play/pause and skip that stays on top of your other apps. Drag it anywhere; it comes back where you left it, and reopens with Notes if it was showing.
+- **Add to note** (the notebook button): puts the song that's playing into the note you're writing, as a card with its picture. Click the card to play the song (Spotify songs and your own files both work); click **Edit** to see the link.
+- A **"Now playing" pop-up** in the top corner when the next song starts. Turn it off in Settings → Music.
+
+### Your own music files
+
+**My music** in the player plays music files on your computer (MP3, M4A, FLAC, WAV, OGG), with no Spotify or account needed. The first time, press **Choose music folder**. Notes reads each song's name, artist, album and picture from the file (or from its name, like `01 - Artist - Title.mp3`). Find songs by typing, press one to play it and the rest of the list after it, or press **Shuffle all**. Volume, shuffle, repeat, skip, Up next, the sleep timer and your keyboard's play/pause keys all work the same, and a **visualiser** shows moving bars to the music (switch it off with the bars button, or in Settings → Music; Spotify doesn't let other apps see its sound, so it's only for your own files). Playing something on Spotify stops your music, and **Back to Spotify** at the bottom right of the player hands it back. The folder you chose and what was read from your files are kept in `local-music.json` in the settings folder, so only new or changed files are read again (press ↻ to look for new ones).
 
 ## AI helper (optional)
 
@@ -97,6 +123,14 @@ Notes can use Claude, made by Anthropic, to help with your notes. It's off until
 - **Chat** (the speech bubble at the top, or Ctrl+K → *AI helper: chat with Claude*): ask Claude anything, like a normal chat. Your chats are listed on the side so you can go back to one, rename or delete it, and any chat can be saved as a note. Chats are kept in `ai-chats.json` in the settings folder, on this computer only. Chat doesn't see your notes.
 
 Nothing is sent unless you press one of these. Then only what's needed goes to Anthropic: the note you're working on, for a question the best-matching notes, or in Chat the conversation so far. Locked notes are never sent. The key is stored encrypted, like calendar sign-ins, in `ai.json` in the settings folder.
+
+## Themes from a file
+
+Besides the built-in themes, Notes can wear themes that don't come with the app. A theme file (`.notestheme`) can change the colours, fonts, the pictures behind each part of the app, the loading screen, the icon on starred notes and the app icon. In **Settings → Appearance**, press **Import a theme…** and pick the file; it shows up with the other themes. Hover over it and press **×** to remove it. Importing a newer copy of the same theme replaces the old one.
+
+A theme file only holds looks (colours, pictures, fonts and a few words), never code, so a theme someone sends you can't do anything harmful. Its own app icon is used while the theme is on, unless you turn off **Use a theme's own icon**.
+
+**Making one:** a theme is a folder with a `theme.json` and its pictures and fonts. [src/shared/themePack.ts](src/shared/themePack.ts) describes every field and which parts of the app can have a picture. Pack the folder into a theme file with `npm run pack-theme -- path/to/folder`.
 
 ## Features
 
@@ -173,6 +207,7 @@ All of these can be changed in **Settings → Shortcuts**. On a Mac, Ctrl is **�
 | Ctrl+Shift+F | Search all notes |
 | Ctrl+Shift+E | Show files |
 | Ctrl+Shift+A | Open email |
+| Ctrl+Alt+B | Streamer mode on / off |
 | Ctrl+Shift+O | Show outline |
 | Ctrl+\\ | Focus mode (hide both sidebars) |
 | Ctrl+= / Ctrl+- / Ctrl+0 | Bigger / smaller / reset text |

@@ -2,18 +2,30 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import WelcomeScreen from './components/WelcomeScreen'
 import Shell from './components/Shell'
 import { flushAll } from './lib/editorController'
-import { loadPrefs } from './store/prefs'
+import { loadPrefs, usePrefs } from './store/prefs'
+import { activeThemeId, getTheme } from '@shared/themes'
+import LoadingScreen, { THEME_LOADING_MS } from './components/Theme/LoadingScreen'
+import { systemDark } from './lib/appearance'
 import { saveCapture } from './lib/capture'
+import StartupLogo from './components/Motion/StartupLogo'
 
 export default function App() {
   // undefined = still loading, null = no vault chosen yet
   const [vault, setVault] = useState<string | null | undefined>(undefined)
+  // An imported theme's loading screen stays up a moment, so you get to see it.
+  const [showingLoading, setShowingLoading] = useState(true)
 
   useEffect(() => {
     // Settings first, so the theme and editor options are right from the first frame.
     loadPrefs()
       .catch((err) => console.error('[prefs]', err))
-      .then(() => window.api.getVault())
+      .then(() => {
+        const { prefs } = usePrefs.getState()
+        const hasLoading = !!getTheme(activeThemeId(prefs, systemDark())).pack?.loading
+        if (hasLoading) setTimeout(() => setShowingLoading(false), THEME_LOADING_MS)
+        else setShowingLoading(false)
+        return window.api.getVault()
+      })
       .then(setVault)
     // Save any pending edits before the window closes.
     return window.api.onBeforeClose(async () => {
@@ -48,7 +60,12 @@ export default function App() {
     setVault(null)
   }, [])
 
-  if (vault === undefined) return <div className="app-loading" />
-  if (vault === null) return <WelcomeScreen onPick={pickVault} />
-  return <Shell vault={vault} onSwitchVault={pickVault} onCloseVault={closeVault} />
+  if (vault === undefined || showingLoading) return <LoadingScreen />
+  return (
+    <>
+      {vault === null ? <WelcomeScreen onPick={pickVault} /> : <Shell vault={vault} onSwitchVault={pickVault} onCloseVault={closeVault} />}
+      {/* After the settings have loaded, so it knows whether you've turned motion off. */}
+      <StartupLogo />
+    </>
+  )
 }

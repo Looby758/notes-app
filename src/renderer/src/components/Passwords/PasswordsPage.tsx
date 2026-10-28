@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { AlertTriangle, Check, Copy, Dices, ExternalLink, Eye, EyeOff, KeyRound, Lock, Pencil, Plus, Search, ShieldCheck, Trash2 } from 'lucide-react'
+import Private from '../Streamer/Private'
 import {
   autoLockMinutes,
   changeMasterPassword,
@@ -28,6 +29,7 @@ import {
 } from '../../lib/passwords/generate'
 import { ShowRecoveryKey } from '../Lock/LockDialog'
 import { notify } from '../../store/notify'
+import EmptyArt from '../Motion/EmptyArt'
 
 /** Seconds a copied password stays on the clipboard. */
 const CLEAR_AFTER = 30
@@ -60,7 +62,9 @@ export default function PasswordsPage({ autoFocus }: { autoFocus: boolean }) {
         ) : mustRenew ? (
           <NewMaster title="Choose a new master password" intro="You unlocked with your recovery key. Pick a new master password; your recovery key keeps working." done={() => setMustRenew(false)} />
         ) : (
-          <Vault />
+          <Private cover label="Your saved logins are hidden for streamer mode">
+            <Vault />
+          </Private>
         )}
       </div>
     </div>
@@ -335,7 +339,12 @@ function Vault() {
               </li>
             ))}
           </ul>
-          {count === 0 && <p className="passwords-none">No logins yet. Press “New login” to add one.</p>}
+          {count === 0 && (
+            <div className="empty-with-art">
+              <EmptyArt kind="key" />
+              <p className="passwords-none">No logins yet. Press “New login” to add one.</p>
+            </div>
+          )}
           {count > 0 && shown.length === 0 && <p className="passwords-none">Nothing matches “{query}”.</p>}
         </div>
         <div className="passwords-detail">

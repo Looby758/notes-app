@@ -8,12 +8,22 @@ import { IS_MAC } from '@shared/platform'
 import {
   APP_FIELD_SEP,
   parseAccountState,
+  moveBody,
+  nextRepeat,
   parseAppState,
+  parseDevices,
+  parsePlaylist,
   parsePlaylists,
+  parsePlaylistSongs,
+  parseQueue,
+  parseRecent,
   parseSearch,
   playBody,
+  playlistId,
   type MusicAction,
+  type MusicDevice,
   type MusicItem,
+  type MusicQueue,
   type MusicSearchResults,
   type MusicState,
   type MusicStatus
@@ -35,7 +45,13 @@ const SCOPE = [
   'user-modify-playback-state',
   'user-read-currently-playing',
   'playlist-read-private',
-  'playlist-read-collaborative'
+  'playlist-read-collaborative',
+  'user-library-read',
+  'user-library-modify',
+  'user-read-recently-played',
+  // For making and editing playlists (asked for now so you only connect again once).
+  'playlist-modify-private',
+  'playlist-modify-public'
 ].join(' ')
 // Overridable for tests, which point these at a local fake Spotify.
 const AUTH_URL = process.env.NOTES_SPOTIFY_AUTH_URL ?? 'https://accounts.spotify.com/authorize'
@@ -48,6 +64,10 @@ interface Stored {
   /** Encrypted. */
   refreshToken?: string
   name?: string
+  /** Your Spotify user id, to tell which playlists are yours. */
+  userId?: string
+  /** What Spotify let Notes do (space-separated), to spot sign-ins from before Notes asked for more. */
+  scope?: string
 }
 
 let stored: Stored | null = null
@@ -82,6 +102,7 @@ export function status(): MusicStatus {
     clientId: s.clientId,
     connected: !!s.refreshToken,
     name: s.name,
+    needsReconnect: !!s.refreshToken && s.scope !== undefined && SCOPE.split(' ').some((x) => !s.scope!.split(' ').includes(x)),
     error: accountError,
     redirectUri: REDIRECT_URI,
     canEncrypt: safeStorage.isEncryptionAvailable()
@@ -95,6 +116,7 @@ export function setClient(clientId: string): MusicStatus {
   if (id !== s.clientId) {
     s.refreshToken = undefined
     s.name = undefined
+    s.scope = undefined
     accessToken = null
     accountError = undefined
   }
@@ -129,11 +151,11 @@ const APP_STATE_SCRIPT = `tell application id "com.spotify.client"
   try
     set art to artwork url of t
   end try
-  set info to {name of t, artist of t, album of t, art, id of t, (duration of t) as text, player position, shuffling as text, (sound volume) as text}
+  set info to {name of t, artist of t, album of t, art, id of t, (duration of t) as text, player position, shuffling as text, (sound volume) as text, repeating as text}
 end tell
 set sep to character id ${APP_FIELD_SEP.charCodeAt(0)}
 set pos to (round ((item 7 of info) * 1000)) as text
-return s & sep & (item 1 of info) & sep & (item 2 of info) & sep & (item 3 of info) & sep & (item 4 of info) & sep & (item 5 of info) & sep & (item 6 of info) & sep & pos & sep & (item 8 of info) & sep & (item 9 of info)`
+return s & sep & (item 1 of info) & sep & (item 2 of info) & sep & (item 3 of info) & sep & (item 4 of info) & sep & (item 5 of info) & sep & (item 6 of info) & sep & pos & sep & (item 8 of info) & sep & (item 9 of info) & sep & (item 10 of info)`
 
 async function appState(): Promise<MusicState> {
   if (!(await appRunning())) return { source: 'none', playing: false, positionMs: 0, hint: 'not-running' }
@@ -256,11 +278,13 @@ export async function connect(): Promise<MusicStatus> {
     const tokens = await postToken({ grant_type: 'authorization_code', code: authCode, redirect_uri: REDIRECT_URI, client_id: s.clientId, code_verifier: verifier })
     if (typeof tokens.refresh_token !== 'string') throw new Error('Spotify didn’t allow staying signed in. Try connecting again.')
     s.refreshToken = encrypt(tokens.refresh_token)
+    s.scope = typeof tokens.scope === 'string' ? tokens.scope : undefined
     accessToken = { token: String(tokens.access_token), expires: Date.now() + Number(tokens.expires_in ?? 3600) * 1000 }
     accountError = undefined
     save()
     const me = await api('/me').catch(() => ({}) as Record<string, unknown>)
     s.name = typeof me.display_name === 'string' ? me.display_name : undefined
+    s.userId = typeof me.id === 'string' ? me.id : undefined
     save()
     return status()
   } finally {
@@ -272,6 +296,7 @@ export function disconnect(): MusicStatus {
   const s = load()
   s.refreshToken = undefined
   s.name = undefined
+  s.scope = undefined
   accessToken = null
   accountError = undefined
   save()
@@ -286,10 +311,9 @@ async function getAccessToken(): Promise<string | null> {
     const tokens = await postToken({ grant_type: 'refresh_token', refresh_token: decrypt(s.refreshToken), client_id: s.clientId })
     accessToken = { token: String(tokens.access_token), expires: Date.now() + Number(tokens.expires_in ?? 3600) * 1000 }
     // Spotify may hand out a new refresh token; the old one then stops working.
-    if (typeof tokens.refresh_token === 'string') {
-      s.refreshToken = encrypt(tokens.refresh_token)
-      save()
-    }
+    if (typeof tokens.refresh_token === 'string') s.refreshToken = encrypt(tokens.refresh_token)
+    if (typeof tokens.scope === 'string') s.scope = tokens.scope
+    if (typeof tokens.refresh_token === 'string' || typeof tokens.scope === 'string') save()
     accountError = undefined
     return accessToken.token
   } catch (err) {
@@ -337,6 +361,9 @@ async function api(path: string, init: { method?: string; body?: unknown } = {})
     if (reason === 'PREMIUM_REQUIRED' || /premium/i.test(err.message ?? '')) {
       throw new SpotifyError('Spotify only lets Notes control your music with Spotify Premium.', 403, 'PREMIUM_REQUIRED')
     }
+    if (res.status === 403 && /scope/i.test(err.message ?? '')) {
+      throw new SpotifyError('Notes needs a little more permission for this. Connect Spotify again in Settings → Music (Disconnect, then Connect).', 403)
+    }
     if (res.status === 403 && /user.*(not|registered)|developer/i.test(err.message ?? '')) {
       throw new SpotifyError('Spotify says your account isn’t allowed to use your developer app. Add your Spotify email under User Management in the Spotify dashboard.', 403)
     }
@@ -377,9 +404,11 @@ export async function control(action: MusicAction): Promise<void> {
   if (await appRunning()) {
     const commands: Record<MusicAction, string> = {
       toggle: 'playpause',
+      pause: 'pause',
       next: 'next track',
       previous: 'previous track',
-      shuffle: 'set shuffling to not shuffling'
+      shuffle: 'set shuffling to not shuffling',
+      repeat: 'set repeating to not repeating'
     }
     await tellApp(commands[action])
     return
@@ -393,7 +422,10 @@ export async function control(action: MusicAction): Promise<void> {
   else {
     const now = parseAccountState(await api('/me/player'))
     if (action === 'shuffle') await api(`/me/player/shuffle?state=${!now.shuffle}`, { method: 'PUT' })
-    else await api(now.playing ? '/me/player/pause' : '/me/player/play', { method: 'PUT' })
+    else if (action === 'repeat') await api(`/me/player/repeat?state=${nextRepeat(now.repeat)}`, { method: 'PUT' })
+    else if (action === 'pause') {
+      if (now.playing) await api('/me/player/pause', { method: 'PUT' })
+    } else await api(now.playing ? '/me/player/pause' : '/me/player/play', { method: 'PUT' })
   }
 }
 
@@ -443,7 +475,127 @@ export async function search(query: string): Promise<MusicSearchResults> {
   return parseSearch(await api(`/search?${new URLSearchParams({ q, type: 'track,playlist,album', limit: '10' })}`))
 }
 
-export async function playlists(): Promise<MusicItem[]> {
-  return parsePlaylists(await api('/me/playlists?limit=50'))
+/** Your Spotify user id (asked for once, for sign-ins from before Notes kept it). */
+async function myId(): Promise<string | undefined> {
+  const s = load()
+  if (!s.userId) {
+    const me = await api('/me')
+    if (typeof me.id === 'string') {
+      s.userId = me.id
+      save()
+    }
+  }
+  return s.userId
 }
 
+export async function playlists(): Promise<MusicItem[]> {
+  const me = await myId().catch(() => undefined)
+  return parsePlaylists(await api('/me/playlists?limit=50'), me)
+}
+
+function idOf(uri: string): string {
+  const id = playlistId(uri)
+  if (!id) throw new Error('That isn’t one of your playlists.')
+  return id
+}
+
+/** A playlist's songs, in order (only for playlists you own or can edit, which is all Spotify allows). */
+export async function playlistSongs(uri: string): Promise<MusicItem[]> {
+  const id = idOf(uri)
+  const songs: MusicItem[] = []
+  // 50 at a time; a very long playlist stops at 1,000.
+  for (let offset = 0; offset < 1000; offset += 50) {
+    const page = await api(`/playlists/${id}/items?limit=50&offset=${offset}&additional_types=track,episode`)
+    songs.push(...parsePlaylistSongs(page))
+    if (!page.next) break
+  }
+  return songs
+}
+
+/** Makes a new private playlist. */
+export async function createPlaylist(name: string): Promise<MusicItem> {
+  const n = name.trim()
+  if (!n) throw new Error('Give the playlist a name.')
+  return parsePlaylist(await api('/me/playlists', { method: 'POST', body: { name: n.slice(0, 100), public: false } }), await myId().catch(() => undefined))
+}
+
+export async function renamePlaylist(uri: string, name: string): Promise<void> {
+  const n = name.trim()
+  if (!n) throw new Error('Give the playlist a name.')
+  await api(`/playlists/${idOf(uri)}`, { method: 'PUT', body: { name: n.slice(0, 100) } })
+}
+
+/** Removes a playlist from your library (for one you made, that's deleting it, as in the Spotify app). */
+export async function deletePlaylist(uri: string): Promise<void> {
+  idOf(uri)
+  await api(`/me/library?${new URLSearchParams({ uris: uri })}`, { method: 'DELETE' })
+}
+
+/** Adds songs to the end of a playlist. */
+export async function addToPlaylist(uri: string, songs: string[]): Promise<void> {
+  const uris = songs.filter((u) => SONG_URI.test(u)).slice(0, 100)
+  if (!uris.length) throw new Error('Only songs can be added to a playlist.')
+  await api(`/playlists/${idOf(uri)}/items`, { method: 'POST', body: { uris } })
+}
+
+/** Takes a song out of a playlist (every time it's in there, which is how Spotify does it). */
+export async function removeFromPlaylist(uri: string, song: string): Promise<void> {
+  if (!SONG_URI.test(song)) throw new Error('That isn’t a song.')
+  await api(`/playlists/${idOf(uri)}/items`, { method: 'DELETE', body: { items: [{ uri: song }] } })
+}
+
+/** Moves the song at position `from` to position `to` (both counting from 0). */
+export async function moveInPlaylist(uri: string, from: number, to: number): Promise<void> {
+  if (![from, to].every((n) => Number.isInteger(n) && n >= 0) || from === to) return
+  await api(`/playlists/${idOf(uri)}/items`, { method: 'PUT', body: moveBody(from, to) })
+}
+
+
+/** 0–100, on the Spotify app here or wherever your account is playing. */
+export async function setVolume(percent: number): Promise<void> {
+  const v = Math.max(0, Math.min(100, Math.round(percent)))
+  if (await appRunning()) await tellApp(`set sound volume to ${v}`)
+  else if (connected()) await api(`/me/player/volume?volume_percent=${v}`, { method: 'PUT' })
+  else throw new Error(IS_MAC ? 'Open Spotify first.' : 'Connect your Spotify account in Settings → Music first.')
+}
+
+const SONG_URI = /^spotify:(track|episode):[A-Za-z0-9]+$/
+
+/** Whether a song is in your Liked Songs. */
+export async function isLiked(uri: string): Promise<boolean> {
+  if (!SONG_URI.test(uri) || !connected()) return false
+  const body = await api(`/me/library/contains?${new URLSearchParams({ uris: uri })}`)
+  // Spotify answers with a list of true/false, one for each link asked about.
+  return Array.isArray(body) && body[0] === true
+}
+
+/** Adds a song to (or takes it out of) your Liked Songs. */
+export async function setLiked(uri: string, liked: boolean): Promise<void> {
+  if (!SONG_URI.test(uri)) throw new Error('Only songs can be liked.')
+  if (!connected()) throw new Error('Connect your Spotify account in Settings → Music to like songs.')
+  await api(`/me/library?${new URLSearchParams({ uris: uri })}`, { method: liked ? 'PUT' : 'DELETE' })
+}
+
+export async function queue(): Promise<MusicQueue> {
+  return parseQueue(await api('/me/player/queue'))
+}
+
+/** Plays a song after the current one. */
+export async function addToQueue(uri: string): Promise<void> {
+  if (!SONG_URI.test(uri)) throw new Error('Only songs can be added to the queue.')
+  await api(`/me/player/queue?${new URLSearchParams({ uri })}`, { method: 'POST' })
+}
+
+export async function recent(): Promise<MusicItem[]> {
+  return parseRecent(await api('/me/player/recently-played?limit=50'))
+}
+
+export async function devices(): Promise<MusicDevice[]> {
+  return parseDevices(await api('/me/player/devices'))
+}
+
+/** Moves the music to another device and keeps it playing there. */
+export async function transfer(deviceId: string): Promise<void> {
+  if (!/^[A-Za-z0-9]+$/.test(deviceId)) throw new Error('That device isn’t available.')
+  await api('/me/player', { method: 'PUT', body: { device_ids: [deviceId], play: true } })
+}

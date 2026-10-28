@@ -24,7 +24,9 @@ import {
   PanelRight,
   Settings as SettingsIcon,
   SquareTerminal,
-  PoundSterling
+  PoundSterling,
+  Eye,
+  EyeOff
 } from 'lucide-react'
 import { useVault } from '../store/vault'
 import { useEditor, type SaveStatus } from '../store/editor'
@@ -78,6 +80,8 @@ import SketchPad from './Sketch/SketchPad'
 import { FlashcardsButton } from './Flashcards/FlashcardsPage'
 import { MessagesButton } from './Messages/MessagesPage'
 import { openRandomNote } from '../lib/random'
+import { toggleStreamerMode } from '../store/streamer'
+import Private from './Streamer/Private'
 import { startReminders, stopReminders } from '../lib/reminderScheduler'
 
 interface Props {
@@ -108,6 +112,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
   const fonts = usePrefs((s) => s.prefs.editorFont + s.prefs.uiFont + s.prefs.zoom)
   const showWordCount = usePrefs((s) => s.prefs.showWordCount)
   const reading = usePrefs((s) => s.prefs.readingMode)
+  const streamer = usePrefs((s) => s.prefs.streamerMode)
   const zen = useUI((s) => s.zen)
   const musicOpen = useMusic((s) => s.open)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -306,6 +311,14 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         >
           {reading ? <PenLine size={15} /> : <BookOpen size={15} />}
         </button>
+        <button
+          className={`icon-btn ${streamer ? 'active' : ''}`}
+          onClick={toggleStreamerMode}
+          title={`Streamer mode: ${streamer ? 'on' : 'off'} (${showKeys('Ctrl+Alt+B')})`}
+          data-streamer-toggle
+        >
+          {streamer ? <EyeOff size={15} /> : <Eye size={15} />}
+        </button>
         <button className="icon-btn" onClick={() => openRandomNote()} title="Open a random note" data-random-note>
           <Dices size={15} />
         </button>
@@ -384,12 +397,20 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       </div>
 
       <footer className="statusbar">
-        <span title={vault}>{vault}</span>
+        {/* The folder's path usually has your name in it. */}
+        <Private>
+          <span title={streamer ? undefined : vault}>{vault}</span>
+        </Private>
         <span className="statusbar-spacer" />
         <StatusTimer />
         <button className="statusbar-btn" onClick={toggleZen} title={`Zen mode (${showKeys('Ctrl+Alt+Z')})`} data-zen-toggle>
           <Moon size={11} /> Zen
         </button>
+        {streamer && (
+          <button className="streamer-pill" onClick={toggleStreamerMode} title="Streamer mode is on: private things are blurred. Click to turn it off." data-streamer-pill>
+            <span className="dot" /> LIVE
+          </button>
+        )}
         {reading && (
           <button className="reading-pill" onClick={() => setPrefs({ readingMode: false })} title="Notes are read-only. Click to write again.">
             <BookOpen size={11} /> Reading

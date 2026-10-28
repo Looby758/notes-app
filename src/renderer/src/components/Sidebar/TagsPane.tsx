@@ -3,6 +3,7 @@ import { Hash } from 'lucide-react'
 import { allTags, useNoteIndex } from '../../store/noteIndex'
 import { showSearch } from '../../store/ui'
 import { usePrefs } from '../../store/prefs'
+import EmptyArt from '../Motion/EmptyArt'
 
 export default function TagsPane() {
   const version = useNoteIndex((s) => s.version)
@@ -13,6 +14,7 @@ export default function TagsPane() {
   if (tags.length === 0) {
     return (
       <div className="panel-empty">
+        <EmptyArt kind="tag" size={44} />
         No tags yet. Add one anywhere in a note, like <code>#idea</code> or <code>#project/alpha</code>, or in frontmatter
         as <code>tags: [idea]</code>.
       </div>

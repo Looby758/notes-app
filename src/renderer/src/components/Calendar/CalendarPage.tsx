@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import Private, { usePrivateTitle } from '../Streamer/Private'
 import { useUI, type CalendarView } from '../../store/ui'
 import { usePrefs } from '../../store/prefs'
 import { addDays, dayKey, formatDate, fromDayKey, monthGrid, startOfWeek } from '../../lib/dates'
@@ -222,6 +223,7 @@ function layoutEvents(items: Block[]): { item: Block; top: number; height: numbe
 }
 
 function WeekView({ first, onAdd }: { first: Date; weekStart: 0 | 1; onAdd: (e: MouseEvent, d: Date, start?: string, end?: string) => void }) {
+  const privateTitle = usePrivateTitle()
   const byDay = useItemsByDay()
   const createOnClick = usePrefs((s) => s.prefs.createDailyOnClick)
   usePrefs((s) => s.prefs.timeFormat)
@@ -344,13 +346,15 @@ function WeekView({ first, onAdd }: { first: Date; weekStart: 0 | 1; onAdd: (e: 
                     ...(item.color ? { ['--event-color' as string]: item.color } : {})
                   }}
                   onClick={(e) => item.onClick(e)}
-                  title={`${displayTime(item.start)}${item.end ? '–' + displayTime(item.end) : ''} ${item.title}`}
+                  title={privateTitle(`${displayTime(item.start)}${item.end ? '–' + displayTime(item.end) : ''} ${item.title}`)}
                 >
                   <span className="cal-event-time">
                     {displayTime(item.start)}
                     <EventWeather title={item.title} date={item.date} start={item.start} compact />
                   </span>
-                  <span className="cal-event-title">{item.title}</span>
+                  <span className="cal-event-title">
+                    <Private>{item.title}</Private>
+                  </span>
                 </button>
               ))}
               {key === today && <div className="cal-now" style={{ top: ((now.getHours() * 60 + now.getMinutes()) / 60) * HOUR_PX }} />}

@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ChevronRight, Columns2, FileText, Star, StarOff } from 'lucide-react'
-import { useStarred, placeStar, toggleStar } from '../../store/starred'
+import { ChevronRight, Columns2, FileText, StarOff } from 'lucide-react'
+import Private from '../Streamer/Private'
+import { useHideNames } from '../../store/streamer'
+import { useStarred, placeStar, toggleStar, justStarred } from '../../store/starred'
 import { useVault } from '../../store/vault'
 import { useEditor } from '../../store/editor'
 import { useUI } from '../../store/ui'
@@ -8,9 +10,11 @@ import { notePaths, noteTitle, parentOf } from '../../lib/paths'
 import { openNote, splitPane } from '../../lib/editorController'
 import { getDrag, setDrag } from '../../lib/dnd'
 import ContextMenu, { type MenuItem } from '../ContextMenu'
+import StarIcon from '../Theme/StarIcon'
 
 /** Starred notes at the top of the Files view. Drag to reorder; drop a note from the tree here to star it. */
 export default function StarredSection() {
+  const hideNames = useHideNames()
   const paths = useStarred((s) => s.paths)
   const tree = useVault((s) => s.tree)
   const active = useEditor((s) => s.active)
@@ -81,7 +85,7 @@ export default function StarredSection() {
         onDragLeave={() => setDropIndex(null)}
         onDrop={onDrop}
       >
-        <Star size={12} /> Drop a note here to star it
+        <StarIcon size={12} /> Drop a note here to star it
       </div>
     )
   }
@@ -100,7 +104,7 @@ export default function StarredSection() {
               key={path}
               className={`starred-row tree-row ${path === active ? 'selected' : ''} ${dropIndex === i ? 'drop-above' : ''}`}
               draggable
-              title={path}
+              title={hideNames ? undefined : path}
               onDragStart={(e) => {
                 setDrag({ kind: 'note', path, fromStarred: true })
                 e.dataTransfer.effectAllowed = 'move'
@@ -114,8 +118,10 @@ export default function StarredSection() {
               onAuxClick={(e) => e.button === 1 && openNote(path, { newTab: true })}
               onContextMenu={(e) => onContextMenu(e, path)}
             >
-              <Star size={13} className="tree-icon starred-icon" />
-              <span className="tree-label">{noteTitle(path)}</span>
+              <StarIcon size={13} className={`tree-icon starred-icon ${justStarred(path) ? 'pop' : ''}`} />
+              <span className="tree-label">
+                <Private when={hideNames}>{noteTitle(path)}</Private>
+              </span>
               {parentOf(path) && <span className="starred-folder">{parentOf(path)}</span>}
             </div>
           ))}

@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
 import { ArrowRightLeft, CalendarDays, Columns2, Copy, ExternalLink, FileDown, FolderSearch, Gamepad2, GitCompare, Globe, Grid3x3, House, KeyRound, Layers, Mail, MessageSquare, MessagesSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
+import Private from '../Streamer/Private'
+import { useHideNames } from '../../store/streamer'
 import { useEditor } from '../../store/editor'
 import { toggleStar, useStarred } from '../../store/starred'
 import { useNoteIndex } from '../../store/noteIndex'
@@ -48,6 +50,14 @@ import { UnreadBadge } from '../Messages/MessagesPage'
 import { useWeb, type WebPage } from '../../store/web'
 import { displayUrl } from '@shared/web'
 import { FILE_MANAGER, showKeys } from '@shared/platform'
+import { animateOut } from '../../lib/motion'
+
+/** Closing with the mouse lets the tab shrink away first. (Ctrl+W stays instant, so it can be pressed quickly.) */
+function closeWithAnimation(el: HTMLElement | null, id: string, pane: string, unlessPinned = false): void {
+  // Shrink from the tab's real width, not its 200px limit.
+  if (el) el.style.maxWidth = `${el.offsetWidth}px`
+  animateOut(el, 'closing', () => (unlessPinned ? closeTabUnlessPinned(id, pane) : closeTab(id, pane)))
+}
 
 function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (isBlankTab(id)) return 'New tab'
@@ -81,6 +91,7 @@ export default function TabBar({ pane }: { pane: string }) {
   const paneCount = useEditor((s) => Object.keys(s.panes).length)
   const status = useEditor((s) => s.status)
   const pinned = useEditor((s) => s.panes[pane]?.pinned ?? NO_PINS)
+  const hideNames = useHideNames()
   const mindMap = useUI((s) => isMindMap(s, pane, active))
   const starred = useStarred((s) => s.paths)
   const web = useWeb((s) => s.pages)
@@ -205,7 +216,7 @@ export default function TabBar({ pane }: { pane: string }) {
             <div
               key={id}
               className={`tab ${id === active ? 'active' : ''} ${unsaved ? 'unsaved' : ''} ${isBlankTab(id) ? 'blank' : ''} ${isTabPinned ? 'pinned' : ''} ${dropIndex === i ? 'drop-before' : ''}`}
-              title={`${isFileTab(id) ? fileOfTab(id) : isWebTab(id) ? web[id]?.url || tabTitle(id, web) : (id as string).includes(':') ? tabTitle(id, web) : id}${isTabPinned ? ' (pinned)' : ''}`}
+              title={hideNames && (isNoteTab(id) || isFileTab(id)) ? undefined : `${isFileTab(id) ? fileOfTab(id) : isWebTab(id) ? web[id]?.url || tabTitle(id, web) : (id as string).includes(':') ? tabTitle(id, web) : id}${isTabPinned ? ' (pinned)' : ''}`}
               draggable
               onDragStart={(e) => {
                 setDrag({ kind: 'tab', pane, id })
@@ -221,7 +232,8 @@ export default function TabBar({ pane }: { pane: string }) {
               onMouseDown={(e) => {
                 if (e.button === 1) {
                   e.preventDefault()
-                  closeTabUnlessPinned(id, pane)
+                  if (isTabPinned) closeTabUnlessPinned(id, pane)
+                  else closeWithAnimation(e.currentTarget, id, pane, true)
                 }
               }}
             >
@@ -245,7 +257,9 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === GAMES_TAB && <Gamepad2 size={13} className="tab-icon" />}
               {isFileTab(id) && <FileIcon path={fileOfTab(id)} size={13} className="tab-icon" />}
               {icons.get(id) && <span className="tab-emoji">{icons.get(id)}</span>}
-              <span className="tab-title">{tabTitle(id, web)}</span>
+              <span className="tab-title">
+                <Private when={hideNames && (isNoteTab(id) || isFileTab(id))}>{tabTitle(id, web)}</Private>
+              </span>
               {id === MESSAGES_TAB && <UnreadBadge />}
               {isTabPinned ? (
                 // Pinned tabs show a pin instead of ✕; clicking it unpins.
@@ -266,7 +280,7 @@ export default function TabBar({ pane }: { pane: string }) {
                   title={`Close (${showKeys('Ctrl+W')})`}
                   onClick={(e) => {
                     e.stopPropagation()
-                    closeTab(id, pane)
+                    closeWithAnimation(e.currentTarget.closest<HTMLElement>('.tab'), id, pane)
                   }}
                 >
                   <span className="tab-dot" />

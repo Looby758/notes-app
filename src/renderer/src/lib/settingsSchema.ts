@@ -47,7 +47,7 @@ export const SETTINGS: SettingDef[] = [
     description: 'Pick one dark and one light theme below; Notes switches between them when your system does.',
     keywords: 'light dark mode system auto automatic appearance night day'
   },
-  { key: 'theme', section: 'appearance', group: 'Theme', type: 'theme', label: 'Theme', keywords: 'colour color dark light white paper sepia black nord blue' },
+  { key: 'theme', section: 'appearance', group: 'Theme', type: 'theme', label: 'Theme', keywords: 'colour color dark light white paper sepia black nord blue import imported theme file notestheme pictures' },
   {
     key: 'appIcon',
     section: 'appearance',
@@ -58,6 +58,15 @@ export const SETTINGS: SettingDef[] = [
       ? 'Shown in the Dock while Notes runs.'
       : 'Shown on the window, the taskbar (also when pinned), the Start menu and the desktop shortcut. Windows can take a moment to catch up; if a pinned icon doesn’t change, unpin and pin Notes again.',
     keywords: 'icon logo dock taskbar green'
+  },
+  {
+    key: 'themeAppIcon',
+    section: 'appearance',
+    group: 'App icon',
+    type: 'toggle',
+    label: 'Use a theme’s own icon',
+    description: 'When a theme you imported comes with its own app icon, it’s used while that theme is on.',
+    keywords: 'icon logo dock taskbar theme imported'
   },
   {
     key: 'accent',
@@ -163,13 +172,19 @@ export const SETTINGS: SettingDef[] = [
   },
   { key: 'showStatusBar', section: 'appearance', group: 'Interface', type: 'toggle', label: 'Show status bar', description: 'The strip at the bottom with save status and counts.' },
   {
-    key: 'reduceMotion',
+    key: 'motion',
     section: 'appearance',
     group: 'Interface',
-    type: 'toggle',
-    label: 'Reduce motion',
-    description: 'Turns off animations and transitions.',
-    keywords: 'animation accessibility'
+    type: 'choice',
+    options: [
+      { value: 'full', label: 'Full' },
+      { value: 'subtle', label: 'Subtle' },
+      { value: 'off', label: 'Off' }
+    ],
+    label: 'Motion',
+    description:
+      'Full: pages slide in, tabs grow, ticks and stars pop. Subtle: things fade instead of moving. Off: no animations at all. If your system is set to reduce motion, Full acts like Subtle.',
+    keywords: 'animation animations reduce motion accessibility transitions effects fade slide'
   },
   {
     key: 'gameLaunchAnimation',
@@ -177,7 +192,7 @@ export const SETTINGS: SettingDef[] = [
     group: 'Interface',
     type: 'toggle',
     label: 'Launch animation for games',
-    description: 'Pressing Play on the Games page shows the game’s art and logo for a few seconds while it starts. Click or press Esc to skip it. Off while Reduce motion is on.',
+    description: 'Pressing Play on the Games page shows the game’s art and logo for a few seconds while it starts. Click or press Esc to skip it. Off while Motion is Off.',
     keywords: 'games play launch start animation intro splash steam epic cinematic'
   },
   {
@@ -191,8 +206,35 @@ export const SETTINGS: SettingDef[] = [
       { value: 'off', label: 'Off' }
     ],
     label: 'Animated game covers',
-    description: 'Covers on the Games page that move, from SteamGridDB (add a free key on the Games page). Still pictures are shown when a game has none, and while Reduce motion is on.',
+    description: 'Covers on the Games page that move, from SteamGridDB (add a free key on the Games page). Still pictures are shown when a game has none, and while Motion is on Subtle or Off.',
     keywords: 'games covers art animated moving living gif webp steamgriddb grid'
+  },
+  {
+    key: 'streamerMode',
+    section: 'appearance',
+    group: 'Streamer mode',
+    type: 'toggle',
+    label: 'Streamer mode',
+    description: `For sharing your screen: your town, email, money, passwords, messages, calendar events and the notes folder’s path are blurred until you click them. Also the eye at the top, or ${showKeys('Ctrl+Alt+B')}.`,
+    keywords: 'streamer streaming screenshare screen share sharing discord obs privacy private hide blur postcode'
+  },
+  {
+    key: 'streamerHideNotes',
+    section: 'appearance',
+    group: 'Streamer mode',
+    type: 'toggle',
+    label: 'Hide notes until I click Show',
+    description: 'A note you open in streamer mode stays covered until you choose to show it. Closing its tab hides it again.',
+    keywords: 'streamer streaming screenshare privacy private hide notes cover'
+  },
+  {
+    key: 'streamerHideNames',
+    section: 'appearance',
+    group: 'Streamer mode',
+    type: 'toggle',
+    label: 'Blur note names',
+    description: 'In streamer mode, note names in the file list, tabs and recent notes are blurred too. Click one to see it; click again to open it.',
+    keywords: 'streamer streaming screenshare privacy private hide names titles file list tabs'
   },
 
   // ---------- Editor ----------
@@ -446,6 +488,26 @@ export const SETTINGS: SettingDef[] = [
     label: 'Lock again after',
     description: 'Unlocked notes and passwords lock again after this long without using Notes. (Passwords still lock after 30 min if this is “Never”. Also Ctrl+K → “Lock all notes and passwords now”, and they always lock when Notes closes.)',
     keywords: 'lock password encrypt private secure auto timeout'
+  },
+
+  // ---------- Music ----------
+  {
+    key: 'musicSongPopup',
+    section: 'music',
+    group: 'Player',
+    type: 'toggle',
+    label: 'Show a pop-up when the song changes',
+    description: 'The song’s name, artist and picture appear in the corner for a few seconds when the next one starts.',
+    keywords: 'music song now playing popup notification toast spotify'
+  },
+  {
+    key: 'musicVisualiser',
+    section: 'music',
+    group: 'Player',
+    type: 'toggle',
+    label: 'Visualiser for your own music',
+    description: 'Moving bars in the player while your own music files play (Spotify doesn’t let other apps see its sound). Also the bars button under the player.',
+    keywords: 'music visualizer visualiser bars waves equaliser animation'
   },
 
   // ---------- Calendar ----------

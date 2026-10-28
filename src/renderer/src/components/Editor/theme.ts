@@ -181,6 +181,47 @@ export const editorTheme = EditorView.theme(
       backgroundColor: 'rgba(255, 255, 255, 0.75)',
       borderTopLeftRadius: '4px'
     },
+    // Songs (a Spotify or My music link on its own line)
+    '.cm-song': {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      maxWidth: '420px',
+      margin: '6px 0',
+      padding: '8px 10px 8px 8px',
+      border: '1px solid var(--border)',
+      borderRadius: '8px',
+      backgroundColor: 'var(--bg-panel)',
+      cursor: 'pointer',
+      fontFamily: 'var(--font-ui)'
+    },
+    '.cm-song:hover': { borderColor: 'var(--accent-dim)' },
+    '.cm-song:hover .cm-song-play': { backgroundColor: 'var(--accent)', color: '#fff' },
+    '.cm-song-art': {
+      display: 'grid',
+      placeItems: 'center',
+      flexShrink: '0',
+      width: '44px',
+      height: '44px',
+      borderRadius: '6px',
+      overflow: 'hidden',
+      backgroundColor: 'var(--bg-hover)',
+      color: 'var(--accent)'
+    },
+    '.cm-song-art img': { width: '100%', height: '100%', objectFit: 'cover' },
+    '.cm-song-text': { display: 'flex', flexDirection: 'column', gap: '1px', minWidth: '0', flex: '1' },
+    '.cm-song-name': { fontWeight: '600', fontSize: '13.5px', color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+    '.cm-song-artist': { fontSize: '12px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+    '.cm-song-play': {
+      display: 'grid',
+      placeItems: 'center',
+      width: '30px',
+      height: '30px',
+      borderRadius: '50%',
+      backgroundColor: 'var(--bg-hover)',
+      color: 'var(--text-strong)',
+      transition: 'background-color 120ms, color 120ms'
+    },
     '.cm-place-info': { display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px' },
     '.cm-place-icon': { fontSize: '16px' },
     '.cm-place-text': { display: 'flex', flexDirection: 'column', minWidth: '0', flex: '1' },
@@ -322,14 +363,7 @@ export const editorTheme = EditorView.theme(
     // lists and tasks
     '.cm-bullet': { color: 'var(--text-faint)', display: 'inline-block', width: '1ch', fontWeight: '700' },
     '.cm-list-number': { color: 'var(--text-faint)' },
-    '.cm-task-checkbox': {
-      width: '15px',
-      height: '15px',
-      margin: '0 8px 0 0',
-      verticalAlign: '-2px',
-      accentColor: 'var(--accent)',
-      cursor: 'pointer'
-    },
+    // The task checkbox is drawn in styles/motion.css, so its tick can animate.
     '.cm-task-done': { color: 'var(--text-faint)', textDecoration: 'line-through' },
 
     // images and tables

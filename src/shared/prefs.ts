@@ -1,4 +1,4 @@
-import { THEMES } from './themes'
+import { allThemes } from './themes'
 import { IS_MAC } from './platform'
 
 /**
@@ -24,13 +24,29 @@ export interface Prefs {
   density: 'compact' | 'comfortable'
   zoom: number
   showStatusBar: boolean
-  reduceMotion: boolean
+  /** How much the app animates. The system's reduce-motion setting turns Full down to Subtle (see lib/motion.ts). */
+  motion: 'full' | 'subtle' | 'off'
   /** Pressing Play on the Games page shows a short title card with the game's art while it starts. */
   gameLaunchAnimation: boolean
   /** Animated game covers (from SteamGridDB): moving all the time, only under the pointer, or never. */
   gameAnimatedCovers: 'always' | 'hover' | 'off'
   /** Which app icon design to use (taskbar / Dock / window). */
   appIcon: string
+  /** A pop-up with the song's name and picture when the music player moves on to a new song. */
+  musicSongPopup: boolean
+  /** Moving bars in the music player while your own music files play. */
+  musicVisualiser: boolean
+
+  // Streamer mode
+  /** Blur private things (your town, email, money, passwords, messages, events) until you click them, for sharing your screen. */
+  streamerMode: boolean
+  /** In streamer mode, a note you open stays hidden until you click Show. */
+  streamerHideNotes: boolean
+  /** In streamer mode, note names (file list, tabs, recent notes) are blurred too. */
+  streamerHideNames: boolean
+
+  /** Use an imported theme's own app icon while that theme is on. */
+  themeAppIcon: boolean
 
   // Editor
   livePreview: boolean
@@ -58,6 +74,10 @@ export interface Prefs {
   openLinksInApp: boolean
   /** Notes starts on the Home page (today, reminders, recent notes). */
   homeOnStart: boolean
+  /** The Home page's boxes in the order you dragged them into (ids; boxes not listed keep their usual place). */
+  homeOrder: string[]
+  /** Home page boxes you've hidden. */
+  homeHidden: string[]
   /** Every note opens read-only (links open with a plain click) until you switch back to writing. */
   readingMode: boolean
   /** The file list shows pictures, recordings and other files, not just notes. */
@@ -155,10 +175,17 @@ export const DEFAULT_PREFS: Prefs = {
   density: 'comfortable',
   zoom: 1,
   showStatusBar: true,
-  reduceMotion: false,
+  motion: 'full',
   gameLaunchAnimation: true,
   gameAnimatedCovers: 'always',
   appIcon: 'default',
+  musicSongPopup: true,
+  musicVisualiser: true,
+
+  streamerMode: false,
+  streamerHideNotes: true,
+  streamerHideNames: true,
+  themeAppIcon: true,
 
   livePreview: true,
   spellcheck: true,
@@ -178,6 +205,8 @@ export const DEFAULT_PREFS: Prefs = {
   openInNewTab: false,
   openLinksInApp: true,
   homeOnStart: true,
+  homeOrder: [],
+  homeHidden: [],
   readingMode: false,
   randomIncludeDaily: false,
   showAttachments: true,
@@ -244,6 +273,7 @@ export const RANGES = {
 const CHOICES = {
   noteWidth: ['narrow', 'medium', 'wide', 'full'],
   density: ['compact', 'comfortable'],
+  motion: ['full', 'subtle', 'off'],
   gameAnimatedCovers: ['always', 'hover', 'off'],
   timeFormat: ['24h', '12h'],
   captureTarget: ['daily', 'inbox'],
@@ -258,6 +288,10 @@ const CHOICES = {
 
 /** Shortcuts offered for quick capture (system-wide, so they're picked from a safe list). */
 export const CAPTURE_SHORTCUTS = CHOICES.captureShortcut
+
+/** A list of Home box ids: short, simple and each only once. */
+const cleanIds = (v: unknown): string[] =>
+  Array.isArray(v) ? [...new Set(v.filter((id): id is string => typeof id === 'string' && /^[a-z0-9-]{1,40}$/.test(id)))].slice(0, 50) : []
 
 const isHex = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)
 /** Font names are used inside CSS, so keep them to characters a font name can contain. */
@@ -278,7 +312,7 @@ export function cleanFolder(v: unknown, fallback: string): string {
 /** Turns anything (a hand-edited file, an old version) into valid preferences. */
 export function normalizePrefs(raw: unknown): Prefs {
   const input = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
-  const out: Prefs = { ...DEFAULT_PREFS, shortcuts: {} }
+  const out: Prefs = { ...DEFAULT_PREFS, homeOrder: [], homeHidden: [], shortcuts: {} }
 
   for (const key of Object.keys(DEFAULT_PREFS) as (keyof Prefs)[]) {
     const value = input[key]
@@ -298,9 +332,12 @@ export function normalizePrefs(raw: unknown): Prefs {
     }
   }
 
-  if (typeof input.theme === 'string' && THEMES.some((t) => t.id === input.theme)) out.theme = input.theme
-  if (typeof input.lightTheme === 'string' && THEMES.some((t) => t.id === input.lightTheme && t.light)) out.lightTheme = input.lightTheme
-  if (typeof input.darkTheme === 'string' && THEMES.some((t) => t.id === input.darkTheme && !t.light)) out.darkTheme = input.darkTheme
+  // Before Motion had three levels it was a "Reduce motion" switch.
+  if (input.motion === undefined && input.reduceMotion === true) out.motion = 'off'
+  const themes = allThemes()
+  if (typeof input.theme === 'string' && themes.some((t) => t.id === input.theme)) out.theme = input.theme
+  if (typeof input.lightTheme === 'string' && themes.some((t) => t.id === input.lightTheme && t.light)) out.lightTheme = input.lightTheme
+  if (typeof input.darkTheme === 'string' && themes.some((t) => t.id === input.darkTheme && !t.light)) out.darkTheme = input.darkTheme
   if (input.accent === '' || isHex(input.accent)) out.accent = (input.accent as string).toLowerCase()
   out.uiFont = cleanFont(input.uiFont)
   out.editorFont = cleanFont(input.editorFont)
@@ -329,6 +366,8 @@ export function normalizePrefs(raw: unknown): Prefs {
   }
   if (typeof input.captureHeading === 'string' && input.captureHeading.length <= 60) out.captureHeading = input.captureHeading.trim()
   out.captureInbox = cleanFolder(input.captureInbox ?? DEFAULT_PREFS.captureInbox, DEFAULT_PREFS.captureInbox) || DEFAULT_PREFS.captureInbox
+  out.homeOrder = cleanIds(input.homeOrder)
+  out.homeHidden = cleanIds(input.homeHidden)
 
   if (input.shortcuts && typeof input.shortcuts === 'object') {
     for (const [id, value] of Object.entries(input.shortcuts as Record<string, unknown>)) {

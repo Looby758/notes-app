@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CalendarDays, ChevronLeft, ChevronRight, FileText, History, Maximize2, Plus } from 'lucide-react'
+import Private from '../Streamer/Private'
+import { useHideNames } from '../../store/streamer'
 import { useUI } from '../../store/ui'
 import { usePrefs } from '../../store/prefs'
 import { useVault } from '../../store/vault'
@@ -17,6 +19,7 @@ import { DayList, ExternalStatus, QuickAdd, useExternalRange, useItemsByDay, wee
  * Hidden when there aren't any.
  */
 function OnThisDay({ date, byDay }: { date: Date; byDay: Map<string, DatedItem[]> }) {
+  const hideNames = useHideNames()
   const groups = earlierDays(date)
     .map((d) => ({ ...d, items: (byDay.get(d.key) ?? []).filter((i) => i.kind === 'daily' || i.kind === 'note') }))
     .filter((g) => g.items.length)
@@ -32,8 +35,8 @@ function OnThisDay({ date, byDay }: { date: Date; byDay: Map<string, DatedItem[]
             {g.label}
           </span>
           {g.items.map((i) => (
-            <button key={i.path + i.kind} className="on-this-day-item" onClick={() => openNote(i.path)} title={i.path}>
-              <FileText size={12} /> {i.kind === 'daily' ? formatDate(fromDayKey(g.key)!, 'dddd D MMMM YYYY') : i.title}
+            <button key={i.path + i.kind} className="on-this-day-item" onClick={() => openNote(i.path)} title={hideNames ? undefined : i.path}>
+              <FileText size={12} /> {i.kind === 'daily' ? formatDate(fromDayKey(g.key)!, 'dddd D MMMM YYYY') : <Private when={hideNames}>{i.title}</Private>}
             </button>
           ))}
         </div>

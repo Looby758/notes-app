@@ -7,6 +7,7 @@ import LaunchAnimation from './LaunchAnimation'
 import CoversSetup from './CoversSetup'
 import { usePrefs } from '../../store/prefs'
 import { notify } from '../../store/notify'
+import { useMotion } from '../../lib/motion'
 
 const SOURCE_NAMES: Record<GameSource, string> = { steam: 'Steam', epic: 'Epic Games', app: IS_MAC ? 'Mac app' : 'App', added: 'Added by you' }
 
@@ -15,19 +16,6 @@ const SORTS: { value: GameSort; label: string }[] = [
   { value: 'most', label: 'Most played' },
   { value: 'name', label: 'A to Z' }
 ]
-
-/** Whether the system asks for less motion (as well as the Reduce motion setting). */
-function useSystemReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(() => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false)
-  useEffect(() => {
-    const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)')
-    if (!mq) return
-    const update = (): void => setReduced(mq.matches)
-    mq.addEventListener('change', update)
-    return () => mq.removeEventListener('change', update)
-  }, [])
-  return reduced
-}
 
 const savedSort = (): GameSort => {
   try {
@@ -49,9 +37,10 @@ export default function GamesPage() {
   const [starting, setStarting] = useState<string | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; game: Game } | null>(null)
   const [launching, setLaunching] = useState<Game | null>(null)
-  const animate = usePrefs((s) => s.prefs.gameLaunchAnimation && !s.prefs.reduceMotion)
-  const systemReduced = useSystemReducedMotion()
-  const coverMode = usePrefs((s): AnimatedCovers => (s.prefs.reduceMotion || systemReduced ? 'off' : s.prefs.gameAnimatedCovers))
+  const motion = useMotion()
+  const animate = usePrefs((s) => s.prefs.gameLaunchAnimation) && motion !== 'off'
+  // Covers that move all the time are a loop, so they only play with Motion on Full.
+  const coverMode = usePrefs((s): AnimatedCovers => (motion === 'full' ? s.prefs.gameAnimatedCovers : 'off'))
   const [coversStatus, setCoversStatus] = useState<CoversStatus | null>(null)
   const [covers, setCovers] = useState<Record<string, string>>({})
   const [coversOpen, setCoversOpen] = useState(false)

@@ -45,7 +45,7 @@ export default function MusicSettings() {
       <h3>Spotify</h3>
       <p className="cal-sources-intro">
         The music player sits in the bottom-left corner: show or hide it with <Music size={12} /> at the top. It shows what’s
-        playing, with play/pause, skip and shuffle.
+        playing, with play/pause, skip, shuffle, repeat and volume.
       </p>
       {status.appControl && (
         <p className="cal-sources-intro">
@@ -54,8 +54,9 @@ export default function MusicSettings() {
         </p>
       )}
       <p className="cal-sources-intro">
-        Connect your Spotify account to also <strong>search</strong> Spotify and pick from <strong>your playlists</strong> in the
-        player{status.appControl ? ', and control Spotify on your phone or speakers' : ''}. Spotify only allows this with{' '}
+        Connect your Spotify account to also <strong>search</strong> Spotify, pick from <strong>your playlists</strong>, like
+        songs, see <strong>what’s up next</strong> and <strong>what you’ve played</strong>, and choose where it plays
+        {status.appControl ? ' (including your phone or speakers)' : ''}. Spotify only allows this with{' '}
         <strong>Spotify Premium</strong>, and you make a free “developer app” on Spotify’s site once (about 3 minutes).
       </p>
 
@@ -137,6 +138,11 @@ export default function MusicSettings() {
             <strong>User Management</strong> in your app on the dashboard.
           </p>
         </>
+      )}
+      {status.connected && status.needsReconnect && (
+        <p className="setting-warning" data-music-reconnect>
+          To like songs and see what you’ve played recently, Notes needs a little more permission: press <strong>Disconnect</strong>, then connect again.
+        </p>
       )}
       {status.error && !error && <p className="setting-warning">{status.error}</p>}
       {!status.canEncrypt && <p className="setting-warning">This computer can’t encrypt the sign-in, so Spotify can’t be connected.</p>}

@@ -59,21 +59,42 @@ import MindMap from '../MindMap/MindMap'
 import WebPage from '../Web/WebPage'
 import { isMindMap, useUI } from '../../store/ui'
 import { needsUnlock, useLock } from '../../lib/lock/session'
+import ThemePicture, { usePageAccent } from '../Theme/ThemePicture'
+import { pageOfTab } from '@shared/themePack'
+import { useNoteHidden } from '../../store/streamer'
+import NoteCover from '../Streamer/NoteCover'
+import { isRestoring, replay } from '../../lib/motion'
+
+/** Panes that have been on screen, so only a brand-new one slides open (splitting remounts the old one). */
+const seenPanes = new Set<string>()
 
 /** One pane: its tab bar, and whatever its active tab shows (a note, a blank tab's picker, Settings…). */
 export default function Pane({ pane }: { pane: string }) {
   const host = useRef<HTMLDivElement>(null)
   const active = useEditor((s) => s.panes[pane]?.active ?? null)
+  // An imported theme can put a picture (and its own accent) behind each part of the app.
+  const page = pageOfTab(active)
+  const pageAccent = usePageAccent(page)
   const tabs = useEditor((s) => s.panes[pane]?.tabs)
   const isActivePane = useEditor((s) => s.activePane === pane)
   const multiple = useEditor((s) => Object.keys(s.panes).length > 1)
   const conflict = useEditor((s) => (active ? s.status[active] === 'conflict' : false))
   const [zone, setZone] = useState<DropZone | null>(null)
   const lockedNote = useLock((s) => isNoteTab(active) && needsUnlock(active, s))
-  const showingNote = isNoteTab(active) && !lockedNote
+  const streamerHidden = useNoteHidden(isNoteTab(active) && !lockedNote ? active : null)
+  const showingNote = isNoteTab(active) && !lockedNote && !streamerHidden
   const mindMap = useUI((s) => showingNote && isMindMap(s, pane, active))
 
   useEffect(() => mountPane(pane, host.current!), [pane])
+
+  const [isNew] = useState(() => !seenPanes.has(pane) && !isRestoring())
+  seenPanes.add(pane)
+
+  // Switching to another note keeps the same editor, so its fade-in is played again by hand.
+  const noteShown = showingNote && !mindMap
+  useEffect(() => {
+    if (noteShown) replay(host.current, 'page-enter')
+  }, [active, noteShown])
 
   const onDragOver = (e: DragEvent<HTMLDivElement>): void => {
     // Files from the list are dropped into the note (the editor handles that).
@@ -102,8 +123,9 @@ export default function Pane({ pane }: { pane: string }) {
 
   return (
     <div
-      className={`pane ${isActivePane && multiple ? 'focused' : ''} ${isActivePane ? 'active-pane' : ''}`}
+      className={`pane ${isActivePane && multiple ? 'focused' : ''} ${isActivePane ? 'active-pane' : ''} ${isNew ? 'pane-new' : ''}`}
       data-pane={pane}
+      style={pageAccent}
       onMouseDownCapture={() => focusPane(pane)}
       onFocusCapture={() => focusPane(pane)}
     >
@@ -114,6 +136,7 @@ export default function Pane({ pane }: { pane: string }) {
         onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setZone(null)}
         onDrop={onDrop}
       >
+        <ThemePicture page={page} />
         {conflict && active && (
           <div className="conflict-banner">
             <AlertTriangle size={15} />
@@ -128,6 +151,7 @@ export default function Pane({ pane }: { pane: string }) {
         )}
         <div ref={host} className={`editor-host ${showingNote && !mindMap ? '' : 'hidden'}`} />
         {mindMap && <MindMap key={active} pane={pane} path={active!} />}
+        {streamerHidden && <NoteCover key={active} path={active!} autoFocus={isActivePane} />}
         {lockedNote && <LockScreen key={active} path={active!} autoFocus={isActivePane} />}
         {isFileTab(active) &&
           (isBoard(active) ? (
