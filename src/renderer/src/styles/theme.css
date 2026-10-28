@@ -8879,10 +8879,15 @@ p.games-none {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, transparent 30%, var(--bg) 100%);
+  background: linear-gradient(to bottom, transparent 20%, var(--bg) 90%);
+}
+/* Small, busy places: the picture is half as strong and fades sooner. */
+.sidebar-inner > .theme-picture,
+.music-player > .theme-picture {
+  opacity: calc(var(--picture-strength) * 0.5);
 }
 .sidebar-inner > .theme-picture::after {
-  background: linear-gradient(to bottom, transparent 40%, var(--bg-panel) 100%);
+  background: linear-gradient(to bottom, transparent 0%, var(--bg-panel) 70%);
 }
 .music-player > .theme-picture {
   border-radius: inherit;
@@ -8927,19 +8932,28 @@ body.theme-headings :is(h1, h2, h3) {
 }
 .theme-loading-text {
   position: relative;
-  font-family: var(--font-headings);
-  font-size: 56px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-family: var(--font-loading);
+  font-size: clamp(72px, 11vw, 140px);
+  letter-spacing: 0.06em;
   color: var(--text-strong);
-  text-shadow: 0 2px 24px var(--bg);
+  text-shadow: 0 2px 30px var(--bg), 0 0 2px color-mix(in srgb, var(--bg) 60%, transparent);
+  animation: theme-loading-words 900ms var(--ease) 150ms both;
 }
 @keyframes theme-loading-in {
   from {
     opacity: 0;
   }
 }
-body.reduce-motion .theme-loading {
+/* The words arrive like they're being written: from blurred and slightly larger to sharp. */
+@keyframes theme-loading-words {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: scale(1.08) rotate(-2deg);
+  }
+}
+body.reduce-motion .theme-loading,
+body.reduce-motion .theme-loading-text {
   animation: none;
 }
 

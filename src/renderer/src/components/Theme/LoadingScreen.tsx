@@ -13,7 +13,11 @@ export default function LoadingScreen() {
       {loading && (
         <div className="theme-loading" data-theme-loading>
           {loading.picture && <div className="theme-loading-picture" style={{ backgroundImage: `url("${themeFileUrl(theme.id, loading.picture)}")` }} />}
-          {loading.text && <span className="theme-loading-text">{loading.text}</span>}
+          {loading.text && (
+            <span className="theme-loading-text" style={loading.color ? { color: loading.color } : undefined}>
+              {loading.text}
+            </span>
+          )}
         </div>
       )}
     </div>

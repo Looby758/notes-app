@@ -20,8 +20,8 @@ import type { Theme, ThemeColors } from './themes'
  *       "home": { "file": "pictures/daryl.jpg", "position": "center top", "accent": "#7d9a6a" },
  *       "all": { "file": "pictures/group.jpg" }   // anywhere without its own picture
  *     },
- *     "pictureStrength": 0.3,          // how strongly pictures show, 0.05 to 0.9
- *     "loading": { "text": "JSS", "picture": "pictures/enid.jpg" },
+ *     "pictureStrength": 0.15,         // how strongly pictures show, 0.03 to 0.6 (the sidebar and music player show half)
+ *     "loading": { "text": "JSS", "picture": "pictures/enid.jpg", "font": "fonts/marker.ttf", "color": "#e8e2d4" },
  *     "starIcon": "icons/wings.png",   // in place of the star on starred notes
  *     "appIcon": "icons/hat.png",      // the app's icon while the theme is on (square, 512px or more)
  *     "fonts": { "ui": "fonts/a.woff2", "headings": "fonts/b.ttf", "editor": "fonts/c.woff2" }
@@ -77,10 +77,11 @@ export interface ThemePack {
   author?: string
   pictures: Record<string, PagePicture>
   pictureStrength: number
-  loading?: { text?: string; picture?: string }
+  loading?: { text?: string; picture?: string; color?: string }
   starIcon?: string
   appIcon?: string
-  fonts: { ui?: string; headings?: string; editor?: string }
+  /** `loading` is the font for the loading screen's words. */
+  fonts: { ui?: string; headings?: string; editor?: string; loading?: string }
   /** Every file the theme uses, so importing copies only these. */
   files: string[]
 }
@@ -158,20 +159,26 @@ export function readThemeManifest(raw: unknown, hasFile: (path: string) => boole
     }
   }
 
-  const strength = typeof raw.pictureStrength === 'number' && Number.isFinite(raw.pictureStrength) ? raw.pictureStrength : 0.3
+  const strength = typeof raw.pictureStrength === 'number' && Number.isFinite(raw.pictureStrength) ? raw.pictureStrength : 0.15
   const loadingRaw = isObject(raw.loading) ? raw.loading : {}
-  const loading = { text: cleanText(loadingRaw.text, 40), picture: file(loadingRaw.picture, PICTURE_TYPES) }
+  const loading = {
+    text: cleanText(loadingRaw.text, 40),
+    picture: file(loadingRaw.picture, PICTURE_TYPES),
+    ...(isHex(loadingRaw.color) ? { color: loadingRaw.color.toLowerCase() } : {})
+  }
   const fontsRaw = isObject(raw.fonts) ? raw.fonts : {}
   const fonts: ThemePack['fonts'] = {}
   for (const key of ['ui', 'headings', 'editor'] as const) {
     const font = file(fontsRaw[key], FONT_TYPES)
     if (font) fonts[key] = font
   }
+  const loadingFont = file(loadingRaw.font, FONT_TYPES)
+  if (loadingFont) fonts.loading = loadingFont
 
   const pack: ThemePack = {
     author: cleanText(raw.author, 60),
     pictures,
-    pictureStrength: Math.min(0.9, Math.max(0.05, strength)),
+    pictureStrength: Math.min(0.6, Math.max(0.03, strength)),
     loading: loading.text || loading.picture ? loading : undefined,
     starIcon: file(raw.starIcon, PICTURE_TYPES),
     appIcon: file(raw.appIcon, ['.png', '.jpg', '.jpeg', '.webp']),

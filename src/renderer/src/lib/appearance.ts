@@ -32,6 +32,7 @@ export function applyAppearance(p: Prefs): void {
   root.setProperty('--font-ui', fontStack(uiFont, UI_FALLBACK))
   root.setProperty('--font-editor', fontStack(p.editorFont || fonts.editor || '', uiFont ? `'${uiFont}', ${UI_FALLBACK}` : UI_FALLBACK))
   root.setProperty('--font-headings', fonts.headings ? `'${fonts.headings}', var(--font-editor)` : 'var(--font-editor)')
+  root.setProperty('--font-loading', fonts.loading ? `'${fonts.loading}', var(--font-headings)` : 'var(--font-headings)')
   root.setProperty('--picture-strength', String(theme.pack?.pictureStrength ?? 0))
   root.setProperty('--font-mono', fontStack(p.codeFont, MONO_FALLBACK))
   root.setProperty('--editor-font-size', `${p.editorFontSize}px`)
@@ -52,9 +53,11 @@ export function applyAppearance(p: Prefs): void {
 /** Fonts in imported themes, loaded once each; resolves to the family names to use. */
 const loadedFonts = new Map<string, FontFace>()
 
-function themeFonts(theme: Theme): { ui?: string; headings?: string; editor?: string } {
-  const out: { ui?: string; headings?: string; editor?: string } = {}
-  for (const [role, path] of Object.entries(theme.pack?.fonts ?? {}) as [keyof typeof out, string][]) {
+type ThemeFonts = Partial<Record<'ui' | 'headings' | 'editor' | 'loading', string>>
+
+function themeFonts(theme: Theme): ThemeFonts {
+  const out: ThemeFonts = {}
+  for (const [role, path] of Object.entries(theme.pack?.fonts ?? {}) as [keyof ThemeFonts, string][]) {
     const url = themeFileUrl(theme.id, path)
     // A family name of plain characters, the same each time for the same file.
     const family = `Theme ${theme.id} ${path}`.replace(/[^\w -]/g, ' ')

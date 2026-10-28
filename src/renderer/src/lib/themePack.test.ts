@@ -36,7 +36,7 @@ describe('readThemeManifest', () => {
       colors,
       pictures: { home: { file: 'pictures/daryl.jpg', position: 'center top', accent: '#7D9A6A' }, all: 'pictures/enid.jpg' },
       pictureStrength: 0.4,
-      loading: { text: 'JSS', picture: 'pictures/enid.jpg' },
+      loading: { text: 'JSS', picture: 'pictures/enid.jpg', font: 'fonts/head.woff2', color: '#E8E2D4' },
       starIcon: 'icons/wings.png',
       appIcon: 'icons/hat.png',
       fonts: { headings: 'fonts/head.woff2' }
@@ -49,10 +49,10 @@ describe('readThemeManifest', () => {
     expect(t.pack?.pictures.home).toEqual({ file: 'pictures/daryl.jpg', position: 'center top', accent: '#7d9a6a' })
     expect(t.pack?.pictures.all).toEqual({ file: 'pictures/enid.jpg', position: 'center' })
     expect(t.pack?.pictureStrength).toBe(0.4)
-    expect(t.pack?.loading).toEqual({ text: 'JSS', picture: 'pictures/enid.jpg' })
+    expect(t.pack?.loading).toEqual({ text: 'JSS', picture: 'pictures/enid.jpg', color: '#e8e2d4' })
     expect(t.pack?.starIcon).toBe('icons/wings.png')
     expect(t.pack?.appIcon).toBe('icons/hat.png')
-    expect(t.pack?.fonts).toEqual({ headings: 'fonts/head.woff2' })
+    expect(t.pack?.fonts).toEqual({ headings: 'fonts/head.woff2', loading: 'fonts/head.woff2' })
     expect(t.pack?.files.sort()).toEqual(['fonts/head.woff2', 'icons/hat.png', 'icons/wings.png', 'pictures/daryl.jpg', 'pictures/enid.jpg'])
   })
 
@@ -82,7 +82,7 @@ describe('readThemeManifest', () => {
   it('keeps picture positions to plain CSS words and limits strength', () => {
     const t = theme({ name: 'X', colors, pictures: { home: { file: 'pictures/daryl.jpg', position: 'url(https://x) top' } }, pictureStrength: 5 })
     expect(t.pack?.pictures.home.position).toBe('center')
-    expect(t.pack?.pictureStrength).toBe(0.9)
+    expect(t.pack?.pictureStrength).toBe(0.6)
     expect(theme({ name: 'X', colors, pictures: { home: { file: 'pictures/daryl.jpg', position: '30% Top' } } }).pack?.pictures.home.position).toBe('30% top')
   })
 
