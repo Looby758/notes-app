@@ -12,7 +12,8 @@ import {
   PenLine,
   PanelLeft,
   PanelRight,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  SquareTerminal
 } from 'lucide-react'
 import { useVault } from '../store/vault'
 import { useEditor, type SaveStatus } from '../store/editor'
@@ -33,6 +34,7 @@ import {
   remeasure,
   SETTINGS_TAB,
   GRAPH_TAB,
+  TERMINAL_TAB,
   setZenEditor
 } from '../lib/editorController'
 import { openLink, openWikiLink } from '../lib/openLink'
@@ -270,6 +272,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
           <Orbit size={15} />
         </button>
         <FlashcardsButton />
+        <button className="icon-btn" onClick={() => openSpecialTab(TERMINAL_TAB)} title={`Terminal (${showKeys('Ctrl+Alt+T')})`} data-terminal-button>
+          <SquareTerminal size={15} />
+        </button>
         <LayoutMenu />
         <button className="icon-btn" onClick={() => useUI.setState({ modal: 'commands' })} title={`All commands (${showKeys('Ctrl+K')})`}>
           <CommandIcon size={15} />
