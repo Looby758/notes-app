@@ -37,6 +37,7 @@ import { dictionaryMenu, setupDictionary } from './dictionary'
 import { setupWebTitle } from './webTitle'
 import { setupImporter } from './importer'
 import { applyIconOutsideApp } from './appIcon'
+import { readHandwritingOffline } from './handwriting'
 
 let vault: Vault | null = null
 const shownReminders = new Set<Electron.Notification>()
@@ -526,6 +527,7 @@ function registerIpc(): void {
   ipcMain.handle('ai:summarise', (_e, title: string, text: string) => ai.summarise(title, text))
   ipcMain.handle('ai:tidy', (_e, text: string, kind: 'note' | 'capture') => ai.tidy(text, kind === 'capture' ? 'capture' : 'note'))
   ipcMain.handle('ai:ask', (_e, question: string, notes: AiNote[], history: AiAskTurn[]) => ai.askNotes(question, notes, history))
+  ipcMain.handle('handwriting:read', (_e, png: Uint8Array, reader: 'ai' | 'offline') => (reader === 'ai' ? ai.readHandwriting(png) : readHandwritingOffline(png)))
 
   ipcMain.handle('vault:readAppData', (_e, name: string) => currentVault().readAppData(name))
   ipcMain.handle('vault:writeAppData', (_e, name: string, content: string) => currentVault().writeAppData(name, content))

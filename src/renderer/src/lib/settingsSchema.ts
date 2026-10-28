@@ -268,6 +268,21 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'typewriter focus dim paragraph line'
   },
   {
+    key: 'handwritingReader',
+    section: 'editor',
+    group: 'Sketches',
+    type: 'choice',
+    options: [
+      { value: 'auto', label: 'AI helper if set up' },
+      { value: 'ai', label: 'AI helper' },
+      { value: 'offline', label: 'Offline' }
+    ],
+    label: 'Turn handwriting into text with',
+    description:
+      'The sketch pad’s “Turn into text” button. The AI helper reads messy and joined-up writing well, but sends that sketch to Anthropic (about a cent each time). Offline stays on this computer and needs no key, but works best with neat printed letters.',
+    keywords: 'handwriting ocr recognise recognize text sketch pen convert'
+  },
+  {
     key: 'focusMinutes',
     section: 'editor',
     group: 'Focus timer',

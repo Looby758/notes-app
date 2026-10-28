@@ -104,6 +104,7 @@ const api: NotesApi = {
   aiSummarise: (title, text) => ipcRenderer.invoke('ai:summarise', title, text),
   aiTidy: (text, kind) => ipcRenderer.invoke('ai:tidy', text, kind),
   aiAsk: (question, notes, history) => ipcRenderer.invoke('ai:ask', question, notes, history),
+  readHandwriting: (png, reader) => ipcRenderer.invoke('handwriting:read', png, reader),
   getVault: () => ipcRenderer.invoke('vault:get'),
   pickVault: () => ipcRenderer.invoke('vault:pick'),
   closeVault: () => ipcRenderer.invoke('vault:close'),

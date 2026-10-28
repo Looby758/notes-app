@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Eraser, Grid3x3, Highlighter, Pen, Redo2, Rows3, Trash2, Undo2, X } from 'lucide-react'
+import { Copy, Eraser, Grid3x3, Highlighter, Pen, Redo2, Rows3, ScanText, Trash2, Undo2, X } from 'lucide-react'
 import { useUI } from '../../store/ui'
 import { usePrefs } from '../../store/prefs'
 import { useVault } from '../../store/vault'
 import { notify } from '../../store/notify'
-import { insertIntoActiveNote, refreshLinkDecorations } from '../../lib/editorController'
+import { refreshAiStatus } from '../../store/ai'
+import { insertBlockIntoActiveNote, insertIntoActiveNote, refreshLinkDecorations } from '../../lib/editorController'
+import { inkPng, pickReader, READER_NAMES, type Reader } from '../../lib/handwriting'
+import { errorMessage } from '../../lib/paths'
 import {
   bumpSketch,
   emptySketch,
@@ -30,10 +33,19 @@ const SIZES = [2, 4, 8]
 const HIGHLIGHTER_SCALE = 6
 const ERASER_RADIUS = 10
 
+/** "Turn into text": the writing being read, or what was read (editable before it goes in the note). */
+interface Reading {
+  reader: Reader
+  state: 'working' | 'done' | 'error'
+  text: string
+  error?: string
+}
+
 /**
  * The sketch pad: draw with a mouse, trackpad or pen (pressure makes lines thicker). Save puts
  * the drawing in the attachments folder and in the note at the cursor; an existing sketch is
- * saved over in place, so every note showing it updates.
+ * saved over in place, so every note showing it updates. "Turn into text" reads the handwriting
+ * (with the AI helper or offline, see Settings → Editor → Sketches) so it can go in the note as text.
  */
 export default function SketchPad() {
   const sketch = useUI((s) => s.sketch)
@@ -51,6 +63,10 @@ function Pad({ path, close }: { path: string | null; close: () => void }) {
   const [highlighterColour, setHighlighterColour] = useState(HIGHLIGHTER_COLOURS[0])
   const [size, setSize] = useState(SIZES[1])
   const [saving, setSaving] = useState(false)
+  const [reading, setReading] = useState<Reading | null>(null)
+  const readerPref = usePrefs((s) => s.prefs.handwritingReader)
+  /** Only the latest reading counts, if you ask again before one finishes. */
+  const readingId = useRef(0)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   /** The finished strokes, drawn once, so only the line being drawn is redrawn as you move. */
   const layerRef = useRef<HTMLCanvasElement | null>(null)
@@ -231,9 +247,13 @@ function Pad({ path, close }: { path: string | null; close: () => void }) {
     close()
   }
 
-  const save = async (): Promise<void> => {
+  /** Saves the sketch, and puts `text` (read from it) in the note after it. */
+  const save = async (text?: string): Promise<void> => {
     if (!board || saving) return
-    if (!changed) return close()
+    if (!changed) {
+      if (text) putText(text)
+      return close()
+    }
     setSaving(true)
     try {
       const svg = sketchToSvg(board)
@@ -241,9 +261,11 @@ function Pad({ path, close }: { path: string | null; close: () => void }) {
         await window.api.writeSketch(path, svg)
         bumpSketch(path)
         refreshLinkDecorations()
+        if (text) putText(text)
       } else {
         const saved = await window.api.saveAttachment(folder, sketchFileName(), new TextEncoder().encode(svg))
         if (!insertIntoActiveNote(saved)) notify(`Your sketch was saved in the “${folder}” folder.`)
+        else if (text) putText(text)
         useVault.getState().refresh()
       }
       close()
@@ -253,12 +275,60 @@ function Pad({ path, close }: { path: string | null; close: () => void }) {
     }
   }
 
+  // ---------- turning the writing into text ----------
+
+  /** At the cursor of the open note, or copied if no note is open. */
+  const putText = (text: string): void => {
+    if (insertBlockIntoActiveNote(text)) return
+    void navigator.clipboard.writeText(text)
+    notify('No note is open, so the text was copied. Paste it wherever you like.', 'info')
+  }
+
+  const readWriting = async (choice?: Reader): Promise<void> => {
+    if (!board) return
+    const id = ++readingId.current
+    const done = (r: Reading): void => {
+      if (readingId.current === id) setReading(r)
+    }
+    const hasKey = (await refreshAiStatus().catch(() => null))?.hasKey ?? false
+    const reader = choice ?? pickReader(readerPref, hasKey)
+    if (reader === 'ai' && !hasKey) {
+      return done({ reader, state: 'error', text: '', error: 'The AI helper needs your Anthropic API key first (Settings → AI helper).' })
+    }
+    done({ reader, state: 'working', text: '' })
+    try {
+      const png = await inkPng(board)
+      if (!png) throw new Error('Write something with the pen first. Highlighter marks aren’t read.')
+      done({ reader, state: 'done', text: await window.api.readHandwriting(png, reader) })
+    } catch (err) {
+      done({ reader, state: 'error', text: '', error: errorMessage(err) })
+    }
+  }
+
+  const closeReading = (): void => {
+    readingId.current++
+    setReading(null)
+  }
+
+  /** A new sketch can go in as text alone, without saving the drawing. */
+  const useTextOnly = (text: string): void => {
+    putText(text)
+    close()
+  }
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
+      // Typing in the text box is just typing (Esc closes the box).
+      if (e.target instanceof HTMLTextAreaElement) {
+        if (e.key !== 'Escape') return
+        e.preventDefault()
+        e.stopPropagation()
+        return closeReading()
+      }
       const mod = e.ctrlKey || e.metaKey
       const key = e.key.toLowerCase()
       let handled = true
-      if (e.key === 'Escape') void cancel()
+      if (e.key === 'Escape') void (reading ? closeReading() : cancel())
       else if (mod && key === 'z' && e.shiftKey) redo()
       else if (mod && key === 'z') undo()
       else if (mod && key === 'y') redo()
@@ -341,31 +411,106 @@ function Pad({ path, close }: { path: string | null; close: () => void }) {
             </button>
           </div>
           <span className="sketch-spacer" />
-          <button className="btn btn-primary" onClick={save} disabled={!board || saving} title={`Save (${showKeys('Ctrl+S')})`} data-sketch-save>
+          <button
+            className={`btn ${reading ? 'active' : ''}`}
+            onClick={() => void readWriting()}
+            disabled={!board?.strokes.length || saving || reading?.state === 'working'}
+            title="Read your handwriting and turn it into typed text"
+            data-sketch-read
+          >
+            <ScanText size={14} /> Turn into text
+          </button>
+          <button className="btn btn-primary" onClick={() => void save()} disabled={!board || saving} title={`Save (${showKeys('Ctrl+S')})`} data-sketch-save>
             {saving ? 'Saving…' : path ? 'Save changes' : 'Save sketch'}
           </button>
           <button className="icon-btn" onClick={cancel} title="Close (Esc)" data-sketch-close>
             <X size={15} />
           </button>
         </div>
-        <div className="sketch-board">
-          {board ? (
-            <canvas
-              ref={canvasRef}
-              className={`sketch-canvas tool-${tool}`}
-              style={{ aspectRatio: `${board.width} / ${board.height}` }}
-              onPointerDown={onPointerDown}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
-              onPointerCancel={onPointerUp}
-              data-sketch-canvas
+        <div className="sketch-body">
+          <div className="sketch-board">
+            {board ? (
+              <canvas
+                ref={canvasRef}
+                className={`sketch-canvas tool-${tool}`}
+                style={{ aspectRatio: `${board.width} / ${board.height}` }}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onPointerCancel={onPointerUp}
+                data-sketch-canvas
+              />
+            ) : (
+              <p className="sketch-loading">Opening the sketch…</p>
+            )}
+          </div>
+          {reading && (
+            <ReadingPanel
+              reading={reading}
+              newSketch={!path}
+              onEdit={(text) => setReading({ ...reading, text })}
+              onRetry={(reader) => void readWriting(reader)}
+              onTextOnly={useTextOnly}
+              onWithSketch={(text) => void save(text)}
+              onClose={closeReading}
             />
-          ) : (
-            <p className="sketch-loading">Opening the sketch…</p>
           )}
         </div>
       </div>
     </div>
+  )
+}
+
+function ReadingPanel(props: {
+  reading: Reading
+  newSketch: boolean
+  onEdit: (text: string) => void
+  onRetry: (reader: Reader) => void
+  onTextOnly: (text: string) => void
+  onWithSketch: (text: string) => void
+  onClose: () => void
+}) {
+  const { reading } = props
+  const other: Reader = reading.reader === 'ai' ? 'offline' : 'ai'
+  const text = reading.text.trim()
+  return (
+    <aside className="sketch-reading" aria-label="Text from your writing" data-sketch-reading={reading.state}>
+      <div className="sketch-reading-head">
+        <strong>Text from your writing</strong>
+        <button className="icon-btn" onClick={props.onClose} title="Close (Esc)">
+          <X size={14} />
+        </button>
+      </div>
+      {reading.state === 'working' ? (
+        <p className="sketch-reading-note">Reading your writing with {READER_NAMES[reading.reader]}…</p>
+      ) : reading.state === 'error' ? (
+        <p className="sketch-reading-note error">{reading.error}</p>
+      ) : (
+        <>
+          <p className="sketch-reading-note">Read by {READER_NAMES[reading.reader]}. Fix anything it got wrong, then add it to your note.</p>
+          <textarea className="sketch-reading-text" value={reading.text} onChange={(e) => props.onEdit(e.target.value)} spellCheck autoFocus data-sketch-reading-text />
+          <div className="sketch-reading-actions">
+            {/* An edited sketch is already in the note, so its changes are saved and the text goes in too. */}
+            <button className="btn btn-primary" disabled={!text} onClick={() => (props.newSketch ? props.onTextOnly : props.onWithSketch)(text)} data-sketch-text-only>
+              {props.newSketch ? 'Add text only' : 'Add text to note'}
+            </button>
+            {props.newSketch && (
+              <button className="btn" disabled={!text} onClick={() => props.onWithSketch(text)} data-sketch-text-and-sketch>
+                Add text and sketch
+              </button>
+            )}
+            <button className="icon-btn" disabled={!text} onClick={() => void navigator.clipboard.writeText(text)} title="Copy the text">
+              <Copy size={14} />
+            </button>
+          </div>
+        </>
+      )}
+      {reading.state !== 'working' && (
+        <button className="link-btn sketch-reading-other" onClick={() => props.onRetry(other)} data-sketch-read-other>
+          Read it with {READER_NAMES[other]} instead
+        </button>
+      )}
+    </aside>
   )
 }
 

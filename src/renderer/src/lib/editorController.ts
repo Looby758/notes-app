@@ -202,15 +202,20 @@ export function setZenEditor(on: boolean): void {
  * cursor of the note you're in. Returns false if no note is open.
  */
 export function insertIntoActiveNote(file: string): boolean {
+  return insertBlockIntoActiveNote((note) => attachmentLink(file, note))
+}
+
+/** Puts text on lines of its own at the cursor of the note being edited; false if no note is open. */
+export function insertBlockIntoActiveNote(text: string | ((note: string) => string)): boolean {
   const pv = views.get(activePane())
   if (!pv?.shown || !isNoteTab(pv.shown)) return false
   const view = pv.view
-  const link = attachmentLink(file, pv.shown)
+  const insert = typeof text === 'string' ? text : text(pv.shown)
   const at = view.state.selection.main.head
   const line = view.state.doc.lineAt(at)
   const before = at > line.from ? '\n' : ''
   const after = at < line.to ? '\n' : ''
-  view.dispatch({ changes: { from: at, insert: before + link + after }, selection: { anchor: at + before.length + link.length } })
+  view.dispatch({ changes: { from: at, insert: before + insert + after }, selection: { anchor: at + before.length + insert.length } })
   return true
 }
 

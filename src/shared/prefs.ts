@@ -63,6 +63,8 @@ export interface Prefs {
   typewriterDimUnit: 'paragraph' | 'line'
   /** How the graph tab draws your notes. */
   graphStyle: 'neighbourhood' | 'constellation'
+  /** What reads handwriting in a sketch: the AI helper when a key is saved (else offline), or always one of them. */
+  handwritingReader: 'auto' | 'ai' | 'offline'
 
   // Focus timer (zen mode)
   focusMinutes: number
@@ -167,6 +169,7 @@ export const DEFAULT_PREFS: Prefs = {
   typewriterDim: false,
   typewriterDimUnit: 'paragraph',
   graphStyle: 'neighbourhood',
+  handwritingReader: 'auto',
 
   focusMinutes: 25,
   breakMinutes: 5,
@@ -227,6 +230,7 @@ const CHOICES = {
   captureTarget: ['daily', 'inbox'],
   typewriterDimUnit: ['paragraph', 'line'],
   graphStyle: ['neighbourhood', 'constellation'],
+  handwritingReader: ['auto', 'ai', 'offline'],
   appIcon: ['default', 'green', 'forest', 'ocean', 'sunset', 'light', 'midnight'],
   captureShortcut: IS_MAC
     ? ['Control+Alt+Space', 'Alt+Space', 'Control+Shift+Space', 'Super+Alt+N', '']

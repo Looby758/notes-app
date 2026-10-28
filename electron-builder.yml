@@ -10,6 +10,18 @@ files:
   - build/icon.png
   - build/trayTemplate.png
   - build/trayTemplate@2x.png
+  # The offline handwriting reader uses the smaller English model (4.0.0_best_int), not this one.
+  - '!node_modules/@tesseract.js-data/eng/4.0.0/**'
+# The offline handwriting reader runs in a worker thread, which can't read from inside app.asar,
+# so it and the packages the worker loads are unpacked.
+asarUnpack:
+  - node_modules/tesseract.js/**
+  - node_modules/tesseract.js-core/**
+  - node_modules/@tesseract.js-data/**
+  - node_modules/regenerator-runtime/**
+  - node_modules/is-url/**
+  - node_modules/wasm-feature-detect/**
+  - node_modules/bmp-js/**
 win:
   target:
     - target: nsis
