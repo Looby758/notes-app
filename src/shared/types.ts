@@ -1,5 +1,6 @@
 import type { Prefs } from './prefs'
 import type { DictionaryEntry } from './dictionary'
+import type { Sheet } from './sheet'
 
 export interface WindowBounds {
   x?: number
@@ -233,6 +234,8 @@ export interface NotesApi {
   removeCalendarFeed(id: string): Promise<CalendarSourcesStatus>
   /** Events between two instants from every enabled calendar (cached ones if offline). */
   fetchCalendarEvents(from: string, to: string): Promise<{ events: CalEvent[]; errors: string[]; offline: boolean }>
+  /** A .gsheet file's sheet, fetched from Google with the sign-in above. */
+  readGoogleSheet(path: string): Promise<GoogleSheetResult>
   aiStatus(): Promise<AiStatus>
   /** Checks the key with Anthropic, then stores it encrypted. */
   aiSetKey(key: string): Promise<AiStatus>
@@ -326,3 +329,12 @@ export interface AppleNote {
   modified: string
   locked: boolean
 }
+/** A Google Sheet (.gsheet file) fetched for the spreadsheet viewer, or why it couldn't be. */
+export type GoogleSheetResult =
+  | { sheets: Sheet[]; webUrl: string }
+  | {
+      error: string
+      webUrl?: string
+      /** What would fix it: set Google up in Settings, sign in (again), switch the Sheets API on, or just try later. */
+      fix?: 'setup' | 'connect' | 'enable-api' | 'retry'
+    }
