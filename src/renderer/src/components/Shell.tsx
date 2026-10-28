@@ -4,6 +4,7 @@ import {
   Command as CommandIcon,
   FolderOpen,
   FolderSync,
+  House,
   LogOut,
   MessageSquare,
   Orbit,
@@ -35,6 +36,7 @@ import {
   SETTINGS_TAB,
   GRAPH_TAB,
   CHAT_TAB,
+  HOME_TAB,
   setZenEditor
 } from '../lib/editorController'
 import { openLink, openWikiLink } from '../lib/openLink'
@@ -256,6 +258,10 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         </button>
 
         <div className="titlebar-spacer" />
+
+        <button className="icon-btn" onClick={() => openSpecialTab(HOME_TAB)} title={`Home (${showKeys('Ctrl+Shift+J')})`} data-home-button>
+          <House size={15} />
+        </button>
 
         <button
           className={`icon-btn ${reading ? 'active' : ''}`}

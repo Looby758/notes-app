@@ -23,6 +23,7 @@ import {
   setAlign,
   setCell,
   sortBy,
+  tableTotals,
   type TableData
 } from '../../lib/tables'
 
@@ -30,6 +31,7 @@ import {
  * Tables you edit in place: click a cell and type. Tab / Shift+Tab move between cells, Enter goes
  * down (adding a row at the bottom), Esc stops. A small toolbar adds and removes rows and columns,
  * aligns and sorts. Every change rewrites the table's markdown with its columns lined up.
+ * A row labelled Total (or Average) fills its empty cells in with the column's total.
  */
 
 const icon = (I: LucideIcon): string => renderToStaticMarkup(createElement(I, { size: 14 }))
@@ -128,12 +130,19 @@ export class TableWidget extends WidgetType {
       this.write(view, data, { row: r, col: c })
     }
 
+    const totals = tableTotals(t)
+
     const makeCell = (value: string, row: number, col: number): HTMLElement => {
       const cell = document.createElement(row < 0 ? 'th' : 'td')
       cell.dataset.row = String(row)
       cell.dataset.col = String(col)
       cell.style.textAlign = t.align[col] || 'left'
-      cell.innerHTML = renderCell(value) || '&nbsp;'
+      // An empty cell in a Total row shows the column's total (it isn't written into the note).
+      const total = totals.get(row)?.[col]
+      const show = (): void => {
+        cell.innerHTML = total ? `<span class="cm-table-total" title="Worked out from the numbers above">${esc(total)}</span>` : renderCell(value) || '&nbsp;'
+      }
+      show()
       if (!editable) return cell
       cell.tabIndex = 0
       // Clicking shows the cell's markdown in a text box.
@@ -162,7 +171,7 @@ export class TableWidget extends WidgetType {
           if (keep) save()
           if (then) move(row, col, then)
           else if (keep) this.write(view, data, focusTo)
-          else cell.innerHTML = renderCell(value) || '&nbsp;'
+          else show()
         }
         input.addEventListener('keydown', (e) => {
           if (e.key === 'Tab') {

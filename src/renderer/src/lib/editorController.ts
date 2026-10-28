@@ -59,6 +59,7 @@ export const CONFLICTS_TAB = 'conflicts:'
 export const AI_TAB = 'ai:'
 export const CHAT_TAB = 'chat:'
 export const FLASHCARDS_TAB = 'flashcards:'
+export const HOME_TAB = 'home:'
 /** A picture, recording, PDF… from the notes folder, shown in a tab: "file:attachments/a.png". */
 export const FILE_TAB = 'file:'
 export const fileTab = (path: string): string => FILE_TAB + path
@@ -370,6 +371,14 @@ function restore(): { layout: LayoutNode; panes: Record<string, PaneState>; acti
   return { layout: { type: 'pane', id: FIRST_PANE }, panes: { [FIRST_PANE]: { tabs: [], active: null } }, activePane: FIRST_PANE }
 }
 
+/** With "Show Home when Notes starts" on, starts on the Home page (keeping your other tabs). */
+function withHome(r: ReturnType<typeof restore>): ReturnType<typeof restore> {
+  if (!usePrefs.getState().prefs.homeOnStart) return r
+  const pane = r.panes[r.activePane]
+  const tabs = pane.tabs.includes(HOME_TAB) ? pane.tabs : [HOME_TAB, ...pane.tabs]
+  return { ...r, panes: { ...r.panes, [r.activePane]: { ...pane, tabs, active: HOME_TAB } } }
+}
+
 // ---------- loading and showing ----------
 
 /** A note's file, or 'locked' when it's a locked note you haven't unlocked yet. */
@@ -645,7 +654,7 @@ export function init(vault: string): void {
   files.clear()
   sessions.clear()
   vaultKey = vault
-  const restored = restore()
+  const restored = withHome(restore())
   useEditor.setState({ status: {}, recent: loadRecent() })
   setPanes(() => restored)
   clearStats()
