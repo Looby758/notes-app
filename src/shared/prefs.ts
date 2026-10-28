@@ -36,6 +36,8 @@ export interface Prefs {
   musicSongPopup: boolean
   /** Moving bars in the music player while your own music files play. */
   musicVisualiser: boolean
+  /** A little animated pet in the bottom corner that cheers when you finish things and naps when you're away. */
+  pet: boolean
 
   // Streamer mode
   /** Blur private things (your town, email, money, passwords, messages, events) until you click them, for sharing your screen. */
@@ -181,6 +183,7 @@ export const DEFAULT_PREFS: Prefs = {
   appIcon: 'default',
   musicSongPopup: true,
   musicVisualiser: true,
+  pet: true,
 
   streamerMode: false,
   streamerHideNotes: true,

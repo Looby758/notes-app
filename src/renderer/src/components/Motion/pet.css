@@ -1,0 +1,408 @@
+/*
+ * The app pet (Pet.tsx). Its colours come from the theme's accent, so it fits every theme.
+ * Movement is scaled by --m-move (styles/motion.css): on Subtle it only fades and blinks, and
+ * Motion → Off stops every animation (theme.css), leaving just its expressions.
+ */
+
+.pet {
+  --fur: color-mix(in srgb, var(--accent) 62%, #fff4ea);
+  --fur-dark: color-mix(in srgb, var(--accent) 78%, #2a1d3a);
+  --belly: #fffaf3;
+  --belly-dark: color-mix(in srgb, var(--accent) 18%, #fff2e4);
+  --ink: #2b2236;
+  --blush: #ff8fab;
+  --look-x: 0;
+  --look-y: 0;
+  position: fixed;
+  right: 18px;
+  bottom: calc(var(--statusbar-h) + 8px);
+  z-index: 40;
+  width: 60px;
+  height: 64px;
+  cursor: pointer;
+  user-select: none;
+  animation: pet-arrive calc(600ms * var(--m-time)) var(--m-spring) backwards;
+}
+body.hide-statusbar .pet {
+  bottom: 10px;
+}
+
+@keyframes pet-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(calc(16px * var(--m-move))) scale(calc(1 - 0.3 * var(--m-move)));
+  }
+}
+
+.pet-svg {
+  display: block;
+  overflow: visible;
+  filter: drop-shadow(0 3px 6px rgb(0 0 0 / 0.25));
+}
+.pet-svg * {
+  transform-box: fill-box;
+}
+
+.pet-fur-light {
+  stop-color: var(--fur);
+}
+.pet-fur-dark {
+  stop-color: var(--fur-dark);
+}
+.pet-belly-light {
+  stop-color: var(--belly);
+}
+.pet-belly-dark {
+  stop-color: var(--belly-dark);
+}
+.pet-ear-inner {
+  fill: var(--blush);
+  opacity: 0.55;
+}
+.pet-paw {
+  fill: var(--belly);
+  stroke: color-mix(in srgb, var(--fur-dark) 40%, transparent);
+  stroke-width: 0.6;
+}
+.pet-cheek {
+  fill: var(--blush);
+  opacity: 0.45;
+  transition: opacity 300ms ease;
+}
+.pet-eye ellipse {
+  fill: var(--ink);
+}
+.pet-glint {
+  fill: #fff;
+}
+.pet-eyes-happy,
+.pet-eyes-shut,
+.pet-mouth {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pet-mouth-open {
+  fill: #c2415d;
+  stroke-width: 1.2;
+}
+
+/* ---------- Faces: open eyes normally, ^ ^ when happy, closed when asleep ---------- */
+
+.pet-eyes-happy,
+.pet-eyes-shut,
+.pet-mouth-open {
+  opacity: 0;
+}
+.pet-cheer .pet-eyes-open,
+.pet-pat .pet-eyes-open,
+.pet-nap .pet-eyes-open,
+.pet-cheer .pet-mouth-calm {
+  opacity: 0;
+}
+.pet-cheer .pet-eyes-happy,
+.pet-pat .pet-eyes-happy,
+.pet-nap .pet-eyes-shut,
+.pet-cheer .pet-mouth-open {
+  opacity: 1;
+}
+.pet-cheer .pet-cheek,
+.pet-pat .pet-cheek {
+  opacity: 0.8;
+}
+
+/* Watching the pointer: the eyes move furthest, the face a little, so the head seems to turn. */
+.pet-eyes-open {
+  transform: translate(calc(var(--look-x) * 1px), calc(var(--look-y) * 1px));
+  transition: transform 180ms ease-out;
+}
+.pet-face {
+  transform: translate(calc(var(--look-x) * 0.45px), calc(var(--look-y) * 0.35px));
+  transition: transform 260ms ease-out;
+}
+.pet-eye {
+  transform-origin: center;
+  transition: transform 70ms ease-in;
+}
+.pet-blinking .pet-eye {
+  transform: scaleY(0.1);
+}
+
+/* ---------- Always: breathing, a wagging tail, an ear twitch now and then ---------- */
+
+.pet-breathe {
+  transform-origin: 50% 100%;
+  animation: pet-breathe calc(3.2s * var(--m-time)) ease-in-out infinite;
+}
+@keyframes pet-breathe {
+  50% {
+    transform: scale(calc(1 + 0.02 * var(--m-move)), calc(1 + 0.04 * var(--m-move)));
+  }
+}
+.pet-tail {
+  transform-origin: 0% 80%;
+  animation: pet-wag calc(2.4s * var(--m-time)) ease-in-out infinite;
+}
+@keyframes pet-wag {
+  0%,
+  100% {
+    transform: rotate(calc(-6deg * var(--m-move)));
+  }
+  50% {
+    transform: rotate(calc(12deg * var(--m-move)));
+  }
+}
+.pet-ear-l {
+  transform-origin: 80% 100%;
+  animation: pet-twitch-l 7s ease-in-out infinite;
+}
+.pet-ear-r {
+  transform-origin: 20% 100%;
+  animation: pet-twitch-r 9.5s ease-in-out 2s infinite;
+}
+@keyframes pet-twitch-l {
+  0%,
+  90%,
+  100% {
+    transform: none;
+  }
+  93% {
+    transform: rotate(calc(-14deg * var(--m-move)));
+  }
+  96% {
+    transform: rotate(calc(4deg * var(--m-move)));
+  }
+}
+@keyframes pet-twitch-r {
+  0%,
+  88%,
+  100% {
+    transform: none;
+  }
+  91% {
+    transform: rotate(calc(14deg * var(--m-move)));
+  }
+  94% {
+    transform: rotate(calc(-4deg * var(--m-move)));
+  }
+}
+
+/* The shadow under it, which shrinks when it hops. */
+.pet-shadow {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 1px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.28);
+  filter: blur(2px);
+}
+.pet-hop {
+  position: absolute;
+  inset: 0 0 auto 0;
+  transform-origin: 50% 100%;
+}
+
+/* ---------- Cheering: two springy hops, ^ ^ eyes and sparkles ---------- */
+
+.pet-cheer .pet-hop {
+  animation: pet-hop calc(1.4s * var(--m-time)) var(--m-ease-out);
+}
+@keyframes pet-hop {
+  0%,
+  50%,
+  100% {
+    transform: none;
+  }
+  8%,
+  58% {
+    transform: scale(calc(1 + 0.12 * var(--m-move)), calc(1 - 0.14 * var(--m-move)));
+  }
+  24% {
+    transform: translateY(calc(-20px * var(--m-move))) scale(calc(1 - 0.06 * var(--m-move)), calc(1 + 0.1 * var(--m-move))) rotate(calc(-6deg * var(--m-move)));
+  }
+  40%,
+  90% {
+    transform: scale(calc(1 + 0.08 * var(--m-move)), calc(1 - 0.08 * var(--m-move)));
+  }
+  74% {
+    transform: translateY(calc(-14px * var(--m-move))) rotate(calc(6deg * var(--m-move)));
+  }
+}
+.pet-cheer .pet-shadow {
+  animation: pet-shadow calc(1.4s * var(--m-time)) var(--m-ease-out);
+}
+@keyframes pet-shadow {
+  24% {
+    transform: scaleX(calc(1 - 0.45 * var(--m-move)));
+    opacity: 0.5;
+  }
+  74% {
+    transform: scaleX(calc(1 - 0.3 * var(--m-move)));
+    opacity: 0.6;
+  }
+}
+.pet-cheer .pet-tail {
+  animation-duration: calc(0.4s * var(--m-time));
+}
+
+.pet-sparkles {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  pointer-events: none;
+}
+.pet-sparkles i {
+  --a: calc(var(--i) * 60deg - 90deg);
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  margin: -5px;
+  background: var(--accent-strong, #ffd166);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  animation: pet-sparkle calc(900ms * var(--m-time)) var(--m-ease-out) calc(var(--i) * 40ms) both;
+}
+.pet-sparkles i:nth-child(odd) {
+  background: #ffd166;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px;
+}
+@keyframes pet-sparkle {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--a)) translateX(calc(14px * var(--m-move))) scale(0.2);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--a)) translateX(calc(34px + 8px * var(--m-move))) rotate(180deg) scale(1);
+  }
+}
+
+/* ---------- A pat: a happy squish and floating hearts ---------- */
+
+.pet-pat .pet-hop {
+  animation: pet-squish calc(600ms * var(--m-time)) var(--m-spring);
+}
+@keyframes pet-squish {
+  30% {
+    transform: scale(calc(1 + 0.1 * var(--m-move)), calc(1 - 0.12 * var(--m-move)));
+  }
+  60% {
+    transform: scale(calc(1 - 0.03 * var(--m-move)), calc(1 + 0.04 * var(--m-move)));
+  }
+}
+.pet-hearts {
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  pointer-events: none;
+}
+.pet-hearts i {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  background: var(--blush);
+  clip-path: path('M4.5 8.6 0.9 5A2.2 2.2 0 0 1 4.5 1.9 2.2 2.2 0 0 1 8.1 5z');
+  animation: pet-heart calc(900ms * var(--m-time)) ease-out both;
+}
+.pet-hearts i:nth-child(1) {
+  --dx: -14px;
+}
+.pet-hearts i:nth-child(2) {
+  --dx: 2px;
+  animation-delay: 120ms;
+  transform: scale(1.2);
+}
+.pet-hearts i:nth-child(3) {
+  --dx: 14px;
+  animation-delay: 240ms;
+}
+@keyframes pet-heart {
+  0% {
+    opacity: 0;
+    transform: translate(calc(var(--dx) * 0.3), 6px) scale(0.4);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), calc(-12px - 14px * var(--m-move))) scale(1.1);
+  }
+}
+
+/* ---------- Napping: sinks down, breathes slowly, Zzz drift up ---------- */
+
+.pet-nap .pet-hop {
+  transform: translateY(calc(3px * var(--m-move))) scale(calc(1 + 0.04 * var(--m-move)), calc(1 - 0.06 * var(--m-move)));
+  transition: transform calc(900ms * var(--m-time)) ease-in-out;
+}
+.pet-nap .pet-breathe {
+  animation-duration: calc(4.6s * var(--m-time));
+}
+.pet-nap .pet-tail {
+  animation-duration: calc(6s * var(--m-time));
+}
+.pet-nap .pet-ear {
+  animation: none;
+}
+.pet-zzz {
+  position: absolute;
+  right: -2px;
+  top: -6px;
+  pointer-events: none;
+  font: 700 12px/1 var(--font-ui, system-ui), sans-serif;
+  color: var(--text-muted, #aaa);
+}
+.pet-zzz i {
+  position: absolute;
+  font-style: normal;
+  animation: pet-z calc(3s * var(--m-time)) ease-in-out infinite both;
+}
+.pet-zzz i:nth-child(2) {
+  animation-delay: 1s;
+  font-size: 14px;
+}
+.pet-zzz i:nth-child(3) {
+  animation-delay: 2s;
+  font-size: 16px;
+}
+@keyframes pet-z {
+  0% {
+    opacity: 0;
+    transform: translate(0, 6px) scale(0.6);
+  }
+  25%,
+  60% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(10px * var(--m-move)), calc(-18px * var(--m-move))) rotate(calc(12deg * var(--m-move))) scale(1);
+  }
+}
+/* With motion off there's one still "z". */
+[data-motion='off'] .pet-zzz i {
+  opacity: 0.8;
+}
+
+/* ---------- Waking up: a big stretch ---------- */
+
+.pet-wake .pet-hop {
+  animation: pet-stretch calc(700ms * var(--m-time)) var(--m-ease-out);
+}
+@keyframes pet-stretch {
+  40% {
+    transform: scale(calc(1 - 0.06 * var(--m-move)), calc(1 + 0.12 * var(--m-move)));
+  }
+  70% {
+    transform: scale(calc(1 + 0.04 * var(--m-move)), calc(1 - 0.04 * var(--m-move)));
+  }
+}
