@@ -97,6 +97,29 @@ describe('statementFromPdf', () => {
     ])
   })
 
+  it('reads Lloyds statements: hidden screen-reader labels, a summary box and a Type column', () => {
+    const p = page([
+      [[300, '28 October 2026']],
+      [[300, '01 October 2026 to 28 October 2026']],
+      [[57, 'Money In'], [291, '£150.00'], [304, 'Balance on 01 October 2026'], [538, '£85.23']],
+      [[57, 'Money Out'], [291, '£15.73'], [304, 'Balance on 28 October 2026'], [538, '£219.50']],
+      [[57, 'Date'], [122, 'Description'], [271, 'Type'], [323, 'Money In (£)'], [393, 'Money Out (£)'], [490, 'Balance (£)']],
+      [[57, '01 Oct 26'], [122, 'SAINSBURYS S/MKT'], [271, 'DEB'], [454, '5.85'], [538, '79.38']],
+      [[57, '05 Oct 26'], [122, 'M JONES'], [271, 'FPI'], [376, '150.00'], [538, '229.38']],
+      [[57, '06 Oct 26'], [122, 'GROUND NEWS'], [271, 'DEB'], [454, '9.88'], [538, '219.50']],
+      [[57, '(Continued on next page)']]
+    ])
+    // Lloyds adds tiny invisible copies of the headings above each row, and a "." after every cell.
+    const hidden = (str: string, x: number, y: number): PdfItem => ({ str, x, y, width: 0, size: 0.05 })
+    const extra = p.flatMap((item) => (item.size === undefined && /\d\.\d\d$/.test(item.str) ? [hidden('.', item.x + item.width, item.y)] : []))
+    extra.push(hidden('Date', 57, 165), hidden('Description', 122, 165), hidden('Money In (£)', 375, 169), hidden('blank.', 375, 169))
+    expect(read([[...p, ...extra]])).toEqual([
+      { date: '2026-10-01', amount: -585, description: 'SAINSBURYS S/MKT' },
+      { date: '2026-10-05', amount: 15000, description: 'M JONES' },
+      { date: '2026-10-06', amount: -988, description: 'GROUND NEWS' }
+    ])
+  })
+
   it('finds nothing in a PDF that is not a statement', () => {
     expect(statementFromPdf([page([[[40, 'Dear customer, thank you for banking with us.']]])])).toEqual([])
   })
