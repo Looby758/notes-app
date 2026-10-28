@@ -180,6 +180,20 @@ export const SETTINGS: SettingDef[] = [
     description: 'Pressing Play on the Games page shows the game’s art and logo for a few seconds while it starts. Click or press Esc to skip it. Off while Reduce motion is on.',
     keywords: 'games play launch start animation intro splash steam epic cinematic'
   },
+  {
+    key: 'gameAnimatedCovers',
+    section: 'appearance',
+    group: 'Interface',
+    type: 'choice',
+    options: [
+      { value: 'always', label: 'Always' },
+      { value: 'hover', label: 'On hover' },
+      { value: 'off', label: 'Off' }
+    ],
+    label: 'Animated game covers',
+    description: 'Covers on the Games page that move, from SteamGridDB (add a free key on the Games page). Still pictures are shown when a game has none, and while Reduce motion is on.',
+    keywords: 'games covers art animated moving living gif webp steamgriddb grid'
+  },
 
   // ---------- Editor ----------
   {

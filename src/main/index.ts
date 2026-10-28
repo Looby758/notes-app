@@ -50,6 +50,7 @@ import { closeYouTube, setupYouTube } from './youtube'
 import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
 import { setupGames } from './games'
+import { setupGameCovers } from './gameCovers'
 import { applyIconOutsideApp } from './appIcon'
 import { CODE_SANDBOX_SCHEME, registerCodeSandbox } from './codeSandbox'
 import { readHandwritingOffline } from './handwriting'
@@ -496,6 +497,7 @@ function registerIpc(): void {
   localMusic.setupLocalMusic()
   setupImporter()
   setupGames()
+  setupGameCovers()
   setupTerminal(() => vault?.root ?? null)
   // The Mac asks once whether Notes may use the microphone.
   ipcMain.handle('voice:access', async () => (IS_MAC ? systemPreferences.askForMediaAccess('microphone') : true))
