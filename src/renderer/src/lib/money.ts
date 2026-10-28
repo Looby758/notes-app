@@ -177,6 +177,12 @@ export function parseDate(text: string): string | null {
     const month = MONTHS.indexOf(m[2].slice(0, 3).toLowerCase())
     if (month >= 0) return validDay(+m[3], month + 1, +m[1])
   }
+  // "Oct 3, 2026", as spreadsheets sometimes show dates.
+  m = /^([a-z]{3,})\.? (\d{1,2})(?:st|nd|rd|th)?,? (\d{4})$/i.exec(s)
+  if (m) {
+    const month = MONTHS.indexOf(m[1].slice(0, 3).toLowerCase())
+    if (month >= 0) return validDay(+m[3], month + 1, +m[2])
+  }
   return null
 }
 
