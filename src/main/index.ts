@@ -37,6 +37,7 @@ import { dictionaryMenu, setupDictionary } from './dictionary'
 import { setupWebTitle } from './webTitle'
 import { setupImporter } from './importer'
 import { applyIconOutsideApp } from './appIcon'
+import { CODE_SANDBOX_SCHEME, registerCodeSandbox } from './codeSandbox'
 
 let vault: Vault | null = null
 const shownReminders = new Set<Electron.Notification>()
@@ -212,7 +213,8 @@ const AUDIO_TYPES = new Set(['.webm', '.mp3', '.m4a', '.wav', '.ogg', '.oga', '.
 const VIEWER_TYPES = new Set(['.mp4', '.mov', '.m4v', '.ogv', '.pdf', '.ico', '.xlsx', '.xlsm', '.csv', '.tsv'])
 
 protocol.registerSchemesAsPrivileged([
-  { scheme: 'vault', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }
+  { scheme: 'vault', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
+  CODE_SANDBOX_SCHEME
 ])
 
 function registerVaultProtocol(): void {
@@ -653,6 +655,7 @@ app.whenReady().then(async () => {
     (_wc, permission, _origin, details) => ALLOWED_PERMISSIONS.has(permission) || (permission === 'media' && (details as { mediaType?: string }).mediaType === 'audio')
   )
   registerVaultProtocol()
+  registerCodeSandbox()
   registerIpc()
   safely('export', setupExport)
   // Hand edits to settings.json apply straight away.
