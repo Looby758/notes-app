@@ -50,6 +50,8 @@ export interface Prefs {
   showWordCount: boolean
   /** Opening a note adds a tab instead of changing the current one. */
   openInNewTab: boolean
+  /** Notes starts on the Home page (today, reminders, recent notes). */
+  homeOnStart: boolean
   /** Every note opens read-only (links open with a plain click) until you switch back to writing. */
   readingMode: boolean
   /** The file list shows pictures, recordings and other files, not just notes. */
@@ -160,6 +162,7 @@ export const DEFAULT_PREFS: Prefs = {
   cursorBlink: true,
   showWordCount: true,
   openInNewTab: false,
+  homeOnStart: true,
   readingMode: false,
   randomIncludeDaily: false,
   showAttachments: true,

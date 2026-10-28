@@ -21,7 +21,7 @@ import {
   Trash2,
   X
 } from 'lucide-react'
-import type { EmailFolder, EmailMessage } from '@shared/types'
+import type { EmailFolder, EmailMessage, EmailSummary } from '@shared/types'
 import {
   closeEmail,
   discardDraft,
@@ -41,7 +41,9 @@ import { useVault } from '../../store/vault'
 import { useNoteIndex } from '../../store/noteIndex'
 import { useUI } from '../../store/ui'
 import { notify } from '../../store/notify'
-import { openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
+import { EMAIL_TAB, openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
+import { addHomeCard } from '../../lib/home'
+import { HomeBox } from '../Home/HomePage'
 import { addEvent } from '../../lib/daily'
 import { dayKey, fromDayKey } from '../../lib/dates'
 import { htmlToMarkdown } from '../../lib/import/html'
@@ -604,3 +606,76 @@ function Composer() {
     </form>
   )
 }
+
+// ---------- the box on the Home page ----------
+
+const HOME_SHOWN = 4
+
+/** Your unread inbox emails on the Home page (nothing until Gmail is connected). */
+function EmailHomeCard() {
+  const status = useEmail((s) => s.status)
+  const [unread, setUnread] = useState<EmailSummary[] | null>(null)
+  const [more, setMore] = useState(false)
+
+  useEffect(() => {
+    refreshEmailStatus().catch(() => undefined)
+  }, [])
+  useEffect(() => {
+    if (!status?.gmail) return
+    let live = true
+    window.api
+      .emailList('unread', '')
+      .then((page) => {
+        if (!live) return
+        setUnread(page.emails)
+        setMore(!!page.next)
+      })
+      .catch(() => live && setUnread(null))
+    return () => {
+      live = false
+    }
+  }, [status?.gmail])
+
+  if (!status?.gmail || !unread) return null
+  const open = (id?: string): void => {
+    openSpecialTab(EMAIL_TAB)
+    if (id) void openEmail(id)
+  }
+  const count = `${unread.length}${more ? '+' : ''}`
+  return (
+    <HomeBox
+      icon={<Mail size={15} />}
+      title="Email"
+      action={
+        <button className="link-button home-box-action" onClick={() => open()}>
+          Inbox
+        </button>
+      }
+    >
+      {unread.length === 0 ? (
+        <p className="home-empty">No unread email.</p>
+      ) : (
+        <>
+          <p className="home-empty">
+            {count} unread in your inbox
+          </p>
+          <ul className="home-list">
+            {unread.slice(0, HOME_SHOWN).map((e) => (
+              <li key={e.id}>
+                <button className="home-row" onClick={() => open(e.id)} title={e.subject}>
+                  <span className="home-row-icon">
+                    <Mail size={13} />
+                  </span>
+                  <span className="home-row-title">{e.subject}</span>
+                  <span className="home-row-folder">{shortName(e.from)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </HomeBox>
+  )
+}
+
+addHomeCard({ id: 'email', order: 20, Card: EmailHomeCard })
