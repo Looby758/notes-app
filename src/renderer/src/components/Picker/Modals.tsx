@@ -14,6 +14,7 @@ import ExportDialog from './ExportDialog'
 import BulkDialog from './BulkDialog'
 import ImportDialog from './ImportDialog'
 import AiDialog from '../Ai/AiDialog'
+import PlaceDialog from './PlaceDialog'
 import { showKeys } from '@shared/platform'
 
 /** Ctrl+P (quick switcher), Ctrl+K (command palette) and "new note from template", shown over the app. */
@@ -31,6 +32,7 @@ export default function Modals() {
         {modal === 'bulk' && <BulkDialog close={close} />}
         {modal === 'import' && <ImportDialog close={close} />}
         {modal === 'ai' && <AiDialog close={close} />}
+        {modal === 'place' && <PlaceDialog close={close} />}
       </div>
     </div>
   )

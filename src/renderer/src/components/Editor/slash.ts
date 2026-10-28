@@ -172,6 +172,16 @@ const ITEMS: SlashItem[] = [
     }
   },
   {
+    label: 'Place…',
+    keywords: 'location map google maps address pin directions where venue shop restaurant',
+    section: 'Insert',
+    detail: 'Google Maps',
+    apply: (view, from, to) => {
+      view.dispatch({ changes: { from, to, insert: '' } })
+      useUI.setState({ modal: 'place' })
+    }
+  },
+  {
     label: 'Reminder',
     keywords: 'remind alarm notify alert time ⏰',
     section: 'Insert',

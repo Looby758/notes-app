@@ -120,6 +120,12 @@ export const commands: Command[] = [
     run: () => (activeNote() ? useUI.setState({ voiceOpen: true }) : notify('Open a note first; the voice note goes into it.', 'info'))
   },
   {
+    id: 'note.place',
+    group: 'Notes',
+    title: 'Add a place (Google Maps link)',
+    run: () => (activeNote() ? useUI.setState({ modal: 'place' }) : notify('Open a note first; the place goes into it.', 'info'))
+  },
+  {
     id: 'note.export',
     group: 'Notes',
     title: 'Export note… (PDF, Word, web page)',

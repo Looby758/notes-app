@@ -1,6 +1,7 @@
 import type { Prefs } from './prefs'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
+import type { Place } from './places'
 
 export interface WindowBounds {
   x?: number
@@ -253,6 +254,10 @@ export interface NotesApi {
 
   /** A web page's title (for pasted links); null if it can't be read quickly. */
   webTitle(url: string): Promise<string | null>
+  /** Places matching a search (from OpenStreetMap), or an error to show if it couldn't be reached. */
+  searchPlaces(query: string): Promise<{ places: Place[]; error?: string }>
+  /** One square of a map preview as a data: URL; null if it couldn't be fetched. */
+  mapTile(z: number, x: number, y: number): Promise<string | null>
 
   // The web browser tab
   /** Signs you out of every website and forgets what the web tabs stored. */
