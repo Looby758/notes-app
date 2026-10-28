@@ -11,6 +11,7 @@ import { IS_MAC, showKeys } from '@shared/platform'
 import { noteTitle, parentOf } from '../../lib/paths'
 import { DayList, ExternalStatus, useExternalRange, useItemsByDay } from '../Calendar/shared'
 import { useAllCards, useDueCount } from '../Flashcards/FlashcardsPage'
+import { WeatherHomeBox } from '../Weather/Weather'
 
 /** The current time, updated every minute (so the date and greeting roll over at midnight). */
 function useNow(): Date {
@@ -139,11 +140,12 @@ function Keys({ s }: { s: string }) {
   )
 }
 
-/** The start page: today's plans (reminders included), flashcards and recent notes at a glance. */
+/** The start page: today's plans (reminders included), the weather, flashcards and recent notes at a glance. */
 export default function HomePage() {
   const now = useNow()
   const boxes = [
     { id: 'today', order: 10, node: <TodayBox now={now} /> },
+    { id: 'weather', order: 20, node: <WeatherHomeBox /> },
     { id: 'flashcards', order: 30, node: <FlashcardsBox /> },
     { id: 'recent', order: 40, node: <RecentBox /> },
     ...homeCards().map(({ id, order, Card }) => ({ id, order, node: <Card /> }))
