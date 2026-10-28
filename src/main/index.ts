@@ -18,7 +18,7 @@ import {
 } from 'electron'
 import { existsSync, statSync } from 'fs'
 import { readFile } from 'fs/promises'
-import { basename, extname, join } from 'path'
+import { basename, extname, isAbsolute, join, relative } from 'path'
 import { pathToFileURL } from 'url'
 import type { AiAskTurn, AiChat, AiChatMessage, AiNote, ConfirmOptions, EmailFolder, OutgoingEmail } from '@shared/types'
 import type { MusicAction } from '@shared/spotify'
@@ -38,6 +38,7 @@ import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, tear
 import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
 import { setupConverter } from './converter'
+import { explorerFile, setupExplorer } from './explorer'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
@@ -268,6 +269,11 @@ function registerVaultProtocol(): void {
         }
         const pic = await localMusic.cover(rel)
         return pic ? new Response(Buffer.from(pic.data), { headers: { 'Content-Type': pic.type, 'Cache-Control': 'max-age=3600' } }) : new Response('No picture', { status: 404 })
+      }
+      // Previews in the file explorer tab (vault://explore/<full path>): pictures, video, sound and PDFs only.
+      if (url.host === 'explore') {
+        const full = explorerFile(url)
+        return full ? net.fetch(pathToFileURL(full).toString(), { headers: request.headers }) : new Response('Not allowed', { status: 403 })
       }
       const rel = decodeURIComponent(url.pathname.slice(1))
       const full = currentVault().abs(rel)
@@ -646,6 +652,15 @@ function registerIpc(): void {
   ipcMain.handle('fs:saveAttachment', (_e, folder: string, name: string, data: Uint8Array) =>
     currentVault().saveAttachment(folder, name, data)
   )
+  // A file dragged from the file explorer tab into a note: one already in the notes folder is linked
+  // where it is, anything else is copied into the attachments folder first.
+  ipcMain.handle('fs:attachFromComputer', async (_e, folder: string, source: string) => {
+    if (typeof source !== 'string' || !isAbsolute(source)) throw new Error('That isn’t a file on this computer.')
+    const v = currentVault()
+    const rel = relative(v.root, source)
+    if (rel && !rel.startsWith('..') && !isAbsolute(rel)) return rel.split(/[\\/]/).join('/')
+    return v.copyAttachment(folder, source)
+  })
   ipcMain.handle('fs:pickAttachment', async (event, folder: string, imagesOnly: boolean) => {
     const win = BrowserWindow.fromWebContents(event.sender)!
     const result = await dialog.showOpenDialog(win, {
@@ -783,6 +798,7 @@ app.whenReady().then(async () => {
   safely('Music mini player', () => setupMusicMini(currentPrefs, () => mainWindow))
   safely('export', setupExport)
   safely('converter', setupConverter)
+  safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))
   mainWindow = createWindow()

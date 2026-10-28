@@ -64,6 +64,17 @@ async function attachFiles(view: EditorView, files: File[], pos: number): Promis
   }
 }
 
+/** Links a file dragged from the file explorer tab, copying it into the attachments folder if it's from outside the notes folder. */
+async function attachFromComputer(view: EditorView, source: string, pos: number): Promise<void> {
+  try {
+    const saved = await window.api.attachFromComputer(usePrefs.getState().prefs.attachmentFolder, source)
+    insertLinks(view, [attachmentLink(saved, view.state.facet(notePath))], pos)
+    useVault.getState().refresh()
+  } catch (err) {
+    notify(err)
+  }
+}
+
 /** Lets you pick images (or any files) from disk, copies them in and links them at the cursor. */
 export async function pickAndAttach(view: EditorView, imagesOnly: boolean): Promise<void> {
   const note = view.state.facet(notePath)
@@ -85,7 +96,7 @@ export const attachmentHandlers = EditorView.domEventHandlers({
     return true
   },
   dragover(e) {
-    if (e.dataTransfer?.types.includes('Files') || getDrag()?.kind === 'file') {
+    if (e.dataTransfer?.types.includes('Files') || getDrag()?.kind === 'file' || getDrag()?.kind === 'computer') {
       e.preventDefault()
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
       return true
@@ -100,6 +111,12 @@ export const attachmentHandlers = EditorView.domEventHandlers({
       e.preventDefault()
       const pos = view.posAtCoords({ x: e.clientX, y: e.clientY }) ?? view.state.selection.main.head
       insertLinks(view, [attachmentLink(drag.path, view.state.facet(notePath))], pos)
+      return true
+    }
+    if (drag?.kind === 'computer') {
+      e.preventDefault()
+      const pos = view.posAtCoords({ x: e.clientX, y: e.clientY }) ?? view.state.selection.main.head
+      void attachFromComputer(view, drag.path, pos)
       return true
     }
     if (drag) return true

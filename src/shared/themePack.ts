@@ -51,6 +51,7 @@ export const THEME_PAGES: Record<string, string> = {
   chat: 'AI chat',
   sudoku: 'Sudoku',
   convert: 'File converter',
+  explorer: 'File explorer',
   graph: 'Graph',
   settings: 'Settings',
   terminal: 'Terminal',

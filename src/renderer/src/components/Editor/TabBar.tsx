@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ArrowRightLeft, CalendarDays, Columns2, Copy, ExternalLink, FileDown, FolderSearch, Gamepad2, GitCompare, Globe, Grid3x3, House, KeyRound, Layers, Mail, MessageSquare, MessagesSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
+import { ArrowRightLeft, CalendarDays, Columns2, Copy, ExternalLink, FileDown, FolderSearch, Gamepad2, GitCompare, Globe, Grid3x3, HardDrive, House, KeyRound, Layers, Mail, MessageSquare, MessagesSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
 import Private from '../Streamer/Private'
 import { useHideNames } from '../../store/streamer'
 import { useEditor } from '../../store/editor'
@@ -21,6 +21,7 @@ import {
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
+  EXPLORER_TAB,
   SUDOKU_TAB,
   MESSAGES_TAB,
   GAMES_TAB,
@@ -79,6 +80,7 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === SUDOKU_TAB) return 'Sudoku'
   if (id === MESSAGES_TAB) return 'Messages'
   if (id === GAMES_TAB) return 'Games'
+  if (id === EXPLORER_TAB) return 'Files'
   if (isFileTab(id)) return fileOfTab(id).slice(fileOfTab(id).lastIndexOf('/') + 1).replace(/\.canvas$/i, '')
   return noteTitle(id)
 }
@@ -114,7 +116,7 @@ export default function TabBar({ pane }: { pane: string }) {
   }
 
   const onDragOver = (e: DragEvent): void => {
-    if (!getDrag()) return
+    if (!getDrag() || getDrag()!.kind === 'computer') return
     e.preventDefault()
     e.stopPropagation()
     e.dataTransfer.dropEffect = 'move'
@@ -124,7 +126,7 @@ export default function TabBar({ pane }: { pane: string }) {
   const onDrop = (e: DragEvent): void => {
     const drag = getDrag()
     setDropIndex(null)
-    if (!drag) return
+    if (!drag || drag.kind === 'computer') return
     e.preventDefault()
     e.stopPropagation()
     const index = indexAt(e.clientX)
@@ -255,6 +257,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === SUDOKU_TAB && <Grid3x3 size={13} className="tab-icon" />}
               {id === MESSAGES_TAB && <MessagesSquare size={13} className="tab-icon" />}
               {id === GAMES_TAB && <Gamepad2 size={13} className="tab-icon" />}
+              {id === EXPLORER_TAB && <HardDrive size={13} className="tab-icon" />}
               {isFileTab(id) && <FileIcon path={fileOfTab(id)} size={13} className="tab-icon" />}
               {icons.get(id) && <span className="tab-emoji">{icons.get(id)}</span>}
               <span className="tab-title">

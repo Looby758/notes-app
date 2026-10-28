@@ -71,6 +71,8 @@ export const SUDOKU_TAB = 'sudoku:'
 /** WhatsApp and Discord in one tab (components/Messages). */
 export const MESSAGES_TAB = 'messages:'
 export const GAMES_TAB = 'games:'
+/** Browse the whole computer and Google Drive (components/Explorer). */
+export const EXPLORER_TAB = 'explorer:'
 /** A picture, recording, PDF… from the notes folder, shown in a tab: "file:attachments/a.png". */
 export const FILE_TAB = 'file:'
 export const fileTab = (path: string): string => FILE_TAB + path
