@@ -74,6 +74,25 @@ export async function decryptText(key: Bytes, sealed: Sealed): Promise<string> {
   }
 }
 
+/** Encrypts bytes with a raw 256-bit key: the 12-byte IV, then the ciphertext. */
+export async function encryptBytes(key: Bytes, plain: Bytes): Promise<Bytes> {
+  const iv = random(12)
+  const data = new Uint8Array(await subtle.encrypt({ name: 'AES-GCM', iv }, await aesKey(key), plain))
+  const out = new Uint8Array(12 + data.length)
+  out.set(iv)
+  out.set(data, 12)
+  return out
+}
+
+/** Decrypts what encryptBytes made. Throws WrongPassword if the key is wrong or the data was changed. */
+export async function decryptBytes(key: Bytes, sealed: Bytes): Promise<Bytes> {
+  try {
+    return new Uint8Array(await subtle.decrypt({ name: 'AES-GCM', iv: sealed.slice(0, 12) }, await aesKey(key), sealed.slice(12)))
+  } catch {
+    throw new WrongPassword()
+  }
+}
+
 // ---------- the notes password (lock.json) ----------
 
 export interface LockFile {

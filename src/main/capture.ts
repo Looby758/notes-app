@@ -129,10 +129,10 @@ function updateTrayMenu(): void {
   const shortcut = registered ? `\t${shortcutLabel(registered)}` : ''
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: 'Open Notes', click: () => hooks.showMain() },
+      { label: 'Open Orbit', click: () => hooks.showMain() },
       { label: `Quick capture${shortcut}`, click: openCapture },
       { type: 'separator' },
-      { label: 'Quit Notes', click: () => app.quit() }
+      { label: 'Quit Orbit', click: () => app.quit() }
     ])
   )
 }
@@ -164,7 +164,7 @@ export function noteHiddenToTray(): void {
   if (IS_MAC) return
   tray?.displayBalloon({
     iconType: 'info',
-    title: 'Notes is still running',
+    title: 'Orbit is still running',
     content: registered
       ? `It's in the tray. Press ${shortcutLabel(registered)} any time to capture a thought.`
       : 'It’s in the tray. Click the icon to open it again, or right-click to quit.'

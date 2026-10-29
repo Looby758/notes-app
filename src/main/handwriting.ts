@@ -40,21 +40,39 @@ function worker(): Promise<Worker> {
 // A worker that fails to start never answers, so don't wait for ever.
 const TIMEOUT = 90_000
 
-export async function readHandwritingOffline(png: Uint8Array): Promise<string> {
-  let text: string
+/** The raw text Tesseract reads in a picture (a sketch, a scanned receipt). */
+async function recognize(image: Uint8Array): Promise<string> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
-    const read = worker().then((w) => w.recognize(Buffer.from(png)))
+    const read = worker().then((w) => w.recognize(Buffer.from(image)))
     const late = new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error('Tesseract took too long')), TIMEOUT)))
-    const { data } = await Promise.race([read, late])
-    text = cleanReading(data.text)
+    return (await Promise.race([read, late])).data.text
   } catch (err) {
     loading = null
-    logError('handwriting', err)
-    throw new Error('The offline reader couldn’t read this sketch. Try again, or use the AI helper.')
+    throw err
   } finally {
     clearTimeout(timer)
   }
+}
+
+export async function readHandwritingOffline(png: Uint8Array): Promise<string> {
+  let text: string
+  try {
+    text = cleanReading(await recognize(png))
+  } catch (err) {
+    logError('handwriting', err)
+    throw new Error('The offline reader couldn’t read this sketch. Try again, or use the AI helper.')
+  }
   if (!text) throw new Error('No writing was found. Try writing larger and more clearly, or use the AI helper.')
   return text
+}
+
+/** The printed text in a photo (a receipt from the phone scanner); '' if it can't be read. */
+export async function readPrintedText(image: Uint8Array): Promise<string> {
+  try {
+    return await recognize(image)
+  } catch (err) {
+    logError('scan text', err)
+    return ''
+  }
 }

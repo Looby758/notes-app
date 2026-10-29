@@ -1,4 +1,4 @@
-# Notes
+# Orbit
 
 A dark, fast note-taking app for Windows and Mac. Every note is a plain `.md` file in a folder you choose, so your notes stay yours: open them in any editor, back them up however you like, and sync them with Google Drive.
 
@@ -6,21 +6,21 @@ A dark, fast note-taking app for Windows and Mac. Every note is a plain `.md` fi
 
 Download the latest version from the [Releases page](https://github.com/Looby758/notes-app/releases/latest).
 
-**Windows:** download `Notes-Setup-<version>.exe` and run it. Windows shows a SmartScreen warning because the installer isn't code-signed: click **More info → Run anyway**.
+**Windows:** download `Orbit-Setup-<version>.exe` and run it. Windows shows a SmartScreen warning because the installer isn't code-signed: click **More info → Run anyway**.
 
-**Mac:** download `Notes-<version>-arm64.dmg` for Apple Silicon Macs (M1 and newer), or `Notes-<version>-x64.dmg` for older Intel Macs (Apple menu → About This Mac shows which). Open it and drag Notes into Applications (if you open Notes straight from the disk image, it offers to move itself there; say yes). The first time you open it, macOS says it can't check the app for malicious software, because it isn't signed with a paid Apple certificate:
+**Mac:** download `Orbit-<version>-arm64.dmg` for Apple Silicon Macs (M1 and newer), or `Orbit-<version>-x64.dmg` for older Intel Macs (Apple menu → About This Mac shows which). Open it and drag Orbit into Applications (if you open Orbit straight from the disk image, it offers to move itself there; say yes). The first time you open it, macOS says it can't check the app for malicious software, because it isn't signed with a paid Apple certificate:
 
 1. Click **Done** (or **OK**).
-2. Open **System Settings → Privacy & Security**, scroll down to the message about Notes, and click **Open Anyway**. Confirm with your password.
+2. Open **System Settings → Privacy & Security**, scroll down to the message about Orbit, and click **Open Anyway**. Confirm with your password.
 
 You only need to do that once.
 
 ## Updates
 
-Notes checks the Releases page every few hours (Settings → About shows the result and has *Check now*).
+Orbit checks the Releases page every few hours (Settings → About shows the result and has *Check now*).
 
 - **Windows:** a new version downloads in the background; a card in the corner offers **Restart**, or it installs the next time you quit.
-- **Mac:** Notes tells you a new version is out and opens its download page. Install it the same way as above. (Updating itself in place needs a paid Apple certificate.)
+- **Mac:** Orbit tells you a new version is out and opens its download page. Install it the same way as above. (Updating itself in place needs a paid Apple certificate.)
 
 ## Syncing with Google Drive
 
@@ -28,7 +28,7 @@ Install [Google Drive for Desktop](https://www.google.com/drive/download/), crea
 
 ## Seeing your Google Calendar (read-only)
 
-There are two ways. Both are in **Settings → Calendar**, and both are read-only: Notes never changes your calendar.
+There are two ways. Both are in **Settings → Calendar**, and both are read-only: Orbit never changes your calendar.
 
 **Easiest: a calendar link (no sign-in, never expires).** In Google Calendar on the web, open *Settings → (your calendar) → Integrate calendar* and copy the **Secret address in iCal format**. Paste it under *Calendar links* with a name. Repeat for each calendar you want. Outlook and Apple calendar links work too.
 
@@ -37,16 +37,16 @@ There are two ways. Both are in **Settings → Calendar**, and both are read-onl
 1. Open [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials) and create a project.
 2. In *APIs & Services → Library*, enable the **Google Calendar API**.
 3. In *OAuth consent screen*, pick **External**, give the app a name, and add your own Google account under **Test users**.
-4. In *Credentials*, choose *Create credentials → OAuth client ID → Desktop app*. Copy the **client ID** and **client secret** into Notes and click **Connect Google Calendar**.
+4. In *Credentials*, choose *Create credentials → OAuth client ID → Desktop app*. Copy the **client ID** and **client secret** into Orbit and click **Connect Google Calendar**.
 5. Your browser opens Google's sign-in page; approve read-only access. Pick which calendars to show.
 
-While the project is in Google's "Testing" mode, Google ends the sign-in after 7 days and Notes will ask you to reconnect. The calendar link method above doesn't have that limit.
+While the project is in Google's "Testing" mode, Google ends the sign-in after 7 days and Orbit will ask you to reconnect. The calendar link method above doesn't have that limit.
 
 Your sign-in, client secret and calendar links are stored encrypted with the system's own protection (Windows' data protection, or the Mac Keychain) in `calendars.json` in the settings folder (see below). Events are refreshed every 10 minutes and when you come back to the app; the last copy is kept so they still show when you're offline.
 
 ## Email (Gmail)
 
-The **Email** page (Ctrl+Shift+A, or the envelope at the top) shows your Gmail inbox inside Notes. It uses the same Google sign-in as the calendar, so set that up first (above). Then, once:
+The **Email** page (Ctrl+Shift+A, or the envelope at the top) shows your Gmail inbox inside Orbit. It uses the same Google sign-in as the calendar, so set that up first (above). Then, once:
 
 1. Open the [Gmail API page](https://console.cloud.google.com/apis/library/gmail.googleapis.com) in the same Google Cloud project and press **Enable**.
 2. On the [Audience page](https://console.cloud.google.com/auth/audience), make sure your Gmail address is listed under **Test users** (*Add users* if not). Without it, Google says "Access blocked: Notes has not completed the Google verification process".
@@ -131,6 +131,25 @@ Besides the built-in themes, Notes can wear themes that don't come with the app.
 A theme file only holds looks (colours, pictures, fonts and a few words), never code, so a theme someone sends you can't do anything harmful. Its own app icon is used while the theme is on, unless you turn off **Use a theme's own icon**.
 
 **Making one:** a theme is a folder with a `theme.json` and its pictures and fonts. [src/shared/themePack.ts](src/shared/themePack.ts) describes every field and which parts of the app can have a picture. Pack the folder into a theme file with `npm run pack-theme -- path/to/folder`.
+
+## Send to phone
+
+Right-click a note or file in the sidebar → **Send to phone…**, or press the phone button in a web tab. A QR code appears; point your phone's camera at it and tap the link. The file downloads (or the web page opens) straight from this computer over your Wi-Fi: nothing to install on the phone, no account, and nothing goes through the internet. The phone needs to be on the same Wi-Fi. Each code stops working after 10 minutes, or when you close it. The first time, Windows or macOS asks whether Notes may accept incoming connections: allow it on private networks.
+
+## Your phone and Notes
+
+Press the phone button at the top (or Ctrl+K → *Phone: connect your phone*) and scan the code with your phone's camera. Your phone gets a page with:
+
+- **Send**: photos, videos and files go into the note you have open (or the attachments folder).
+- **Clipboard**: see what's copied on the computer and copy it to the phone, or paste something on the phone and send it to the computer's clipboard.
+- **Remote**: play/pause and skip music, and control the YouTube mini window (±10 seconds, play/pause, next).
+- **Touchpad**: drag to move the pointer, tap to click, two fingers to right-click or scroll, and type on the computer from the phone's keyboard. On a Mac, allow Notes under System Settings → Privacy & Security → Accessibility the first time.
+- **Talk**: tap the microphone on the phone's keyboard and talk; the words appear in the open note as you speak.
+- **Scan**: take a photo of a page, drag the corners onto it, and it's straightened and cleaned up into the open note. **Add receipt to Money** reads the shop, total and date and adds it as spending.
+
+On an iPhone, tap Share → **Add to Home Screen** to keep the page: it reconnects by itself whenever Notes is open. **New code** or **Forget phone** in the same window stops the old one working. Everything goes over your own Wi-Fi, never the internet, so anyone on the same Wi-Fi who had the code could use it: only pair on networks you trust.
+
+**Wi-Fi for guests** (Ctrl+K → *Phone: Wi-Fi QR code for guests*) shows a code guests scan to join your Wi-Fi without typing the password. Notes fills in the network and password (a Mac asks for your Keychain first); you can change them.
 
 ## Features
 

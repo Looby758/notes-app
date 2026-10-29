@@ -68,9 +68,12 @@ export const HOME_TAB = 'home:'
 export const MONEY_TAB = 'money:'
 export const CONVERT_TAB = 'convert:'
 export const SUDOKU_TAB = 'sudoku:'
+export const MINESWEEPER_TAB = 'minesweeper:'
 /** WhatsApp and Discord in one tab (components/Messages). */
 export const MESSAGES_TAB = 'messages:'
 export const GAMES_TAB = 'games:'
+/** Browse the whole computer and Google Drive (components/Explorer). */
+export const EXPLORER_TAB = 'explorer:'
 /** A picture, recording, PDF… from the notes folder, shown in a tab: "file:attachments/a.png". */
 export const FILE_TAB = 'file:'
 export const fileTab = (path: string): string => FILE_TAB + path
@@ -234,6 +237,30 @@ export function insertBlockIntoActiveNote(text: string | ((note: string) => stri
   const before = at > line.from ? '\n' : ''
   const after = at < line.to ? '\n' : ''
   view.dispatch({ changes: { from: at, insert: before + insert + after }, selection: { anchor: at + before.length + insert.length } })
+  return true
+}
+
+const live = new Map<string, { view: EditorView; from: number; length: number }>()
+
+/**
+ * Text that keeps changing as it arrives (talking into the phone): the first piece goes in at the
+ * cursor of the note you're in, and each later one replaces it. `done` ends that piece.
+ */
+export function liveTypeIntoActiveNote(id: string, text: string, done: boolean): boolean {
+  let at = live.get(id)
+  if (!at || at.from + at.length > at.view.state.doc.length) {
+    const pv = views.get(activePane())
+    if (!pv?.shown || !isNoteTab(pv.shown)) return false
+    const head = pv.view.state.selection.main.head
+    // Start after a space if the cursor is right after a word.
+    const before = head > 0 && /\S/.test(pv.view.state.sliceDoc(head - 1, head)) ? ' ' : ''
+    if (before) pv.view.dispatch({ changes: { from: head, insert: before } })
+    at = { view: pv.view, from: head + before.length, length: 0 }
+    live.set(id, at)
+  }
+  at.view.dispatch({ changes: { from: at.from, to: at.from + at.length, insert: text }, selection: { anchor: at.from + text.length } })
+  at.length = text.length
+  if (done) live.delete(id)
   return true
 }
 

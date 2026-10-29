@@ -80,7 +80,7 @@ function Pad({ path, onSaved, close }: { path: string | null; onSaved?: (path: s
     loadSketch(path)
       .then((s) => {
         if (cancelled) return
-        if (!s) throw new Error('This picture wasn’t drawn in Notes, so it can’t be edited here.')
+        if (!s) throw new Error('This picture wasn’t drawn in Orbit, so it can’t be edited here.')
         setBoard(s)
       })
       .catch((err) => {

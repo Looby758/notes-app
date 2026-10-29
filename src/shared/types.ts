@@ -1,9 +1,11 @@
+import type { ExplorerEntry, ExplorerPlace } from './explorer'
 import type { Prefs } from './prefs'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
 import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
 import type { LocalLibrary } from './localMusic'
+import type { WifiNetwork } from './wifi'
 import type { MusicAction, MusicDevice, MusicItem, MusicQueue, MusicSearchResults, MusicState, MusicStatus } from './spotify'
 import type { CoversStatus, GamesList, LaunchArt } from './games'
 import type { Theme } from './themes'
@@ -33,6 +35,9 @@ export interface Settings {
   /** The floating mini music player: where it was left, and whether it was showing. */
   musicMiniWindow?: WindowBounds
   musicMiniOpen?: boolean
+  /** The paired phone's link (its token, and the port it was on), so the phone reconnects by itself. */
+  phoneToken?: string
+  phonePort?: number
 }
 
 /** What the notes window's music player tells the floating mini player. */
@@ -224,9 +229,31 @@ export interface AiChat {
 
 export interface YouTubeState {
   url: string
+  /** Where to start a video popped out from another website, in seconds. */
+  startAt?: number
   pinned: boolean
   videoOnly: boolean
 }
+
+/** Something shared with a phone over the local Wi-Fi: `url` goes in the QR code. */
+export interface PhoneShare {
+  token: string
+  url: string
+  expiresAt: number
+}
+
+/** The paired phone's QR address, and how many phones have its page open now. */
+export interface PhonePairing {
+  url: string
+  connected: number
+}
+
+/** Something the paired phone did, for the notes window to carry out. */
+export type PhoneEvent =
+  | { type: 'connected'; count: number }
+  | { type: 'file'; path: string; into: 'note' | 'folder' }
+  | { type: 'receipt'; path: string; text: string }
+  | { type: 'dictate'; id: string; text: string; done: boolean }
 
 export interface NotesApi {
   /** A native yes/no dialog; resolves true if the user picked `ok`. */
@@ -314,8 +341,11 @@ export interface NotesApi {
   onWebShortcut(callback: (shortcut: string) => void): () => void
 
   // The YouTube mini window
-  /** Opens the floating YouTube window (or brings it back), playing `url` if it's a YouTube link. */
-  openYouTube(url?: string): Promise<void>
+  /**
+   * Opens the floating YouTube window (or brings it back), playing `url` if given: a YouTube link,
+   * or any web page with a video on it, played from `seconds` in.
+   */
+  openYouTube(url?: string, seconds?: number): Promise<void>
   /** In the mini window: what to show first, and how you left it set. */
   youTubeState(): Promise<YouTubeState>
   /** In the mini window: the page showing now, so it carries on there next time. */
@@ -327,7 +357,7 @@ export interface NotesApi {
   minimizeYouTube(): Promise<void>
   closeYouTube(): Promise<void>
   /** In the mini window: play this page (opened from the notes window). */
-  onYouTubeLoad(callback: (url: string) => void): () => void
+  onYouTubeLoad(callback: (url: string, seconds: number) => void): () => void
 
   // Updates
   updateStatus(): Promise<UpdateStatus>
@@ -529,9 +559,32 @@ export interface NotesApi {
   trashMany(paths: string[]): Promise<string[]>
   /** Shows the item selected in File Explorer / Finder. */
   reveal(path: string): Promise<void>
+  /** Sends a vault file, or a web link, to a phone on the same Wi-Fi: returns the address for its QR code. */
+  phoneShareFile(path: string): Promise<PhoneShare>
+  phoneShareLink(url: string): Promise<PhoneShare>
+  /** Ends a share early (the QR code stops working). */
+  phoneStop(token: string): Promise<void>
+  /** The phone has the file (or opened the link). */
+  onPhoneDelivered(callback: (token: string) => void): () => void
+  /** Pairs a phone (or shows the code again); `fresh` makes a new code, so the old one stops working. */
+  phonePair(fresh?: boolean): Promise<PhonePairing>
+  phoneForget(): Promise<void>
+  onPhoneEvent(callback: (event: PhoneEvent) => void): () => void
+  /** The Wi-Fi this computer is on, for a guest QR code (blank where it can't be read). */
+  phoneWifi(): Promise<WifiNetwork>
   /** Reads/writes a small app file kept in the vault's hidden ".notesapp" folder (synced with your notes). */
   readAppData(name: string): Promise<string | null>
   writeAppData(name: string, content: string): Promise<void>
+  /** The file vault's encrypted files (in ".notesapp/safe"); null if there's no such file. */
+  readSafeFile(id: string): Promise<Uint8Array | null>
+  writeSafeFile(id: string, data: Uint8Array): Promise<void>
+  removeSafeFile(id: string): Promise<void>
+  /** Lets you pick files to lock away; returns their contents. */
+  pickSafeFiles(): Promise<{ path: string; name: string; data: Uint8Array }[]>
+  /** Sends picked originals to the Bin once they're safely locked away. */
+  trashSafeOriginals(paths: string[]): Promise<void>
+  /** Saves an unlocked copy where you choose. Resolves false if cancelled. */
+  saveSafeCopy(name: string, data: Uint8Array): Promise<boolean>
   /** Saves pasted/dropped file data into a vault folder; returns the new file's path. */
   /** Saves an edited spreadsheet (.xlsx, .xlsm, .csv or .tsv) over the file. */
   writeSheet(path: string, data: Uint8Array): Promise<void>
@@ -540,6 +593,17 @@ export interface NotesApi {
   writeSketch(path: string, svg: string): Promise<void>
   /** Lets you pick files on disk and copies them into a vault folder; returns their paths. */
   pickAttachment(folder: string, imagesOnly: boolean): Promise<string[]>
+  /** Links a file from anywhere on the computer: copied into `folder` unless it's already in the notes folder. Returns its vault path. */
+  attachFromComputer(folder: string, source: string): Promise<string>
+
+  // File explorer tab (full paths on this computer)
+  explorerPlaces(): Promise<ExplorerPlace[]>
+  explorerList(dir: string): Promise<ExplorerEntry[]>
+  /** The start of a text file, for its preview. */
+  explorerReadText(path: string): Promise<string>
+  /** Opens a file in its usual app (programs are shown in File Explorer / Finder instead). */
+  explorerOpen(path: string): Promise<void>
+  explorerReveal(path: string): Promise<void>
   /** Opens a vault file (like a PDF) in its usual app. */
   openFile(path: string): Promise<void>
   /** Reads a note's markdown. */

@@ -18,7 +18,7 @@ const FONT_VARS: Partial<Record<keyof Prefs, string>> = {
 }
 
 const APP_ICONS: [string, string][] = [
-  ['default', 'Purple'],
+  ['default', 'Orbit'],
   ['green', 'Green'],
   ['forest', 'Forest'],
   ['ocean', 'Ocean'],

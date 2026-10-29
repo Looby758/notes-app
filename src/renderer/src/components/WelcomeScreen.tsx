@@ -12,7 +12,7 @@ export default function WelcomeScreen({ onPick }: Props) {
         <div className="welcome-icon">
           <NotebookPen size={28} strokeWidth={1.6} />
         </div>
-        <h1>Notes</h1>
+        <h1>Orbit</h1>
         <p>
           Your notes are plain markdown files in a folder you choose. To sync with Google Drive, pick a
           folder inside your Drive (for example <code>G:\My Drive\Notes</code>).

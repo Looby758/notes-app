@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   createLock,
+  decryptBytes,
+  encryptBytes,
   isLockedText,
   lockedHeader,
   lockWithNotesKey,
@@ -60,4 +62,15 @@ describe('a note with its own password', () => {
     const wrong = await ownKeyFrom('nope', header.salt, header.iterations)
     await expect(unlockNote(file, wrong.key)).rejects.toBeInstanceOf(WrongPassword)
   }, 30_000)
+})
+
+describe('files in the file vault', () => {
+  it('round-trips bytes and refuses the wrong key', async () => {
+    const key = crypto.getRandomValues(new Uint8Array(32))
+    const plain = Uint8Array.from([1, 2, 3, 250, 0, 7])
+    const sealed = await encryptBytes(key, plain)
+    expect(sealed.length).toBe(12 + plain.length + 16)
+    expect([...(await decryptBytes(key, sealed))]).toEqual([...plain])
+    await expect(decryptBytes(crypto.getRandomValues(new Uint8Array(32)), sealed)).rejects.toThrow(WrongPassword)
+  })
 })

@@ -160,13 +160,13 @@ function listenForCode(state: string): Promise<{ server: Server; port: number; c
         )
       }
       if (url.searchParams.get('state') !== state) {
-        page('Something went wrong', 'This sign-in link doesn’t match. Please try connecting again from Notes.')
+        page('Something went wrong', 'This sign-in link doesn’t match. Please try connecting again from Orbit.')
         fail(new Error('Sign-in was interrupted. Please try again.'))
       } else if (url.searchParams.get('error')) {
-        page('Not connected', 'You can close this tab and return to Notes.')
+        page('Not connected', 'You can close this tab and return to Orbit.')
         fail(new Error(url.searchParams.get('error') === 'access_denied' ? 'Google didn’t give access, so nothing was connected. If it said “Access blocked”, add your Google account under Test users on the Audience page of your Google Cloud project.' : 'Google sign-in failed.'))
       } else {
-        page('Connected to Notes ✓', 'You can close this tab and return to Notes.')
+        page('Connected to Orbit ✓', 'You can close this tab and return to Orbit.')
         deliver(url.searchParams.get('code') ?? '')
       }
     })

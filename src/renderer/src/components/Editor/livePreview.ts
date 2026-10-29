@@ -27,6 +27,8 @@ import { mathDiagrams } from './mathDiagrams'
 /** The time at the start of a schedule line: "09:30", "9am", "09:30-10:30", "2pm – 3pm". */
 const EVENT_TIME = /^(\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?(?:\s*[-–—]\s*\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?)?)\s/i
 import { useNoteIndex } from '../../store/noteIndex'
+import { playSound } from '../../lib/sounds'
+import { petCheer } from '../../lib/pet'
 
 /**
  * Live preview: markdown renders in place, and the raw syntax reappears on whichever lines
@@ -575,7 +577,7 @@ function buildInline(view: EditorView): DecorationSet {
     for (const m of text.matchAll(/(?:⏰️?|\bremind:)\s*(?:\d{4}-\d{2}-\d{2}\s+)?\d{1,2}:\d{2}/gu)) {
       const from = range.from + m.index
       if (/Code/.test(syntaxTree(state).resolveInner(from, 1).name)) continue
-      out.push(Decoration.mark({ class: 'cm-reminder', attributes: { title: 'Reminder: Notes will show a notification at this time' } }).range(from, from + m[0].length))
+      out.push(Decoration.mark({ class: 'cm-reminder', attributes: { title: 'Reminder: Orbit will show a notification at this time' } }).range(from, from + m[0].length))
     }
   }
 
@@ -648,7 +650,11 @@ const clickHandlers = EditorView.domEventHandlers({
     if (target.matches('.cm-task-checkbox')) {
       const pos = view.posAtDOM(target)
       const current = view.state.sliceDoc(pos + 1, pos + 2)
-      if (current === ' ') tickedAt = performance.now()
+      if (current === ' ') {
+        tickedAt = performance.now()
+        playSound('tick')
+        petCheer()
+      }
       view.dispatch({ changes: { from: pos + 1, to: pos + 2, insert: current === ' ' ? 'x' : ' ' } })
       e.preventDefault()
       return true

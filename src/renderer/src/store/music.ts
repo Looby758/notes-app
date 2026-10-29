@@ -260,11 +260,11 @@ export function startMusic(): () => void {
 
 export const setMusicMini = (open: boolean): Promise<boolean> => window.api.setMusicMini(open)
 
-/** Sends what's playing to the mini player while it's showing, and does what its buttons ask. */
+/** Sends what's playing to the mini player (and a paired phone's remote), and does what their buttons ask. */
 function startMini(): () => void {
   const push = (): void => {
-    const { state, at, miniOpen } = useMusic.getState()
-    if (miniOpen) window.api.pushMusicMini({ state, at })
+    const { state, at } = useMusic.getState()
+    window.api.pushMusicMini({ state, at })
   }
   const offOpen = window.api.onMusicMiniOpen((miniOpen) => {
     useMusic.setState({ miniOpen })

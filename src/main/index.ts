@@ -18,7 +18,8 @@ import {
 } from 'electron'
 import { existsSync, statSync } from 'fs'
 import { readFile } from 'fs/promises'
-import { basename, extname, join } from 'path'
+import * as fsp from 'fs/promises'
+import { basename, extname, isAbsolute, join, relative } from 'path'
 import { pathToFileURL } from 'url'
 import type { AiAskTurn, AiChat, AiChatMessage, AiNote, ConfirmOptions, EmailFolder, OutgoingEmail } from '@shared/types'
 import type { MusicAction } from '@shared/spotify'
@@ -38,10 +39,13 @@ import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, tear
 import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
 import { setupConverter } from './converter'
+import { explorerFile, setupExplorer } from './explorer'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
 import { dictionaryMenu, setupDictionary } from './dictionary'
+import { setupPhoneLink } from './phoneLink'
+import { setupPhonePair } from './phonePair'
 import { setupWebTitle } from './webTitle'
 import { setupPlaces } from './places'
 import { setupWeather } from './weather'
@@ -65,6 +69,9 @@ let quitting = false
 let hubReleased: Promise<void> = Promise.resolve()
 
 logCrashes()
+
+// The app used to be called Notes: keep its data folder so settings and sign-ins carry over.
+app.setPath('userData', join(app.getPath('appData'), 'Notes'))
 
 // Windows shows notifications under this app id (it matches the installer's).
 if (process.platform === 'win32') app.setAppUserModelId('com.notesapp.desktop')
@@ -239,6 +246,9 @@ function openVault(path: string | null): void {
 }
 
 // Images (and voice notes) in notes load through vault://local/<path>, served only from inside the open vault.
+/** Biggest file the file vault takes (it's read into memory to encrypt). */
+const SAFE_MAX_BYTES = 100 * 1024 * 1024
+const safePicked = new Set<string>()
 const IMAGE_TYPES = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.avif'])
 const AUDIO_TYPES = new Set(['.webm', '.mp3', '.m4a', '.wav', '.ogg', '.oga', '.aac', '.flac', '.opus'])
 /** Shown in their own tab from the file list. */
@@ -268,6 +278,11 @@ function registerVaultProtocol(): void {
         }
         const pic = await localMusic.cover(rel)
         return pic ? new Response(Buffer.from(pic.data), { headers: { 'Content-Type': pic.type, 'Cache-Control': 'max-age=3600' } }) : new Response('No picture', { status: 404 })
+      }
+      // Previews in the file explorer tab (vault://explore/<full path>): pictures, video, sound and PDFs only.
+      if (url.host === 'explore') {
+        const full = explorerFile(url)
+        return full ? net.fetch(pathToFileURL(full).toString(), { headers: request.headers }) : new Response('Not allowed', { status: 403 })
       }
       const rel = decodeURIComponent(url.pathname.slice(1))
       const full = currentVault().abs(rel)
@@ -498,7 +513,7 @@ function registerIpc(): void {
     }
     // Streamer mode: the reminder itself could be private, so the notification only says there is one.
     const quiet = currentPrefs().streamerMode
-    const n = new Notification({ title: quiet ? 'Reminder' : r.title, body: quiet ? 'Click to see it in Notes.' : r.body, silent: false })
+    const n = new Notification({ title: quiet ? 'Reminder' : r.title, body: quiet ? 'Click to see it in Orbit.' : r.body, silent: false })
     // Windows reports some failures (e.g. notifications switched off for Notes) here.
     n.on('failed', (_ev, error) => logError('reminder notification', new Error(error)))
     n.on('click', () => {
@@ -513,6 +528,11 @@ function registerIpc(): void {
   })
   setupMenus()
   setupDictionary()
+  setupPhoneLink(() => mainWindow, (path) => currentVault().abs(path))
+  setupPhonePair(
+    () => mainWindow,
+    (name, data) => currentVault().saveAttachment(currentPrefs().attachmentFolder, name, data)
+  )
   setupWebTitle()
   setupPlaces()
   setupWeather()
@@ -641,11 +661,49 @@ function registerIpc(): void {
 
   ipcMain.handle('vault:readAppData', (_e, name: string) => currentVault().readAppData(name))
   ipcMain.handle('vault:writeAppData', (_e, name: string, content: string) => currentVault().writeAppData(name, content))
+  ipcMain.handle('safe:read', (_e, id: string) => currentVault().readSafeFile(id))
+  ipcMain.handle('safe:write', (_e, id: string, data: Uint8Array) => currentVault().writeSafeFile(id, data))
+  ipcMain.handle('safe:remove', (_e, id: string) => currentVault().removeSafeFile(id))
+  // Files picked to lock away. Only these paths may later be sent to the Bin by safe:trashOriginals.
+  ipcMain.handle('safe:pick', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)!
+    const result = await dialog.showOpenDialog(win, { title: 'Add to file vault', properties: ['openFile', 'multiSelections'] })
+    if (result.canceled) return []
+    const picked = []
+    for (const path of result.filePaths) {
+      if ((await fsp.stat(path)).size > SAFE_MAX_BYTES) throw new Error(`"${basename(path)}" is too big for the file vault (over 100 MB).`)
+      picked.push({ path, name: basename(path), data: new Uint8Array(await fsp.readFile(path)) })
+      safePicked.add(path)
+    }
+    return picked
+  })
+  ipcMain.handle('safe:trashOriginals', async (_e, paths: string[]) => {
+    for (const p of paths) {
+      if (!safePicked.delete(p)) continue
+      await shell.trashItem(p).catch((err) => logError('vault original', err))
+    }
+  })
+  ipcMain.handle('safe:saveCopy', async (event, name: string, data: Uint8Array) => {
+    const win = BrowserWindow.fromWebContents(event.sender)!
+    const result = await dialog.showSaveDialog(win, { title: 'Save a copy', defaultPath: join(app.getPath('downloads'), basename(name)) })
+    if (result.canceled || !result.filePath) return false
+    await fsp.writeFile(result.filePath, data)
+    return true
+  })
   ipcMain.handle('fs:writeSketch', (_e, path: string, svg: string) => currentVault().writeSketch(path, svg))
   ipcMain.handle('fs:writeSheet', (_e, path: string, data: Uint8Array) => currentVault().writeSheet(path, data))
   ipcMain.handle('fs:saveAttachment', (_e, folder: string, name: string, data: Uint8Array) =>
     currentVault().saveAttachment(folder, name, data)
   )
+  // A file dragged from the file explorer tab into a note: one already in the notes folder is linked
+  // where it is, anything else is copied into the attachments folder first.
+  ipcMain.handle('fs:attachFromComputer', async (_e, folder: string, source: string) => {
+    if (typeof source !== 'string' || !isAbsolute(source)) throw new Error('That isn’t a file on this computer.')
+    const v = currentVault()
+    const rel = relative(v.root, source)
+    if (rel && !rel.startsWith('..') && !isAbsolute(rel)) return rel.split(/[\\/]/).join('/')
+    return v.copyAttachment(folder, source)
+  })
   ipcMain.handle('fs:pickAttachment', async (event, folder: string, imagesOnly: boolean) => {
     const win = BrowserWindow.fromWebContents(event.sender)!
     const result = await dialog.showOpenDialog(win, {
@@ -731,9 +789,9 @@ async function offerMoveToApplications(): Promise<boolean> {
     buttons: ['Move to Applications', 'Not now'],
     defaultId: 0,
     cancelId: 1,
-    message: 'Move Notes to your Applications folder?',
+    message: 'Move Orbit to your Applications folder?',
     detail:
-      'Notes is running from the disk image or your Downloads folder. From there it can stop working (for example when the disk image is ejected) and can’t be kept in the Dock properly. Notes will restart from Applications.',
+      'Orbit is running from the disk image or your Downloads folder. From there it can stop working (for example when the disk image is ejected) and can’t be kept in the Dock properly. Orbit will restart from Applications.',
     checkboxLabel: 'Don’t ask again'
   })
   if (response !== 0) {
@@ -783,6 +841,7 @@ app.whenReady().then(async () => {
   safely('Music mini player', () => setupMusicMini(currentPrefs, () => mainWindow))
   safely('export', setupExport)
   safely('converter', setupConverter)
+  safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))
   mainWindow = createWindow()

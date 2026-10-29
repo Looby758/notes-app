@@ -134,6 +134,9 @@ export const unlockVaultWithRecovery = (recoveryKey: string): Promise<void> => o
 
 export const vaultHasRecoveryKey = (): boolean => !!file?.lock.byRecovery
 
+/** The vault key while unlocked, for the file vault (which shares the master password). */
+export const vaultKeyNow = (): Bytes | null => vaultKey
+
 export function lockVault(): void {
   if (vaultKey) forget()
 }

@@ -19,6 +19,8 @@ import {
   MONEY_TAB,
   CONVERT_TAB,
   SUDOKU_TAB,
+  MINESWEEPER_TAB,
+  EXPLORER_TAB,
   MESSAGES_TAB,
   GAMES_TAB,
   closePane,
@@ -49,6 +51,7 @@ import { newBoard } from './boards'
 import { newSpreadsheet } from './newSheet'
 import { openAsk, runNoteJob } from '../store/ai'
 import { musicControl, musicToggleLike, setMusicMini, shareSongToNote, toggleMusic, useMusic } from '../store/music'
+import { sendToPhone } from '../store/phone'
 import { changeNotesPassword, lockAllNow, lockNote, lockNoteOwn, removeLock } from './lock/actions'
 
 export interface Command {
@@ -203,6 +206,8 @@ export const commands: Command[] = [
   },
   { id: 'email.open', group: 'Navigation', title: 'Open email', shortcut: 'Ctrl+Shift+A', run: () => openSpecialTab(EMAIL_TAB) },
   { id: 'calendar.panel', group: 'Calendar', title: 'Show calendar in the side panel', run: () => showRightView('calendar') },
+  { id: 'phone.pair', group: 'Phone', title: 'Phone: connect your phone (send, clipboard, remote, touchpad, talk, scan)', run: () => sendToPhone({ kind: 'pair' }) },
+  { id: 'phone.wifi', group: 'Phone', title: 'Phone: Wi-Fi QR code for guests', run: () => sendToPhone({ kind: 'wifi' }) },
   { id: 'music.player', group: 'Music', title: 'Show or hide the music player', shortcut: 'Ctrl+Alt+M', run: toggleMusic },
   { id: 'music.toggle', group: 'Music', title: 'Music: play / pause', run: () => void musicControl('toggle') },
   { id: 'music.next', group: 'Music', title: 'Music: next song', run: () => void musicControl('next') },
@@ -284,7 +289,9 @@ export const commands: Command[] = [
   { id: 'terminal.open', group: 'Navigation', title: 'Open terminal (command line in the notes folder)', shortcut: 'Ctrl+Alt+T', run: () => openSpecialTab(TERMINAL_TAB) },
   { id: 'money.open', group: 'Navigation', title: 'Open money tracker', shortcut: 'Ctrl+Shift+B', run: () => openSpecialTab(MONEY_TAB) },
   { id: 'convert.open', group: 'Navigation', title: 'Convert files (photos, Word, audio…)', run: () => openSpecialTab(CONVERT_TAB) },
+  { id: 'explorer.open', group: 'Navigation', title: 'Browse files on this computer (and Google Drive)', run: () => openSpecialTab(EXPLORER_TAB) },
   { id: 'sudoku.open', group: 'Navigation', title: 'Play sudoku (take a quick break)', run: () => openSpecialTab(SUDOKU_TAB) },
+  { id: 'minesweeper.open', group: 'Navigation', title: 'Play minesweeper (take a quick break)', run: () => openSpecialTab(MINESWEEPER_TAB) },
   { id: 'games.open', group: 'Navigation', title: 'Games (play your Steam and other games)', run: () => openSpecialTab(GAMES_TAB) },
   { id: 'web.open', group: 'Web', title: 'Open a web page', shortcut: 'Ctrl+Shift+I', run: () => openWebTab() },
   { id: 'web.beside', group: 'Web', title: 'Open a web page beside this note', run: () => openWebTab('', { beside: true }) },

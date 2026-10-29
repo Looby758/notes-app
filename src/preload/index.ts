@@ -74,7 +74,7 @@ const api: NotesApi = {
     ipcRenderer.on('web:shortcut', handler)
     return () => ipcRenderer.removeListener('web:shortcut', handler)
   },
-  openYouTube: (url) => ipcRenderer.invoke('youtube:open', url),
+  openYouTube: (url, seconds) => ipcRenderer.invoke('youtube:open', url, seconds),
   youTubeState: () => ipcRenderer.invoke('youtube:state'),
   rememberYouTube: (url) => ipcRenderer.invoke('youtube:remember', url),
   pinYouTube: (on) => ipcRenderer.invoke('youtube:pin', on),
@@ -82,7 +82,7 @@ const api: NotesApi = {
   minimizeYouTube: () => ipcRenderer.invoke('youtube:minimize'),
   closeYouTube: () => ipcRenderer.invoke('youtube:close'),
   onYouTubeLoad: (callback) => {
-    const handler = (_e: unknown, url: string): void => callback(url)
+    const handler = (_e: unknown, url: string, seconds?: number): void => callback(url, Number(seconds) || 0)
     ipcRenderer.on('youtube:load', handler)
     return () => ipcRenderer.removeListener('youtube:load', handler)
   },
@@ -253,12 +253,40 @@ const api: NotesApi = {
   trash: (path) => ipcRenderer.invoke('fs:trash', path),
   trashMany: (paths) => ipcRenderer.invoke('fs:trashMany', paths),
   reveal: (path) => ipcRenderer.invoke('fs:reveal', path),
+  phoneShareFile: (path) => ipcRenderer.invoke('phone:shareFile', path),
+  phoneShareLink: (url) => ipcRenderer.invoke('phone:shareLink', url),
+  phoneStop: (token) => ipcRenderer.invoke('phone:stop', token),
+  onPhoneDelivered: (callback) => {
+    const handler = (_e: unknown, token: string): void => callback(token)
+    ipcRenderer.on('phone:delivered', handler)
+    return () => ipcRenderer.removeListener('phone:delivered', handler)
+  },
+  phonePair: (fresh) => ipcRenderer.invoke('phone:pair', fresh),
+  phoneForget: () => ipcRenderer.invoke('phone:forget'),
+  onPhoneEvent: (callback) => {
+    const handler = (_e: unknown, event: Parameters<typeof callback>[0]): void => callback(event)
+    ipcRenderer.on('phone:event', handler)
+    return () => ipcRenderer.removeListener('phone:event', handler)
+  },
+  phoneWifi: () => ipcRenderer.invoke('phone:wifi'),
   readAppData: (name) => ipcRenderer.invoke('vault:readAppData', name),
   writeAppData: (name, content) => ipcRenderer.invoke('vault:writeAppData', name, content),
+  readSafeFile: (id) => ipcRenderer.invoke('safe:read', id),
+  writeSafeFile: (id, data) => ipcRenderer.invoke('safe:write', id, data),
+  removeSafeFile: (id) => ipcRenderer.invoke('safe:remove', id),
+  pickSafeFiles: () => ipcRenderer.invoke('safe:pick'),
+  trashSafeOriginals: (paths) => ipcRenderer.invoke('safe:trashOriginals', paths),
+  saveSafeCopy: (name, data) => ipcRenderer.invoke('safe:saveCopy', name, data),
   writeSketch: (path, svg) => ipcRenderer.invoke('fs:writeSketch', path, svg),
   writeSheet: (path, data) => ipcRenderer.invoke('fs:writeSheet', path, data),
   saveAttachment: (folder, name, data) => ipcRenderer.invoke('fs:saveAttachment', folder, name, data),
   pickAttachment: (folder, imagesOnly) => ipcRenderer.invoke('fs:pickAttachment', folder, imagesOnly),
+  attachFromComputer: (folder, source) => ipcRenderer.invoke('fs:attachFromComputer', folder, source),
+  explorerPlaces: () => ipcRenderer.invoke('explorer:places'),
+  explorerList: (dir) => ipcRenderer.invoke('explorer:list', dir),
+  explorerReadText: (path) => ipcRenderer.invoke('explorer:readText', path),
+  explorerOpen: (path) => ipcRenderer.invoke('explorer:open', path),
+  explorerReveal: (path) => ipcRenderer.invoke('explorer:reveal', path),
   openFile: (path) => ipcRenderer.invoke('fs:openFile', path),
   readNote: (path) => ipcRenderer.invoke('fs:read', path),
   writeNote: (path, content) => ipcRenderer.invoke('fs:write', path, content),

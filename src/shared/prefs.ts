@@ -36,6 +36,16 @@ export interface Prefs {
   musicSongPopup: boolean
   /** Moving bars in the music player while your own music files play. */
   musicVisualiser: boolean
+  /** Soft clicks and whooshes as you use the app (lib/sounds.ts). */
+  interfaceSounds: boolean
+  /** How loud they are, 0 to 1. */
+  interfaceSoundsVolume: number
+  /** After a while without using Notes, show the time, weather and what's playing on a moving screen. */
+  screensaver: boolean
+  /** Minutes without using Notes before the screensaver starts. */
+  screensaverMinutes: number
+  /** A little animated pet in the bottom corner that cheers when you finish things and naps when you're away. */
+  pet: boolean
 
   // Streamer mode
   /** Blur private things (your town, email, money, passwords, messages, events) until you click them, for sharing your screen. */
@@ -181,6 +191,11 @@ export const DEFAULT_PREFS: Prefs = {
   appIcon: 'default',
   musicSongPopup: true,
   musicVisualiser: true,
+  interfaceSounds: true,
+  interfaceSoundsVolume: 0.5,
+  screensaver: true,
+  screensaverMinutes: 5,
+  pet: true,
 
   streamerMode: false,
   streamerHideNotes: true,
@@ -260,6 +275,7 @@ export const RANGES = {
   editorFontSize: { min: 12, max: 28, step: 1 },
   lineHeight: { min: 1.2, max: 2.2, step: 0.02 },
   zoom: { min: 0.8, max: 1.5, step: 0.05 },
+  interfaceSoundsVolume: { min: 0, max: 1, step: 0.05 },
   autosaveDelay: { min: 300, max: 5000, step: 100 },
   tabSize: { min: 2, max: 8, step: 1 },
   weekStart: { min: 0, max: 1, step: 1 },
@@ -267,7 +283,8 @@ export const RANGES = {
   breakMinutes: { min: 1, max: 60, step: 1 },
   longBreakMinutes: { min: 1, max: 90, step: 1 },
   focusRounds: { min: 1, max: 12, step: 1 },
-  autoLockMinutes: { min: 0, max: 120, step: 5 }
+  autoLockMinutes: { min: 0, max: 120, step: 5 },
+  screensaverMinutes: { min: 1, max: 60, step: 1 }
 } as const
 
 const CHOICES = {

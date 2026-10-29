@@ -206,7 +206,7 @@ function EmailSetup() {
                 project. Press <strong>Continue</strong>.
               </li>
               <li>
-                When Google asks what Notes can do, <strong>tick the Gmail box</strong> (read, change and send email) and press
+                When Google asks what Orbit can do, <strong>tick the Gmail box</strong> (read, change and send email) and press
                 Continue. Then come back here.
               </li>
             </ol>

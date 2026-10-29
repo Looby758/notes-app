@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, nativeTheme, screen, shell, type WebContents } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, screen, shell, webContents, type WebContents } from 'electron'
 import { join } from 'path'
 import { activeThemeId, getTheme } from '@shared/themes'
 import type { Prefs } from '@shared/prefs'
@@ -99,18 +99,58 @@ function createMiniWindow(): BrowserWindow {
   return win
 }
 
+/**
+ * A video popped out from another website plays on that site's page, and the mini window can
+ * move about that site (and YouTube's) but nowhere else.
+ */
+let siteHost = ''
+/** Where to start a popped-out video from another site, in seconds (YouTube's links carry their own). */
+let startAt = 0
+
+const isWebPage = (url: string): boolean => /^https?:\/\//i.test(url)
+const bareHost = (url: string): string => {
+  try {
+    return new URL(url).hostname.replace(/^www\./i, '').toLowerCase()
+  } catch {
+    return ''
+  }
+}
+
 /** Opens the mini window (or brings it back), playing `url` if given, otherwise where you left off. */
-export function openYouTube(url?: string): void {
-  const page = url && isYouTubeUrl(url) ? url : ''
+export function openYouTube(url?: string, seconds = 0): void {
+  const page = url && isWebPage(url) ? url : ''
+  if (page && !isYouTubeUrl(page)) siteHost = bareHost(page)
   if (miniWin && !miniWin.isDestroyed()) {
     if (miniWin.isMinimized()) miniWin.restore()
     miniWin.show()
     miniWin.focus()
-    if (page) miniWin.webContents.send('youtube:load', page)
+    if (page) miniWin.webContents.send('youtube:load', page, seconds)
     return
   }
-  if (page) saveSettings({ youtubeUrl: page })
+  if (page) {
+    saveSettings({ youtubeUrl: page })
+    startAt = seconds
+  }
   miniWin = createMiniWindow()
+}
+
+export type YouTubeAction = 'toggle' | 'back' | 'forward' | 'next'
+
+/** The phone remote's buttons for the video in the mini window; false if there's no mini window. */
+export async function youTubeControl(action: YouTubeAction): Promise<boolean> {
+  if (!miniWin || miniWin.isDestroyed()) return false
+  const host = miniWin.webContents
+  const video = webContents.getAllWebContents().find((c) => c.getType() === 'webview' && c.hostWebContents === host)
+  if (!video) return false
+  const js: Record<YouTubeAction, string> = {
+    toggle: `(v => v && (v.paused ? v.play() : v.pause()))(document.querySelector('video'))`,
+    back: `(v => v && (v.currentTime = Math.max(0, v.currentTime - 10)))(document.querySelector('video'))`,
+    forward: `(v => v && (v.currentTime += 10))(document.querySelector('video'))`,
+    next: `document.querySelector('.ytp-next-button')?.click()`
+  }
+  if (!js[action]) return false
+  await video.executeJavaScript(js[action], true).catch(() => {})
+  return true
 }
 
 /** Closes the mini window (when the notes window really closes, so Notes can quit). */
@@ -124,6 +164,7 @@ const STAYS_IN_WINDOW = /(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com|goo
 function staysInWindow(url: string): boolean {
   try {
     const { protocol, hostname } = new URL(url)
+    if (siteHost && bareHost(url) === siteHost) return protocol === 'https:' || protocol === 'http:'
     return protocol === 'https:' && STAYS_IN_WINDOW.test(hostname)
   } catch {
     return url === 'about:blank'
@@ -191,18 +232,25 @@ export function setupYouTube(getPrefs: () => Prefs): void {
       if (isMainFrame) leave(e, url)
     })
   })
-  ipcMain.handle('youtube:open', (_e, url?: string) => openYouTube(typeof url === 'string' ? url : undefined))
+  ipcMain.handle('youtube:open', (_e, url?: string, seconds?: number) =>
+    openYouTube(typeof url === 'string' ? url : undefined, Number(seconds) || 0)
+  )
   ipcMain.handle('youtube:state', () => {
     const { youtubeUrl, youtubePinned, youtubeVideoOnly } = loadSettings()
+    const url = youtubeUrl && isWebPage(youtubeUrl) ? youtubeUrl : YOUTUBE_HOME
+    if (!isYouTubeUrl(url)) siteHost = bareHost(url)
+    const start = startAt
+    startAt = 0
     return {
-      url: youtubeUrl && isYouTubeUrl(youtubeUrl) ? youtubeUrl : YOUTUBE_HOME,
+      url,
+      startAt: start,
       pinned: youtubePinned !== false,
       videoOnly: youtubeVideoOnly !== false
     }
   })
   // What's playing, so closing and reopening carries on from there.
   ipcMain.handle('youtube:remember', (_e, url: string) => {
-    if (typeof url === 'string' && isYouTubeUrl(url)) saveSettings({ youtubeUrl: url })
+    if (typeof url === 'string' && isWebPage(url)) saveSettings({ youtubeUrl: url })
   })
   ipcMain.handle('youtube:pin', (event, on: boolean) => {
     const win = BrowserWindow.fromWebContents(event.sender)

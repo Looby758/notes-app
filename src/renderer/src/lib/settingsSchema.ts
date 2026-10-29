@@ -55,7 +55,7 @@ export const SETTINGS: SettingDef[] = [
     type: 'appIcon',
     label: 'App icon',
     description: IS_MAC
-      ? 'Shown in the Dock while Notes runs.'
+      ? 'Shown in the Dock while Orbit runs.'
       : 'Shown on the window, the taskbar (also when pinned), the Start menu and the desktop shortcut. Windows can take a moment to catch up; if a pinned icon doesn’t change, unpin and pin Notes again.',
     keywords: 'icon logo dock taskbar green'
   },
@@ -187,6 +187,35 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'animation animations reduce motion accessibility transitions effects fade slide'
   },
   {
+    key: 'interfaceSounds',
+    section: 'appearance',
+    group: 'Interface',
+    type: 'toggle',
+    label: 'Interface sounds',
+    description: 'Soft clicks when you press buttons, a whoosh as panels and dialogs open and close, and a tick when you tick off a task.',
+    keywords: 'sound sounds audio click clicks whoosh noise feedback mute quiet'
+  },
+  {
+    key: 'interfaceSoundsVolume',
+    section: 'appearance',
+    group: 'Interface',
+    type: 'slider',
+    ...RANGES.interfaceSoundsVolume,
+    format: pct,
+    label: 'Interface sounds volume',
+    description: 'How loud the interface sounds are.',
+    keywords: 'sound sounds audio volume loud quiet'
+  },
+  {
+    key: 'pet',
+    section: 'appearance',
+    group: 'Interface',
+    type: 'toggle',
+    label: 'App pet',
+    description: 'A little creature in the bottom corner. It cheers when you tick a task, finish a focus session or solve a Sudoku, naps when you’re away, and likes being clicked. Hidden in zen mode. With Motion on Subtle it only fades and blinks; on Off it sits still.',
+    keywords: 'pet companion buddy mascot cat creature animal friend cute corner'
+  },
+  {
     key: 'gameLaunchAnimation',
     section: 'appearance',
     group: 'Interface',
@@ -208,6 +237,26 @@ export const SETTINGS: SettingDef[] = [
     label: 'Animated game covers',
     description: 'Covers on the Games page that move, from SteamGridDB (add a free key on the Games page). Still pictures are shown when a game has none, and while Motion is on Subtle or Off.',
     keywords: 'games covers art animated moving living gif webp steamgriddb grid'
+  },
+  {
+    key: 'screensaver',
+    section: 'appearance',
+    group: 'Screensaver',
+    type: 'toggle',
+    label: 'Screensaver',
+    description: 'After a while without using Notes, the app fades into a slowly moving screen with the time, the weather and what’s playing. Any key, click or mouse movement brings it back. It waits while a video plays, and hides your town in streamer mode. With Motion on Subtle or Off it holds still.',
+    keywords: 'screensaver screen saver idle away clock time weather music now playing ambient standby'
+  },
+  {
+    key: 'screensaverMinutes',
+    section: 'appearance',
+    group: 'Screensaver',
+    type: 'slider',
+    ...RANGES.screensaverMinutes,
+    format: (v) => `${v} min`,
+    label: 'Start after',
+    description: 'How long Notes waits without you using it before the screensaver starts.',
+    keywords: 'screensaver screen saver idle timeout minutes delay'
   },
   {
     key: 'streamerMode',
@@ -620,7 +669,7 @@ export const SETTINGS: SettingDef[] = [
     type: 'choice',
     options: CAPTURE_SHORTCUTS.map((value) => ({ value, label: value ? acceleratorLabel(value) : 'Off' })),
     label: 'Shortcut',
-    description: `Works from any app, as long as Notes is running (it can wait in the ${TRAY_NAME}).`,
+    description: `Works from any app, as long as Orbit is running (it can wait in the ${TRAY_NAME}).`,
     keywords: 'capture hotkey global win key'
   },
   {
@@ -682,7 +731,7 @@ export const SETTINGS: SettingDef[] = [
     section: 'capture',
     group: IS_MAC ? 'Menu bar' : 'Tray',
     type: 'toggle',
-    label: IS_MAC ? 'Open Notes when you log in' : 'Start Notes when Windows starts',
+    label: IS_MAC ? 'Open Orbit when you log in' : 'Start Orbit when Windows starts',
     description: IS_MAC ? 'Only in the installed app.' : 'It starts quietly in the tray.',
     keywords: 'startup login boot'
   },
@@ -696,7 +745,7 @@ export const SETTINGS: SettingDef[] = [
     label: 'Check for updates automatically',
     description: IS_MAC
       ? 'Notes tells you when a new version is out and opens its download page.'
-      : 'New versions download in the background and install when you restart Notes.',
+      : 'New versions download in the background and install when you restart Orbit.',
     keywords: 'update upgrade version new release'
   }
 ]
@@ -714,7 +763,7 @@ export const SECTIONS: { id: SectionId; label: string }[] = [
 ]
 
 /** Accent colours offered as one-click swatches. */
-export const ACCENT_SWATCHES = ['#8b7cf6', '#5ea8ff', '#3ccfcf', '#4ade80', '#e0a458', '#f97066', '#f472b6', '#c4b5fd']
+export const ACCENT_SWATCHES = ['#4ade80', '#8b7cf6', '#5ea8ff', '#3ccfcf', '#e0a458', '#f97066', '#f472b6', '#c4b5fd']
 
 export function matchesSearch(def: SettingDef, query: string): boolean {
   const haystack = `${def.label} ${def.description ?? ''} ${def.keywords ?? ''} ${def.group}`.toLowerCase()

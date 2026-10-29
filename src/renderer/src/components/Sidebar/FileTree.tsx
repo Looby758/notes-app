@@ -21,8 +21,10 @@ import {
   Pencil,
   Star,
   StarOff,
-  Trash2
+  Trash2,
+  Smartphone
 } from 'lucide-react'
+import { sendToPhone } from '../../store/phone'
 import Private from '../Streamer/Private'
 import { useHideNames } from '../../store/streamer'
 import { isStarred, justStarred, toggleStar, useStarred } from '../../store/starred'
@@ -180,6 +182,9 @@ export default function FileTree() {
       ...attachment,
       { label: 'Rename', icon: <Pencil size={15} />, onClick: () => startRename(node.path) },
       { label: `Show in ${FILE_MANAGER}`, icon: <FolderSearch size={15} />, onClick: () => window.api.reveal(node.path) },
+      ...(node.type === 'folder' || isLocked(node.path)
+        ? []
+        : [{ label: 'Send to phone…', icon: <Smartphone size={15} />, onClick: () => sendToPhone({ kind: 'file', path: node.path }) } as MenuItem]),
       ...(node.type === 'attachment' ? [] : [{ label: 'Export…', icon: <FileDown size={15} />, onClick: () => openExport(node.path, node.type === 'folder') } as MenuItem]),
       'separator',
       { label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: () => trash(node.path) }

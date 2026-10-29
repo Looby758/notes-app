@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { WebviewTag } from 'electron'
-import { ArrowLeft, ArrowRight, Eraser, ExternalLink, Globe, MonitorPlay, MoreHorizontal, RotateCw, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Eraser, ExternalLink, Globe, MonitorPlay, MoreHorizontal, RotateCw, Smartphone, X } from 'lucide-react'
 import { displayUrl, toWebUrl, WEB_PARTITION } from '@shared/web'
 import { youTubeVideoId, youTubeWatchUrl } from '@shared/youtube'
+import { FIND_VIDEO } from '@shared/video'
 import { loadInWebTab, setWebPage, useWeb, webviews } from '../../store/web'
 import { notify } from '../../store/notify'
+import { sendToPhone } from '../../store/phone'
 import { CLICK_MOD } from '@shared/platform'
 
 /** Signs you out of every website, after asking. */
@@ -36,6 +38,7 @@ interface Failure {
  */
 export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidden: boolean; autoFocus: boolean }) {
   const url = useWeb((s) => s.pages[tab]?.url ?? '')
+  const pageTitle = useWeb((s) => s.pages[tab]?.title)
   // The page the webview starts on; after that it navigates itself (or through loadInWebTab).
   const [src, setSrc] = useState(url)
   // React knows <webview> as a plain element; Electron gives it the methods (WebviewTag).
@@ -133,17 +136,21 @@ export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidde
 
   const ready = (): WebviewTag | null => (src ? view.current : null)
 
-  // A YouTube video carries on in the mini window from where it's got to, and stops here.
+  // The video on the page (any website, not just YouTube) carries on in the mini window from where
+  // it's got to, and stops here.
   const videoId = youTubeVideoId(url)
   const popOut = async (): Promise<void> => {
-    if (!videoId) return
-    let seconds = 0
+    let found: { seconds?: number; url?: string } | null = null
     try {
-      seconds = Number(await ready()?.executeJavaScript(`(() => { const v = document.querySelector('video'); if (!v) return 0; v.pause(); return v.currentTime })()`)) || 0
+      found = (await ready()?.executeJavaScript(FIND_VIDEO)) ?? null
     } catch {
-      // The page isn't ready: start from the beginning.
+      // The page isn't ready: a YouTube video starts from the beginning.
     }
-    void window.api.openYouTube(youTubeWatchUrl(videoId, seconds))
+    const seconds = Number(found?.seconds) || 0
+    if (videoId) void window.api.openYouTube(youTubeWatchUrl(videoId, seconds))
+    else if (found?.url) void window.api.openYouTube(found.url)
+    else if (found) void window.api.openYouTube(url, seconds)
+    else notify('There’s no video on this page to pop out.', 'info')
   }
 
   return (
@@ -184,11 +191,14 @@ export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidde
           }}
           data-web-address
         />
-        {videoId && (
-          <button type="button" className="icon-btn" title="Play in the YouTube mini window (floats over everything)" onClick={() => void popOut()}>
+        {/^https?:/i.test(url) && (
+          <button type="button" className="icon-btn" title="Pop the video out into the mini window (floats over everything)" onClick={() => void popOut()}>
             <MonitorPlay size={14} />
           </button>
         )}
+        <button type="button" className="icon-btn" title="Send to phone (scan a QR code)" disabled={!url} onClick={() => sendToPhone({ kind: 'link', url, title: pageTitle })}>
+          <Smartphone size={14} />
+        </button>
         <button type="button" className="icon-btn" title="Open in your browser" disabled={!url} onClick={() => window.open(url)}>
           <ExternalLink size={14} />
         </button>

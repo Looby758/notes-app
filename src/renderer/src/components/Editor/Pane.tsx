@@ -26,8 +26,10 @@ import {
   MONEY_TAB,
   CONVERT_TAB,
   SUDOKU_TAB,
+  MINESWEEPER_TAB,
   MESSAGES_TAB,
   GAMES_TAB,
+  EXPLORER_TAB,
   SETTINGS_TAB,
   splitPane
 } from '../../lib/editorController'
@@ -54,7 +56,9 @@ import HomePage from '../Home/HomePage'
 import MoneyPage from '../Money/MoneyPage'
 import ConvertPage from '../Convert/ConvertPage'
 import SudokuPage from '../Sudoku/SudokuPage'
+import MinesweeperPage from '../Minesweeper/MinesweeperPage'
 import GamesPage from '../Games/GamesPage'
+import ExplorerPage from '../Explorer/ExplorerPage'
 import MindMap from '../MindMap/MindMap'
 import WebPage from '../Web/WebPage'
 import { isMindMap, useUI } from '../../store/ui'
@@ -98,7 +102,7 @@ export default function Pane({ pane }: { pane: string }) {
 
   const onDragOver = (e: DragEvent<HTMLDivElement>): void => {
     // Files from the list are dropped into the note (the editor handles that).
-    if (!getDrag() || getDrag()!.kind === 'file') return
+    if (!getDrag() || getDrag()!.kind === 'file' || getDrag()!.kind === 'computer') return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
     setZone(zoneAt(e.currentTarget.getBoundingClientRect(), e.clientX, e.clientY))
@@ -108,7 +112,7 @@ export default function Pane({ pane }: { pane: string }) {
     const drag = getDrag()
     const where = zone ?? zoneAt(e.currentTarget.getBoundingClientRect(), e.clientX, e.clientY)
     setZone(null)
-    if (!drag || drag.kind === 'file') return
+    if (!drag || drag.kind === 'file' || drag.kind === 'computer') return
     e.preventDefault()
     if (drag.kind === 'tab') {
       if (where === 'center') moveTab(drag.id, drag.pane, pane)
@@ -179,7 +183,9 @@ export default function Pane({ pane }: { pane: string }) {
         {active === MONEY_TAB && <MoneyPage />}
         {active === CONVERT_TAB && <ConvertPage />}
         {active === SUDOKU_TAB && <SudokuPage />}
+        {active === MINESWEEPER_TAB && <MinesweeperPage />}
         {active === GAMES_TAB && <GamesPage />}
+        {active === EXPLORER_TAB && <ExplorerPage autoFocus={isActivePane} />}
         {zone && <div className={`drop-zone ${zone}`} />}
       </div>
     </div>

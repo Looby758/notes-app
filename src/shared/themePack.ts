@@ -50,7 +50,9 @@ export const THEME_PAGES: Record<string, string> = {
   ai: 'Ask AI',
   chat: 'AI chat',
   sudoku: 'Sudoku',
+  minesweeper: 'Minesweeper',
   convert: 'File converter',
+  explorer: 'File explorer',
   graph: 'Graph',
   settings: 'Settings',
   terminal: 'Terminal',
@@ -128,7 +130,7 @@ export const themeSlug = (value: unknown): string =>
  */
 export function readThemeManifest(raw: unknown, hasFile: (path: string) => boolean): { theme: Theme } | { error: string } {
   if (!isObject(raw)) return { error: 'theme.json isn’t a theme.' }
-  if (typeof raw.format === 'number' && raw.format > THEME_FORMAT) return { error: 'This theme needs a newer version of Notes.' }
+  if (typeof raw.format === 'number' && raw.format > THEME_FORMAT) return { error: 'This theme needs a newer version of Orbit.' }
   const name = cleanText(raw.name, 60)
   if (!name) return { error: 'The theme has no name.' }
   const slug = themeSlug(raw.id) || themeSlug(name)

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   ArrowRightLeft,
   Grid3x3,
+  Bomb,
   ChevronDown,
   Command as CommandIcon,
   FolderOpen,
@@ -25,8 +26,10 @@ import {
   Settings as SettingsIcon,
   SquareTerminal,
   PoundSterling,
+  HardDrive,
   Eye,
-  EyeOff
+  EyeOff,
+  Smartphone
 } from 'lucide-react'
 import { useVault } from '../store/vault'
 import { useEditor, type SaveStatus } from '../store/editor'
@@ -56,6 +59,8 @@ import {
   MONEY_TAB,
   CONVERT_TAB,
   SUDOKU_TAB,
+  MINESWEEPER_TAB,
+  EXPLORER_TAB,
   GAMES_TAB,
   setZenEditor
 } from '../lib/editorController'
@@ -66,11 +71,15 @@ import LayoutMenu from './Editor/LayoutMenu'
 import RightPanel from './Panels/RightPanel'
 import Modals from './Picker/Modals'
 import LockDialog from './Lock/LockDialog'
+import SendToPhone from './Phone/SendToPhone'
+import { sendToPhone, startPhone, usePhone } from '../store/phone'
 import { startFormatMenu } from '../lib/formatMenu'
 import { startDictionary } from '../lib/dictionary'
 import { EventDetails } from './Calendar/shared'
 import Resizer from './Resizer'
 import UpdateToast from './UpdateToast'
+import Screensaver from './Screensaver/Screensaver'
+import Pet from './Motion/Pet'
 import MusicPlayer from './Music/MusicPlayer'
 import { toggleMusic, useMusic } from '../store/music'
 import ZenBar, { StatusTimer } from './ZenBar'
@@ -144,6 +153,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     const offSketch = window.api.onSketchStart(() => useUI.setState({ sketch: { path: null } }))
     const offFormat = startFormatMenu()
     const offDictionary = startDictionary()
+    const offPhone = startPhone()
     const offChanged = window.api.onVaultChanged((paths) => {
       useVault.getState().refresh(paths)
       handleExternalChanges(paths)
@@ -170,6 +180,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       offSketch()
       offFormat()
       offDictionary()
+      offPhone()
       stopReminders()
     }
   }, [vault])
@@ -345,14 +356,21 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         <button className="icon-btn" onClick={() => void window.api.openYouTube()} title={`YouTube mini window (${showKeys('Ctrl+Alt+Y')})`} data-youtube-button>
           <MonitorPlay size={15} />
         </button>
+        <PhoneButton />
         <button className="icon-btn" onClick={() => openSpecialTab(CHAT_TAB)} title="Chat with Claude" data-chat-button>
           <MessageSquare size={15} />
+        </button>
+        <button className="icon-btn" onClick={() => openSpecialTab(EXPLORER_TAB)} title="Files on this computer" data-explorer-button>
+          <HardDrive size={15} />
         </button>
         <button className="icon-btn" onClick={() => openSpecialTab(CONVERT_TAB)} title="Convert files" data-convert-button>
           <ArrowRightLeft size={15} />
         </button>
         <button className="icon-btn" onClick={() => openSpecialTab(SUDOKU_TAB)} title="Sudoku (a quick break)" data-sudoku-button>
           <Grid3x3 size={15} />
+        </button>
+        <button className="icon-btn" onClick={() => openSpecialTab(MINESWEEPER_TAB)} title="Minesweeper (a quick break)" data-minesweeper-button>
+          <Bomb size={15} />
         </button>
         <button className={`icon-btn ${musicOpen ? 'active' : ''}`} onClick={toggleMusic} title="Music player (Spotify)" data-music-button>
           <Music size={15} />
@@ -429,13 +447,30 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
 
       <Modals />
       <LockDialog />
+      <SendToPhone />
       <EventDetails />
+      <Pet />
       <UpdateToast />
       <MusicPlayer />
       <ZenBar />
       <VoiceRecorder />
       <DefinitionCard />
       <SketchPad />
+      <Screensaver />
     </div>
+  )
+}
+
+/** Connect your phone; shows a dot while the phone's page is open. */
+function PhoneButton() {
+  const connected = usePhone((s) => s.connected > 0)
+  return (
+    <button
+      className={`icon-btn phone-btn ${connected ? 'connected' : ''}`}
+      onClick={() => sendToPhone({ kind: 'pair' })}
+      title={connected ? 'Your phone is connected' : 'Connect your phone'}
+    >
+      <Smartphone size={15} />
+    </button>
   )
 }
