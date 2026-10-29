@@ -13,6 +13,7 @@ import {
   type Difficulty,
   type Grid
 } from '../../lib/sudoku'
+import { petCheer } from '../../lib/pet'
 
 /** A game in progress. `notes` holds the small pencil marks: bit n is set when n is pencilled in. */
 interface Game {
@@ -67,6 +68,13 @@ export default function SudokuPage() {
 
   useEffect(() => save(GAME_KEY, game), [game])
   useEffect(() => board.current?.focus(), [])
+
+  // Solving it (not opening the page on a game that was already solved) gets a cheer from the pet.
+  const wasWon = useRef(game.won)
+  useEffect(() => {
+    if (game.won && !wasWon.current) petCheer()
+    wasWon.current = game.won
+  }, [game.won])
 
   // A new fastest time for this level?
   useEffect(() => {

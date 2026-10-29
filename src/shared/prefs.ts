@@ -44,6 +44,8 @@ export interface Prefs {
   screensaver: boolean
   /** Minutes without using Notes before the screensaver starts. */
   screensaverMinutes: number
+  /** A little animated pet in the bottom corner that cheers when you finish things and naps when you're away. */
+  pet: boolean
 
   // Streamer mode
   /** Blur private things (your town, email, money, passwords, messages, events) until you click them, for sharing your screen. */
@@ -193,6 +195,7 @@ export const DEFAULT_PREFS: Prefs = {
   interfaceSoundsVolume: 0.5,
   screensaver: true,
   screensaverMinutes: 5,
+  pet: true,
 
   streamerMode: false,
   streamerHideNotes: true,

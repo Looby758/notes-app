@@ -74,6 +74,7 @@ import { EventDetails } from './Calendar/shared'
 import Resizer from './Resizer'
 import UpdateToast from './UpdateToast'
 import Screensaver from './Screensaver/Screensaver'
+import Pet from './Motion/Pet'
 import MusicPlayer from './Music/MusicPlayer'
 import { toggleMusic, useMusic } from '../store/music'
 import ZenBar, { StatusTimer } from './ZenBar'
@@ -436,6 +437,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <Modals />
       <LockDialog />
       <EventDetails />
+      <Pet />
       <UpdateToast />
       <MusicPlayer />
       <ZenBar />

@@ -28,6 +28,7 @@ import { mathDiagrams } from './mathDiagrams'
 const EVENT_TIME = /^(\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?(?:\s*[-–—]\s*\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?)?)\s/i
 import { useNoteIndex } from '../../store/noteIndex'
 import { playSound } from '../../lib/sounds'
+import { petCheer } from '../../lib/pet'
 
 /**
  * Live preview: markdown renders in place, and the raw syntax reappears on whichever lines
@@ -652,6 +653,7 @@ const clickHandlers = EditorView.domEventHandlers({
       if (current === ' ') {
         tickedAt = performance.now()
         playSound('tick')
+        petCheer()
       }
       view.dispatch({ changes: { from: pos + 1, to: pos + 2, insert: current === ' ' ? 'x' : ' ' } })
       e.preventDefault()

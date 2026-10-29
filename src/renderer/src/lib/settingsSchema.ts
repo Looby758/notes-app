@@ -207,6 +207,15 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'sound sounds audio volume loud quiet'
   },
   {
+    key: 'pet',
+    section: 'appearance',
+    group: 'Interface',
+    type: 'toggle',
+    label: 'App pet',
+    description: 'A little creature in the bottom corner. It cheers when you tick a task, finish a focus session or solve a Sudoku, naps when you’re away, and likes being clicked. Hidden in zen mode. With Motion on Subtle it only fades and blinks; on Off it sits still.',
+    keywords: 'pet companion buddy mascot cat creature animal friend cute corner'
+  },
+  {
     key: 'gameLaunchAnimation',
     section: 'appearance',
     group: 'Interface',

@@ -3,6 +3,7 @@ import { usePrefs } from './prefs'
 import { notify } from './notify'
 import { useUI, toggleZen } from './ui'
 import { chime } from '../lib/ambience'
+import { petCheer } from '../lib/pet'
 
 /**
  * The focus timer: focus for a while, then (with several rounds) a short break, focus again… and a
@@ -50,6 +51,7 @@ export function next(skipped = true): void {
   const { phase, round, rounds } = useTimer.getState()
   const { timerChime, timerLeaveZen } = usePrefs.getState().prefs
   if (!phase) return
+  if (phase === 'focus' && !skipped) petCheer()
   if (phase === 'focus' && round < rounds) {
     if (timerChime && !skipped) chime(true)
     notify(`Round ${round} done. Take a ${minutes('break')} minute break.`, 'info')
