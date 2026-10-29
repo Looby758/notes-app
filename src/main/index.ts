@@ -43,6 +43,8 @@ import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
 import { dictionaryMenu, setupDictionary } from './dictionary'
+import { setupPhoneLink } from './phoneLink'
+import { setupPhonePair } from './phonePair'
 import { setupWebTitle } from './webTitle'
 import { setupPlaces } from './places'
 import { setupWeather } from './weather'
@@ -520,6 +522,11 @@ function registerIpc(): void {
   })
   setupMenus()
   setupDictionary()
+  setupPhoneLink(() => mainWindow, (path) => currentVault().abs(path))
+  setupPhonePair(
+    () => mainWindow,
+    (name, data) => currentVault().saveAttachment(currentPrefs().attachmentFolder, name, data)
+  )
   setupWebTitle()
   setupPlaces()
   setupWeather()

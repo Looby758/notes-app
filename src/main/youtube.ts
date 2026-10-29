@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, nativeTheme, screen, shell, type WebContents } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, screen, shell, webContents, type WebContents } from 'electron'
 import { join } from 'path'
 import { activeThemeId, getTheme } from '@shared/themes'
 import type { Prefs } from '@shared/prefs'
@@ -132,6 +132,25 @@ export function openYouTube(url?: string, seconds = 0): void {
     startAt = seconds
   }
   miniWin = createMiniWindow()
+}
+
+export type YouTubeAction = 'toggle' | 'back' | 'forward' | 'next'
+
+/** The phone remote's buttons for the video in the mini window; false if there's no mini window. */
+export async function youTubeControl(action: YouTubeAction): Promise<boolean> {
+  if (!miniWin || miniWin.isDestroyed()) return false
+  const host = miniWin.webContents
+  const video = webContents.getAllWebContents().find((c) => c.getType() === 'webview' && c.hostWebContents === host)
+  if (!video) return false
+  const js: Record<YouTubeAction, string> = {
+    toggle: `(v => v && (v.paused ? v.play() : v.pause()))(document.querySelector('video'))`,
+    back: `(v => v && (v.currentTime = Math.max(0, v.currentTime - 10)))(document.querySelector('video'))`,
+    forward: `(v => v && (v.currentTime += 10))(document.querySelector('video'))`,
+    next: `document.querySelector('.ytp-next-button')?.click()`
+  }
+  if (!js[action]) return false
+  await video.executeJavaScript(js[action], true).catch(() => {})
+  return true
 }
 
 /** Closes the mini window (when the notes window really closes, so Notes can quit). */

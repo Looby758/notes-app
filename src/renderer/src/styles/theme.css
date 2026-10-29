@@ -9494,3 +9494,97 @@ body.reduce-motion .theme-loading-text {
   background: var(--bg);
   color: var(--text);
 }
+
+/* Send to phone */
+.phone-dialog {
+  width: 360px;
+  padding: 20px 22px 16px;
+  text-align: center;
+  outline: none;
+}
+.phone-dialog h2 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  font-size: 17px;
+}
+.phone-name {
+  margin: 0 0 14px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.phone-qr {
+  display: grid;
+  place-items: center;
+  width: 228px;
+  height: 228px;
+  margin: 0 auto 12px;
+  border-radius: 12px;
+  background: #fff;
+  color: #555;
+}
+.phone-qr img {
+  width: 212px;
+  height: 212px;
+  image-rendering: pixelated;
+}
+.phone-hint {
+  margin: 0 0 14px;
+  color: var(--text-faint);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.phone-error {
+  margin: 18px 0;
+  color: var(--danger, #e5534b);
+}
+.phone-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 24px 0;
+  color: var(--accent);
+  animation: pop 200ms var(--ease);
+}
+.phone-done span {
+  color: var(--text);
+}
+.phone-actions {
+  display: flex;
+  justify-content: center;
+}
+.phone-actions {
+  gap: 8px;
+}
+.phone-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.phone-fields input {
+  width: 100%;
+}
+.phone-password {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.phone-btn {
+  position: relative;
+}
+.phone-btn.connected::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}

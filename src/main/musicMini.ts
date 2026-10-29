@@ -96,6 +96,21 @@ export function closeMusicMini(): void {
   miniWin = null
 }
 
+const listeners = new Set<(state: MusicMiniState) => void>()
+
+/** What's playing, as the notes window last said, and news of changes (for the phone remote). */
+export const lastMusic = (): MusicMiniState | null => last
+export function onMusic(fn: (state: MusicMiniState) => void): () => void {
+  listeners.add(fn)
+  return () => listeners.delete(fn)
+}
+
+/** Carries out a music button (play/pause, next…) pressed somewhere other than the notes window. */
+export function musicCommand(command: MusicMiniCommand): void {
+  const win = notesWindow?.()
+  if (win && !win.isDestroyed()) win.webContents.send('musicMini:command', command)
+}
+
 export function setupMusicMini(getPrefs: () => Prefs, getNotesWindow: () => BrowserWindow | null): void {
   prefs = getPrefs
   notesWindow = getNotesWindow
@@ -105,12 +120,10 @@ export function setupMusicMini(getPrefs: () => Prefs, getNotesWindow: () => Brow
   // From the notes window: what's playing now.
   ipcMain.on('musicMini:push', (_e, state: MusicMiniState) => {
     last = state
+    for (const fn of listeners) fn(state)
     if (miniWin && !miniWin.isDestroyed()) miniWin.webContents.send('musicMini:state', state)
   })
   ipcMain.handle('musicMini:last', () => last)
   // From the mini player: a button press, carried out by the notes window.
-  ipcMain.on('musicMini:command', (_e, command: MusicMiniCommand) => {
-    const win = notesWindow()
-    if (win && !win.isDestroyed()) win.webContents.send('musicMini:command', command)
-  })
+  ipcMain.on('musicMini:command', (_e, command: MusicMiniCommand) => musicCommand(command))
 }

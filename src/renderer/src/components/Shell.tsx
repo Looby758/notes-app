@@ -27,7 +27,8 @@ import {
   SquareTerminal,
   PoundSterling,
   Eye,
-  EyeOff
+  EyeOff,
+  Smartphone
 } from 'lucide-react'
 import { useVault } from '../store/vault'
 import { useEditor, type SaveStatus } from '../store/editor'
@@ -68,6 +69,8 @@ import LayoutMenu from './Editor/LayoutMenu'
 import RightPanel from './Panels/RightPanel'
 import Modals from './Picker/Modals'
 import LockDialog from './Lock/LockDialog'
+import SendToPhone from './Phone/SendToPhone'
+import { sendToPhone, startPhone, usePhone } from '../store/phone'
 import { startFormatMenu } from '../lib/formatMenu'
 import { startDictionary } from '../lib/dictionary'
 import { EventDetails } from './Calendar/shared'
@@ -148,6 +151,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     const offSketch = window.api.onSketchStart(() => useUI.setState({ sketch: { path: null } }))
     const offFormat = startFormatMenu()
     const offDictionary = startDictionary()
+    const offPhone = startPhone()
     const offChanged = window.api.onVaultChanged((paths) => {
       useVault.getState().refresh(paths)
       handleExternalChanges(paths)
@@ -174,6 +178,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       offSketch()
       offFormat()
       offDictionary()
+      offPhone()
       stopReminders()
     }
   }, [vault])
@@ -349,6 +354,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         <button className="icon-btn" onClick={() => void window.api.openYouTube()} title={`YouTube mini window (${showKeys('Ctrl+Alt+Y')})`} data-youtube-button>
           <MonitorPlay size={15} />
         </button>
+        <PhoneButton />
         <button className="icon-btn" onClick={() => openSpecialTab(CHAT_TAB)} title="Chat with Claude" data-chat-button>
           <MessageSquare size={15} />
         </button>
@@ -436,6 +442,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
 
       <Modals />
       <LockDialog />
+      <SendToPhone />
       <EventDetails />
       <Pet />
       <UpdateToast />
@@ -446,5 +453,19 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <SketchPad />
       <Screensaver />
     </div>
+  )
+}
+
+/** Connect your phone; shows a dot while the phone's page is open. */
+function PhoneButton() {
+  const connected = usePhone((s) => s.connected > 0)
+  return (
+    <button
+      className={`icon-btn phone-btn ${connected ? 'connected' : ''}`}
+      onClick={() => sendToPhone({ kind: 'pair' })}
+      title={connected ? 'Your phone is connected' : 'Connect your phone'}
+    >
+      <Smartphone size={15} />
+    </button>
   )
 }

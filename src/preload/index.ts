@@ -253,6 +253,22 @@ const api: NotesApi = {
   trash: (path) => ipcRenderer.invoke('fs:trash', path),
   trashMany: (paths) => ipcRenderer.invoke('fs:trashMany', paths),
   reveal: (path) => ipcRenderer.invoke('fs:reveal', path),
+  phoneShareFile: (path) => ipcRenderer.invoke('phone:shareFile', path),
+  phoneShareLink: (url) => ipcRenderer.invoke('phone:shareLink', url),
+  phoneStop: (token) => ipcRenderer.invoke('phone:stop', token),
+  onPhoneDelivered: (callback) => {
+    const handler = (_e: unknown, token: string): void => callback(token)
+    ipcRenderer.on('phone:delivered', handler)
+    return () => ipcRenderer.removeListener('phone:delivered', handler)
+  },
+  phonePair: (fresh) => ipcRenderer.invoke('phone:pair', fresh),
+  phoneForget: () => ipcRenderer.invoke('phone:forget'),
+  onPhoneEvent: (callback) => {
+    const handler = (_e: unknown, event: Parameters<typeof callback>[0]): void => callback(event)
+    ipcRenderer.on('phone:event', handler)
+    return () => ipcRenderer.removeListener('phone:event', handler)
+  },
+  phoneWifi: () => ipcRenderer.invoke('phone:wifi'),
   readAppData: (name) => ipcRenderer.invoke('vault:readAppData', name),
   writeAppData: (name, content) => ipcRenderer.invoke('vault:writeAppData', name, content),
   readSafeFile: (id) => ipcRenderer.invoke('safe:read', id),
