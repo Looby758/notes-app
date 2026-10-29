@@ -1,3 +1,4 @@
+import type { ExplorerEntry, ExplorerPlace } from './explorer'
 import type { Prefs } from './prefs'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
@@ -592,6 +593,17 @@ export interface NotesApi {
   writeSketch(path: string, svg: string): Promise<void>
   /** Lets you pick files on disk and copies them into a vault folder; returns their paths. */
   pickAttachment(folder: string, imagesOnly: boolean): Promise<string[]>
+  /** Links a file from anywhere on the computer: copied into `folder` unless it's already in the notes folder. Returns its vault path. */
+  attachFromComputer(folder: string, source: string): Promise<string>
+
+  // File explorer tab (full paths on this computer)
+  explorerPlaces(): Promise<ExplorerPlace[]>
+  explorerList(dir: string): Promise<ExplorerEntry[]>
+  /** The start of a text file, for its preview. */
+  explorerReadText(path: string): Promise<string>
+  /** Opens a file in its usual app (programs are shown in File Explorer / Finder instead). */
+  explorerOpen(path: string): Promise<void>
+  explorerReveal(path: string): Promise<void>
   /** Opens a vault file (like a PDF) in its usual app. */
   openFile(path: string): Promise<void>
   /** Reads a note's markdown. */

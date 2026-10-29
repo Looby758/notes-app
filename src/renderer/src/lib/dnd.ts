@@ -10,6 +10,8 @@ export type DragPayload =
   | { kind: 'note'; path: string; fromStarred?: boolean }
   /** A picture, recording or other file from the file tree: dropped into a note, it's embedded. */
   | { kind: 'file'; path: string }
+  /** A file from the file explorer tab (its full path on the computer): dropped into a note, it's attached. */
+  | { kind: 'computer'; path: string }
 
 let current: DragPayload | null = null
 

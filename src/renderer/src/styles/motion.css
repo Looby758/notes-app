@@ -325,6 +325,22 @@
   animation-delay: 350ms;
 }
 
+/* ---------- The file explorer: a folder's files ripple in, the preview fades up ---------- */
+
+.explorer-item {
+  animation: m-row-in calc(240ms * var(--m-time)) var(--m-ease-out) backwards;
+  animation-delay: calc(var(--i, 0) * 14ms * var(--m-time));
+}
+.explorer-list.grid .explorer-item {
+  animation-name: m-float-in;
+}
+.explorer-preview {
+  animation: m-fade-in calc(200ms * var(--m-time)) ease-out;
+}
+.explorer-look > * {
+  animation: m-float-in calc(300ms * var(--m-time)) var(--m-ease-out) backwards;
+}
+
 /* ---------- The logo at start-up (components/Motion/StartupLogo.tsx) ---------- */
 
 .startup-logo {

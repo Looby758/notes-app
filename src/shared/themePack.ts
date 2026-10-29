@@ -52,6 +52,7 @@ export const THEME_PAGES: Record<string, string> = {
   sudoku: 'Sudoku',
   minesweeper: 'Minesweeper',
   convert: 'File converter',
+  explorer: 'File explorer',
   graph: 'Graph',
   settings: 'Settings',
   terminal: 'Terminal',

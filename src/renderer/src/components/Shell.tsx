@@ -26,6 +26,7 @@ import {
   Settings as SettingsIcon,
   SquareTerminal,
   PoundSterling,
+  HardDrive,
   Eye,
   EyeOff,
   Smartphone
@@ -59,6 +60,7 @@ import {
   CONVERT_TAB,
   SUDOKU_TAB,
   MINESWEEPER_TAB,
+  EXPLORER_TAB,
   GAMES_TAB,
   setZenEditor
 } from '../lib/editorController'
@@ -357,6 +359,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         <PhoneButton />
         <button className="icon-btn" onClick={() => openSpecialTab(CHAT_TAB)} title="Chat with Claude" data-chat-button>
           <MessageSquare size={15} />
+        </button>
+        <button className="icon-btn" onClick={() => openSpecialTab(EXPLORER_TAB)} title="Files on this computer" data-explorer-button>
+          <HardDrive size={15} />
         </button>
         <button className="icon-btn" onClick={() => openSpecialTab(CONVERT_TAB)} title="Convert files" data-convert-button>
           <ArrowRightLeft size={15} />
