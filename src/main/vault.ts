@@ -224,6 +224,36 @@ export class Vault {
     return join(this.root, '.notesapp', name)
   }
 
+  /**
+   * The file vault's locked files: .notesapp/safe/<id>.bin, already encrypted by the renderer, so
+   * nothing readable ever reaches the disk. Ids are random hex made by the renderer.
+   */
+  private safePath(id: string): string {
+    if (!/^[a-f0-9]{16,64}$/.test(id)) throw new Error('Invalid vault file id.')
+    return join(this.root, '.notesapp', 'safe', `${id}.bin`)
+  }
+
+  async readSafeFile(id: string): Promise<Uint8Array | null> {
+    try {
+      return new Uint8Array(await fs.readFile(this.safePath(id)))
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
+      throw err
+    }
+  }
+
+  async writeSafeFile(id: string, data: Uint8Array): Promise<void> {
+    const file = this.safePath(id)
+    await fs.mkdir(dirname(file), { recursive: true })
+    const tmp = `${file}.${tempSuffix()}.tmp`
+    await fs.writeFile(tmp, data)
+    await renameWithRetry(tmp, file)
+  }
+
+  async removeSafeFile(id: string): Promise<void> {
+    await fs.rm(this.safePath(id), { force: true })
+  }
+
   /** Saves a pasted or dropped file into `folderRel` (created if needed) under a unique name. */
   async saveAttachment(folderRel: string, fileName: string, data: Uint8Array): Promise<string> {
     if (data.byteLength > MAX_ATTACHMENT_BYTES) throw new Error('That file is too big to attach (over 100 MB).')

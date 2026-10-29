@@ -537,6 +537,16 @@ export interface NotesApi {
   /** Reads/writes a small app file kept in the vault's hidden ".notesapp" folder (synced with your notes). */
   readAppData(name: string): Promise<string | null>
   writeAppData(name: string, content: string): Promise<void>
+  /** The file vault's encrypted files (in ".notesapp/safe"); null if there's no such file. */
+  readSafeFile(id: string): Promise<Uint8Array | null>
+  writeSafeFile(id: string, data: Uint8Array): Promise<void>
+  removeSafeFile(id: string): Promise<void>
+  /** Lets you pick files to lock away; returns their contents. */
+  pickSafeFiles(): Promise<{ path: string; name: string; data: Uint8Array }[]>
+  /** Sends picked originals to the Bin once they're safely locked away. */
+  trashSafeOriginals(paths: string[]): Promise<void>
+  /** Saves an unlocked copy where you choose. Resolves false if cancelled. */
+  saveSafeCopy(name: string, data: Uint8Array): Promise<boolean>
   /** Saves pasted/dropped file data into a vault folder; returns the new file's path. */
   /** Saves an edited spreadsheet (.xlsx, .xlsm, .csv or .tsv) over the file. */
   writeSheet(path: string, data: Uint8Array): Promise<void>
