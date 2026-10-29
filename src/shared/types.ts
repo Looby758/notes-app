@@ -224,6 +224,8 @@ export interface AiChat {
 
 export interface YouTubeState {
   url: string
+  /** Where to start a video popped out from another website, in seconds. */
+  startAt?: number
   pinned: boolean
   videoOnly: boolean
 }
@@ -314,8 +316,11 @@ export interface NotesApi {
   onWebShortcut(callback: (shortcut: string) => void): () => void
 
   // The YouTube mini window
-  /** Opens the floating YouTube window (or brings it back), playing `url` if it's a YouTube link. */
-  openYouTube(url?: string): Promise<void>
+  /**
+   * Opens the floating YouTube window (or brings it back), playing `url` if given: a YouTube link,
+   * or any web page with a video on it, played from `seconds` in.
+   */
+  openYouTube(url?: string, seconds?: number): Promise<void>
   /** In the mini window: what to show first, and how you left it set. */
   youTubeState(): Promise<YouTubeState>
   /** In the mini window: the page showing now, so it carries on there next time. */
@@ -327,7 +332,7 @@ export interface NotesApi {
   minimizeYouTube(): Promise<void>
   closeYouTube(): Promise<void>
   /** In the mini window: play this page (opened from the notes window). */
-  onYouTubeLoad(callback: (url: string) => void): () => void
+  onYouTubeLoad(callback: (url: string, seconds: number) => void): () => void
 
   // Updates
   updateStatus(): Promise<UpdateStatus>
