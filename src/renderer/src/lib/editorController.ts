@@ -71,6 +71,8 @@ export const SUDOKU_TAB = 'sudoku:'
 export const MINESWEEPER_TAB = 'minesweeper:'
 /** Scenes, webcam and screen recording (components/Studio). */
 export const STUDIO_TAB = 'studio:'
+/** Sound clips with hotkeys, the voice changer and music into a voice call (components/Soundboard). */
+export const SOUNDBOARD_TAB = 'soundboard:'
 /** WhatsApp and Discord in one tab (components/Messages). */
 export const MESSAGES_TAB = 'messages:'
 export const GAMES_TAB = 'games:'
