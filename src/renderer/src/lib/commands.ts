@@ -52,6 +52,8 @@ import { newSpreadsheet } from './newSheet'
 import { openAsk, runNoteJob } from '../store/ai'
 import { musicControl, musicToggleLike, setMusicMini, shareSongToNote, toggleMusic, useMusic } from '../store/music'
 import { sendToPhone } from '../store/phone'
+import { openRadial } from '../components/Nav/RadialMenu'
+import { startSnip } from './snip'
 import { changeNotesPassword, lockAllNow, lockNote, lockNoteOwn, removeLock } from './lock/actions'
 
 export interface Command {
@@ -274,6 +276,9 @@ export const commands: Command[] = [
   { id: 'layout.rows2', group: 'Panes', title: 'Layout: two rows', run: () => applyPreset('rows2') },
   { id: 'layout.grid4', group: 'Panes', title: 'Layout: grid of four', run: () => applyPreset('grid4') },
 
+  { id: 'launcher', group: 'Navigation', title: 'All features (the launcher)', shortcut: 'Ctrl+Shift+Space', run: () => useUI.setState({ launcherOpen: true }) },
+  { id: 'radial', group: 'Navigation', title: 'Radial menu (your favourite features in a ring)', run: () => openRadial() },
+  { id: 'snip.start', group: 'Tools', title: 'Screen snip: grab text from anywhere on screen', shortcut: 'Ctrl+Shift+S', run: () => void startSnip() },
   { id: 'switcher', group: 'Navigation', title: 'Open note…', shortcut: 'Ctrl+P', run: () => useUI.setState({ modal: 'switcher' }) },
   { id: 'palette', group: 'Navigation', title: 'Show all commands', shortcut: 'Ctrl+K', run: () => useUI.setState({ modal: 'commands' }) },
   { id: 'search', group: 'Navigation', title: 'Search all notes', shortcut: 'Ctrl+Shift+F', run: () => showSearch() },
@@ -316,7 +321,7 @@ export const commands: Command[] = [
   { id: 'outline', group: 'Navigation', title: 'Show outline', shortcut: 'Ctrl+Shift+O', run: () => showRightView('outline') },
 
   { id: 'ai.chat', group: 'AI helper', title: 'AI helper: chat with Claude', run: () => openSpecialTab(CHAT_TAB) },
-  { id: 'ai.ask', group: 'AI helper', title: 'AI helper: ask my notes', run: () => openAsk() },
+  { id: 'ai.ask', group: 'AI helper', title: 'AI helper: ask everything (notes, email, calendar, money)', run: () => openAsk() },
   { id: 'ai.summarise', group: 'AI helper', title: 'AI helper: summarise this note', run: () => activeNote() && runNoteJob('summary') },
   { id: 'ai.tidy', group: 'AI helper', title: 'AI helper: tidy up this note', run: () => activeNote() && runNoteJob('tidy') },
 

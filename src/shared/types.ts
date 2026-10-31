@@ -385,6 +385,20 @@ export interface NotesApi {
 
   // Quick capture
   /** Opens the quick capture window. */
+  // Screen snip (main/snip.ts)
+  /** Takes a picture of the screen under the pointer and opens the snip window over it. */
+  startSnip(): Promise<void>
+  snipStatus(): Promise<{ shortcut: string; error?: string }>
+  /** Snip window: the picture of the screen (PNG) and the screen's scale factor. */
+  snipImage(): Promise<{ png: Uint8Array; scale: number } | null>
+  /** Snip window: the text in part of the picture (read offline). */
+  snipRead(png: Uint8Array): Promise<string>
+  snipClose(): Promise<void>
+  /** Snip window: what to do with the text (closes the snip). */
+  snipSend(action: 'copy' | 'note' | 'web' | 'translate' | 'ask', text: string): Promise<void>
+  /** Main window: snipped text to save in today's note or ask the AI about. */
+  onSnipText(callback: (action: 'note' | 'ask', text: string) => void): () => void
+  onSnipFailed(callback: (message: string) => void): () => void
   openCapture(): Promise<void>
   closeCapture(): Promise<void>
   /** Capture window: stay open even when it loses focus (while recording). */
@@ -487,7 +501,10 @@ export interface NotesApi {
   aiSummarise(title: string, text: string): Promise<string>
   /** A quick capture is tidied as one list item; a note can get headings and lists. */
   aiTidy(text: string, kind: 'note' | 'capture'): Promise<string>
-  aiAsk(question: string, notes: AiNote[], history: AiAskTurn[]): Promise<string>
+  /** `extra`: digests of money, calendar and email for Ask everything (lib/askContext.ts). */
+  aiAsk(question: string, notes: AiNote[], history: AiAskTurn[], extra?: AiExtraContext): Promise<string>
+  /** Ctrl+K: the action a sentence asks for, as Claude reads it (checked by validSmart before anything runs). */
+  aiInterpret(text: string, context: string): Promise<unknown>
   // Games
   /** The games installed on this computer, with time played; `rescan` looks for new ones first. */
   gamesList(rescan: boolean): Promise<GamesList>
@@ -627,6 +644,13 @@ export interface MenuWord {
 
 export type PopupMenuItem = 'separator' | { id?: string; label: string; accelerator?: string; submenu?: PopupMenuItem[] }
 /** What quick capture sends to be saved. */
+/** Ask everything: other things the AI can look at, as plain text. */
+export interface AiExtraContext {
+  money?: string
+  calendar?: string
+  email?: string
+}
+
 export interface CaptureRequest {
   text: string
   /** Where it goes; by default your capture setting (today's note or the inbox). */

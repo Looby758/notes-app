@@ -41,6 +41,12 @@ interface UIState {
   /** Bumped to ask the search box to take focus. */
   searchFocus: number
   modal: Modal
+  /** Text Ctrl+K opens with (e.g. from the launcher). */
+  paletteQuery: string
+  /** The full-screen launcher with every feature. */
+  launcherOpen: boolean
+  /** The radial menu, open at this point on screen. */
+  radial: { x: number; y: number } | null
   /** Asks Settings to switch to this section (e.g. from a "Set up" button elsewhere). */
   settingsSection: string | null
   /** What the Export dialog exports: a note, or a folder ('' = every note). */
@@ -85,6 +91,9 @@ export const useUI = create<UIState>(() => ({
   searchQuery: '',
   searchFocus: 0,
   modal: null,
+  paletteQuery: '',
+  launcherOpen: false,
+  radial: null,
   settingsSection: null,
   exportTarget: null,
   bulkAction: 'move',

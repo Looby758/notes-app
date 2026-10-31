@@ -8,7 +8,9 @@ import {
   OTHER_INCOME,
   type MoneyCategory,
   type MoneyData,
-  type MoneyEntry
+  type MoneyEntry,
+  type SavingsGoal,
+  CATEGORY_COLORS
 } from '../lib/money'
 import { notify } from './notify'
 
@@ -40,9 +42,9 @@ function persist(): void {
     return
   }
   writing = true
-  const { categories, entries, budgets, rules } = useMoney.getState()
+  const { categories, entries, budgets, rules, goals, notRecurring } = useMoney.getState()
   window.api
-    .writeAppData(FILE, JSON.stringify({ categories, entries, budgets, rules }, null, 2))
+    .writeAppData(FILE, JSON.stringify({ categories, entries, budgets, rules, goals, notRecurring }, null, 2))
     .catch(notify)
     .finally(() => {
       writing = false
@@ -126,4 +128,37 @@ export function deleteCategory(id: string): void {
     budgets: rest,
     rules: Object.fromEntries(Object.entries(rules).filter(([, v]) => v !== id))
   })
+}
+
+/** Makes sure money.json has been read (other pages and Ctrl+K can add things before Money is opened). */
+export async function ensureMoney(): Promise<void> {
+  if (!useMoney.getState().loaded) await loadMoney()
+}
+
+// ---------- savings goals ----------
+
+export function addGoal(goal: Omit<SavingsGoal, 'id' | 'color' | 'saved'> & { saved?: number }): SavingsGoal {
+  const { goals } = useMoney.getState()
+  const made: SavingsGoal = { saved: 0, ...goal, id: newId(), color: CATEGORY_COLORS[goals.length % CATEGORY_COLORS.length] }
+  save({ goals: [...goals, made] })
+  return made
+}
+
+export function updateGoal(id: string, change: Partial<Omit<SavingsGoal, 'id'>>): void {
+  save({ goals: useMoney.getState().goals.map((g) => (g.id === id ? { ...g, ...change } : g)) })
+}
+
+/** Puts money into (or takes it out of) a goal. */
+export function addToGoal(id: string, pence: number): void {
+  save({ goals: useMoney.getState().goals.map((g) => (g.id === id ? { ...g, saved: Math.max(0, g.saved + pence) } : g)) })
+}
+
+export function deleteGoal(id: string): void {
+  save({ goals: useMoney.getState().goals.filter((g) => g.id !== id) })
+}
+
+/** "That isn't a subscription": stops listing a repeating payment. */
+export function setNotRecurring(key: string, not = true): void {
+  const list = useMoney.getState().notRecurring.filter((k) => k !== key)
+  save({ notRecurring: not ? [...list, key] : list })
 }

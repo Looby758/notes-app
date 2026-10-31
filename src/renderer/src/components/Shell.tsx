@@ -1,35 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  ArrowRightLeft,
-  Grid3x3,
-  Bomb,
   ChevronDown,
   Command as CommandIcon,
   FolderOpen,
   FolderSync,
-  Gamepad2,
-  House,
   LogOut,
-  MessageSquare,
-  Music,
-  Orbit,
-  Mail,
   BookOpen,
-  Dices,
-  KeyRound,
-  Globe,
-  MonitorPlay,
   Moon,
-  PenLine,
   PanelLeft,
   PanelRight,
-  Settings as SettingsIcon,
-  SquareTerminal,
-  PoundSterling,
-  HardDrive,
-  Eye,
-  EyeOff,
-  Smartphone
+  Settings as SettingsIcon
 } from 'lucide-react'
 import { useVault } from '../store/vault'
 import { useEditor, type SaveStatus } from '../store/editor'
@@ -50,29 +30,21 @@ import {
   refreshLinkDecorations,
   remeasure,
   SETTINGS_TAB,
-  GRAPH_TAB,
-  TERMINAL_TAB,
-  PASSWORDS_TAB,
-  EMAIL_TAB,
-  CHAT_TAB,
-  HOME_TAB,
-  MONEY_TAB,
-  CONVERT_TAB,
-  SUDOKU_TAB,
-  MINESWEEPER_TAB,
-  EXPLORER_TAB,
-  GAMES_TAB,
   setZenEditor
 } from '../lib/editorController'
 import { openLink, openWikiLink } from '../lib/openLink'
 import Sidebar from './Sidebar/Sidebar'
+import Dock, { TopbarFeatures } from './Nav/Dock'
+import Launcher, { LauncherButton } from './Nav/Launcher'
+import RadialMenu from './Nav/RadialMenu'
 import EditorArea from './Editor/EditorArea'
 import LayoutMenu from './Editor/LayoutMenu'
 import RightPanel from './Panels/RightPanel'
 import Modals from './Picker/Modals'
 import LockDialog from './Lock/LockDialog'
 import SendToPhone from './Phone/SendToPhone'
-import { sendToPhone, startPhone, usePhone } from '../store/phone'
+import { startPhone } from '../store/phone'
+import { watchSnips } from '../lib/snip'
 import { startFormatMenu } from '../lib/formatMenu'
 import { startDictionary } from '../lib/dictionary'
 import { EventDetails } from './Calendar/shared'
@@ -81,14 +53,10 @@ import UpdateToast from './UpdateToast'
 import Screensaver from './Screensaver/Screensaver'
 import Pet from './Motion/Pet'
 import MusicPlayer from './Music/MusicPlayer'
-import { toggleMusic, useMusic } from '../store/music'
 import ZenBar, { StatusTimer } from './ZenBar'
 import VoiceRecorder from './VoiceRecorder'
 import DefinitionCard from './DefinitionCard'
 import SketchPad from './Sketch/SketchPad'
-import { FlashcardsButton } from './Flashcards/FlashcardsPage'
-import { MessagesButton } from './Messages/MessagesPage'
-import { openRandomNote } from '../lib/random'
 import { toggleStreamerMode } from '../store/streamer'
 import Private from './Streamer/Private'
 import { startReminders, stopReminders } from '../lib/reminderScheduler'
@@ -123,7 +91,6 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
   const reading = usePrefs((s) => s.prefs.readingMode)
   const streamer = usePrefs((s) => s.prefs.streamerMode)
   const zen = useUI((s) => s.zen)
-  const musicOpen = useMusic((s) => s.open)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const tree = useVault((s) => s.tree)
@@ -154,6 +121,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     const offFormat = startFormatMenu()
     const offDictionary = startDictionary()
     const offPhone = startPhone()
+    const offSnips = watchSnips()
     const offChanged = window.api.onVaultChanged((paths) => {
       useVault.getState().refresh(paths)
       handleExternalChanges(paths)
@@ -181,6 +149,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       offFormat()
       offDictionary()
       offPhone()
+      offSnips()
       stopReminders()
     }
   }, [vault])
@@ -310,74 +279,8 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
 
         <div className="titlebar-spacer" />
 
-        <button className="icon-btn" onClick={() => openSpecialTab(HOME_TAB)} title={`Home (${showKeys('Ctrl+Shift+J')})`} data-home-button>
-          <House size={15} />
-        </button>
-
-        <button
-          className={`icon-btn ${reading ? 'active' : ''}`}
-          onClick={() => setPrefs({ readingMode: !reading })}
-          title={`${reading ? 'Back to writing' : 'Reading mode'} (${showKeys('Ctrl+Shift+R')})`}
-          data-reading-toggle
-        >
-          {reading ? <PenLine size={15} /> : <BookOpen size={15} />}
-        </button>
-        <button
-          className={`icon-btn ${streamer ? 'active' : ''}`}
-          onClick={toggleStreamerMode}
-          title={`Streamer mode: ${streamer ? 'on' : 'off'} (${showKeys('Ctrl+Alt+B')})`}
-          data-streamer-toggle
-        >
-          {streamer ? <EyeOff size={15} /> : <Eye size={15} />}
-        </button>
-        <button className="icon-btn" onClick={() => openRandomNote()} title="Open a random note" data-random-note>
-          <Dices size={15} />
-        </button>
-        <button className="icon-btn" onClick={() => openSpecialTab(GRAPH_TAB)} title={`Graph (${showKeys('Ctrl+Shift+G')})`}>
-          <Orbit size={15} />
-        </button>
-        <button className="icon-btn" onClick={() => openSpecialTab(EMAIL_TAB)} title={`Email (${showKeys('Ctrl+Shift+A')})`}>
-          <Mail size={15} />
-        </button>
-        <MessagesButton />
-        <FlashcardsButton />
-        <button className="icon-btn" onClick={() => openSpecialTab(TERMINAL_TAB)} title={`Terminal (${showKeys('Ctrl+Alt+T')})`} data-terminal-button>
-          <SquareTerminal size={15} />
-        </button>
-        <button className="icon-btn" onClick={() => openSpecialTab(PASSWORDS_TAB)} title={`Passwords (${showKeys('Ctrl+Alt+K')})`} data-passwords-button>
-          <KeyRound size={15} />
-        </button>
-        <button className="icon-btn" onClick={() => openSpecialTab(MONEY_TAB)} title={`Money (${showKeys('Ctrl+Shift+B')})`} data-money-button>
-          <PoundSterling size={15} />
-        </button>
-        <button className="icon-btn" onClick={() => openWebTab('', { beside: true })} title={`Web browser (${showKeys('Ctrl+Shift+I')})`} data-web-button>
-          <Globe size={15} />
-        </button>
-        <button className="icon-btn" onClick={() => void window.api.openYouTube()} title={`YouTube mini window (${showKeys('Ctrl+Alt+Y')})`} data-youtube-button>
-          <MonitorPlay size={15} />
-        </button>
-        <PhoneButton />
-        <button className="icon-btn" onClick={() => openSpecialTab(CHAT_TAB)} title="Chat with Claude" data-chat-button>
-          <MessageSquare size={15} />
-        </button>
-        <button className="icon-btn" onClick={() => openSpecialTab(EXPLORER_TAB)} title="Files on this computer" data-explorer-button>
-          <HardDrive size={15} />
-        </button>
-        <button className="icon-btn" onClick={() => openSpecialTab(CONVERT_TAB)} title="Convert files" data-convert-button>
-          <ArrowRightLeft size={15} />
-        </button>
-        <button className="icon-btn" onClick={() => openSpecialTab(SUDOKU_TAB)} title="Sudoku (a quick break)" data-sudoku-button>
-          <Grid3x3 size={15} />
-        </button>
-        <button className="icon-btn" onClick={() => openSpecialTab(MINESWEEPER_TAB)} title="Minesweeper (a quick break)" data-minesweeper-button>
-          <Bomb size={15} />
-        </button>
-        <button className={`icon-btn ${musicOpen ? 'active' : ''}`} onClick={toggleMusic} title="Music player (Spotify)" data-music-button>
-          <Music size={15} />
-        </button>
-        <button className="icon-btn" onClick={() => openSpecialTab(GAMES_TAB)} title="Games" data-games-button>
-          <Gamepad2 size={15} />
-        </button>
+        <TopbarFeatures />
+        <LauncherButton />
         <LayoutMenu />
         <button className="icon-btn" onClick={() => useUI.setState({ modal: 'commands' })} title={`All commands (${showKeys('Ctrl+K')})`}>
           <CommandIcon size={15} />
@@ -395,6 +298,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       </header>
 
       <div className="workspace">
+        <Dock />
         <aside
           className={`sidebar left ${leftOpen ? '' : 'collapsed'}`}
           style={{ ['--panel-w' as string]: `${leftWidth}px` }}
@@ -446,6 +350,8 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       </footer>
 
       <Modals />
+      <Launcher />
+      <RadialMenu />
       <LockDialog />
       <SendToPhone />
       <EventDetails />
@@ -458,19 +364,5 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <SketchPad />
       <Screensaver />
     </div>
-  )
-}
-
-/** Connect your phone; shows a dot while the phone's page is open. */
-function PhoneButton() {
-  const connected = usePhone((s) => s.connected > 0)
-  return (
-    <button
-      className={`icon-btn phone-btn ${connected ? 'connected' : ''}`}
-      onClick={() => sendToPhone({ kind: 'pair' })}
-      title={connected ? 'Your phone is connected' : 'Connect your phone'}
-    >
-      <Smartphone size={15} />
-    </button>
   )
 }

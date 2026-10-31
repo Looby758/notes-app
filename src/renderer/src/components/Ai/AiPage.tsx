@@ -1,7 +1,7 @@
 import './ai.css'
 import { useEffect, useRef, useState } from 'react'
 import { ArrowUp, Loader2, RotateCcw } from 'lucide-react'
-import { askNotes, clearAsk, refreshAiStatus, useAi } from '../../store/ai'
+import { askNotes, clearAsk, refreshAiStatus, setAskSource, useAi, type AskSources } from '../../store/ai'
 import { useNoteIndex } from '../../store/noteIndex'
 import { notify } from '../../store/notify'
 import { openNote, openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
@@ -9,7 +9,29 @@ import { answerParts } from '../../lib/ai'
 import { openAiSettings } from './AiSettings'
 import EmptyArt from '../Motion/EmptyArt'
 
-const EXAMPLES = ['What did I decide about the trip?', 'What’s still on my to-do lists?', 'When is the dentist appointment?']
+const EXAMPLES = ['What’s on this week?', 'How much did I spend on takeaways last month?', 'Any emails I need to reply to?', 'What’s still on my to-do lists?']
+
+const SOURCE_LABELS: { key: keyof AskSources; label: string }[] = [
+  { key: 'email', label: 'Email' },
+  { key: 'calendar', label: 'Calendar' },
+  { key: 'money', label: 'Money' }
+]
+
+/** Which of your things Ask everything may look at (notes always). */
+function Sources() {
+  const sources = useAi((s) => s.sources)
+  return (
+    <div className="ai-sources" data-ask-sources>
+      <span>Looks at your notes{SOURCE_LABELS.some((x) => sources[x.key]) ? ' and' : ''}:</span>
+      {SOURCE_LABELS.map(({ key, label }) => (
+        <label key={key} className={`ai-source ${sources[key] ? 'on' : ''}`}>
+          <input type="checkbox" checked={sources[key]} onChange={(e) => setAskSource(key, e.target.checked)} />
+          {label}
+        </label>
+      ))}
+    </div>
+  )
+}
 
 /** An answer with its [[links]] turned into buttons that open the note. */
 function Answer({ text }: { text: string }) {
@@ -33,7 +55,7 @@ function Answer({ text }: { text: string }) {
   )
 }
 
-/** "Ask my notes": questions answered by Claude from the notes that best match them. */
+/** "Ask everything": questions answered by Claude from your notes, and your email, calendar and money if you allow it. */
 export default function AiPage({ autoFocus }: { autoFocus: boolean }) {
   const status = useAi((s) => s.status)
   const turns = useAi((s) => s.turns)
@@ -61,8 +83,8 @@ export default function AiPage({ autoFocus }: { autoFocus: boolean }) {
       <div className="ai-page" data-ai-page>
         <div className="ai-empty">
           <EmptyArt kind="sparkle" size={64} />
-          <h2>Ask my notes</h2>
-          <p>Ask a question in your own words and Claude answers from your notes, with links to the notes it used.</p>
+          <h2>Ask everything</h2>
+          <p>Ask a question in your own words and Claude answers from your notes, email, calendar and money, with links to the notes it used.</p>
           <p>To start, add your Anthropic API key in Settings.</p>
           <button
             className="btn btn-primary"
@@ -84,8 +106,9 @@ export default function AiPage({ autoFocus }: { autoFocus: boolean }) {
         {turns.length === 0 && (
           <div className="ai-empty">
             <EmptyArt kind="sparkle" size={64} />
-            <h2>Ask my notes</h2>
-            <p>Ask anything about what you’ve written. Claude reads the notes that best match your question and answers from them.</p>
+            <h2>Ask everything</h2>
+            <p>Ask anything about your notes, emails, calendar or money. Orbit picks out what matches your question and Claude answers from it. Nothing is sent until you ask.</p>
+            <Sources />
             <div className="ai-examples">
               {EXAMPLES.map((e) => (
                 <button key={e} className="btn" onClick={() => send(e)}>
@@ -102,7 +125,7 @@ export default function AiPage({ autoFocus }: { autoFocus: boolean }) {
             {t.error && <p className="setting-warning">{t.error}</p>}
             {!t.answer && !t.error && (
               <p className="ai-working">
-                <Loader2 size={14} className="spin" /> Looking through your notes…
+                <Loader2 size={14} className="spin" /> Looking through your things…
               </p>
             )}
           </div>
@@ -119,7 +142,7 @@ export default function AiPage({ autoFocus }: { autoFocus: boolean }) {
           ref={input}
           rows={1}
           value={question}
-          placeholder="Ask a question about your notes…"
+          placeholder="Ask about your notes, email, calendar or money…"
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {

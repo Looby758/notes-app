@@ -113,6 +113,23 @@ const api: NotesApi = {
   showExported: (path) => ipcRenderer.invoke('export:show', path),
   decodeHeic: (data) => ipcRenderer.invoke('convert:heic', data),
 
+  startSnip: () => ipcRenderer.invoke('snip:start'),
+  snipStatus: () => ipcRenderer.invoke('snip:status'),
+  snipImage: () => ipcRenderer.invoke('snip:image'),
+  snipRead: (png) => ipcRenderer.invoke('snip:read', png),
+  snipClose: () => ipcRenderer.invoke('snip:close'),
+  snipSend: (action, text) => ipcRenderer.invoke('snip:send', action, text),
+  onSnipText: (callback) => {
+    const handler = (_e: unknown, action: 'note' | 'ask', text: string): void => callback(action, text)
+    ipcRenderer.on('snip:text', handler)
+    return () => ipcRenderer.removeListener('snip:text', handler)
+  },
+  onSnipFailed: (callback) => {
+    const handler = (_e: unknown, message: string): void => callback(message)
+    ipcRenderer.on('snip:failed', handler)
+    return () => ipcRenderer.removeListener('snip:failed', handler)
+  },
+
   openCapture: () => ipcRenderer.invoke('capture:open'),
   closeCapture: () => ipcRenderer.invoke('capture:close'),
   captureKeepOpen: (on) => ipcRenderer.invoke('capture:keepOpen', on),
@@ -202,7 +219,8 @@ const api: NotesApi = {
   aiClearKey: () => ipcRenderer.invoke('ai:clearKey'),
   aiSummarise: (title, text) => ipcRenderer.invoke('ai:summarise', title, text),
   aiTidy: (text, kind) => ipcRenderer.invoke('ai:tidy', text, kind),
-  aiAsk: (question, notes, history) => ipcRenderer.invoke('ai:ask', question, notes, history),
+  aiInterpret: (text, context) => ipcRenderer.invoke('ai:interpret', text, context),
+  aiAsk: (question, notes, history, extra) => ipcRenderer.invoke('ai:ask', question, notes, history, extra),
   gamesList: (rescan) => ipcRenderer.invoke('games:list', rescan),
   gamesPlay: (id) => ipcRenderer.invoke('games:play', id),
   gamesLaunchArt: (id) => ipcRenderer.invoke('games:launchArt', id),

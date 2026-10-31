@@ -21,7 +21,7 @@ import { readFile } from 'fs/promises'
 import * as fsp from 'fs/promises'
 import { basename, extname, isAbsolute, join, relative } from 'path'
 import { pathToFileURL } from 'url'
-import type { AiAskTurn, AiChat, AiChatMessage, AiNote, ConfirmOptions, EmailFolder, OutgoingEmail } from '@shared/types'
+import type { AiAskTurn, AiExtraContext, AiChat, AiChatMessage, AiNote, ConfirmOptions, EmailFolder, OutgoingEmail } from '@shared/types'
 import type { MusicAction } from '@shared/spotify'
 import { normalizePrefs, type Prefs } from '@shared/prefs'
 import { activeThemeId, getTheme } from '@shared/themes'
@@ -36,6 +36,7 @@ import * as spotify from './spotify'
 import * as localMusic from './localMusic'
 import { closeMusicMini, setupMusicMini } from './musicMini'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
+import { applySnipShortcut, setupSnip, startSnip } from './snip'
 import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
 import { setupConverter } from './converter'
@@ -148,6 +149,7 @@ function appIconFile(prefs: Prefs): { id: string; file?: string } {
 /** Settings that live outside the app's windows: the capture shortcut, the app icon and starting at login. */
 function applySystemPrefs(prefs: Prefs): void {
   applyCaptureShortcut(prefs.captureShortcut)
+  applySnipShortcut(prefs.snipShortcut)
   safely('app icon', () => applyAppIcon(prefs))
   // Only the installed app registers itself (in development it would register electron.exe).
   if (!app.isPackaged) return
@@ -653,7 +655,8 @@ function registerIpc(): void {
   ipcMain.handle('ai:clearKey', () => ai.clearKey())
   ipcMain.handle('ai:summarise', (_e, title: string, text: string) => ai.summarise(title, text))
   ipcMain.handle('ai:tidy', (_e, text: string, kind: 'note' | 'capture') => ai.tidy(text, kind === 'capture' ? 'capture' : 'note'))
-  ipcMain.handle('ai:ask', (_e, question: string, notes: AiNote[], history: AiAskTurn[]) => ai.askNotes(question, notes, history))
+  ipcMain.handle('ai:interpret', (_e, text: string, context: string) => ai.interpret(String(text).slice(0, 1000), String(context).slice(0, 8000)))
+  ipcMain.handle('ai:ask', (_e, question: string, notes: AiNote[], history: AiAskTurn[], extra?: AiExtraContext) => ai.askNotes(question, notes, history, extra))
   ipcMain.handle('ai:chat', (_e, messages: AiChatMessage[]) => ai.chat(messages))
   ipcMain.handle('ai:loadChats', () => ai.loadChats())
   ipcMain.handle('ai:saveChats', (_e, chats: AiChat[]) => ai.saveChats(chats))
@@ -846,7 +849,8 @@ app.whenReady().then(async () => {
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))
   mainWindow = createWindow()
   // The extras: if one of them fails on some computer, the app itself still works.
-  safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs }))
+  safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: () => void startSnip() }))
+  safely('screen snip', () => setupSnip({ getMain: () => mainWindow, showMain }))
   safely('system settings', () => applySystemPrefs(currentPrefs()))
   safely('updates', () => setupUpdater(() => currentPrefs().checkForUpdates))
 })

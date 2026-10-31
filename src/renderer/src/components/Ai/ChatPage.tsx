@@ -183,7 +183,7 @@ export default function ChatPage({ autoFocus }: { autoFocus: boolean }) {
             <div className="ai-empty">
               <EmptyArt kind="chat" size={64} />
               <h2>Chat with Claude</h2>
-              <p>Ask anything at all. For questions about what you’ve written, use “Ask my notes” instead.</p>
+              <p>Ask anything at all. For questions about what you’ve written, use “Ask everything” instead.</p>
               <div className="ai-examples">
                 {EXAMPLES.map((e) => (
                   <button key={e} className="btn" onClick={() => send(e)}>

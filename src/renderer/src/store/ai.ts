@@ -7,6 +7,9 @@ import { applyText, getOpenText, isNoteTab, noteLockOf, openSpecialTab, AI_TAB }
 import { pickContext, splitFrontmatter, withSummary, withTidiedBody } from '../lib/ai'
 import { errorMessage, noteTitle } from '../lib/paths'
 import { isLockedText } from '../lib/lock/crypto'
+import { calendarContext, emailContext, moneyContext, questionWords } from '../lib/askContext'
+import { dayOf } from '../lib/money'
+import { ensureMoney, useMoney } from './money'
 
 /** The AI helper: the summary / tidy-up dialog for a note, and the "Ask my notes" conversation. */
 
@@ -24,13 +27,40 @@ export interface AskTurn {
   error?: string
 }
 
+/** What "Ask everything" may look at. Notes always; the rest can be switched off on the page. */
+export interface AskSources {
+  email: boolean
+  calendar: boolean
+  money: boolean
+}
+
 interface AiState {
   status: AiStatus | null
   job: NoteJob | null
   turns: AskTurn[]
+  sources: AskSources
 }
 
-export const useAi = create<AiState>(() => ({ status: null, job: null, turns: [] }))
+const SOURCES_KEY = 'ask:sources'
+const savedSources = ((): AskSources => {
+  try {
+    return { email: true, calendar: true, money: true, ...JSON.parse(localStorage.getItem(SOURCES_KEY) ?? '{}') }
+  } catch {
+    return { email: true, calendar: true, money: true }
+  }
+})()
+
+export const useAi = create<AiState>(() => ({ status: null, job: null, turns: [], sources: savedSources }))
+
+export function setAskSource(key: keyof AskSources, on: boolean): void {
+  const sources = { ...useAi.getState().sources, [key]: on }
+  useAi.setState({ sources })
+  try {
+    localStorage.setItem(SOURCES_KEY, JSON.stringify(sources))
+  } catch {
+    // not fatal
+  }
+}
 
 export async function refreshAiStatus(): Promise<AiStatus> {
   const status = await window.api.aiStatus()
@@ -101,15 +131,66 @@ export async function askNotes(question: string): Promise<void> {
     // Follow-ups like "and when is it?" find little on their own, so earlier questions help pick notes.
     const searchText = [...earlier.map((t) => t.question), q].join(' ')
     const notes = pickContext(notesForQuestion(searchText)).map(({ title, text }) => ({ title, text }))
+    const extra = await gatherContext(searchText)
     const answer = await window.api.aiAsk(
       q,
       notes,
-      earlier.map((t) => ({ question: t.question, answer: t.answer! }))
+      earlier.map((t) => ({ question: t.question, answer: t.answer! })),
+      extra
     )
     update({ answer })
   } catch (err) {
     update({ error: errorMessage(err) })
   }
+}
+
+/** Opens Ask everything and asks a question (from Ctrl+K or the summon bar). */
+export async function askEverything(question: string): Promise<void> {
+  openAsk()
+  await askNotes(question)
+}
+
+/** Money, calendar and email as text for the AI, for the sources that are switched on. Anything unavailable is skipped. */
+async function gatherContext(question: string): Promise<{ money?: string; calendar?: string; email?: string }> {
+  const { sources } = useAi.getState()
+  const today = dayOf(new Date())
+  const out: { money?: string; calendar?: string; email?: string } = {}
+  const jobs: Promise<void>[] = []
+  if (sources.money) {
+    jobs.push(
+      ensureMoney().then(() => {
+        out.money = moneyContext(useMoney.getState(), today, question) || undefined
+      })
+    )
+  }
+  if (sources.calendar) {
+    const from = new Date(Date.now() - 60 * 86400000).toISOString()
+    const to = new Date(Date.now() + 120 * 86400000).toISOString()
+    jobs.push(
+      window.api.fetchCalendarEvents(from, to).then(
+        (r) => {
+          out.calendar = calendarContext(r.events) || undefined
+        },
+        () => undefined
+      )
+    )
+  }
+  if (sources.email) {
+    jobs.push(
+      (async () => {
+        const status = await window.api.emailStatus()
+        if (!status.gmail) return
+        const words = questionWords(question).slice(0, 4)
+        const [recent, found] = await Promise.all([
+          window.api.emailList('inbox', '', undefined).catch(() => null),
+          words.length ? window.api.emailList('all', words.join(' OR '), undefined).catch(() => null) : null
+        ])
+        out.email = emailContext([...(found?.emails ?? []), ...(recent?.emails ?? [])]) || undefined
+      })().catch(() => undefined)
+    )
+  }
+  await Promise.all(jobs)
+  return out
 }
 
 export function clearAsk(): void {

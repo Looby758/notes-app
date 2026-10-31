@@ -2,7 +2,7 @@ import { app, safeStorage } from 'electron'
 import { readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import Anthropic from '@anthropic-ai/sdk'
-import type { AiAskTurn, AiChat, AiChatMessage, AiNote, AiStatus } from '@shared/types'
+import type { AiAskTurn, AiExtraContext, AiChat, AiChatMessage, AiNote, AiStatus } from '@shared/types'
 
 /**
  * The AI helper: summarise a note, tidy a quick capture, answer questions from your notes and read
@@ -149,26 +149,31 @@ export function tidy(text: string, kind: 'note' | 'capture'): Promise<string> {
   return ask(kind === 'capture' ? TIDY_CAPTURE_SYSTEM : TIDY_SYSTEM, [{ role: 'user', content: `<text>\n${text}\n</text>` }], 'low')
 }
 
-const askSystem = (): string => `You answer a person's questions using their own notes, which are given to you in <note> tags.
-Answer briefly and plainly, from the notes only. When you use a note, name it as a wiki link with its exact title, like [[Trip plans]].
-If the notes don't contain the answer, say so in one sentence and don't guess.
+const askSystem = (): string => `You answer a person's questions using their own things: notes (in <note> tags) and, when given, digests of their money tracker (<money>), calendar (<calendar>) and email inbox (<email>). Amounts are in pounds.
+Answer briefly and plainly, from what you're given only. When you use a note, name it as a wiki link with its exact title, like [[Trip plans]]. When you use an email, say who it's from and the date.
+If none of it contains the answer, say so in one sentence and don't guess.
 Today's date is ${new Date().toISOString().slice(0, 10)}.`
 
-export function askNotes(question: string, notes: AiNote[], history: AiAskTurn[]): Promise<string> {
+export function askNotes(question: string, notes: AiNote[], history: AiAskTurn[], extra: AiExtraContext = {}): Promise<string> {
   const context = notes.length
     ? notes.map((n) => `<note title="${n.title.replace(/"/g, "'")}">\n${n.text}\n</note>`).join('\n\n')
     : '(No notes matched this question.)'
+  let others = ''
+  for (const key of ['money', 'calendar', 'email'] as const) {
+    const text = typeof extra?.[key] === 'string' ? extra[key]!.slice(0, 30000) : ''
+    if (text) others += `\n\n<${key}>\n${text}\n</${key}>`
+  }
   const messages: Anthropic.Beta.BetaMessageParam[] = []
   for (const turn of history) {
     messages.push({ role: 'user', content: turn.question }, { role: 'assistant', content: turn.answer })
   }
-  messages.push({ role: 'user', content: `<notes>\n${context}\n</notes>\n\n${question}` })
+  messages.push({ role: 'user', content: `<notes>\n${context}\n</notes>${others}\n\n${question}` })
   return ask(askSystem(), messages, 'medium')
 }
 
 const chatSystem = (): string => `You are Claude, chatting with someone inside their notes app. Help with whatever they ask: questions, explanations, writing, ideas, planning, maths, code.
 Be clear and friendly, and match the length of your answer to the question. Use markdown (headings, lists, tables, code blocks) when it makes an answer easier to read.
-You can't see their notes or browse the web here, so if they need something from their notes, suggest the "Ask my notes" page.
+You can't see their notes or browse the web here, so if they need something from their notes, suggest the "Ask everything" page.
 Today's date is ${new Date().toISOString().slice(0, 10)}.`
 
 /** The AI chat page: Claude's reply to a conversation that can be about anything. */
@@ -221,4 +226,36 @@ export async function readHandwriting(png: Uint8Array): Promise<string> {
   )
   if (text === NO_WRITING) throw new Error('Claude couldn’t find any writing in this sketch.')
   return text
+}
+
+const interpretSystem = (context: string): string => `You turn a sentence someone typed into the command box of their notes app (Orbit) into one action, as JSON.
+Today is ${new Date().toISOString().slice(0, 10)} (${new Date().toLocaleDateString('en-GB', { weekday: 'long' })}). Money is in pounds; amounts in the JSON are whole pence.
+
+Reply with only one JSON object, one of:
+{"kind":"money","income":false,"amount":1200,"category":"<category id>","note":"what it was","date":"YYYY-MM-DD"}
+{"kind":"event","date":"YYYY-MM-DD","time":"HH:MM","title":"...","remind":true}   (time optional; remind true for "remind me")
+{"kind":"note","title":"..."}             a new note
+{"kind":"jot","text":"..."}               a line added to today's note
+{"kind":"convert","format":"pdf|docx|html|md|txt|jpg|png|webp|mp3|wav"}
+{"kind":"play","query":"song or artist"}
+{"kind":"music","action":"toggle|next|previous"}
+{"kind":"open","feature":"<feature id>"}
+{"kind":"search","query":"..."}           search their notes
+{"kind":"web","query":"..."}              search the web
+{"kind":"goal","name":"...","amount":120000}   a savings goal
+{"kind":"ask","question":"..."}           a question about their own notes, email, calendar or money
+{"kind":"none","reason":"one short sentence"}   if it isn't something the app can do
+
+${context}`
+
+/** Ctrl+K: what a sentence the built-in patterns didn't understand is asking for. Only called after the person agrees. */
+export async function interpret(text: string, context: string): Promise<unknown> {
+  const reply = await ask(interpretSystem(context), [{ role: 'user', content: text }], 'low')
+  const json = /\{[\s\S]*\}/.exec(reply)?.[0]
+  if (!json) throw new Error('Claude didn’t understand that one.')
+  try {
+    return JSON.parse(json)
+  } catch {
+    throw new Error('Claude didn’t understand that one.')
+  }
 }

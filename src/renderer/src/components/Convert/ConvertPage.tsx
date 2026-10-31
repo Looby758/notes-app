@@ -3,7 +3,7 @@ import { ArrowRightLeft, AudioLines, Check, FileText, FolderOpen, Image as Image
 import type { SaveFormat } from '@shared/types'
 import { FILE_MANAGER } from '@shared/platform'
 import { getDrag } from '../../lib/dnd'
-import { convertFile, describeSize, kindOf, outputName, targetsFor, whyNot, type ImageOptions, type Kind } from '../../lib/convert'
+import { convertFile, preferredConvertFormat, describeSize, kindOf, outputName, targetsFor, whyNot, type ImageOptions, type Kind } from '../../lib/convert'
 
 interface Item {
   id: number
@@ -44,7 +44,8 @@ export default function ConvertPage() {
   const addFiles = (files: FileList | File[]): void => {
     const added: Item[] = [...files].map((file) => {
       const targets = targetsFor(file.name)
-      return { id: nextId++, file, format: targets[0]?.format ?? null, status: 'ready', message: targets.length ? undefined : whyNot(file.name) }
+      const wanted = preferredConvertFormat()
+      return { id: nextId++, file, format: (targets.find((t) => t.format === wanted) ?? targets[0])?.format ?? null, status: 'ready', message: targets.length ? undefined : whyNot(file.name) }
     })
     setItems((list) => [...list, ...added])
     setSaved(null)
