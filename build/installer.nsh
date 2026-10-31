@@ -10,32 +10,34 @@
   Var FfmpegBox
   Var FfmpegWanted
 
+  ; The page functions live inside this macro so they are defined after electron-builder has
+  ; included Modern UI, which MUI_HEADER_TEXT needs.
   !macro customPageAfterChangeDir
     Page custom FfmpegPageCreate FfmpegPageLeave
+
+    Function FfmpegPageCreate
+      !insertmacro MUI_HEADER_TEXT "Optional extras" "Extra parts you can add now or later."
+      nsDialogs::Create 1018
+      Pop $0
+      ${NSD_CreateCheckbox} 0 0 100% 12u "Download ffmpeg for live streaming and converting videos (about a 30 MB download)"
+      Pop $FfmpegBox
+      ${NSD_CreateLabel} 12u 18u 95% 40u "Only needed to go live on Twitch or YouTube and to convert videos (recording works without it). Orbit downloads it the first time it opens. You can also get it later in Settings → Studio."
+      Pop $0
+      ${If} $FfmpegWanted == "1"
+        ${NSD_Check} $FfmpegBox
+      ${EndIf}
+      nsDialogs::Show
+    FunctionEnd
+
+    Function FfmpegPageLeave
+      ${NSD_GetState} $FfmpegBox $0
+      ${If} $0 == ${BST_CHECKED}
+        StrCpy $FfmpegWanted "1"
+      ${Else}
+        StrCpy $FfmpegWanted "0"
+      ${EndIf}
+    FunctionEnd
   !macroend
-
-  Function FfmpegPageCreate
-    !insertmacro MUI_HEADER_TEXT "Optional extras" "Extra parts you can add now or later."
-    nsDialogs::Create 1018
-    Pop $0
-    ${NSD_CreateCheckbox} 0 0 100% 12u "Download ffmpeg for live streaming and converting videos (about a 30 MB download)"
-    Pop $FfmpegBox
-    ${NSD_CreateLabel} 12u 18u 95% 40u "Only needed to go live on Twitch or YouTube and to convert videos (recording works without it). Orbit downloads it the first time it opens. You can also get it later in Settings → Studio."
-    Pop $0
-    ${If} $FfmpegWanted == "1"
-      ${NSD_Check} $FfmpegBox
-    ${EndIf}
-    nsDialogs::Show
-  FunctionEnd
-
-  Function FfmpegPageLeave
-    ${NSD_GetState} $FfmpegBox $0
-    ${If} $0 == ${BST_CHECKED}
-      StrCpy $FfmpegWanted "1"
-    ${Else}
-      StrCpy $FfmpegWanted "0"
-    ${EndIf}
-  FunctionEnd
 
   !macro customInstall
     ${If} $FfmpegWanted == "1"
