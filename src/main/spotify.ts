@@ -12,6 +12,9 @@ import {
   nextRepeat,
   parseAppState,
   parseDevices,
+  LIKED_SONGS_URI,
+  likedContext,
+  likedSongsItem,
   parsePlaylist,
   parsePlaylists,
   parsePlaylistSongs,
@@ -438,27 +441,13 @@ export async function seek(ms: number): Promise<void> {
 /** Plays a song, playlist or album; a song can be played within its playlist/album (`context`). */
 export async function play(uri: string, context?: string): Promise<void> {
   if (!/^spotify:[a-z]+:[A-Za-z0-9]+$/.test(uri) || (context && !/^spotify:[a-z]+:[A-Za-z0-9]+$/.test(context))) throw new Error('That isn’t a Spotify link.')
+  if (uri === LIKED_SONGS_URI || context === LIKED_SONGS_URI) return playLiked(uri === LIKED_SONGS_URI ? undefined : uri)
   const playInApp = (): Promise<string> => tellApp(context ? `play track ${quoted(uri)} in context ${quoted(context)}` : `play track ${quoted(uri)}`)
   if (await appRunning()) {
     await playInApp()
     return
   }
-  if (connected()) {
-    try {
-      await api('/me/player/play', { method: 'PUT', body: playBody(uri, context) })
-      return
-    } catch (err) {
-      if ((err as SpotifyError).reason !== 'NO_ACTIVE_DEVICE') throw err
-      // Spotify's open somewhere but idle: play there.
-      const devices = (await api('/me/player/devices')).devices as { id?: string; is_restricted?: boolean }[] | undefined
-      const device = (devices ?? []).find((d) => d.id && !d.is_restricted)
-      if (device) {
-        await api(`/me/player/play?device_id=${encodeURIComponent(device.id!)}`, { method: 'PUT', body: playBody(uri, context) })
-        return
-      }
-      if (!IS_MAC) throw err
-    }
-  }
+  if (connected() && (await playOnAccount(playBody(uri, context)))) return
   if (IS_MAC) {
     if (!(await launchApp())) throw new Error('Spotify didn’t open. Is the Spotify app installed?')
     await playInApp()
@@ -466,6 +455,77 @@ export async function play(uri: string, context?: string): Promise<void> {
   }
   // Windows without an account: Spotify opens on it, and you press play there.
   await shell.openExternal(uri)
+}
+
+/**
+ * PUT /me/player/play on your account, on whichever device is playing or, if Spotify's open somewhere
+ * but idle, there. False if it isn't open anywhere and this is a Mac (so the app can be opened instead).
+ */
+async function playOnAccount(body: Record<string, unknown>): Promise<boolean> {
+  try {
+    await api('/me/player/play', { method: 'PUT', body })
+    return true
+  } catch (err) {
+    if ((err as SpotifyError).reason !== 'NO_ACTIVE_DEVICE') throw err
+    const devices = (await api('/me/player/devices')).devices as { id?: string; is_restricted?: boolean }[] | undefined
+    const device = (devices ?? []).find((d) => d.id && !d.is_restricted)
+    if (device) {
+      await api(`/me/player/play?device_id=${encodeURIComponent(device.id!)}`, { method: 'PUT', body })
+      return true
+    }
+    if (!IS_MAC) throw err
+    return false
+  }
+}
+
+/** Your Liked Songs' links, newest first, from `from` (or the start) on, at most `max` of them. */
+async function likedUris(from: string | undefined, max: number): Promise<string[]> {
+  const out: string[] = []
+  for (let offset = 0; offset < 2000 && out.length < max; offset += 50) {
+    const page = await api(`/me/tracks?limit=50&offset=${offset}`)
+    for (const song of parsePlaylistSongs(page)) {
+      if (from && !out.length && song.uri !== from) continue
+      out.push(song.uri)
+    }
+    if (!page.next) break
+  }
+  return out.slice(0, max)
+}
+
+/** Plays your Liked Songs from the top, or from one of its songs, and carries on through the rest. */
+async function playLiked(song?: string): Promise<void> {
+  const me = await myId().catch(() => undefined)
+  if (!me) throw new Error('Connect your Spotify account in Settings → Music to play your Liked Songs.')
+  const context = likedContext(me)
+  // The Spotify app plays Liked Songs as a whole, like any playlist.
+  if (await appRunning()) {
+    const first = song ?? (await likedUris(undefined, 1))[0]
+    if (!first) throw new Error('You haven’t liked any songs yet.')
+    await tellApp(`play track ${quoted(first)} in context ${quoted(context)}`)
+    return
+  }
+  // Your account: Liked Songs as the playlist where Spotify allows it; otherwise the songs themselves,
+  // from that one on, so it still carries on to the next.
+  try {
+    if (await playOnAccount(song ? { context_uri: context, offset: { uri: song } } : { context_uri: context })) return
+  } catch (err) {
+    if (![400, 403, 404].includes((err as SpotifyError).status)) throw err
+    const uris = await likedUris(song, 300)
+    if (!uris.length) throw new Error(song ? 'That song isn’t in your Liked Songs any more.' : 'You haven’t liked any songs yet.')
+    if (await playOnAccount({ uris })) return
+  }
+  if (!(await launchApp())) throw new Error('Spotify didn’t open. Is the Spotify app installed?')
+  const first = song ?? (await likedUris(undefined, 1))[0]
+  if (first) await tellApp(`play track ${quoted(first)} in context ${quoted(context)}`)
+}
+
+/**
+ * Plays a song further down Up next by skipping to it (`count` songs on), the way the Spotify app does,
+ * so the playlist and anything you queued after it carry on playing.
+ */
+export async function skip(count: number): Promise<void> {
+  const n = Math.min(50, Math.max(1, Math.floor(Number(count) || 1)))
+  for (let i = 0; i < n; i++) await control('next')
 }
 
 export async function search(query: string): Promise<MusicSearchResults> {
@@ -490,7 +550,9 @@ async function myId(): Promise<string | undefined> {
 
 export async function playlists(): Promise<MusicItem[]> {
   const me = await myId().catch(() => undefined)
-  return parsePlaylists(await api('/me/playlists?limit=50'), me)
+  const [list, liked] = await Promise.all([api('/me/playlists?limit=50'), api('/me/tracks?limit=1').catch(() => null)])
+  // Your Liked Songs first, as in the Spotify app.
+  return [...(liked ? [likedSongsItem(liked)] : []), ...parsePlaylists(list, me)]
 }
 
 function idOf(uri: string): string {
@@ -501,11 +563,23 @@ function idOf(uri: string): string {
 
 /** A playlist's songs, in order (only for playlists you own or can edit, which is all Spotify allows). */
 export async function playlistSongs(uri: string): Promise<MusicItem[]> {
+  if (uri === LIKED_SONGS_URI) return likedSongs()
   const id = idOf(uri)
   const songs: MusicItem[] = []
   // 50 at a time; a very long playlist stops at 1,000.
   for (let offset = 0; offset < 1000; offset += 50) {
     const page = await api(`/playlists/${id}/items?limit=50&offset=${offset}&additional_types=track,episode`)
+    songs.push(...parsePlaylistSongs(page))
+    if (!page.next) break
+  }
+  return songs
+}
+
+/** Your Liked Songs, newest first (a very long list stops at 2,000). */
+async function likedSongs(): Promise<MusicItem[]> {
+  const songs: MusicItem[] = []
+  for (let offset = 0; offset < 2000; offset += 50) {
+    const page = await api(`/me/tracks?limit=50&offset=${offset}`)
     songs.push(...parsePlaylistSongs(page))
     if (!page.next) break
   }

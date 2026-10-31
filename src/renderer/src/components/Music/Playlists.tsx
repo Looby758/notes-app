@@ -58,7 +58,7 @@ export function Playlists() {
         <ItemList
           items={items}
           actions={(item) =>
-            item.editable && (
+            (item.editable || item.liked) && (
               <button className="icon-btn music-row-btn" onClick={() => setOpen(item)} title="See the songs and change them" data-music-open-playlist={item.name}>
                 <ChevronRight size={15} />
               </button>
@@ -110,8 +110,12 @@ function NameInput({ initial = '', placeholder, onDone, onCancel }: { initial?: 
   )
 }
 
-/** One of your playlists: play it, rename or delete it, add songs, take them out, and drag them into order. */
+/**
+ * One of your playlists: play it, rename or delete it, add songs, take them out, and drag them into order.
+ * Your Liked Songs open here too, to see and play them; taking a song out unlikes it.
+ */
 function PlaylistView({ playlist, onBack }: { playlist: MusicItem; onBack: () => void }) {
+  const liked = playlist.liked === true
   const [name, setName] = useState(playlist.name)
   const [songs, setSongs] = useState<MusicItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -141,7 +145,7 @@ function PlaylistView({ playlist, onBack }: { playlist: MusicItem; onBack: () =>
   const remove = (song: MusicItem): Promise<void> =>
     change(
       (songs ?? []).filter((s) => s.uri !== song.uri),
-      () => window.api.musicRemoveFromPlaylist(playlist.uri, song.uri)
+      () => (liked ? window.api.musicSetLiked(song.uri, false) : window.api.musicRemoveFromPlaylist(playlist.uri, song.uri))
     )
   const move = (from: number, to: number): Promise<void> => {
     const next = [...(songs ?? [])]
@@ -169,6 +173,13 @@ function PlaylistView({ playlist, onBack }: { playlist: MusicItem; onBack: () =>
               }}
             />
           </div>
+        ) : liked ? (
+          <>
+            <strong title={name}>{name}</strong>
+            <button className="music-play music-play-small" onClick={() => musicPlay(playlist.uri)} title="Play your Liked Songs" disabled={!songs?.length}>
+              <Play size={13} />
+            </button>
+          </>
         ) : (
           <>
             <strong title={name}>{name}</strong>
@@ -203,8 +214,8 @@ function PlaylistView({ playlist, onBack }: { playlist: MusicItem; onBack: () =>
         )}
       </div>
 
-      <AddSongs onAdd={add} have={songs ?? []} />
-      {playingNow?.uri && songs && !songs.some((s) => s.uri === playingNow.uri) && (
+      {!liked && <AddSongs onAdd={add} have={songs ?? []} />}
+      {!liked && playingNow?.uri && songs && !songs.some((s) => s.uri === playingNow.uri) && (
         <button
           className="music-new"
           onClick={() => add({ kind: 'track', name: playingNow.name, detail: playingNow.artist, art: playingNow.art, uri: playingNow.uri! })}
@@ -215,13 +226,14 @@ function PlaylistView({ playlist, onBack }: { playlist: MusicItem; onBack: () =>
       )}
       {error && <p className="music-panel-note">{error}</p>}
       {!songs && !error && <p className="music-panel-note">Loading the songs…</p>}
-      {songs && !songs.length && <p className="music-panel-note">No songs yet. Search above to add some.</p>}
+      {songs && !songs.length && <p className="music-panel-note">{liked ? 'No liked songs yet. Press the heart on a song to add it here.' : 'No songs yet. Search above to add some.'}</p>}
       {songs && songs.length > 0 && (
         <ul className="music-items">
           {songs.map((song, i) => (
             <li
               key={`${song.uri}:${i}`}
-              draggable
+              // Liked Songs are in the order you liked them, which Spotify doesn't let you change.
+              draggable={!liked}
               className={`${dragFrom === i ? 'dragging' : ''} ${dragOver === i && dragFrom !== null && dragFrom !== i ? (dragFrom < i ? 'drop-below' : 'drop-above') : ''}`}
               onDragStart={(e) => {
                 setDragFrom(i)
@@ -243,9 +255,11 @@ function PlaylistView({ playlist, onBack }: { playlist: MusicItem; onBack: () =>
                 setDragOver(null)
               }}
             >
-              <span className="music-grip" title="Drag to move">
-                <GripVertical size={12} />
-              </span>
+              {!liked && (
+                <span className="music-grip" title="Drag to move">
+                  <GripVertical size={12} />
+                </span>
+              )}
               <button onClick={() => musicPlay(song.uri, playlist.uri)} title={`Play ${song.name}`}>
                 <ItemArt art={song.art} />
                 <span className="music-item-text">
@@ -253,7 +267,7 @@ function PlaylistView({ playlist, onBack }: { playlist: MusicItem; onBack: () =>
                   <span>{song.detail}</span>
                 </span>
               </button>
-              <button className="icon-btn music-row-btn" onClick={() => remove(song)} title="Take out of this playlist" data-music-remove={song.name}>
+              <button className="icon-btn music-row-btn" onClick={() => remove(song)} title={liked ? 'Unlike (take out of your Liked Songs)' : 'Take out of this playlist'} data-music-remove={song.name}>
                 <X size={14} />
               </button>
             </li>

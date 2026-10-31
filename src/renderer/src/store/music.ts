@@ -166,6 +166,11 @@ export function musicSeek(ms: number): Promise<boolean> {
   return run(() => window.api.musicSeek(ms))
 }
 
+/** Jumps to a song further down Spotify's Up next, so the playlist carries on after it. */
+export function musicSkip(count: number): Promise<boolean> {
+  return run(() => window.api.musicSkip(count))
+}
+
 /** Plays something on Spotify (stopping your own music if it's playing). */
 export function musicPlay(uri: string, context?: string): Promise<boolean> {
   if (useMusic.getState().local) stopLocal()
