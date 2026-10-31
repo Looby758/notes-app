@@ -33,8 +33,11 @@ interface Graph {
   voiceToMonitor: GainNode
   clipsToMonitor: GainNode
   monitor: GainNode
-  monitorOut: HTMLAudioElement
+  monitorDest: MediaStreamAudioDestinationNode
 }
+
+/** Your headphones: a second AudioContext (not an <audio> element, which Windows treats as a media player and hands the media keys to). Only open while there's something for you to hear. */
+let monitorCtx: AudioContext | null = null
 
 let graph: Graph | null = null
 let mic: { stream: MediaStream; source: MediaStreamAudioSourceNode; key: string } | null = null
@@ -87,23 +90,66 @@ function makeGraph(): Graph {
   clips.connect(clipsToMonitor).connect(monitor)
   const monitorDest = ctx.createMediaStreamDestination()
   monitor.connect(monitorDest)
-  const monitorOut = new Audio()
-  monitorOut.srcObject = monitorDest.stream
-  void monitorOut.play().catch(() => undefined)
 
-  graph = { ctx, send, meter, voice, micIn, micMeter, clips, music, voiceToMonitor, clipsToMonitor, monitor, monitorOut }
+  graph = { ctx, send, meter, voice, micIn, micMeter, clips, music, voiceToMonitor, clipsToMonitor, monitor, monitorDest }
   applyEffect()
   applyLevels()
   void applySend()
-  void applyMonitor()
   useSoundboard.setState({ running: true })
   return graph
 }
 
 function ensure(): Graph {
+  clearTimeout(sleepTimer)
   const g = graph ?? makeGraph()
   if (g.ctx.state === 'suspended') void g.ctx.resume()
   return g
+}
+
+/** Whether anything needs to be heard in your headphones right now. */
+const needMonitor = (): boolean => {
+  const s = st()
+  return !!graph && ((s.hearYourself && s.micOn && !!mic) || (s.hearSounds && voices.size > 0))
+}
+
+/** Opens the headphones path when it's needed and closes it when it isn't, so Orbit isn't holding your speakers for nothing. */
+function syncMonitor(): void {
+  if (needMonitor()) {
+    if (monitorCtx || !graph) return
+    const ctx = new AudioContext({ latencyHint: 'interactive' })
+    ctx.createMediaStreamSource(graph.monitorDest.stream).connect(ctx.destination)
+    monitorCtx = ctx
+    void applyMonitor()
+  } else if (monitorCtx) {
+    void monitorCtx.close().catch(() => undefined)
+    monitorCtx = null
+  }
+}
+
+let sleepTimer: ReturnType<typeof setTimeout> | undefined
+
+/**
+ * With the mic and music off and no sound playing, everything is closed after a few seconds, so
+ * Orbit holds no sound devices at all (an always-open sound stream was stopping Spotify playing).
+ */
+function maybeSleep(): void {
+  syncMonitor()
+  clearTimeout(sleepTimer)
+  const s = st()
+  if (!graph || s.micOn || s.musicOn || voices.size > 0) return
+  sleepTimer = setTimeout(() => {
+    const now = st()
+    if (!graph || now.micOn || now.musicOn || voices.size > 0) return
+    effect?.stop()
+    effect = null
+    musicSource?.disconnect()
+    musicSource = null
+    if (monitorCtx) void monitorCtx.close().catch(() => undefined)
+    monitorCtx = null
+    void graph.ctx.close().catch(() => undefined)
+    graph = null
+    useSoundboard.setState({ running: false })
+  }, 4000)
 }
 
 const smooth = (param: AudioParam, value: number): void => {
@@ -153,13 +199,13 @@ async function applySend(): Promise<void> {
 
 async function applyMonitor(): Promise<void> {
   if (!graph) return
-  const el = graph.monitorOut as HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> }
+  const ctx = monitorCtx as SinkContext | null
+  if (!ctx?.setSinkId) return
   try {
-    await el.setSinkId?.(st().monitorId)
+    await ctx.setSinkId(st().monitorId)
   } catch {
-    await el.setSinkId?.('').catch(() => undefined)
+    await ctx.setSinkId('').catch(() => undefined)
   }
-  void el.play().catch(() => undefined)
 }
 
 function closeMic(): void {
@@ -175,6 +221,7 @@ async function applyMic(): Promise<void> {
   const key = `${s.micId}|${s.noiseSuppression}`
   if (!s.micOn) {
     closeMic()
+    maybeSleep()
     return
   }
   if (mic?.key === key) return
@@ -225,6 +272,7 @@ async function applyMic(): Promise<void> {
     await micOpening
   } finally {
     micOpening = null
+    syncMonitor()
   }
 }
 
@@ -235,6 +283,7 @@ function applyMusic(): void {
     musicSource?.disconnect()
     musicSource = null
     applyLevels()
+    maybeSleep()
     return
   }
   const g = ensure()
@@ -253,6 +302,7 @@ function applyMusic(): void {
 
 function setPlaying(): void {
   useSoundboard.setState({ playing: [...voices].filter(([, list]) => list.length > 0).map(([id]) => id) })
+  maybeSleep()
 }
 
 function buffer(file: string, ctx: AudioContext): Promise<AudioBuffer> {
@@ -300,11 +350,13 @@ export async function playClip(id: string): Promise<void> {
     problem(`Couldn’t play “${clip.name}”. The file may be damaged, or in a format this computer can’t play.`)
     return
   }
-  const src = g.ctx.createBufferSource()
+  // The sound engine may have gone to sleep while a big file was being read.
+  const live = ensure()
+  const src = live.ctx.createBufferSource()
   src.buffer = buf
-  const level = g.ctx.createGain()
+  const level = live.ctx.createGain()
   level.gain.value = clip.volume
-  src.connect(level).connect(g.clips)
+  src.connect(level).connect(live.clips)
   src.onended = () => {
     level.disconnect()
     const list = (voices.get(id) ?? []).filter((s) => s !== src)
@@ -380,8 +432,10 @@ export function startSoundboard(): () => void {
       s.hearSounds !== b.hearSounds ||
       s.micMuted !== b.micMuted ||
       s.micOn !== b.micOn
-    )
+    ) {
       applyLevels()
+      syncMonitor()
+    }
   })
   // Your own music may only start after "music into the call" was turned on.
   const offMusic = useMusic.subscribe((s, b) => {
