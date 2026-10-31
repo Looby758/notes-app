@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { MusicMiniCommand, MusicMiniState, NotesApi } from '@shared/types'
 
 const api: NotesApi = {
@@ -112,6 +112,20 @@ const api: NotesApi = {
   exportFiles: (folderName, files) => ipcRenderer.invoke('export:files', folderName, files),
   showExported: (path) => ipcRenderer.invoke('export:show', path),
   decodeHeic: (data) => ipcRenderer.invoke('convert:heic', data),
+  pathForFile: (file) => {
+    try {
+      return webUtils.getPathForFile(file)
+    } catch {
+      return ''
+    }
+  },
+  convertVideo: (request) => ipcRenderer.invoke('convert:video', request),
+  cancelVideo: (id) => ipcRenderer.invoke('convert:video-cancel', id),
+  onVideoProgress: (callback) => {
+    const handler = (_e: unknown, id: number, done: number): void => callback(id, done)
+    ipcRenderer.on('convert:video-progress', handler)
+    return () => ipcRenderer.removeListener('convert:video-progress', handler)
+  },
 
   openCapture: () => ipcRenderer.invoke('capture:open'),
   closeCapture: () => ipcRenderer.invoke('capture:close'),

@@ -7,7 +7,9 @@ describe('file converter formats', () => {
     expect(kindOf('IMG_0001.HEIC')).toBe('image')
     expect(kindOf('song.wav')).toBe('audio')
     expect(kindOf('Report.docx')).toBe('document')
-    expect(kindOf('clip.mov')).toBeNull()
+    expect(kindOf('clip.MOV')).toBe('video')
+    expect(kindOf('screen recording.webm')).toBe('video')
+    expect(kindOf('slides.key')).toBeNull()
     expect(kindOf('noextension')).toBeNull()
   })
 
@@ -16,12 +18,14 @@ describe('file converter formats', () => {
     expect(targetsFor('photo.heic').map((t) => t.format)).toEqual(['jpg', 'png', 'webp'])
     expect(targetsFor('a.mp3').map((t) => t.format)).toEqual(['wav'])
     expect(targetsFor('Report.docx')[0].format).toBe('pdf')
-    expect(targetsFor('clip.mov')).toEqual([])
+    expect(targetsFor('clip.mov').map((t) => t.format)).toEqual(['mp4', 'webm', 'gif', 'mp3', 'wav'])
+    expect(targetsFor('clip.mp4')[0].format).toBe('mov')
+    expect(targetsFor('slides.key')).toEqual([])
   })
 
   it('explains files it can’t convert', () => {
     expect(whyNot('old.doc')).toMatch(/save it as \.docx/)
-    expect(whyNot('clip.MOV')).toMatch(/Videos/)
+    expect(whyNot('slides.key')).toMatch(/Keynote/)
   })
 
   it('names converted files without clashes', () => {

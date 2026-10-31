@@ -1,8 +1,9 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { existsSync } from 'fs'
-import { mkdir, rm, writeFile } from 'fs/promises'
+import { copyFile, mkdir, rm, writeFile } from 'fs/promises'
 import { join } from 'path'
-import type { SaveFormat } from '@shared/types'
+import type { ExportData, SaveFormat } from '@shared/types'
+import { convertedPath } from './converter'
 
 /**
  * Export: saving exported files where you choose, and printing pages to PDF (in a hidden window
@@ -19,7 +20,11 @@ const FILTERS: Record<SaveFormat, Electron.FileFilter> = {
   png: { name: 'PNG picture', extensions: ['png'] },
   webp: { name: 'WebP picture', extensions: ['webp'] },
   mp3: { name: 'MP3 audio', extensions: ['mp3'] },
-  wav: { name: 'WAV audio', extensions: ['wav'] }
+  wav: { name: 'WAV audio', extensions: ['wav'] },
+  mp4: { name: 'MP4 video', extensions: ['mp4'] },
+  mov: { name: 'QuickTime video', extensions: ['mov'] },
+  webm: { name: 'WebM video', extensions: ['webm'] },
+  gif: { name: 'GIF animation', extensions: ['gif'] }
 }
 
 /** The folder you last exported to, so the next export starts there. */
@@ -27,7 +32,14 @@ let lastFolder: string | null = null
 /** Only files Notes itself exported can be revealed. */
 const exported = new Set<string>()
 
-const toBytes = (data: Uint8Array | string): Buffer => (typeof data === 'string' ? Buffer.from(data, 'utf8') : Buffer.from(data))
+/** Writes an exported file: its text or bytes, or a converted video copied from where it waits. */
+async function put(path: string, data: ExportData): Promise<void> {
+  if (typeof data === 'string') return writeFile(path, data, 'utf8')
+  if (data instanceof Uint8Array) return writeFile(path, data)
+  const from = convertedPath(data)
+  if (!from) throw new Error('The converted file is gone. Convert it again, then save.')
+  await copyFile(from, path)
+}
 
 async function printToPdf(html: string): Promise<Uint8Array> {
   const file = join(app.getPath('temp'), `notes-export-${process.pid}-${Date.now()}.html`)
@@ -46,7 +58,7 @@ async function printToPdf(html: string): Promise<Uint8Array> {
 export function setupExport(): void {
   ipcMain.handle('export:pdf', (_e, html: string) => printToPdf(html))
 
-  ipcMain.handle('export:file', async (event, defaultName: string, format: SaveFormat, data: Uint8Array | string) => {
+  ipcMain.handle('export:file', async (event, defaultName: string, format: SaveFormat, data: ExportData) => {
     const win = BrowserWindow.fromWebContents(event.sender)!
     const result = await dialog.showSaveDialog(win, {
       title: 'Save',
@@ -54,13 +66,13 @@ export function setupExport(): void {
       filters: [FILTERS[format] ?? FILTERS.pdf]
     })
     if (result.canceled || !result.filePath) return null
-    await writeFile(result.filePath, toBytes(data))
+    await put(result.filePath, data)
     lastFolder = join(result.filePath, '..')
     exported.add(result.filePath)
     return result.filePath
   })
 
-  ipcMain.handle('export:files', async (event, folderName: string, files: { name: string; data: Uint8Array | string }[]) => {
+  ipcMain.handle('export:files', async (event, folderName: string, files: { name: string; data: ExportData }[]) => {
     const win = BrowserWindow.fromWebContents(event.sender)!
     const result = await dialog.showOpenDialog(win, {
       title: `Choose where to put the “${folderName}” folder`,
@@ -77,7 +89,7 @@ export function setupExport(): void {
     for (const f of files) {
       // Names come from note titles; keep them to a plain file name.
       const safe = f.name.replace(/[\\/:*?"<>|]+/g, '-')
-      await writeFile(join(folder, safe), toBytes(f.data))
+      await put(join(folder, safe), f.data)
     }
     lastFolder = parent
     exported.add(folder)
