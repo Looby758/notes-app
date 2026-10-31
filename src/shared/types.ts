@@ -255,6 +255,15 @@ export type PhoneEvent =
   | { type: 'receipt'; path: string; text: string }
   | { type: 'dictate'; id: string; text: string; done: boolean }
 
+/** A screen or window the Studio can capture (desktopCapturer). */
+export interface StudioCaptureSource {
+  id: string
+  name: string
+  kind: 'screen' | 'window'
+  /** A small picture of it (data: URL), or '' if there isn't one. */
+  thumb: string
+}
+
 export interface NotesApi {
   /** A native yes/no dialog; resolves true if the user picked `ok`. */
   confirm(options: ConfirmOptions): Promise<boolean>
@@ -287,6 +296,19 @@ export interface NotesApi {
   onReminderOpen(callback: (path: string, line: number) => void): () => void
   /** Mac: asks for microphone access (once); elsewhere always true. */
   micAccess(): Promise<boolean>
+  /** Studio: the screens and windows that can be captured. */
+  studioSources(): Promise<StudioCaptureSource[]>
+  /** Studio, Mac: asks for camera access / checks screen recording isn't blocked; elsewhere true. */
+  studioAccess(what: 'camera' | 'screen'): Promise<boolean>
+  studioDefaultFolder(): Promise<string>
+  studioPickFolder(): Promise<string | null>
+  /** Starts a recording file in `folder` (null = Videos/Orbit Recordings). */
+  studioStart(folder: string | null, ext: 'mp4' | 'webm'): Promise<{ id: number; path: string }>
+  studioChunk(id: number, data: Uint8Array): Promise<{ ok: boolean; error?: string }>
+  /** Finishes the file; resolves to its path. */
+  studioStop(id: number): Promise<string | null>
+  studioReveal(path: string): Promise<void>
+  studioOpenFolder(folder: string | null): Promise<string>
   /** The note's right-click menu asked to record a voice note. */
   onVoiceStart(callback: () => void): () => void
   /** The note's right-click menu asked to draw a sketch. */

@@ -39,6 +39,7 @@ import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, tear
 import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
 import { setupConverter } from './converter'
+import { isAppPage, setupStudio } from './studio'
 import { explorerFile, setupExplorer } from './explorer'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
@@ -821,14 +822,16 @@ app.whenReady().then(async () => {
   safely('imported themes', loadImportedThemes)
   if (await offerMoveToApplications()) return
   safely('menu', setAppMenu)
-  // The microphone (for voice notes) is allowed; the camera and everything else isn't.
+  // The microphone (for voice notes) is allowed; the camera and screen only for Orbit's own pages
+  // (the Studio), never web pages; everything else isn't.
   const audioOnly = (details: { mediaTypes?: string[] } | undefined): boolean =>
     !!details?.mediaTypes?.length && details.mediaTypes.every((t) => t === 'audio')
-  session.defaultSession.setPermissionRequestHandler((_wc, permission, callback, details) =>
-    callback(ALLOWED_PERMISSIONS.has(permission) || (permission === 'media' && audioOnly(details as { mediaTypes?: string[] })))
+  session.defaultSession.setPermissionRequestHandler((wc, permission, callback, details) =>
+    callback(ALLOWED_PERMISSIONS.has(permission) || (permission === 'media' && (audioOnly(details as { mediaTypes?: string[] }) || isAppPage(wc))))
   )
   session.defaultSession.setPermissionCheckHandler(
-    (_wc, permission, _origin, details) => ALLOWED_PERMISSIONS.has(permission) || (permission === 'media' && (details as { mediaType?: string }).mediaType === 'audio')
+    (wc, permission, _origin, details) =>
+      ALLOWED_PERMISSIONS.has(permission) || (permission === 'media' && ((details as { mediaType?: string }).mediaType === 'audio' || isAppPage(wc)))
   )
   registerVaultProtocol()
   registerCodeSandbox()
@@ -847,6 +850,7 @@ app.whenReady().then(async () => {
   safely('Music mini player', () => setupMusicMini(currentPrefs, () => mainWindow))
   safely('export', setupExport)
   safely('converter', setupConverter)
+  safely('studio', setupStudio)
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))

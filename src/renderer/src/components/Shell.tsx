@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ArrowRightLeft,
+  Clapperboard,
   Grid3x3,
   Bomb,
   ChevronDown,
@@ -60,6 +61,7 @@ import {
   CONVERT_TAB,
   SUDOKU_TAB,
   MINESWEEPER_TAB,
+  STUDIO_TAB,
   EXPLORER_TAB,
   GAMES_TAB,
   setZenEditor
@@ -81,6 +83,7 @@ import UpdateToast from './UpdateToast'
 import Screensaver from './Screensaver/Screensaver'
 import Pet from './Motion/Pet'
 import MusicPlayer from './Music/MusicPlayer'
+import RecordingBar from './Studio/RecordingBar'
 import { toggleMusic, useMusic } from '../store/music'
 import ZenBar, { StatusTimer } from './ZenBar'
 import VoiceRecorder from './VoiceRecorder'
@@ -366,6 +369,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
         <button className="icon-btn" onClick={() => openSpecialTab(CONVERT_TAB)} title="Convert files" data-convert-button>
           <ArrowRightLeft size={15} />
         </button>
+        <button className="icon-btn" onClick={() => openSpecialTab(STUDIO_TAB)} title="Studio (record your screen and webcam)" data-studio-button>
+          <Clapperboard size={15} />
+        </button>
         <button className="icon-btn" onClick={() => openSpecialTab(SUDOKU_TAB)} title="Sudoku (a quick break)" data-sudoku-button>
           <Grid3x3 size={15} />
         </button>
@@ -452,6 +458,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <Pet />
       <UpdateToast />
       <MusicPlayer />
+      <RecordingBar />
       <ZenBar />
       <VoiceRecorder />
       <DefinitionCard />
