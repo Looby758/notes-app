@@ -151,6 +151,18 @@ On an iPhone, tap Share → **Add to Home Screen** to keep the page: it reconnec
 
 **Wi-Fi for guests** (Ctrl+K → *Phone: Wi-Fi QR code for guests*) shows a code guests scan to join your Wi-Fi without typing the password. Notes fills in the network and password (a Mac asks for your Keychain first); you can change them.
 
+
+## One mouse, two computers
+
+Use one mouse and keyboard on a Windows PC and a Mac side by side, both running Orbit on the same Wi-Fi. Turn on **Settings → Two computers → Share mouse and keyboard** on both, press **Pair** next to the other computer, and check the same 6-digit code shows on both screens. Then say which side the other computer is on.
+
+- **Push the pointer off that edge** of the screen and it carries on onto the other computer, with the keyboard. Push it back to come home. **Ctrl+Alt+Esc** (⌃⌥Esc on a Mac) brings it straight back, and so does touching the other computer's own mouse or trackpad.
+- **Copy on one, paste on the other**: text, formatted text and pictures go across with the pointer. Passwords copied from the vault stay put.
+- **Drag a file or folder to the edge** and drop it on the strip that appears: it goes to the other computer's Downloads.
+- **Ctrl works as ⌘ on the Mac** (so Ctrl+C, Ctrl+V and Ctrl+Z work the same on both); you can turn this off in the Mac's Orbit settings.
+- On a Mac, allow Orbit under System Settings → Privacy & Security → **Accessibility** so the PC's mouse can work there, and allow it on the local network when asked. Windows asks once whether Orbit may accept connections: allow it on private networks.
+- Everything goes straight between the two computers over your Wi-Fi, encrypted with keys only they know (what you type is passwords too). Nothing goes through the internet.
+
 ## Features
 
 - **Live preview editor** — markdown renders as you type; the raw syntax shows only on the line you're editing. Headings, bold/italic/strike, code blocks with highlighting, tables, checkboxes, quotes, images, links.
