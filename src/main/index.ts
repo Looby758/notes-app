@@ -49,6 +49,7 @@ import { formatMenuFor, setupMenus } from './menus'
 import { dictionaryMenu, setupDictionary } from './dictionary'
 import { setupPhoneLink } from './phoneLink'
 import { phoneNotify, setupPhonePair } from './phonePair'
+import { setupPhoneCam } from './phoneCam'
 import { setupWebTitle } from './webTitle'
 import { setupPlaces } from './places'
 import { setupWeather } from './weather'
@@ -545,6 +546,7 @@ function registerIpc(): void {
     () => mainWindow,
     (name, data) => currentVault().saveAttachment(currentPrefs().attachmentFolder, name, data)
   )
+  setupPhoneCam(() => mainWindow)
   setupWebTitle()
   setupPlaces()
   setupWeather()

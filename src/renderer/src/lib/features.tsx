@@ -31,6 +31,7 @@ import {
   Smartphone,
   Sparkles,
   SquareTerminal,
+  Webcam,
   Zap,
   type LucideIcon
 } from 'lucide-react'
@@ -107,6 +108,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   email: { icon: Mail, run: () => openSpecialTab(EMAIL_TAB) },
   messages: { icon: MessagesSquare, run: () => openSpecialTab(MESSAGES_TAB), badge: () => <FeatureBadge id="messages" /> },
   phone: { icon: Smartphone, run: () => sendToPhone({ kind: 'pair' }), useActive: () => usePhone((s) => s.connected > 0) },
+  webcam: { icon: Webcam, run: () => sendToPhone({ kind: 'webcam' }), useActive: () => usePhone((s) => !!s.cam?.on) },
   web: { icon: Globe, run: () => openWebTab('', { beside: true }) },
   chat: { icon: MessageSquare, run: () => openSpecialTab(CHAT_TAB) },
   ask: { icon: Sparkles, run: () => openAsk() },
