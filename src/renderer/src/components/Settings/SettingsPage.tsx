@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CalendarDays, FileJson, Music, FolderCog, Info, Keyboard, Palette, PenLine, RefreshCw, RotateCcw, ScrollText, Search, Sparkles, X, Zap } from 'lucide-react'
+import { CalendarDays, Compass, FileJson, Music, FolderCog, Info, Keyboard, Palette, PenLine, RefreshCw, RotateCcw, ScrollText, Search, Sparkles, X, Zap } from 'lucide-react'
 import { checkForUpdates, useUpdates, watchUpdates } from '../../store/updates'
 import { DEFAULT_PREFS } from '@shared/prefs'
 import type { CaptureStatus } from '@shared/types'
@@ -11,6 +11,7 @@ import CalendarSources from './CalendarSources'
 import SnippetsEditor from './SnippetsEditor'
 import PlaceholderHelp from './PlaceholderHelp'
 import RemindersSettings from './RemindersSettings'
+import NavEditor from '../Nav/NavEditor'
 import AiSettings from '../Ai/AiSettings'
 import MusicSettings from '../Music/MusicSettings'
 import { useUI } from '../../store/ui'
@@ -19,6 +20,7 @@ import { showKeys, TRAY_NAME } from '@shared/platform'
 
 const ICONS: Record<SectionId, typeof Palette> = {
   appearance: Palette,
+  navigation: Compass,
   editor: PenLine,
   files: FolderCog,
   calendar: CalendarDays,
@@ -84,6 +86,33 @@ function SettingsList({ defs }: { defs: SettingDef[] }) {
 }
 
 /** Whether the system-wide capture shortcut is working, with a button to try capture now. */
+/** Whether the screen snip shortcut could be registered. */
+function SnipShortcutStatus() {
+  const shortcut = usePrefs((s) => s.prefs.snipShortcut)
+  const [status, setStatus] = useState<{ shortcut: string; error?: string } | null>(null)
+  useEffect(() => {
+    const t = setTimeout(() => window.api.snipStatus().then(setStatus), 400)
+    return () => clearTimeout(t)
+  }, [shortcut])
+  if (!status) return null
+  return (
+    <div className="capture-status" data-snip-status>
+      {status.error ? (
+        <p className="setting-warning">{status.error}</p>
+      ) : status.shortcut ? (
+        <p>
+          <span className="cal-connected-dot" /> Press <kbd>{status.shortcut}</kbd> in any app to grab text from the screen.
+        </p>
+      ) : (
+        <p>Screen snip has no shortcut. Use {showKeys('Ctrl+Shift+S')} inside Orbit, or the {TRAY_NAME} icon.</p>
+      )}
+      <button className="btn" onClick={() => void window.api.startSnip()}>
+        Try it now
+      </button>
+    </div>
+  )
+}
+
 function CaptureShortcutStatus() {
   const shortcut = usePrefs((s) => s.prefs.captureShortcut)
   const [status, setStatus] = useState<CaptureStatus | null>(null)
@@ -99,11 +128,11 @@ function CaptureShortcutStatus() {
         <p className="setting-warning">{status.error}</p>
       ) : status.shortcut ? (
         <p>
-          <span className="cal-connected-dot" /> Press <kbd>{status.shortcut}</kbd> in any app to capture a thought.
+          <span className="cal-connected-dot" /> Press <kbd>{status.shortcut}</kbd> in any app to open the summon bar.
         </p>
       ) : (
         <p>
-          Quick capture has no shortcut. You can still open it from the {TRAY_NAME} icon or with {showKeys('Ctrl+K')} → “Quick
+          The summon bar has no shortcut. You can still open it from the {TRAY_NAME} icon or with {showKeys('Ctrl+K')} → “Quick
           capture”.
         </p>
       )}
@@ -275,7 +304,9 @@ export default function SettingsPage() {
                   {section === 'calendar' && <RemindersSettings />}
                   {section === 'calendar' && <PlaceholderHelp />}
                   {section === 'calendar' && <CalendarSources />}
+                  {section === 'navigation' && <NavEditor />}
                   {section === 'capture' && <CaptureShortcutStatus />}
+                  {section === 'capture' && <SnipShortcutStatus />}
                   {section === 'ai' && <AiSettings />}
                   {section === 'music' && <MusicSettings />}
                 </>

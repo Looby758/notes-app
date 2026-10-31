@@ -26,6 +26,8 @@ export interface CaptureResult {
   /** Where it was saved, e.g. "Today's note". */
   where?: string
   error?: string
+  /** A command opened something in the main window: bring it to the front. */
+  show?: boolean
 }
 
 interface Hooks {
@@ -53,7 +55,7 @@ function createCaptureWindow(): BrowserWindow {
   const { colors } = getTheme(activeThemeId(hooks.prefs(), nativeTheme.shouldUseDarkColors))
   const win = new BrowserWindow({
     width: 560,
-    height: 212,
+    height: 240,
     show: false,
     frame: false,
     resizable: false,
@@ -203,11 +205,14 @@ export function setupCapture(h: Hooks): void {
       pending.set(id, resolve)
       setTimeout(() => {
         if (pending.delete(id)) resolve({ ok: false, error: 'Saving took too long. Try again.' })
-      }, 8000)
+      }, request.command ? 30000 : 8000)
     })
     main.webContents.send('capture:add', id, request)
     const r = await result
-    if (r.ok) hideCapture()
+    if (r.ok) {
+      hideCapture()
+      if (r.show) hooks.showMain()
+    }
     return r
   })
   ipcMain.handle('capture:result', (_e, id: number, result: CaptureResult) => {

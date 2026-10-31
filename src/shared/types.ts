@@ -405,12 +405,12 @@ export interface NotesApi {
   captureKeepOpen(on: boolean): Promise<void>
   captureStatus(): Promise<CaptureStatus>
   /** From the capture window: save this text (the main window does the saving). */
-  submitCapture(request: CaptureRequest): Promise<{ ok: boolean; where?: string; error?: string }>
+  submitCapture(request: CaptureRequest): Promise<{ ok: boolean; where?: string; error?: string; show?: boolean }>
   /** Capture window: called each time it's shown, to start fresh. */
   onCaptureReset(callback: () => void): () => void
   /** Main window: asked to save a capture; reply with captureResult. */
   onCaptureRequest(callback: (id: number, request: CaptureRequest) => void): () => void
-  captureResult(id: number, result: { ok: boolean; where?: string; error?: string }): Promise<void>
+  captureResult(id: number, result: { ok: boolean; where?: string; error?: string; show?: boolean }): Promise<void>
 
   // Google Calendar and calendar links (read-only)
   calendarSources(): Promise<CalendarSourcesStatus>
@@ -657,6 +657,8 @@ export interface CaptureRequest {
   target?: { kind: 'daily' | 'inbox' } | { kind: 'note' | 'folder'; path: string }
   /** Instead: a calendar event on that day (in its daily note's schedule). */
   event?: { date: string; time?: string; title: string; remind: boolean }
+  /** Instead: a command for the main window to run ("spent 12 on food", "? what's on today"). */
+  command?: string
 }
 /** A note as read from Apple Notes. */
 export interface AppleNote {

@@ -127,3 +127,20 @@ export async function interpretWithAi(text: string): Promise<SmartAction> {
   if (!action) throw new Error('Claude’s answer didn’t make sense, so nothing was done.')
   return action
 }
+
+// What the summon bar's commands open in the main window, so it's brought to the front.
+const SHOWS: SmartAction['kind'][] = ['open', 'search', 'web', 'note', 'convert', 'goal', 'ask']
+
+/** A command typed in the summon bar ("?" first means Ask everything). */
+export async function runCommandText(text: string): Promise<{ ok: boolean; where?: string; error?: string; show?: boolean }> {
+  const t = text.trim()
+  await ensureMoney()
+  const action: SmartAction | null = t.startsWith('?') ? { kind: 'ask', question: t.slice(1).trim() } : parseCommand(t)
+  if (!action) return { ok: false, error: 'Orbit didn’t understand that. Press Enter again to save it as a note.' }
+  try {
+    const where = await runSmart(action)
+    return { ok: true, where, show: SHOWS.includes(action.kind) }
+  } catch (err) {
+    return { ok: false, error: errorMessage(err) }
+  }
+}
