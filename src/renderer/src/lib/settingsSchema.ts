@@ -8,7 +8,7 @@ import { formatDate } from './dates'
  * and search looks through labels, descriptions and keywords.
  */
 
-export type SectionId = 'appearance' | 'editor' | 'files' | 'calendar' | 'capture' | 'ai' | 'music' | 'shortcuts' | 'about'
+export type SectionId = 'appearance' | 'editor' | 'files' | 'calendar' | 'capture' | 'ai' | 'music' | 'studio' | 'shortcuts' | 'about'
 
 interface Base {
   key: keyof Prefs
@@ -758,6 +758,7 @@ export const SECTIONS: { id: SectionId; label: string }[] = [
   { id: 'capture', label: 'Quick capture' },
   { id: 'ai', label: 'AI helper' },
   { id: 'music', label: 'Music' },
+  { id: 'studio', label: 'Studio' },
   { id: 'shortcuts', label: 'Shortcuts' },
   { id: 'about', label: 'About' }
 ]

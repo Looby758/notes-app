@@ -25,6 +25,7 @@ import {
 import type { StudioCaptureSource } from '@shared/types'
 import { dragRect, formatDuration, itemAt, newItem, QUALITIES, snap, SOURCE_LABELS, studioId, type Handle, type StudioItem, type StudioSourceKind } from '@shared/studio'
 import { activeScene, addItem, removeItem, reorderItem, switchScene, updateItem, updateScene, useStudio } from '../../store/studio'
+import { GoLive } from './GoLive'
 import { desktopAudioSupported, hasChannel, level, retrySource, startRecording, stopRecording, studioCanvas, studioPage } from '../../lib/studio'
 import { showKeys } from '@shared/platform'
 
@@ -200,9 +201,7 @@ function RecordBar() {
           <Circle size={13} fill="currentColor" /> Record
         </button>
       )}
-      <button className="btn" disabled title="Coming next: stream to Twitch and YouTube">
-        Go live (soon)
-      </button>
+<GoLive />
     </header>
   )
 }

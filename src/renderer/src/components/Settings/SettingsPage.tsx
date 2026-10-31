@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CalendarDays, FileJson, Music, FolderCog, Info, Keyboard, Palette, PenLine, RefreshCw, RotateCcw, ScrollText, Search, Sparkles, X, Zap } from 'lucide-react'
+import { CalendarDays, Clapperboard, FileJson, Music, FolderCog, Info, Keyboard, Palette, PenLine, RefreshCw, RotateCcw, ScrollText, Search, Sparkles, X, Zap } from 'lucide-react'
 import { checkForUpdates, useUpdates, watchUpdates } from '../../store/updates'
 import { DEFAULT_PREFS } from '@shared/prefs'
 import type { CaptureStatus } from '@shared/types'
@@ -13,6 +13,7 @@ import PlaceholderHelp from './PlaceholderHelp'
 import RemindersSettings from './RemindersSettings'
 import AiSettings from '../Ai/AiSettings'
 import MusicSettings from '../Music/MusicSettings'
+import StudioSettings from '../Studio/LiveSetup'
 import { useUI } from '../../store/ui'
 import pkg from '../../../../../package.json'
 import { showKeys, TRAY_NAME } from '@shared/platform'
@@ -25,6 +26,7 @@ const ICONS: Record<SectionId, typeof Palette> = {
   capture: Zap,
   ai: Sparkles,
   music: Music,
+  studio: Clapperboard,
   shortcuts: Keyboard,
   about: Info
 }
@@ -278,6 +280,7 @@ export default function SettingsPage() {
                   {section === 'capture' && <CaptureShortcutStatus />}
                   {section === 'ai' && <AiSettings />}
                   {section === 'music' && <MusicSettings />}
+                  {section === 'studio' && <StudioSettings />}
                 </>
               )}
             </>

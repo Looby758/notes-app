@@ -309,6 +309,23 @@ export interface NotesApi {
   studioStop(id: number): Promise<string | null>
   studioReveal(path: string): Promise<void>
   studioOpenFolder(folder: string | null): Promise<string>
+  /** Going live (main/live.ts). */
+  liveStatus(): Promise<import('./live').LiveStatus>
+  onLiveStatus(callback: (s: import('./live').LiveStatus) => void): () => void
+  /** Downloads ffmpeg (needed to go live). */
+  liveGetFfmpeg(): Promise<import('./live').LiveStatus>
+  liveRemoveFfmpeg(): Promise<import('./live').LiveStatus>
+  /** Saves a stream key (encrypted) and, for Custom, the server address. An empty key keeps the saved one. */
+  liveSetKey(service: import('./live').LiveService, key: string, customUrl?: string): Promise<import('./live').LiveStatus>
+  liveClearKey(service: import('./live').LiveService): Promise<import('./live').LiveStatus>
+  liveSetService(service: import('./live').LiveService): Promise<import('./live').LiveStatus>
+  liveStart(service: import('./live').LiveService, quality: string): Promise<void>
+  /** Resolves false once the stream has ended. */
+  liveChunk(data: Uint8Array): Promise<boolean>
+  liveStop(): Promise<void>
+  onLiveStats(callback: (s: import('./live').LiveStats) => void): () => void
+  /** The stream ended by itself: an error message, or null. */
+  onLiveEnded(callback: (error: string | null) => void): () => void
   /** The note's right-click menu asked to record a voice note. */
   onVoiceStart(callback: () => void): () => void
   /** The note's right-click menu asked to draw a sketch. */
