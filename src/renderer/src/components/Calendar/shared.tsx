@@ -6,7 +6,10 @@ import { usePrefs } from '../../store/prefs'
 import { ensureRange, useExternal, type ExternalItem } from '../../store/externalEvents'
 import { openNote } from '../../lib/editorController'
 import { addEvent, displayTime, toggleCalendarTask } from '../../lib/daily'
-import { formatDate, fromDayKey } from '../../lib/dates'
+import { addDays, dayKey, formatDate, fromDayKey } from '../../lib/dates'
+import { useMoney } from '../../store/money'
+import { findRecurring, occurrences } from '../../lib/moneyInsights'
+import { formatPounds } from '../../lib/money'
 import type { DatedItem } from '../../lib/schedule'
 import { EventWeather } from '../Weather/Weather'
 
@@ -71,7 +74,7 @@ export function ItemRow({ item, compact = false }: { item: DatedItem; compact?: 
   )
 }
 
-/** Loads Google/link events for [from, to) and returns all external events by day. */
+/** Loads Google/link events for [from, to) and returns all external events by day, with bills and paydays from Money. */
 export function useExternalRange(from: Date, to: Date): Map<string, ExternalItem[]> {
   const fromKey = from.getTime()
   const toKey = to.getTime()
@@ -79,7 +82,47 @@ export function useExternalRange(from: Date, to: Date): Map<string, ExternalItem
   useEffect(() => {
     ensureRange(new Date(fromKey), new Date(toKey))
   }, [fromKey, toKey, generation])
-  return useExternal((s) => s.byDay)
+  const byDay = useExternal((s) => s.byDay)
+  const bills = useBillItems(from, to)
+  return useMemo(() => {
+    if (!bills.length) return byDay
+    const merged = new Map(byDay)
+    for (const item of bills) merged.set(item.date, [item, ...(merged.get(item.date) ?? [])])
+    return merged
+  }, [byDay, bills])
+}
+
+/** Repeating payments and paydays the money tracker found, as all-day calendar items. */
+function useBillItems(from: Date, to: Date): ExternalItem[] {
+  const entries = useMoney((s) => s.entries)
+  const notRecurring = useMoney((s) => s.notRecurring)
+  const fromDay = dayKey(from)
+  const toDay = dayKey(new Date(to.getTime() - 1))
+  return useMemo(() => {
+    const today = dayKey(new Date())
+    const items: ExternalItem[] = []
+    for (const r of findRecurring(entries, today, notRecurring)) {
+      // Only from today on: earlier ones are already in your spending log.
+      for (const date of occurrences(r, fromDay > today ? fromDay : today, toDay)) {
+        const end = dayKey(addDays(fromDayKey(date)!, 1))
+        items.push({
+          date,
+          allDay: true,
+          event: {
+            id: `money:${r.income ? 'in' : 'out'}:${r.key}`,
+            sourceId: 'money',
+            calendarName: r.income ? 'Payday (from Money)' : 'Bill (from Money)',
+            color: r.income ? '#199e70' : '#c98500',
+            title: `${r.income ? '💷' : '🧾'} ${r.name} ${formatPounds(r.amount)}`,
+            allDay: true,
+            start: date,
+            end
+          }
+        })
+      }
+    }
+    return items
+  }, [entries, notRecurring, fromDay, toDay])
 }
 
 /** "Offline, showing saved events" / "Your Google sign-in expired…", when there's something to say. */

@@ -10051,3 +10051,230 @@ body.reduce-motion .theme-loading-text {
   flex: none;
   font-size: 11.5px;
 }
+
+/* ---------- Money: forecast, goals, subscriptions, ask ---------- */
+
+.money-forecast {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 10px 0 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-panel);
+}
+.money-forecast-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: color-mix(in srgb, #199e70 18%, transparent);
+  color: #2fbf8a;
+}
+.money-forecast.short .money-forecast-icon {
+  background: color-mix(in srgb, #e66767 18%, transparent);
+  color: #e66767;
+}
+.money-forecast strong {
+  color: var(--text-strong);
+  font-size: 14.5px;
+}
+.money-forecast p {
+  margin: 3px 0 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.money-section h3 svg {
+  vertical-align: -2px;
+  margin-right: 4px;
+  color: var(--accent);
+}
+.money-goals,
+.money-recurring {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.money-goal {
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-panel);
+}
+.money-goal-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.money-goal-name {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+.money-goal-name:focus {
+  outline: 1px solid var(--border-strong);
+  border-radius: 4px;
+}
+.money-goal-figures {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.money-goal-bar {
+  height: 8px;
+  margin: 10px 0 8px;
+  border-radius: 4px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+.money-goal-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  transition: width calc(400ms * var(--m-time)) var(--m-ease-out);
+}
+.money-goal.done .money-goal-bar span {
+  background: #199e70 !important;
+}
+.money-goal-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.money-goal-foot .money-hint {
+  flex: 1;
+  margin: 0;
+}
+.money-goal-due {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.money-goal-due input,
+.money-new-goal input {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+.money-goal-add {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.money-goal-add input {
+  width: 64px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+.money-new-goal-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.money-new-goal-row > input:first-child {
+  flex: 1;
+  min-width: 180px;
+  padding: 6px 8px;
+}
+.money-recurring-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13.5px;
+}
+.money-recurring-name {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  color: var(--text-strong);
+}
+.money-recurring-name small {
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+.money-recurring-next {
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.money-recurring-row strong {
+  min-width: 70px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.money-ask form {
+  display: flex;
+  gap: 8px;
+}
+.money-ask input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  color: var(--text);
+  font: inherit;
+}
+.money-ask-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.money-home-next {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.ai-sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 12px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.ai-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.ai-source.on {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  color: var(--text-strong);
+}
+.ai-source input {
+  margin: 0;
+}

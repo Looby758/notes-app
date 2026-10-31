@@ -4,12 +4,14 @@ import { budgetState, formatPounds, monthName, monthOf, monthTotals } from '../.
 import { MONEY_TAB, openSpecialTab } from '../../lib/editorController'
 import { HomeBox } from '../Home/HomePage'
 import Private from '../Streamer/Private'
+import { useRecurring } from './MoneyPlans'
 
 /** The Home page's "spending this month" box: nothing until the money tracker has something in it. */
 export default function MoneyHomeCard() {
   const entries = useMoney((s) => s.entries)
   const categories = useMoney((s) => s.categories)
   const budgets = useMoney((s) => s.budgets)
+  const nextBill = useRecurring().find((r) => !r.income)
   if (!entries.length) return null
   const month = monthOf(new Date())
   const totals = monthTotals(entries, month)
@@ -40,6 +42,12 @@ export default function MoneyHomeCard() {
           )}
         </span>
       </div>
+      {nextBill && (
+        <div className="money-home-next" data-money-next-bill>
+          🧾 Next bill: <Private>{nextBill.name}</Private> <Private>{formatPounds(nextBill.amount)}</Private>,{' '}
+          {new Date(`${nextBill.next}T12:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+        </div>
+      )}
       {warnings.map(({ cat, spent, budget }) => (
         <div key={cat.id} className={`money-home-warn budget-${budgetState(spent, budget)}`}>
           <AlertTriangle size={12} />
