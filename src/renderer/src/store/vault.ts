@@ -10,11 +10,14 @@ import { ancestorsOf, findNode, isWithin, notePaths, parentOf, replacePrefix } f
 import { closeMissing, discardWithin, flushAll, openNote, remap as remapTabs } from '../lib/editorController'
 import { snapshotLinks, updateLinksAfterMove } from '../lib/linkUpdates'
 import { notify } from './notify'
+import { TRASH_NAME } from '@shared/platform'
 import { resetIndex, syncIndex } from './noteIndex'
-import { loadStarred, remapStars, removeStarsWithin } from './starred'
-import { loadFlashcards, remapFlashcards, removeFlashcardsWithin } from './flashcards'
+import { loadStarred, putBackStars, remapStars, removeStarsWithin, useStarred } from './starred'
+import { loadFlashcards, putBackFlashcards, remapFlashcards, removeFlashcardsWithin, useFlashcards } from './flashcards'
 import { loadMoney } from './money'
-import { loadLockedFolders, remapLockedFolders, removeLockedFoldersWithin } from '../lib/lock/folders'
+import { loadLockedFolders, putBackLockedFolders, remapLockedFolders, removeLockedFoldersWithin, useLockedFolders } from '../lib/lock/folders'
+import { history, recordUndo, undoChanged } from '../lib/undo'
+import type { CardProgress } from '../lib/flashcards'
 
 interface VaultState {
   vault: string
@@ -49,6 +52,27 @@ interface VaultState {
 }
 
 const expandedKey = (vault: string): string => `expanded:${vault}`
+
+/** A note's or folder's name as you see it (notes without ".md"). */
+const shownName = (path: string): string => (path.split('/').pop() ?? path).replace(/\.md$/i, '')
+const folderName = (folder: string): string => (folder ? shownName(folder) : 'the top of your notes')
+const itemsLabel = (paths: string[]): string => (paths.length === 1 ? `“${shownName(paths[0])}”` : `${paths.length} items`)
+
+/** What's kept about notes besides the files (stars, flashcard progress, locked folders), to put back after an undone delete. */
+interface Extras {
+  stars: string[]
+  cards: Record<string, CardProgress>
+  locked: string[]
+}
+
+function extrasWithin(paths: string[]): Extras {
+  const inside = (p: string): boolean => paths.some((root) => isWithin(p, root))
+  return {
+    stars: useStarred.getState().paths.filter(inside),
+    cards: Object.fromEntries(Object.entries(useFlashcards.getState().progress).filter(([id]) => inside(id.slice(0, id.indexOf('::'))))),
+    locked: useLockedFolders.getState().folders.filter(inside)
+  }
+}
 
 function loadExpanded(vault: string): Set<string> {
   try {
@@ -94,6 +118,99 @@ export const useVault = create<VaultState>((set, get) => {
     remapLockedFolders(from, to)
   }
 
+  /** Closes and forgets deleted things (tabs, stars, flashcard progress, locked folders). */
+  const forgetWithin = (paths: string[]): void => {
+    for (const path of paths) {
+      discardWithin(path)
+      removeStarsWithin(path)
+      removeFlashcardsWithin(path)
+      removeLockedFoldersWithin(path)
+    }
+    const { selected } = get()
+    if (selected && paths.some((p) => isWithin(selected, p))) set({ selected: null })
+  }
+
+  const doRename = async (path: string, name: string, updateLinks?: boolean): Promise<string> => {
+    await flushAll()
+    const snapshot = await snapshotLinks(path)
+    const next = await window.api.rename(path, name)
+    if (next === path) return path
+    remap(path, next)
+    await get().refresh()
+    await updateLinksAfterMove(snapshot, path, next, updateLinks)
+    await fixFileLinks(path, next)
+    await fixBoardLinks(path, next)
+    return next
+  }
+
+  const doMove = async (path: string, folder: string, updateLinks?: boolean): Promise<string> => {
+    await flushAll()
+    const snapshot = await snapshotLinks(path)
+    const next = await window.api.move(path, folder)
+    if (next === path) return path
+    remap(path, next)
+    get().expandTo(folder)
+    await get().refresh()
+    await updateLinksAfterMove(snapshot, path, next, updateLinks)
+    await fixFileLinks(path, next)
+    await fixBoardLinks(path, next)
+    return next
+  }
+
+  /** Brings deleted things back from Orbit's bin. Returns where they went. */
+  const bringBack = async (paths: string[], extras?: Extras): Promise<string[]> => {
+    const back = await window.api.undoRestore(paths, true)
+    if (extras) {
+      putBackStars(extras.stars)
+      putBackFlashcards(extras.cards)
+      putBackLockedFolders(extras.locked)
+    }
+    // Back as "name (2)" when something has its name now.
+    back.forEach((to, i) => to !== paths[i] && remap(paths[i], to))
+    for (const p of back) get().expandTo(parentOf(p))
+    await get().refresh()
+    undoChanged('files')
+    return back
+  }
+
+  /** Deletes again without asking (redo), into Orbit's bin. */
+  const putAway = async (paths: string[]): Promise<void> => {
+    await flushAll()
+    const held = await window.api.undoHold(paths, true)
+    forgetWithin(paths)
+    await get().refresh()
+    undoChanged('files')
+    if (held.length < paths.length) throw new Error(`Moved to the ${TRASH_NAME}, but it can't be undone again from here.`)
+  }
+
+  /** Undo for a delete: only for what went into Orbit's bin (a huge folder on another drive goes straight to the Bin). */
+  const recordDelete = async (paths: string[], extras: Extras): Promise<void> => {
+    const held = await window.api.undoHeld(paths, true).catch(() => [] as string[])
+    if (!held.length) return
+    let at = held
+    recordUndo({
+      label: `Deleted ${itemsLabel(held)}`,
+      undo: async () => {
+        at = await bringBack(at, extras)
+      },
+      redo: () => putAway(at),
+      forget: (done) => done && void window.api.undoRelease(at, true)
+    })
+  }
+
+  /** Undo for something new: it goes into Orbit's bin (so redo can bring it back). */
+  const recordNew = (path: string): void => {
+    let at = path
+    recordUndo({
+      label: `Made “${shownName(path)}”`,
+      undo: () => putAway([at]),
+      redo: async () => {
+        ;[at] = await bringBack([at])
+      },
+      forget: (done) => !done && void window.api.undoRelease([at], true)
+    })
+  }
+
   return {
     vault: '',
     tree: [],
@@ -102,6 +219,7 @@ export const useVault = create<VaultState>((set, get) => {
     renaming: null,
 
     open(vault) {
+      if (vault !== get().vault) history.clear()
       set({ vault, tree: [], expanded: loadExpanded(vault), selected: null, renaming: null })
       resetIndex()
       void loadLock()
@@ -163,6 +281,7 @@ export const useVault = create<VaultState>((set, get) => {
         await get().refresh()
         set({ selected: path, renaming: path })
         openNote(path, { focus: false })
+        recordNew(path)
       } catch (err) {
         notify(err)
       }
@@ -189,6 +308,7 @@ export const useVault = create<VaultState>((set, get) => {
         get().expandTo(dir)
         await get().refresh()
         set({ selected: path, renaming: path })
+        recordNew(path)
       } catch (err) {
         notify(err)
       }
@@ -197,15 +317,21 @@ export const useVault = create<VaultState>((set, get) => {
     async rename(path, name) {
       set({ renaming: null })
       try {
-        await flushAll()
-        const snapshot = await snapshotLinks(path)
-        const next = await window.api.rename(path, name)
+        const next = await doRename(path, name)
         if (next === path) return
-        remap(path, next)
-        await get().refresh()
-        await updateLinksAfterMove(snapshot, path, next)
-        await fixFileLinks(path, next)
-        await fixBoardLinks(path, next)
+        const oldName = path.split('/').pop()!
+        const newName = next.split('/').pop()!
+        recordUndo({
+          label: `Renamed “${shownName(path)}” to “${shownName(next)}”`,
+          undo: async () => {
+            await doRename(next, oldName, true)
+            undoChanged('files')
+          },
+          redo: async () => {
+            await doRename(path, newName, true)
+            undoChanged('files')
+          }
+        })
       } catch (err) {
         notify(err)
       }
@@ -213,16 +339,21 @@ export const useVault = create<VaultState>((set, get) => {
 
     async move(path, folder, updateLinks) {
       try {
-        await flushAll()
-        const snapshot = await snapshotLinks(path)
-        const next = await window.api.move(path, folder)
+        const next = await doMove(path, folder, updateLinks)
         if (next === path) return
-        remap(path, next)
-        get().expandTo(folder)
-        await get().refresh()
-        await updateLinksAfterMove(snapshot, path, next, updateLinks)
-        await fixFileLinks(path, next)
-        await fixBoardLinks(path, next)
+        const from = parentOf(path)
+        recordUndo({
+          label: `Moved “${shownName(path)}” to ${folderName(folder)}`,
+          // Links were already updated (or left) the first time: do the same again.
+          undo: async () => {
+            await doMove(next, from, updateLinks ?? true)
+            undoChanged('files')
+          },
+          redo: async () => {
+            await doMove(path, folder, updateLinks ?? true)
+            undoChanged('files')
+          }
+        })
       } catch (err) {
         notify(err)
       }
@@ -232,13 +363,10 @@ export const useVault = create<VaultState>((set, get) => {
       try {
         await flushAll()
         if (!(await window.api.trash(path))) return
-        discardWithin(path)
-        removeStarsWithin(path)
-        removeFlashcardsWithin(path)
-        removeLockedFoldersWithin(path)
-        const { selected } = get()
-        if (selected && isWithin(selected, path)) set({ selected: null })
+        const extras = extrasWithin([path])
+        forgetWithin([path])
         await get().refresh()
+        await recordDelete([path], extras)
       } catch (err) {
         notify(err)
       }
@@ -248,15 +376,10 @@ export const useVault = create<VaultState>((set, get) => {
       try {
         await flushAll()
         const gone = await window.api.trashMany(paths)
-        for (const path of gone) {
-          discardWithin(path)
-          removeStarsWithin(path)
-          removeFlashcardsWithin(path)
-          removeLockedFoldersWithin(path)
-        }
-        const { selected } = get()
-        if (selected && gone.some((p) => isWithin(selected, p))) set({ selected: null })
+        const extras = extrasWithin(gone)
+        forgetWithin(gone)
         await get().refresh()
+        await recordDelete(gone, extras)
       } catch (err) {
         notify(err)
       }

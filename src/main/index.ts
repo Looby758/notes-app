@@ -14,6 +14,7 @@ import {
   screen,
   session,
   shell,
+  webContents,
   type MenuItemConstructorOptions
 } from 'electron'
 import { existsSync, statSync } from 'fs'
@@ -43,6 +44,7 @@ import { setupConverter } from './converter'
 import { isAppPage, setupStudio } from './studio'
 import { setupLive } from './live'
 import { explorerFile, setupExplorer } from './explorer'
+import { hold, setupUndoBin } from './undoBin'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
@@ -182,8 +184,9 @@ function setAppMenu(): void {
       {
         label: 'Edit',
         submenu: [
-          { role: 'undo' },
-          { role: 'redo' },
+          // Orbit decides what's undone: the text you're typing in, or the last change you made anywhere else.
+          { label: 'Undo', accelerator: 'CmdOrCtrl+Z', click: () => editCommand('undo') },
+          { label: 'Redo', accelerator: 'Shift+CmdOrCtrl+Z', click: () => editCommand('redo') },
           { type: 'separator' },
           { role: 'cut' },
           { role: 'copy' },
@@ -196,6 +199,15 @@ function setAppMenu(): void {
       { label: 'Window', submenu: [{ role: 'minimize' }, { role: 'zoom' }, { type: 'separator' }, { role: 'front' }] }
     ])
   )
+}
+
+/** Undo / Redo from the Edit menu (or ⌘Z when the page didn't use it): Orbit's own windows decide, web pages undo their text. */
+function editCommand(which: 'undo' | 'redo'): void {
+  const wc = webContents.getFocusedWebContents()
+  if (!wc) return
+  if (mainWindow && wc === mainWindow.webContents) wc.send('edit:command', which)
+  else if (which === 'undo') wc.undo()
+  else wc.redo()
 }
 
 /** The theme showing now (yours, or your light/dark one when matching the system). */
@@ -657,7 +669,10 @@ function registerIpc(): void {
   ipcMain.handle('music:createPlaylist', (_e, name: string) => spotify.createPlaylist(String(name)))
   ipcMain.handle('music:renamePlaylist', (_e, uri: string, name: string) => spotify.renamePlaylist(String(uri), String(name)))
   ipcMain.handle('music:deletePlaylist', (_e, uri: string) => spotify.deletePlaylist(String(uri)))
-  ipcMain.handle('music:addToPlaylist', (_e, uri: string, songs: string[]) => spotify.addToPlaylist(String(uri), Array.isArray(songs) ? songs.map(String) : []))
+  ipcMain.handle('music:addToPlaylist', (_e, uri: string, songs: string[], position?: number) =>
+    spotify.addToPlaylist(String(uri), Array.isArray(songs) ? songs.map(String) : [], typeof position === 'number' ? position : undefined)
+  )
+  ipcMain.handle('music:restorePlaylist', (_e, uri: string) => spotify.restorePlaylist(String(uri)))
   ipcMain.handle('music:removeFromPlaylist', (_e, uri: string, song: string) => spotify.removeFromPlaylist(String(uri), String(song)))
   ipcMain.handle('music:moveInPlaylist', (_e, uri: string, from: number, to: number) => spotify.moveInPlaylist(String(uri), Number(from), Number(to)))
   ipcMain.handle('music:transfer', (_e, deviceId: string) => spotify.transfer(String(deviceId)))
@@ -758,7 +773,7 @@ function registerIpc(): void {
     const done: string[] = []
     for (const p of items) {
       try {
-        await shell.trashItem(v.abs(p))
+        await hold(v.abs(p))
         done.push(p)
       } catch (err) {
         logError('delete', err)
@@ -785,7 +800,7 @@ function registerIpc(): void {
         : `The note will be moved to the ${TRASH_NAME}.`
     })
     if (response !== 0) return false
-    await shell.trashItem(full)
+    await hold(full)
     return true
   })
 }
@@ -862,6 +877,7 @@ app.whenReady().then(async () => {
   safely('studio', setupStudio)
   safely('live streaming', setupLive)
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
+  safely('undo', () => setupUndoBin(() => vault?.root ?? null))
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))
   mainWindow = createWindow()

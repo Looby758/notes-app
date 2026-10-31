@@ -241,7 +241,8 @@ const api: NotesApi = {
   musicCreatePlaylist: (name) => ipcRenderer.invoke('music:createPlaylist', name),
   musicRenamePlaylist: (uri, name) => ipcRenderer.invoke('music:renamePlaylist', uri, name),
   musicDeletePlaylist: (uri) => ipcRenderer.invoke('music:deletePlaylist', uri),
-  musicAddToPlaylist: (uri, songs) => ipcRenderer.invoke('music:addToPlaylist', uri, songs),
+  musicAddToPlaylist: (uri, songs, position) => ipcRenderer.invoke('music:addToPlaylist', uri, songs, position),
+  musicRestorePlaylist: (uri) => ipcRenderer.invoke('music:restorePlaylist', uri),
   musicRemoveFromPlaylist: (uri, song) => ipcRenderer.invoke('music:removeFromPlaylist', uri, song),
   musicMoveInPlaylist: (uri, from, to) => ipcRenderer.invoke('music:moveInPlaylist', uri, from, to),
   localMusicLibrary: (fresh) => ipcRenderer.invoke('localMusic:library', fresh),
@@ -400,7 +401,17 @@ const api: NotesApi = {
     ipcRenderer.on('app:before-close', handler)
     return () => ipcRenderer.removeListener('app:before-close', handler)
   },
-  readyToClose: () => ipcRenderer.invoke('app:ready-to-close')
+  readyToClose: () => ipcRenderer.invoke('app:ready-to-close'),
+  undoHold: (paths, inVault) => ipcRenderer.invoke('undo:hold', paths, inVault),
+  undoHeld: (paths, inVault) => ipcRenderer.invoke('undo:held', paths, inVault),
+  undoRestore: (paths, inVault) => ipcRenderer.invoke('undo:restore', paths, inVault),
+  undoRelease: (paths, inVault) => ipcRenderer.invoke('undo:release', paths, inVault),
+  undoMoveBack: (items) => ipcRenderer.invoke('undo:moveBack', items),
+  onEditCommand: (callback) => {
+    const handler = (_e: unknown, which: 'undo' | 'redo'): void => callback(which)
+    ipcRenderer.on('edit:command', handler)
+    return () => ipcRenderer.removeListener('edit:command', handler)
+  }
 }
 
 contextBridge.exposeInMainWorld('api', api)

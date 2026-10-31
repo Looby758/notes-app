@@ -33,6 +33,7 @@ import {
   setZenEditor
 } from '../lib/editorController'
 import { openLink, openWikiLink } from '../lib/openLink'
+import { watchUndoKeys } from '../lib/undo'
 import Sidebar from './Sidebar/Sidebar'
 import Dock, { TopbarFeatures } from './Nav/Dock'
 import Launcher, { LauncherButton } from './Nav/Launcher'
@@ -195,6 +196,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     setZenEditor(zen)
     remeasure()
   }, [zen])
+
+  // Ctrl+Z / Ctrl+Shift+Z for everything that isn't typing (moved files, playlists, settings…).
+  useEffect(() => watchUndoKeys(IS_MAC), [])
 
   // Every keyboard shortcut comes from the command list, so Ctrl+K shows exactly what works.
   useEffect(() => {

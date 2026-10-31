@@ -4,6 +4,8 @@ import { DEFAULT_PREFS, type Prefs } from '@shared/prefs'
 import { activeThemeId, getTheme, type Theme } from '@shared/themes'
 import { applyAppearance, systemDark, watchSystemTheme } from '../lib/appearance'
 import { loadThemes, useThemes } from './themes'
+import { recordUndo } from '../lib/undo'
+import { SETTINGS } from '../lib/settingsSchema'
 
 /** Your Settings. The main process stores them in settings.json and checks every value. */
 export const usePrefs = create<{ prefs: Prefs }>(() => ({ prefs: DEFAULT_PREFS }))
@@ -22,8 +24,40 @@ export async function loadPrefs(): Promise<void> {
   })
 }
 
+const SPECIAL_LABELS: Partial<Record<keyof Prefs, string>> = {
+  homeOrder: 'Changed the Home page',
+  homeHidden: 'Changed the Home page',
+  shortcuts: 'Changed a shortcut',
+  editorFontSize: 'Changed the text size'
+}
+
+/** "Changed “Accent colour”", for the undo message. */
+function changeLabel(keys: (keyof Prefs)[]): string {
+  if (keys.length !== 1) return 'Changed settings'
+  const special = SPECIAL_LABELS[keys[0]]
+  if (special) return special
+  const def = SETTINGS.find((d) => d.key === keys[0])
+  return def ? `Changed “${def.label}”` : 'Changed a setting'
+}
+
+/** Ctrl+Z puts settings back. A slider dragged (or a key held) is one change, not one per step. */
+function recordChange(patch: Partial<Prefs>): void {
+  const prefs = usePrefs.getState().prefs
+  const keys = (Object.keys(patch) as (keyof Prefs)[]).filter((k) => JSON.stringify(prefs[k]) !== JSON.stringify(patch[k]))
+  if (!keys.length) return
+  const before = Object.fromEntries(keys.map((k) => [k, prefs[k]])) as Partial<Prefs>
+  const after = Object.fromEntries(keys.map((k) => [k, patch[k]])) as Partial<Prefs>
+  recordUndo({
+    label: changeLabel(keys),
+    mergeKey: `prefs:${[...keys].sort().join(',')}`,
+    undo: () => setPrefs(before),
+    redo: () => setPrefs(after)
+  })
+}
+
 /** Applies a change immediately, and saves it shortly after. */
 export function setPrefs(patch: Partial<Prefs>): void {
+  recordChange(patch)
   usePrefs.setState((s) => ({ prefs: { ...s.prefs, ...patch } }))
   pending = { ...pending, ...patch }
   clearTimeout(timer)
