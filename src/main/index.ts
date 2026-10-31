@@ -640,6 +640,7 @@ function registerIpc(): void {
   ipcMain.handle('music:nowPlaying', () => spotify.nowPlaying())
   ipcMain.handle('music:control', (_e, action: MusicAction) => spotify.control(action))
   ipcMain.handle('music:seek', (_e, ms: number) => spotify.seek(ms))
+  ipcMain.handle('music:skip', (_e, count: number) => spotify.skip(Number(count)))
   ipcMain.handle('music:play', (_e, uri: string, context?: string) => spotify.play(uri, context))
   ipcMain.handle('music:search', (_e, query: string) => spotify.search(query))
   ipcMain.handle('music:playlists', () => spotify.playlists())

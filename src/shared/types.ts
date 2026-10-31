@@ -521,6 +521,8 @@ export interface NotesApi {
   musicControl(action: MusicAction): Promise<void>
   musicSeek(ms: number): Promise<void>
   /** Plays a spotify: URI; a song can be played within a playlist or album (`context`). */
+  /** Skips `count` songs on (playing a song further down Up next, keeping the playlist going). */
+  musicSkip(count: number): Promise<void>
   musicPlay(uri: string, context?: string): Promise<void>
   /** Needs your account. */
   musicSearch(query: string): Promise<MusicSearchResults>

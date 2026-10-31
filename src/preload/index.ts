@@ -226,6 +226,7 @@ const api: NotesApi = {
   musicNowPlaying: () => ipcRenderer.invoke('music:nowPlaying'),
   musicControl: (action) => ipcRenderer.invoke('music:control', action),
   musicSeek: (ms) => ipcRenderer.invoke('music:seek', ms),
+  musicSkip: (count) => ipcRenderer.invoke('music:skip', count),
   musicPlay: (uri, context) => ipcRenderer.invoke('music:play', uri, context),
   musicSearch: (query) => ipcRenderer.invoke('music:search', query),
   musicPlaylists: () => ipcRenderer.invoke('music:playlists'),
