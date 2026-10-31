@@ -10361,6 +10361,69 @@ body.reduce-motion .theme-loading-text {
   background: var(--accent);
 }
 
+/* Phone webcam */
+.cam-dialog {
+  width: 400px;
+}
+.cam-intro {
+  margin-top: 8px;
+  font-size: 13px;
+}
+.cam-line {
+  margin: 4px 0 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.cam-line.ok {
+  color: var(--text);
+}
+.cam-box {
+  margin: 6px 0 14px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-raised);
+  font-size: 13px;
+  text-align: left;
+}
+.cam-box p {
+  margin: 0 0 10px;
+}
+.cam-preview {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  margin: 0 0 8px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #000;
+  color: var(--text-faint);
+  font-size: 12.5px;
+}
+.cam-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.cam-settings {
+  display: flex;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+.cam-settings label {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: left;
+}
+.cam-foot {
+  margin: 12px 0 0;
+  font-size: 11.5px;
+}
+
 /* The summon bar's command line: what Enter will do instead of saving. */
 .capture-command {
   display: flex;

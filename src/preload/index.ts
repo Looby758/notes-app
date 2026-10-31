@@ -342,6 +342,23 @@ const api: NotesApi = {
     return () => ipcRenderer.removeListener('phone:event', handler)
   },
   phoneWifi: () => ipcRenderer.invoke('phone:wifi'),
+  camStatus: () => ipcRenderer.invoke('cam:status'),
+  camOn: () => ipcRenderer.invoke('cam:on'),
+  camOff: () => ipcRenderer.invoke('cam:off'),
+  camRetry: () => ipcRenderer.invoke('cam:retry'),
+  camSet: (patch) => ipcRenderer.invoke('cam:set', patch),
+  camNewLink: () => ipcRenderer.invoke('cam:newLink'),
+  camPreview: (on) => ipcRenderer.invoke('cam:preview', on),
+  onCamStatus: (callback) => {
+    const handler = (_e: unknown, status: Parameters<typeof callback>[0]): void => callback(status)
+    ipcRenderer.on('cam:status', handler)
+    return () => ipcRenderer.removeListener('cam:status', handler)
+  },
+  onCamFrame: (callback) => {
+    const handler = (_e: unknown, jpeg: Uint8Array): void => callback(jpeg)
+    ipcRenderer.on('cam:frame', handler)
+    return () => ipcRenderer.removeListener('cam:frame', handler)
+  },
   phoneSetDeck: (buttons) => ipcRenderer.invoke('phone:setDeck', buttons),
   phoneSetScreen: (screen) => ipcRenderer.invoke('phone:setScreen', screen),
   phoneNotify: (title, body) => ipcRenderer.invoke('phone:notify', title, body),
