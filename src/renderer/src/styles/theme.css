@@ -3436,6 +3436,13 @@ body.resizing-rows * {
   font-size: 13px;
   line-height: 1.4;
   cursor: default;
+  /* Selecting the note (Ctrl+A, dragging) doesn't highlight the buttons and labels up here. */
+  user-select: none;
+}
+.cm-props input,
+.cm-props textarea,
+.cm-props [contenteditable='true'] {
+  user-select: text;
 }
 .cm-props-none {
   padding: 0 0 4px;

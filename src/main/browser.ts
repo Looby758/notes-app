@@ -1,5 +1,5 @@
 import { join } from 'path'
-import { app, clipboard, ipcMain, Menu, session, shell, webContents, type MenuItemConstructorOptions, type WebContents } from 'electron'
+import { app, clipboard, ipcMain, Menu, powerMonitor, session, shell, webContents, type MenuItemConstructorOptions, type WebContents } from 'electron'
 import { firefoxUserAgent, isGoogleSignIn, isWebUrl, plainUserAgent, searchUrl, WEB_PARTITION } from '@shared/web'
 import { isMessagesUrl, MESSAGES_PARTITION } from '@shared/messages'
 import { shortcutFromEvent } from '@shared/shortcuts'
@@ -75,6 +75,13 @@ export function setupBrowser(quiet: () => boolean = () => false): void {
   messages.setPermissionRequestHandler((_wc, permission, callback) => callback(allowed(permission)))
   messages.setPermissionCheckHandler((_wc, permission) => allowed(permission))
 
+  // What the hub's sites have stored goes to disk every minute, and before the computer sleeps or
+  // shuts down, so the app being stopped without closing properly (Windows shutting down while it's
+  // in the tray, a crash) doesn't lose a sign-in.
+  setInterval(saveMessages, 60_000).unref?.()
+  powerMonitor.on('suspend', saveMessages)
+  powerMonitor.on('shutdown', () => void releaseMessages())
+
   ipcMain.handle('messages:release', () => releaseMessages())
   ipcMain.handle('messages:clear', async () => {
     await messages.clearStorageData()
@@ -115,7 +122,14 @@ export async function releaseMessages(): Promise<void> {
   const leave = (page: WebContents): Promise<unknown> => page.loadURL('about:blank').catch(() => undefined)
   const timeout = new Promise((resolve) => setTimeout(resolve, 2000))
   await Promise.race([Promise.all(pages.map(leave)), timeout])
+  saveMessages()
+}
+
+/** Writes the messages hub's storage and cookies to disk now, rather than whenever Chromium gets to it. */
+export function saveMessages(): void {
+  const hub = session.fromPartition(MESSAGES_PARTITION)
   hub.flushStorageData()
+  hub.cookies.flushStore().catch(() => undefined)
 }
 
 /**

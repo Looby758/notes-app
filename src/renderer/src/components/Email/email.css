@@ -267,19 +267,6 @@
   border-radius: 5px;
   background: var(--bg-raised);
 }
-.email-pictures {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-  padding: 0;
-  border: none;
-  background: none;
-  font: inherit;
-  font-size: 12px;
-  color: var(--accent);
-  cursor: pointer;
-}
 .email-frame {
   flex: 1;
   min-height: 0;
