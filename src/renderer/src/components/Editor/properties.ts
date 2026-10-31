@@ -1,5 +1,5 @@
-import { EditorState, StateEffect, StateField, type Extension } from '@codemirror/state'
-import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet } from '@codemirror/view'
+import { EditorSelection, EditorState, Prec, StateEffect, StateField, type Extension } from '@codemirror/state'
+import { Decoration, EditorView, keymap, ViewPlugin, WidgetType, type DecorationSet } from '@codemirror/view'
 import { createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { readFrontmatter } from '../../lib/properties'
@@ -153,4 +153,20 @@ const keepCursorOut = ViewPlugin.fromClass(
   }
 )
 
-export const properties: Extension = [rawProperties, panel, keepCursorOut]
+/**
+ * Ctrl+A selects the note itself, not the properties above it. Pressed again (the note already
+ * selected), it takes in the properties too, for copying the whole file.
+ */
+function selectBody(view: EditorView): boolean {
+  const { state } = view
+  if (state.field(rawProperties, false) !== false) return false
+  const fm = readFrontmatter(state.doc.sliceString(0, Math.min(state.doc.length, 20000)))
+  if (!fm) return false
+  const start = Math.min(state.doc.length, state.doc.lineAt(Math.max(0, fm.to - 1)).to + 1)
+  const { from, to } = state.selection.main
+  if (from === start && to === state.doc.length) return false
+  view.dispatch({ selection: EditorSelection.single(start, state.doc.length), userEvent: 'select' })
+  return true
+}
+
+export const properties: Extension = [rawProperties, panel, keepCursorOut, Prec.highest(keymap.of([{ key: 'Mod-a', run: selectBody }]))]

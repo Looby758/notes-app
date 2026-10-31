@@ -39,6 +39,8 @@ win:
     - '!node_modules/node-pty/prebuilds/{darwin-*,win32-arm64}/**'
 nsis:
   oneClick: false
+  # An unticked box to also download ffmpeg (for the Studio's Go live).
+  include: build/installer.nsh
   perMachine: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true

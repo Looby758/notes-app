@@ -1,4 +1,4 @@
-import type { ExplorerEntry, ExplorerPlace } from './explorer'
+import type { ExplorerEntry, ExplorerPlace, PasteMode } from './explorer'
 import type { Prefs } from './prefs'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
@@ -274,6 +274,15 @@ export interface PhoneScreen {
   timer: { label: string; endsAt: number | null; left: number | null } | null
 }
 
+/** A screen or window the Studio can capture (desktopCapturer). */
+export interface StudioCaptureSource {
+  id: string
+  name: string
+  kind: 'screen' | 'window'
+  /** A small picture of it (data: URL), or '' if there isn't one. */
+  thumb: string
+}
+
 export interface NotesApi {
   /** A native yes/no dialog; resolves true if the user picked `ok`. */
   confirm(options: ConfirmOptions): Promise<boolean>
@@ -306,6 +315,36 @@ export interface NotesApi {
   onReminderOpen(callback: (path: string, line: number) => void): () => void
   /** Mac: asks for microphone access (once); elsewhere always true. */
   micAccess(): Promise<boolean>
+  /** Studio: the screens and windows that can be captured. */
+  studioSources(): Promise<StudioCaptureSource[]>
+  /** Studio, Mac: asks for camera access / checks screen recording isn't blocked; elsewhere true. */
+  studioAccess(what: 'camera' | 'screen'): Promise<boolean>
+  studioDefaultFolder(): Promise<string>
+  studioPickFolder(): Promise<string | null>
+  /** Starts a recording file in `folder` (null = Videos/Orbit Recordings). */
+  studioStart(folder: string | null, ext: 'mp4' | 'webm'): Promise<{ id: number; path: string }>
+  studioChunk(id: number, data: Uint8Array): Promise<{ ok: boolean; error?: string }>
+  /** Finishes the file; resolves to its path. */
+  studioStop(id: number): Promise<string | null>
+  studioReveal(path: string): Promise<void>
+  studioOpenFolder(folder: string | null): Promise<string>
+  /** Going live (main/live.ts). */
+  liveStatus(): Promise<import('./live').LiveStatus>
+  onLiveStatus(callback: (s: import('./live').LiveStatus) => void): () => void
+  /** Downloads ffmpeg (needed to go live). */
+  liveGetFfmpeg(): Promise<import('./live').LiveStatus>
+  liveRemoveFfmpeg(): Promise<import('./live').LiveStatus>
+  /** Saves a stream key (encrypted) and, for Custom, the server address. An empty key keeps the saved one. */
+  liveSetKey(service: import('./live').LiveService, key: string, customUrl?: string): Promise<import('./live').LiveStatus>
+  liveClearKey(service: import('./live').LiveService): Promise<import('./live').LiveStatus>
+  liveSetService(service: import('./live').LiveService): Promise<import('./live').LiveStatus>
+  liveStart(service: import('./live').LiveService, quality: string): Promise<void>
+  /** Resolves false once the stream has ended. */
+  liveChunk(data: Uint8Array): Promise<boolean>
+  liveStop(): Promise<void>
+  onLiveStats(callback: (s: import('./live').LiveStats) => void): () => void
+  /** The stream ended by itself: an error message, or null. */
+  onLiveEnded(callback: (error: string | null) => void): () => void
   /** The note's right-click menu asked to record a voice note. */
   onVoiceStart(callback: () => void): () => void
   /** The note's right-click menu asked to draw a sketch. */
@@ -392,15 +431,29 @@ export interface NotesApi {
   /** Turns a complete HTML page into a PDF (A4). */
   printToPdf(html: string): Promise<Uint8Array>
   /** Asks where to save one exported file and writes it; resolves with its path, or null if cancelled. */
-  exportFile(defaultName: string, format: SaveFormat, data: Uint8Array | string): Promise<string | null>
+  exportFile(defaultName: string, format: SaveFormat, data: ExportData): Promise<string | null>
   /** Asks for a folder and writes several exported files into a new folder inside it; resolves with that folder, or null. */
-  exportFiles(folderName: string, files: { name: string; data: Uint8Array | string }[]): Promise<string | null>
+  exportFiles(folderName: string, files: { name: string; data: ExportData }[]): Promise<string | null>
   /** Shows a file in File Explorer / Finder. */
   showExported(path: string): Promise<void>
 
   // File converter
   /** An iPhone photo (HEIC/HEIF) as plain pixels: RGBA, 4 bytes a pixel. */
   decodeHeic(data: Uint8Array): Promise<{ width: number; height: number; data: Uint8Array }>
+  /** Where a dropped or chosen file is on this computer ("" if it isn't a file on disk). */
+  pathForFile(file: File): string
+  /** Whether the video converter (ffmpeg) is downloaded. */
+  videoConverterStatus(): Promise<FfmpegState>
+  /** Downloads the video converter (ffmpeg); resolves when it's done or has failed. */
+  getVideoConverter(): Promise<FfmpegState>
+  /** Download progress for the video converter. Returns a function that stops listening. */
+  onVideoConverterStatus(callback: (state: FfmpegState) => void): () => void
+  /** Converts a video (or takes its sound) with ffmpeg; resolves when it's done. */
+  convertVideo(request: VideoConvertRequest): Promise<ConvertedFile>
+  /** Stops a video conversion, or throws away a finished one that wasn't saved. */
+  cancelVideo(id: number): Promise<void>
+  /** How far along a video conversion is (0…1). Returns a function that stops listening. */
+  onVideoProgress(callback: (id: number, done: number) => void): () => void
 
   // Quick capture
   /** Opens the quick capture window. */
@@ -644,6 +697,18 @@ export interface NotesApi {
   /** Opens a file in its usual app (programs are shown in File Explorer / Finder instead). */
   explorerOpen(path: string): Promise<void>
   explorerReveal(path: string): Promise<void>
+  /** A new empty folder or file, renamed " (2)" if the name's taken. Returns its path. */
+  explorerCreate(dir: string, name: string, kind: 'folder' | 'file'): Promise<string>
+  /** Returns the new path. */
+  explorerRename(path: string, name: string): Promise<string>
+  /** Copies or moves items into a folder, never over anything. Returns the new paths. */
+  explorerPaste(paths: string[], dir: string, mode: PasteMode): Promise<string[]>
+  /** Moves items to the Recycle Bin / Bin (no question asked here). Returns the ones moved. */
+  explorerTrash(paths: string[]): Promise<string[]>
+  /** Finds names under a folder and all its subfolders. */
+  explorerSearch(dir: string, query: string, showHidden: boolean): Promise<ExplorerEntry[]>
+  /** Copies files/folders from the computer into a notes folder ('' is the top); ones already in the notes folder are moved. Returns their notes-folder paths. */
+  explorerToVault(paths: string[], folder: string): Promise<string[]>
   /** Opens a vault file (like a PDF) in its usual app. */
   openFile(path: string): Promise<void>
   /** Reads a note's markdown. */
@@ -706,4 +771,60 @@ export type GoogleSheetResult =
       fix?: 'setup' | 'connect' | 'enable-api' | 'retry'
     }
 /** The kinds of file Notes can save (exports and converted files). */
-export type SaveFormat = 'pdf' | 'docx' | 'html' | 'md' | 'txt' | 'jpg' | 'png' | 'webp' | 'mp3' | 'wav'
+export type SaveFormat = 'pdf' | 'docx' | 'html' | 'md' | 'txt' | 'jpg' | 'png' | 'webp' | 'mp3' | 'wav' | 'mp4' | 'mov' | 'webm' | 'gif'
+
+/** A converted video waiting in a temporary file (videos are too big to pass around in memory). */
+export interface ConvertedFile {
+  converted: string
+  size: number
+}
+
+/** What an exported file holds: its bytes, its text, or a converted video waiting to be saved. */
+export type ExportData = Uint8Array | string | ConvertedFile
+
+/** Whether ffmpeg (downloaded only when asked, for converting videos and streaming) is on this computer. */
+export interface FfmpegState {
+  state: 'ready' | 'missing' | 'downloading' | 'unsupported'
+  progress?: number
+  error?: string
+}
+
+/** A caption bar above or below a GIF, drawn in the window (any font on this computer) and sent as a picture. */
+export interface GifCaption {
+  text: string
+  font: string
+  /** Text size as a share of the GIF's width (0.08 = 8%), so it looks the same at any size. */
+  size: number
+  bold: boolean
+  textColor: string
+  barColor: string
+  position: 'top' | 'bottom'
+}
+
+/** The GIF maker's choices. Times are in seconds of the original video; the crop is in its pixels. */
+export interface GifSettings {
+  start: number
+  end: number
+  crop: { x: number; y: number; w: number; h: number } | null
+  /** 0.5 is half speed, 2 is double. */
+  speed: number
+  fps: number
+  /** The GIF's width in pixels (captions included). */
+  width: number
+  caption: GifCaption | null
+}
+
+export interface VideoConvertRequest {
+  /** Picks out this job in progress updates and when cancelling. */
+  id: number
+  /** The original video on this computer. */
+  path: string
+  format: SaveFormat
+  /** Shrinks the picture to at most this many pixels tall; null keeps its size. */
+  maxHeight: number | null
+  /** GIFs made in the GIF maker: the clip, crop, speed and caption. */
+  gif?: GifSettings
+  /** The caption bar as a PNG, exactly `gif.width` pixels wide. */
+  captionPng?: Uint8Array
+  captionHeight?: number
+}

@@ -14,6 +14,7 @@ import { resetIndex, syncIndex } from './noteIndex'
 import { loadStarred, remapStars, removeStarsWithin } from './starred'
 import { loadFlashcards, remapFlashcards, removeFlashcardsWithin } from './flashcards'
 import { loadMoney } from './money'
+import { loadLockedFolders, remapLockedFolders, removeLockedFoldersWithin } from '../lib/lock/folders'
 
 interface VaultState {
   vault: string
@@ -90,6 +91,7 @@ export const useVault = create<VaultState>((set, get) => {
     remapTabs(from, to)
     remapStars(from, to)
     remapFlashcards(from, to)
+    remapLockedFolders(from, to)
   }
 
   return {
@@ -103,6 +105,7 @@ export const useVault = create<VaultState>((set, get) => {
       set({ vault, tree: [], expanded: loadExpanded(vault), selected: null, renaming: null })
       resetIndex()
       void loadLock()
+      void loadLockedFolders()
       void loadPasswords()
       void loadSnippets()
       void loadSavedSearches()
@@ -232,6 +235,7 @@ export const useVault = create<VaultState>((set, get) => {
         discardWithin(path)
         removeStarsWithin(path)
         removeFlashcardsWithin(path)
+        removeLockedFoldersWithin(path)
         const { selected } = get()
         if (selected && isWithin(selected, path)) set({ selected: null })
         await get().refresh()
@@ -248,7 +252,7 @@ export const useVault = create<VaultState>((set, get) => {
           discardWithin(path)
           removeStarsWithin(path)
           removeFlashcardsWithin(path)
-        removeFlashcardsWithin(path)
+          removeLockedFoldersWithin(path)
         }
         const { selected } = get()
         if (selected && gone.some((p) => isWithin(selected, p))) set({ selected: null })

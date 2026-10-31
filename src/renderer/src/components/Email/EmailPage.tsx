@@ -6,7 +6,6 @@ import {
   ExternalLink,
   FilePlus,
   Forward,
-  Image,
   Loader2,
   Mail,
   Paperclip,
@@ -360,10 +359,8 @@ function Reader() {
   const opening = useEmail((s) => s.opening)
   const openId = useEmail((s) => s.openId)
   const draft = useEmail((s) => s.draft)
-  const [pictures, setPictures] = useState(false)
   const [adding, setAdding] = useState(false)
   useEffect(() => {
-    setPictures(false)
     setAdding(false)
   }, [openId])
 
@@ -470,28 +467,23 @@ function Reader() {
               </button>
             </div>
           )}
-          {email.html && !pictures && /<img\b/i.test(email.html) && (
-            <button className="email-pictures" onClick={() => setPictures(true)}>
-              <Image size={12} /> Pictures are hidden so senders can’t tell you’ve opened this. Show pictures
-            </button>
-          )}
         </div>
-        <EmailBody email={email} pictures={pictures} />
+        <EmailBody email={email} />
       </Private>
     </div>
   )
 }
 
 /**
- * The email itself. HTML emails go in a locked-down frame: no scripts, nothing from the internet
- * unless you show pictures, and links open in your browser.
+ * The email itself. HTML emails go in a locked-down frame: no scripts, pictures and fonts load
+ * straight away, and links open in your browser.
  */
-function EmailBody({ email, pictures }: { email: EmailMessage; pictures: boolean }) {
+function EmailBody({ email }: { email: EmailMessage }) {
   const doc = useMemo(() => {
     if (!email.html) return null
-    const csp = `default-src 'none'; style-src 'unsafe-inline'${pictures ? '; img-src https: http: data:; font-src https: data:' : '; img-src data:'}`
+    const csp = "default-src 'none'; style-src 'unsafe-inline'; img-src https: http: data: cid:; font-src https: data:"
     return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><base target="_blank"><style>html{background:#fff;color:#202124;font:14px/1.5 -apple-system,'Segoe UI',sans-serif}body{margin:16px;overflow-wrap:anywhere}img{max-width:100%;height:auto}</style></head><body>${email.html}</body></html>`
-  }, [email.html, pictures])
+  }, [email.html])
   if (doc) {
     return <iframe className="email-frame" title="Email" sandbox="allow-popups allow-popups-to-escape-sandbox" srcDoc={doc} />
   }

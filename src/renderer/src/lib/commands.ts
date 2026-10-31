@@ -20,6 +20,7 @@ import {
   CONVERT_TAB,
   SUDOKU_TAB,
   MINESWEEPER_TAB,
+  STUDIO_TAB,
   EXPLORER_TAB,
   MESSAGES_TAB,
   GAMES_TAB,
@@ -47,6 +48,7 @@ import { showMessages } from '../store/messages'
 import { FILE_MANAGER } from '@shared/platform'
 import { openRandomNote } from './random'
 import { notify } from '../store/notify'
+import { parentOf } from './paths'
 import { newBoard } from './boards'
 import { newSpreadsheet } from './newSheet'
 import { openAsk, runNoteJob } from '../store/ai'
@@ -54,7 +56,7 @@ import { musicControl, musicToggleLike, setMusicMini, shareSongToNote, toggleMus
 import { sendToPhone } from '../store/phone'
 import { openRadial } from '../components/Nav/RadialMenu'
 import { startSnip } from './snip'
-import { changeNotesPassword, lockAllNow, lockNote, lockNoteOwn, removeLock } from './lock/actions'
+import { changeNotesPassword, lockAllNow, lockFolder, lockNote, lockNoteOwn, removeLock } from './lock/actions'
 
 export interface Command {
   id: string
@@ -178,6 +180,17 @@ export const commands: Command[] = [
       if (path) removeLock(path)
     }
   },
+  {
+    id: 'lock.folder',
+    group: 'Locked notes',
+    title: 'Lock the folder this note is in',
+    run: () => {
+      const path = activeNote()
+      const folder = path ? parentOf(path) : ''
+      if (folder) lockFolder(folder)
+      else notify('Open a note that’s inside a folder first (or right-click a folder in the sidebar and choose “Lock folder”).', 'info')
+    }
+  },
   { id: 'lock.now', group: 'Locked notes', title: 'Lock all notes and passwords now', shortcut: 'Ctrl+Alt+L', run: lockAllNow },
   { id: 'lock.password', group: 'Locked notes', title: 'Change notes password…', run: changeNotesPassword },
   { id: 'passwords.open', group: 'Passwords', title: 'Open passwords', shortcut: 'Ctrl+Alt+K', run: () => openSpecialTab(PASSWORDS_TAB) },
@@ -296,6 +309,8 @@ export const commands: Command[] = [
   { id: 'convert.open', group: 'Navigation', title: 'Convert files (photos, Word, audio…)', run: () => openSpecialTab(CONVERT_TAB) },
   { id: 'explorer.open', group: 'Navigation', title: 'Browse files on this computer (and Google Drive)', run: () => openSpecialTab(EXPLORER_TAB) },
   { id: 'sudoku.open', group: 'Navigation', title: 'Play sudoku (take a quick break)', run: () => openSpecialTab(SUDOKU_TAB) },
+  { id: 'studio.open', group: 'Navigation', title: 'Open the Studio (record your screen and webcam)', run: () => openSpecialTab(STUDIO_TAB) },
+  { id: 'studio.record', group: 'Navigation', title: 'Start or stop recording (Studio)', run: () => void import('./studio').then((m) => m.toggleRecording()) },
   { id: 'minesweeper.open', group: 'Navigation', title: 'Play minesweeper (take a quick break)', run: () => openSpecialTab(MINESWEEPER_TAB) },
   { id: 'games.open', group: 'Navigation', title: 'Games (play your Steam and other games)', run: () => openSpecialTab(GAMES_TAB) },
   { id: 'web.open', group: 'Web', title: 'Open a web page', shortcut: 'Ctrl+Shift+I', run: () => openWebTab() },

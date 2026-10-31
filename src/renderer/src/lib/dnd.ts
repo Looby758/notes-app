@@ -12,8 +12,14 @@ export type DragPayload =
   | { kind: 'file'; path: string }
   /** A file from the file explorer tab (its full path on the computer): dropped into a note, it's attached. */
   | { kind: 'computer'; path: string }
+  /** Several items, or folders, from the file explorer tab: they can be dropped into the notes tree, not a note. */
+  | { kind: 'computerMany'; paths: string[] }
 
 let current: DragPayload | null = null
+
+/** Full paths on the computer being dragged from the file explorer tab, if that's what's being dragged. */
+export const computerPaths = (drag: DragPayload | null): string[] =>
+  drag?.kind === 'computer' ? [drag.path] : drag?.kind === 'computerMany' ? drag.paths : []
 
 export const getDrag = (): DragPayload | null => current
 export const setDrag = (payload: DragPayload | null): void => {

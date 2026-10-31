@@ -44,8 +44,11 @@ export function displayUrl(url: string): string {
  * sites (Google sign-in among them) turn away browsers they don't recognise.
  */
 export function plainUserAgent(agent: string): string {
+  // Only what Chrome itself sends: any other "Name/1.2.3" (the app's own name, whatever it's
+  // called this release, and Electron's) makes sites like WhatsApp say "use Google Chrome".
   return agent
-    .replace(/\s(Electron|notesapp|Notes)\/\S+/gi, '')
+    .replace(/\s([A-Za-z][\w.-]*)\/\S+/g, (token, name: string) => (/^(AppleWebKit|Chrome|Safari)$/.test(name) ? token : ''))
+    .replace(/Chrome\/(\d+)\.[\d.]+/, 'Chrome/$1.0.0.0')
     .replace(/\s{2,}/g, ' ')
     .trim()
 }

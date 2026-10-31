@@ -1,15 +1,28 @@
 import { app, ipcMain, shell } from 'electron'
 import { existsSync, readdirSync } from 'fs'
-import { open, readdir, stat } from 'fs/promises'
+import { cp, mkdir, open, readdir, rename, rm, stat, writeFile } from 'fs/promises'
 import { homedir } from 'os'
-import { isAbsolute, join, relative, resolve } from 'path'
-import { isHiddenName, isStreamable, previewKind, TEXT_PREVIEW_BYTES, type ExplorerEntry, type ExplorerPlace } from '@shared/explorer'
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'path'
+import {
+  isHiddenName,
+  isInside,
+  isStreamable,
+  nameProblem,
+  previewKind,
+  SEARCH_LIMIT,
+  TEXT_PREVIEW_BYTES,
+  uniqueName,
+  type ExplorerEntry,
+  type ExplorerPlace,
+  type PasteMode
+} from '@shared/explorer'
 import { IS_MAC } from '@shared/platform'
 
 /**
  * The file explorer tab's side of things: the places to start from, folder listings, text
  * previews and opening files. Pictures, video, sound and PDFs are previewed through
- * vault://explore/… (see explorerFile). Nothing here changes or deletes a file.
+ * vault://explore/… (see explorerFile). File actions (new, rename, copy, move) never overwrite
+ * anything: a name that's taken gets " (2)". Deleting only ever goes to the Recycle Bin / Bin.
  */
 
 /** Programs and scripts are only ever shown in File Explorer / Finder, never run from here. */
@@ -101,6 +114,24 @@ function checkPath(path: unknown): string {
   return resolve(path)
 }
 
+async function entryOf(vaultRoot: string | null, path: string): Promise<ExplorerEntry | null> {
+  try {
+    const info = await stat(path)
+    const name = basename(path)
+    return {
+      name,
+      path,
+      isDir: info.isDirectory(),
+      size: info.isDirectory() ? 0 : info.size,
+      modified: info.mtimeMs,
+      hidden: isHiddenName(name),
+      vaultPath: inVault(vaultRoot, path)
+    }
+  } catch {
+    return null
+  }
+}
+
 async function list(vaultRoot: string | null, dir: string): Promise<ExplorerEntry[]> {
   const items = await readdir(dir, { withFileTypes: true })
   const entries = await Promise.all(
@@ -144,6 +175,93 @@ export function explorerFile(url: URL): string | null {
   return isAbsolute(path) && isStreamable(path) ? resolve(path) : null
 }
 
+const namesIn = async (dir: string): Promise<string[]> => readdir(dir).catch(() => [])
+
+function checkName(name: unknown): string {
+  const problem = typeof name === 'string' ? nameProblem(name) : 'That isn’t a name.'
+  if (problem) throw new Error(problem)
+  return (name as string).trim()
+}
+
+/** A new, empty folder or file in `dir`, named so it doesn't clash. Returns its path. */
+async function create(dir: string, name: string, kind: 'folder' | 'file'): Promise<string> {
+  const path = join(dir, uniqueName(checkName(name), await namesIn(dir), kind === 'folder'))
+  if (kind === 'folder') await mkdir(path)
+  else await writeFile(path, '', { flag: 'wx' })
+  return path
+}
+
+async function renameItem(path: string, name: string): Promise<string> {
+  const next = join(dirname(path), checkName(name))
+  if (next === path) return path
+  // Changing only the capitals ("plan" → "Plan") is the same file on Windows and a Mac, so it's allowed.
+  if (next.toLowerCase() !== path.toLowerCase() && existsSync(next)) throw new Error(`There's already something called "${basename(next)}" here.`)
+  await rename(path, next)
+  return next
+}
+
+/** Copies or moves each item into `dir`, never over something already there. Returns the new paths. */
+async function paste(paths: string[], dir: string, mode: PasteMode): Promise<string[]> {
+  const done: string[] = []
+  const taken = await namesIn(dir)
+  for (const from of paths) {
+    const info = await stat(from)
+    if (info.isDirectory() && isInside(dir, from)) throw new Error(`"${basename(from)}" can't go inside itself.`)
+    // Moving into the folder it's already in does nothing; copying there makes "name (2)".
+    if (mode === 'move' && resolve(dirname(from)) === resolve(dir)) continue
+    const name = uniqueName(basename(from), taken, info.isDirectory())
+    taken.push(name)
+    const to = join(dir, name)
+    if (mode === 'move') {
+      try {
+        await rename(from, to)
+      } catch (err) {
+        // To another drive, a move is a copy and then a delete.
+        if ((err as NodeJS.ErrnoException).code !== 'EXDEV') throw err
+        await cp(from, to, { recursive: true, errorOnExist: true, force: false, preserveTimestamps: true })
+        await rm(from, { recursive: true, force: true })
+      }
+    } else {
+      await cp(from, to, { recursive: true, errorOnExist: true, force: false, preserveTimestamps: true })
+    }
+    done.push(to)
+  }
+  return done
+}
+
+/** The folders that are never worth searching through. */
+const SKIP_DIRS = new Set(['node_modules', '$recycle.bin', 'system volume information', 'appdata', 'library', 'windows', 'program files', 'program files (x86)', 'programdata'])
+
+/** Names containing every word typed, anywhere under `dir`. Stops at SEARCH_LIMIT matches or a few seconds. */
+async function search(vaultRoot: string | null, dir: string, query: string, showHidden: boolean): Promise<ExplorerEntry[]> {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+  if (!words.length) return []
+  const found: string[] = []
+  const queue = [dir]
+  const until = Date.now() + 4000
+  while (queue.length && found.length < SEARCH_LIMIT && Date.now() < until) {
+    const at = queue.shift()!
+    const items = await readdir(at, { withFileTypes: true }).catch(() => [])
+    for (const item of items) {
+      const hidden = isHiddenName(item.name)
+      if (hidden && !showHidden) continue
+      const path = join(at, item.name)
+      const lower = item.name.toLowerCase()
+      if (words.every((w) => lower.includes(w))) found.push(path)
+      // Shortcuts to folders aren't followed, so a loop can't trap the search.
+      if (item.isDirectory() && !item.isSymbolicLink() && !(at !== dir && SKIP_DIRS.has(lower))) queue.push(path)
+      if (found.length >= SEARCH_LIMIT) break
+    }
+  }
+  const entries = await Promise.all(found.map((p) => entryOf(vaultRoot, p)))
+  return entries.filter((e): e is ExplorerEntry => !!e)
+}
+
+const checkPaths = (paths: unknown): string[] => {
+  if (!Array.isArray(paths)) throw new Error('Nothing was picked.')
+  return paths.map(checkPath)
+}
+
 export function setupExplorer(vaultRoot: () => string | null): void {
   ipcMain.handle('explorer:places', () => places(vaultRoot()))
   ipcMain.handle('explorer:list', (_e, dir: string) => list(vaultRoot(), checkPath(dir)))
@@ -162,4 +280,31 @@ export function setupExplorer(vaultRoot: () => string | null): void {
     if (error) throw new Error(error)
   })
   ipcMain.handle('explorer:reveal', (_e, path: string) => shell.showItemInFolder(checkPath(path)))
+  ipcMain.handle('explorer:create', (_e, dir: string, name: string, kind: 'folder' | 'file') => create(checkPath(dir), name, kind === 'folder' ? 'folder' : 'file'))
+  ipcMain.handle('explorer:rename', (_e, path: string, name: string) => renameItem(checkPath(path), name))
+  ipcMain.handle('explorer:paste', (_e, paths: string[], dir: string, mode: PasteMode) => paste(checkPaths(paths), checkPath(dir), mode === 'move' ? 'move' : 'copy'))
+  ipcMain.handle('explorer:trash', async (_e, paths: string[]) => {
+    const done: string[] = []
+    for (const p of checkPaths(paths)) {
+      // The top of a drive can't go in the Bin.
+      if (dirname(p) === p) continue
+      await shell.trashItem(p)
+      done.push(p)
+    }
+    return done
+  })
+  // Dropped from the explorer (or File Explorer / Finder) onto a folder in the sidebar's notes tree:
+  // copied in from outside the notes folder, moved when it's already inside it. Returns notes-folder paths.
+  ipcMain.handle('explorer:toVault', async (_e, paths: string[], folder: string) => {
+    const root = vaultRoot()
+    if (!root) throw new Error('Open a notes folder first.')
+    const target = resolve(root, typeof folder === 'string' ? folder : '')
+    if (!isInside(target, root)) throw new Error('That folder isn’t in your notes folder.')
+    const sources = checkPaths(paths)
+    const inside = sources.filter((p) => inVault(root, p))
+    const outside = sources.filter((p) => !inVault(root, p))
+    const done = [...(await paste(inside, target, 'move')), ...(await paste(outside, target, 'copy'))]
+    return done.map((p) => inVault(root, p)).filter((p): p is string => !!p)
+  })
+  ipcMain.handle('explorer:search', (_e, dir: string, query: string, showHidden: boolean) => search(vaultRoot(), checkPath(dir), String(query ?? ''), !!showHidden))
 }

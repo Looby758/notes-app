@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { MusicMiniCommand, MusicMiniState, NotesApi } from '@shared/types'
 
 const api: NotesApi = {
@@ -26,6 +26,39 @@ const api: NotesApi = {
   setFullScreen: (on) => ipcRenderer.invoke('app:fullscreen', on),
   showReminder: (r) => ipcRenderer.invoke('reminder:show', r),
   micAccess: () => ipcRenderer.invoke('voice:access'),
+  studioSources: () => ipcRenderer.invoke('studio:sources'),
+  studioAccess: (what) => ipcRenderer.invoke('studio:access', what),
+  studioDefaultFolder: () => ipcRenderer.invoke('studio:defaultFolder'),
+  studioPickFolder: () => ipcRenderer.invoke('studio:pickFolder'),
+  studioStart: (folder, ext) => ipcRenderer.invoke('studio:start', folder, ext),
+  studioChunk: (id, data) => ipcRenderer.invoke('studio:chunk', id, data),
+  studioStop: (id) => ipcRenderer.invoke('studio:stop', id),
+  studioReveal: (path) => ipcRenderer.invoke('studio:reveal', path),
+  studioOpenFolder: (folder) => ipcRenderer.invoke('studio:openFolder', folder),
+  liveStatus: () => ipcRenderer.invoke('live:status'),
+  onLiveStatus: (callback) => {
+    const handler = (_e: unknown, s: Parameters<typeof callback>[0]): void => callback(s)
+    ipcRenderer.on('live:status', handler)
+    return () => ipcRenderer.removeListener('live:status', handler)
+  },
+  liveGetFfmpeg: () => ipcRenderer.invoke('live:getFfmpeg'),
+  liveRemoveFfmpeg: () => ipcRenderer.invoke('live:removeFfmpeg'),
+  liveSetKey: (service, key, customUrl) => ipcRenderer.invoke('live:setKey', service, key, customUrl),
+  liveClearKey: (service) => ipcRenderer.invoke('live:clearKey', service),
+  liveSetService: (service) => ipcRenderer.invoke('live:setService', service),
+  liveStart: (service, quality) => ipcRenderer.invoke('live:start', service, quality),
+  liveChunk: (data) => ipcRenderer.invoke('live:chunk', data),
+  liveStop: () => ipcRenderer.invoke('live:stop'),
+  onLiveStats: (callback) => {
+    const handler = (_e: unknown, s: Parameters<typeof callback>[0]): void => callback(s)
+    ipcRenderer.on('live:stats', handler)
+    return () => ipcRenderer.removeListener('live:stats', handler)
+  },
+  onLiveEnded: (callback) => {
+    const handler = (_e: unknown, err: string | null): void => callback(err)
+    ipcRenderer.on('live:ended', handler)
+    return () => ipcRenderer.removeListener('live:ended', handler)
+  },
   onVoiceStart: (callback) => {
     const handler = (): void => callback()
     ipcRenderer.on('voice:start', handler)
@@ -112,6 +145,27 @@ const api: NotesApi = {
   exportFiles: (folderName, files) => ipcRenderer.invoke('export:files', folderName, files),
   showExported: (path) => ipcRenderer.invoke('export:show', path),
   decodeHeic: (data) => ipcRenderer.invoke('convert:heic', data),
+  pathForFile: (file) => {
+    try {
+      return webUtils.getPathForFile(file)
+    } catch {
+      return ''
+    }
+  },
+  videoConverterStatus: () => ipcRenderer.invoke('convert:ffmpeg-status'),
+  getVideoConverter: () => ipcRenderer.invoke('convert:ffmpeg-get'),
+  onVideoConverterStatus: (callback) => {
+    const handler = (_e: unknown, state: Parameters<typeof callback>[0]): void => callback(state)
+    ipcRenderer.on('convert:ffmpeg-status', handler)
+    return () => ipcRenderer.removeListener('convert:ffmpeg-status', handler)
+  },
+  convertVideo: (request) => ipcRenderer.invoke('convert:video', request),
+  cancelVideo: (id) => ipcRenderer.invoke('convert:video-cancel', id),
+  onVideoProgress: (callback) => {
+    const handler = (_e: unknown, id: number, done: number): void => callback(id, done)
+    ipcRenderer.on('convert:video-progress', handler)
+    return () => ipcRenderer.removeListener('convert:video-progress', handler)
+  },
 
   startSnip: () => ipcRenderer.invoke('snip:start'),
   snipStatus: () => ipcRenderer.invoke('snip:status'),
@@ -308,6 +362,12 @@ const api: NotesApi = {
   explorerReadText: (path) => ipcRenderer.invoke('explorer:readText', path),
   explorerOpen: (path) => ipcRenderer.invoke('explorer:open', path),
   explorerReveal: (path) => ipcRenderer.invoke('explorer:reveal', path),
+  explorerCreate: (dir, name, kind) => ipcRenderer.invoke('explorer:create', dir, name, kind),
+  explorerRename: (path, name) => ipcRenderer.invoke('explorer:rename', path, name),
+  explorerPaste: (paths, dir, mode) => ipcRenderer.invoke('explorer:paste', paths, dir, mode),
+  explorerTrash: (paths) => ipcRenderer.invoke('explorer:trash', paths),
+  explorerSearch: (dir, query, showHidden) => ipcRenderer.invoke('explorer:search', dir, query, showHidden),
+  explorerToVault: (paths, folder) => ipcRenderer.invoke('explorer:toVault', paths, folder),
   openFile: (path) => ipcRenderer.invoke('fs:openFile', path),
   readNote: (path) => ipcRenderer.invoke('fs:read', path),
   writeNote: (path, content) => ipcRenderer.invoke('fs:write', path, content),

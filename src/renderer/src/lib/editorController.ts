@@ -69,6 +69,8 @@ export const MONEY_TAB = 'money:'
 export const CONVERT_TAB = 'convert:'
 export const SUDOKU_TAB = 'sudoku:'
 export const MINESWEEPER_TAB = 'minesweeper:'
+/** Scenes, webcam and screen recording (components/Studio). */
+export const STUDIO_TAB = 'studio:'
 /** WhatsApp and Discord in one tab (components/Messages). */
 export const MESSAGES_TAB = 'messages:'
 export const GAMES_TAB = 'games:'

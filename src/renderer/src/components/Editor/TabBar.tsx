@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ArrowRightLeft, Bomb, CalendarDays, Columns2, Copy, ExternalLink, FileDown, FolderSearch, Gamepad2, GitCompare, Globe, Grid3x3, HardDrive, House, KeyRound, Layers, Mail, MessageSquare, MessagesSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
+import { ArrowRightLeft, Bomb, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, FolderSearch, Gamepad2, GitCompare, Globe, Grid3x3, HardDrive, House, KeyRound, Layers, Mail, MessageSquare, MessagesSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
 import Private from '../Streamer/Private'
 import { useHideNames } from '../../store/streamer'
 import { useEditor } from '../../store/editor'
@@ -24,6 +24,7 @@ import {
   EXPLORER_TAB,
   SUDOKU_TAB,
   MINESWEEPER_TAB,
+  STUDIO_TAB,
   MESSAGES_TAB,
   GAMES_TAB,
   closePane,
@@ -82,6 +83,7 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === CONVERT_TAB) return 'Convert files'
   if (id === SUDOKU_TAB) return 'Sudoku'
   if (id === MINESWEEPER_TAB) return 'Minesweeper'
+  if (id === STUDIO_TAB) return 'Studio'
   if (id === MESSAGES_TAB) return 'Messages'
   if (id === GAMES_TAB) return 'Games'
   if (id === EXPLORER_TAB) return 'Files'
@@ -130,7 +132,7 @@ export default function TabBar({ pane }: { pane: string }) {
   const onDrop = (e: DragEvent): void => {
     const drag = getDrag()
     setDropIndex(null)
-    if (!drag || drag.kind === 'computer') return
+    if (!drag || drag.kind === 'computer' || drag.kind === 'computerMany') return
     e.preventDefault()
     e.stopPropagation()
     const index = indexAt(e.clientX)
@@ -260,6 +262,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === CONVERT_TAB && <ArrowRightLeft size={13} className="tab-icon" />}
               {id === SUDOKU_TAB && <Grid3x3 size={13} className="tab-icon" />}
               {id === MINESWEEPER_TAB && <Bomb size={13} className="tab-icon" />}
+              {id === STUDIO_TAB && <Clapperboard size={13} className="tab-icon" />}
               {id === MESSAGES_TAB && <MessagesSquare size={13} className="tab-icon" />}
               {id === GAMES_TAB && <Gamepad2 size={13} className="tab-icon" />}
               {id === EXPLORER_TAB && <HardDrive size={13} className="tab-icon" />}

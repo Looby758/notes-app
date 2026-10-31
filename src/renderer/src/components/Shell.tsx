@@ -53,6 +53,7 @@ import UpdateToast from './UpdateToast'
 import Screensaver from './Screensaver/Screensaver'
 import Pet from './Motion/Pet'
 import MusicPlayer from './Music/MusicPlayer'
+import RecordingBar from './Studio/RecordingBar'
 import ZenBar, { StatusTimer } from './ZenBar'
 import VoiceRecorder from './VoiceRecorder'
 import DefinitionCard from './DefinitionCard'
@@ -358,6 +359,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <Pet />
       <UpdateToast />
       <MusicPlayer />
+      <RecordingBar />
       <ZenBar />
       <VoiceRecorder />
       <DefinitionCard />
