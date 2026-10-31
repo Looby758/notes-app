@@ -177,6 +177,8 @@ export interface Prefs {
   /** Holding the middle mouse button opens a ring of these features under the pointer. */
   radialMiddleClick: boolean
   radialFeatures: string[]
+  /** Buttons on the phone's Deck tab: feature ids, and a few phone-only actions (lib/phoneDeck.ts). */
+  phoneDeck: string[]
   /** Ctrl+K: if no built-in pattern understands a sentence, offer to ask the AI (never sent without asking). */
   smartCommandsAi: boolean
 
@@ -288,6 +290,7 @@ export const DEFAULT_PREFS: Prefs = {
   radialMiddleClick: true,
   radialFeatures: ['today', 'new-note', 'calendar', 'money', 'music', 'email', 'snip', 'ask'],
   smartCommandsAi: true,
+  phoneDeck: ['play-pause', 'next-song', 'previous-song', 'today', 'new-note', 'snip', 'streamer', 'lock-all', 'zen', 'money', 'calendar', 'messages'],
 
   shortcuts: {}
 }
@@ -411,7 +414,7 @@ export function normalizePrefs(raw: unknown): Prefs {
   out.captureInbox = cleanFolder(input.captureInbox ?? DEFAULT_PREFS.captureInbox, DEFAULT_PREFS.captureInbox) || DEFAULT_PREFS.captureInbox
   out.homeOrder = cleanIds(input.homeOrder)
   out.homeHidden = cleanIds(input.homeHidden)
-  for (const k of ['topbarFeatures', 'dockFeatures', 'radialFeatures'] as const) {
+  for (const k of ['topbarFeatures', 'dockFeatures', 'radialFeatures', 'phoneDeck'] as const) {
     out[k] = input[k] === undefined ? [...DEFAULT_PREFS[k]] : cleanIds(input[k])
   }
 

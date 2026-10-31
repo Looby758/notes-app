@@ -133,7 +133,7 @@ export const featuresFor = (ids: readonly string[]): Feature[] => ids.map((id) =
 /** Opens the launcher (every feature, grouped, type to filter). */
 export const openLauncher = (): void => useUI.setState({ launcherOpen: true })
 
-export type FeaturePlace = 'topbarFeatures' | 'dockFeatures' | 'radialFeatures'
+export type FeaturePlace = 'topbarFeatures' | 'dockFeatures' | 'radialFeatures' | 'phoneDeck'
 
 /** Adds a feature to (or takes it off) the top bar, the dock or the radial menu. */
 export function toggleFeatureIn(place: FeaturePlace, id: string): void {

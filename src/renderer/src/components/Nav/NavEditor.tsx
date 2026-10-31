@@ -3,11 +3,13 @@ import { RotateCcw } from 'lucide-react'
 import { DEFAULT_PREFS } from '@shared/prefs'
 import { resetPrefs, usePrefs } from '../../store/prefs'
 import { FEATURE_GROUPS, FEATURES, toggleFeatureIn, type FeaturePlace } from '../../lib/features'
+import { DECK_EXTRAS } from '../../lib/phoneDeck'
 
 const PLACES: { place: FeaturePlace; label: string }[] = [
   { place: 'topbarFeatures', label: 'Top bar' },
   { place: 'dockFeatures', label: 'Dock' },
-  { place: 'radialFeatures', label: 'Radial' }
+  { place: 'radialFeatures', label: 'Radial' },
+  { place: 'phoneDeck', label: 'Phone deck' }
 ]
 
 /** Settings → Finding features: tick where each feature shows up. Everything is always in the launcher. */
@@ -26,7 +28,7 @@ export default function NavEditor() {
       </div>
       <p className="setting-hint">
         Every feature is always in the launcher (the “All features” button, or Ctrl+Shift+Space). Tick the ones you want one click away. New ones go at the end;
-        drag them in the top bar or dock to reorder.
+        drag them in the top bar or dock to reorder. The phone deck is the Deck tab on your phone’s Orbit page.
       </p>
       <table>
         <thead>
@@ -40,7 +42,7 @@ export default function NavEditor() {
         <tbody>
           {FEATURE_GROUPS.flatMap((g) => [
             <tr key={g} className="nav-editor-group">
-              <td colSpan={4}>{g}</td>
+              <td colSpan={5}>{g}</td>
             </tr>,
             ...FEATURES.filter((f) => f.group === g).map((f) => {
               const Icon = f.icon
@@ -60,6 +62,24 @@ export default function NavEditor() {
               )
             })
           ])}
+          <tr className="nav-editor-group">
+            <td colSpan={5}>Phone deck only</td>
+          </tr>
+          {DECK_EXTRAS.map((x) => (
+            <tr key={x.id} data-feature={x.id}>
+              <td>
+                <span className="nav-editor-name">
+                  <span aria-hidden>{x.icon}</span> {x.name}
+                </span>
+              </td>
+              <td />
+              <td />
+              <td />
+              <td>
+                <input type="checkbox" checked={prefs.phoneDeck.includes(x.id)} onChange={() => toggleFeatureIn('phoneDeck', x.id)} aria-label={`${x.name} on the phone deck`} />
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </section>

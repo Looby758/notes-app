@@ -46,7 +46,7 @@ import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
 import { dictionaryMenu, setupDictionary } from './dictionary'
 import { setupPhoneLink } from './phoneLink'
-import { setupPhonePair } from './phonePair'
+import { phoneNotify, setupPhonePair } from './phonePair'
 import { setupWebTitle } from './webTitle'
 import { setupPlaces } from './places'
 import { setupWeather } from './weather'
@@ -509,6 +509,8 @@ function registerIpc(): void {
   })
   // A reminder: a system notification; clicking it brings Notes up at that note.
   ipcMain.handle('reminder:show', (_e, r: { title: string; body: string; path: string; line: number }) => {
+    // Your phone buzzes too, if its Orbit page is open.
+    phoneNotify('⏰ ' + (currentPrefs().streamerMode ? 'Reminder' : r.title), currentPrefs().streamerMode ? '' : r.body)
     if (!Notification.isSupported()) {
       logError('reminder', new Error('Notifications aren’t supported on this system.'))
       return false

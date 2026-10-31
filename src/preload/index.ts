@@ -287,6 +287,9 @@ const api: NotesApi = {
     return () => ipcRenderer.removeListener('phone:event', handler)
   },
   phoneWifi: () => ipcRenderer.invoke('phone:wifi'),
+  phoneSetDeck: (buttons) => ipcRenderer.invoke('phone:setDeck', buttons),
+  phoneSetScreen: (screen) => ipcRenderer.invoke('phone:setScreen', screen),
+  phoneNotify: (title, body) => ipcRenderer.invoke('phone:notify', title, body),
   readAppData: (name) => ipcRenderer.invoke('vault:readAppData', name),
   writeAppData: (name, content) => ipcRenderer.invoke('vault:writeAppData', name, content),
   readSafeFile: (id) => ipcRenderer.invoke('safe:read', id),

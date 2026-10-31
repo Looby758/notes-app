@@ -5,6 +5,7 @@ import { insertIntoActiveNote, liveTypeIntoActiveNote } from '../lib/editorContr
 import { parseReceipt } from '../lib/receipt'
 import { formatPounds, guessCategory } from '../lib/money'
 import { addEntry, loadMoney, useMoney } from './money'
+import { runDeck, startPhoneSync } from '../lib/phoneDeck'
 
 /**
  * The phone dialog: sending a vault file (note or attachment) or a web link, pairing a phone, or
@@ -48,6 +49,9 @@ function handle(event: PhoneEvent): void {
     case 'receipt':
       void addReceipt(event.path, event.text).catch(notify)
       return
+    case 'deck':
+      runDeck(event.id)
+      return
     case 'dictate':
       if (!liveTypeIntoActiveNote(event.id, event.text, event.done) && !warned.has(event.id)) {
         warned.add(event.id)
@@ -57,4 +61,11 @@ function handle(event: PhoneEvent): void {
 }
 
 /** Listens to the paired phone while the notes window is open. */
-export const startPhone = (): (() => void) => window.api.onPhoneEvent(handle)
+export function startPhone(): () => void {
+  const off = window.api.onPhoneEvent(handle)
+  const offSync = startPhoneSync()
+  return () => {
+    off()
+    offSync()
+  }
+}

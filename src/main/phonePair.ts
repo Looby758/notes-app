@@ -1,7 +1,7 @@
 import { clipboard, ipcMain, type BrowserWindow } from 'electron'
 import type { IncomingMessage, ServerResponse } from 'http'
 import { basename } from 'path'
-import type { PhoneEvent, PhonePairing } from '@shared/types'
+import type { DeckButton, PhoneEvent, PhonePairing, PhoneScreen } from '@shared/types'
 import { endSession, lanAddress, newToken, openSession } from './phoneLink'
 import { phoneAppHtml } from './phoneApp'
 import { sendInput, type PhoneInput } from './phoneInput'
@@ -29,6 +29,8 @@ const clients = new Set<ServerResponse>()
 let clipTimer: ReturnType<typeof setInterval> | undefined
 let lastClip = ''
 let offMusic: (() => void) | null = null
+let deck: DeckButton[] = []
+let screenData: PhoneScreen | null = null
 
 const toWindow = (event: PhoneEvent): void => getWindow()?.webContents.send('phone:event', event)
 
@@ -47,6 +49,8 @@ function connect(req: IncomingMessage, res: ServerResponse): void {
   res.writeHead(200, { 'Content-Type': 'text/event-stream', Connection: 'keep-alive' })
   res.write(`data: ${JSON.stringify({ type: 'clip', text: clipboard.readText() })}\n\n`)
   res.write(`data: ${JSON.stringify(music())}\n\n`)
+  res.write(`data: ${JSON.stringify({ type: 'deck', buttons: deck })}\n\n`)
+  if (screenData) res.write(`data: ${JSON.stringify({ type: 'screen', ...screenData })}\n\n`)
   clients.add(res)
   const ping = setInterval(() => res.write(': ping\n\n'), 25_000)
   if (clients.size === 1) {
@@ -114,6 +118,19 @@ async function command(cmd: { kind?: string; [key: string]: unknown }): Promise<
       lastClip = String(cmd.text ?? '')
       clipboard.writeText(lastClip)
       return
+    case 'deck': {
+      const button = deck.find((b) => b.id === cmd.id)
+      if (!button) throw new Error('That button isn’t on the deck any more.')
+      const win = getWindow()
+      if (!win || win.isDestroyed()) throw new Error('Open Orbit on your computer first.')
+      if (button.show) {
+        if (win.isMinimized()) win.restore()
+        win.show()
+        win.focus()
+      }
+      toWindow({ type: 'deck', id: button.id })
+      return
+    }
   }
 }
 
@@ -145,6 +162,17 @@ async function handle(req: IncomingMessage, res: ServerResponse, rest: string, b
   json(res, 404, { error: 'Not found' })
 }
 
+/** A heads-up on the phone (a reminder going off, new messages): shown while the Orbit page is open there. */
+export function phoneNotify(title: string, body: string): void {
+  if (clients.size) broadcast({ type: 'notify', title: title.slice(0, 200), body: body.slice(0, 500) })
+}
+
+const cleanDeck = (v: unknown): DeckButton[] =>
+  (Array.isArray(v) ? v : [])
+    .filter((b): b is DeckButton => !!b && typeof b.id === 'string' && typeof b.label === 'string' && typeof b.icon === 'string')
+    .slice(0, 40)
+    .map((b) => ({ id: b.id.slice(0, 40), label: b.label.slice(0, 40), icon: b.icon.slice(0, 8), show: b.show === true }))
+
 /** Starts the paired session (a remembered one if there is one) and returns its QR address. */
 async function pair(fresh = false): Promise<PhonePairing> {
   const saved = loadSettings()
@@ -175,6 +203,16 @@ export function setupPhonePair(
   ipcMain.handle('phone:pair', (_e, fresh?: boolean) => pair(fresh === true))
   ipcMain.handle('phone:forget', () => forget())
   ipcMain.handle('phone:wifi', () => currentWifi())
+  ipcMain.handle('phone:setDeck', (_e, buttons: unknown) => {
+    deck = cleanDeck(buttons)
+    broadcast({ type: 'deck', buttons: deck })
+  })
+  ipcMain.handle('phone:setScreen', (_e, data: PhoneScreen) => {
+    if (!data || typeof data !== 'object') return
+    screenData = data
+    broadcast({ type: 'screen', ...data })
+  })
+  ipcMain.handle('phone:notify', (_e, title: string, body: string) => phoneNotify(String(title), String(body)))
   // A phone paired before reconnects as soon as Notes is open again.
   if (loadSettings().phoneToken) pair().catch((err) => logError('phone link', err))
 }

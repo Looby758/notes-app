@@ -254,6 +254,25 @@ export type PhoneEvent =
   | { type: 'file'; path: string; into: 'note' | 'folder' }
   | { type: 'receipt'; path: string; text: string }
   | { type: 'dictate'; id: string; text: string; done: boolean }
+  /** A button on the phone's Deck was pressed. */
+  | { type: 'deck'; id: string }
+
+/** A button on the phone's Deck tab. */
+export interface DeckButton {
+  id: string
+  label: string
+  /** An emoji (the phone page has no icon font). */
+  icon: string
+  /** Bring Orbit's window to the front when pressed (it opens something). */
+  show?: boolean
+}
+
+/** What the phone's Screen tab shows: today's plan, the open note, the focus timer. */
+export interface PhoneScreen {
+  today: { time: string; title: string; done?: boolean }[]
+  note: { title: string; text: string } | null
+  timer: { label: string; endsAt: number | null; left: number | null } | null
+}
 
 export interface NotesApi {
   /** A native yes/no dialog; resolves true if the user picked `ok`. */
@@ -587,6 +606,10 @@ export interface NotesApi {
   phonePair(fresh?: boolean): Promise<PhonePairing>
   phoneForget(): Promise<void>
   onPhoneEvent(callback: (event: PhoneEvent) => void): () => void
+  /** The Deck buttons and Screen contents for the paired phone, and a heads-up to show on it. */
+  phoneSetDeck(buttons: DeckButton[]): Promise<void>
+  phoneSetScreen(screen: PhoneScreen): Promise<void>
+  phoneNotify(title: string, body: string): Promise<void>
   /** The Wi-Fi this computer is on, for a guest QR code (blank where it can't be read). */
   phoneWifi(): Promise<WifiNetwork>
   /** Reads/writes a small app file kept in the vault's hidden ".notesapp" folder (synced with your notes). */
