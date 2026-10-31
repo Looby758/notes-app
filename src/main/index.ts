@@ -49,6 +49,7 @@ import { formatMenuFor, setupMenus } from './menus'
 import { dictionaryMenu, setupDictionary } from './dictionary'
 import { setupPhoneLink } from './phoneLink'
 import { phoneNotify, setupPhonePair } from './phonePair'
+import { isShareWindow, setupMouseShare, teardownMouseShare } from './mouseShare'
 import { setupWebTitle } from './webTitle'
 import { setupPlaces } from './places'
 import { setupWeather } from './weather'
@@ -833,7 +834,12 @@ app.whenReady().then(async () => {
   const audioOnly = (details: { mediaTypes?: string[] } | undefined): boolean =>
     !!details?.mediaTypes?.length && details.mediaTypes.every((t) => t === 'audio')
   session.defaultSession.setPermissionRequestHandler((wc, permission, callback, details) =>
-    callback(ALLOWED_PERMISSIONS.has(permission) || (permission === 'media' && (audioOnly(details as { mediaTypes?: string[] }) || isAppPage(wc))))
+    callback(
+      ALLOWED_PERMISSIONS.has(permission) ||
+        (permission === 'media' && (audioOnly(details as { mediaTypes?: string[] }) || isAppPage(wc))) ||
+        // Mouse sharing's invisible window takes the pointer while it's on the other computer.
+        (permission === 'pointerLock' && isShareWindow(wc))
+    )
   )
   session.defaultSession.setPermissionCheckHandler(
     (wc, permission, _origin, details) =>
@@ -865,6 +871,8 @@ app.whenReady().then(async () => {
   // The extras: if one of them fails on some computer, the app itself still works.
   safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: () => void startSnip() }))
   safely('screen snip', () => setupSnip({ getMain: () => mainWindow, showMain }))
+  // A password copied from the vault isn't passed to the other computer.
+  safely('mouse sharing', () => setupMouseShare(() => mainWindow, (text) => text === copiedSecret))
   safely('system settings', () => applySystemPrefs(currentPrefs()))
   safely('updates', () => setupUpdater(() => currentPrefs().checkForUpdates))
 })
@@ -891,6 +899,7 @@ app.on('before-quit', () => {
 })
 app.on('will-quit', () => {
   teardownCapture()
+  safely('mouse sharing', teardownMouseShare)
   clearSecret()
 })
 

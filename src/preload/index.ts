@@ -1,6 +1,13 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { MusicMiniCommand, MusicMiniState, NotesApi } from '@shared/types'
 
+/** Listens for a message from the main process; returns the way to stop. */
+function on<T>(channel: string, callback: (value: T) => void): () => void {
+  const handler = (_e: unknown, value: T): void => callback(value)
+  ipcRenderer.on(channel, handler)
+  return () => ipcRenderer.removeListener(channel, handler)
+}
+
 const api: NotesApi = {
   confirm: (options) => ipcRenderer.invoke('app:confirm', options),
   copySecret: (text, seconds) => ipcRenderer.invoke('clipboard:copySecret', text, seconds),
@@ -341,6 +348,23 @@ const api: NotesApi = {
     return () => ipcRenderer.removeListener('phone:event', handler)
   },
   phoneWifi: () => ipcRenderer.invoke('phone:wifi'),
+  shareStatus: () => ipcRenderer.invoke('share:status'),
+  shareSet: (patch) => ipcRenderer.invoke('share:set', patch),
+  onShareStatus: (callback) => on('share:status', callback),
+  sharePair: (target) => ipcRenderer.invoke('share:pair', target),
+  shareConfirmPairing: () => ipcRenderer.invoke('share:confirmPairing'),
+  shareCancelPairing: () => ipcRenderer.invoke('share:cancelPairing'),
+  shareUnpair: () => ipcRenderer.invoke('share:unpair'),
+  shareAskAccessibility: () => ipcRenderer.invoke('share:askAccessibility'),
+  shareSendFiles: (paths) => ipcRenderer.invoke('share:sendFiles', paths),
+  onShareReceived: (callback) => on('share:received', callback),
+  onShareOpenSettings: (callback) => on('share:openSettings', callback),
+  shareInput: (event) => ipcRenderer.send('share:input', event),
+  shareComeBack: () => ipcRenderer.send('share:comeBack'),
+  onShareCapture: (callback) => on('share:capture', callback),
+  shareDropped: (paths) => ipcRenderer.send('share:dropped', paths),
+  shareDropCancel: () => ipcRenderer.send('share:dropCancel'),
+  onShareDrop: (callback) => on('share:drop', callback),
   phoneSetDeck: (buttons) => ipcRenderer.invoke('phone:setDeck', buttons),
   phoneSetScreen: (screen) => ipcRenderer.invoke('phone:setScreen', screen),
   phoneNotify: (title, body) => ipcRenderer.invoke('phone:notify', title, body),
