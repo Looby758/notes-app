@@ -104,7 +104,7 @@ export default function Pane({ pane }: { pane: string }) {
 
   const onDragOver = (e: DragEvent<HTMLDivElement>): void => {
     // Files from the list are dropped into the note (the editor handles that).
-    if (!getDrag() || getDrag()!.kind === 'file' || getDrag()!.kind === 'computer') return
+    if (!getDrag() || getDrag()!.kind === 'file' || getDrag()!.kind === 'computer' || getDrag()!.kind === 'computerMany') return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
     setZone(zoneAt(e.currentTarget.getBoundingClientRect(), e.clientX, e.clientY))
@@ -114,7 +114,7 @@ export default function Pane({ pane }: { pane: string }) {
     const drag = getDrag()
     const where = zone ?? zoneAt(e.currentTarget.getBoundingClientRect(), e.clientX, e.clientY)
     setZone(null)
-    if (!drag || drag.kind === 'file' || drag.kind === 'computer') return
+    if (!drag || drag.kind === 'file' || drag.kind === 'computer' || drag.kind === 'computerMany') return
     e.preventDefault()
     if (drag.kind === 'tab') {
       if (where === 'center') moveTab(drag.id, drag.pane, pane)

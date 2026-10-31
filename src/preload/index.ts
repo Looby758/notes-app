@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { MusicMiniCommand, MusicMiniState, NotesApi } from '@shared/types'
 
 const api: NotesApi = {
@@ -296,6 +296,13 @@ const api: NotesApi = {
   explorerReadText: (path) => ipcRenderer.invoke('explorer:readText', path),
   explorerOpen: (path) => ipcRenderer.invoke('explorer:open', path),
   explorerReveal: (path) => ipcRenderer.invoke('explorer:reveal', path),
+  explorerCreate: (dir, name, kind) => ipcRenderer.invoke('explorer:create', dir, name, kind),
+  explorerRename: (path, name) => ipcRenderer.invoke('explorer:rename', path, name),
+  explorerPaste: (paths, dir, mode) => ipcRenderer.invoke('explorer:paste', paths, dir, mode),
+  explorerTrash: (paths) => ipcRenderer.invoke('explorer:trash', paths),
+  explorerSearch: (dir, query, showHidden) => ipcRenderer.invoke('explorer:search', dir, query, showHidden),
+  explorerToVault: (paths, folder) => ipcRenderer.invoke('explorer:toVault', paths, folder),
+  pathForFile: (file) => webUtils.getPathForFile(file),
   openFile: (path) => ipcRenderer.invoke('fs:openFile', path),
   readNote: (path) => ipcRenderer.invoke('fs:read', path),
   writeNote: (path, content) => ipcRenderer.invoke('fs:write', path, content),
