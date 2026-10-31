@@ -41,6 +41,30 @@ export interface Settings {
   phonePort?: number
   /** One mouse, two computers: whether it's on, the paired computer, and how it's set up. */
   mouseShare?: ShareSaved
+  /** The phone webcam: whether it's on, its https link (token and port), and how the picture is made. */
+  camOn?: boolean
+  camToken?: string
+  camPort?: number
+  camQuality?: 'sd' | 'hd'
+  camFill?: boolean
+}
+
+/** How the phone webcam is doing, for its window in Orbit. */
+export interface CamStatus {
+  on: boolean
+  /** The https address the phone opens (empty while off). */
+  url: string
+  /** Whether the phone is sending frames right now, and how many a second. */
+  phone: boolean
+  fps: number
+  /**
+   * The PC camera: running; starting; "no-driver" (OBS Studio's camera isn't installed); "in-use"
+   * (OBS itself, or something else, is the virtual camera); "error"; "mac" (not needed there); "off".
+   */
+  camera: 'running' | 'starting' | 'no-driver' | 'in-use' | 'error' | 'mac' | 'off'
+  message: string
+  quality: 'sd' | 'hd'
+  fill: boolean
 }
 
 /** Mouse sharing, as saved. `side` is where the other computer sits, seen from this one. */
@@ -570,6 +594,8 @@ export interface NotesApi {
   musicControl(action: MusicAction): Promise<void>
   musicSeek(ms: number): Promise<void>
   /** Plays a spotify: URI; a song can be played within a playlist or album (`context`). */
+  /** Skips `count` songs on (playing a song further down Up next, keeping the playlist going). */
+  musicSkip(count: number): Promise<void>
   musicPlay(uri: string, context?: string): Promise<void>
   /** Needs your account. */
   musicSearch(query: string): Promise<MusicSearchResults>
@@ -737,6 +763,19 @@ export interface NotesApi {
   shareDropped(paths: string[]): void
   shareDropCancel(): void
   onShareDrop(callback: (info: { name: string; side: ShareSide }) => void): () => void
+  /** The phone webcam (Windows): turn it on/off, its status and settings, and a live preview of the phone's frames. */
+  camStatus(): Promise<CamStatus>
+  camOn(): Promise<CamStatus>
+  camOff(): Promise<CamStatus>
+  /** Checks again for OBS's camera (after installing it) and starts the camera. */
+  camRetry(): Promise<CamStatus>
+  camSet(patch: { quality?: 'sd' | 'hd'; fill?: boolean }): Promise<CamStatus>
+  /** A new link (the old code and Home Screen page stop working). */
+  camNewLink(): Promise<CamStatus>
+  camPreview(on: boolean): Promise<void>
+  onCamStatus(callback: (status: CamStatus) => void): () => void
+  /** The phone's frames as JPEGs, a dozen or so a second, while the preview is on. */
+  onCamFrame(callback: (jpeg: Uint8Array) => void): () => void
   /** Reads/writes a small app file kept in the vault's hidden ".notesapp" folder (synced with your notes). */
   readAppData(name: string): Promise<string | null>
   writeAppData(name: string, content: string): Promise<void>

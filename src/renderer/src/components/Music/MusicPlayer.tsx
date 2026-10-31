@@ -2,6 +2,7 @@ import './music.css'
 import { useEffect, useRef, useState } from 'react'
 import {
   AudioLines,
+  GripHorizontal,
   Heart,
   Laptop,
   Link2,
@@ -31,6 +32,7 @@ import {
   musicControl,
   musicPlay,
   musicSeek,
+  musicSkip,
   musicSetVolume,
   musicToggleLike,
   musicTransfer,
@@ -83,7 +85,90 @@ export default function MusicPlayer() {
   )
 }
 
+const PLACE_KEY = 'orbit.musicPlayerPlace'
+interface Place {
+  left: number
+  bottom: number
+}
+
+/** Keeps a spot inside the window (`el` is the player, for its size). */
+function clampPlace(p: Place, el: HTMLElement | null): Place {
+  const w = el?.offsetWidth ?? 380
+  const h = el?.offsetHeight ?? 120
+  return {
+    left: Math.round(Math.max(0, Math.min(p.left, window.innerWidth - w))),
+    bottom: Math.round(Math.max(0, Math.min(p.bottom, window.innerHeight - h)))
+  }
+}
+
+function savedPlace(): Place | null {
+  try {
+    const p = JSON.parse(localStorage.getItem(PLACE_KEY) ?? 'null')
+    return p && Number.isFinite(p.left) && Number.isFinite(p.bottom) ? { left: p.left, bottom: p.bottom } : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Lets you drag the player somewhere else by its grip (so it isn't covering what's in the corner), and
+ * remembers where. Double-clicking the grip puts it back in the corner.
+ */
+function useMovable(): { ref: React.RefObject<HTMLDivElement | null>; style: React.CSSProperties | undefined; grip: React.HTMLAttributes<HTMLElement> } {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [place, setPlace] = useState<Place | null>(savedPlace)
+
+  // Stay inside the window when it gets smaller or the player gets taller (a panel opening).
+  useEffect(() => {
+    if (!place) return
+    const fit = (): void =>
+      setPlace((p) => {
+        if (!p) return p
+        const c = clampPlace(p, ref.current)
+        return c.left === p.left && c.bottom === p.bottom ? p : c
+      })
+    fit()
+    window.addEventListener('resize', fit)
+    const ro = ref.current ? new ResizeObserver(fit) : null
+    if (ref.current) ro?.observe(ref.current)
+    return () => {
+      window.removeEventListener('resize', fit)
+      ro?.disconnect()
+    }
+  }, [place !== null])
+
+  const grip: React.HTMLAttributes<HTMLElement> = {
+    onPointerDown: (e) => {
+      const el = ref.current
+      if (!el || e.button !== 0) return
+      e.preventDefault()
+      const box = el.getBoundingClientRect()
+      const start = { x: e.clientX, y: e.clientY, left: box.left, bottom: window.innerHeight - box.bottom }
+      let last: Place | null = null
+      const move = (ev: PointerEvent): void => {
+        last = clampPlace({ left: start.left + ev.clientX - start.x, bottom: start.bottom - (ev.clientY - start.y) }, el)
+        setPlace(last)
+      }
+      const up = (): void => {
+        window.removeEventListener('pointermove', move)
+        window.removeEventListener('pointerup', up)
+        document.body.classList.remove('music-player-dragging')
+        if (last) localStorage.setItem(PLACE_KEY, JSON.stringify(last))
+      }
+      document.body.classList.add('music-player-dragging')
+      window.addEventListener('pointermove', move)
+      window.addEventListener('pointerup', up)
+    },
+    onDoubleClick: () => {
+      setPlace(null)
+      localStorage.removeItem(PLACE_KEY)
+    }
+  }
+  return { ref, style: place ? { left: place.left, bottom: place.bottom } : undefined, grip }
+}
+
 function Player() {
+  const movable = useMovable()
   const state = useMusic((s) => s.state)
   const error = useMusic((s) => s.error)
   const status = useMusic((s) => s.status)
@@ -94,7 +179,7 @@ function Player() {
   const toggleTab = (t: Tab): void => setTab(tab === t ? null : t)
 
   return (
-    <div className="music-player" data-music-player>
+    <div className="music-player" ref={movable.ref} style={movable.style} data-music-player>
       <ThemePicture page="music" exact />
       {tab && (
         <div className="music-panel">
@@ -145,6 +230,9 @@ function Player() {
       <div className="music-main">
         {state ? <NowPlaying state={state} /> : <div className="music-empty">Looking for Spotify…</div>}
         <div className="music-side">
+          <span className="icon-btn music-move" title="Drag to move the player (double-click to put it back in the corner)" data-music-move {...movable.grip}>
+            <GripHorizontal size={14} />
+          </span>
           <button className={`icon-btn ${tab ? 'active' : ''}`} onClick={() => toggleTab(tab ?? (status?.connected || !local ? 'playlists' : 'local'))} title="Playlists, search and your music" data-music-browse>
             <ListMusic size={15} />
           </button>
@@ -442,11 +530,13 @@ function UpNext() {
       {queue.current && (
         <>
           <h4>Now playing</h4>
-          <ItemList items={[queue.current]} />
+          {/* Starts it again, rather than playing it on its own (which would end the playlist). */}
+          <ItemList items={[queue.current]} onPlay={() => musicSeek(0)} />
         </>
       )}
       <h4>Next up</h4>
-      <ItemList items={queue.next} />
+      {/* Skipping ahead to it keeps the playlist (and anything else you queued) playing after it. */}
+      <ItemList items={queue.next} onPlay={(_item, i) => musicSkip(i + 1)} />
     </div>
   )
 }

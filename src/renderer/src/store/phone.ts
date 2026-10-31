@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { PhoneEvent } from '@shared/types'
+import type { CamStatus, PhoneEvent } from '@shared/types'
 import { notify } from './notify'
 import { insertIntoActiveNote, liveTypeIntoActiveNote } from '../lib/editorController'
 import { parseReceipt } from '../lib/receipt'
@@ -9,11 +9,11 @@ import { runDeck, startPhoneSync } from '../lib/phoneDeck'
 
 /**
  * The phone dialog: sending a vault file (note or attachment) or a web link, pairing a phone, or
- * the Wi-Fi code for guests.
+ * the Wi-Fi code for guests, or the phone webcam.
  */
-export type PhoneTarget = { kind: 'file'; path: string } | { kind: 'link'; url: string; title?: string } | { kind: 'pair' } | { kind: 'wifi' }
+export type PhoneTarget = { kind: 'file'; path: string } | { kind: 'link'; url: string; title?: string } | { kind: 'pair' } | { kind: 'wifi' } | { kind: 'webcam' }
 
-export const usePhone = create<{ target: PhoneTarget | null; connected: number }>(() => ({ target: null, connected: 0 }))
+export const usePhone = create<{ target: PhoneTarget | null; connected: number; cam: CamStatus | null }>(() => ({ target: null, connected: 0, cam: null }))
 export const sendToPhone = (target: PhoneTarget | null): void => usePhone.setState({ target })
 
 const fileName = (path: string): string => path.split('/').pop() ?? path
@@ -64,8 +64,11 @@ function handle(event: PhoneEvent): void {
 export function startPhone(): () => void {
   const off = window.api.onPhoneEvent(handle)
   const offSync = startPhoneSync()
+  const offCam = window.api.onCamStatus((cam) => usePhone.setState({ cam }))
+  window.api.camStatus().then((cam) => usePhone.setState({ cam }), () => {})
   return () => {
     off()
     offSync()
+    offCam()
   }
 }

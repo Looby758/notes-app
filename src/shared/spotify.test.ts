@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { APP_FIELD_SEP, formatTime, moveBody, nextRepeat, parsePlaylistSongs, playlistId, parseAccountState, parseAppState, parseDevices, parsePlaylists, parseQueue, parseRecent, parseSearch, playBody, spotifyUri } from './spotify'
+import { APP_FIELD_SEP, formatTime, LIKED_SONGS_URI, likedContext, likedSongsItem, moveBody, nextRepeat, parsePlaylistSongs, playlistId, parseAccountState, parseAppState, parseDevices, parsePlaylists, parseQueue, parseRecent, parseSearch, playBody, spotifyUri } from './spotify'
 
 describe('spotifyUri', () => {
   it('reads share links and URIs', () => {
@@ -159,4 +159,18 @@ describe('playBody', () => {
 it('formatTime', () => {
   expect(formatTime(187000)).toBe('3:07')
   expect(formatTime(3725000)).toBe('1:02:05')
+})
+
+describe('Liked Songs', () => {
+  it('shows as a playlist with how many songs it has', () => {
+    expect(likedSongsItem({ total: 412, items: [] })).toEqual({ kind: 'playlist', name: 'Liked Songs', detail: '412 songs', uri: LIKED_SONGS_URI, liked: true })
+    expect(likedSongsItem({ total: 1 }).detail).toBe('1 song')
+  })
+  it('plays as your collection', () => {
+    expect(likedContext('looby')).toBe('spotify:user:looby:collection')
+  })
+  it('reads the songs from GET /me/tracks', () => {
+    const songs = parsePlaylistSongs({ items: [{ added_at: 'x', track: { type: 'track', name: 'A', uri: 'spotify:track:aaa', artists: [{ name: 'B' }], album: { images: [] } } }] })
+    expect(songs.map((s) => s.uri)).toEqual(['spotify:track:aaa'])
+  })
 })

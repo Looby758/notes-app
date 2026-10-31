@@ -1,27 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
-import qrcode from 'qrcode-generator'
+import { useEffect, useState } from 'react'
 import { CheckCircle2, Eye, EyeOff, Smartphone, Wifi } from 'lucide-react'
 import type { PhoneShare } from '@shared/types'
 import { wifiQrText } from '@shared/wifi'
 import { sendToPhone, usePhone, type PhoneTarget } from '../../store/phone'
 import { notify } from '../../store/notify'
+import { Qr, cleanError } from './Qr'
+import PhoneWebcam from './PhoneWebcam'
 
-const cleanError = (err: unknown): string =>
-  (err instanceof Error ? err.message : String(err)).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
-
-/** The QR code a phone's camera opens. */
-function Qr({ text }: { text: string }) {
-  const src = useMemo(() => {
-    if (!text) return ''
-    const code = qrcode(0, 'M')
-    code.addData(text, 'Byte')
-    code.make()
-    return code.createDataURL(6, 2)
-  }, [text])
-  return <div className="phone-qr">{src ? <img src={src} alt="QR code" /> : <span>Making the code…</span>}</div>
-}
-
-/** The phone dialog: send something to the phone, pair the phone, or show the Wi-Fi code for guests. */
+/** The phone dialog: send something to the phone, pair the phone, the phone webcam, or the Wi-Fi code for guests. */
 export default function SendToPhone() {
   const target = usePhone((s) => s.target)
   if (!target) return null
@@ -29,13 +15,21 @@ export default function SendToPhone() {
   return (
     <div className="modal-backdrop" onMouseDown={close}>
       <div
-        className="modal phone-dialog"
+        className={`modal phone-dialog${target.kind === 'webcam' ? ' cam-dialog' : ''}`}
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.key === 'Escape' && close()}
         tabIndex={-1}
         ref={(el) => el?.focus()}
       >
-        {target.kind === 'pair' ? <Pair close={close} /> : target.kind === 'wifi' ? <GuestWifi close={close} /> : <Send target={target} close={close} />}
+        {target.kind === 'pair' ? (
+          <Pair close={close} />
+        ) : target.kind === 'webcam' ? (
+          <PhoneWebcam close={close} />
+        ) : target.kind === 'wifi' ? (
+          <GuestWifi close={close} />
+        ) : (
+          <Send target={target} close={close} />
+        )}
       </div>
     </div>
   )
@@ -186,7 +180,13 @@ function GuestWifi({ close }: { close: () => void }) {
       <div className="phone-fields">
         <input value={ssid} onChange={(e) => setSsid(e.target.value)} placeholder="Wi-Fi name" spellCheck={false} />
         <div className="phone-password">
-          <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password (blank if none)" type={shown ? 'text' : 'password'} spellCheck={false} />
+          <input
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password (blank if none)"
+            type={shown ? 'text' : 'password'}
+            spellCheck={false}
+          />
           <button type="button" className="icon-btn" title={shown ? 'Hide' : 'Show'} onClick={() => setShown(!shown)}>
             {shown ? <EyeOff size={14} /> : <Eye size={14} />}
           </button>
