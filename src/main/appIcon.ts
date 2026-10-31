@@ -1,6 +1,7 @@
 import { app, nativeImage, shell, type NativeImage } from 'electron'
 import { execFile } from 'child_process'
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'fs'
+import { createHash } from 'crypto'
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { logError } from './log'
 
@@ -78,8 +79,22 @@ function windowsIcon(id: string, image: NativeImage): void {
   if (id !== 'default') {
     const dir = join(app.getPath('userData'), 'app-icons')
     mkdirSync(dir, { recursive: true })
-    icon = join(dir, `${id}.ico`)
-    if (!existsSync(icon)) writeFileSync(icon, icoFromImage(image))
+    // Named after what's in it, so when a design changes (the Notes icons becoming Orbit ones) the
+    // shortcuts get the new picture instead of the one saved before, and Windows' icon cache
+    // doesn't keep showing the old one under the same name.
+    const ico = icoFromImage(image)
+    const hash = createHash('sha1').update(ico).digest('hex').slice(0, 10)
+    icon = join(dir, `${id}-${hash}.ico`)
+    if (!existsSync(icon)) writeFileSync(icon, ico)
+    for (const old of readdirSync(dir)) {
+      if (old.endsWith('.ico') && old !== `${id}-${hash}.ico` && (old === `${id}.ico` || old.startsWith(`${id}-`))) {
+        try {
+          rmSync(join(dir, old))
+        } catch {
+          // still in use: left for next time
+        }
+      }
+    }
   }
   // Explorer caches icons: ask it to look again.
   if (updateShortcuts(icon) > 0) execFile('ie4uinit.exe', ['-show'], () => undefined)

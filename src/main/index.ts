@@ -49,7 +49,7 @@ import { setupPhonePair } from './phonePair'
 import { setupWebTitle } from './webTitle'
 import { setupPlaces } from './places'
 import { setupWeather } from './weather'
-import { releaseMessages, setupBrowser } from './browser'
+import { releaseMessages, saveMessages, setupBrowser } from './browser'
 import { closeYouTube, setupYouTube } from './youtube'
 import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
@@ -369,6 +369,10 @@ function createWindow(): BrowserWindow {
   // Before closing, give the renderer a moment to save any unsaved edits.
   let readyToClose = false
   let toldAboutTray = false
+  // Windows is shutting down or signing out: WhatsApp and Discord close properly first (see releaseMessages).
+  win.on('session-end', () => {
+    if (win === mainWindow) void releaseMessages()
+  })
   win.on('close', (e) => {
     // Keeping Notes in the tray: just hide the window (autosave keeps working while it's hidden).
     if (!quitting && currentPrefs().closeToTray) {
@@ -382,6 +386,8 @@ function createWindow(): BrowserWindow {
       } else {
         win.hide()
       }
+      // Hidden in the tray, the app may next be stopped by Windows shutting down: save sign-ins now.
+      saveMessages()
       if (!toldAboutTray && !loadSettings().toldAboutTray) {
         toldAboutTray = true
         saveSettings({ toldAboutTray: true })
