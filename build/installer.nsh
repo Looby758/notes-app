@@ -1,7 +1,7 @@
 ; Windows installer extras (electron-builder includes this file; see nsis.include).
 ;
 ; An "Optional extras" page with one box, unticked: download ffmpeg, which the Studio needs to go
-; live on Twitch or YouTube. Ticking it leaves a note for Orbit, which downloads ffmpeg the first
+; live on Twitch or YouTube, and the file converter needs for videos. Ticking it leaves a note for Orbit, which downloads ffmpeg the first
 ; time it opens (Settings → Studio can do the same at any time). Silent updates skip the page.
 !ifndef BUILD_UNINSTALLER
   !include nsDialogs.nsh
@@ -18,9 +18,9 @@
     !insertmacro MUI_HEADER_TEXT "Optional extras" "Extra parts you can add now or later."
     nsDialogs::Create 1018
     Pop $0
-    ${NSD_CreateCheckbox} 0 0 100% 12u "Download ffmpeg for live streaming from the Studio (about a 30 MB download)"
+    ${NSD_CreateCheckbox} 0 0 100% 12u "Download ffmpeg for live streaming and converting videos (about a 30 MB download)"
     Pop $FfmpegBox
-    ${NSD_CreateLabel} 12u 18u 95% 40u "Only needed to go live on Twitch or YouTube (recording works without it). Orbit downloads it the first time it opens. You can also get it later in Settings → Studio."
+    ${NSD_CreateLabel} 12u 18u 95% 40u "Only needed to go live on Twitch or YouTube and to convert videos (recording works without it). Orbit downloads it the first time it opens. You can also get it later in Settings → Studio."
     Pop $0
     ${If} $FfmpegWanted == "1"
       ${NSD_Check} $FfmpegBox
