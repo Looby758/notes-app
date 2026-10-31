@@ -121,6 +121,27 @@ const api: NotesApi = {
   exportFiles: (folderName, files) => ipcRenderer.invoke('export:files', folderName, files),
   showExported: (path) => ipcRenderer.invoke('export:show', path),
   decodeHeic: (data) => ipcRenderer.invoke('convert:heic', data),
+  pathForFile: (file) => {
+    try {
+      return webUtils.getPathForFile(file)
+    } catch {
+      return ''
+    }
+  },
+  videoConverterStatus: () => ipcRenderer.invoke('convert:ffmpeg-status'),
+  getVideoConverter: () => ipcRenderer.invoke('convert:ffmpeg-get'),
+  onVideoConverterStatus: (callback) => {
+    const handler = (_e: unknown, state: Parameters<typeof callback>[0]): void => callback(state)
+    ipcRenderer.on('convert:ffmpeg-status', handler)
+    return () => ipcRenderer.removeListener('convert:ffmpeg-status', handler)
+  },
+  convertVideo: (request) => ipcRenderer.invoke('convert:video', request),
+  cancelVideo: (id) => ipcRenderer.invoke('convert:video-cancel', id),
+  onVideoProgress: (callback) => {
+    const handler = (_e: unknown, id: number, done: number): void => callback(id, done)
+    ipcRenderer.on('convert:video-progress', handler)
+    return () => ipcRenderer.removeListener('convert:video-progress', handler)
+  },
 
   openCapture: () => ipcRenderer.invoke('capture:open'),
   closeCapture: () => ipcRenderer.invoke('capture:close'),

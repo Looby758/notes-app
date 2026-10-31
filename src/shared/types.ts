@@ -395,15 +395,29 @@ export interface NotesApi {
   /** Turns a complete HTML page into a PDF (A4). */
   printToPdf(html: string): Promise<Uint8Array>
   /** Asks where to save one exported file and writes it; resolves with its path, or null if cancelled. */
-  exportFile(defaultName: string, format: SaveFormat, data: Uint8Array | string): Promise<string | null>
+  exportFile(defaultName: string, format: SaveFormat, data: ExportData): Promise<string | null>
   /** Asks for a folder and writes several exported files into a new folder inside it; resolves with that folder, or null. */
-  exportFiles(folderName: string, files: { name: string; data: Uint8Array | string }[]): Promise<string | null>
+  exportFiles(folderName: string, files: { name: string; data: ExportData }[]): Promise<string | null>
   /** Shows a file in File Explorer / Finder. */
   showExported(path: string): Promise<void>
 
   // File converter
   /** An iPhone photo (HEIC/HEIF) as plain pixels: RGBA, 4 bytes a pixel. */
   decodeHeic(data: Uint8Array): Promise<{ width: number; height: number; data: Uint8Array }>
+  /** Where a dropped or chosen file is on this computer ("" if it isn't a file on disk). */
+  pathForFile(file: File): string
+  /** Whether the video converter (ffmpeg) is downloaded. */
+  videoConverterStatus(): Promise<FfmpegState>
+  /** Downloads the video converter (ffmpeg); resolves when it's done or has failed. */
+  getVideoConverter(): Promise<FfmpegState>
+  /** Download progress for the video converter. Returns a function that stops listening. */
+  onVideoConverterStatus(callback: (state: FfmpegState) => void): () => void
+  /** Converts a video (or takes its sound) with ffmpeg; resolves when it's done. */
+  convertVideo(request: VideoConvertRequest): Promise<ConvertedFile>
+  /** Stops a video conversion, or throws away a finished one that wasn't saved. */
+  cancelVideo(id: number): Promise<void>
+  /** How far along a video conversion is (0…1). Returns a function that stops listening. */
+  onVideoProgress(callback: (id: number, done: number) => void): () => void
 
   // Quick capture
   /** Opens the quick capture window. */
@@ -693,4 +707,60 @@ export type GoogleSheetResult =
       fix?: 'setup' | 'connect' | 'enable-api' | 'retry'
     }
 /** The kinds of file Notes can save (exports and converted files). */
-export type SaveFormat = 'pdf' | 'docx' | 'html' | 'md' | 'txt' | 'jpg' | 'png' | 'webp' | 'mp3' | 'wav'
+export type SaveFormat = 'pdf' | 'docx' | 'html' | 'md' | 'txt' | 'jpg' | 'png' | 'webp' | 'mp3' | 'wav' | 'mp4' | 'mov' | 'webm' | 'gif'
+
+/** A converted video waiting in a temporary file (videos are too big to pass around in memory). */
+export interface ConvertedFile {
+  converted: string
+  size: number
+}
+
+/** What an exported file holds: its bytes, its text, or a converted video waiting to be saved. */
+export type ExportData = Uint8Array | string | ConvertedFile
+
+/** Whether ffmpeg (downloaded only when asked, for converting videos and streaming) is on this computer. */
+export interface FfmpegState {
+  state: 'ready' | 'missing' | 'downloading' | 'unsupported'
+  progress?: number
+  error?: string
+}
+
+/** A caption bar above or below a GIF, drawn in the window (any font on this computer) and sent as a picture. */
+export interface GifCaption {
+  text: string
+  font: string
+  /** Text size as a share of the GIF's width (0.08 = 8%), so it looks the same at any size. */
+  size: number
+  bold: boolean
+  textColor: string
+  barColor: string
+  position: 'top' | 'bottom'
+}
+
+/** The GIF maker's choices. Times are in seconds of the original video; the crop is in its pixels. */
+export interface GifSettings {
+  start: number
+  end: number
+  crop: { x: number; y: number; w: number; h: number } | null
+  /** 0.5 is half speed, 2 is double. */
+  speed: number
+  fps: number
+  /** The GIF's width in pixels (captions included). */
+  width: number
+  caption: GifCaption | null
+}
+
+export interface VideoConvertRequest {
+  /** Picks out this job in progress updates and when cancelling. */
+  id: number
+  /** The original video on this computer. */
+  path: string
+  format: SaveFormat
+  /** Shrinks the picture to at most this many pixels tall; null keeps its size. */
+  maxHeight: number | null
+  /** GIFs made in the GIF maker: the clip, crop, speed and caption. */
+  gif?: GifSettings
+  /** The caption bar as a PNG, exactly `gif.width` pixels wide. */
+  captionPng?: Uint8Array
+  captionHeight?: number
+}
