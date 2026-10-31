@@ -35,6 +35,30 @@ const api: NotesApi = {
   studioStop: (id) => ipcRenderer.invoke('studio:stop', id),
   studioReveal: (path) => ipcRenderer.invoke('studio:reveal', path),
   studioOpenFolder: (folder) => ipcRenderer.invoke('studio:openFolder', folder),
+  liveStatus: () => ipcRenderer.invoke('live:status'),
+  onLiveStatus: (callback) => {
+    const handler = (_e: unknown, s: Parameters<typeof callback>[0]): void => callback(s)
+    ipcRenderer.on('live:status', handler)
+    return () => ipcRenderer.removeListener('live:status', handler)
+  },
+  liveGetFfmpeg: () => ipcRenderer.invoke('live:getFfmpeg'),
+  liveRemoveFfmpeg: () => ipcRenderer.invoke('live:removeFfmpeg'),
+  liveSetKey: (service, key, customUrl) => ipcRenderer.invoke('live:setKey', service, key, customUrl),
+  liveClearKey: (service) => ipcRenderer.invoke('live:clearKey', service),
+  liveSetService: (service) => ipcRenderer.invoke('live:setService', service),
+  liveStart: (service, quality) => ipcRenderer.invoke('live:start', service, quality),
+  liveChunk: (data) => ipcRenderer.invoke('live:chunk', data),
+  liveStop: () => ipcRenderer.invoke('live:stop'),
+  onLiveStats: (callback) => {
+    const handler = (_e: unknown, s: Parameters<typeof callback>[0]): void => callback(s)
+    ipcRenderer.on('live:stats', handler)
+    return () => ipcRenderer.removeListener('live:stats', handler)
+  },
+  onLiveEnded: (callback) => {
+    const handler = (_e: unknown, err: string | null): void => callback(err)
+    ipcRenderer.on('live:ended', handler)
+    return () => ipcRenderer.removeListener('live:ended', handler)
+  },
   onVoiceStart: (callback) => {
     const handler = (): void => callback()
     ipcRenderer.on('voice:start', handler)

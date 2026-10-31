@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { LiveService, LiveStats } from '@shared/live'
 import { cleanScenes, defaultScenes, qualityById, type StudioItem, type StudioQuality, type StudioScene } from '@shared/studio'
 
 /**
@@ -27,6 +28,9 @@ export interface StudioState {
   /** Problems with a source, by item id ("That window was closed."). */
   problems: Record<string, string>
   audioProblem: string | null
+  /** Streaming right now. */
+  live: { startedAt: number; service: LiveService } | null
+  liveStats: LiveStats | null
 }
 
 const SCENES_KEY = 'studio.scenes'
@@ -74,7 +78,9 @@ export const useStudio = create<StudioState>(() => ({
   recording: null,
   lastRecording: null,
   problems: {},
-  audioProblem: null
+  audioProblem: null,
+  live: null,
+  liveStats: null
 }))
 
 let saveTimer: ReturnType<typeof setTimeout> | undefined

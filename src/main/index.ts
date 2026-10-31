@@ -40,6 +40,7 @@ import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
 import { setupConverter } from './converter'
 import { isAppPage, setupStudio } from './studio'
+import { setupLive } from './live'
 import { explorerFile, setupExplorer } from './explorer'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
@@ -851,6 +852,7 @@ app.whenReady().then(async () => {
   safely('export', setupExport)
   safely('converter', setupConverter)
   safely('studio', setupStudio)
+  safely('live streaming', setupLive)
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))

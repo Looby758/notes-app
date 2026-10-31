@@ -1,4 +1,5 @@
 import { fitRect, pickRecordingType, qualityById, type StudioItem } from '@shared/studio'
+import type { LiveService } from '@shared/live'
 import { IS_MAC } from '@shared/platform'
 import { activeScene, useStudio } from '../store/studio'
 import { useMusic, watchMusic } from '../store/music'
@@ -432,7 +433,7 @@ function wake(): void {
 }
 
 function sleep(): void {
-  if (pageOpen || recorder) return
+  if (pageOpen || recorder || liveRecorder) return
   clearInterval(loop)
   loop = undefined
   window.removeEventListener('keydown', onSceneKey, true)
@@ -505,7 +506,7 @@ export async function startRecording(): Promise<void> {
       const path = await window.api.studioStop(file.id)
       useStudio.setState({ recording: null, lastRecording: path })
       if (path) notify(`Saved your recording: ${path.split(/[\\/]/).pop()}`, 'info')
-      if (!pageOpen) sleep()
+      sleep()
     })
   }
   rec.start(1000)
@@ -522,7 +523,72 @@ export async function stopRecording(): Promise<void> {
 
 export const toggleRecording = (): Promise<void> => (recorder ? stopRecording() : startRecording())
 
+// ---------- going live ----------
+
+let liveRecorder: MediaRecorder | null = null
+let liveSends: Promise<unknown> = Promise.resolve()
+
+/** WebM pieces for ffmpeg: H.264 when the computer can make it (less work), otherwise VP8. */
+const LIVE_TYPES = ['video/webm;codecs=h264,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+
+window.api.onLiveStats((liveStats) => useStudio.setState({ liveStats }))
+window.api.onLiveEnded((error) => {
+  const rec = liveRecorder
+  liveRecorder = null
+  if (rec && rec.state !== 'inactive') rec.stop()
+  useStudio.setState({ live: null, liveStats: null })
+  if (error) notify(`Your stream stopped: ${error}`)
+  sleep()
+})
+
+export async function goLive(service: LiveService): Promise<void> {
+  if (liveRecorder) return
+  const mime = LIVE_TYPES.find((m) => MediaRecorder.isTypeSupported(m))
+  if (!mime) {
+    notify('This computer can’t make video to stream.')
+    return
+  }
+  wake()
+  const q = qualityById(useStudio.getState().quality)
+  try {
+    await window.api.liveStart(service, q.id)
+  } catch (err) {
+    notify(errorMessage(err))
+    return
+  }
+  const video = studioCanvas().captureStream(q.fps).getVideoTracks()
+  const sound = mixOut?.stream.getAudioTracks() ?? []
+  // Sent to ffmpeg nearly untouched (it re-encodes), so keep the quality high.
+  const rec = new MediaRecorder(new MediaStream([...video, ...sound]), { mimeType: mime, videoBitsPerSecond: q.bitrate * 1.5, audioBitsPerSecond: 192_000 })
+  liveRecorder = rec
+  liveSends = Promise.resolve()
+  rec.ondataavailable = (e) => {
+    if (!e.data.size) return
+    liveSends = liveSends.then(async () => {
+      if (liveRecorder === rec) await window.api.liveChunk(new Uint8Array(await e.data.arrayBuffer()))
+    })
+  }
+  rec.onstop = () => {
+    video.forEach((t) => t.stop())
+    void liveSends.then(() => window.api.liveStop())
+  }
+  rec.start(250)
+  useStudio.setState({ live: { startedAt: Date.now(), service }, liveStats: null })
+}
+
+export function endLive(): void {
+  const rec = liveRecorder
+  liveRecorder = null
+  useStudio.setState({ live: null, liveStats: null })
+  if (rec && rec.state !== 'inactive') rec.stop()
+  else void window.api.liveStop()
+  sleep()
+}
+
+export const isLive = (): boolean => !!liveRecorder
+
 // Close everything cleanly when the app is closing.
 window.addEventListener('beforeunload', () => {
   void stopRecording()
+  if (liveRecorder) endLive()
 })
