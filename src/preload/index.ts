@@ -119,6 +119,13 @@ const api: NotesApi = {
       return ''
     }
   },
+  videoConverterStatus: () => ipcRenderer.invoke('convert:ffmpeg-status'),
+  getVideoConverter: () => ipcRenderer.invoke('convert:ffmpeg-get'),
+  onVideoConverterStatus: (callback) => {
+    const handler = (_e: unknown, state: Parameters<typeof callback>[0]): void => callback(state)
+    ipcRenderer.on('convert:ffmpeg-status', handler)
+    return () => ipcRenderer.removeListener('convert:ffmpeg-status', handler)
+  },
   convertVideo: (request) => ipcRenderer.invoke('convert:video', request),
   cancelVideo: (id) => ipcRenderer.invoke('convert:video-cancel', id),
   onVideoProgress: (callback) => {

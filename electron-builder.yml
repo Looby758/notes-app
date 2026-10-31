@@ -30,8 +30,6 @@ asarUnpack:
   - node_modules/is-url/**
   - node_modules/wasm-feature-detect/**
   - node_modules/bmp-js/**
-  # The file converter's video program (ffmpeg): a program can't run from inside the archive.
-  - node_modules/ffmpeg-static/**
 win:
   target:
     - target: nsis

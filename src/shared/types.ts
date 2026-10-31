@@ -384,7 +384,13 @@ export interface NotesApi {
   decodeHeic(data: Uint8Array): Promise<{ width: number; height: number; data: Uint8Array }>
   /** Where a dropped or chosen file is on this computer ("" if it isn't a file on disk). */
   pathForFile(file: File): string
-  /** Converts a video (or takes its sound) with the built-in converter; resolves when it's done. */
+  /** Whether the video converter (ffmpeg) is downloaded. */
+  videoConverterStatus(): Promise<FfmpegState>
+  /** Downloads the video converter (ffmpeg); resolves when it's done or has failed. */
+  getVideoConverter(): Promise<FfmpegState>
+  /** Download progress for the video converter. Returns a function that stops listening. */
+  onVideoConverterStatus(callback: (state: FfmpegState) => void): () => void
+  /** Converts a video (or takes its sound) with ffmpeg; resolves when it's done. */
   convertVideo(request: VideoConvertRequest): Promise<ConvertedFile>
   /** Stops a video conversion, or throws away a finished one that wasn't saved. */
   cancelVideo(id: number): Promise<void>
@@ -675,6 +681,13 @@ export interface ConvertedFile {
 
 /** What an exported file holds: its bytes, its text, or a converted video waiting to be saved. */
 export type ExportData = Uint8Array | string | ConvertedFile
+
+/** Whether ffmpeg (downloaded only when asked, for converting videos and streaming) is on this computer. */
+export interface FfmpegState {
+  state: 'ready' | 'missing' | 'downloading' | 'unsupported'
+  progress?: number
+  error?: string
+}
 
 export interface VideoConvertRequest {
   /** Picks out this job in progress updates and when cancelling. */

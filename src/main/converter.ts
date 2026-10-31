@@ -5,10 +5,11 @@ import { mkdir, rm, stat } from 'fs/promises'
 import { join } from 'path'
 import type { ConvertedFile, VideoConvertRequest } from '@shared/types'
 import { parseTime, videoArgs } from './videoArgs'
+import { downloadFfmpeg, ffmpegPath, ffmpegState, onFfmpegState } from './ffmpeg'
 
 /**
- * The file converter's jobs here: reading iPhone photos (HEIC), and videos, which go through the
- * ffmpeg program that comes with the app. The HEIC decoder is loaded the first time it's needed,
+ * The file converter's jobs here: reading iPhone photos (HEIC), and videos, which go through
+ * ffmpeg (downloaded only when you ask: see ffmpeg.ts). The HEIC decoder is loaded the first time it's needed,
  * so it costs nothing until then. Everything else converts in the window.
  */
 
@@ -46,13 +47,6 @@ async function decodeHeic(data: Uint8Array): Promise<{ width: number; height: nu
 
 // ---- Videos ----
 
-/** The ffmpeg program bundled with the app (unpacked from the app's archive so it can run). */
-function ffmpegPath(): string {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const path = (require('ffmpeg-static') as string | null) ?? ''
-  return path.replace('app.asar', 'app.asar.unpacked')
-}
-
 /** Puts ffmpeg's last few error lines into plain words. */
 function explain(log: string): string {
   if (/Invalid data found|could not find codec|moov atom not found/i.test(log)) return 'This video couldn’t be read. It may be damaged, or not finished copying.'
@@ -75,7 +69,7 @@ export function convertedPath(file: ConvertedFile): string | null {
 async function convertVideo(send: (id: number, done: number) => void, req: VideoConvertRequest): Promise<ConvertedFile> {
   if (!req.path || !existsSync(req.path)) throw new Error('This video couldn’t be found on this computer. Save it to a folder first, then add it again.')
   const binary = ffmpegPath()
-  if (!binary || !existsSync(binary)) throw new Error('The video converter is missing from this copy of Orbit. Reinstalling Orbit should fix it.')
+  if (!existsSync(binary)) throw new Error('Download the video converter first (the button above).')
   await mkdir(tempFolder(), { recursive: true })
   const out = join(tempFolder(), `${process.pid}-${req.id}-${Date.now()}.${req.format}`)
   const args = ['-hide_banner', '-nostdin', '-y', '-i', req.path, ...videoArgs(req.format, req.maxHeight), '-progress', 'pipe:1', '-nostats', out]
@@ -143,6 +137,19 @@ export function setupConverter(): void {
     convertVideo((id, done) => !e.sender.isDestroyed() && e.sender.send('convert:video-progress', id, done), req)
   )
   ipcMain.handle('convert:video-cancel', (_e, id: number) => cancelVideo(id))
+  // Windows that asked for the status get told how a download is going.
+  const watchers = new Set<Electron.WebContents>()
+  onFfmpegState((state) => {
+    for (const wc of watchers) if (!wc.isDestroyed()) wc.send('convert:ffmpeg-status', state)
+  })
+  ipcMain.handle('convert:ffmpeg-status', (e) => {
+    if (!watchers.has(e.sender)) {
+      watchers.add(e.sender)
+      e.sender.once('destroyed', () => watchers.delete(e.sender))
+    }
+    return ffmpegState()
+  })
+  ipcMain.handle('convert:ffmpeg-get', () => downloadFfmpeg())
   clearTemp()
   app.on('will-quit', clearTemp)
 }

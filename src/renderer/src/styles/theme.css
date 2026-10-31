@@ -8347,6 +8347,25 @@ a.passwords-text:hover {
   opacity: 0.5;
   cursor: default;
 }
+.convert-ffmpeg {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+}
+.convert-ffmpeg > span {
+  flex: 1;
+}
+.convert-ffmpeg-error {
+  display: block;
+  margin-top: 4px;
+  color: var(--danger, #e5484d);
+}
+
 .convert-saved {
   margin: 14px 0 0;
   color: var(--text-muted);

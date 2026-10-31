@@ -1,6 +1,6 @@
-import { useRef, useState, type DragEvent } from 'react'
-import { ArrowRightLeft, AudioLines, Check, FileText, Film, FolderOpen, Image as ImageIcon, Loader2, Upload, X } from 'lucide-react'
-import type { ExportData, SaveFormat } from '@shared/types'
+import { useEffect, useRef, useState, type DragEvent } from 'react'
+import { ArrowRightLeft, AudioLines, Check, Download, FileText, Film, FolderOpen, Image as ImageIcon, Loader2, Upload, X } from 'lucide-react'
+import type { ExportData, FfmpegState, SaveFormat } from '@shared/types'
 import { FILE_MANAGER } from '@shared/platform'
 import { getDrag } from '../../lib/dnd'
 import { convertFile, describeSize, kindOf, outputName, targetsFor, whyNot, type ImageOptions, type Kind } from '../../lib/convert'
@@ -42,6 +42,8 @@ export default function ConvertPage() {
   const [items, setItems] = useState<Item[]>([])
   const [side, setSide] = useState<number | null>(null)
   const [videoHeight, setVideoHeight] = useState<number | null>(null)
+  /** Videos need ffmpeg, which is downloaded only when asked for. */
+  const [ffmpeg, setFfmpeg] = useState<FfmpegState | null>(null)
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -64,6 +66,7 @@ export default function ConvertPage() {
     const image: ImageOptions = { maxSide: side, quality: 0.9 }
     for (const it of items) {
       if (!it.format || it.status === 'done') continue
+      if (kindOf(it.file.name) === 'video' && !videoReady) continue
       update(it.id, { status: 'working', progress: undefined, message: undefined })
       try {
         const result = await convertFile(it.file, it.format, { id: it.id, image, videoHeight, onProgress: (progress) => update(it.id, { progress }) })
@@ -104,10 +107,17 @@ export default function ConvertPage() {
     addFiles(e.dataTransfer.files)
   }
 
-  const waiting = items.filter((it) => it.format && it.status !== 'done').length
-  const done = items.filter((it) => it.status === 'done').length
   const hasImages = items.some((it) => it.format && kindOf(it.file.name) === 'image')
   const hasVideos = items.some((it) => it.format && kindOf(it.file.name) === 'video')
+  const videoReady = ffmpeg?.state === 'ready'
+  const waiting = items.filter((it) => it.format && it.status !== 'done' && (videoReady || kindOf(it.file.name) !== 'video')).length
+  const done = items.filter((it) => it.status === 'done').length
+
+  useEffect(() => {
+    if (!hasVideos) return
+    void window.api.videoConverterStatus().then(setFfmpeg)
+    return window.api.onVideoConverterStatus(setFfmpeg)
+  }, [hasVideos])
 
   /** Takes items off the list, stopping (and throwing away) any video conversions. */
   const remove = (gone: Item[]): void => {
@@ -209,6 +219,28 @@ export default function ConvertPage() {
                 )
               })}
             </ul>
+
+            {hasVideos && ffmpeg && ffmpeg.state !== 'ready' && (
+              <div className="convert-ffmpeg" data-convert-ffmpeg>
+                {ffmpeg.state === 'unsupported' ? (
+                  <span>Converting videos isn’t available on this kind of computer yet.</span>
+                ) : ffmpeg.state === 'downloading' ? (
+                  <span className="convert-working">
+                    <Loader2 size={14} className="spin" /> Downloading the video converter… {Math.round((ffmpeg.progress ?? 0) * 100)}%
+                  </span>
+                ) : (
+                  <>
+                    <span>
+                      Videos need ffmpeg, a free video tool. It’s a one-time download of about 25 MB, and the Studio uses it too.
+                      {ffmpeg.error && <small className="convert-ffmpeg-error">{ffmpeg.error}</small>}
+                    </span>
+                    <button className="btn btn-primary" onClick={() => void window.api.getVideoConverter().then(setFfmpeg)} data-convert-get-ffmpeg>
+                      <Download size={13} /> Download
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
 
             {hasImages && (
               <label className="convert-option">
