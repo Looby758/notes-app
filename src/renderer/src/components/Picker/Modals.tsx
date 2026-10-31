@@ -1,12 +1,15 @@
-import { useCallback, useMemo, useState } from 'react'
-import { Command as CommandIcon, FilePlus, LayoutTemplate } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Command as CommandIcon, FilePlus, LayoutTemplate, Loader2, Sparkles, Wand2 } from 'lucide-react'
 import { useUI } from '../../store/ui'
 import { useVault } from '../../store/vault'
 import { usePrefs } from '../../store/prefs'
 import { getNoteText } from '../../store/noteIndex'
 import { commands, shortcutFor } from '../../lib/commands'
 import { fuzzyFilter } from '../../lib/fuzzy'
-import { isWithin, noteTitle, notePaths } from '../../lib/paths'
+import { errorMessage, isWithin, noteTitle, notePaths } from '../../lib/paths'
+import { describeCommand, interpretWithAi, parseCommand, runSmart } from '../../lib/smartCommands'
+import type { SmartAction } from '../../lib/smartParse'
+import { notify } from '../../store/notify'
 import { EXAMPLE_TEMPLATE, fillTemplate } from '../../lib/templates'
 import Picker, { Highlighted, type PickerItem } from './Picker'
 import { useNoteItems } from './noteItems'
@@ -144,28 +147,82 @@ function TemplatePicker({ close }: { close: () => void }) {
   )
 }
 
+type AiState = { text: string; state: 'working' } | { text: string; state: 'done'; action: SmartAction } | { text: string; state: 'error'; error: string }
+
+/**
+ * Ctrl+K: every command, plus plain sentences ("spent 12 on food", "remind me Friday 5pm call
+ * Dave"). What a sentence will do is shown first and only happens when you press Enter. If none
+ * of the built-in patterns understand it, you're asked whether to let the AI work it out; nothing
+ * is sent until you say yes.
+ */
 function CommandPalette({ close }: { close: () => void }) {
-  const [query, setQuery] = useState('')
-  const items = useMemo<PickerItem[]>(
-    () =>
-      fuzzyFilter(commands, query, (c) => c.title).map(({ item: c, positions }) => ({
-        id: c.id,
-        icon: <CommandIcon size={14} />,
-        label: <Highlighted text={c.title} positions={positions} />,
-        hint: shortcutFor(c) && <kbd>{showKeys(shortcutFor(c)!)}</kbd>,
-        run: () => {
-          close()
-          c.run()
-        }
-      })),
-    [query, close]
+  const [query, setQuery] = useState(() => useUI.getState().paletteQuery)
+  const [ai, setAi] = useState<AiState | null>(null)
+  const aiAllowed = usePrefs((s) => s.prefs.smartCommandsAi)
+  useEffect(() => {
+    if (useUI.getState().paletteQuery) useUI.setState({ paletteQuery: '' })
+  }, [])
+
+  const run = useCallback(
+    (action: SmartAction) => {
+      close()
+      runSmart(action).catch((err) => notify(err))
+    },
+    [close]
   )
+
+  const items = useMemo<PickerItem[]>(() => {
+    const q = query.trim()
+    const smart = q.includes(' ') || /\d/.test(q) ? parseCommand(q) : null
+    const matches = fuzzyFilter(commands, query, (c) => c.title).map(({ item: c, positions }) => ({
+      id: c.id,
+      icon: <CommandIcon size={14} />,
+      label: <Highlighted text={c.title} positions={positions} />,
+      hint: shortcutFor(c) && <kbd>{showKeys(shortcutFor(c)!)}</kbd>,
+      run: () => {
+        close()
+        c.run()
+      }
+    }))
+    const top: PickerItem[] = []
+    if (smart) {
+      top.push({ id: 'smart', icon: <Wand2 size={14} />, label: <strong>{describeCommand(smart)}</strong>, hint: <kbd>Enter</kbd>, run: () => run(smart) })
+    } else if (ai && ai.text === q) {
+      if (ai.state === 'working') top.push({ id: 'ai', icon: <Loader2 size={14} className="spin" />, label: 'Asking the AI what you mean…', run: () => undefined })
+      else if (ai.state === 'done') {
+        const action = ai.action
+        top.push({ id: 'ai', icon: <Sparkles size={14} />, label: <><span className="palette-ai-tag">AI</span> <strong>{describeCommand(action)}</strong></>, hint: <kbd>Enter</kbd>, run: () => run(action) })
+      } else top.push({ id: 'ai', icon: <Sparkles size={14} />, label: <span className="palette-ai-error">{ai.error}</span>, run: () => setAi(null) })
+    }
+    // Words, and nothing understood them: offer the AI, but only send if they pick it.
+    const offerAi = !smart && aiAllowed && q.split(/\s+/).length >= 2 && (!ai || ai.text !== q)
+    const ask: PickerItem[] = offerAi
+      ? [
+          {
+            id: 'ask-ai',
+            icon: <Sparkles size={14} />,
+            label: <>Not sure what you mean. <strong>Ask the AI to work it out?</strong></>,
+            detail: 'Sends just this sentence to Claude',
+            run: () => {
+              setAi({ text: q, state: 'working' })
+              interpretWithAi(q).then(
+                (action) => setAi((cur) => (cur?.text === q ? { text: q, state: 'done', action } : cur)),
+                (err) => setAi((cur) => (cur?.text === q ? { text: q, state: 'error', error: errorMessage(err) } : cur))
+              )
+            }
+          }
+        ]
+      : []
+    // Commands that match well stay above the offer; a long sentence rarely matches one on purpose.
+    return matches.length && q.split(/\s+/).length < 3 ? [...top, ...matches, ...ask] : [...top, ...ask, ...matches]
+  }, [query, close, ai, aiAllowed, run])
+
   return (
     <Picker
       query={query}
       onQuery={setQuery}
       items={items}
-      placeholder="Type a command…"
+      placeholder="Type a command, or say what you want (“spent 12 on food”, “remind me Friday 5pm…”)"
       empty="No matching commands"
       onEscape={close}
     />

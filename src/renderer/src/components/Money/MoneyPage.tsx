@@ -41,14 +41,16 @@ import { addHomeCard } from '../../lib/home'
 import { readWorkbook } from '../../lib/sheets'
 import { statementFromPdf } from '../../lib/pdfStatement'
 import MoneyHomeCard from './MoneyHomeCard'
+import MoneyPlans, { AskMoney, ForecastCard } from './MoneyPlans'
 import EmptyArt from '../Motion/EmptyArt'
 
 addHomeCard({ id: 'money', order: 25, title: 'Spending this month', Card: MoneyHomeCard })
 
-type View = 'overview' | 'entries' | 'import' | 'budgets'
+type View = 'overview' | 'entries' | 'plans' | 'import' | 'budgets'
 const VIEWS: [View, string][] = [
   ['overview', 'This month'],
   ['entries', 'Spending log'],
+  ['plans', 'Goals & bills'],
   ['import', 'Import statement'],
   ['budgets', 'Budgets & categories']
 ]
@@ -90,6 +92,7 @@ export default function MoneyPage() {
           )}
           {view === 'overview' && <Overview month={month} setMonth={setMonth} showBudgets={() => setView('budgets')} />}
           {view === 'entries' && <Entries month={month} edit={setEditing} />}
+          {view === 'plans' && <MoneyPlans />}
           {view === 'import' && <Import done={() => setView('entries')} />}
           {view === 'budgets' && <Budgets />}
         </div>
@@ -246,6 +249,8 @@ function Overview({ month, setMonth, showBudgets }: { month: string; setMonth: (
         </div>
       </div>
 
+      {month === monthOf(new Date()) && <ForecastCard />}
+
       <section className="money-section">
         <h3>Budgets</h3>
         {budgeted.length ? (
@@ -324,6 +329,8 @@ function Overview({ month, setMonth, showBudgets }: { month: string; setMonth: (
         <h3>Month by month</h3>
         <MonthsChart month={month} setMonth={setMonth} />
       </section>
+
+      <AskMoney />
     </>
   )
 }

@@ -254,6 +254,25 @@ export type PhoneEvent =
   | { type: 'file'; path: string; into: 'note' | 'folder' }
   | { type: 'receipt'; path: string; text: string }
   | { type: 'dictate'; id: string; text: string; done: boolean }
+  /** A button on the phone's Deck was pressed. */
+  | { type: 'deck'; id: string }
+
+/** A button on the phone's Deck tab. */
+export interface DeckButton {
+  id: string
+  label: string
+  /** An emoji (the phone page has no icon font). */
+  icon: string
+  /** Bring Orbit's window to the front when pressed (it opens something). */
+  show?: boolean
+}
+
+/** What the phone's Screen tab shows: today's plan, the open note, the focus timer. */
+export interface PhoneScreen {
+  today: { time: string; title: string; done?: boolean }[]
+  note: { title: string; text: string } | null
+  timer: { label: string; endsAt: number | null; left: number | null } | null
+}
 
 /** A screen or window the Studio can capture (desktopCapturer). */
 export interface StudioCaptureSource {
@@ -438,18 +457,32 @@ export interface NotesApi {
 
   // Quick capture
   /** Opens the quick capture window. */
+  // Screen snip (main/snip.ts)
+  /** Takes a picture of the screen under the pointer and opens the snip window over it. */
+  startSnip(): Promise<void>
+  snipStatus(): Promise<{ shortcut: string; error?: string }>
+  /** Snip window: the picture of the screen (PNG) and the screen's scale factor. */
+  snipImage(): Promise<{ png: Uint8Array; scale: number } | null>
+  /** Snip window: the text in part of the picture (read offline). */
+  snipRead(png: Uint8Array): Promise<string>
+  snipClose(): Promise<void>
+  /** Snip window: what to do with the text (closes the snip). */
+  snipSend(action: 'copy' | 'note' | 'web' | 'translate' | 'ask', text: string): Promise<void>
+  /** Main window: snipped text to save in today's note or ask the AI about. */
+  onSnipText(callback: (action: 'note' | 'ask', text: string) => void): () => void
+  onSnipFailed(callback: (message: string) => void): () => void
   openCapture(): Promise<void>
   closeCapture(): Promise<void>
   /** Capture window: stay open even when it loses focus (while recording). */
   captureKeepOpen(on: boolean): Promise<void>
   captureStatus(): Promise<CaptureStatus>
   /** From the capture window: save this text (the main window does the saving). */
-  submitCapture(request: CaptureRequest): Promise<{ ok: boolean; where?: string; error?: string }>
+  submitCapture(request: CaptureRequest): Promise<{ ok: boolean; where?: string; error?: string; show?: boolean }>
   /** Capture window: called each time it's shown, to start fresh. */
   onCaptureReset(callback: () => void): () => void
   /** Main window: asked to save a capture; reply with captureResult. */
   onCaptureRequest(callback: (id: number, request: CaptureRequest) => void): () => void
-  captureResult(id: number, result: { ok: boolean; where?: string; error?: string }): Promise<void>
+  captureResult(id: number, result: { ok: boolean; where?: string; error?: string; show?: boolean }): Promise<void>
 
   // Google Calendar and calendar links (read-only)
   calendarSources(): Promise<CalendarSourcesStatus>
@@ -540,7 +573,10 @@ export interface NotesApi {
   aiSummarise(title: string, text: string): Promise<string>
   /** A quick capture is tidied as one list item; a note can get headings and lists. */
   aiTidy(text: string, kind: 'note' | 'capture'): Promise<string>
-  aiAsk(question: string, notes: AiNote[], history: AiAskTurn[]): Promise<string>
+  /** `extra`: digests of money, calendar and email for Ask everything (lib/askContext.ts). */
+  aiAsk(question: string, notes: AiNote[], history: AiAskTurn[], extra?: AiExtraContext): Promise<string>
+  /** Ctrl+K: the action a sentence asks for, as Claude reads it (checked by validSmart before anything runs). */
+  aiInterpret(text: string, context: string): Promise<unknown>
   // Games
   /** The games installed on this computer, with time played; `rescan` looks for new ones first. */
   gamesList(rescan: boolean): Promise<GamesList>
@@ -623,6 +659,10 @@ export interface NotesApi {
   phonePair(fresh?: boolean): Promise<PhonePairing>
   phoneForget(): Promise<void>
   onPhoneEvent(callback: (event: PhoneEvent) => void): () => void
+  /** The Deck buttons and Screen contents for the paired phone, and a heads-up to show on it. */
+  phoneSetDeck(buttons: DeckButton[]): Promise<void>
+  phoneSetScreen(screen: PhoneScreen): Promise<void>
+  phoneNotify(title: string, body: string): Promise<void>
   /** The Wi-Fi this computer is on, for a guest QR code (blank where it can't be read). */
   phoneWifi(): Promise<WifiNetwork>
   /** Reads/writes a small app file kept in the vault's hidden ".notesapp" folder (synced with your notes). */
@@ -669,8 +709,6 @@ export interface NotesApi {
   explorerSearch(dir: string, query: string, showHidden: boolean): Promise<ExplorerEntry[]>
   /** Copies files/folders from the computer into a notes folder ('' is the top); ones already in the notes folder are moved. Returns their notes-folder paths. */
   explorerToVault(paths: string[], folder: string): Promise<string[]>
-  /** The full path of a file dropped in from File Explorer / Finder ('' if it has none). */
-  pathForFile(file: File): string
   /** Opens a vault file (like a PDF) in its usual app. */
   openFile(path: string): Promise<void>
   /** Reads a note's markdown. */
@@ -694,12 +732,21 @@ export interface MenuWord {
 
 export type PopupMenuItem = 'separator' | { id?: string; label: string; accelerator?: string; submenu?: PopupMenuItem[] }
 /** What quick capture sends to be saved. */
+/** Ask everything: other things the AI can look at, as plain text. */
+export interface AiExtraContext {
+  money?: string
+  calendar?: string
+  email?: string
+}
+
 export interface CaptureRequest {
   text: string
   /** Where it goes; by default your capture setting (today's note or the inbox). */
   target?: { kind: 'daily' | 'inbox' } | { kind: 'note' | 'folder'; path: string }
   /** Instead: a calendar event on that day (in its daily note's schedule). */
   event?: { date: string; time?: string; title: string; remind: boolean }
+  /** Instead: a command for the main window to run ("spent 12 on food", "? what's on today"). */
+  command?: string
 }
 /** A note as read from Apple Notes. */
 export interface AppleNote {

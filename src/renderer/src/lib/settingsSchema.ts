@@ -1,5 +1,5 @@
 import type { Prefs } from '@shared/prefs'
-import { CAPTURE_SHORTCUTS, RANGES } from '@shared/prefs'
+import { CAPTURE_SHORTCUTS, RANGES, SNIP_SHORTCUTS } from '@shared/prefs'
 import { acceleratorLabel, IS_MAC, showKeys, TRAY_NAME } from '@shared/platform'
 import { formatDate } from './dates'
 
@@ -8,7 +8,7 @@ import { formatDate } from './dates'
  * and search looks through labels, descriptions and keywords.
  */
 
-export type SectionId = 'appearance' | 'editor' | 'files' | 'calendar' | 'capture' | 'ai' | 'music' | 'studio' | 'shortcuts' | 'about'
+export type SectionId = 'appearance' | 'navigation' | 'editor' | 'files' | 'calendar' | 'capture' | 'ai' | 'music' | 'studio' | 'shortcuts' | 'about'
 
 interface Base {
   key: keyof Prefs
@@ -661,21 +661,60 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'weather forecast rain outdoor outside event calendar'
   },
 
+  // ---------- Finding features ----------
+  {
+    key: 'showDock',
+    section: 'navigation',
+    group: 'Dock',
+    type: 'toggle',
+    label: 'Show the dock',
+    description: 'A slim strip of your favourite features down the left edge. Drag to reorder, right-click to remove.',
+    keywords: 'dock sidebar strip favourites apps rail'
+  },
+  {
+    key: 'radialMiddleClick',
+    section: 'navigation',
+    group: 'Radial menu',
+    type: 'toggle',
+    label: 'Hold the middle mouse button for the radial menu',
+    description: 'A ring of features appears under the pointer. Move toward one and let go. A quick middle-click still works as before.',
+    keywords: 'radial ring wheel pie menu middle mouse scroll wheel click'
+  },
+  {
+    key: 'smartCommandsAi',
+    section: 'navigation',
+    group: 'Ctrl+K',
+    type: 'toggle',
+    label: 'Offer to ask the AI when Ctrl+K doesn’t understand',
+    description: 'Sentences like “spent 12 on food” are understood on this computer. For anything else, Ctrl+K asks first before sending the sentence to Claude.',
+    keywords: 'command palette ai smart sentence natural language ctrl k'
+  },
+
   // ---------- Quick capture & tray ----------
   {
     key: 'captureShortcut',
     section: 'capture',
-    group: 'Quick capture',
+    group: 'Summon bar',
     type: 'choice',
     options: CAPTURE_SHORTCUTS.map((value) => ({ value, label: value ? acceleratorLabel(value) : 'Off' })),
     label: 'Shortcut',
-    description: `Works from any app, as long as Orbit is running (it can wait in the ${TRAY_NAME}).`,
-    keywords: 'capture hotkey global win key'
+    description: `Opens the summon bar over any app, as long as Orbit is running (it can wait in the ${TRAY_NAME}). Jot a thought, or type a command like “spent 12 on food”, “play Drake” or “open money”.`,
+    keywords: 'capture hotkey global win key summon bar spotlight'
+  },
+  {
+    key: 'snipShortcut',
+    section: 'capture',
+    group: 'Screen snip',
+    type: 'choice',
+    options: SNIP_SHORTCUTS.map((value) => ({ value, label: value ? acceleratorLabel(value) : 'Off' })),
+    label: 'Shortcut',
+    description: 'Drag a box round text anywhere on screen to copy it, save it, search it, translate it or ask the AI about it. Read on this computer.',
+    keywords: 'snip screenshot ocr text grab copy translate hotkey'
   },
   {
     key: 'captureTarget',
     section: 'capture',
-    group: 'Quick capture',
+    group: 'Summon bar',
     type: 'choice',
     options: [
       { value: 'daily', label: "Today's note" },
@@ -687,7 +726,7 @@ export const SETTINGS: SettingDef[] = [
   {
     key: 'captureHeading',
     section: 'capture',
-    group: 'Quick capture',
+    group: 'Summon bar',
     type: 'text',
     placeholder: 'Captured',
     label: 'Heading in the daily note',
@@ -697,7 +736,7 @@ export const SETTINGS: SettingDef[] = [
   {
     key: 'captureInbox',
     section: 'capture',
-    group: 'Quick capture',
+    group: 'Summon bar',
     type: 'folder',
     prefix: 'Inbox note:',
     placeholder: 'Inbox',
@@ -705,11 +744,11 @@ export const SETTINGS: SettingDef[] = [
     description: 'Used when captures go to the inbox. Created if it doesn’t exist.',
     keywords: 'capture inbox'
   },
-  { key: 'captureTimestamp', section: 'capture', group: 'Quick capture', type: 'toggle', label: 'Add the time to each capture', description: 'Like "- 14:05 Call the plumber".' },
+  { key: 'captureTimestamp', section: 'capture', group: 'Summon bar', type: 'toggle', label: 'Add the time to each capture', description: 'Like "- 14:05 Call the plumber".' },
   {
     key: 'captureRememberTarget',
     section: 'capture',
-    group: 'Quick capture',
+    group: 'Summon bar',
     type: 'toggle',
     label: 'Remember where I last sent a capture',
     description: 'The → menu at the top of quick capture picks another note or folder. Normally each capture starts back at the usual place; with this on, it stays where you last chose.',
@@ -752,10 +791,11 @@ export const SETTINGS: SettingDef[] = [
 
 export const SECTIONS: { id: SectionId; label: string }[] = [
   { id: 'appearance', label: 'Appearance' },
+  { id: 'navigation', label: 'Finding features' },
   { id: 'editor', label: 'Editor' },
   { id: 'files', label: 'Files' },
   { id: 'calendar', label: 'Calendar' },
-  { id: 'capture', label: 'Quick capture' },
+  { id: 'capture', label: 'Summon bar & snip' },
   { id: 'ai', label: 'AI helper' },
   { id: 'music', label: 'Music' },
   { id: 'studio', label: 'Studio' },

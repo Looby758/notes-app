@@ -26,12 +26,16 @@ export interface CaptureResult {
   /** Where it was saved, e.g. "Today's note". */
   where?: string
   error?: string
+  /** A command opened something in the main window: bring it to the front. */
+  show?: boolean
 }
 
 interface Hooks {
   getMain: () => BrowserWindow | null
   showMain: () => void
   prefs: () => Prefs
+  /** Starts a screen snip (main/snip.ts). */
+  snip?: () => void
 }
 let hooks: Hooks
 
@@ -39,7 +43,7 @@ const ICON = join(__dirname, '../../build/icon.png')
 /** A Mac menu bar icon is a black-and-clear 'template' that macOS tints to match the menu bar. */
 const MAC_TRAY_ICON = join(__dirname, '../../build/trayTemplate.png')
 
-function loadRenderer(win: BrowserWindow, hash: string): void {
+export function loadRenderer(win: BrowserWindow, hash: string): void {
   if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}#${hash}`)
   else win.loadFile(join(__dirname, '../renderer/index.html'), { hash })
 }
@@ -51,7 +55,7 @@ function createCaptureWindow(): BrowserWindow {
   const { colors } = getTheme(activeThemeId(hooks.prefs(), nativeTheme.shouldUseDarkColors))
   const win = new BrowserWindow({
     width: 560,
-    height: 212,
+    height: 240,
     show: false,
     frame: false,
     resizable: false,
@@ -98,6 +102,11 @@ export function openCapture(): void {
   else reveal()
 }
 
+/** Hides the summon bar (e.g. before a screen snip, so it isn't in the picture). */
+export function hideCaptureWindow(): void {
+  captureWin?.hide()
+}
+
 /**
  * Puts quick capture away. On a Mac, if no Notes window is showing, hand the focus back to the
  * app you were in (Windows does that by itself).
@@ -130,7 +139,8 @@ function updateTrayMenu(): void {
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: 'Open Orbit', click: () => hooks.showMain() },
-      { label: `Quick capture${shortcut}`, click: openCapture },
+      { label: `Summon bar${shortcut}`, click: openCapture },
+      { label: 'Screen snip', click: () => void hooks.snip?.() },
       { type: 'separator' },
       { label: 'Quit Orbit', click: () => app.quit() }
     ])
@@ -195,11 +205,14 @@ export function setupCapture(h: Hooks): void {
       pending.set(id, resolve)
       setTimeout(() => {
         if (pending.delete(id)) resolve({ ok: false, error: 'Saving took too long. Try again.' })
-      }, 8000)
+      }, request.command ? 30000 : 8000)
     })
     main.webContents.send('capture:add', id, request)
     const r = await result
-    if (r.ok) hideCapture()
+    if (r.ok) {
+      hideCapture()
+      if (r.show) hooks.showMain()
+    }
     return r
   })
   ipcMain.handle('capture:result', (_e, id: number, result: CaptureResult) => {

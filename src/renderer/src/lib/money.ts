@@ -32,6 +32,22 @@ export interface MoneyData {
   budgets: Record<string, number>
   /** Categories you picked for shops and payees, by merchantKey(), used to sort imported rows. */
   rules: Record<string, string>
+  /** Savings goals ("New PC £1,200"). */
+  goals: SavingsGoal[]
+  /** Repeating payments you said aren't subscriptions or bills (by merchantKey), so they aren't listed. */
+  notRecurring: string[]
+}
+
+export interface SavingsGoal {
+  id: string
+  name: string
+  /** Pence. */
+  target: number
+  /** Pence put aside so far. */
+  saved: number
+  /** YYYY-MM-DD you want it by, or '' for no date. */
+  due: string
+  color: string
 }
 
 export const OTHER = 'other'
@@ -55,7 +71,7 @@ export const DEFAULT_CATEGORIES: MoneyCategory[] = [
   { id: OTHER_INCOME, name: 'Other income', color: GREY, income: true }
 ]
 
-export const emptyMoney = (): MoneyData => ({ categories: DEFAULT_CATEGORIES.map((c) => ({ ...c })), entries: [], budgets: {}, rules: {} })
+export const emptyMoney = (): MoneyData => ({ categories: DEFAULT_CATEGORIES.map((c) => ({ ...c })), entries: [], budgets: {}, rules: {}, goals: [], notRecurring: [] })
 
 /** Reads money.json, keeping whatever is usable from a damaged or older file. */
 export function readMoney(text: string | null): MoneyData {
@@ -106,6 +122,19 @@ export function readMoney(text: string | null): MoneyData {
   if (r.rules && typeof r.rules === 'object') {
     for (const [k, v] of Object.entries(r.rules as Record<string, unknown>)) if (typeof v === 'string') data.rules[k] = v
   }
+  if (Array.isArray(r.goals)) {
+    data.goals = (r.goals as Record<string, unknown>[])
+      .filter((g) => !!g && typeof g.id === 'string' && typeof g.name === 'string' && Number.isFinite(g.target) && (g.target as number) > 0)
+      .map((g, i) => ({
+        id: g.id as string,
+        name: (g.name as string).slice(0, 80),
+        target: Math.round(g.target as number),
+        saved: Number.isFinite(g.saved) ? Math.max(0, Math.round(g.saved as number)) : 0,
+        due: typeof g.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(g.due) ? g.due : '',
+        color: typeof g.color === 'string' && /^#[0-9a-f]{6}$/i.test(g.color) ? g.color : CATEGORY_COLORS[i % CATEGORY_COLORS.length]
+      }))
+  }
+  if (Array.isArray(r.notRecurring)) data.notRecurring = (r.notRecurring as unknown[]).filter((k): k is string => typeof k === 'string')
   return data
 }
 

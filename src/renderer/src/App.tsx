@@ -6,6 +6,7 @@ import { loadPrefs, usePrefs } from './store/prefs'
 import { activeThemeId, getTheme } from '@shared/themes'
 import LoadingScreen, { THEME_LOADING_MS } from './components/Theme/LoadingScreen'
 import { systemDark } from './lib/appearance'
+import { runCommandText } from './lib/smartCommands'
 import { saveCapture } from './lib/capture'
 import StartupLogo from './components/Motion/StartupLogo'
 
@@ -40,9 +41,11 @@ export default function App() {
   useEffect(
     () =>
       window.api.onCaptureRequest(async (id, request) => {
-        const result = vaultRef.current
-          ? await saveCapture(request)
-          : { ok: false, error: 'Open Orbit and choose a notes folder first.' }
+        const result = !vaultRef.current
+          ? { ok: false, error: 'Open Orbit and choose a notes folder first.' }
+          : request.command
+            ? await runCommandText(request.command)
+            : await saveCapture(request)
         window.api.captureResult(id, result)
       }),
     []

@@ -159,12 +159,28 @@ export interface Prefs {
   /** Quick capture keeps the last place you chose instead of going back to the usual one. */
   captureRememberTarget: boolean
   captureTimestamp: boolean
+  /** System-wide shortcut for a screen snip (grab text from anywhere on screen); '' for none. */
+  snipShortcut: string
   /** Closing the window keeps Notes running in the tray (so quick capture still works). */
   closeToTray: boolean
   launchAtStartup: boolean
 
   /** Look for a newer version on GitHub now and then. */
   checkForUpdates: boolean
+
+  // Finding features
+  /** Feature ids (lib/features.tsx) shown as buttons in the top bar, in order. */
+  topbarFeatures: string[]
+  /** The dock down the left edge, with its own list of features. */
+  showDock: boolean
+  dockFeatures: string[]
+  /** Holding the middle mouse button opens a ring of these features under the pointer. */
+  radialMiddleClick: boolean
+  radialFeatures: string[]
+  /** Buttons on the phone's Deck tab: feature ids, and a few phone-only actions (lib/phoneDeck.ts). */
+  phoneDeck: string[]
+  /** Ctrl+K: if no built-in pattern understands a sentence, offer to ask the AI (never sent without asking). */
+  smartCommandsAi: boolean
 
   /** Shortcut overrides by command id: a shortcut like "Ctrl+Shift+K", or null for none. */
   shortcuts: Record<string, string | null>
@@ -262,10 +278,19 @@ export const DEFAULT_PREFS: Prefs = {
   captureInbox: 'Inbox',
   captureTimestamp: true,
   captureRememberTarget: false,
+  snipShortcut: IS_MAC ? 'Control+Alt+S' : 'Alt+Shift+S',
   closeToTray: true,
   launchAtStartup: false,
 
   checkForUpdates: true,
+
+  topbarFeatures: ['home', 'today', 'calendar', 'email', 'messages', 'money', 'music', 'phone'],
+  showDock: true,
+  dockFeatures: ['home', 'today', 'calendar', 'email', 'messages', 'money', 'chat', 'ask', 'explorer', 'convert', 'music', 'games'],
+  radialMiddleClick: true,
+  radialFeatures: ['today', 'new-note', 'calendar', 'money', 'music', 'email', 'snip', 'ask'],
+  smartCommandsAi: true,
+  phoneDeck: ['play-pause', 'next-song', 'previous-song', 'today', 'new-note', 'snip', 'streamer', 'lock-all', 'zen', 'money', 'calendar', 'messages'],
 
   shortcuts: {}
 }
@@ -300,8 +325,12 @@ const CHOICES = {
   appIcon: ['default', 'green', 'forest', 'ocean', 'sunset', 'light', 'midnight'],
   captureShortcut: IS_MAC
     ? ['Control+Alt+Space', 'Alt+Space', 'Control+Shift+Space', 'Super+Alt+N', '']
-    : ['Super+Shift+N', 'Control+Alt+Space', 'Control+Shift+Space', 'Alt+Shift+N', '']
+    : ['Super+Shift+N', 'Control+Alt+Space', 'Control+Shift+Space', 'Alt+Shift+N', ''],
+  snipShortcut: IS_MAC ? ['Control+Alt+S', 'Control+Shift+S', 'Alt+Shift+S', ''] : ['Alt+Shift+S', 'Control+Alt+S', 'Super+Shift+T', '']
 } as const
+
+/** Shortcuts offered for screen snip (system-wide). */
+export const SNIP_SHORTCUTS = CHOICES.snipShortcut
 
 /** Shortcuts offered for quick capture (system-wide, so they're picked from a safe list). */
 export const CAPTURE_SHORTCUTS = CHOICES.captureShortcut
@@ -385,6 +414,9 @@ export function normalizePrefs(raw: unknown): Prefs {
   out.captureInbox = cleanFolder(input.captureInbox ?? DEFAULT_PREFS.captureInbox, DEFAULT_PREFS.captureInbox) || DEFAULT_PREFS.captureInbox
   out.homeOrder = cleanIds(input.homeOrder)
   out.homeHidden = cleanIds(input.homeHidden)
+  for (const k of ['topbarFeatures', 'dockFeatures', 'radialFeatures', 'phoneDeck'] as const) {
+    out[k] = input[k] === undefined ? [...DEFAULT_PREFS[k]] : cleanIds(input[k])
+  }
 
   if (input.shortcuts && typeof input.shortcuts === 'object') {
     for (const [id, value] of Object.entries(input.shortcuts as Record<string, unknown>)) {

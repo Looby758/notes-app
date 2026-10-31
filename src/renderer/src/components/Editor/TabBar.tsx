@@ -72,7 +72,7 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === GRAPH_TAB) return 'Graph'
   if (id === REPLACE_TAB) return 'Find & replace'
   if (id === CONFLICTS_TAB) return 'Sync copies'
-  if (id === AI_TAB) return 'Ask my notes'
+  if (id === AI_TAB) return 'Ask everything'
   if (id === CHAT_TAB) return 'Chat'
   if (id === FLASHCARDS_TAB) return 'Flashcards'
   if (id === TERMINAL_TAB) return 'Terminal'

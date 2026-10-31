@@ -1,0 +1,62 @@
+/**
+ * The names and groups of Orbit's features, with no app code attached, so the summon bar (its
+ * own small window) and Ctrl+K's sentence reader can use them too. lib/features.tsx adds the icons
+ * and what each one does.
+ */
+
+export type FeatureGroup = 'Notes' | 'Plan' | 'Money' | 'Connect' | 'Media' | 'Play' | 'Tools'
+
+export const FEATURE_GROUPS: FeatureGroup[] = ['Notes', 'Plan', 'Money', 'Connect', 'Media', 'Play', 'Tools']
+
+export interface FeatureInfo {
+  /** Stable id, saved in settings (lowercase letters, numbers and dashes). */
+  id: string
+  name: string
+  /** One short line, shown in the launcher. */
+  blurb: string
+  group: FeatureGroup
+  /** Extra words the launcher's search should match. */
+  keywords?: string
+  /** The command (lib/commands.ts) whose shortcut opens this, to show the keys. */
+  command?: string
+}
+
+export const FEATURE_INFO: FeatureInfo[] = [
+  { id: 'home', name: 'Home', blurb: 'Today, weather, recent notes', group: 'Notes', command: 'home.open' },
+  { id: 'today', name: "Today's note", blurb: 'Opens today’s daily note, or makes it', group: 'Notes', command: 'daily.today', keywords: 'daily journal diary' },
+  { id: 'new-note', name: 'New note', blurb: 'A blank note', group: 'Notes', command: 'note.new', keywords: 'create write' },
+  { id: 'capture', name: 'Summon bar', blurb: 'Jot, ask, calculate or run anything, over any app', group: 'Notes', keywords: 'quick capture inbox thought' },
+  { id: 'search', name: 'Search notes', blurb: 'Find words in every note', group: 'Notes', command: 'search', keywords: 'find' },
+  { id: 'graph', name: 'Graph', blurb: 'How your notes link together', group: 'Notes', command: 'graph.open', keywords: 'links map' },
+  { id: 'random', name: 'Random note', blurb: 'Rediscover something you wrote', group: 'Notes', command: 'note.random' },
+  { id: 'reading', name: 'Reading mode', blurb: 'Notes become read-only', group: 'Notes', command: 'view.reading' },
+
+  { id: 'calendar', name: 'Calendar', blurb: 'Events, reminders and bills', group: 'Plan', command: 'calendar.open', keywords: 'events schedule' },
+  { id: 'flashcards', name: 'Flashcards', blurb: 'Review what’s due', group: 'Plan', command: 'flashcards.open', keywords: 'revise study cards' },
+  { id: 'zen', name: 'Zen & focus timer', blurb: 'Full screen, just you and the note', group: 'Plan', command: 'view.zen', keywords: 'pomodoro focus timer' },
+
+  { id: 'money', name: 'Money', blurb: 'Spending, budgets, goals and subscriptions', group: 'Money', command: 'money.open', keywords: 'bank budget spend savings' },
+  { id: 'passwords', name: 'Passwords', blurb: 'Your saved logins', group: 'Money', command: 'passwords.open', keywords: 'vault logins security' },
+
+  { id: 'email', name: 'Email', blurb: 'Gmail inside Orbit', group: 'Connect', command: 'email.open', keywords: 'gmail inbox mail' },
+  { id: 'messages', name: 'Messages', blurb: 'WhatsApp and Discord', group: 'Connect', command: 'messages.open', keywords: 'whatsapp discord chat' },
+  { id: 'phone', name: 'Phone', blurb: 'Send files, Stream Deck, second screen', group: 'Connect', keywords: 'qr mobile touchpad remote deck' },
+  { id: 'web', name: 'Web browser', blurb: 'A web page beside your notes', group: 'Connect', command: 'web.open', keywords: 'internet browse google' },
+  { id: 'chat', name: 'AI chat', blurb: 'Chat with Claude about anything', group: 'Connect', command: 'ai.chat', keywords: 'claude ai assistant' },
+  { id: 'ask', name: 'Ask everything', blurb: 'AI that knows your notes, email, calendar and money', group: 'Connect', command: 'ai.ask', keywords: 'ai question claude' },
+
+  { id: 'music', name: 'Music', blurb: 'Spotify and your own songs', group: 'Media', command: 'music.player', keywords: 'spotify songs player' },
+  { id: 'youtube', name: 'YouTube', blurb: 'A mini window that floats on top', group: 'Media', command: 'youtube.open', keywords: 'video' },
+
+  { id: 'games', name: 'Games', blurb: 'Your Steam and other games', group: 'Play', command: 'games.open', keywords: 'steam epic play' },
+  { id: 'sudoku', name: 'Sudoku', blurb: 'A quick break', group: 'Play', command: 'sudoku.open' },
+  { id: 'minesweeper', name: 'Minesweeper', blurb: 'A quick break', group: 'Play', command: 'minesweeper.open' },
+
+  { id: 'snip', name: 'Screen snip', blurb: 'Grab text from anywhere on screen', group: 'Tools', command: 'snip.start', keywords: 'ocr screenshot copy text translate' },
+  { id: 'explorer', name: 'Files', blurb: 'Files on this computer', group: 'Tools', command: 'explorer.open', keywords: 'explorer finder folders drive' },
+  { id: 'convert', name: 'Convert files', blurb: 'Photos, documents, audio and more', group: 'Tools', command: 'convert.open', keywords: 'pdf mp3 mp4 gif video png jpg word' },
+  { id: 'studio', name: 'Studio', blurb: 'Record your screen and webcam, or go live', group: 'Tools', command: 'studio.open', keywords: 'record obs stream twitch youtube webcam live' },
+  { id: 'terminal', name: 'Terminal', blurb: 'Command line in your notes folder', group: 'Tools', command: 'terminal.open', keywords: 'shell cmd powershell' },
+  { id: 'streamer', name: 'Streamer mode', blurb: 'Blur private things while sharing', group: 'Tools', command: 'view.streamer', keywords: 'privacy blur stream obs' },
+  { id: 'settings', name: 'Settings', blurb: 'Make Orbit yours', group: 'Tools', command: 'settings', keywords: 'preferences options' }
+]

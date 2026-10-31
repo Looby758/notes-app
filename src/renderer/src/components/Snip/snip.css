@@ -1,0 +1,109 @@
+/* Screen snip (#snip): a still picture of the screen with a box drawn on it. */
+body.snip-window,
+body.snip-window #root {
+  background: #000;
+  overflow: hidden;
+  margin: 0;
+}
+.snip {
+  position: fixed;
+  inset: 0;
+  cursor: crosshair;
+  user-select: none;
+}
+.snip-shot {
+  position: absolute;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
+.snip-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+}
+.snip-box {
+  position: absolute;
+  border: 1.5px solid var(--accent, #8b7cf6);
+  border-radius: 3px;
+  /* Darkens everything outside the box. */
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.45);
+}
+.snip-hint {
+  position: absolute;
+  top: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(20, 20, 24, 0.85);
+  color: #fff;
+  font: 13px/1.4 system-ui, sans-serif;
+  pointer-events: none;
+  animation: snip-in 200ms ease-out;
+}
+.snip-panel {
+  position: absolute;
+  width: 420px;
+  padding: 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--bg-raised);
+  color: var(--text);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  cursor: default;
+  user-select: text;
+  animation: snip-in 160ms ease-out;
+}
+.snip-panel textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 60px;
+  max-height: 240px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 13px;
+}
+.snip-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.snip-reading,
+.snip-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 28px 4px 2px;
+  font-size: 13px;
+}
+.snip-error {
+  color: var(--text-muted);
+}
+.snip-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+@keyframes snip-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.snip-hint {
+  animation-name: snip-hint-in;
+}
+@keyframes snip-hint-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+}

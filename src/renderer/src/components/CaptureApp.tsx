@@ -7,6 +7,20 @@ import { dayKeyOf, findWhen } from '../lib/when'
 import { formatDate, fromDayKey } from '../lib/dates'
 import { fuzzyFilter } from '../lib/fuzzy'
 import { errorMessage, noteTitle } from '../lib/paths'
+import { describeSmart, parseSmart, type SmartAction } from '../lib/smartParse'
+import { FEATURE_INFO } from '../lib/featureInfo'
+
+/** What the summon bar would do with what's typed, instead of saving it: a command, a sum, or "?" to ask. */
+function summonAction(text: string): SmartAction | null {
+  const t = text.trim()
+  if (!t || t.includes('\n')) return null
+  if (t.startsWith('?')) return t.slice(1).trim() ? { kind: 'ask', question: t.slice(1).trim() } : null
+  const a = parseSmart(t, { features: FEATURE_INFO })
+  // Events and jots are what saving already does (with the calendar chip); questions only with "?".
+  // Reminders ("remind me Friday 5pm…") are handled as commands so the ⏰ is set and "remind me" left out.
+  if (a?.kind === 'event' && a.remind) return a
+  return a && a.kind !== 'event' && a.kind !== 'jot' && a.kind !== 'ask' ? a : null
+}
 
 type Dest = NonNullable<CaptureRequest['target']>
 
@@ -62,6 +76,11 @@ export default function CaptureApp() {
   const [canTidy, setCanTidy] = useState(false)
   const [tidying, setTidying] = useState(false)
   const [untidied, setUntidied] = useState<string | null>(null)
+  const [rec, setRec] = useState<Recording | null>(null)
+  const [voice, setVoice] = useState<string | null>(null)
+  const [elapsed, setElapsed] = useState(0)
+  // "Save as a note instead" for a command the bar picked up.
+  const [noCommand, setNoCommand] = useState(false)
 
   // Each time the window is shown: start fresh and focus.
   useEffect(() => {
@@ -75,6 +94,7 @@ export default function CaptureApp() {
       setRemind(false)
       setUntidied(null)
       setTidying(false)
+      setNoCommand(false)
       window.api.aiStatus().then((s) => setCanTidy(s.hasKey), () => setCanTidy(false))
       setDest(usePrefs.getState().prefs.captureRememberTarget ? readStored<Dest | null>(LAST_KEY, null) : null)
       window.api.captureStatus().then(setStatus)
@@ -101,13 +121,30 @@ export default function CaptureApp() {
     }
   }
 
+  // ---------- commands ----------
+  const command = useMemo(() => (voice ? null : summonAction(text)), [text, voice])
+  const commandOn = !!command && !noCommand
+  const runCommand = async (): Promise<void> => {
+    if (!command || saving) return
+    setError(null)
+    if (command.kind === 'calc') {
+      await navigator.clipboard.writeText(command.result).catch(() => undefined)
+      void window.api.closeCapture()
+      return
+    }
+    setSaving(true)
+    const result = await window.api.submitCapture({ text, command: text })
+    setSaving(false)
+    if (!result.ok) setError(result.error ?? 'That didn’t work.')
+  }
+
   // ---------- calendar ----------
   const found = useMemo(() => findWhen(text), [text])
   const eventDate = manual?.date ?? (found ? dayKeyOf(found.date) : dayKeyOf(new Date()))
   const eventTime = manual ? manual.time : (found?.time ?? '')
   // Found a time: it's an event unless you say no. Found only a day ("today"): just offered.
-  const eventOn = eventMode === 'on' || (eventMode === 'auto' && !!found?.time)
-  const offered = eventMode === 'auto' && !!found && !found.time
+  const eventOn = !commandOn && (eventMode === 'on' || (eventMode === 'auto' && !!found?.time))
+  const offered = !commandOn && eventMode === 'auto' && !!found && !found.time
   const eventLabel = (): string => {
     const day = fromDayKey(eventDate)
     const today = dayKeyOf(new Date())
@@ -117,9 +154,6 @@ export default function CaptureApp() {
   }
 
   // ---------- a voice note ----------
-  const [rec, setRec] = useState<Recording | null>(null)
-  const [voice, setVoice] = useState<string | null>(null)
-  const [elapsed, setElapsed] = useState(0)
   useEffect(() => {
     if (!rec) return
     const t = setInterval(() => setElapsed(Date.now() - rec.startedAt), 250)
@@ -190,7 +224,7 @@ export default function CaptureApp() {
     <div className="capture">
       <div className="capture-head">
         <Zap size={14} />
-        <span>Quick capture</span>
+        <span>Summon</span>
         <span className="capture-spacer" />
         {(eventOn || offered) && (
           <span className={`capture-chip ${eventOn ? 'on' : 'offered'}`} data-capture-chip={eventOn ? 'on' : 'offered'}>
@@ -254,7 +288,7 @@ export default function CaptureApp() {
           ref={input}
           className="capture-input"
           value={text}
-          placeholder="What’s on your mind? (Add a time, like “dinner at 8 tomorrow”, to put it in the calendar.)"
+          placeholder="Jot a thought, or try “spent 12 on food”, “play Drake”, “open money”, “12*4”, “? what’s on this week”…"
           spellCheck
           readOnly={tidying}
           onChange={(e) => {
@@ -264,13 +298,25 @@ export default function CaptureApp() {
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
-              save()
+              // Alt+Enter: save it as a note even if it looks like a command.
+              if (commandOn && !e.altKey) void runCommand()
+              else save()
             } else if (e.key === 'Escape') {
               e.preventDefault()
               window.api.closeCapture()
             }
           }}
         />
+      )}
+      {commandOn && command && !panel && (
+        <div className="capture-command" data-capture-command={command.kind}>
+          <Zap size={13} />
+          <span>{describeSmart(command)}</span>
+          <kbd>Enter</kbd>
+          <button className="link-button" onClick={() => setNoCommand(true)} title="Alt+Enter does this too">
+            Save as a note instead
+          </button>
+        </div>
       )}
       <div className="capture-foot">
         {error ? (
@@ -318,9 +364,15 @@ export default function CaptureApp() {
           {rec ? <Square size={13} /> : <Mic size={15} />}
           {rec && <span>{formatDuration(elapsed)}</span>}
         </button>
-        <button className="btn btn-primary" onClick={save} disabled={(!text.trim() && !voice) || saving || tidying || !!rec} data-capture-save>
-          <CornerDownLeft size={13} /> {saving ? 'Saving…' : 'Save'}
-        </button>
+        {commandOn ? (
+          <button className="btn btn-primary" onClick={() => void runCommand()} disabled={saving} data-capture-run>
+            <CornerDownLeft size={13} /> {saving ? 'Working…' : command?.kind === 'calc' ? 'Copy' : 'Do it'}
+          </button>
+        ) : (
+          <button className="btn btn-primary" onClick={save} disabled={(!text.trim() && !voice) || saving || tidying || !!rec} data-capture-save>
+            <CornerDownLeft size={13} /> {saving ? 'Saving…' : 'Save'}
+          </button>
+        )}
       </div>
       {status?.error && <div className="capture-warning">{status.error}</div>}
     </div>

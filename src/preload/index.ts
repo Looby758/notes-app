@@ -167,6 +167,23 @@ const api: NotesApi = {
     return () => ipcRenderer.removeListener('convert:video-progress', handler)
   },
 
+  startSnip: () => ipcRenderer.invoke('snip:start'),
+  snipStatus: () => ipcRenderer.invoke('snip:status'),
+  snipImage: () => ipcRenderer.invoke('snip:image'),
+  snipRead: (png) => ipcRenderer.invoke('snip:read', png),
+  snipClose: () => ipcRenderer.invoke('snip:close'),
+  snipSend: (action, text) => ipcRenderer.invoke('snip:send', action, text),
+  onSnipText: (callback) => {
+    const handler = (_e: unknown, action: 'note' | 'ask', text: string): void => callback(action, text)
+    ipcRenderer.on('snip:text', handler)
+    return () => ipcRenderer.removeListener('snip:text', handler)
+  },
+  onSnipFailed: (callback) => {
+    const handler = (_e: unknown, message: string): void => callback(message)
+    ipcRenderer.on('snip:failed', handler)
+    return () => ipcRenderer.removeListener('snip:failed', handler)
+  },
+
   openCapture: () => ipcRenderer.invoke('capture:open'),
   closeCapture: () => ipcRenderer.invoke('capture:close'),
   captureKeepOpen: (on) => ipcRenderer.invoke('capture:keepOpen', on),
@@ -256,7 +273,8 @@ const api: NotesApi = {
   aiClearKey: () => ipcRenderer.invoke('ai:clearKey'),
   aiSummarise: (title, text) => ipcRenderer.invoke('ai:summarise', title, text),
   aiTidy: (text, kind) => ipcRenderer.invoke('ai:tidy', text, kind),
-  aiAsk: (question, notes, history) => ipcRenderer.invoke('ai:ask', question, notes, history),
+  aiInterpret: (text, context) => ipcRenderer.invoke('ai:interpret', text, context),
+  aiAsk: (question, notes, history, extra) => ipcRenderer.invoke('ai:ask', question, notes, history, extra),
   gamesList: (rescan) => ipcRenderer.invoke('games:list', rescan),
   gamesPlay: (id) => ipcRenderer.invoke('games:play', id),
   gamesLaunchArt: (id) => ipcRenderer.invoke('games:launchArt', id),
@@ -323,6 +341,9 @@ const api: NotesApi = {
     return () => ipcRenderer.removeListener('phone:event', handler)
   },
   phoneWifi: () => ipcRenderer.invoke('phone:wifi'),
+  phoneSetDeck: (buttons) => ipcRenderer.invoke('phone:setDeck', buttons),
+  phoneSetScreen: (screen) => ipcRenderer.invoke('phone:setScreen', screen),
+  phoneNotify: (title, body) => ipcRenderer.invoke('phone:notify', title, body),
   readAppData: (name) => ipcRenderer.invoke('vault:readAppData', name),
   writeAppData: (name, content) => ipcRenderer.invoke('vault:writeAppData', name, content),
   readSafeFile: (id) => ipcRenderer.invoke('safe:read', id),
@@ -347,7 +368,6 @@ const api: NotesApi = {
   explorerTrash: (paths) => ipcRenderer.invoke('explorer:trash', paths),
   explorerSearch: (dir, query, showHidden) => ipcRenderer.invoke('explorer:search', dir, query, showHidden),
   explorerToVault: (paths, folder) => ipcRenderer.invoke('explorer:toVault', paths, folder),
-  pathForFile: (file) => webUtils.getPathForFile(file),
   openFile: (path) => ipcRenderer.invoke('fs:openFile', path),
   readNote: (path) => ipcRenderer.invoke('fs:read', path),
   writeNote: (path, content) => ipcRenderer.invoke('fs:write', path, content),

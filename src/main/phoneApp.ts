@@ -1,5 +1,5 @@
 /**
- * The page a paired phone opens: Send, Clipboard, Remote, Touchpad, Talk and Scan. It's plain
+ * The page a paired phone opens: Deck, Screen, Send, Clipboard, Remote, Touchpad, Talk and Scan. It's plain
  * HTML and JavaScript (no framework) so it loads instantly from Notes over the Wi-Fi, and works in
  * the phone's own browser with nothing installed. `base` is the paired session's address.
  */
@@ -23,7 +23,7 @@ header{display:flex;align-items:center;gap:8px;padding:12px 16px;font-weight:600
 main{flex:1;overflow-y:auto;padding:4px 16px 16px}
 section{display:none}section.on{display:block}
 nav{display:flex;border-top:1px solid #2a2a33;padding-bottom:env(safe-area-inset-bottom);background:#1c1c24}
-nav button{flex:1;background:none;border:0;color:#9a9aa8;font-size:11px;padding:8px 0 10px}
+nav button{flex:1;min-width:0;background:none;border:0;color:#9a9aa8;font-size:10px;padding:8px 0 10px}
 nav button b{display:block;font-size:20px;line-height:26px;font-weight:400}
 nav button.on{color:#a99cff}
 h2{font-size:15px;color:#9a9aa8;font-weight:500;margin:18px 0 8px}
@@ -42,10 +42,31 @@ textarea{min-height:110px;resize:vertical}
 #pad{height:46vh;background:#22222b;border-radius:16px;touch-action:none;display:flex;align-items:center;justify-content:center;color:#55555f;font-size:14px;text-align:center;padding:20px}
 #scanWrap{position:relative;touch-action:none;margin:8px 0}#scanCanvas{width:100%;display:block;border-radius:10px}
 .corner{position:absolute;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;border:3px solid #a99cff;background:rgba(124,108,240,.25)}
+#deckGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:6px}
+#deckGrid button{aspect-ratio:1;border:0;border-radius:18px;background:linear-gradient(160deg,#2c2c38,#1f1f28);color:#e8e8ee;font-size:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 4px 12px rgba(0,0,0,.25);transition:transform .08s}
+#deckGrid button b{font-size:30px;line-height:1;font-weight:400}
+#deckGrid button:active{transform:scale(.94);background:#7c6cf0}
+.modes{display:flex;gap:6px;margin:6px 0 10px}.modes button{flex:1;background:#22222b;color:#9a9aa8;border:0;border-radius:10px;padding:9px 0;font-size:13px}.modes button.on{background:#7c6cf0;color:#fff}
+#clock{font-size:64px;font-weight:200;text-align:center;letter-spacing:1px;margin:10px 0 0}#date{text-align:center;color:#9a9aa8;margin-bottom:12px}
+.plan div{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #26262e;font-size:15px}.plan div span{color:#a99cff;min-width:46px;font-variant-numeric:tabular-nums}.plan div.done{opacity:.45;text-decoration:line-through}
+#noteView{white-space:pre-wrap;word-wrap:break-word;font-size:16px;line-height:1.55;background:#1c1c24;border-radius:14px;padding:14px}#noteView h1,#noteView h2,#noteView h3{margin:10px 0 4px;color:#fff}
+#timerBig{font-size:84px;font-weight:200;text-align:center;font-variant-numeric:tabular-nums;margin:24px 0 4px}#timerLabel{text-align:center;color:#a99cff;font-size:18px}
+#banner{position:fixed;left:12px;right:12px;top:calc(10px + env(safe-area-inset-top));background:#2c2c3a;border:1px solid #7c6cf0;border-radius:16px;padding:12px 14px;display:none;box-shadow:0 10px 30px rgba(0,0,0,.5);z-index:5}#banner b{display:block}#banner span{color:#c8c8d0;font-size:14px}
 #toast{position:fixed;left:16px;right:16px;bottom:90px;background:#33333d;padding:12px 14px;border-radius:12px;display:none;text-align:center}
 </style></head><body>
 <header><span id="dot"></span>Notes <span id="state">Connecting…</span></header>
 <main>
+<section id="deck">
+  <h2>Deck</h2>
+  <div id="deckGrid"></div>
+  <p class="note">Each button runs on your computer. Choose the buttons in Orbit: Settings → Finding features → Phone deck.</p>
+</section>
+<section id="screen">
+  <div class="modes"><button data-mode="today" class="on">Today</button><button data-mode="note">Open note</button><button data-mode="timer">Timer</button></div>
+  <div data-view="today"><div id="clock"></div><div id="date"></div><div class="plan" id="plan"></div></div>
+  <div data-view="note" hidden><h2 id="noteTitle">Open note</h2><div id="noteView"></div></div>
+  <div data-view="timer" hidden><div id="timerBig">–</div><div id="timerLabel">No timer running. Start one in Zen mode.</div></div>
+</section>
 <section id="send" class="on">
   <h2>Send to your computer</h2>
   <button class="btn" data-pick="note">Into the open note</button>
@@ -96,7 +117,9 @@ textarea{min-height:110px;resize:vertical}
 </section>
 </main>
 <div id="toast"></div>
+<div id="banner"><b id="bannerTitle"></b><span id="bannerBody"></span></div>
 <nav>
+  <button data-tab="deck"><b>▦</b>Deck</button><button data-tab="screen"><b>◫</b>Screen</button>
   <button data-tab="send" class="on"><b>⇪</b>Send</button><button data-tab="clip"><b>⎘</b>Clipboard</button><button data-tab="remote"><b>▶︎</b>Remote</button>
   <button data-tab="touch"><b>⌨︎</b>Touchpad</button><button data-tab="talk"><b>🎙</b>Talk</button><button data-tab="scan"><b>⧉</b>Scan</button>
 </nav>
@@ -126,6 +149,9 @@ function listen() {
   events.onmessage = function (e) {
     var m = JSON.parse(e.data)
     if (m.type === 'clip') $('fromPc').value = m.text
+    if (m.type === 'deck') drawDeck(m.buttons)
+    if (m.type === 'screen') { screen = m; drawScreen() }
+    if (m.type === 'notify') heads(m.title, m.body)
     if (m.type === 'music') {
       $('song').textContent = m.name || 'Nothing playing'
       $('artist').textContent = m.artist || ''
@@ -135,6 +161,71 @@ function listen() {
   }
 }
 listen()
+
+// Deck: big buttons that run things on the computer.
+function drawDeck(buttons) {
+  var grid = $('deckGrid'); grid.innerHTML = ''
+  buttons.forEach(function (b) {
+    var el = document.createElement('button')
+    var icon = document.createElement('b'); icon.textContent = b.icon
+    var label = document.createElement('span'); label.textContent = b.label
+    el.appendChild(icon); el.appendChild(label)
+    el.onclick = function () { if (navigator.vibrate) navigator.vibrate(12); cmd({ kind: 'deck', id: b.id }) }
+    grid.appendChild(el)
+  })
+  if (!buttons.length) grid.innerHTML = '<p class="note">No buttons yet.</p>'
+}
+
+// Screen: today's plan with a big clock, the open note, or the focus timer.
+var screen = null, mode = 'today'
+try { mode = localStorage.getItem('screenMode') || 'today' } catch (e) {}
+function setMode(m) {
+  mode = m
+  document.querySelectorAll('[data-mode]').forEach(function (b) { b.classList.toggle('on', b.dataset.mode === m) })
+  document.querySelectorAll('[data-view]').forEach(function (v) { v.hidden = v.dataset.view !== m })
+  try { localStorage.setItem('screenMode', m) } catch (e) {}
+  drawScreen()
+}
+document.querySelectorAll('[data-mode]').forEach(function (b) { b.onclick = function () { setMode(b.dataset.mode) } })
+function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] }) }
+function drawScreen() {
+  var now = new Date()
+  $('clock').textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  $('date').textContent = now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })
+  if (!screen) return
+  $('plan').innerHTML = screen.today.length
+    ? screen.today.map(function (i) { return '<div class="' + (i.done ? 'done' : '') + '"><span>' + esc(i.time || 'All day') + '</span>' + esc(i.title) + '</div>' }).join('')
+    : '<p class="note">Nothing planned for today.</p>'
+  if (screen.note) {
+    $('noteTitle').textContent = screen.note.title
+    $('noteView').innerHTML = esc(screen.note.text).replace(/^(#{1,3}) (.*)$/gm, function (_, h, t) { return '<h' + h.length + '>' + t + '</h' + h.length + '>' }).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/^- \[x\] /gim, '☑ ').replace(/^- \[ \] /gm, '☐ ').replace(/^- /gm, '• ').replace(/(<\/h\d>)\n+/g, '$1')
+  } else {
+    $('noteTitle').textContent = 'Open note'
+    $('noteView').innerHTML = '<p class="note">Open a note on your computer and it shows here. (Locked notes stay on the computer.)</p>'
+  }
+  var t = screen.timer
+  if (t) {
+    var left = t.endsAt ? t.endsAt - Date.now() : t.left
+    var s = Math.max(0, Math.round((left || 0) / 1000))
+    $('timerBig').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0')
+    $('timerLabel').textContent = t.label + (t.endsAt ? '' : ' (paused)')
+  } else { $('timerBig').textContent = '–'; $('timerLabel').textContent = 'No timer running. Start one in Zen mode.' }
+}
+setInterval(drawScreen, 1000)
+setMode(mode)
+
+// Heads-ups from the computer (reminders, new messages) while this page is open.
+var beepCtx = null
+document.addEventListener('touchstart', function () { if (!beepCtx && window.AudioContext) beepCtx = new AudioContext() }, { once: true })
+function heads(title, body) {
+  $('bannerTitle').textContent = title; $('bannerBody').textContent = body || ''
+  var b = $('banner'); b.style.display = 'block'
+  clearTimeout(heads.timer); heads.timer = setTimeout(function () { b.style.display = 'none' }, 8000)
+  if (navigator.vibrate) navigator.vibrate([120, 60, 120])
+  if (beepCtx) { try { var o = beepCtx.createOscillator(), g = beepCtx.createGain(); o.frequency.value = 880; g.gain.value = 0.08; o.connect(g); g.connect(beepCtx.destination); o.start(); o.stop(beepCtx.currentTime + 0.15) } catch (e) {} }
+}
+$('banner').onclick = function () { $('banner').style.display = 'none' }
+
 document.addEventListener('visibilitychange', function () { if (!document.hidden && events.readyState === 2) listen() })
 
 // Send files.
