@@ -47,7 +47,8 @@ import { newBoard } from '../../lib/boards'
 import { newSpreadsheet } from '../../lib/newSheet'
 import { isBoard } from '../../lib/canvas'
 import { useLock, isLocked } from '../../lib/lock/session'
-import { lockNote, removeLock } from '../../lib/lock/actions'
+import { lockFolder, lockNote, openLockedFolder, removeFolderLock, removeLock } from '../../lib/lock/actions'
+import { lockedFolderOf, useLockedFolders } from '../../lib/lock/folders'
 import { motionLevel, slideFrom, snapshot, usePresence } from '../../lib/motion'
 import EmptyArt from '../Motion/EmptyArt'
 import StarIcon from '../Theme/StarIcon'
@@ -59,10 +60,13 @@ const AUTO_EXPAND_MS = 600
 let dragging: string | null = null
 
 /** Rows currently visible in the tree, top to bottom (children of collapsed folders excluded). */
+/** A locked folder stays shut (its contents hidden) until the notes password is entered. */
+const isShut = (path: string): boolean => !useLock.getState().unlocked && useLockedFolders.getState().folders.includes(path)
+
 function visibleRows(nodes: FileNode[], expanded: Set<string>, out: FileNode[] = []): FileNode[] {
   for (const n of nodes) {
     out.push(n)
-    if (n.type === 'folder' && expanded.has(n.path)) visibleRows(n.children ?? [], expanded, out)
+    if (n.type === 'folder' && expanded.has(n.path) && !isShut(n.path)) visibleRows(n.children ?? [], expanded, out)
   }
   return out
 }
@@ -180,6 +184,13 @@ export default function FileTree() {
     const edit: MenuItem[] = [
       ...open,
       ...attachment,
+      ...(node.type !== 'folder'
+        ? []
+        : useLockedFolders.getState().folders.includes(node.path)
+          ? [{ label: 'Remove folder lock…', icon: <LockOpen size={15} />, onClick: () => void removeFolderLock(node.path) } as MenuItem]
+          : lockedFolderOf(node.path)
+            ? []
+            : [{ label: 'Lock folder', icon: <Lock size={15} />, onClick: () => lockFolder(node.path) } as MenuItem]),
       { label: 'Rename', icon: <Pencil size={15} />, onClick: () => startRename(node.path) },
       { label: `Show in ${FILE_MANAGER}`, icon: <FolderSearch size={15} />, onClick: () => window.api.reveal(node.path) },
       ...(node.type === 'folder' || isLocked(node.path)
@@ -233,7 +244,8 @@ export default function FileTree() {
         break
       case 'ArrowRight':
         if (node?.type !== 'folder') return
-        if (!expanded.has(node.path)) toggle(node.path)
+        if (isShut(node.path)) openLockedFolder(() => useVault.getState().expand(node.path))
+        else if (!expanded.has(node.path)) toggle(node.path)
         else if (node.children?.length) go(node.children[0])
         break
       case 'ArrowLeft':
@@ -243,7 +255,8 @@ export default function FileTree() {
         break
       case 'Enter':
         if (!node) return
-        if (node.type === 'folder') toggle(node.path)
+        if (node.type === 'folder' && isShut(node.path)) openLockedFolder(() => useVault.getState().expand(node.path))
+        else if (node.type === 'folder') toggle(node.path)
         else openItem(node)
         break
       case 'F2':
@@ -333,12 +346,14 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
   const starred = useStarred((s) => s.paths.includes(node.path))
   const multi = useSelection((s) => s.paths.includes(node.path))
   const noteIcon = useNoteIndex((s) => (isFolder ? undefined : s.notes.get(node.path)?.icon))
-  const locked = useLock((s) => !isFolder && node.path in s.locked)
+  const lockedFolder = useLockedFolders((s) => isFolder && s.folders.includes(node.path))
+  const shut = useLock((s) => lockedFolder && !s.unlocked)
+  const locked = useLock((s) => (isFolder ? lockedFolder : node.path in s.locked))
   const { toggle, expand, select, startRename } = useVault.getState()
   const expandTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   // Folders open and close smoothly: the children stay a moment while closing, and only a folder
   // opened just now (not one that was already open at start-up) animates open.
-  const children = usePresence(isFolder && expanded, 180)
+  const children = usePresence(isFolder && expanded && !shut, 180)
   const wasExpanded = useRef(expanded)
   const opening = useRef(false)
   if (wasExpanded.current !== expanded) {
@@ -365,7 +380,8 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
     }
     clearSelection()
     select(node.path)
-    if (isFolder) toggle(node.path)
+    if (shut) openLockedFolder(() => useVault.getState().expand(node.path))
+    else if (isFolder) toggle(node.path)
     else openItem(node)
   }
 
@@ -421,12 +437,12 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
         onDrop={(e) => onDrop(e, folder)}
       >
         {isFolder ? (
-          <ChevronRight size={14} className={`tree-chevron ${expanded ? 'open' : ''}`} />
+          <ChevronRight size={14} className={`tree-chevron ${expanded && !shut ? 'open' : ''}`} />
         ) : (
           <span className="tree-chevron" />
         )}
         {isFolder ? (
-          expanded ? (
+          expanded && !shut ? (
             <FolderOpen size={15} className="tree-icon" />
           ) : (
             <Folder size={15} className="tree-icon" />

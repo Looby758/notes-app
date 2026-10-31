@@ -47,12 +47,13 @@ import { showMessages } from '../store/messages'
 import { FILE_MANAGER } from '@shared/platform'
 import { openRandomNote } from './random'
 import { notify } from '../store/notify'
+import { parentOf } from './paths'
 import { newBoard } from './boards'
 import { newSpreadsheet } from './newSheet'
 import { openAsk, runNoteJob } from '../store/ai'
 import { musicControl, musicToggleLike, setMusicMini, shareSongToNote, toggleMusic, useMusic } from '../store/music'
 import { sendToPhone } from '../store/phone'
-import { changeNotesPassword, lockAllNow, lockNote, lockNoteOwn, removeLock } from './lock/actions'
+import { changeNotesPassword, lockAllNow, lockFolder, lockNote, lockNoteOwn, removeLock } from './lock/actions'
 
 export interface Command {
   id: string
@@ -174,6 +175,17 @@ export const commands: Command[] = [
     run: () => {
       const path = activeNote()
       if (path) removeLock(path)
+    }
+  },
+  {
+    id: 'lock.folder',
+    group: 'Locked notes',
+    title: 'Lock the folder this note is in',
+    run: () => {
+      const path = activeNote()
+      const folder = path ? parentOf(path) : ''
+      if (folder) lockFolder(folder)
+      else notify('Open a note that’s inside a folder first (or right-click a folder in the sidebar and choose “Lock folder”).', 'info')
     }
   },
   { id: 'lock.now', group: 'Locked notes', title: 'Lock all notes and passwords now', shortcut: 'Ctrl+Alt+L', run: lockAllNow },
