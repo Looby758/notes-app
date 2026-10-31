@@ -17,6 +17,8 @@ function summonAction(text: string): SmartAction | null {
   if (t.startsWith('?')) return t.slice(1).trim() ? { kind: 'ask', question: t.slice(1).trim() } : null
   const a = parseSmart(t, { features: FEATURE_INFO })
   // Events and jots are what saving already does (with the calendar chip); questions only with "?".
+  // Reminders ("remind me Friday 5pm…") are handled as commands so the ⏰ is set and "remind me" left out.
+  if (a?.kind === 'event' && a.remind) return a
   return a && a.kind !== 'event' && a.kind !== 'jot' && a.kind !== 'ask' ? a : null
 }
 

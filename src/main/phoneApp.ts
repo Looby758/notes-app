@@ -198,7 +198,7 @@ function drawScreen() {
     : '<p class="note">Nothing planned for today.</p>'
   if (screen.note) {
     $('noteTitle').textContent = screen.note.title
-    $('noteView').innerHTML = esc(screen.note.text).replace(/^(#{1,3}) (.*)$/gm, function (_, h, t) { return '<h' + h.length + '>' + t + '</h' + h.length + '>' }).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/^- \[x\] /gim, '☑ ').replace(/^- \[ \] /gm, '☐ ').replace(/^- /gm, '• ')
+    $('noteView').innerHTML = esc(screen.note.text).replace(/^(#{1,3}) (.*)$/gm, function (_, h, t) { return '<h' + h.length + '>' + t + '</h' + h.length + '>' }).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/^- \[x\] /gim, '☑ ').replace(/^- \[ \] /gm, '☐ ').replace(/^- /gm, '• ').replace(/(<\/h\d>)\n+/g, '$1')
   } else {
     $('noteTitle').textContent = 'Open note'
     $('noteView').innerHTML = '<p class="note">Open a note on your computer and it shows here. (Locked notes stay on the computer.)</p>'

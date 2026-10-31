@@ -31,14 +31,15 @@ export default function SnipApp() {
   const img = useRef<HTMLImageElement>(null)
 
   useEffect(() => {
-    let url = ''
     window.api.snipImage().then((shot) => {
       if (!shot) {
         void window.api.snipClose()
         return
       }
-      url = URL.createObjectURL(new Blob([shot.png as BlobPart], { type: 'image/png' }))
-      setImage({ url, scale: shot.scale })
+      // A data: address (the page's security rules don't allow blob: pictures).
+      const reader = new FileReader()
+      reader.onload = () => setImage({ url: String(reader.result), scale: shot.scale })
+      reader.readAsDataURL(new Blob([shot.png as BlobPart], { type: 'image/png' }))
     })
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') void window.api.snipClose()
@@ -46,7 +47,6 @@ export default function SnipApp() {
     window.addEventListener('keydown', onKey)
     return () => {
       window.removeEventListener('keydown', onKey)
-      if (url) URL.revokeObjectURL(url)
     }
   }, [])
 

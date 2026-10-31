@@ -171,8 +171,8 @@ function Tile({ feature: f, index, selected, onHover, onLaunch }: { feature: Fea
       <span className="launcher-text">
         <span className="launcher-name">{f.name}</span>
         <span className="launcher-blurb">{f.blurb}</span>
+        {keys && <kbd className="launcher-keys">{keys}</kbd>}
       </span>
-      {keys && <kbd className="launcher-keys">{keys}</kbd>}
       <span className="launcher-pins">
         {PLACES.map(({ place, label, icon: PinIcon }) => {
           const on = prefs[place].includes(f.id)

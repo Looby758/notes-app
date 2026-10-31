@@ -4,7 +4,6 @@ import { addGoal, addToGoal, deleteGoal, setNotRecurring, updateGoal, useMoney }
 import { askEverything, useAi } from '../../store/ai'
 import { dayOf, formatPounds, monthName, parseAmount, type SavingsGoal } from '../../lib/money'
 import { findRecurring, forecastMonth, monthlyCost, weeklyToGoal, type Recurring } from '../../lib/moneyInsights'
-import Private from '../Streamer/Private'
 
 const shortDate = (key: string): string => new Date(`${key}T12:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
 const typedPence = (text: string): number | null => {
@@ -34,26 +33,26 @@ export function ForecastCard() {
       <div>
         <strong>
           At this rate you’ll end {month} {ok ? 'with ' : ''}
-          <Private>{formatPounds(Math.abs(f.endOfMonth))}</Private> {ok ? 'left' : 'short'}
+          {formatPounds(Math.abs(f.endOfMonth))} {ok ? 'left' : 'short'}
         </strong>
         <p>
-          {f.daysLeft} {f.daysLeft === 1 ? 'day' : 'days'} to go
+          {f.daysLeft === 0 ? 'Last day of the month' : `${f.daysLeft} ${f.daysLeft === 1 ? 'day' : 'days'} to go`}
           {f.billsDue > 0 && (
             <>
               {' '}
-              · <Private>{formatPounds(f.billsDue)}</Private> of bills still to come
+              · {formatPounds(f.billsDue)} of bills still to come
             </>
           )}
           {f.payDue > 0 && (
             <>
               {' '}
-              · <Private>{formatPounds(f.payDue)}</Private> pay due
+              · {formatPounds(f.payDue)} pay due
             </>
           )}
           {f.everydayLeft > 0 && (
             <>
               {' '}
-              · about <Private>{formatPounds(f.everydayLeft)}</Private> more everyday spending
+              · about {formatPounds(f.everydayLeft)} more everyday spending
             </>
           )}
         </p>
@@ -139,13 +138,13 @@ export default function MoneyPlans() {
               <div className="money-tile">
                 <span>A month</span>
                 <strong>
-                  <Private>{formatPounds(monthly)}</Private>
+                  {formatPounds(monthly)}
                 </strong>
               </div>
               <div className="money-tile">
                 <span>A year</span>
                 <strong>
-                  <Private>{formatPounds(monthly * 12, true)}</Private>
+                  {formatPounds(monthly * 12, true)}
                 </strong>
               </div>
               <div className="money-tile">
@@ -200,7 +199,7 @@ function RecurringRow({ r }: { r: Recurring }) {
     <li className="money-recurring-row" data-recurring={r.key}>
       <span className="money-swatch" style={{ background: cat?.color ?? '#8a8e9a' }} />
       <span className="money-recurring-name">
-        <Private>{r.name}</Private>
+        {r.name}
         <small>
           {r.interval} · {r.count} payments so far{cat ? ` · ${cat.name}` : ''}
         </small>
@@ -209,7 +208,7 @@ function RecurringRow({ r }: { r: Recurring }) {
         {r.income ? 'Next' : 'Due'} {days <= 0 ? 'today' : days === 1 ? 'tomorrow' : shortDate(r.next)}
       </span>
       <strong>
-        <Private>{formatPounds(r.amount)}</Private>
+        {formatPounds(r.amount)}
       </strong>
       <button className="icon-btn" title="Not a repeating payment: stop listing it" onClick={() => setNotRecurring(r.key)}>
         <EyeOff size={13} />
@@ -236,7 +235,7 @@ function GoalRow({ goal: g }: { goal: SavingsGoal }) {
         <span className="money-swatch" style={{ background: g.color }} />
         <input className="money-goal-name" value={g.name} onChange={(e) => updateGoal(g.id, { name: e.target.value })} aria-label="Goal name" />
         <span className="money-goal-figures">
-          <Private>{formatPounds(g.saved, true)}</Private> of <Private>{formatPounds(g.target, true)}</Private>
+          {formatPounds(g.saved, true)} of {formatPounds(g.target, true)}
         </span>
         <button className="icon-btn" title="Delete goal" onClick={() => deleteGoal(g.id)}>
           <Trash2 size={13} />
@@ -251,7 +250,7 @@ function GoalRow({ goal: g }: { goal: SavingsGoal }) {
             '🎉 Goal reached!'
           ) : weekly ? (
             <>
-              Put aside <Private>{formatPounds(weekly)}</Private> a week to get there by {shortDate(g.due)}
+              Put aside {formatPounds(weekly)} a week to get there by {shortDate(g.due)}
             </>
           ) : (
             `${pct}% there`
