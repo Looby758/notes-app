@@ -74,6 +74,11 @@ describe('issues and chapters', () => {
     ])
   })
 
+  it('calls the pages beside the issue folders the start', () => {
+    const pages = sortPages(['TWD/Issue 01/01.jpg', 'TWD/cover.jpg', 'TWD/Issue 02/01.jpg'])
+    expect(detectChapters(pages).map((c) => c.title)).toEqual(['Start', 'Issue 01', 'Issue 02'])
+  })
+
   it('finds issue numbers in flat file names', () => {
     const pages: string[] = []
     for (const issue of [1, 2, 3]) for (let p = 1; p <= 22; p++) pages.push(`Walking Dead ${String(issue).padStart(3, '0')} - ${String(p).padStart(2, '0')}.jpg`)

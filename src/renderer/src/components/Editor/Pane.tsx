@@ -26,6 +26,7 @@ import {
   MONEY_TAB,
   CONVERT_TAB,
   SUDOKU_TAB,
+  COMICS_TAB,
   MINESWEEPER_TAB,
   STUDIO_TAB,
   MESSAGES_TAB,
@@ -57,6 +58,7 @@ import HomePage from '../Home/HomePage'
 import MoneyPage from '../Money/MoneyPage'
 import ConvertPage from '../Convert/ConvertPage'
 import SudokuPage from '../Sudoku/SudokuPage'
+import ComicsPage from '../Comics/ComicsPage'
 import StudioPage from '../Studio/StudioPage'
 import MinesweeperPage from '../Minesweeper/MinesweeperPage'
 import GamesPage from '../Games/GamesPage'
@@ -185,6 +187,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === MONEY_TAB && <MoneyPage />}
         {active === CONVERT_TAB && <ConvertPage />}
         {active === SUDOKU_TAB && <SudokuPage />}
+        {active === COMICS_TAB && <ComicsPage />}
         {active === MINESWEEPER_TAB && <MinesweeperPage />}
         {active === STUDIO_TAB && <StudioPage />}
         {active === GAMES_TAB && <GamesPage />}

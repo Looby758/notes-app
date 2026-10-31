@@ -163,7 +163,10 @@ export function detectChapters(pages: string[]): ComicChapter[] {
   if (distinct.size >= 2) {
     const out: ComicChapter[] = []
     dirs.forEach((d, i) => {
-      if (i === 0 || d !== dirs[i - 1]) out.push({ title: d ? cleanFolder(d.slice(d.lastIndexOf('/') + 1)) : 'Start', page: i })
+      if (i > 0 && d === dirs[i - 1]) return
+      // Pages in the folder that holds the issues (a cover at the top) are the start, not an issue.
+      const holdsOthers = !d || [...distinct].some((o) => o.startsWith(`${d}/`))
+      out.push({ title: holdsOthers ? 'Start' : cleanFolder(d.slice(d.lastIndexOf('/') + 1)), page: i })
     })
     return out
   }

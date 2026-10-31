@@ -17,6 +17,7 @@ import {
   House,
   KeyRound,
   Layers,
+  LibraryBig,
   Mail,
   MessageSquare,
   MessagesSquare,
@@ -47,6 +48,7 @@ import { startSnip } from './snip'
 import {
   CALENDAR_TAB,
   CHAT_TAB,
+  COMICS_TAB,
   CONVERT_TAB,
   STUDIO_TAB,
   EMAIL_TAB,
@@ -111,6 +113,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   chat: { icon: MessageSquare, run: () => openSpecialTab(CHAT_TAB) },
   ask: { icon: Sparkles, run: () => openAsk() },
   music: { icon: Music, run: toggleMusic, useActive: () => useMusic((s) => s.open) },
+  comics: { icon: LibraryBig, run: () => openSpecialTab(COMICS_TAB) },
   youtube: { icon: MonitorPlay, run: () => void window.api.openYouTube() },
   games: { icon: Gamepad2, run: () => openSpecialTab(GAMES_TAB) },
   sudoku: { icon: Grid3x3, run: () => openSpecialTab(SUDOKU_TAB) },

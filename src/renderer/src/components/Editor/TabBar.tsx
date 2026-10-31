@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ArrowRightLeft, Bomb, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, FolderSearch, Gamepad2, GitCompare, Globe, Grid3x3, HardDrive, House, KeyRound, Layers, Mail, MessageSquare, MessagesSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
+import { ArrowRightLeft, Bomb, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, FolderSearch, Gamepad2, GitCompare, Globe, Grid3x3, HardDrive, House, KeyRound, Layers, LibraryBig, Mail, MessageSquare, MessagesSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
 import Private from '../Streamer/Private'
 import { useHideNames } from '../../store/streamer'
 import { useEditor } from '../../store/editor'
@@ -23,6 +23,7 @@ import {
   CONVERT_TAB,
   EXPLORER_TAB,
   SUDOKU_TAB,
+  COMICS_TAB,
   MINESWEEPER_TAB,
   STUDIO_TAB,
   MESSAGES_TAB,
@@ -82,6 +83,7 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === MONEY_TAB) return 'Money'
   if (id === CONVERT_TAB) return 'Convert files'
   if (id === SUDOKU_TAB) return 'Sudoku'
+  if (id === COMICS_TAB) return 'Comics'
   if (id === MINESWEEPER_TAB) return 'Minesweeper'
   if (id === STUDIO_TAB) return 'Studio'
   if (id === MESSAGES_TAB) return 'Messages'
@@ -261,6 +263,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === MONEY_TAB && <PoundSterling size={13} className="tab-icon" />}
               {id === CONVERT_TAB && <ArrowRightLeft size={13} className="tab-icon" />}
               {id === SUDOKU_TAB && <Grid3x3 size={13} className="tab-icon" />}
+              {id === COMICS_TAB && <LibraryBig size={13} className="tab-icon" />}
               {id === MINESWEEPER_TAB && <Bomb size={13} className="tab-icon" />}
               {id === STUDIO_TAB && <Clapperboard size={13} className="tab-icon" />}
               {id === MESSAGES_TAB && <MessagesSquare size={13} className="tab-icon" />}

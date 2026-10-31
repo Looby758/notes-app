@@ -59,6 +59,8 @@ import { FILE_MANAGER, TRASH_NAME } from '@shared/platform'
 import { setDrag } from '../../lib/dnd'
 import { openFileTab, openNote } from '../../lib/editorController'
 import { fileKind } from '../../lib/fileKinds'
+import { isComicFile } from '@shared/comics'
+import { openComicFile } from '../../store/comics'
 import { notify } from '../../store/notify'
 import ContextMenu, { type MenuItem } from '../ContextMenu'
 import FileIcon from '../FileIcon'
@@ -257,6 +259,8 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
     // Notes and files in the notes folder open here, in a tab of their own.
     if (entry.vaultPath && /\.md$/i.test(entry.name)) return openNote(entry.vaultPath, { newTab: true })
     if (entry.vaultPath && fileKind(entry.vaultPath) !== 'other') return openFileTab(entry.vaultPath, { newTab: true })
+    // Comics open in Orbit's comic reader (and go on its shelf).
+    if (isComicFile(entry.name)) return void openComicFile(entry.path)
     window.api.explorerOpen(entry.path).catch(notify)
   }
 
