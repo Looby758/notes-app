@@ -43,6 +43,7 @@ import { setupConverter } from './converter'
 import { isAppPage, setupStudio } from './studio'
 import { setupLive } from './live'
 import { explorerFile, setupExplorer } from './explorer'
+import { comicResponse, setupComics } from './comics'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
@@ -283,6 +284,8 @@ function registerVaultProtocol(): void {
         const pic = await localMusic.cover(rel)
         return pic ? new Response(Buffer.from(pic.data), { headers: { 'Content-Type': pic.type, 'Cache-Control': 'max-age=3600' } }) : new Response('No picture', { status: 404 })
       }
+      // Comic pages (vault://comic/<id>/<page>) and covers (vault://comiccover/<id>), from the comic shelf.
+      if (url.host === 'comic' || url.host === 'comiccover') return await comicResponse(url)
       // Previews in the file explorer tab (vault://explore/<full path>): pictures, video, sound and PDFs only.
       if (url.host === 'explore') {
         const full = explorerFile(url)
@@ -859,6 +862,7 @@ app.whenReady().then(async () => {
   safely('studio', setupStudio)
   safely('live streaming', setupLive)
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
+  safely('comic reader', () => setupComics())
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))
   mainWindow = createWindow()
