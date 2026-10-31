@@ -5,6 +5,7 @@ import type { Sheet } from './sheet'
 import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
 import type { LocalLibrary } from './localMusic'
+import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
 import type { WifiNetwork } from './wifi'
 import type { MusicAction, MusicDevice, MusicItem, MusicQueue, MusicSearchResults, MusicState, MusicStatus } from './spotify'
 import type { CoversStatus, GamesList, LaunchArt } from './games'
@@ -457,6 +458,22 @@ export interface NotesApi {
 
   // Quick capture
   /** Opens the quick capture window. */
+  // Soundboard (main/soundboard.ts; the sound itself is played in lib/soundboard.ts)
+  soundboardGet(): Promise<SoundboardStatus>
+  /** Asks for sound files and adds a button for each. */
+  soundboardPick(): Promise<{ status: SoundboardStatus; skipped: string[] }>
+  /** Adds sound files dropped on the board (full paths). */
+  soundboardAddFiles(paths: string[]): Promise<{ status: SoundboardStatus; skipped: string[] }>
+  soundboardUpdate(id: string, patch: Partial<Pick<SoundClip, 'name' | 'hotkey' | 'volume' | 'colour' | 'emoji'>>): Promise<SoundboardStatus>
+  soundboardSetBoardHotkey(which: keyof BoardHotkeys, accel: string): Promise<SoundboardStatus>
+  soundboardRemove(id: string): Promise<SoundboardStatus>
+  soundboardMove(id: string, to: number): Promise<SoundboardStatus>
+  soundboardOpenLink(which: 'cable' | 'blackhole'): Promise<void>
+  soundboardShowFolder(): Promise<void>
+  /** A soundboard hotkey was pressed (anywhere, even in a game). */
+  onSoundboardHotkey(callback: (action: SoundboardAction) => void): () => void
+  onSoundboardChanged(callback: (status: SoundboardStatus) => void): () => void
+
   // Screen snip (main/snip.ts)
   /** Takes a picture of the screen under the pointer and opens the snip window over it. */
   startSnip(): Promise<void>

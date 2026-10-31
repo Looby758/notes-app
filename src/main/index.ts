@@ -41,6 +41,7 @@ import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
 import { setupConverter } from './converter'
 import { isAppPage, setupStudio } from './studio'
+import { setupSoundboard, soundFile } from './soundboard'
 import { setupLive } from './live'
 import { explorerFile, setupExplorer } from './explorer'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
@@ -283,6 +284,15 @@ function registerVaultProtocol(): void {
         const pic = await localMusic.cover(rel)
         return pic ? new Response(Buffer.from(pic.data), { headers: { 'Content-Type': pic.type, 'Cache-Control': 'max-age=3600' } }) : new Response('No picture', { status: 404 })
       }
+      // Soundboard clips (vault://sound/<file>), from Orbit's own soundboard folder.
+      if (url.host === 'sound') {
+        const full = soundFile(decodeURIComponent(url.pathname.slice(1)))
+        if (!full) return new Response('Not found', { status: 404 })
+        const res = await net.fetch(pathToFileURL(full).toString(), { headers: request.headers })
+        const headers = new Headers(res.headers)
+        headers.set('Access-Control-Allow-Origin', '*')
+        return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+      }
       // Previews in the file explorer tab (vault://explore/<full path>): pictures, video, sound and PDFs only.
       if (url.host === 'explore') {
         const full = explorerFile(url)
@@ -342,7 +352,9 @@ function createWindow(): BrowserWindow {
       // Chromium's PDF viewer, for PDFs opened from the file list.
       plugins: true,
       // The web browser tab (browser.ts locks each page down as it's created).
-      webviewTag: true
+      webviewTag: true,
+      // Soundboard hotkeys are pressed in a game, not in Orbit, and must still be able to start the sound.
+      autoplayPolicy: 'no-user-gesture-required'
     }
   })
 
@@ -788,7 +800,7 @@ function registerIpc(): void {
 }
 
 /** Only the browser features the app actually uses; everything else (camera, location…) is refused. */
-const ALLOWED_PERMISSIONS = new Set(['clipboard-sanitized-write', 'clipboard-read', 'fullscreen', 'local-fonts'])
+const ALLOWED_PERMISSIONS = new Set(['clipboard-sanitized-write', 'clipboard-read', 'fullscreen', 'local-fonts', 'speaker-selection'])
 
 /**
  * On a Mac, apps should live in Applications. Run from the disk image (or Downloads), macOS gives
@@ -857,6 +869,7 @@ app.whenReady().then(async () => {
   safely('export', setupExport)
   safely('converter', setupConverter)
   safely('studio', setupStudio)
+  safely('soundboard', setupSoundboard)
   safely('live streaming', setupLive)
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
   // Hand edits to settings.json apply straight away.
