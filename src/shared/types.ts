@@ -9,6 +9,7 @@ import type { WifiNetwork } from './wifi'
 import type { MusicAction, MusicDevice, MusicItem, MusicQueue, MusicSearchResults, MusicState, MusicStatus } from './spotify'
 import type { CoversStatus, GamesList, LaunchArt } from './games'
 import type { Theme } from './themes'
+import type { ShareButton, ShareOs, ShareSide } from './mouseShare'
 
 export interface WindowBounds {
   x?: number
@@ -38,6 +39,8 @@ export interface Settings {
   /** The paired phone's link (its token, and the port it was on), so the phone reconnects by itself. */
   phoneToken?: string
   phonePort?: number
+  /** One mouse, two computers: whether it's on, the paired computer, and how it's set up. */
+  mouseShare?: ShareSaved
   /** The phone webcam: whether it's on, its https link (token and port), and how the picture is made. */
   camOn?: boolean
   camToken?: string
@@ -63,6 +66,52 @@ export interface CamStatus {
   quality: 'sd' | 'hd'
   fill: boolean
 }
+
+/** Mouse sharing, as saved. `side` is where the other computer sits, seen from this one. */
+export interface ShareSaved {
+  enabled: boolean
+  /** This computer's own id (made once). */
+  id: string
+  peer?: { id: string; name: string; os: ShareOs; secret: string; host?: string; port?: number }
+  side: ShareSide
+  swapCtrlCmd: boolean
+  shareClipboard: boolean
+  speed: number
+  /** Keep the mouse on this computer for now. */
+  paused?: boolean
+  /** The other computer's address, typed in, for networks that don't let them find each other. */
+  manualHost?: string
+}
+
+/** Mouse sharing, for the Settings page. */
+export interface ShareStatus {
+  enabled: boolean
+  name: string
+  os: ShareOs
+  paired: { name: string; os: ShareOs } | null
+  connected: boolean
+  side: ShareSide
+  swapCtrlCmd: boolean
+  shareClipboard: boolean
+  speed: number
+  paused: boolean
+  manualHost: string
+  /** Other computers running Orbit with sharing on, not paired yet. */
+  nearby: { id: string; name: string; os: ShareOs }[]
+  pairing: { name: string; code: string; weConfirmed: boolean } | null
+  /** Where the mouse is: on this computer, over on the other one, or this one is being driven. */
+  using: 'here' | 'there' | 'controlled'
+  /** Mac: Orbit is allowed to move the pointer (Accessibility). Always true on Windows. */
+  accessibility: boolean
+  error: string
+}
+
+/** Something done in the invisible window while the mouse is on the other computer. */
+export type ShareInputEvent =
+  | { t: 'move'; dx: number; dy: number }
+  | { t: 'btn'; b: ShareButton; down: boolean }
+  | { t: 'wheel'; dx: number; dy: number }
+  | { t: 'key'; code: string; down: boolean }
 
 /** What the notes window's music player tells the floating mini player. */
 export interface MusicMiniState {
@@ -691,6 +740,29 @@ export interface NotesApi {
   phoneNotify(title: string, body: string): Promise<void>
   /** The Wi-Fi this computer is on, for a guest QR code (blank where it can't be read). */
   phoneWifi(): Promise<WifiNetwork>
+  /** One mouse, two computers (see main/mouseShare.ts). */
+  shareStatus(): Promise<ShareStatus>
+  shareSet(patch: Partial<Omit<ShareSaved, 'id' | 'peer'>>): Promise<ShareStatus>
+  onShareStatus(callback: (status: ShareStatus) => void): () => void
+  /** Starts pairing with a computer found on the network (by id) or typed in (host). */
+  sharePair(target: { id?: string; host?: string }): Promise<void>
+  shareConfirmPairing(): Promise<void>
+  shareCancelPairing(): Promise<void>
+  shareUnpair(): Promise<void>
+  shareAskAccessibility(): Promise<boolean>
+  shareSendFiles(paths: string[]): Promise<void>
+  /** A file came over from the other computer (it's in Downloads). */
+  onShareReceived(callback: (info: { title: string; path: string }) => void): () => void
+  /** The other computer started pairing: open Settings to show the code. */
+  onShareOpenSettings(callback: () => void): () => void
+  /** The invisible window: what you do, and "come back". */
+  shareInput(event: ShareInputEvent): void
+  shareComeBack(): void
+  onShareCapture(callback: (info: { name: string; os: ShareOs }) => void): () => void
+  /** The drop strip: files dropped on it, or nothing to send. */
+  shareDropped(paths: string[]): void
+  shareDropCancel(): void
+  onShareDrop(callback: (info: { name: string; side: ShareSide }) => void): () => void
   /** The phone webcam (Windows): turn it on/off, its status and settings, and a live preview of the phone's frames. */
   camStatus(): Promise<CamStatus>
   camOn(): Promise<CamStatus>
