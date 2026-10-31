@@ -26,6 +26,15 @@ const api: NotesApi = {
   setFullScreen: (on) => ipcRenderer.invoke('app:fullscreen', on),
   showReminder: (r) => ipcRenderer.invoke('reminder:show', r),
   micAccess: () => ipcRenderer.invoke('voice:access'),
+  studioSources: () => ipcRenderer.invoke('studio:sources'),
+  studioAccess: (what) => ipcRenderer.invoke('studio:access', what),
+  studioDefaultFolder: () => ipcRenderer.invoke('studio:defaultFolder'),
+  studioPickFolder: () => ipcRenderer.invoke('studio:pickFolder'),
+  studioStart: (folder, ext) => ipcRenderer.invoke('studio:start', folder, ext),
+  studioChunk: (id, data) => ipcRenderer.invoke('studio:chunk', id, data),
+  studioStop: (id) => ipcRenderer.invoke('studio:stop', id),
+  studioReveal: (path) => ipcRenderer.invoke('studio:reveal', path),
+  studioOpenFolder: (folder) => ipcRenderer.invoke('studio:openFolder', folder),
   onVoiceStart: (callback) => {
     const handler = (): void => callback()
     ipcRenderer.on('voice:start', handler)
