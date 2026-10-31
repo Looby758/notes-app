@@ -1,6 +1,6 @@
 import type { CalEvent, EmailSummary } from '@shared/types'
 import { formatPounds, monthName, monthTotals, addMonths, type MoneyData } from './money'
-import { findRecurring, forecastMonth, monthlyCost } from './moneyInsights'
+import { allRecurring, forecastMonth, monthlyCost } from './moneyInsights'
 
 /**
  * "Ask everything": besides the notes that match, the AI gets a short, plain-text digest of your
@@ -19,7 +19,7 @@ const line = (cells: (string | number | undefined)[]): string => cells.filter((c
 
 /** Money as text: this month and the last few, budgets, goals, repeating payments, and entries (matching ones first). */
 export function moneyContext(data: MoneyData, today: string, question: string, budget = 14000): string {
-  if (!data.entries.length && !data.goals.length) return ''
+  if (!data.entries.length && !data.goals.length && !data.subscriptions.length && !data.balance) return ''
   const name = (id: string): string => data.categories.find((c) => c.id === id)?.name ?? id
   const month = today.slice(0, 7)
   const out: string[] = []
@@ -33,9 +33,10 @@ export function moneyContext(data: MoneyData, today: string, question: string, b
   const budgets = Object.entries(data.budgets).map(([c, p]) => `${name(c)} ${formatPounds(p)}/month`)
   if (budgets.length) out.push(`Budgets: ${budgets.join(', ')}`)
   for (const g of data.goals) out.push(`Savings goal: ${g.name}, ${formatPounds(g.saved)} of ${formatPounds(g.target)}${g.due ? ` by ${g.due}` : ''}`)
-  const recurring = findRecurring(data.entries, today, data.notRecurring)
-  for (const r of recurring) out.push(`Repeating ${r.income ? 'income' : 'payment'}: ${r.name}, ${formatPounds(r.amount)} ${r.interval} (about ${formatPounds(monthlyCost(r))} a month), last ${r.last}, next ${r.next}`)
-  const f = forecastMonth(data.entries, recurring, today)
+  const recurring = allRecurring(data, today)
+  for (const r of recurring) out.push(`Repeating ${r.income ? 'income' : 'payment'}: ${r.name}, ${formatPounds(r.amount)} ${r.interval} (about ${formatPounds(monthlyCost(r))} a month)${r.manual ? ', added by hand' : ''}${r.last ? `, last ${r.last}` : ''}, next ${r.next}`)
+  const f = forecastMonth(data.entries, recurring, today, data.balance)
+  if (f.balanceNow !== undefined) out.push(`Balance: about ${formatPounds(f.balanceNow)} now (you entered ${formatPounds(data.balance!.amount)} on ${data.balance!.date})`)
   out.push(`Forecast for the end of ${monthName(month)}: ${f.endOfMonth >= 0 ? `${formatPounds(f.endOfMonth)} left` : `${formatPounds(-f.endOfMonth)} short`}`)
 
   const words = questionWords(question)
