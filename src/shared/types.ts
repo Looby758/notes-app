@@ -1,4 +1,4 @@
-import type { ExplorerEntry, ExplorerPlace } from './explorer'
+import type { ExplorerEntry, ExplorerPlace, PasteMode } from './explorer'
 import type { Prefs } from './prefs'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
@@ -604,6 +604,18 @@ export interface NotesApi {
   /** Opens a file in its usual app (programs are shown in File Explorer / Finder instead). */
   explorerOpen(path: string): Promise<void>
   explorerReveal(path: string): Promise<void>
+  /** A new empty folder or file, renamed " (2)" if the name's taken. Returns its path. */
+  explorerCreate(dir: string, name: string, kind: 'folder' | 'file'): Promise<string>
+  /** Returns the new path. */
+  explorerRename(path: string, name: string): Promise<string>
+  /** Copies or moves items into a folder, never over anything. Returns the new paths. */
+  explorerPaste(paths: string[], dir: string, mode: PasteMode): Promise<string[]>
+  /** Moves items to the Recycle Bin / Bin (no question asked here). Returns the ones moved. */
+  explorerTrash(paths: string[]): Promise<string[]>
+  /** Finds names under a folder and all its subfolders. */
+  explorerSearch(dir: string, query: string, showHidden: boolean): Promise<ExplorerEntry[]>
+  /** The full path of a file dropped in from File Explorer / Finder ('' if it has none). */
+  pathForFile(file: File): string
   /** Opens a vault file (like a PDF) in its usual app. */
   openFile(path: string): Promise<void>
   /** Reads a note's markdown. */

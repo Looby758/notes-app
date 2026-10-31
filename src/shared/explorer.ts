@@ -122,3 +122,51 @@ export function describeModified(ms: number, now = Date.now()): string {
 
 /** The address the window loads a file's preview from (see the vault: protocol). */
 export const explorerUrl = (path: string): string => `vault://explore/${encodeURIComponent(path)}`
+
+/** How pasting (or dropping) files into a folder treats them. */
+export type PasteMode = 'copy' | 'move'
+
+const RESERVED = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i
+
+/** Why a new name won't work as a file name on Windows or a Mac, or null when it's fine. */
+export function nameProblem(name: string): string | null {
+  const trimmed = name.trim()
+  if (!trimmed) return 'A name can’t be empty.'
+  if (trimmed === '.' || trimmed === '..') return 'That name is taken by the system.'
+  if (/[\\/:*?"<>|\x00-\x1f]/.test(trimmed)) return 'A name can’t have any of these: \\ / : * ? " < > |'
+  if (RESERVED.test(trimmed)) return 'Windows keeps that name for itself.'
+  if (/[. ]$/.test(name)) return 'A name can’t end with a dot or a space.'
+  if (trimmed.length > 255) return 'That name is too long.'
+  return null
+}
+
+/** "Plan.txt" → "Plan (2).txt", the first one that isn't taken (names compared the way Windows does). */
+export function uniqueName(name: string, taken: Iterable<string>, isDir = false): string {
+  const used = new Set([...taken].map((n) => n.toLowerCase()))
+  if (!used.has(name.toLowerCase())) return name
+  const dot = isDir || !name.includes('.') || name.startsWith('.') ? -1 : name.lastIndexOf('.')
+  const stem = (dot < 0 ? name : name.slice(0, dot)).replace(/ \(\d+\)$/, '')
+  const ext = dot < 0 ? '' : name.slice(dot)
+  for (let n = 2; ; n++) {
+    const next = `${stem} (${n})${ext}`
+    if (!used.has(next.toLowerCase())) return next
+  }
+}
+
+/** Whether `path` is `folder` or somewhere inside it (so a folder isn't moved into itself). */
+export function isInside(path: string, folder: string): boolean {
+  const norm = (p: string): string => p.replace(/[\\/]+$/, '').replace(/\\/g, '/').toLowerCase()
+  const a = norm(path)
+  const b = norm(folder)
+  return a === b || a.startsWith(`${b}/`)
+}
+
+/** The folder holding a file, shown under search results: "Documents › Work". */
+export function whereIn(path: string, from: string): string {
+  const all = crumbsOf(path)
+  const start = crumbsOf(from).length
+  return all.slice(start, -1).map((c) => c.name).join(' › ')
+}
+
+/** Searching subfolders stops after this many matches. */
+export const SEARCH_LIMIT = 500
