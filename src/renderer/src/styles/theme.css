@@ -8376,6 +8376,225 @@ a.passwords-text:hover {
   gap: 4px;
 }
 
+/* GIF maker (components/Convert/GifMaker) */
+.modal.gif-maker {
+  width: 980px;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+}
+.modal-backdrop.gif-backdrop {
+  padding-top: 24px;
+}
+.gif-head,
+.gif-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.gif-foot {
+  border-top: 1px solid var(--border);
+  border-bottom: none;
+  color: var(--text-muted);
+}
+.gif-head span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+.gif-body {
+  display: flex;
+  gap: 18px;
+  padding: 14px;
+  overflow: auto;
+}
+.gif-stage {
+  flex: 1;
+  min-width: 0;
+}
+.gif-preview {
+  display: flex;
+  flex-direction: column;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.gif-preview.caption-bottom {
+  flex-direction: column-reverse;
+}
+/* Sized by the video itself, so the crop box lines up with the picture exactly. */
+.gif-frame {
+  position: relative;
+  line-height: 0;
+  overflow: hidden;
+}
+.gif-frame video {
+  display: block;
+  max-width: 100%;
+  max-height: 50vh;
+  cursor: pointer;
+}
+.gif-caption {
+  line-height: 0;
+}
+.gif-caption canvas {
+  width: 100%;
+  display: block;
+}
+.gif-crop {
+  position: absolute;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+  cursor: move;
+  touch-action: none;
+}
+.gif-crop-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px 0 0 0;
+  background: #fff;
+  cursor: nwse-resize;
+}
+.gif-note {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+}
+.gif-timeline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.gif-range {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+.gif-range input {
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+.gif-range-clip {
+  position: absolute;
+  top: 50%;
+  height: 14px;
+  transform: translateY(-50%);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.gif-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+.gif-clip,
+.gif-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.gif-clip label,
+.gif-row > label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.gif-clip .text-input {
+  width: 90px;
+}
+.gif-length {
+  margin-left: auto;
+  color: var(--text-muted);
+}
+.gif-options {
+  width: 330px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.gif-options h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text-strong);
+}
+.gif-options small {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-muted);
+}
+.gif-options .select {
+  min-width: 0;
+}
+.gif-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.gif-chip {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.gif-chip.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.gif-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gif-toggle h4 {
+  margin: 0;
+}
+.gif-caption-options {
+  margin-top: 8px;
+}
+.gif-caption-options textarea.text-input {
+  width: 100%;
+  height: auto;
+  padding: 8px 10px;
+  resize: vertical;
+}
+.gif-caption-options .gif-row > label .text-input {
+  width: 150px;
+}
+.gif-inline {
+  flex-direction: row !important;
+  align-items: center;
+}
+.gif-inline input[type='color'] {
+  width: 30px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: none;
+}
+.convert-gif-btn {
+  white-space: nowrap;
+}
+
 /* ---------- file explorer (components/Explorer) ---------- */
 .pane-body > .explorer-page {
   flex: 1;

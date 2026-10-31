@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
-import { ArrowRightLeft, AudioLines, Check, Download, FileText, Film, FolderOpen, Image as ImageIcon, Loader2, Upload, X } from 'lucide-react'
-import type { ExportData, FfmpegState, SaveFormat } from '@shared/types'
+import { ArrowRightLeft, AudioLines, Check, Download, FileText, Film, FolderOpen, Image as ImageIcon, Loader2, Sparkles, Upload, X } from 'lucide-react'
+import type { ExportData, FfmpegState, GifSettings, SaveFormat } from '@shared/types'
+import GifMaker from './GifMaker'
 import { FILE_MANAGER } from '@shared/platform'
 import { getDrag } from '../../lib/dnd'
 import { convertFile, describeSize, kindOf, outputName, targetsFor, whyNot, type ImageOptions, type Kind } from '../../lib/convert'
@@ -14,6 +15,8 @@ interface Item {
   /** Audio: how far along (0…1). */
   progress?: number
   result?: ExportData
+  /** Videos: what the GIF maker was set to (clip, crop, speed, caption). */
+  gif?: GifSettings
   message?: string
 }
 
@@ -44,6 +47,8 @@ export default function ConvertPage() {
   const [videoHeight, setVideoHeight] = useState<number | null>(null)
   /** Videos need ffmpeg, which is downloaded only when asked for. */
   const [ffmpeg, setFfmpeg] = useState<FfmpegState | null>(null)
+  /** The video open in the GIF maker. */
+  const [gifFor, setGifFor] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -60,21 +65,40 @@ export default function ConvertPage() {
     setSaved(null)
   }
 
+  const convertOne = async (it: Item): Promise<void> => {
+    if (!it.format) return
+    update(it.id, { status: 'working', progress: undefined, message: undefined })
+    try {
+      const image: ImageOptions = { maxSide: side, quality: 0.9 }
+      const result = await convertFile(it.file, it.format, { id: it.id, image, videoHeight, gif: it.gif, onProgress: (progress) => update(it.id, { progress }) })
+      update(it.id, { status: 'done', result })
+    } catch (err) {
+      update(it.id, { status: 'failed', message: err instanceof Error ? err.message : String(err) })
+    }
+  }
+
   const convertAll = async (): Promise<void> => {
     setBusy(true)
     setSaved(null)
-    const image: ImageOptions = { maxSide: side, quality: 0.9 }
     for (const it of items) {
       if (!it.format || it.status === 'done') continue
       if (kindOf(it.file.name) === 'video' && !videoReady) continue
-      update(it.id, { status: 'working', progress: undefined, message: undefined })
-      try {
-        const result = await convertFile(it.file, it.format, { id: it.id, image, videoHeight, onProgress: (progress) => update(it.id, { progress }) })
-        update(it.id, { status: 'done', result })
-      } catch (err) {
-        update(it.id, { status: 'failed', message: err instanceof Error ? err.message : String(err) })
-      }
+      await convertOne(it)
     }
+    setBusy(false)
+  }
+
+  /** The GIF maker's "Make GIF": keeps its settings on the video and makes the GIF now (if ffmpeg is ready). */
+  const makeGif = async (id: number, gif: GifSettings): Promise<void> => {
+    setGifFor(null)
+    const it = items.find((x) => x.id === id)
+    if (!it) return
+    const next: Item = { ...it, gif, format: 'gif', status: 'ready', result: undefined, message: undefined }
+    setItems((list) => list.map((x) => (x.id === id ? next : x)))
+    if (!videoReady) return
+    setBusy(true)
+    setSaved(null)
+    await convertOne(next)
     setBusy(false)
   }
 
@@ -174,7 +198,7 @@ export default function ConvertPage() {
                       <small>
                         {it.status === 'done' && it.result
                           ? `${describeSize(it.file.size)} → ${describeSize(sizeOf(it.result))}`
-                          : it.message ?? describeSize(it.file.size)}
+                          : it.message ?? (it.format === 'gif' && it.gif ? gifSummary(it.gif) : describeSize(it.file.size))}
                       </small>
                     </div>
                     {targets.length > 0 && (
@@ -184,7 +208,7 @@ export default function ConvertPage() {
                           className="select"
                           value={it.format ?? ''}
                           disabled={it.status === 'working'}
-                          onChange={(e) => update(it.id, { format: e.target.value as SaveFormat, status: 'ready', result: undefined, message: undefined })}
+                          onChange={(e) => update(it.id, { format: e.target.value as SaveFormat, status: 'ready', result: undefined, message: undefined, gif: undefined })}
                         >
                           {targets.map((t) => (
                             <option key={t.format} value={t.format}>
@@ -193,6 +217,17 @@ export default function ConvertPage() {
                           ))}
                         </select>
                       </label>
+                    )}
+                    {kind === 'video' && (
+                      <button
+                        className="btn convert-gif-btn"
+                        title="Pick a few seconds, crop, change the speed and add a caption"
+                        disabled={it.status === 'working' || busy}
+                        onClick={() => setGifFor(it.id)}
+                        data-convert-make-gif
+                      >
+                        <Sparkles size={13} /> {it.gif ? 'Edit GIF' : 'Make a GIF'}
+                      </button>
                     )}
                     <div className="convert-status">
                       {it.status === 'working' && (
@@ -301,6 +336,24 @@ export default function ConvertPage() {
           </>
         )}
       </div>
+      {gifFor !== null && items.some((it) => it.id === gifFor) && (
+        <GifMaker
+          file={items.find((it) => it.id === gifFor)!.file}
+          initial={items.find((it) => it.id === gifFor)!.gif}
+          onClose={() => setGifFor(null)}
+          onMake={(gif) => void makeGif(gifFor, gif)}
+        />
+      )}
     </div>
   )
+}
+
+/** "GIF: 5.0 seconds from 1:02, cropped, 1.5× speed, with a caption" */
+function gifSummary(g: GifSettings): string {
+  const from = `${Math.floor(g.start / 60)}:${String(Math.floor(g.start % 60)).padStart(2, '0')}`
+  const parts = [`GIF: ${((g.end - g.start) / g.speed).toFixed(1)} seconds from ${from}`]
+  if (g.crop) parts.push('cropped')
+  if (g.speed !== 1) parts.push(`${g.speed}× speed`)
+  if (g.caption) parts.push('with a caption')
+  return parts.join(', ')
 }

@@ -1,10 +1,10 @@
 import { app, ipcMain } from 'electron'
 import { spawn, type ChildProcess } from 'child_process'
 import { existsSync, rmSync } from 'fs'
-import { mkdir, rm, stat } from 'fs/promises'
+import { mkdir, rm, stat, writeFile } from 'fs/promises'
 import { join } from 'path'
 import type { ConvertedFile, VideoConvertRequest } from '@shared/types'
-import { parseTime, videoArgs } from './videoArgs'
+import { gifLength, gifMakerArgs, parseTime, videoArgs } from './videoArgs'
 import { downloadFfmpeg, ffmpegPath, ffmpegState, onFfmpegState } from './ffmpeg'
 
 /**
@@ -72,11 +72,18 @@ async function convertVideo(send: (id: number, done: number) => void, req: Video
   if (!existsSync(binary)) throw new Error('Download the video converter first (the button above).')
   await mkdir(tempFolder(), { recursive: true })
   const out = join(tempFolder(), `${process.pid}-${req.id}-${Date.now()}.${req.format}`)
-  const args = ['-hide_banner', '-nostdin', '-y', '-i', req.path, ...videoArgs(req.format, req.maxHeight), '-progress', 'pipe:1', '-nostats', out]
+  let caption: string | null = null
+  if (req.gif && req.captionPng) {
+    caption = `${out}.caption.png`
+    await writeFile(caption, Buffer.from(req.captionPng))
+  }
+  const made = req.gif && req.format === 'gif' ? gifMakerArgs(req.path, req.gif, caption, req.captionHeight) : ['-i', req.path, ...videoArgs(req.format, req.maxHeight)]
+  const args = ['-hide_banner', '-nostdin', '-y', ...made, '-progress', 'pipe:1', '-nostats', out]
   return new Promise((resolve, reject) => {
     const child = spawn(binary, args, { windowsHide: true })
     running.set(req.id, child)
-    let duration: number | null = null
+    // A GIF maker clip's length is known; otherwise it's read from what ffmpeg says.
+    let duration: number | null = req.gif && req.format === 'gif' ? gifLength(req.gif) : null
     let log = ''
     child.stderr.on('data', (chunk: Buffer) => {
       log = (log + chunk.toString()).slice(-8000)
@@ -97,6 +104,7 @@ async function convertVideo(send: (id: number, done: number) => void, req: Video
     child.on('close', async (code, signal) => {
       const cancelled = running.get(req.id) !== child
       running.delete(req.id)
+      if (caption) await rm(caption, { force: true })
       if (code !== 0 || cancelled) {
         await rm(out, { force: true })
         return reject(new Error(cancelled || signal ? 'Stopped.' : explain(log)))

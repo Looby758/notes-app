@@ -689,6 +689,31 @@ export interface FfmpegState {
   error?: string
 }
 
+/** A caption bar above or below a GIF, drawn in the window (any font on this computer) and sent as a picture. */
+export interface GifCaption {
+  text: string
+  font: string
+  /** Text size as a share of the GIF's width (0.08 = 8%), so it looks the same at any size. */
+  size: number
+  bold: boolean
+  textColor: string
+  barColor: string
+  position: 'top' | 'bottom'
+}
+
+/** The GIF maker's choices. Times are in seconds of the original video; the crop is in its pixels. */
+export interface GifSettings {
+  start: number
+  end: number
+  crop: { x: number; y: number; w: number; h: number } | null
+  /** 0.5 is half speed, 2 is double. */
+  speed: number
+  fps: number
+  /** The GIF's width in pixels (captions included). */
+  width: number
+  caption: GifCaption | null
+}
+
 export interface VideoConvertRequest {
   /** Picks out this job in progress updates and when cancelling. */
   id: number
@@ -697,4 +722,9 @@ export interface VideoConvertRequest {
   format: SaveFormat
   /** Shrinks the picture to at most this many pixels tall; null keeps its size. */
   maxHeight: number | null
+  /** GIFs made in the GIF maker: the clip, crop, speed and caption. */
+  gif?: GifSettings
+  /** The caption bar as a PNG, exactly `gif.width` pixels wide. */
+  captionPng?: Uint8Array
+  captionHeight?: number
 }
