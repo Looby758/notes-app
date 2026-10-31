@@ -130,7 +130,7 @@ export default function TabBar({ pane }: { pane: string }) {
   const onDrop = (e: DragEvent): void => {
     const drag = getDrag()
     setDropIndex(null)
-    if (!drag || drag.kind === 'computer') return
+    if (!drag || drag.kind === 'computer' || drag.kind === 'computerMany') return
     e.preventDefault()
     e.stopPropagation()
     const index = indexAt(e.clientX)

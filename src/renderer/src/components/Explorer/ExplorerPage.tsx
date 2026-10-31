@@ -426,8 +426,9 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
     e.dataTransfer.effectAllowed = 'copyMove'
     e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(list.map((x) => x.path)))
     e.dataTransfer.setData('text/plain', list.map((x) => x.path).join('\n'))
-    // A single file can also be dropped into a note.
-    setDrag(list.length === 1 && !entry.isDir ? { kind: 'computer', path: entry.path } : null)
+    // A single file can also be dropped into a note;
+    // The notes tree in the sidebar takes any of them.
+    setDrag(list.length === 1 && !entry.isDir ? { kind: 'computer', path: entry.path } : { kind: 'computerMany', paths: list.map((x) => x.path) })
   }
 
   const dropProps = (target: string) => ({

@@ -33,7 +33,8 @@ import { useVault } from '../../store/vault'
 import { displayName, isWithin, parentOf } from '../../lib/paths'
 import ContextMenu, { type MenuItem } from '../ContextMenu'
 import { focusEditor, openNote, splitPane } from '../../lib/editorController'
-import { setDrag } from '../../lib/dnd'
+import { computerPaths, getDrag, setDrag } from '../../lib/dnd'
+import { notify } from '../../store/notify'
 import { useEditor } from '../../store/editor'
 import { useNoteIndex } from '../../store/noteIndex'
 import { openExport, useUI } from '../../store/ui'
@@ -80,6 +81,24 @@ function openItem(node: FileNode, opts: { newTab?: boolean } = {}): void {
 
 function canDrop(source: string | null, folder: string): boolean {
   return source !== null && !isWithin(folder, source) && parentOf(source) !== folder
+}
+
+/** Files coming in from outside the tree: the file explorer tab, or File Explorer / Finder. */
+const fromComputer = (e: DragEvent): boolean => computerPaths(getDrag()).length > 0 || (dragging === null && e.dataTransfer.types.includes('Files'))
+
+const lastPart = (p: string): string => p.split('/').pop() ?? p
+
+/** Copies dropped files from the computer into a notes folder ('' is the top). */
+function dropFromComputer(e: DragEvent, folder: string): boolean {
+  let paths = computerPaths(getDrag())
+  if (!paths.length) paths = [...e.dataTransfer.files].map((f) => window.api.pathForFile(f)).filter(Boolean)
+  setDrag(null)
+  if (!paths.length) return false
+  window.api
+    .explorerToVault(paths, folder)
+    .then((done) => done.length && notify(`Added ${done.length === 1 ? `"${lastPart(done[0])}"` : `${done.length} items`} to ${folder ? `"${lastPart(folder)}"` : 'your notes'}.`, 'info'))
+    .catch(notify)
+  return true
 }
 
 interface MenuState {
@@ -262,6 +281,12 @@ export default function FileTree() {
 
   // Dropping on empty space moves the item to the vault root.
   const onRootDragOver = (e: DragEvent): void => {
+    if (fromComputer(e)) {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'copy'
+      setDropTarget('')
+      return
+    }
     if (!canDrop(dragging, '')) return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
@@ -274,6 +299,7 @@ export default function FileTree() {
     const source = dragging
     dragging = null
     setDropTarget(null)
+    if (!source && dropFromComputer(e, folder)) return
     if (source && canDrop(source, folder)) move(source, folder)
   }
 
@@ -384,12 +410,13 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
 
   const onDragOver = (e: DragEvent): void => {
     e.stopPropagation()
-    if (!canDrop(dragging, folder)) {
+    const incoming = fromComputer(e)
+    if (!incoming && !canDrop(dragging, folder)) {
       setDropTarget(null)
       return
     }
     e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
+    e.dataTransfer.dropEffect = incoming ? 'copy' : 'move'
     if (dropTarget !== folder) {
       setDropTarget(folder)
       // Hovering a closed folder while dragging opens it.

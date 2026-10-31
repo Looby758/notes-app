@@ -614,6 +614,8 @@ export interface NotesApi {
   explorerTrash(paths: string[]): Promise<string[]>
   /** Finds names under a folder and all its subfolders. */
   explorerSearch(dir: string, query: string, showHidden: boolean): Promise<ExplorerEntry[]>
+  /** Copies files/folders from the computer into a notes folder ('' is the top); ones already in the notes folder are moved. Returns their notes-folder paths. */
+  explorerToVault(paths: string[], folder: string): Promise<string[]>
   /** The full path of a file dropped in from File Explorer / Finder ('' if it has none). */
   pathForFile(file: File): string
   /** Opens a vault file (like a PDF) in its usual app. */

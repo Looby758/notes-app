@@ -293,5 +293,18 @@ export function setupExplorer(vaultRoot: () => string | null): void {
     }
     return done
   })
+  // Dropped from the explorer (or File Explorer / Finder) onto a folder in the sidebar's notes tree:
+  // copied in from outside the notes folder, moved when it's already inside it. Returns notes-folder paths.
+  ipcMain.handle('explorer:toVault', async (_e, paths: string[], folder: string) => {
+    const root = vaultRoot()
+    if (!root) throw new Error('Open a notes folder first.')
+    const target = resolve(root, typeof folder === 'string' ? folder : '')
+    if (!isInside(target, root)) throw new Error('That folder isn’t in your notes folder.')
+    const sources = checkPaths(paths)
+    const inside = sources.filter((p) => inVault(root, p))
+    const outside = sources.filter((p) => !inVault(root, p))
+    const done = [...(await paste(inside, target, 'move')), ...(await paste(outside, target, 'copy'))]
+    return done.map((p) => inVault(root, p)).filter((p): p is string => !!p)
+  })
   ipcMain.handle('explorer:search', (_e, dir: string, query: string, showHidden: boolean) => search(vaultRoot(), checkPath(dir), String(query ?? ''), !!showHidden))
 }

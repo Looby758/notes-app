@@ -292,6 +292,7 @@ const api: NotesApi = {
   explorerPaste: (paths, dir, mode) => ipcRenderer.invoke('explorer:paste', paths, dir, mode),
   explorerTrash: (paths) => ipcRenderer.invoke('explorer:trash', paths),
   explorerSearch: (dir, query, showHidden) => ipcRenderer.invoke('explorer:search', dir, query, showHidden),
+  explorerToVault: (paths, folder) => ipcRenderer.invoke('explorer:toVault', paths, folder),
   pathForFile: (file) => webUtils.getPathForFile(file),
   openFile: (path) => ipcRenderer.invoke('fs:openFile', path),
   readNote: (path) => ipcRenderer.invoke('fs:read', path),
