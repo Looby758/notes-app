@@ -386,6 +386,7 @@ const api: NotesApi = {
   explorerTrash: (paths) => ipcRenderer.invoke('explorer:trash', paths),
   explorerSearch: (dir, query, showHidden) => ipcRenderer.invoke('explorer:search', dir, query, showHidden),
   explorerToVault: (paths, folder) => ipcRenderer.invoke('explorer:toVault', paths, folder),
+  explorerStartDrag: (paths) => ipcRenderer.send('explorer:startDrag', paths),
   openFile: (path) => ipcRenderer.invoke('fs:openFile', path),
   readNote: (path) => ipcRenderer.invoke('fs:read', path),
   writeNote: (path, content) => ipcRenderer.invoke('fs:write', path, content),

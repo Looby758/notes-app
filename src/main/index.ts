@@ -484,6 +484,9 @@ function createWindow(): BrowserWindow {
     if (/^(https?|mailto):/i.test(url)) shell.openExternal(url)
     return { action: 'deny' }
   })
+  // A file let go where nothing takes it (like one dragged out of the Files tab and dropped on the
+  // toolbar) would otherwise replace the whole app with that file. The app never leaves its page.
+  win.webContents.on('will-navigate', (e) => e.preventDefault())
 
   if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
     win.loadURL(process.env['ELECTRON_RENDERER_URL'])

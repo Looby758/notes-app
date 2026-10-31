@@ -748,6 +748,8 @@ export interface NotesApi {
   explorerSearch(dir: string, query: string, showHidden: boolean): Promise<ExplorerEntry[]>
   /** Copies files/folders from the computer into a notes folder ('' is the top); ones already in the notes folder are moved. Returns their notes-folder paths. */
   explorerToVault(paths: string[], folder: string): Promise<string[]>
+  /** Starts dragging files out as real files (into Discord, a browser, File Explorer / Finder, or back into Orbit). Call it from dragstart, after preventDefault. */
+  explorerStartDrag(paths: string[]): void
   /** Opens a vault file (like a PDF) in its usual app. */
   openFile(path: string): Promise<void>
   /** Reads a note's markdown. */
