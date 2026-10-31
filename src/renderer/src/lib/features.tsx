@@ -32,6 +32,8 @@ import {
   Sparkles,
   SquareTerminal,
   Zap,
+  Film,
+  History,
   type LucideIcon
 } from 'lucide-react'
 import { useVault } from '../store/vault'
@@ -49,6 +51,7 @@ import {
   CHAT_TAB,
   CONVERT_TAB,
   STUDIO_TAB,
+  CLIPS_TAB,
   EMAIL_TAB,
   EXPLORER_TAB,
   FLASHCARDS_TAB,
@@ -119,6 +122,8 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   explorer: { icon: HardDrive, run: () => openSpecialTab(EXPLORER_TAB) },
   convert: { icon: ArrowRightLeft, run: () => openSpecialTab(CONVERT_TAB) },
   studio: { icon: Clapperboard, run: () => openSpecialTab(STUDIO_TAB) },
+  clips: { icon: Film, run: () => openSpecialTab(CLIPS_TAB) },
+  replay: { icon: History, run: () => void import('./replay').then((m) => m.saveReplay()), useActive: () => usePrefs((s) => s.prefs.replayOn) },
   terminal: { icon: SquareTerminal, run: () => openSpecialTab(TERMINAL_TAB) },
   streamer: { icon: Eye, run: toggleStreamerMode, useActive: () => usePrefs((s) => s.prefs.streamerMode) },
   settings: { icon: Settings, run: () => openSpecialTab(SETTINGS_TAB) }

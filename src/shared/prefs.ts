@@ -161,6 +161,17 @@ export interface Prefs {
   captureTimestamp: boolean
   /** System-wide shortcut for a screen snip (grab text from anywhere on screen); '' for none. */
   snipShortcut: string
+  /** Instant replay: keep the last few seconds of the screen ready to save (lib/replay.ts). */
+  replayOn: boolean
+  /** System-wide shortcut that saves the replay; '' for none. */
+  replayShortcut: string
+  /** How many seconds a saved replay holds. */
+  replaySeconds: number
+  /** Studio quality id (shared/studio QUALITIES). */
+  replayQuality: string
+  /** Record what you hear (Windows) and your microphone in replays. */
+  replaySound: boolean
+  replayMic: boolean
   /** Closing the window keeps Notes running in the tray (so quick capture still works). */
   closeToTray: boolean
   launchAtStartup: boolean
@@ -279,6 +290,12 @@ export const DEFAULT_PREFS: Prefs = {
   captureTimestamp: true,
   captureRememberTarget: false,
   snipShortcut: IS_MAC ? 'Control+Alt+S' : 'Alt+Shift+S',
+  replayOn: false,
+  replayShortcut: IS_MAC ? 'Control+Alt+R' : 'Alt+Shift+R',
+  replaySeconds: 30,
+  replayQuality: '1080p60',
+  replaySound: true,
+  replayMic: false,
   closeToTray: true,
   launchAtStartup: false,
 
@@ -309,7 +326,8 @@ export const RANGES = {
   longBreakMinutes: { min: 1, max: 90, step: 1 },
   focusRounds: { min: 1, max: 12, step: 1 },
   autoLockMinutes: { min: 0, max: 120, step: 5 },
-  screensaverMinutes: { min: 1, max: 60, step: 1 }
+  screensaverMinutes: { min: 1, max: 60, step: 1 },
+  replaySeconds: { min: 10, max: 120, step: 5 }
 } as const
 
 const CHOICES = {
@@ -326,8 +344,14 @@ const CHOICES = {
   captureShortcut: IS_MAC
     ? ['Control+Alt+Space', 'Alt+Space', 'Control+Shift+Space', 'Super+Alt+N', '']
     : ['Super+Shift+N', 'Control+Alt+Space', 'Control+Shift+Space', 'Alt+Shift+N', ''],
-  snipShortcut: IS_MAC ? ['Control+Alt+S', 'Control+Shift+S', 'Alt+Shift+S', ''] : ['Alt+Shift+S', 'Control+Alt+S', 'Super+Shift+T', '']
+  snipShortcut: IS_MAC ? ['Control+Alt+S', 'Control+Shift+S', 'Alt+Shift+S', ''] : ['Alt+Shift+S', 'Control+Alt+S', 'Super+Shift+T', ''],
+  // F-keys too: they work in games, where Alt or Ctrl combinations may do something else.
+  replayShortcut: IS_MAC ? ['Control+Alt+R', 'Control+Shift+R', 'F9', 'F10', ''] : ['Alt+Shift+R', 'Control+Shift+R', 'Alt+F9', 'F9', 'F10', ''],
+  replayQuality: ['720p30', '1080p30', '1080p60']
 } as const
+
+/** Shortcuts offered for saving an instant replay (system-wide). */
+export const REPLAY_SHORTCUTS = CHOICES.replayShortcut
 
 /** Shortcuts offered for screen snip (system-wide). */
 export const SNIP_SHORTCUTS = CHOICES.snipShortcut
@@ -392,7 +416,7 @@ export function normalizePrefs(raw: unknown): Prefs {
     out.spellcheckLanguage = input.spellcheckLanguage
   }
   out.tabSize = Math.round(out.tabSize)
-  for (const k of ['focusMinutes', 'breakMinutes', 'longBreakMinutes', 'focusRounds', 'autoLockMinutes'] as const) out[k] = Math.round(out[k])
+  for (const k of ['focusMinutes', 'breakMinutes', 'longBreakMinutes', 'focusRounds', 'autoLockMinutes', 'replaySeconds'] as const) out[k] = Math.round(out[k])
   out.attachmentFolder = cleanFolder(input.attachmentFolder ?? DEFAULT_PREFS.attachmentFolder, DEFAULT_PREFS.attachmentFolder)
   out.templatesFolder = cleanFolder(input.templatesFolder ?? DEFAULT_PREFS.templatesFolder, DEFAULT_PREFS.templatesFolder)
   out.dailyFolder = cleanFolder(input.dailyFolder ?? DEFAULT_PREFS.dailyFolder, DEFAULT_PREFS.dailyFolder)

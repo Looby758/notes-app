@@ -71,6 +71,8 @@ export const SUDOKU_TAB = 'sudoku:'
 export const MINESWEEPER_TAB = 'minesweeper:'
 /** Scenes, webcam and screen recording (components/Studio). */
 export const STUDIO_TAB = 'studio:'
+/** Instant replay and the clip editor (components/Clips). */
+export const CLIPS_TAB = 'clips:'
 /** WhatsApp and Discord in one tab (components/Messages). */
 export const MESSAGES_TAB = 'messages:'
 export const GAMES_TAB = 'games:'

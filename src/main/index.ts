@@ -41,6 +41,7 @@ import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
 import { setupConverter } from './converter'
 import { isAppPage, setupStudio } from './studio'
+import { applyReplayShortcut, clipFile, setupClips } from './clips'
 import { setupLive } from './live'
 import { explorerFile, setupExplorer } from './explorer'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
@@ -152,6 +153,7 @@ function appIconFile(prefs: Prefs): { id: string; file?: string } {
 function applySystemPrefs(prefs: Prefs): void {
   applyCaptureShortcut(prefs.captureShortcut)
   applySnipShortcut(prefs.snipShortcut)
+  applyReplayShortcut(prefs.replayOn ? prefs.replayShortcut : '')
   safely('app icon', () => applyAppIcon(prefs))
   // Only the installed app registers itself (in development it would register electron.exe).
   if (!app.isPackaged) return
@@ -282,6 +284,16 @@ function registerVaultProtocol(): void {
         }
         const pic = await localMusic.cover(rel)
         return pic ? new Response(Buffer.from(pic.data), { headers: { 'Content-Type': pic.type, 'Cache-Control': 'max-age=3600' } }) : new Response('No picture', { status: 404 })
+      }
+      // The clip editor's videos (vault://clips/<name>), from the recordings folder.
+      if (url.host === 'clips') {
+        const full = clipFile(decodeURIComponent(url.pathname.slice(1)))
+        if (!full) return new Response('Not allowed', { status: 403 })
+        // Readable by the page (crossOrigin), so a frame can be the picture when dragging a clip out.
+        const res = await net.fetch(pathToFileURL(full).toString(), { headers: request.headers })
+        const headers = new Headers(res.headers)
+        headers.set('Access-Control-Allow-Origin', '*')
+        return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
       }
       // Previews in the file explorer tab (vault://explore/<full path>): pictures, video, sound and PDFs only.
       if (url.host === 'explore') {
@@ -865,6 +877,7 @@ app.whenReady().then(async () => {
   // The extras: if one of them fails on some computer, the app itself still works.
   safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: () => void startSnip() }))
   safely('screen snip', () => setupSnip({ getMain: () => mainWindow, showMain }))
+  safely('instant replay', () => setupClips({ getMain: () => mainWindow, showMain }))
   safely('system settings', () => applySystemPrefs(currentPrefs()))
   safely('updates', () => setupUpdater(() => currentPrefs().checkForUpdates))
 })

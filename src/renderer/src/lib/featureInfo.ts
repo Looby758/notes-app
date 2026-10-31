@@ -55,6 +55,8 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'snip', name: 'Screen snip', blurb: 'Grab text from anywhere on screen', group: 'Tools', command: 'snip.start', keywords: 'ocr screenshot copy text translate' },
   { id: 'explorer', name: 'Files', blurb: 'Files on this computer', group: 'Tools', command: 'explorer.open', keywords: 'explorer finder folders drive' },
   { id: 'convert', name: 'Convert files', blurb: 'Photos, documents, audio and more', group: 'Tools', command: 'convert.open', keywords: 'pdf mp3 mp4 gif video png jpg word' },
+  { id: 'clips', name: 'Clips', blurb: 'Instant replay: save the last 30 seconds, trim it, send it', group: 'Tools', command: 'clips.open', keywords: 'instant replay shadowplay clip highlight discord trim caption game' },
+  { id: 'replay', name: 'Save replay', blurb: 'Save the last 30 seconds of your screen', group: 'Tools', command: 'replay.save', keywords: 'instant replay clip that save highlight' },
   { id: 'studio', name: 'Studio', blurb: 'Record your screen and webcam, or go live', group: 'Tools', command: 'studio.open', keywords: 'record obs stream twitch youtube webcam live' },
   { id: 'terminal', name: 'Terminal', blurb: 'Command line in your notes folder', group: 'Tools', command: 'terminal.open', keywords: 'shell cmd powershell' },
   { id: 'streamer', name: 'Streamer mode', blurb: 'Blur private things while sharing', group: 'Tools', command: 'view.streamer', keywords: 'privacy blur stream obs' },
