@@ -32,6 +32,7 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'reading', name: 'Reading mode', blurb: 'Notes become read-only', group: 'Notes', command: 'view.reading' },
 
   { id: 'calendar', name: 'Calendar', blurb: 'Events, reminders and bills', group: 'Plan', command: 'calendar.open', keywords: 'events schedule' },
+  { id: 'clocks', name: 'World clocks', blurb: 'The time in other places, daylight saving included', group: 'Plan', command: 'clocks.open', keywords: 'time zone timezone dst daylight saving world clock' },
   { id: 'flashcards', name: 'Flashcards', blurb: 'Review what’s due', group: 'Plan', command: 'flashcards.open', keywords: 'revise study cards' },
   { id: 'zen', name: 'Zen & focus timer', blurb: 'Full screen, just you and the note', group: 'Plan', command: 'view.zen', keywords: 'pomodoro focus timer' },
 

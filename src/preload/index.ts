@@ -91,6 +91,7 @@ const api: NotesApi = {
   webTitle: (url) => ipcRenderer.invoke('web:title', url),
   searchPlaces: (query) => ipcRenderer.invoke('places:search', query),
   mapTile: (z, x, y) => ipcRenderer.invoke('places:tile', z, x, y),
+  zoneAt: (lat, lon) => ipcRenderer.invoke('places:zone', lat, lon),
   weather: (force) => ipcRenderer.invoke('weather:get', force),
   setWeatherPlace: (place) => ipcRenderer.invoke('weather:setPlace', place),
   clearWebData: () => ipcRenderer.invoke('web:clear'),

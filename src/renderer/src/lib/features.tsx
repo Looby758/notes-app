@@ -12,6 +12,7 @@ import {
   FilePlus,
   Gamepad2,
   Globe,
+  Globe2,
   Grid3x3,
   HardDrive,
   House,
@@ -58,6 +59,7 @@ import {
   HOME_TAB,
   MESSAGES_TAB,
   MINESWEEPER_TAB,
+  CLOCKS_TAB,
   MONEY_TAB,
   PASSWORDS_TAB,
   SETTINGS_TAB,
@@ -101,6 +103,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
     useActive: () => usePrefs((s) => s.prefs.readingMode)
   },
   calendar: { icon: CalendarDays, run: () => openSpecialTab(CALENDAR_TAB) },
+  clocks: { icon: Globe2, run: () => openSpecialTab(CLOCKS_TAB) },
   flashcards: { icon: Layers, run: () => openSpecialTab(FLASHCARDS_TAB), badge: () => <FeatureBadge id="flashcards" /> },
   zen: { icon: Moon, run: () => toggleZen() },
   money: { icon: PoundSterling, run: () => openSpecialTab(MONEY_TAB) },
