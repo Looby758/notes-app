@@ -3,6 +3,9 @@ import { usePrefs } from '../../store/prefs'
 import { useUI } from '../../store/ui'
 import { useMotion } from '../../lib/motion'
 import { PET_CHEER } from '../../lib/pet'
+import { useEditor } from '../../store/editor'
+import { useVideoPlayer } from '../../store/videoPlayer'
+import { VIDEO_TAB } from '../../lib/editorController'
 import './pet.css'
 
 /** How long without a key press or pointer move before the pet curls up for a nap. */
@@ -26,7 +29,11 @@ type Mood = 'idle' | 'cheer' | 'pat' | 'nap' | 'wake'
 export default function Pet() {
   const on = usePrefs((s) => s.prefs.pet)
   const zen = useUI((s) => s.zen)
-  if (!on || zen) return null
+  // It keeps out of the way of a film (and the player's buttons in that corner).
+  const playerShown = useEditor((s) => Object.values(s.panes).some((p) => p.active === VIDEO_TAB))
+  const video = useVideoPlayer((s) => s.current)
+  const watching = playerShown && !!video
+  if (!on || zen || watching) return null
   return <PetBody />
 }
 

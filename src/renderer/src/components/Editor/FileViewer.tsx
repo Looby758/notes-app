@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ExternalLink, FileText, FolderSearch, Pencil } from 'lucide-react'
+import { ExternalLink, FileText, Film, FolderSearch, Pencil } from 'lucide-react'
 import { fileKind, openExternally, vaultUrl } from '../../lib/fileKinds'
 import { openNote } from '../../lib/editorController'
 import { noteTitle } from '../../lib/paths'
@@ -8,6 +8,7 @@ import { FILE_MANAGER } from '@shared/platform'
 import { loadSketch, useSketchVersions } from '../../lib/sketch'
 import { useUI } from '../../store/ui'
 import SheetView from './SheetView'
+import { openVaultVideo } from '../../store/videoPlayer'
 
 /** Notes that show or link to `path` (by its file name, as embeds are written). */
 function usedIn(path: string): string[] {
@@ -60,6 +61,11 @@ export default function FileViewer({ path }: { path: string }) {
         {isSketch && (
           <button className="btn btn-primary" onClick={() => useUI.setState({ sketch: { path } })} data-edit-sketch>
             <Pencil size={13} /> Edit sketch
+          </button>
+        )}
+        {kind === 'video' && (
+          <button className="btn btn-primary" onClick={() => openVaultVideo(path)}>
+            <Film size={13} /> Play in the video player
           </button>
         )}
         <button className="btn" onClick={() => openExternally(path)}>

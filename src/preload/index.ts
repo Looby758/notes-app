@@ -167,6 +167,13 @@ const api: NotesApi = {
     return () => ipcRenderer.removeListener('convert:video-progress', handler)
   },
 
+  videoInfo: (path) => ipcRenderer.invoke('video:info', path),
+  videoSubtitles: (path, source) => ipcRenderer.invoke('video:subtitles', path, source),
+  videoKeyframe: (path, at, fileStart) => ipcRenderer.invoke('video:keyframe', path, at, fileStart),
+  stopVideoStream: (session) => ipcRenderer.invoke('video:stop', session),
+  videoInVault: (path) => ipcRenderer.invoke('video:inVault', path),
+  pickVideoFile: (kind, near) => ipcRenderer.invoke('video:pick', kind, near),
+
   startSnip: () => ipcRenderer.invoke('snip:start'),
   snipStatus: () => ipcRenderer.invoke('snip:status'),
   snipImage: () => ipcRenderer.invoke('snip:image'),

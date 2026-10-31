@@ -30,6 +30,7 @@ import {
   STUDIO_TAB,
   MESSAGES_TAB,
   GAMES_TAB,
+  VIDEO_TAB,
   EXPLORER_TAB,
   SETTINGS_TAB,
   splitPane
@@ -60,6 +61,7 @@ import SudokuPage from '../Sudoku/SudokuPage'
 import StudioPage from '../Studio/StudioPage'
 import MinesweeperPage from '../Minesweeper/MinesweeperPage'
 import GamesPage from '../Games/GamesPage'
+import VideoPage from '../Video/VideoPage'
 import ExplorerPage from '../Explorer/ExplorerPage'
 import MindMap from '../MindMap/MindMap'
 import WebPage from '../Web/WebPage'
@@ -188,6 +190,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === MINESWEEPER_TAB && <MinesweeperPage />}
         {active === STUDIO_TAB && <StudioPage />}
         {active === GAMES_TAB && <GamesPage />}
+        {active === VIDEO_TAB && <VideoPage autoFocus={isActivePane} />}
         {active === EXPLORER_TAB && <ExplorerPage autoFocus={isActivePane} />}
         {zone && <div className={`drop-zone ${zone}`} />}
       </div>

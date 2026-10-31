@@ -62,6 +62,8 @@ import { fileKind } from '../../lib/fileKinds'
 import { notify } from '../../store/notify'
 import ContextMenu, { type MenuItem } from '../ContextMenu'
 import FileIcon from '../FileIcon'
+import { isVideoFile } from '@shared/videoPlayer'
+import { openVideo } from '../../store/videoPlayer'
 
 const PLACE_ICONS: Record<ExplorerPlace['kind'], typeof Folder> = {
   home: House,
@@ -254,6 +256,8 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
 
   const open = (entry: ExplorerEntry): void => {
     if (entry.isDir) return go(entry.path)
+    // Videos (anywhere on the computer) play in the video player.
+    if (isVideoFile(entry.name)) return openVideo(entry.path)
     // Notes and files in the notes folder open here, in a tab of their own.
     if (entry.vaultPath && /\.md$/i.test(entry.name)) return openNote(entry.vaultPath, { newTab: true })
     if (entry.vaultPath && fileKind(entry.vaultPath) !== 'other') return openFileTab(entry.vaultPath, { newTab: true })
