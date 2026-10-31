@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { MusicMiniCommand, MusicMiniState, NotesApi } from '@shared/types'
+import type { LocalAiState, MusicMiniCommand, MusicMiniState, NotesApi } from '@shared/types'
 
 const api: NotesApi = {
   confirm: (options) => ipcRenderer.invoke('app:confirm', options),
@@ -274,7 +274,21 @@ const api: NotesApi = {
   aiSummarise: (title, text) => ipcRenderer.invoke('ai:summarise', title, text),
   aiTidy: (text, kind) => ipcRenderer.invoke('ai:tidy', text, kind),
   aiInterpret: (text, context) => ipcRenderer.invoke('ai:interpret', text, context),
-  aiAsk: (question, notes, history, extra) => ipcRenderer.invoke('ai:ask', question, notes, history, extra),
+  aiAsk: (question, notes, history, extra, engine) => ipcRenderer.invoke('ai:ask', question, notes, history, extra, engine),
+  aiSetEngine: (use) => ipcRenderer.invoke('ai:setEngine', use),
+  aiSortMoney: (rows, categories) => ipcRenderer.invoke('ai:sortMoney', rows, categories),
+  aiMeaning: (word, sentence) => ipcRenderer.invoke('ai:meaning', word, sentence),
+  localAiState: () => ipcRenderer.invoke('localAi:state'),
+  localAiInstall: (model) => ipcRenderer.invoke('localAi:install', model),
+  localAiCancel: () => ipcRenderer.invoke('localAi:cancel'),
+  localAiRemove: () => ipcRenderer.invoke('localAi:remove'),
+  localAiUnload: () => ipcRenderer.invoke('localAi:unload'),
+  localAiSetUnloadForGames: (on) => ipcRenderer.invoke('localAi:setUnloadForGames', on),
+  onLocalAiState: (callback) => {
+    const handler = (_e: Electron.IpcRendererEvent, state: LocalAiState): void => callback(state)
+    ipcRenderer.on('localAi:state', handler)
+    return () => ipcRenderer.removeListener('localAi:state', handler)
+  },
   gamesList: (rescan) => ipcRenderer.invoke('games:list', rescan),
   gamesPlay: (id) => ipcRenderer.invoke('games:play', id),
   gamesLaunchArt: (id) => ipcRenderer.invoke('games:launchArt', id),
@@ -305,7 +319,7 @@ const api: NotesApi = {
     ipcRenderer.on('term:exit', handler)
     return () => ipcRenderer.removeListener('term:exit', handler)
   },
-  aiChat: (messages) => ipcRenderer.invoke('ai:chat', messages),
+  aiChat: (messages, engine) => ipcRenderer.invoke('ai:chat', messages, engine),
   aiLoadChats: () => ipcRenderer.invoke('ai:loadChats'),
   aiSaveChats: (chats) => ipcRenderer.invoke('ai:saveChats', chats),
   readHandwriting: (png, reader) => ipcRenderer.invoke('handwriting:read', png, reader),

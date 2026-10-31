@@ -33,7 +33,8 @@ export default function AiDialog({ close }: { close: () => void }) {
       )}
       {job.state === 'nokey' && (
         <p className="export-note">
-          The AI helper needs your own Anthropic API key first. It takes a couple of minutes to get one, and you only do it once.
+          The AI helper needs the offline AI (a free download that runs on this computer) or your own Anthropic API key first.
+          Both are in Settings → AI helper, and you only set it up once.
         </p>
       )}
       {job.state === 'error' && <p className="setting-warning">{job.error}</p>}

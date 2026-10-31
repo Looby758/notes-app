@@ -686,7 +686,7 @@ export const SETTINGS: SettingDef[] = [
     group: 'Ctrl+K',
     type: 'toggle',
     label: 'Offer to ask the AI when Ctrl+K doesn’t understand',
-    description: 'Sentences like “spent 12 on food” are understood on this computer. For anything else, Ctrl+K asks first before sending the sentence to Claude.',
+    description: 'Sentences like “spent 12 on food” are understood on this computer. For anything else, Ctrl+K asks first before the AI reads the sentence (the offline AI if you have it, otherwise Claude).',
     keywords: 'command palette ai smart sentence natural language ctrl k'
   },
 

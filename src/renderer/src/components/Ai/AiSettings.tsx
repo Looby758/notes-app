@@ -40,8 +40,8 @@ export default function AiSettings() {
     <section className="settings-group cal-sources ai-settings" data-section="ai">
       <h3>Claude</h3>
       <p className="cal-sources-intro">
-        The AI helper can summarise a note, tidy up a quick note, and answer questions from your notes. It uses Claude, made
-        by Anthropic, with your own account, so Anthropic bills you directly (usually a cent or two each time).
+        Claude, made by Anthropic, is the online AI: cleverer than the offline one, and it reads handwriting in sketches. It uses
+        your own account, so Anthropic bills you directly (usually a cent or two each time).
       </p>
       <p className="cal-sources-intro">
         Nothing is sent unless you press one of its buttons. Then only what that needs goes to Anthropic: the note you’re

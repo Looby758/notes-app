@@ -3,6 +3,7 @@ import type { Prefs } from '@shared/prefs'
 import {
   ArrowRightLeft,
   Clapperboard,
+  Cpu,
   Bomb,
   BookOpen,
   CalendarDays,
@@ -118,6 +119,13 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   snip: { icon: Scan, run: () => void startSnip() },
   explorer: { icon: HardDrive, run: () => openSpecialTab(EXPLORER_TAB) },
   convert: { icon: ArrowRightLeft, run: () => openSpecialTab(CONVERT_TAB) },
+  'offline-ai': {
+    icon: Cpu,
+    run: () => {
+      openSpecialTab(SETTINGS_TAB)
+      useUI.setState({ settingsSection: 'ai' })
+    }
+  },
   studio: { icon: Clapperboard, run: () => openSpecialTab(STUDIO_TAB) },
   terminal: { icon: SquareTerminal, run: () => openSpecialTab(TERMINAL_TAB) },
   streamer: { icon: Eye, run: toggleStreamerMode, useActive: () => usePrefs((s) => s.prefs.streamerMode) },

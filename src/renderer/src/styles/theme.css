@@ -8158,6 +8158,26 @@ a.passwords-text:hover {
   width: 100%;
   user-select: text;
 }
+.money-ai-sort {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+}
+.money-ai-sort > span {
+  flex: 1;
+  min-width: 200px;
+}
+.money-import-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .money-import-actions {
   display: flex;
   gap: 8px;

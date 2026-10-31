@@ -67,10 +67,12 @@ const ASK_EXAMPLES = ['How much did I spend on takeaways last month?', 'What are
 export function AskMoney() {
   const [q, setQ] = useState('')
   const moneyOn = useAi((s) => s.sources.money)
+  const offline = useAi((s) => s.status?.offline.state === 'ready')
   const ask = (question: string): void => {
     if (!question.trim()) return
     setQ('')
-    void askEverything(question)
+    // With the offline AI, money questions stay on this computer.
+    void askEverything(question, { private: true })
   }
   return (
     <section className="money-section money-ask" data-money-ask>
@@ -95,10 +97,17 @@ export function AskMoney() {
           </button>
         ))}
       </div>
-      <p className="money-hint">
-        Claude answers from your money tracker{moneyOn ? '' : ' (switched off on the Ask everything page, so it can’t see it yet)'}. Nothing is sent until you
-        ask. Needs your Anthropic key in Settings → AI helper.
-      </p>
+      {offline ? (
+        <p className="money-hint">
+          The offline AI answers from your money tracker{moneyOn ? '' : ' (switched off on the Ask everything page, so it can’t see it yet)'}, privately: it runs on
+          this computer, so your money never leaves it.
+        </p>
+      ) : (
+        <p className="money-hint">
+          Claude answers from your money tracker{moneyOn ? '' : ' (switched off on the Ask everything page, so it can’t see it yet)'}. Nothing is sent until you
+          ask. Needs your Anthropic key in Settings → AI helper, or get the offline AI there to keep it all on this computer.
+        </p>
+      )}
     </section>
   )
 }
