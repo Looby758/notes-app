@@ -8,6 +8,7 @@ import type { LocalLibrary } from './localMusic'
 import type { WifiNetwork } from './wifi'
 import type { MusicAction, MusicDevice, MusicItem, MusicQueue, MusicSearchResults, MusicState, MusicStatus } from './spotify'
 import type { CoversStatus, GamesList, LaunchArt } from './games'
+import type { VideoInfo } from './videoPlayer'
 import type { Theme } from './themes'
 import type { ShareButton, ShareOs, ShareSide } from './mouseShare'
 
@@ -540,6 +541,20 @@ export interface NotesApi {
   cancelVideo(id: number): Promise<void>
   /** How far along a video conversion is (0…1). Returns a function that stops listening. */
   onVideoProgress(callback: (id: number, done: number) => void): () => void
+
+  // Video player
+  /** What's in a video (its tracks need the video helper, ffmpeg) and the subtitle files beside it. */
+  videoInfo(path: string): Promise<VideoInfo>
+  /** Subtitles as text: a subtitle file, or one of the video's own tracks (as WebVTT). */
+  videoSubtitles(path: string, source: { stream?: number; file?: string }): Promise<string>
+  /** Where a stream that copies the picture from `at` really starts (the keyframe before). */
+  videoKeyframe(path: string, at: number, fileStart: number): Promise<number>
+  /** Stops a page's live video stream. */
+  stopVideoStream(session: string): Promise<void>
+  /** The full path of a file in the notes folder. */
+  videoInVault(path: string): Promise<string>
+  /** Asks for a video, or subtitles (starting beside `near`); null if cancelled. */
+  pickVideoFile(kind: 'video' | 'subtitles', near?: string): Promise<string | null>
 
   // Quick capture
   /** Opens the quick capture window. */

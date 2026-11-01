@@ -74,6 +74,8 @@ export const STUDIO_TAB = 'studio:'
 /** WhatsApp and Discord in one tab (components/Messages). */
 export const MESSAGES_TAB = 'messages:'
 export const GAMES_TAB = 'games:'
+/** The video player (components/Video); which video it shows is in store/videoPlayer. */
+export const VIDEO_TAB = 'video:'
 /** Browse the whole computer and Google Drive (components/Explorer). */
 export const EXPLORER_TAB = 'explorer:'
 /** A picture, recording, PDF… from the notes folder, shown in a tab: "file:attachments/a.png". */

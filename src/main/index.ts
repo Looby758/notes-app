@@ -45,6 +45,7 @@ import { isAppPage, setupStudio } from './studio'
 import { setupLive } from './live'
 import { explorerFile, setupExplorer } from './explorer'
 import { hold, setupUndoBin } from './undoBin'
+import { setupVideoPlayer, videoResponse } from './videoPlayer'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
@@ -297,6 +298,8 @@ function registerVaultProtocol(): void {
         const pic = await localMusic.cover(rel)
         return pic ? new Response(Buffer.from(pic.data), { headers: { 'Content-Type': pic.type, 'Cache-Control': 'max-age=3600' } }) : new Response('No picture', { status: 404 })
       }
+      // The video player: files played as they are, and ffmpeg's live stream of the rest.
+      if (url.host === 'video' || url.host === 'videostream') return await videoResponse(url, request)
       // Previews in the file explorer tab (vault://explore/<full path>): pictures, video, sound and PDFs only.
       if (url.host === 'explore') {
         const full = explorerFile(url)
@@ -887,6 +890,7 @@ app.whenReady().then(async () => {
   safely('live streaming', setupLive)
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
   safely('undo', () => setupUndoBin(() => vault?.root ?? null))
+  safely('video player', () => setupVideoPlayer(() => vault?.root ?? null))
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))
   mainWindow = createWindow()

@@ -53,6 +53,7 @@ const FEATURE_EMOJI: Record<string, string> = {
   ask: '✨',
   music: '🎵',
   youtube: '📺',
+  video: '🎞️',
   games: '🎮',
   sudoku: '🔢',
   minesweeper: '💣',
