@@ -63,6 +63,7 @@ import ZenBar, { StatusTimer } from './ZenBar'
 import VoiceRecorder from './VoiceRecorder'
 import DefinitionCard from './DefinitionCard'
 import SketchPad from './Sketch/SketchPad'
+import PictureEditor from './PicEdit/PictureEditor'
 import { toggleStreamerMode } from '../store/streamer'
 import Private from './Streamer/Private'
 import DeviceDrop from './Share/DeviceDrop'
@@ -402,6 +403,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <VoiceRecorder />
       <DefinitionCard />
       <SketchPad />
+      <PictureEditor />
       <Screensaver />
     </div>
   )

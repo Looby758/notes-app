@@ -1096,6 +1096,8 @@ export interface NotesApi {
   /** Saves an unlocked copy where you choose. Resolves false if cancelled. */
   saveSafeCopy(name: string, data: Uint8Array): Promise<boolean>
   /** Saves pasted/dropped file data into a vault folder; returns the new file's path. */
+  /** Saves an edited picture (.png, .jpg or .webp) over the file. */
+  writePicture(path: string, data: Uint8Array): Promise<void>
   /** Saves an edited spreadsheet (.xlsx, .xlsm, .csv or .tsv) over the file. */
   writeSheet(path: string, data: Uint8Array): Promise<void>
   saveAttachment(folder: string, name: string, data: Uint8Array): Promise<string>

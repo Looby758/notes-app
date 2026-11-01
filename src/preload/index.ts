@@ -589,6 +589,7 @@ const api: NotesApi = {
   trashSafeOriginals: (paths) => ipcRenderer.invoke('safe:trashOriginals', paths),
   saveSafeCopy: (name, data) => ipcRenderer.invoke('safe:saveCopy', name, data),
   writeSketch: (path, svg) => ipcRenderer.invoke('fs:writeSketch', path, svg),
+  writePicture: (path, data) => ipcRenderer.invoke('fs:writePicture', path, data),
   writeSheet: (path, data) => ipcRenderer.invoke('fs:writeSheet', path, data),
   saveAttachment: (folder, name, data) => ipcRenderer.invoke('fs:saveAttachment', folder, name, data),
   pickAttachment: (folder, imagesOnly) => ipcRenderer.invoke('fs:pickAttachment', folder, imagesOnly),

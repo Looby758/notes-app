@@ -6509,9 +6509,57 @@ body.theme-light .flashcard-grade.grade-easy span {
   opacity: 0;
   transition: opacity 120ms var(--ease);
 }
+.cm-picture {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
 .cm-sketch:hover .cm-sketch-edit,
+.cm-picture:hover .cm-sketch-edit,
 .cm-sketch-edit:focus-visible {
   opacity: 1;
+}
+
+/* ---------- quick picture editor ---------- */
+.pic-stage {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0;
+}
+.pic-canvas {
+  background: repeating-conic-gradient(#3a3d44 0% 25%, #2c2f35 0% 50%) 0 0 / 16px 16px;
+}
+.pic-canvas.tool-text {
+  cursor: text;
+}
+.pic-hint {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.pic-size {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.pic-size input {
+  width: 64px;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-input, var(--bg-panel));
+  color: var(--text);
+  font: inherit;
+}
+.pic-text-input {
+  position: absolute;
+  min-width: 140px;
+  padding: 2px 6px;
+  border: 1px dashed var(--accent);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  font: 600 16px system-ui, sans-serif;
+  line-height: normal;
+  outline: none;
 }
 
 /* ---------- Canvas boards ---------- */
