@@ -145,6 +145,11 @@ const api: NotesApi = {
     ipcRenderer.on('web:shortcut', handler)
     return () => ipcRenderer.removeListener('web:shortcut', handler)
   },
+  onWebMouseNav: (callback) => {
+    const handler = (_e: unknown, contentsId: number, dir: 1 | -1): void => callback(contentsId, dir)
+    ipcRenderer.on('web:mouseNav', handler)
+    return () => ipcRenderer.removeListener('web:mouseNav', handler)
+  },
   openYouTube: (url, seconds) => ipcRenderer.invoke('youtube:open', url, seconds),
   youTubeState: () => ipcRenderer.invoke('youtube:state'),
   rememberYouTube: (url) => ipcRenderer.invoke('youtube:remember', url),
