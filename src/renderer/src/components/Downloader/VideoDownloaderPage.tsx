@@ -1,16 +1,18 @@
-import { useEffect, useRef, useState } from 'react'
-import { Check, CloudDownload, Download, FileInput, FolderOpen, Loader2, Music, Play, RotateCcw, Video, X } from 'lucide-react'
-import type { VideoDownload, VideoDownloaderState } from '@shared/types'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Check, ChevronDown, CloudDownload, Download, FileInput, Folder, FolderOpen, FolderPlus, Loader2, Music, Play, RotateCcw, Video, X } from 'lucide-react'
+import type { FileNode, VideoDownload, VideoDownloaderState } from '@shared/types'
 import { DOWNLOAD_QUALITIES, parseVideoLink, type DownloadQuality } from '@shared/videoDownload'
 import { usePrefs } from '../../store/prefs'
+import { useVault } from '../../store/vault'
+import { fuzzyFilter } from '../../lib/fuzzy'
 import { notify } from '../../store/notify'
 import { openVaultVideo } from '../../store/videoPlayer'
 import { insertIntoActiveNote, openFileTab } from '../../lib/editorController'
 import { describeSize } from '../../lib/convert/formats'
 
 /**
- * The video downloader tab: paste a link from YouTube, X, Instagram, TikTok and lots more, and the
- * video is saved into the attachments folder. The downloading happens in main/videoDownload.ts, so
+ * The video downloader tab: paste a link from YouTube, X, Instagram, TikTok and lots more, pick a
+ * folder in the notes folder (the attachments folder to start with), and press Download. The downloading happens in main/videoDownload.ts, so
  * it carries on if this tab is closed.
  */
 
@@ -55,8 +57,99 @@ function SetupBox({ setup, onGet }: { setup: VideoDownloaderState; onGet: () => 
   )
 }
 
+const FOLDER_KEY = 'orbit.videoDownloader.folder'
+
+function folderList(nodes: FileNode[], out: string[] = []): string[] {
+  for (const n of nodes) {
+    if (n.type !== 'folder') continue
+    out.push(n.path)
+    folderList(n.children ?? [], out)
+  }
+  return out
+}
+
+const folderLabel = (f: string): string => f || 'Top level of your notes'
+
+/**
+ * "Save to": the folders in the notes folder, in a list inside Orbit (no system window). Typing a
+ * name that isn't there offers to make it; the download makes the folder when it's saved.
+ */
+function SaveTo({ folder, onPick }: { folder: string; onPick: (f: string) => void }) {
+  const tree = useVault((s) => s.tree)
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const box = useRef<HTMLDivElement>(null)
+  const list = useMemo(() => ['', ...folderList(tree)], [tree])
+  const typed = query.trim().replace(/^\/+|\/+$/g, '')
+  const shown = typed ? fuzzyFilter(list.slice(1), typed, (f) => f).map((r) => r.item) : list
+  const isNew = typed !== '' && !list.some((f) => f.toLowerCase() === typed.toLowerCase())
+
+  useEffect(() => {
+    if (!open) return
+    const away = (e: MouseEvent): void => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false)
+    }
+    window.addEventListener('mousedown', away)
+    return () => window.removeEventListener('mousedown', away)
+  }, [open])
+
+  const pick = (f: string): void => {
+    onPick(f)
+    setOpen(false)
+    setQuery('')
+  }
+
+  return (
+    <div className="vdl-saveto" ref={box}>
+      <span className="vdl-saveto-label">Save to</span>
+      <button type="button" className="btn vdl-saveto-btn" onClick={() => setOpen(!open)} title={folderLabel(folder)} data-vdl-folder>
+        <Folder size={13} /> <span>{folderLabel(folder)}</span> <ChevronDown size={13} />
+      </button>
+      {open && (
+        <div className="vdl-saveto-menu" data-vdl-folder-menu>
+          <input
+            autoFocus
+            className="text-input"
+            placeholder="Find a folder, or type a new one…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setOpen(false)
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                if (shown[0] !== undefined) pick(shown[0])
+                else if (isNew) pick(typed)
+              }
+            }}
+          />
+          <div className="bulk-folders">
+            {isNew && (
+              <button type="button" onClick={() => pick(typed)} data-vdl-new-folder>
+                <FolderPlus size={14} /> Make a new folder “{typed}”
+              </button>
+            )}
+            {shown.slice(0, 60).map((f) => (
+              <button type="button" key={f || '/'} className={f === folder ? 'on' : ''} onClick={() => pick(f)} data-folder={f}>
+                <Folder size={14} /> {folderLabel(f)}
+                {f === folder && <Check size={13} className="vdl-saveto-check" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function VideoDownloaderPage() {
-  const folder = usePrefs((s) => s.prefs.attachmentFolder)
+  const attachments = usePrefs((s) => s.prefs.attachmentFolder)
+  // The last folder picked here is remembered; to start with it's the attachments folder.
+  const [picked, setPicked] = useState<string | null>(() => localStorage.getItem(FOLDER_KEY))
+  const folder = picked ?? attachments
+  const pickFolder = (f: string): void => {
+    setPicked(f)
+    localStorage.setItem(FOLDER_KEY, f)
+  }
   const [setup, setSetup] = useState<VideoDownloaderState | null>(null)
   const [list, setList] = useState<VideoDownload[]>([])
   const [link, setLink] = useState('')
@@ -75,13 +168,13 @@ export default function VideoDownloaderPage() {
     }
   }, [])
 
-  const start = (url = link, q = quality): void => {
+  const start = (url = link, q = quality, where = folder): void => {
     if (!parseVideoLink(url)) {
       notify('That doesn’t look like a link. Copy the video’s address and paste it here.')
       return
     }
     window.api
-      .downloadVideo({ url, quality: q, folder })
+      .downloadVideo({ url, quality: q, folder: where })
       .then(() => setLink(''))
       .catch(notify)
   }
@@ -107,7 +200,7 @@ export default function VideoDownloaderPage() {
           <CloudDownload size={18} /> Download a video
         </h2>
         <p className="convert-intro">
-          Paste a link from YouTube, X, Instagram, TikTok, Reddit, Twitch and lots more, and the video is saved into your attachments folder. Only download videos you’re
+          Paste a link from YouTube, X, Instagram, TikTok, Reddit, Twitch and lots more, pick where it goes, and press Download. Only download videos you’re
           allowed to keep, for your own use. For sites that want you signed in (like Instagram), sign in once in an Orbit web tab.
         </p>
 
@@ -125,14 +218,6 @@ export default function VideoDownloaderPage() {
             value={link}
             spellCheck={false}
             onChange={(e) => setLink(e.target.value)}
-            onPaste={(e) => {
-              // Pasting a link into the empty box starts it straight away.
-              const text = e.clipboardData.getData('text')
-              if (!link && parseVideoLink(text) && setup?.state === 'ready') {
-                e.preventDefault()
-                start(text.trim())
-              }
-            }}
             data-vdl-link
           />
           <select className="select" value={quality} onChange={(e) => setQuality(e.target.value as DownloadQuality)} data-vdl-quality>
@@ -146,6 +231,7 @@ export default function VideoDownloaderPage() {
             <Download size={13} /> Download
           </button>
         </form>
+        <SaveTo folder={folder} onPick={pickFolder} />
 
         {setup && <SetupBox setup={setup} onGet={get} />}
 
@@ -165,12 +251,20 @@ export default function VideoDownloaderPage() {
                     {d.status === 'cancelled' && 'Stopped'}
                   </small>
                   {d.status === 'working' && (
-                    <div className="vdl-bar">
-                      <div className={d.progress === undefined || d.stage === 'starting' ? 'vdl-bar-busy' : ''} style={{ width: d.progress === undefined || d.stage === 'starting' ? undefined : `${d.progress * 100}%` }} />
+                    <div className="vdl-progress" data-vdl-progress>
+                      <div className="vdl-bar">
+                        <div className={d.progress === undefined || d.stage === 'starting' ? 'vdl-bar-busy' : ''} style={{ width: d.progress === undefined || d.stage === 'starting' ? undefined : `${d.progress * 100}%` }} />
+                      </div>
+                      {d.progress !== undefined && d.stage !== 'starting' && <span className="vdl-percent">{Math.round(d.progress * 100)}%</span>}
                     </div>
                   )}
                 </div>
                 <div className="vdl-actions">
+                  {d.status === 'working' && (
+                    <button className="btn vdl-cancel" onClick={() => void window.api.cancelVideoDownload(d.id)} data-vdl-cancel>
+                      <X size={13} /> Cancel
+                    </button>
+                  )}
                   {d.status === 'done' && d.path && (
                     <>
                       <button className="icon-btn" title={d.quality === 'audio' ? 'Play' : 'Watch in the video player'} onClick={() => open(d)} data-vdl-play>
@@ -198,14 +292,11 @@ export default function VideoDownloaderPage() {
                       <RotateCcw size={14} />
                     </button>
                   )}
-                  <button
-                    className="icon-btn"
-                    title={d.status === 'working' ? 'Stop' : 'Take off the list (the file stays)'}
-                    onClick={() => void (d.status === 'working' ? window.api.cancelVideoDownload(d.id) : window.api.forgetVideoDownload(d.id))}
-                    data-vdl-remove
-                  >
-                    <X size={14} />
-                  </button>
+                  {d.status !== 'working' && (
+                    <button className="icon-btn" title="Take off the list (the file stays)" onClick={() => void window.api.forgetVideoDownload(d.id)} data-vdl-remove>
+                      <X size={14} />
+                    </button>
+                  )}
                 </div>
               </li>
             ))}
