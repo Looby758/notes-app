@@ -5,6 +5,7 @@ import { formatEventLine, insertEvent, toggleTaskAt, type DatedItem } from './sc
 import { applyText, getOpenText, isNoteTab, openNote } from './editorController'
 import { findNode, noteTitle } from './paths'
 import { isLockedText } from './lock/crypto'
+import { readFrontmatter } from './properties'
 import { dailyDateOf, dailyPath } from './dailyPaths'
 import { usePrefs } from '../store/prefs'
 import { useVault } from '../store/vault'
@@ -21,22 +22,46 @@ const DATE_HEADING = '# {{date:dddd D MMMM YYYY}}\n\n'
 
 /**
  * With "keep the date heading" on, a daily template that doesn't start with a heading of its own
- * gets the usual date heading on top (after its properties, if it has any).
+ * gets the usual date heading on top (after its properties, if it has any). The properties block
+ * (icon, banner and the rest) always stays the very first thing in the note, or it stops being
+ * properties: that includes one with spaces after a fence, a `...` closing line, or no newline
+ * after the closing `---`.
  */
 export function withDateHeading(template: string, keep: boolean): string {
-  if (!keep) return template
-  const front = /^---\n[\s\S]*?\n---\n/.exec(template)?.[0] ?? ''
-  const body = template.slice(front.length)
-  if (/^\s*#\s/.test(body)) return template
+  const fm = readFrontmatter(template)
+  let front = fm ? template.slice(0, fm.to) : ''
+  if (front && !front.endsWith('\n')) front += '\n'
+  const body = fm ? template.slice(fm.to) : template
+  if (!keep || /^\s*#\s/.test(body)) return front + body
   return front + DATE_HEADING + body.replace(/^\s*\n/, '')
 }
 
+const templateFile = (name: string): string => (/\.md$/i.test(name) ? name : `${name}.md`)
+
+/**
+ * The daily template's current text: from the editor if it's open (so an icon or banner you just
+ * picked counts before it's saved), else from disk, else from the search index.
+ */
+async function readTemplate(path: string): Promise<string | undefined> {
+  const open = getOpenText(path)
+  if (open !== null) return normalizeText(open)
+  if (exists(path)) {
+    try {
+      const text = normalizeText(await window.api.readNote(path))
+      if (!isLockedText(text)) return text
+    } catch {
+      // fall back to the index below
+    }
+  }
+  return getNoteText(path)
+}
+
 /** What a brand-new daily note starts with: your daily template, or just a title. */
-function newDailyContent(date: Date): { text: string; cursor: number | null } {
+async function newDailyContent(date: Date): Promise<{ text: string; cursor: number | null }> {
   const prefs = usePrefs.getState().prefs
   const title = formatDate(date, prefs.dailyFormat)
-  const templatePath = prefs.dailyTemplate ? (/\.md$/i.test(prefs.dailyTemplate) ? prefs.dailyTemplate : `${prefs.dailyTemplate}.md`) : ''
-  const template = templatePath ? getNoteText(templatePath) : undefined
+  const templatePath = prefs.dailyTemplate ? templateFile(prefs.dailyTemplate) : ''
+  const template = templatePath ? await readTemplate(templatePath) : undefined
   if (templatePath && template === undefined) notify(`Daily template "${prefs.dailyTemplate}" wasn't found, so a plain note was made.`, 'info')
   return fillTemplate(template === undefined ? `${DATE_HEADING}{{cursor}}` : withDateHeading(template, prefs.dailyKeepHeading), { title, date })
 }
@@ -49,7 +74,7 @@ export async function openDaily(date: Date, { create = true, pane }: { create?: 
     return true
   }
   if (!create) return false
-  const { text, cursor } = newDailyContent(date)
+  const { text, cursor } = await newDailyContent(date)
   return (await useVault.getState().createNoteAt(path, text, cursor)) !== null
 }
 
@@ -96,7 +121,7 @@ async function swapText(path: string, from: string, to: string): Promise<void> {
 export async function ensureDaily(date: Date): Promise<string> {
   const path = dailyPath(date)
   if (!exists(path)) {
-    const { text } = newDailyContent(date)
+    const { text } = await newDailyContent(date)
     await window.api.createNoteAt(path)
     await window.api.writeNote(path, text)
   }

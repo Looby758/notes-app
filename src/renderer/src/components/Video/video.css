@@ -519,3 +519,32 @@
 .video-player-page video.skipping {
   visibility: hidden;
 }
+
+/* ---------- the video player's own window ("Pop out") ---------- */
+
+body.video-window-body {
+  background: #000;
+}
+.video-window {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+}
+.video-window > .video-player-page {
+  flex: 1;
+}
+.video-window-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 84px;
+  transform: translateX(-50%);
+  max-width: min(520px, 90vw);
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: rgba(20, 20, 24, 0.92);
+  color: #fff;
+  font-size: 13px;
+  z-index: 20;
+}

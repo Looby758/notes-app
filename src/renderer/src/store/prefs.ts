@@ -28,6 +28,7 @@ const SPECIAL_LABELS: Partial<Record<keyof Prefs, string>> = {
   homeOrder: 'Changed the Home page',
   homeHidden: 'Changed the Home page',
   shortcuts: 'Changed a shortcut',
+  countdowns: 'Changed your countdowns',
   editorFontSize: 'Changed the text size'
 }
 

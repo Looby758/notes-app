@@ -32,6 +32,7 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'reading', name: 'Reading mode', blurb: 'Notes become read-only', group: 'Notes', command: 'view.reading' },
 
   { id: 'calendar', name: 'Calendar', blurb: 'Events, reminders and bills', group: 'Plan', command: 'calendar.open', keywords: 'events schedule' },
+  { id: 'countdowns', name: 'Countdowns', blurb: 'Days until a new season, game update, trip or birthday', group: 'Plan', command: 'countdowns.open', keywords: 'countdown days until timer event release birthday holiday trip season' },
   { id: 'clocks', name: 'World clocks', blurb: 'The time in other places, daylight saving included', group: 'Plan', command: 'clocks.open', keywords: 'time zone timezone dst daylight saving world clock' },
   { id: 'flashcards', name: 'Flashcards', blurb: 'Review what’s due', group: 'Plan', command: 'flashcards.open', keywords: 'revise study cards' },
   { id: 'zen', name: 'Zen & focus timer', blurb: 'Full screen, just you and the note', group: 'Plan', command: 'view.zen', keywords: 'pomodoro focus timer' },
@@ -62,6 +63,7 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'minesweeper', name: 'Minesweeper', blurb: 'A quick break', group: 'Play', command: 'minesweeper.open' },
 
   { id: 'snip', name: 'Screen snip', blurb: 'Grab text from anywhere on screen', group: 'Tools', command: 'snip.start', keywords: 'ocr screenshot copy text translate' },
+  { id: 'mixer', name: 'Volume mixer', blurb: 'A volume for each app: games, Discord, Spotify', group: 'Tools', command: 'mixer.open', keywords: 'sound audio volume loud quiet mute discord spotify game per app levels' },
   { id: 'screens', name: 'Screens', blurb: 'Monitor brightness, contrast and input, with hotkeys', group: 'Tools', command: 'screens.open', keywords: 'monitor display brightness contrast input hdmi displayport usb-c ddc dim switch' },
   { id: 'explorer', name: 'Files', blurb: 'Files on this computer', group: 'Tools', command: 'explorer.open', keywords: 'explorer finder folders drive' },
   { id: 'convert', name: 'Convert files', blurb: 'Photos, documents, audio and more', group: 'Tools', command: 'convert.open', keywords: 'pdf mp3 mp4 gif video png jpg word' },

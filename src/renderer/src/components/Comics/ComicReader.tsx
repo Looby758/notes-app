@@ -117,6 +117,8 @@ export default function ComicReader({ id, onClose }: { id: string; onClose: () =
     return () => {
       live = false
       off()
+      // Closing the comic lets go of its file, so it can be deleted or moved straight away.
+      void window.api.comicsClose(id).catch(() => undefined)
     }
   }, [id])
 

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { localArtUrl, localSongUrl, type LocalLibrary, type LocalSong } from '@shared/localMusic'
 import { nextRepeat, type MusicRepeat, type MusicState } from '@shared/spotify'
 import { errorMessage } from '../lib/paths'
+import { unloadMedia } from '../lib/media'
 import { useMusic } from './music'
 
 /**
@@ -278,7 +279,8 @@ export function localUpNext(): LocalSong[] {
 
 /** Stops your own music and hands the player back to Spotify. */
 export function stopLocal(): void {
-  audio?.pause()
+  // Emptied, not just paused, so the song's file isn't held open (Windows would say Orbit is using it).
+  unloadMedia(audio)
   useMusic.setState({ local: false })
 }
 

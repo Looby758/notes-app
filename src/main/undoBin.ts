@@ -3,6 +3,7 @@ import { existsSync } from 'fs'
 import { cp, lstat, mkdir, readdir, readFile, rename, rm, writeFile } from 'fs/promises'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'path'
 import { uniqueName } from '@shared/explorer'
+import { releaseFiles } from './fileLocks'
 
 /**
  * Orbit's own short-term bin, so deleting can be undone with Ctrl+Z.
@@ -49,6 +50,8 @@ async function sizeOf(path: string, limit: number): Promise<number> {
 
 /** Moves (or copies) something into the bin. Returns false if it went straight to the Recycle Bin / Bin instead. */
 export async function hold(full: string): Promise<boolean> {
+  // A video or comic still open in Orbit would stop Windows moving it.
+  await releaseFiles(full)
   const slot = join(binDir(), `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`)
   const at = join(slot, basename(full))
   await mkdir(slot, { recursive: true })

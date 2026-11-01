@@ -1,6 +1,7 @@
 import { constants as fsConstants, promises as fs } from 'fs'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'path'
 import type { FileNode } from '@shared/types'
+import { releaseFiles } from './fileLocks'
 
 /** Hidden folders (.git, .obsidian, .trash…) and node_modules never show in the tree. */
 export function isIgnoredName(name: string): boolean {
@@ -280,6 +281,22 @@ export class Vault {
     }
   }
 
+  /** Saves an edited picture over its .png, .jpg or .webp (only an existing one, as with sketches). */
+  async writePicture(rel: string, data: Uint8Array): Promise<void> {
+    const full = this.abs(rel)
+    if (!['.png', '.jpg', '.jpeg', '.webp'].includes(extname(full).toLowerCase())) throw new Error('Only .png, .jpg and .webp pictures can be saved over.')
+    if (!(await exists(full))) throw new Error('That picture is no longer in the notes folder.')
+    if (data.byteLength > MAX_ATTACHMENT_BYTES) throw new Error('That picture is too big to save.')
+    const tmp = join(dirname(full), `.${basename(full)}.${tempSuffix()}.tmp`)
+    await fs.writeFile(tmp, data)
+    try {
+      await renameWithRetry(tmp, full)
+    } catch (err) {
+      await fs.rm(tmp, { force: true })
+      throw err
+    }
+  }
+
   /** Saves an edited spreadsheet over its .xlsx, .xlsm, .csv or .tsv (only an existing one, as with sketches). */
   async writeSheet(rel: string, data: Uint8Array): Promise<void> {
     const full = this.abs(rel)
@@ -353,6 +370,7 @@ export class Vault {
     // A case-only rename ("note" → "Note") points at the same file on Windows, so allow it.
     const caseOnly = target.toLowerCase() === src.toLowerCase()
     if (!caseOnly && (await exists(target))) throw new Error(`"${name}" already exists here.`)
+    await releaseFiles(src)
     await fs.rename(src, target)
     return this.rel(target)
   }
@@ -367,6 +385,7 @@ export class Vault {
     }
     const target = join(destDir, basename(src))
     if (await exists(target)) throw new Error(`"${basename(src)}" already exists there.`)
+    await releaseFiles(src)
     await fs.rename(src, target)
     return this.rel(target)
   }

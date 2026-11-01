@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ArrowRightLeft, AudioLines, Headphones, Bomb, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Grid3x3, HardDrive, House, KeyRound, Layers, LibraryBig, Mail, MessageSquare, MessagesSquare, Monitor, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Scissors, Settings, Sparkles, SquareTerminal, Star, StarOff, X, CloudDownload } from 'lucide-react'
+import { ArrowRightLeft, AudioLines, Headphones, Bomb, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Hourglass, Grid3x3, HardDrive, House, KeyRound, Layers, LibraryBig, Mail, MessageSquare, MessagesSquare, Monitor, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Scissors, Settings, SlidersVertical, Sparkles, SquareTerminal, Star, StarOff, X, CloudDownload } from 'lucide-react'
 import Private from '../Streamer/Private'
 import { useHideNames } from '../../store/streamer'
 import { useEditor } from '../../store/editor'
@@ -26,7 +26,9 @@ import {
   COMICS_TAB,
   MINESWEEPER_TAB,
   CLOCKS_TAB,
+  COUNTDOWNS_TAB,
   SCREENS_TAB,
+  MIXER_TAB,
   DOWNLOADER_TAB,
   STUDIO_TAB,
   CLIPS_TAB,
@@ -95,7 +97,9 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === COMICS_TAB) return 'Comics'
   if (id === MINESWEEPER_TAB) return 'Minesweeper'
   if (id === CLOCKS_TAB) return 'World clocks'
+  if (id === COUNTDOWNS_TAB) return 'Countdowns'
   if (id === SCREENS_TAB) return 'Screens'
+  if (id === MIXER_TAB) return 'Volume mixer'
   if (id === DOWNLOADER_TAB) return 'Download a video'
   if (id === STUDIO_TAB) return 'Studio'
   if (id === CLIPS_TAB) return 'Clips'
@@ -313,7 +317,9 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === COMICS_TAB && <LibraryBig size={13} className="tab-icon" />}
               {id === MINESWEEPER_TAB && <Bomb size={13} className="tab-icon" />}
               {id === CLOCKS_TAB && <Globe2 size={13} className="tab-icon" />}
+              {id === COUNTDOWNS_TAB && <Hourglass size={13} className="tab-icon" />}
               {id === SCREENS_TAB && <Monitor size={13} className="tab-icon" />}
+              {id === MIXER_TAB && <SlidersVertical size={13} className="tab-icon" />}
               {id === DOWNLOADER_TAB && <CloudDownload size={13} className="tab-icon" />}
               {id === STUDIO_TAB && <Clapperboard size={13} className="tab-icon" />}
               {id === CLIPS_TAB && <Scissors size={13} className="tab-icon" />}

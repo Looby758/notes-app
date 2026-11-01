@@ -29,7 +29,9 @@ import {
   COMICS_TAB,
   MINESWEEPER_TAB,
   CLOCKS_TAB,
+  COUNTDOWNS_TAB,
   SCREENS_TAB,
+  MIXER_TAB,
   DOWNLOADER_TAB,
   STUDIO_TAB,
   CLIPS_TAB,
@@ -68,7 +70,9 @@ import VideoDownloaderPage from '../Downloader/VideoDownloaderPage'
 import SudokuPage from '../Sudoku/SudokuPage'
 import ComicsPage from '../Comics/ComicsPage'
 import WorldClocksPage from '../Clocks/WorldClocksPage'
+import CountdownsPage from '../Countdowns/CountdownsPage'
 import ScreensPage from '../Screens/ScreensPage'
+import MixerPage from '../Mixer/MixerPage'
 import StudioPage from '../Studio/StudioPage'
 import ClipsPage from '../Clips/ClipsPage'
 import SoundboardPage from '../Soundboard/SoundboardPage'
@@ -204,7 +208,9 @@ export default function Pane({ pane }: { pane: string }) {
         {active === COMICS_TAB && <ComicsPage />}
         {active === MINESWEEPER_TAB && <MinesweeperPage />}
         {active === CLOCKS_TAB && <WorldClocksPage />}
+        {active === COUNTDOWNS_TAB && <CountdownsPage />}
         {active === SCREENS_TAB && <ScreensPage />}
+        {active === MIXER_TAB && <MixerPage />}
         {active === DOWNLOADER_TAB && <VideoDownloaderPage />}
         {active === STUDIO_TAB && <StudioPage />}
         {active === CLIPS_TAB && <ClipsPage />}

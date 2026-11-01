@@ -199,6 +199,7 @@ const api: NotesApi = {
   comicsAddFolder: () => ipcRenderer.invoke('comics:addFolder'),
   comicsRemove: (id) => ipcRenderer.invoke('comics:remove', id),
   comicsOpen: (id) => ipcRenderer.invoke('comics:open', id),
+  comicsClose: (id) => ipcRenderer.invoke('comics:close', id),
   comicsProgress: (id, page, offset, finished) => ipcRenderer.invoke('comics:progress', id, page, offset, finished),
   comicsResetProgress: (id) => ipcRenderer.invoke('comics:resetProgress', id),
   comicsTurned: (pages) => ipcRenderer.invoke('comics:turned', pages),
@@ -258,6 +259,22 @@ const api: NotesApi = {
   videoSubtitles: (path, source) => ipcRenderer.invoke('video:subtitles', path, source),
   videoKeyframe: (path, at, fileStart) => ipcRenderer.invoke('video:keyframe', path, at, fileStart),
   stopVideoStream: (session) => ipcRenderer.invoke('video:stop', session),
+  releaseVideo: (path) => ipcRenderer.invoke('video:release', path),
+  releaseFile: (path) => ipcRenderer.invoke('files:release', path),
+  popOutVideo: (path) => ipcRenderer.invoke('videoWindow:open', path),
+  videoWindowCurrent: () => ipcRenderer.invoke('videoWindow:current'),
+  videoWindowShowing: (path) => ipcRenderer.send('videoWindow:showing', path),
+  popInVideo: (path) => ipcRenderer.invoke('videoWindow:popIn', path),
+  onVideoWindow: (fn) => {
+    const play = (_e: Electron.IpcRendererEvent, path: string): void => fn('play', path)
+    const popIn = (_e: Electron.IpcRendererEvent, path: string): void => fn('popIn', path)
+    ipcRenderer.on('videoWindow:play', play)
+    ipcRenderer.on('videoWindow:popIn', popIn)
+    return () => {
+      ipcRenderer.removeListener('videoWindow:play', play)
+      ipcRenderer.removeListener('videoWindow:popIn', popIn)
+    }
+  },
   videoInVault: (path) => ipcRenderer.invoke('video:inVault', path),
   pickVideoFile: (kind, near) => ipcRenderer.invoke('video:pick', kind, near),
   monitorsGet: () => ipcRenderer.invoke('monitors:get'),
@@ -270,6 +287,9 @@ const api: NotesApi = {
     ipcRenderer.on('monitors:changed', handler)
     return () => ipcRenderer.removeListener('monitors:changed', handler)
   },
+  mixerGet: () => ipcRenderer.invoke('mixer:get'),
+  mixerVolume: (id, volume) => ipcRenderer.invoke('mixer:volume', id, volume),
+  mixerMute: (id, muted) => ipcRenderer.invoke('mixer:mute', id, muted),
   soundboardGet: () => ipcRenderer.invoke('soundboard:get'),
   soundboardPick: () => ipcRenderer.invoke('soundboard:pick'),
   soundboardAddFiles: (paths) => ipcRenderer.invoke('soundboard:add-files', paths),
@@ -516,6 +536,7 @@ const api: NotesApi = {
   shareCancelPairing: () => ipcRenderer.invoke('share:cancelPairing'),
   shareUnpair: () => ipcRenderer.invoke('share:unpair'),
   shareAskAccessibility: () => ipcRenderer.invoke('share:askAccessibility'),
+  shareResetAccessibility: () => ipcRenderer.invoke('share:resetAccessibility'),
   shareSendFiles: (paths) => ipcRenderer.invoke('share:sendFiles', paths),
   onShareReceived: (callback) => on('share:received', callback),
   onShareOpenSettings: (callback) => on('share:openSettings', callback),
@@ -571,6 +592,7 @@ const api: NotesApi = {
   trashSafeOriginals: (paths) => ipcRenderer.invoke('safe:trashOriginals', paths),
   saveSafeCopy: (name, data) => ipcRenderer.invoke('safe:saveCopy', name, data),
   writeSketch: (path, svg) => ipcRenderer.invoke('fs:writeSketch', path, svg),
+  writePicture: (path, data) => ipcRenderer.invoke('fs:writePicture', path, data),
   writeSheet: (path, data) => ipcRenderer.invoke('fs:writeSheet', path, data),
   saveAttachment: (folder, name, data) => ipcRenderer.invoke('fs:saveAttachment', folder, name, data),
   pickAttachment: (folder, imagesOnly) => ipcRenderer.invoke('fs:pickAttachment', folder, imagesOnly),

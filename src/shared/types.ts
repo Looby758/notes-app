@@ -7,6 +7,7 @@ import type { Sheet } from './sheet'
 import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
 import type { LocalLibrary } from './localMusic'
+import type { MixerState } from './mixer'
 import type { MonitorAction, MonitorSaved, MonitorSetting, MonitorsStatus, MonitorTarget } from './monitors'
 import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
 import type { DiscordStatus } from './discord'
@@ -47,6 +48,8 @@ export interface Settings {
   /** The pop-out window (any app, floating on top): where it was left, and how see-through it was. */
   popoutWindow?: WindowBounds
   popoutOpacity?: number
+  /** The video player's own window ("Pop out"): where it was left. */
+  videoWindow?: WindowBounds
   /** The paired phone's link (its token, and the port it was on), so the phone reconnects by itself. */
   phoneToken?: string
   phonePort?: number
@@ -60,6 +63,8 @@ export interface Settings {
   camPort?: number
   camQuality?: 'sd' | 'hd'
   camFill?: boolean
+  /** Mac Accessibility: the Orbit version that last had it working, and the one we last showed macOS's prompt for. */
+  accessibility?: { workedIn?: string; askedIn?: string }
 }
 
 /** How the phone webcam is doing, for its window in Orbit. */
@@ -116,6 +121,11 @@ export interface ShareStatus {
   using: 'here' | 'there' | 'controlled'
   /** Mac: Orbit is allowed to move the pointer (Accessibility). Always true on Windows. */
   accessibility: boolean
+  /**
+   * Mac: Accessibility is still off after you were asked, or after an update: macOS is most likely
+   * holding the permission for an older copy of Orbit, which has to be removed and added again.
+   */
+  accessibilityStale?: boolean
   error: string
 }
 
@@ -697,6 +707,20 @@ export interface NotesApi {
   videoKeyframe(path: string, at: number, fileStart: number): Promise<number>
   /** Stops a page's live video stream. */
   stopVideoStream(session: string): Promise<void>
+  /** The video player closed this video: everything reading it stops, so it can be deleted or moved. */
+  releaseVideo(path: string): Promise<void>
+  /** A viewer closed: Orbit lets go of this file (a full path, or one in the notes folder). */
+  releaseFile(path: string): Promise<void>
+  /** Plays a video in the video player's own window, which can go full screen while Orbit carries on. */
+  popOutVideo(path: string): Promise<void>
+  /** In the video window: the video it was opened with. */
+  videoWindowCurrent(): Promise<string | null>
+  /** In the video window: tells Orbit which video it's showing now. */
+  videoWindowShowing(path: string | null): void
+  /** In the video window: hands the video back to the player tab and closes. */
+  popInVideo(path: string): Promise<void>
+  /** In the video window: Orbit asked it to play another video. In the notes window: a video coming back from it. */
+  onVideoWindow(fn: (event: 'play' | 'popIn', path: string) => void): () => void
   /** The full path of a file in the notes folder. */
   videoInVault(path: string): Promise<string>
   /** Asks for a video, or subtitles (starting beside `near`); null if cancelled. */
@@ -716,6 +740,12 @@ export interface NotesApi {
   /** Saves screen names, input names and hotkeys. */
   monitorsSave(saved: MonitorSaved): Promise<MonitorsStatus>
   onMonitorsChanged(callback: (status: MonitorsStatus) => void): () => void
+  // Volume mixer (main/mixer.ts): a volume for each app, and the whole computer's
+  /** Every app making sound, with its volume and how loud it is now. */
+  mixerGet(): Promise<MixerState>
+  /** Sets an app's volume (0 to 100); 'master' is the whole computer. False if it didn't take. */
+  mixerVolume(id: string, volume: number): Promise<boolean>
+  mixerMute(id: string, muted: boolean): Promise<boolean>
   // Soundboard (main/soundboard.ts; the sound itself is played in lib/soundboard.ts)
   soundboardGet(): Promise<SoundboardStatus>
   /** Asks for sound files and adds a button for each. */
@@ -1011,6 +1041,8 @@ export interface NotesApi {
   shareCancelPairing(): Promise<void>
   shareUnpair(): Promise<void>
   shareAskAccessibility(): Promise<boolean>
+  /** Mac: clears macOS's (stale) Accessibility entry for Orbit, then asks again. False if it couldn't. */
+  shareResetAccessibility(): Promise<boolean>
   shareSendFiles(paths: string[]): Promise<void>
   /** A file came over from the other computer (it's in Downloads). */
   onShareReceived(callback: (info: { title: string; path: string }) => void): () => void
@@ -1071,6 +1103,8 @@ export interface NotesApi {
   /** Saves an unlocked copy where you choose. Resolves false if cancelled. */
   saveSafeCopy(name: string, data: Uint8Array): Promise<boolean>
   /** Saves pasted/dropped file data into a vault folder; returns the new file's path. */
+  /** Saves an edited picture (.png, .jpg or .webp) over the file. */
+  writePicture(path: string, data: Uint8Array): Promise<void>
   /** Saves an edited spreadsheet (.xlsx, .xlsm, .csv or .tsv) over the file. */
   writeSheet(path: string, data: Uint8Array): Promise<void>
   saveAttachment(folder: string, name: string, data: Uint8Array): Promise<string>
@@ -1109,6 +1143,8 @@ export interface NotesApi {
   comicsRemove(id: string): Promise<ComicShelf>
   /** Gets a comic ready to read (the first time, a RAR is unpacked: see onComicsPreparing). */
   comicsOpen(id: string): Promise<ComicOpened>
+  /** The reader closed this comic: its file is let go of. */
+  comicsClose(id: string): Promise<void>
   comicsProgress(id: string, page: number, offset: number, finished?: boolean): Promise<void>
   comicsResetProgress(id: string): Promise<ComicShelf>
   /** Counts pages turned today; returns today's total. */

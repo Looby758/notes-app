@@ -43,13 +43,18 @@ export function listRar(path: string, password?: string): Promise<ArchiveEntry[]
   return inTurn(async () => {
     try {
       const extractor = await createExtractorFromFile({ filepath: path, password })
-      return [...extractor.getFileList().fileHeaders].map((h) => ({
-        name: h.name.replace(/\\/g, '/'),
-        size: h.unpSize,
-        packedSize: h.packSize,
-        isDir: h.flags.directory,
-        encrypted: h.flags.encrypted
-      }))
+      try {
+        return [...extractor.getFileList().fileHeaders].map((h) => ({
+          name: h.name.replace(/\\/g, '/'),
+          size: h.unpSize,
+          packedSize: h.packSize,
+          isDir: h.flags.directory,
+          encrypted: h.flags.encrypted
+        }))
+      } finally {
+        // Reading the list to its end closes the RAR, but a wrong password stops it part way.
+        closeQuietly(extractor)
+      }
     } catch (err) {
       throw explain(err, password)
     }
@@ -76,7 +81,12 @@ export function extractRar(path: string, dest: string, opts: RarExtractOptions =
     try {
       const counting = await createExtractorFromFile({ filepath: path, password: opts.password })
       const wanted = (name: string, isDir: boolean): boolean => !isDir && (!opts.only || opts.only(name.replace(/\\/g, '/')))
-      const total = [...counting.getFileList().fileHeaders].filter((h) => wanted(h.name, h.flags.directory)).length
+      let total: number
+      try {
+        total = [...counting.getFileList().fileHeaders].filter((h) => wanted(h.name, h.flags.directory)).length
+      } finally {
+        closeQuietly(counting)
+      }
 
       const extractor = await createExtractorFromFile({ filepath: path, password: opts.password, targetPath: dest, filenameTransform: rename })
       const done: string[] = []

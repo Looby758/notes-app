@@ -116,12 +116,36 @@ export default function ShareSettings() {
       </Row>
 
       {status.enabled && status.os === 'mac' && !status.accessibility && (
-        <div className="share-warning">
+        <div className="share-warning" data-accessibility-warning={status.accessibilityStale ? 'stale' : 'off'}>
           <ShieldAlert size={16} />
-          <span>
-            macOS needs to allow Orbit to move the pointer and type. Turn Orbit on in System Settings → Privacy &amp; Security →
-            Accessibility (if it’s already there, turn it off and on again).
-          </span>
+          {status.accessibilityStale ? (
+            <span>
+              If Orbit already shows as switched on in System Settings → Privacy &amp; Security → Accessibility, macOS is holding that
+              permission for an older copy of Orbit (each update counts as a new app to it), so it does nothing. Fix the permission clears
+              the old one so you can switch Orbit on again. Or do it by hand: select Orbit in that list, remove it with −, then add it again
+              with + (it’s in Applications).
+            </span>
+          ) : (
+            <span>
+              macOS needs to allow Orbit to move the pointer and type. Turn Orbit on in System Settings → Privacy &amp; Security →
+              Accessibility.
+            </span>
+          )}
+          {status.accessibilityStale && (
+            <button
+              className="btn btn-primary"
+              onClick={() =>
+                void run(async () => {
+                  if (!(await window.api.shareResetAccessibility())) {
+                    await window.api.shareAskAccessibility()
+                  }
+                })
+              }
+              data-fix-accessibility
+            >
+              Fix the permission
+            </button>
+          )}
           <button className="btn" onClick={() => void run(() => window.api.shareAskAccessibility())}>
             Open the setting
           </button>

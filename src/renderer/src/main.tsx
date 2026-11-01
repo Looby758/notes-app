@@ -5,6 +5,7 @@ import CaptureApp from './components/CaptureApp'
 import YouTubeMini from './components/YouTube/YouTubeMini'
 import MusicMini from './components/Music/MusicMini'
 import PopoutWindow from './components/Popout/PopoutWindow'
+import VideoWindow from './components/Video/VideoWindow'
 import SnipApp from './components/Snip/SnipApp'
 import ShareCapture from './components/Share/ShareCapture'
 import ShareDrop from './components/Share/ShareDrop'
@@ -27,6 +28,8 @@ const isMusic = location.hash === '#music'
 const isSnip = location.hash === '#snip'
 // The pop-out window: any app, live, floating on top (#popout).
 const isPopout = location.hash === '#popout'
+// The video player popped out into a window of its own.
+const isVideo = location.hash === '#video'
 // Mouse sharing's invisible window (holds the mouse while it's on the other computer) and its drop strip.
 const isShareCapture = location.hash === '#share-capture'
 const isShareDrop = location.hash === '#share-drop'
@@ -41,8 +44,8 @@ if (isScreenSend || isScreenView) {
 } else if (isPopout) {
   document.body.classList.add('popout-window')
   loadPrefs().catch(() => undefined)
-} else if (isCapture || isYouTube || isMusic || isSnip) {
-  document.body.classList.add(isCapture ? 'capture-window' : isYouTube ? 'youtube-window' : isSnip ? 'snip-window' : 'music-window')
+} else if (isCapture || isYouTube || isMusic || isSnip || isVideo) {
+  document.body.classList.add(isCapture ? 'capture-window' : isYouTube ? 'youtube-window' : isSnip ? 'snip-window' : isVideo ? 'video-window-body' : 'music-window')
   loadPrefs().catch(() => undefined)
 } else {
   startInterfaceSounds()
@@ -68,6 +71,8 @@ createRoot(document.getElementById('root')!).render(
       <SnipApp />
     ) : isPopout ? (
       <PopoutWindow />
+    ) : isVideo ? (
+      <VideoWindow />
     ) : (
       <App />
     )}

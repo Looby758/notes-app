@@ -1,9 +1,10 @@
 import { BrowserWindow, app, dialog, ipcMain } from 'electron'
 import { spawn, execFile, type ChildProcess } from 'child_process'
-import { createReadStream, existsSync, statSync } from 'fs'
+import { existsSync, statSync } from 'fs'
 import { readdir, readFile, stat } from 'fs/promises'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'path'
 import { Readable } from 'stream'
+import { onRelease, releaseFiles, serveFile } from './fileLocks'
 import {
   SUBTITLE_EXTS,
   VIDEO_EXTS,
@@ -40,12 +41,17 @@ function videoPath(path: unknown): string {
 
 const hasFfmpeg = (): boolean => existsSync(ffmpegPath())
 
-/** Runs ffmpeg to the end and gives back what it wrote (stdout) and said (stderr). */
-function runFfmpeg(args: string[], timeoutMs = 20_000, maxBytes = 32 * 1024 * 1024): Promise<{ out: string; err: string; code: number | null }> {
+/** ffmpeg runs reading a video (looking inside it, reading its subtitles), by the video they read. */
+const reads = new Map<ChildProcess, string>()
+
+/** Runs ffmpeg on `file` to the end and gives back what it wrote (stdout) and said (stderr). */
+function runFfmpeg(file: string, args: string[], timeoutMs = 20_000, maxBytes = 32 * 1024 * 1024): Promise<{ out: string; err: string; code: number | null }> {
   return new Promise((done) => {
-    execFile(ffmpegPath(), args, { windowsHide: true, timeout: timeoutMs, maxBuffer: maxBytes, encoding: 'utf8' }, (error, out, err) =>
+    const child = execFile(ffmpegPath(), args, { windowsHide: true, timeout: timeoutMs, maxBuffer: maxBytes, encoding: 'utf8' }, (error, out, err) => {
+      reads.delete(child)
       done({ out: String(out ?? ''), err: String(err ?? ''), code: error ? ((error as { code?: number }).code ?? 1) : 0 })
-    )
+    })
+    reads.set(child, file)
   })
 }
 
@@ -68,7 +74,7 @@ async function info(path: string): Promise<VideoInfo> {
   let probe = null
   if (hasFfmpeg()) {
     // With no output named, ffmpeg describes the file and stops (with an error code, which is fine).
-    const { err } = await runFfmpeg(['-hide_banner', '-nostdin', '-i', full], 15_000)
+    const { err } = await runFfmpeg(full, ['-hide_banner', '-nostdin', '-i', full], 15_000)
     probe = parseProbe(err)
   }
   return { path: full, name: basename(full), size, probe, subtitleFiles }
@@ -86,7 +92,7 @@ async function subtitles(path: string, source: { stream?: number; file?: string 
   const stream = Math.floor(Number(source?.stream))
   if (!Number.isFinite(stream) || stream < 0) throw new Error('That subtitle track isn’t in this video.')
   // Reading them means reading through the whole file, which takes a few seconds for a film.
-  const { out, err, code } = await runFfmpeg(subtitleArgs(full, stream), 120_000)
+  const { out, err, code } = await runFfmpeg(full, subtitleArgs(full, stream), 120_000)
   if (code !== 0 && !out) {
     logError('video subtitles', err.slice(-500))
     throw new Error('Those subtitles couldn’t be read.')
@@ -98,7 +104,7 @@ async function subtitles(path: string, source: { stream?: number; file?: string 
 async function keyframe(path: string, at: number, fileStart: number): Promise<number> {
   const full = videoPath(path)
   if (!hasFfmpeg() || !(at > 0)) return Math.max(0, at || 0)
-  const { out } = await runFfmpeg(keyframeArgs(full, at), 10_000)
+  const { out } = await runFfmpeg(full, keyframeArgs(full, at), 10_000)
   const k = parseKeyframe(out)
   return k === null ? at : Math.max(0, Math.min(at, k - (Number(fileStart) || 0)))
 }
@@ -106,37 +112,40 @@ async function keyframe(path: string, at: number, fileStart: number): Promise<nu
 // ---------- serving ----------
 
 /** Live ffmpeg streams, by the page's session id: a new one replaces the old (after a seek). */
-const streams = new Map<string, ChildProcess>()
+const streams = new Map<string, { child: ChildProcess; file: string }>()
 
-function stopStream(session: string): void {
-  const child = streams.get(session)
-  if (child) {
-    streams.delete(session)
-    child.kill()
-  }
+/** Waits (briefly) for ffmpeg to really be gone, so the video it was reading is free. */
+function ended(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve()
+  return new Promise((done) => {
+    const t = setTimeout(done, 1500)
+    child.once('exit', () => (clearTimeout(t), done()))
+  })
 }
 
-const TYPES: Record<string, string> = { mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', mkv: 'video/x-matroska', ogv: 'video/ogg' }
+function stopStream(session: string): Promise<void> {
+  const s = streams.get(session)
+  if (!s) return Promise.resolve()
+  streams.delete(session)
+  s.child.kill()
+  return ended(s.child)
+}
+
+// Closing the player, or deleting or moving the video in Orbit, stops everything reading it.
+onRelease(async (test) => {
+  const stopping: Promise<void>[] = []
+  for (const [session, s] of streams) if (test(s.file)) stopping.push(stopStream(session))
+  for (const [child, file] of reads) {
+    if (!test(file)) continue
+    reads.delete(child)
+    child.kill()
+    stopping.push(ended(child))
+  }
+  await Promise.all(stopping)
+})
 
 /** The file itself, in pieces as the window asks for them (that's what lets it jump around a film). */
-export function fileResponse(full: string, range: string | null): Response {
-  const size = statSync(full).size
-  const type = TYPES[full.slice(full.lastIndexOf('.') + 1).toLowerCase()] ?? 'application/octet-stream'
-  const m = range ? /^bytes=(\d*)-(\d*)$/.exec(range.trim()) : null
-  let start = 0
-  let end = size - 1
-  if (m && (m[1] || m[2])) {
-    if (m[1]) {
-      start = Number(m[1])
-      if (m[2]) end = Math.min(size - 1, Number(m[2]))
-    } else start = Math.max(0, size - Number(m[2]))
-    if (start >= size || start > end) return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } })
-  }
-  const body = Readable.toWeb(createReadStream(full, { start, end })) as unknown as ReadableStream<Uint8Array>
-  const headers: Record<string, string> = { 'Content-Type': type, 'Content-Length': String(end - start + 1), 'Accept-Ranges': 'bytes' }
-  if (!m) return new Response(body, { status: 200, headers })
-  return new Response(body, { status: 206, headers: { ...headers, 'Content-Range': `bytes ${start}-${end}/${size}` } })
-}
+export const fileResponse = (full: string, range: string | null): Response => serveFile(full, range)
 
 /** Answers vault://video/… and vault://videostream/… for the window. */
 export async function videoResponse(url: URL, request: Request): Promise<Response> {
@@ -153,13 +162,13 @@ export async function videoResponse(url: URL, request: Request): Promise<Respons
   const start = Number(url.searchParams.get('start')) || 0
   const audio = Number(url.searchParams.get('audio')) || 0
   const session = url.searchParams.get('s') || 'default'
-  stopStream(session)
+  void stopStream(session)
   const child = spawn(ffmpegPath(), streamArgs(full, { mode, start, audio }), { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
-  streams.set(session, child)
+  streams.set(session, { child, file: full })
   let log = ''
   child.stderr.on('data', (chunk: Buffer) => (log = (log + chunk.toString()).slice(-4000)))
   child.on('close', (code, signal) => {
-    if (streams.get(session) === child) streams.delete(session)
+    if (streams.get(session)?.child === child) streams.delete(session)
     if (code && !signal && log) logError('video stream', log.slice(-600))
   })
   child.on('error', (err) => logError('video stream', err))
@@ -168,8 +177,10 @@ export async function videoResponse(url: URL, request: Request): Promise<Respons
 }
 
 function stopAll(): void {
-  for (const child of streams.values()) child.kill()
+  for (const s of streams.values()) s.child.kill()
   streams.clear()
+  for (const child of reads.keys()) child.kill()
+  reads.clear()
 }
 
 export function setupVideoPlayer(vaultRoot: () => string | null): void {
@@ -177,6 +188,8 @@ export function setupVideoPlayer(vaultRoot: () => string | null): void {
   ipcMain.handle('video:subtitles', (_e, path: string, source: { stream?: number; file?: string }) => subtitles(path, source))
   ipcMain.handle('video:keyframe', (_e, path: string, at: number, fileStart: number) => keyframe(path, Number(at), Number(fileStart)))
   ipcMain.handle('video:stop', (_e, session: string) => stopStream(String(session)))
+  // The player closed (or moved on to another video): let go of this one completely.
+  ipcMain.handle('video:release', (_e, path: unknown) => (typeof path === 'string' && isAbsolute(path) ? releaseFiles(path) : undefined))
   // A file in the notes folder, by its path in there.
   ipcMain.handle('video:inVault', (_e, rel: string) => {
     const root = vaultRoot()
