@@ -1,6 +1,9 @@
 import { clipboard, ipcMain, type BrowserWindow } from 'electron'
 import type { IncomingMessage, ServerResponse } from 'http'
+import { createReadStream } from 'fs'
+import { stat } from 'fs/promises'
 import { basename } from 'path'
+import { contentDisposition } from '@shared/phoneLink'
 import type { DeckButton, PhoneEvent, PhonePairing, PhoneScreen } from '@shared/types'
 import { endSession, lanAddress, newToken, openSession } from './phoneLink'
 import { phoneAppHtml } from './phoneApp'
@@ -32,7 +35,52 @@ let offMusic: (() => void) | null = null
 let deck: DeckButton[] = []
 let screenData: PhoneScreen | null = null
 
-const toWindow = (event: PhoneEvent): void => getWindow()?.webContents.send('phone:event', event)
+const toWindow = (event: PhoneEvent): void => {
+  getWindow()?.webContents.send('phone:event', event)
+  if (event.type === 'connected') for (const fn of countListeners) fn(event.count)
+}
+const countListeners = new Set<(count: number) => void>()
+
+/** Hears the phone page opening and closing (how many are open). */
+export function onPhoneCount(fn: (count: number) => void): () => void {
+  countListeners.add(fn)
+  return () => countListeners.delete(fn)
+}
+
+/** Whether the phone has the Orbit page open now (so files can be dropped to it). */
+export const phoneConnected = (): boolean => clients.size > 0
+
+/** Files offered to the phone: it downloads each from its own address, for a while. */
+const offered = new Map<string, { path: string; name: string; size: number; timer: ReturnType<typeof setTimeout> }>()
+
+/** Sends files to the phone: it shows them with a Save button each. */
+export async function offerToPhone(paths: string[]): Promise<number> {
+  if (!current || clients.size === 0) throw new Error('Open the Orbit page on your phone first (scan the QR code in Phone).')
+  const items: { name: string; size: number; url: string }[] = []
+  for (const path of paths.slice(0, 50)) {
+    const info = await stat(path).catch(() => null)
+    if (!info?.isFile()) continue
+    const id = newToken()
+    const name = basename(path)
+    // Half an hour to save it, then the address stops working.
+    const timer = setTimeout(() => offered.delete(id), 30 * 60_000)
+    offered.set(id, { path, name, size: info.size, timer })
+    items.push({ name, size: info.size, url: `/s/${current.token}/get/${id}` })
+  }
+  if (!items.length) throw new Error('Only files can go to the phone (not folders).')
+  broadcast({ type: 'incoming', items })
+  return items.length
+}
+
+function serveOffered(req: IncomingMessage, res: ServerResponse, id: string): void {
+  const item = offered.get(id)
+  if (!item) return json(res, 404, { error: 'That file isn’t offered any more. Send it again from Orbit.' })
+  res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': item.size, 'Content-Disposition': contentDisposition(item.name, false) })
+  if (req.method === 'HEAD') return void res.end()
+  const stream = createReadStream(item.path)
+  stream.on('error', () => res.destroy())
+  stream.pipe(res)
+}
 
 function broadcast(data: unknown): void {
   const line = `data: ${JSON.stringify(data)}\n\n`
@@ -140,6 +188,8 @@ async function handle(req: IncomingMessage, res: ServerResponse, rest: string, b
     return void res.end(phoneAppHtml(base))
   }
   if (req.method === 'GET' && rest === '/events') return connect(req, res)
+  const get = /^\/get\/([A-Za-z0-9_-]{22})$/.exec(rest)
+  if (get && (req.method === 'GET' || req.method === 'HEAD')) return serveOffered(req, res, get[1])
   if (req.method !== 'POST') return json(res, 404, { error: 'Not found' })
   try {
     if (rest === '/cmd') {
@@ -188,6 +238,8 @@ async function pair(fresh = false): Promise<PhonePairing> {
 
 function forget(): void {
   if (current) endSession(current.token)
+  for (const item of offered.values()) clearTimeout(item.timer)
+  offered.clear()
   current = null
   for (const res of clients) res.end()
   clients.clear()

@@ -16,6 +16,7 @@ import type { CoversStatus, GamesList, LaunchArt } from './games'
 import type { VideoInfo } from './videoPlayer'
 import type { Theme } from './themes'
 import type { ShareButton, ShareOs, ShareSide } from './mouseShare'
+import type { ScreenInput, ScreenMode, ScreenStatus } from './screenLink'
 
 export interface WindowBounds {
   x?: number
@@ -47,6 +48,8 @@ export interface Settings {
   phonePort?: number
   /** One mouse, two computers: whether it's on, the paired computer, and how it's set up. */
   mouseShare?: ShareSaved
+  /** Screens between the two computers: which of this computer's screens goes on the other one ('' = worked out). */
+  screenLink?: { extendDisplay?: string }
   /** The phone webcam: whether it's on, its https link (token and port), and how the picture is made. */
   camOn?: boolean
   camToken?: string
@@ -110,6 +113,24 @@ export interface ShareStatus {
   /** Mac: Orbit is allowed to move the pointer (Accessibility). Always true on Windows. */
   accessibility: boolean
   error: string
+}
+
+/** What a screen window is for (see main/screenLink.ts). `sourceId` etc. are for the sending side. */
+export interface ScreenSetup {
+  role: 'send' | 'view'
+  mode: ScreenMode
+  peerName: string
+  peerOs: ShareOs
+  sourceId?: string
+  width?: number
+  height?: number
+}
+
+/** Somewhere a file can be dropped to send it: the paired computer or the phone. */
+export interface DropTarget {
+  id: 'computer' | 'phone'
+  name: string
+  os?: ShareOs
 }
 
 /** Something done in the invisible window while the mouse is on the other computer. */
@@ -967,6 +988,26 @@ export interface NotesApi {
   shareDropped(paths: string[]): void
   shareDropCancel(): void
   onShareDrop(callback: (info: { name: string; side: ShareSide }) => void): () => void
+  /** Screens between the two computers (see main/screenLink.ts): the Mac as a second screen, and controlling the Mac. */
+  screenStatus(): Promise<ScreenStatus>
+  onScreenStatus(callback: (status: ScreenStatus) => void): () => void
+  screenStart(mode: ScreenMode): Promise<void>
+  screenStop(): Promise<void>
+  screenSetDisplay(id: string): Promise<void>
+  screenInstallVirtual(): Promise<void>
+  /** The screen windows themselves: what they're for, the WebRTC setting up, the mouse and keys. */
+  screenReady(): Promise<ScreenSetup | null>
+  screenSignal(data: unknown): void
+  onScreenSignal(callback: (data: unknown) => void): () => void
+  screenLive(): void
+  screenInput(input: ScreenInput): void
+  screenFailed(reason: string): void
+  screenClose(): void
+  screenFullscreen(): void
+  /** Drop between devices: the paired computer and the phone, while they're there, and sending to them. */
+  dropTargets(): Promise<DropTarget[]>
+  onDropTargets(callback: (targets: DropTarget[]) => void): () => void
+  dropSend(target: DropTarget['id'], paths: string[]): Promise<string>
   /** The phone webcam (Windows): turn it on/off, its status and settings, and a live preview of the phone's frames. */
   camStatus(): Promise<CamStatus>
   camOn(): Promise<CamStatus>
