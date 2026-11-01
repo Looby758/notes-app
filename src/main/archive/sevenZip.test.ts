@@ -22,14 +22,17 @@ beforeEach(async () => {
 })
 afterEach(() => rm(dir, { recursive: true, force: true }))
 
+/** A name 7-Zip could read as a wildcard. Windows doesn't allow * in file names, so it gets brackets there. */
+const ODD = process.platform === 'win32' ? 'ünïcode [star].txt' : 'ünïcode *star*.txt'
+
 /** A small folder of things to pack: two files and a folder with one in it. */
 async function makeFiles(): Promise<string[]> {
   const src = join(dir, 'src')
   await mkdir(join(src, 'Holiday'), { recursive: true })
   await writeFile(join(src, 'notes.txt'), 'hello '.repeat(50))
-  await writeFile(join(src, 'ünïcode *star*.txt'), 'ü')
+  await writeFile(join(src, ODD), 'ü')
   await writeFile(join(src, 'Holiday', 'day 1.txt'), 'beach')
-  return ['notes.txt', 'ünïcode *star*.txt', 'Holiday'].map((n) => join(src, n))
+  return ['notes.txt', ODD, 'Holiday'].map((n) => join(src, n))
 }
 
 const tree = async (at: string, base = ''): Promise<string[]> => {
@@ -48,10 +51,10 @@ describe('7z', () => {
     await createArchive(await makeFiles(), out, '7z')
     expect(await archiveKind(out)).toBe('7z')
     const names = (await listArchive(out)).map((e) => e.name).sort()
-    expect(names).toEqual(['Holiday/', 'Holiday/day 1.txt', 'notes.txt', 'ünïcode *star*.txt'])
+    expect(names).toEqual(['Holiday/', 'Holiday/day 1.txt', 'notes.txt', ODD])
     const dest = join(dir, 'out')
     await extractArchive(out, dest)
-    expect(await tree(dest)).toEqual(['Holiday/', 'Holiday/day 1.txt', 'notes.txt', 'ünïcode *star*.txt'])
+    expect(await tree(dest)).toEqual(['Holiday/', 'Holiday/day 1.txt', 'notes.txt', ODD])
     expect(await readFile(join(dest, 'notes.txt'), 'utf8')).toBe('hello '.repeat(50))
   })
 
@@ -59,8 +62,8 @@ describe('7z', () => {
     const out = join(dir, 'Pack.7z')
     await createArchive(await makeFiles(), out, '7z')
     const dest = join(dir, 'out')
-    await extractArchive(out, dest, { only: (n) => n.includes('*') })
-    expect(await tree(dest)).toEqual(['ünïcode *star*.txt'])
+    await extractArchive(out, dest, { only: (n) => n === ODD })
+    expect(await tree(dest)).toEqual([ODD])
   })
 
   it('locks a 7z with a password, names and all', async () => {
@@ -81,7 +84,7 @@ describe('zip made by 7-Zip', () => {
     await createArchive(await makeFiles(), out, 'zip')
     expect(await archiveKind(out)).toBe('zip')
     const names = (await listArchive(out)).filter((e) => !e.isDir).map((e) => e.name).sort()
-    expect(names).toEqual(['Holiday/day 1.txt', 'notes.txt', 'ünïcode *star*.txt'])
+    expect(names).toEqual(['Holiday/day 1.txt', 'notes.txt', ODD])
   })
 
   it('unpacks a zip with a password through 7-Zip, and says when it’s wrong', async () => {
