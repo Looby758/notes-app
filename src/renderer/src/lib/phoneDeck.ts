@@ -63,6 +63,7 @@ const FEATURE_EMOJI: Record<string, string> = {
   explorer: '🗂️',
   convert: '🔄',
   studio: '🎬',
+  soundboard: '🔊',
   terminal: '⌨️',
   streamer: '🙈',
   webcam: '📷',

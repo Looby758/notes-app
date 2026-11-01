@@ -203,6 +203,25 @@ const api: NotesApi = {
   stopVideoStream: (session) => ipcRenderer.invoke('video:stop', session),
   videoInVault: (path) => ipcRenderer.invoke('video:inVault', path),
   pickVideoFile: (kind, near) => ipcRenderer.invoke('video:pick', kind, near),
+  soundboardGet: () => ipcRenderer.invoke('soundboard:get'),
+  soundboardPick: () => ipcRenderer.invoke('soundboard:pick'),
+  soundboardAddFiles: (paths) => ipcRenderer.invoke('soundboard:add-files', paths),
+  soundboardUpdate: (id, patch) => ipcRenderer.invoke('soundboard:update', id, patch),
+  soundboardSetBoardHotkey: (which, accel) => ipcRenderer.invoke('soundboard:board-hotkey', which, accel),
+  soundboardRemove: (id) => ipcRenderer.invoke('soundboard:remove', id),
+  soundboardMove: (id, to) => ipcRenderer.invoke('soundboard:move', id, to),
+  soundboardOpenLink: (which) => ipcRenderer.invoke('soundboard:open-link', which),
+  soundboardShowFolder: () => ipcRenderer.invoke('soundboard:show-folder'),
+  onSoundboardHotkey: (callback) => {
+    const handler = (_e: unknown, action: Parameters<typeof callback>[0]): void => callback(action)
+    ipcRenderer.on('soundboard:hotkey', handler)
+    return () => ipcRenderer.removeListener('soundboard:hotkey', handler)
+  },
+  onSoundboardChanged: (callback) => {
+    const handler = (_e: unknown, status: Parameters<typeof callback>[0]): void => callback(status)
+    ipcRenderer.on('soundboard:changed', handler)
+    return () => ipcRenderer.removeListener('soundboard:changed', handler)
+  },
 
   startSnip: () => ipcRenderer.invoke('snip:start'),
   snipStatus: () => ipcRenderer.invoke('snip:status'),

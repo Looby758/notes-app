@@ -213,24 +213,58 @@ export function localRepeat(): void {
 }
 
 let analyser: AnalyserNode | null = null
-/** The sound of your own music, for the visualiser (set up the first time it's asked for). */
-export function localAnalyser(): AnalyserNode | null {
-  if (analyser || !audio) return analyser
+let graph: { ctx: AudioContext; source: MediaElementAudioSourceNode } | null = null
+
+/** Your music's sound in Web Audio (an element can only be wired in once, so the visualiser and the soundboard share it). */
+function musicGraph(): { ctx: AudioContext; source: MediaElementAudioSourceNode } | null {
+  if (graph || !audio) return graph
   try {
     const ctx = new AudioContext()
     const source = ctx.createMediaElementSource(audio)
-    analyser = ctx.createAnalyser()
-    analyser.fftSize = 256
-    analyser.smoothingTimeConstant = 0.78
-    source.connect(analyser)
-    analyser.connect(ctx.destination)
+    source.connect(ctx.destination)
+    graph = { ctx, source }
     // Browsers start an AudioContext paused until something's been clicked.
     if (ctx.state === 'suspended') void ctx.resume()
     audio.addEventListener('play', () => ctx.state === 'suspended' && void ctx.resume())
   } catch {
-    analyser = null
+    graph = null
   }
+  return graph
+}
+
+/** The sound of your own music, for the visualiser (set up the first time it's asked for). */
+export function localAnalyser(): AnalyserNode | null {
+  if (analyser) return analyser
+  const g = musicGraph()
+  if (!g) return null
+  analyser = g.ctx.createAnalyser()
+  analyser.fftSize = 256
+  analyser.smoothingTimeConstant = 0.78
+  g.source.connect(analyser)
   return analyser
+}
+
+let musicTap: { dest: MediaStreamAudioDestinationNode; gain: GainNode } | null = null
+
+/**
+ * Your music as a stream, for sending into a voice call (the soundboard's "music into voice chat").
+ * It's taken before the player's volume (the gain undoes it), so the call has its own volume.
+ * Null until a song of your own has been played.
+ */
+export function localMusicStream(): MediaStream | null {
+  if (musicTap) return musicTap.dest.stream
+  const g = musicGraph()
+  if (!g || !audio) return null
+  const gain = g.ctx.createGain()
+  const dest = g.ctx.createMediaStreamDestination()
+  g.source.connect(gain)
+  gain.connect(dest)
+  musicTap = { dest, gain }
+  const el = audio
+  const undoVolume = (): void => void gain.gain.setTargetAtTime(el.volume > 0.02 ? 1 / el.volume : 0, g.ctx.currentTime, 0.02)
+  undoVolume()
+  el.addEventListener('volumechange', undoVolume)
+  return dest.stream
 }
 
 /** Skips to a song further along the queue. */

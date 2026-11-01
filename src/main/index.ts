@@ -43,6 +43,7 @@ import { setupExport } from './exporter'
 import { setupConverter } from './converter'
 import { isAppPage, setupStudio } from './studio'
 import { setupLocalAi } from './localAi'
+import { setupSoundboard, soundFile } from './soundboard'
 import { setupLive } from './live'
 import { explorerFile, setupExplorer } from './explorer'
 import { hold, setupUndoBin } from './undoBin'
@@ -304,6 +305,15 @@ function registerVaultProtocol(): void {
       if (url.host === 'video' || url.host === 'videostream') return await videoResponse(url, request)
       // Comic pages (vault://comic/<id>/<page>) and covers (vault://comiccover/<id>), from the comic shelf.
       if (url.host === 'comic' || url.host === 'comiccover') return await comicResponse(url)
+      // Soundboard clips (vault://sound/<file>), from Orbit's own soundboard folder.
+      if (url.host === 'sound') {
+        const full = soundFile(decodeURIComponent(url.pathname.slice(1)))
+        if (!full) return new Response('Not found', { status: 404 })
+        const res = await net.fetch(pathToFileURL(full).toString(), { headers: request.headers })
+        const headers = new Headers(res.headers)
+        headers.set('Access-Control-Allow-Origin', '*')
+        return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+      }
       // Previews in the file explorer tab (vault://explore/<full path>): pictures, video, sound and PDFs only.
       if (url.host === 'explore') {
         const full = explorerFile(url)
@@ -363,7 +373,9 @@ function createWindow(): BrowserWindow {
       // Chromium's PDF viewer, for PDFs opened from the file list.
       plugins: true,
       // The web browser tab (browser.ts locks each page down as it's created).
-      webviewTag: true
+      webviewTag: true,
+      // Soundboard hotkeys are pressed in a game, not in Orbit, and must still be able to start the sound.
+      autoplayPolicy: 'no-user-gesture-required'
     }
   })
 
@@ -827,7 +839,7 @@ function registerIpc(): void {
 }
 
 /** Only the browser features the app actually uses; everything else (camera, location…) is refused. */
-const ALLOWED_PERMISSIONS = new Set(['clipboard-sanitized-write', 'clipboard-read', 'fullscreen', 'local-fonts'])
+const ALLOWED_PERMISSIONS = new Set(['clipboard-sanitized-write', 'clipboard-read', 'fullscreen', 'local-fonts', 'speaker-selection'])
 
 /**
  * On a Mac, apps should live in Applications. Run from the disk image (or Downloads), macOS gives
@@ -902,6 +914,7 @@ app.whenReady().then(async () => {
   safely('converter', setupConverter)
   safely('studio', setupStudio)
   safely('offline AI', setupLocalAi)
+  safely('soundboard', setupSoundboard)
   safely('live streaming', setupLive)
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
   safely('undo', () => setupUndoBin(() => vault?.root ?? null))

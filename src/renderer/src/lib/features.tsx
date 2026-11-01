@@ -2,6 +2,7 @@ import type { ComponentType } from 'react'
 import type { Prefs } from '@shared/prefs'
 import {
   ArrowRightLeft,
+  AudioLines,
   Clapperboard,
   Cpu,
   Bomb,
@@ -55,6 +56,7 @@ import {
   COMICS_TAB,
   CONVERT_TAB,
   STUDIO_TAB,
+  SOUNDBOARD_TAB,
   EMAIL_TAB,
   EXPLORER_TAB,
   FLASHCARDS_TAB,
@@ -138,6 +140,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
     }
   },
   studio: { icon: Clapperboard, run: () => openSpecialTab(STUDIO_TAB) },
+  soundboard: { icon: AudioLines, run: () => openSpecialTab(SOUNDBOARD_TAB) },
   terminal: { icon: SquareTerminal, run: () => openSpecialTab(TERMINAL_TAB) },
   streamer: { icon: Eye, run: toggleStreamerMode, useActive: () => usePrefs((s) => s.prefs.streamerMode) },
   settings: { icon: Settings, run: () => openSpecialTab(SETTINGS_TAB) }
