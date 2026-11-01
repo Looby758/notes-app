@@ -12,13 +12,13 @@ import { cleanReply, LOCAL_CONTEXT_CHARS } from '@shared/localAi'
 import {
   chunkSections,
   citedNumbers,
-  DEFAULT_PICTURES,
   findImages,
   htmlToSections,
   imageExtension,
   normaliseTitle,
   pageUrl,
   parseWikiAddress,
+  pictureChoice,
   picturesToGet,
   plainTitle,
   searchTerm,
@@ -106,6 +106,7 @@ function loadAll(): void {
   for (const id of readdirSync(root())) {
     try {
       const meta = JSON.parse(readFileSync(join(dirOf(id), 'wiki.json'), 'utf8')) as Meta
+      meta.pictures = pictureChoice(meta.pictures)
       // A download that was going when Orbit closed waits for you to carry on.
       if (meta.status === 'listing' || meta.status === 'pages' || meta.status === 'indexing') meta.status = 'paused'
       const pages = existsSync(join(dirOf(id), 'pages')) ? readdirSync(join(dirOf(id), 'pages')) : []
@@ -272,7 +273,7 @@ async function siteInfo(address: WikiAddress, signal: AbortSignal): Promise<{ na
   }
 }
 
-/** What the download screen shows about a wiki: its name, size, licence and biggest categories. */
+/** What the download screen shows about a wiki: its name, size and licence. */
 export async function checkWiki(input: string): Promise<WikiCheck> {
   const address = parseWikiAddress(input)
   if (!address) throw new Error('That isn’t a Fandom wiki address. Paste one like walkingdead.fandom.com, or any page’s link from the wiki.')
@@ -281,15 +282,7 @@ export async function checkWiki(input: string): Promise<WikiCheck> {
   const timer = setTimeout(() => abort.abort(), 60_000)
   try {
     const site = await siteInfo(address, abort.signal)
-    const c = await api(address, { action: 'query', list: 'allcategories', acprop: 'size|hidden', aclimit: 500, acmin: 5 }, abort.signal).catch(() => null)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const categories = ((c?.query?.allcategories ?? []) as any[])
-      .filter((x) => !x.hidden)
-      .map((x) => ({ name: normaliseTitle(String(x.category ?? x['*'] ?? '')), pages: Number(x.pages ?? x.size) || 0 }))
-      .filter((x) => x.name && x.pages > 0)
-      .sort((a, b) => b.pages - a.pages)
-      .slice(0, 80)
-    return { base: address.base, name: site.name, articles: site.articles, licence: site.licence, categories, already: wikis.has(address.id) }
+    return { base: address.base, name: site.name, articles: site.articles, licence: site.licence, already: wikis.has(address.id) }
   } catch (err) {
     if (abort.signal.aborted) throw new Error('The wiki took too long to answer. Try again in a bit.')
     throw err
@@ -300,15 +293,8 @@ export async function checkWiki(input: string): Promise<WikiCheck> {
 
 // ---------- downloading ----------
 
-function cleanChoice(p: Partial<WikiPictureChoice> | undefined): WikiPictureChoice {
-  return {
-    main: p?.main !== false,
-    categories: Array.isArray(p?.categories) ? p!.categories.map((c) => String(c).slice(0, 200)).slice(0, 200) : DEFAULT_PICTURES.categories
-  }
-}
-
 /** Starts downloading a wiki (or carries on with one already started). */
-export async function addWiki(input: string, pictures: Partial<WikiPictureChoice>): Promise<WikiInfo> {
+export async function addWiki(input: string, pictures: WikiPictureChoice): Promise<WikiInfo> {
   const address = parseWikiAddress(input)
   if (!address) throw new Error('That isn’t a Fandom wiki address.')
   loadAll()
@@ -319,15 +305,15 @@ export async function addWiki(input: string, pictures: Partial<WikiPictureChoice
     await mkdir(join(dirOf(address.id), 'pages'), { recursive: true })
     await mkdir(join(dirOf(address.id), 'img'), { recursive: true })
     w = {
-      meta: { id: address.id, address, name: site.name, base: address.base, mainPage: site.mainPage, licence: site.licence, pictures: cleanChoice(pictures), status: 'listing', total: site.articles, added: Date.now() },
+      meta: { id: address.id, address, name: site.name, base: address.base, mainPage: site.mainPage, licence: site.licence, pictures: pictureChoice(pictures), status: 'listing', total: site.articles, added: Date.now() },
       done: new Set(),
       failed: 0,
       bytes: 0
     }
     wikis.set(address.id, w)
     await saveMeta(w)
-  } else if (pictures) {
-    w.meta.pictures = cleanChoice(pictures)
+  } else {
+    w.meta.pictures = pictureChoice(pictures)
     await saveMeta(w)
   }
   startJob(address.id)
@@ -473,7 +459,7 @@ async function downloadPage(w: Loaded, pageId: number, signal: AbortSignal): Pro
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const categories = ((parsed.categories ?? []) as any[]).filter((c) => !c.hidden).map((c) => normaliseTitle(String(c.category ?? c['*'] ?? '')))
   const images: Record<string, string> = {}
-  for (const url of picturesToGet(findImages(html), categories, w.meta.pictures)) {
+  for (const url of picturesToGet(findImages(html), pictureChoice(w.meta.pictures))) {
     const file = await downloadImage(id, url, signal).catch((err) => {
       if (signal.aborted) throw err
       return null
@@ -722,7 +708,7 @@ export async function wikiAsk(question: string, ids: string[]): Promise<WikiAnsw
 export function setupWiki(): void {
   ipcMain.handle('wiki:list', () => wikiList())
   ipcMain.handle('wiki:check', (_e, address: string) => checkWiki(String(address ?? '').slice(0, 500)))
-  ipcMain.handle('wiki:add', (_e, address: string, pictures: Partial<WikiPictureChoice>) => addWiki(String(address ?? '').slice(0, 500), pictures ?? {}))
+  ipcMain.handle('wiki:add', (_e, address: string, pictures: WikiPictureChoice) => addWiki(String(address ?? '').slice(0, 500), pictureChoice(pictures)))
   ipcMain.handle('wiki:pause', (_e, id: string) => pauseWiki(String(id)))
   ipcMain.handle('wiki:resume', (_e, id: string) => resumeWiki(String(id)))
   ipcMain.handle('wiki:remove', (_e, id: string) => removeWiki(String(id)))

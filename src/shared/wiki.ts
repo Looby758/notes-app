@@ -10,15 +10,21 @@
 
 // ---------- types ----------
 
-/** Which pictures to download. Most wiki pictures aren't useful, so it's up to you. */
-export interface WikiPictureChoice {
-  /** The main picture of each page (the one at the top of its info box). */
-  main: boolean
-  /** Every picture on pages in these categories (e.g. "Characters"). */
-  categories: string[]
-}
+/**
+ * Which pictures to download: none, the main picture of each page (the one at the top of its
+ * info box), or all of them. Kept to three plain choices: the wiki's own category names can give
+ * away the story ("Deceased"), so they're never shown.
+ */
+export type WikiPictureChoice = 'none' | 'main' | 'all'
 
-export const DEFAULT_PICTURES: WikiPictureChoice = { main: true, categories: [] }
+export const DEFAULT_PICTURES: WikiPictureChoice = 'main'
+
+/** A saved choice (older downloads saved { main, categories }). */
+export function pictureChoice(saved: unknown): WikiPictureChoice {
+  if (saved === 'none' || saved === 'main' || saved === 'all') return saved
+  if (saved && typeof saved === 'object' && (saved as { main?: unknown }).main === false) return 'none'
+  return DEFAULT_PICTURES
+}
 
 export type WikiStatus = 'listing' | 'pages' | 'indexing' | 'done' | 'paused' | 'error'
 
@@ -53,8 +59,6 @@ export interface WikiCheck {
   name: string
   articles: number
   licence: { text: string; url: string }
-  /** The biggest categories, for "also every picture on pages in…". */
-  categories: { name: string; pages: number }[]
   /** It's already downloaded (or downloading). */
   already: boolean
 }
@@ -379,10 +383,9 @@ export function findImages(html: string): { all: string[]; main: string | null }
 }
 
 /** Which of a page's pictures to download, by your choice. */
-export function picturesToGet(found: { all: string[]; main: string | null }, categories: string[], choice: WikiPictureChoice): string[] {
-  const wanted = new Set(choice.categories.map((c) => normaliseTitle(c).toLowerCase()))
-  if (wanted.size && categories.some((c) => wanted.has(normaliseTitle(c).toLowerCase()))) return found.all
-  return choice.main && found.main ? [found.main] : []
+export function picturesToGet(found: { all: string[]; main: string | null }, choice: WikiPictureChoice): string[] {
+  if (choice === 'all') return found.all
+  return choice === 'main' && found.main ? [found.main] : []
 }
 
 /** The kind of file a picture is, from its address (Fandom's look like ".../Rick.png/revision/latest/scale-to-width-down/270"). */

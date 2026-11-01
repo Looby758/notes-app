@@ -1159,7 +1159,7 @@ export interface NotesApi {
   onComicsPreparing(callback: (p: ComicPreparing) => void): () => void
   // Wikis (downloaded Fandom wikis, read offline)
   wikiList(): Promise<WikiInfo[]>
-  /** Looks a wiki up before downloading it: its name, size, licence and biggest categories. */
+  /** Looks a wiki up before downloading it: its name, size and licence. */
   wikiCheck(address: string): Promise<WikiCheck>
   /** Starts downloading a wiki (or carries on with one already there). */
   wikiAdd(address: string, pictures: WikiPictureChoice): Promise<WikiInfo>

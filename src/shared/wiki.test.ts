@@ -9,6 +9,7 @@ import {
   normaliseTitle,
   pageUrl,
   parseWikiAddress,
+  pictureChoice,
   picturesToGet,
   searchTerm,
   wikiAskPrompt,
@@ -93,9 +94,15 @@ describe('page text', () => {
   })
   it('picks pictures by your choice', () => {
     const found = { all: ['a', 'b'], main: 'a' }
-    expect(picturesToGet(found, [], { main: true, categories: [] })).toEqual(['a'])
-    expect(picturesToGet(found, [], { main: false, categories: [] })).toEqual([])
-    expect(picturesToGet(found, ['Main_characters'], { main: false, categories: ['Main characters'] })).toEqual(['a', 'b'])
+    expect(picturesToGet(found, 'main')).toEqual(['a'])
+    expect(picturesToGet(found, 'none')).toEqual([])
+    expect(picturesToGet(found, 'all')).toEqual(['a', 'b'])
+  })
+  it('reads older saved picture choices', () => {
+    expect(pictureChoice({ main: true, categories: ['Characters'] })).toBe('main')
+    expect(pictureChoice({ main: false, categories: [] })).toBe('none')
+    expect(pictureChoice('all')).toBe('all')
+    expect(pictureChoice(undefined)).toBe('main')
   })
   it('decodes entities', () => {
     expect(decodeEntities('&lt;b&gt; &#39;hi&#x27; &rsquo; &bogus;')).toBe("<b> 'hi' ’ &bogus;")

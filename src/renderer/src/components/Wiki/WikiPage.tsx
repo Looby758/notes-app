@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react'
 import { ArrowLeft, ArrowRight, BookOpen, Brain, Download, House, Library, Pause, Play, Search, Trash2, X } from 'lucide-react'
-import { bytesText, DEFAULT_PICTURES, pageUrl, type WikiAnswer, type WikiCheck, type WikiHit, type WikiInfo, type WikiPageView } from '@shared/wiki'
+import { bytesText, DEFAULT_PICTURES, pageUrl, type WikiAnswer, type WikiCheck, type WikiHit, type WikiInfo, type WikiPageView, type WikiPictureChoice } from '@shared/wiki'
 import { goWiki, useWiki, wikiBack, wikiForward, type WikiPlace } from '../../store/wiki'
 import { notify } from '../../store/notify'
 import { openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
@@ -107,13 +107,17 @@ function WikiCard({ wiki: w }: { wiki: WikiInfo }) {
   )
 }
 
+const PICTURE_CHOICES: { value: WikiPictureChoice; name: string; blurb: string }[] = [
+  { value: 'none', name: 'No pictures', blurb: 'The smallest download.' },
+  { value: 'main', name: 'The main picture of each page', blurb: 'Like a character’s photo at the top of their page.' },
+  { value: 'all', name: 'All pictures', blurb: 'Much bigger, and most aren’t needed.' }
+]
+
 function AddWiki() {
   const [address, setAddress] = useState('')
   const [checking, setChecking] = useState(false)
   const [check, setCheck] = useState<WikiCheck | null>(null)
-  const [main, setMain] = useState(DEFAULT_PICTURES.main)
-  const [cats, setCats] = useState<string[]>([])
-  const [filter, setFilter] = useState('')
+  const [pictures, setPictures] = useState<WikiPictureChoice>(DEFAULT_PICTURES)
   const [starting, setStarting] = useState(false)
 
   const look = async (e?: FormEvent): Promise<void> => {
@@ -123,8 +127,7 @@ function AddWiki() {
     setCheck(null)
     try {
       setCheck(await window.api.wikiCheck(address))
-      setCats([])
-      setMain(true)
+      setPictures(DEFAULT_PICTURES)
     } catch (err) {
       notify(err)
     } finally {
@@ -136,7 +139,7 @@ function AddWiki() {
     if (!check) return
     setStarting(true)
     try {
-      await window.api.wikiAdd(check.base, { main, categories: cats })
+      await window.api.wikiAdd(check.base, pictures)
       setCheck(null)
       setAddress('')
     } catch (err) {
@@ -145,13 +148,6 @@ function AddWiki() {
       setStarting(false)
     }
   }
-
-  const shown = useMemo(() => {
-    const f = filter.trim().toLowerCase()
-    return (check?.categories ?? []).filter((c) => !f || c.name.toLowerCase().includes(f))
-  }, [check, filter])
-
-  const tick = (name: string, on: boolean): void => setCats((c) => (on ? [...c, name] : c.filter((x) => x !== name)))
 
   return (
     <section className="wiki-add">
@@ -177,23 +173,11 @@ function AddWiki() {
           </p>
 
           <h4>Pictures</h4>
-          <p className="screens-note">Pictures take up the most space, and most aren’t needed. Choose which to download.</p>
-          <label className="wiki-tick">
-            <input type="checkbox" checked={main} onChange={(e) => setMain(e.target.checked)} /> The main picture of each page (the one in its info box)
-          </label>
-          {check.categories.length > 0 && (
-            <>
-              <p className="wiki-tick-head">Also every picture on pages in:</p>
-              {check.categories.length > 12 && <input className="text-input wiki-cat-filter" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Find a category" />}
-              <div className="wiki-cats">
-                {shown.map((c) => (
-                  <label key={c.name} className="wiki-tick">
-                    <input type="checkbox" checked={cats.includes(c.name)} onChange={(e) => tick(c.name, e.target.checked)} /> {c.name} <span className="wiki-faint">{c.pages.toLocaleString()} pages</span>
-                  </label>
-                ))}
-              </div>
-            </>
-          )}
+          {PICTURE_CHOICES.map((c) => (
+            <label key={c.value} className="wiki-tick">
+              <input type="radio" name="wiki-pictures" checked={pictures === c.value} onChange={() => setPictures(c.value)} /> {c.name} <span className="wiki-faint">{c.blurb}</span>
+            </label>
+          ))}
           <p className="screens-note">
             Pages download one at a time so the wiki isn’t overloaded, so a big wiki can take a few hours. You can keep using Orbit, read pages as they arrive, and pause: it carries on from where it stopped.
           </p>
