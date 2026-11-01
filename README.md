@@ -124,6 +124,16 @@ Notes can use Claude, made by Anthropic, to help with your notes. It's off until
 
 Nothing is sent unless you press one of these. Then only what's needed goes to Anthropic: the note you're working on, for a question the best-matching notes, or in Chat the conversation so far. Locked notes are never sent. The key is stored encrypted, like calendar sign-ins, in `ai.json` in the settings folder.
 
+### Offline AI (optional download)
+
+The AI helper can also run on your own computer, with no internet and nothing sent anywhere. It isn't installed with Orbit: get it from **Settings → AI helper → Offline AI** (or *Offline AI* in the launcher). Pick a model (**Smart**, Qwen3 14B, about 9 GB, for graphics cards with 12 GB or more; or **Quick**, Qwen3 8B, about 5 GB) and press **Download**. It downloads the [llama.cpp](https://github.com/ggml-org/llama.cpp) engine (the NVIDIA CUDA build on Windows with an NVIDIA card, Vulkan for other cards, Metal on Apple Silicon Macs) and the model from Hugging Face, checks both against the SHA-256 their site publishes, and keeps them in `local-ai` in the settings folder. A paused download carries on where it stopped. **Remove** deletes it all.
+
+- Under **Which AI to use**, pick the offline AI or Claude for summaries, tidy-ups, Ask everything, Chat and Ctrl+K's sentence reader. Reading handwriting in sketches always uses Claude.
+- An offline answer says so, with an **Ask Claude online** button. When the offline AI thinks a question is too hard for it, it says so and the button stands out. Orbit never goes online by itself.
+- **Money:** when you import a statement, *Sort them* puts each payment in a category with the offline AI (shops you've picked a category for before keep it). *Ask about your money* on the Money page answers privately with the offline AI. Bank details never leave the computer.
+- **Dictionary:** right-click a word → *Meaning*, then *Explain it as it's used here* for what it means in that sentence.
+- It's loaded into the graphics card only when something asks it a question, and unloaded after 10 quiet minutes (or with *Unload now*). While a game from the Games page is running it stays unloaded, so the game gets the whole card (switch that off in Settings if you like).
+
 ## Themes from a file
 
 Besides the built-in themes, Notes can wear themes that don't come with the app. A theme file (`.notestheme`) can change the colours, fonts, the pictures behind each part of the app, the loading screen, the icon on starred notes and the app icon. In **Settings → Appearance**, press **Import a theme…** and pick the file; it shows up with the other themes. Hover over it and press **×** to remove it. Importing a newer copy of the same theme replaces the old one.

@@ -1,7 +1,45 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { BookOpen, X } from 'lucide-react'
+import { BookOpen, Cpu, Loader2, X } from 'lucide-react'
 import { POS_NAMES, type DictionaryEntry } from '@shared/dictionary'
+import { sentenceAround } from '@shared/localAi'
 import { menuTarget, replaceMenuWord } from '../lib/dictionary'
+import { errorMessage } from '../lib/paths'
+
+/** The sentence the right-clicked word is in, from the note around it. */
+function targetSentence(): string | null {
+  const t = menuTarget()
+  if (!t) return null
+  const doc = t.view.state.doc
+  const start = Math.max(0, t.from - 1000)
+  const text = doc.sliceString(start, Math.min(doc.length, t.to + 1000))
+  return sentenceAround(text, t.from - start, t.to - start)
+}
+
+/** "In this sentence": the offline AI explains the word as it's used here. Only runs when you press the button. */
+function InContext({ word, sentence }: { word: string; sentence: string }) {
+  const [state, setState] = useState<{ working?: boolean; text?: string; error?: string }>({})
+  const explain = (): void => {
+    setState({ working: true })
+    window.api.aiMeaning(word, sentence).then(
+      (text) => setState({ text }),
+      (err) => setState({ error: errorMessage(err) })
+    )
+  }
+  return (
+    <section className="definition-context" data-definition-context>
+      <h3>In this sentence</h3>
+      {state.text ? (
+        <div data-definition-context-text>{state.text}</div>
+      ) : state.error ? (
+        <div className="setting-warning">{state.error}</div>
+      ) : (
+        <button className="definition-more" disabled={state.working} onClick={explain} title="The offline AI reads this sentence, on this computer" data-definition-explain>
+          {state.working ? <Loader2 size={12} className="spin" /> : <Cpu size={12} />} {state.working ? 'Thinking…' : 'Explain it as it’s used here'}
+        </button>
+      )}
+    </section>
+  )
+}
 
 const FIRST = 6
 const MAX_HEIGHT = 460
@@ -12,6 +50,7 @@ export default function DefinitionCard() {
   const [all, setAll] = useState(false)
   const [at, setAt] = useState({ x: 0, y: 0 })
   const [editable, setEditable] = useState(false)
+  const [sentence, setSentence] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(
@@ -22,6 +61,15 @@ export default function DefinitionCard() {
         setEditable(!!target && !target.view.state.readOnly)
         setAll(false)
         setEntry(e)
+        setSentence(null)
+        // Only offered when the offline AI is here (it never runs until the button is pressed).
+        const words = targetSentence()
+        if (words && words.split(/\s+/).length > 2) {
+          window.api.localAiState().then(
+            (s) => s.state === 'ready' && setSentence(words),
+            () => undefined
+          )
+        }
       }),
     []
   )
@@ -77,6 +125,7 @@ export default function DefinitionCard() {
         </button>
       </header>
       <div className="definition-body">
+        {sentence && <InContext key={`${entry.word}:${sentence}`} word={entry.word} sentence={sentence} />}
         {groups.map((g) => (
           <section key={g.pos}>
             <h3>{POS_NAMES[g.pos]}</h3>

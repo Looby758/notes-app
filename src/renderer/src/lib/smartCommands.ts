@@ -124,7 +124,7 @@ export async function interpretWithAi(text: string): Promise<SmartAction> {
   const raw = (await window.api.aiInterpret(text, aiContext())) as { kind?: string; reason?: string } | null
   if (raw?.kind === 'none') throw new Error(raw.reason || 'That isn’t something Orbit can do yet.')
   const action = validSmart(raw, smartContext())
-  if (!action) throw new Error('Claude’s answer didn’t make sense, so nothing was done.')
+  if (!action) throw new Error('The AI’s answer didn’t make sense, so nothing was done.')
   return action
 }
 

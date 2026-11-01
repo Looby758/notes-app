@@ -273,6 +273,55 @@ export interface AiStatus {
   hasKey: boolean
   /** False if the system can't encrypt the key (it is then not saved). */
   canEncrypt: boolean
+  /** Which AI the AI features use: the offline one on this computer, or Claude online. */
+  use: AiEngine
+  /** Whether the AI features can run now with that choice (a key for Claude, the download for offline). */
+  ready: boolean
+  offline: LocalAiState
+}
+
+/** Where an AI answer comes from: the offline AI on this computer, or Claude online. */
+export type AiEngine = 'offline' | 'online'
+
+/** An answer to a question or chat message. */
+export interface AiReply {
+  text: string
+  /** Answered by the offline AI. */
+  offline: boolean
+  /** The offline AI thinks Claude would answer this better (Orbit offers, never switches by itself). */
+  hard: boolean
+}
+
+/** The offline AI (src/main/localAi.ts): an optional download that runs on this computer's graphics card. */
+export interface LocalAiState {
+  state: 'missing' | 'downloading' | 'ready' | 'unsupported'
+  /** While downloading: which part, and how far (0–1). */
+  stage?: 'engine' | 'model'
+  progress?: number
+  /** Bytes in all, while downloading. */
+  bytes?: number
+  error?: string
+  /** The model installed (or being downloaded), from LOCAL_MODELS. */
+  model?: string
+  /** How it runs: NVIDIA CUDA, Vulkan (any graphics card) or Metal (Mac). */
+  engine?: 'cuda' | 'vulkan' | 'metal'
+  /** In the graphics card's memory right now. */
+  loaded: boolean
+  loading: boolean
+  /** Unloaded because a game is running (it comes back when the game closes). */
+  gamePaused: boolean
+  unloadForGames: boolean
+  /** The graphics card found (or the Mac's memory). */
+  gpu: { name: string; memoryGb: number } | null
+  /** The model suggested for this computer. */
+  suggested: string
+}
+
+/** A bank statement line for the offline AI to sort into a category. */
+export interface AiSortRow {
+  description: string
+  /** Pence: negative is money out. */
+  amount: number
 }
 
 /** A note handed to the AI helper as context for a question. */
@@ -291,6 +340,10 @@ export interface AiAskTurn {
 export interface AiChatMessage {
   role: 'user' | 'assistant'
   text: string
+  /** A reply from the offline AI (not Claude). */
+  offline?: boolean
+  /** The offline AI thought Claude would do better with this one. */
+  hard?: boolean
 }
 
 /** A saved AI chat conversation. */
@@ -683,7 +736,23 @@ export interface NotesApi {
   /** A quick capture is tidied as one list item; a note can get headings and lists. */
   aiTidy(text: string, kind: 'note' | 'capture'): Promise<string>
   /** `extra`: digests of money, calendar and email for Ask everything (lib/askContext.ts). */
-  aiAsk(question: string, notes: AiNote[], history: AiAskTurn[], extra?: AiExtraContext): Promise<string>
+  aiAsk(question: string, notes: AiNote[], history: AiAskTurn[], extra?: AiExtraContext, engine?: AiEngine): Promise<AiReply>
+  /** Offline AI or Claude for the AI features. */
+  aiSetEngine(use: AiEngine): Promise<AiStatus>
+  /** Money tracker: a category id for each statement line (by its number), sorted by the offline AI only. */
+  aiSortMoney(rows: AiSortRow[], categories: { id: string; name: string; income?: boolean }[]): Promise<Record<number, string>>
+  /** The dictionary card: what a word means in its sentence, from the offline AI. */
+  aiMeaning(word: string, sentence: string): Promise<string>
+  // The offline AI
+  localAiState(): Promise<LocalAiState>
+  /** Downloads the engine and a model (resumes a stopped download); resolves when it's done or has failed. */
+  localAiInstall(model: string): Promise<LocalAiState>
+  localAiCancel(): Promise<void>
+  localAiRemove(): Promise<LocalAiState>
+  /** Frees the graphics card now (it loads again the next time it's needed). */
+  localAiUnload(): Promise<void>
+  localAiSetUnloadForGames(on: boolean): Promise<LocalAiState>
+  onLocalAiState(callback: (state: LocalAiState) => void): () => void
   /** Ctrl+K: the action a sentence asks for, as Claude reads it (checked by validSmart before anything runs). */
   aiInterpret(text: string, context: string): Promise<unknown>
   // Games
@@ -720,7 +789,7 @@ export interface NotesApi {
   /** The command line ended (you typed exit, or it closed). */
   onTerminalExit(callback: (code: number) => void): () => void
   /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */
-  aiChat(messages: AiChatMessage[]): Promise<string>
+  aiChat(messages: AiChatMessage[], engine?: AiEngine): Promise<AiReply>
   /** Saved chats, kept in the settings folder on this computer. */
   aiLoadChats(): Promise<AiChat[]>
   aiSaveChats(chats: AiChat[]): Promise<void>

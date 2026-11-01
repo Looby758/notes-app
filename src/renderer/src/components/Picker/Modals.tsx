@@ -3,6 +3,7 @@ import { Command as CommandIcon, FilePlus, LayoutTemplate, Loader2, Sparkles, Wa
 import { useUI } from '../../store/ui'
 import { useVault } from '../../store/vault'
 import { usePrefs } from '../../store/prefs'
+import { refreshAiStatus, useAi, usesOffline } from '../../store/ai'
 import { getNoteText } from '../../store/noteIndex'
 import { commands, shortcutFor } from '../../lib/commands'
 import { fuzzyFilter } from '../../lib/fuzzy'
@@ -159,6 +160,10 @@ function CommandPalette({ close }: { close: () => void }) {
   const [query, setQuery] = useState(() => useUI.getState().paletteQuery)
   const [ai, setAi] = useState<AiState | null>(null)
   const aiAllowed = usePrefs((s) => s.prefs.smartCommandsAi)
+  const offlineAi = useAi((s) => usesOffline(s.status))
+  useEffect(() => {
+    refreshAiStatus().catch(() => undefined)
+  }, [])
   useEffect(() => {
     if (useUI.getState().paletteQuery) useUI.setState({ paletteQuery: '' })
   }, [])
@@ -202,7 +207,7 @@ function CommandPalette({ close }: { close: () => void }) {
             id: 'ask-ai',
             icon: <Sparkles size={14} />,
             label: <>Not sure what you mean. <strong>Ask the AI to work it out?</strong></>,
-            detail: 'Sends just this sentence to Claude',
+            detail: offlineAi ? 'The offline AI reads it, on this computer' : 'Sends just this sentence to Claude',
             run: () => {
               setAi({ text: q, state: 'working' })
               interpretWithAi(q).then(
@@ -215,7 +220,7 @@ function CommandPalette({ close }: { close: () => void }) {
       : []
     // Commands that match well stay above the offer; a long sentence rarely matches one on purpose.
     return matches.length && q.split(/\s+/).length < 3 ? [...top, ...matches, ...ask] : [...top, ...ask, ...matches]
-  }, [query, close, ai, aiAllowed, run])
+  }, [query, close, ai, aiAllowed, offlineAi, run])
 
   return (
     <Picker

@@ -2,7 +2,9 @@ import { app, safeStorage } from 'electron'
 import { readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import Anthropic from '@anthropic-ai/sdk'
-import type { AiAskTurn, AiExtraContext, AiChat, AiChatMessage, AiNote, AiStatus } from '@shared/types'
+import type { AiAskTurn, AiEngine, AiExtraContext, AiChat, AiChatMessage, AiNote, AiReply, AiSortRow, AiStatus } from '@shared/types'
+import { cleanReply, fitTexts, HARD_NOTE, LOCAL_CONTEXT_CHARS, MEANING_SYSTEM, meaningPrompt, MONEY_SORT_SYSTEM, moneySortPrompt, parseMoneySort } from '@shared/localAi'
+import { localAiInstalled, localAiState, localComplete, type LocalMessage } from './localAi'
 
 /**
  * The AI helper: summarise a note, tidy a quick capture, answer questions from your notes and read
@@ -11,6 +13,10 @@ import type { AiAskTurn, AiExtraContext, AiChat, AiChatMessage, AiNote, AiStatus
  * `ai.json` in the settings folder.
  *
  * Nothing is sent anywhere unless you ask: each call below runs only when you press a button.
+ *
+ * With the offline AI downloaded (src/main/localAi.ts), the same features can run on this
+ * computer instead, and do unless you choose Claude in Settings. Offline answers to questions say
+ * when Claude would do better, and Orbit then offers (never switches by itself) to ask Claude.
  */
 
 const MODEL = 'claude-opus-5-5'
@@ -20,6 +26,8 @@ const BASE_URL = process.env.NOTES_ANTHROPIC_BASE_URL
 interface Stored {
   /** Encrypted. */
   apiKey?: string
+  /** Which AI the features use; unset means the offline one once it's downloaded. */
+  use?: AiEngine
 }
 
 let stored: Stored | null = null
@@ -50,8 +58,27 @@ function save(): void {
 const encrypt = (text: string): string => safeStorage.encryptString(text).toString('base64')
 const decrypt = (text: string): string => safeStorage.decryptString(Buffer.from(text, 'base64'))
 
+const using = (): AiEngine => load().use ?? (localAiInstalled() ? 'offline' : 'online')
+
 export function status(): AiStatus {
-  return { hasKey: !!load().apiKey, canEncrypt: safeStorage.isEncryptionAvailable() }
+  const hasKey = !!load().apiKey
+  const use = using()
+  return { hasKey, canEncrypt: safeStorage.isEncryptionAvailable(), use, ready: use === 'offline' ? localAiInstalled() : hasKey, offline: localAiState() }
+}
+
+export function setEngine(use: AiEngine): AiStatus {
+  load().use = use === 'offline' ? 'offline' : 'online'
+  save()
+  return status()
+}
+
+/** The engine for a call: the one asked for, or the one chosen in Settings. */
+const engineFor = (asked?: AiEngine): AiEngine => (asked === 'offline' || asked === 'online' ? asked : using())
+
+/** The offline AI's answer, with Anthropic-style messages turned into plain ones. */
+async function askOffline(system: string, messages: { role: 'user' | 'assistant'; content: string }[], maxTokens?: number): Promise<{ text: string; hard: boolean }> {
+  const all: LocalMessage[] = [{ role: 'system', content: system }, ...messages]
+  return cleanReply(await localComplete(all, { maxTokens }))
 }
 
 function getClient(): Anthropic {
@@ -100,7 +127,15 @@ export function clearKey(): AiStatus {
   return status()
 }
 
-async function ask(system: string, messages: Anthropic.Beta.BetaMessageParam[], effort: 'low' | 'medium'): Promise<string> {
+/** Text-only messages run on the offline AI when that's the choice; anything with a picture always goes to Claude. */
+async function ask(system: string, messages: Anthropic.Beta.BetaMessageParam[], effort: 'low' | 'medium', engine?: AiEngine): Promise<string> {
+  if (engineFor(engine) === 'offline' && messages.every((m) => typeof m.content === 'string')) {
+    return (await askOffline(system, messages as { role: 'user' | 'assistant'; content: string }[])).text
+  }
+  return askClaude(system, messages, effort)
+}
+
+async function askClaude(system: string, messages: Anthropic.Beta.BetaMessageParam[], effort: 'low' | 'medium'): Promise<string> {
   let response: Anthropic.Beta.BetaMessage
   try {
     response = await getClient().beta.messages.create({
@@ -149,18 +184,25 @@ export function tidy(text: string, kind: 'note' | 'capture'): Promise<string> {
   return ask(kind === 'capture' ? TIDY_CAPTURE_SYSTEM : TIDY_SYSTEM, [{ role: 'user', content: `<text>\n${text}\n</text>` }], 'low')
 }
 
-const askSystem = (): string => `You answer a person's questions using their own things: notes (in <note> tags) and, when given, digests of their money tracker (<money>), calendar (<calendar>) and email inbox (<email>). Amounts are in pounds.
+const askSystem = (offline = false): string => `You answer a person's questions using their own things: notes (in <note> tags) and, when given, digests of their money tracker (<money>), calendar (<calendar>) and email inbox (<email>). Amounts are in pounds.
 Answer briefly and plainly, from what you're given only. When you use a note, name it as a wiki link with its exact title, like [[Trip plans]]. When you use an email, say who it's from and the date.
-If none of it contains the answer, say so in one sentence and don't guess.
+If none of it contains the answer, say so in one sentence and don't guess.${offline ? `\n${HARD_NOTE}` : ''}
 Today's date is ${new Date().toISOString().slice(0, 10)}.`
 
-export function askNotes(question: string, notes: AiNote[], history: AiAskTurn[], extra: AiExtraContext = {}): Promise<string> {
+export async function askNotes(question: string, notes: AiNote[], history: AiAskTurn[], extra: AiExtraContext = {}, engine?: AiEngine): Promise<AiReply> {
+  const offline = engineFor(engine) === 'offline'
+  if (offline) {
+    // The offline AI reads less at once: the best-matching notes and shorter digests.
+    notes = fitTexts(notes, Math.round(LOCAL_CONTEXT_CHARS * 0.55))
+    history = history.slice(-2)
+  }
+  const extraMax = offline ? 3500 : 30000
   const context = notes.length
     ? notes.map((n) => `<note title="${n.title.replace(/"/g, "'")}">\n${n.text}\n</note>`).join('\n\n')
     : '(No notes matched this question.)'
   let others = ''
   for (const key of ['money', 'calendar', 'email'] as const) {
-    const text = typeof extra?.[key] === 'string' ? extra[key]!.slice(0, 30000) : ''
+    const text = typeof extra?.[key] === 'string' ? extra[key]!.slice(0, extraMax) : ''
     if (text) others += `\n\n<${key}>\n${text}\n</${key}>`
   }
   const messages: Anthropic.Beta.BetaMessageParam[] = []
@@ -168,7 +210,8 @@ export function askNotes(question: string, notes: AiNote[], history: AiAskTurn[]
     messages.push({ role: 'user', content: turn.question }, { role: 'assistant', content: turn.answer })
   }
   messages.push({ role: 'user', content: `<notes>\n${context}\n</notes>${others}\n\n${question}` })
-  return ask(askSystem(), messages, 'medium')
+  if (offline) return { ...(await askOffline(askSystem(true), messages as { role: 'user' | 'assistant'; content: string }[])), offline: true }
+  return { text: await askClaude(askSystem(), messages, 'medium'), offline: false, hard: false }
 }
 
 const chatSystem = (): string => `You are Claude, chatting with someone inside their notes app. Help with whatever they ask: questions, explanations, writing, ideas, planning, maths, code.
@@ -176,13 +219,55 @@ Be clear and friendly, and match the length of your answer to the question. Use 
 You can't see their notes or browse the web here, so if they need something from their notes, suggest the "Ask everything" page.
 Today's date is ${new Date().toISOString().slice(0, 10)}.`
 
-/** The AI chat page: Claude's reply to a conversation that can be about anything. */
-export function chat(messages: AiChatMessage[]): Promise<string> {
-  return ask(
-    chatSystem(),
-    messages.map((m) => ({ role: m.role, content: m.text })),
-    'medium'
+const offlineChatSystem = (): string => `You are Orbit's offline AI, running privately on this person's own computer inside their notes app. Help with whatever they ask: questions, explanations, writing, ideas, planning, maths, code.
+Be clear and friendly, and keep answers fairly short. Use markdown when it makes an answer easier to read.
+You can't see their notes or browse the web here, so if they need something from their notes, suggest the "Ask everything" page.
+${HARD_NOTE}
+Today's date is ${new Date().toISOString().slice(0, 10)}.`
+
+/** The AI chat page: a reply to a conversation that can be about anything. */
+export async function chat(messages: AiChatMessage[], engine?: AiEngine): Promise<AiReply> {
+  const turns = messages.map((m) => ({ role: m.role, content: m.text }))
+  if (engineFor(engine) === 'offline') {
+    // The latest messages that fit, oldest first, starting with one of theirs.
+    const kept = fitTexts([...turns].reverse().map((t) => ({ ...t, text: t.content })), LOCAL_CONTEXT_CHARS * 0.7)
+      .reverse()
+      .map(({ role, text }) => ({ role, content: text }))
+    while (kept.length > 1 && kept[0].role !== 'user') kept.shift()
+    return { ...(await askOffline(offlineChatSystem(), kept, 3000)), offline: true }
+  }
+  return { text: await askClaude(chatSystem(), turns, 'medium'), offline: false, hard: false }
+}
+
+/** Money tracker: sorts statement lines into categories, on the offline AI only (bank details never leave the computer). */
+export async function sortMoney(rows: AiSortRow[], categories: { id: string; name: string; income?: boolean }[]): Promise<Record<number, string>> {
+  if (!localAiInstalled()) throw new Error('Sorting payments needs the offline AI. Get it in Settings → AI helper.')
+  const out: Record<number, string> = {}
+  // In batches, so each answer stays short and in step.
+  for (let at = 0; at < rows.length; at += 40) {
+    const batch = rows.slice(at, at + 40)
+    const reply = await localComplete(
+      [
+        { role: 'system', content: MONEY_SORT_SYSTEM },
+        { role: 'user', content: moneySortPrompt(batch, categories) }
+      ],
+      { maxTokens: 600, temperature: 0 }
+    )
+    for (const [i, id] of Object.entries(parseMoneySort(reply, batch, categories))) out[at + Number(i)] = id
+  }
+  return out
+}
+
+/** The dictionary card: the word as it's used in its sentence, on the offline AI. */
+export async function meaning(word: string, sentence: string): Promise<string> {
+  const reply = await localComplete(
+    [
+      { role: 'system', content: MEANING_SYSTEM },
+      { role: 'user', content: meaningPrompt(word.slice(0, 60), sentence.slice(0, 600)) }
+    ],
+    { maxTokens: 200, temperature: 0.2 }
   )
+  return cleanReply(reply).text
 }
 
 // Chats are kept in the settings folder (not the notes folder), so they stay on this computer.
@@ -211,7 +296,7 @@ Reply with only the text.`
 
 export async function readHandwriting(png: Uint8Array): Promise<string> {
   const image = Buffer.from(png).toString('base64')
-  const text = await ask(
+  const text = await askClaude(
     HANDWRITING_SYSTEM,
     [
       {
@@ -252,10 +337,11 @@ ${context}`
 export async function interpret(text: string, context: string): Promise<unknown> {
   const reply = await ask(interpretSystem(context), [{ role: 'user', content: text }], 'low')
   const json = /\{[\s\S]*\}/.exec(reply)?.[0]
-  if (!json) throw new Error('Claude didn’t understand that one.')
+  const who = using() === 'offline' ? 'The offline AI' : 'Claude'
+  if (!json) throw new Error(`${who} didn’t understand that one.`)
   try {
     return JSON.parse(json)
   } catch {
-    throw new Error('Claude didn’t understand that one.')
+    throw new Error(`${who} didn’t understand that one.`)
   }
 }

@@ -95,7 +95,7 @@ export default function CaptureApp() {
       setUntidied(null)
       setTidying(false)
       setNoCommand(false)
-      window.api.aiStatus().then((s) => setCanTidy(s.hasKey), () => setCanTidy(false))
+      window.api.aiStatus().then((s) => setCanTidy(s.ready), () => setCanTidy(false))
       setDest(usePrefs.getState().prefs.captureRememberTarget ? readStored<Dest | null>(LAST_KEY, null) : null)
       window.api.captureStatus().then(setStatus)
       setTimeout(() => input.current?.focus(), 0)

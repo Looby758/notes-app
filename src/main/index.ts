@@ -22,7 +22,7 @@ import { readFile } from 'fs/promises'
 import * as fsp from 'fs/promises'
 import { basename, extname, isAbsolute, join, relative } from 'path'
 import { pathToFileURL } from 'url'
-import type { AiAskTurn, AiExtraContext, AiChat, AiChatMessage, AiNote, ConfirmOptions, EmailFolder, OutgoingEmail } from '@shared/types'
+import type { AiAskTurn, AiExtraContext, AiChat, AiChatMessage, AiEngine, AiNote, AiSortRow, ConfirmOptions, EmailFolder, OutgoingEmail } from '@shared/types'
 import type { MusicAction } from '@shared/spotify'
 import { normalizePrefs, type Prefs } from '@shared/prefs'
 import { activeThemeId, getTheme } from '@shared/themes'
@@ -42,6 +42,7 @@ import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
 import { setupConverter } from './converter'
 import { isAppPage, setupStudio } from './studio'
+import { setupLocalAi } from './localAi'
 import { setupLive } from './live'
 import { explorerFile, setupExplorer } from './explorer'
 import { hold, setupUndoBin } from './undoBin'
@@ -694,8 +695,18 @@ function registerIpc(): void {
   ipcMain.handle('ai:summarise', (_e, title: string, text: string) => ai.summarise(title, text))
   ipcMain.handle('ai:tidy', (_e, text: string, kind: 'note' | 'capture') => ai.tidy(text, kind === 'capture' ? 'capture' : 'note'))
   ipcMain.handle('ai:interpret', (_e, text: string, context: string) => ai.interpret(String(text).slice(0, 1000), String(context).slice(0, 8000)))
-  ipcMain.handle('ai:ask', (_e, question: string, notes: AiNote[], history: AiAskTurn[], extra?: AiExtraContext) => ai.askNotes(question, notes, history, extra))
-  ipcMain.handle('ai:chat', (_e, messages: AiChatMessage[]) => ai.chat(messages))
+  ipcMain.handle('ai:ask', (_e, question: string, notes: AiNote[], history: AiAskTurn[], extra?: AiExtraContext, engine?: AiEngine) =>
+    ai.askNotes(question, notes, history, extra, engine)
+  )
+  ipcMain.handle('ai:chat', (_e, messages: AiChatMessage[], engine?: AiEngine) => ai.chat(messages, engine))
+  ipcMain.handle('ai:setEngine', (_e, use: AiEngine) => ai.setEngine(use))
+  ipcMain.handle('ai:sortMoney', (_e, rows: AiSortRow[], categories: { id: string; name: string; income?: boolean }[]) =>
+    ai.sortMoney(
+      (Array.isArray(rows) ? rows : []).slice(0, 2000).map((r) => ({ description: String(r?.description ?? ''), amount: Number(r?.amount) || 0 })),
+      (Array.isArray(categories) ? categories : []).map((c) => ({ id: String(c.id), name: String(c.name), income: c.income === true }))
+    )
+  )
+  ipcMain.handle('ai:meaning', (_e, word: string, sentence: string) => ai.meaning(String(word), String(sentence)))
   ipcMain.handle('ai:loadChats', () => ai.loadChats())
   ipcMain.handle('ai:saveChats', (_e, chats: AiChat[]) => ai.saveChats(chats))
   ipcMain.handle('handwriting:read', (_e, png: Uint8Array, reader: 'ai' | 'offline') => (reader === 'ai' ? ai.readHandwriting(png) : readHandwritingOffline(png)))
@@ -890,6 +901,7 @@ app.whenReady().then(async () => {
   safely('export', setupExport)
   safely('converter', setupConverter)
   safely('studio', setupStudio)
+  safely('offline AI', setupLocalAi)
   safely('live streaming', setupLive)
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
   safely('undo', () => setupUndoBin(() => vault?.root ?? null))
