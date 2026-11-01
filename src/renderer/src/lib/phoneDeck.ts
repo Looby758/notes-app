@@ -45,6 +45,7 @@ const FEATURE_EMOJI: Record<string, string> = {
   reading: '📖',
   calendar: '🗓️',
   clocks: '🌍',
+  countdowns: '⏳',
   screens: '🖥️',
   flashcards: '🃏',
   zen: '🌙',

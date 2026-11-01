@@ -1,6 +1,7 @@
 import { allThemes } from './themes'
 import { IS_MAC } from './platform'
 import { cleanClocks, type WorldClock } from './worldClock'
+import { cleanCountdowns, type Countdown } from './countdown'
 
 /**
  * Everything you can customise in Settings. Stored in settings.json under "prefs", which you can
@@ -91,6 +92,8 @@ export interface Prefs {
   homeHidden: string[]
   /** The places on the World clocks page (and its Home box), in your order. */
   worldClocks: WorldClock[]
+  /** The countdowns on the Countdowns page (and its Home box). */
+  countdowns: Countdown[]
   /** Every note opens read-only (links open with a plain click) until you switch back to writing. */
   readingMode: boolean
   /** The file list shows pictures, recordings and other files, not just notes. */
@@ -257,6 +260,7 @@ export const DEFAULT_PREFS: Prefs = {
   homeOrder: [],
   homeHidden: [],
   worldClocks: [],
+  countdowns: [],
   readingMode: false,
   randomIncludeDaily: false,
   showAttachments: true,
@@ -396,7 +400,7 @@ export function cleanFolder(v: unknown, fallback: string): string {
 /** Turns anything (a hand-edited file, an old version) into valid preferences. */
 export function normalizePrefs(raw: unknown): Prefs {
   const input = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
-  const out: Prefs = { ...DEFAULT_PREFS, homeOrder: [], homeHidden: [], worldClocks: [], shortcuts: {} }
+  const out: Prefs = { ...DEFAULT_PREFS, homeOrder: [], homeHidden: [], worldClocks: [], countdowns: [], shortcuts: {} }
 
   for (const key of Object.keys(DEFAULT_PREFS) as (keyof Prefs)[]) {
     const value = input[key]
@@ -453,6 +457,7 @@ export function normalizePrefs(raw: unknown): Prefs {
   out.homeOrder = cleanIds(input.homeOrder)
   out.homeHidden = cleanIds(input.homeHidden)
   out.worldClocks = cleanClocks(input.worldClocks)
+  out.countdowns = cleanCountdowns(input.countdowns)
   for (const k of ['topbarFeatures', 'dockFeatures', 'radialFeatures', 'phoneDeck'] as const) {
     out[k] = input[k] === undefined ? [...DEFAULT_PREFS[k]] : cleanIds(input[k])
   }

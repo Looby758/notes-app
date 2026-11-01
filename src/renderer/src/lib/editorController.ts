@@ -72,6 +72,8 @@ export const COMICS_TAB = 'comics:'
 export const MINESWEEPER_TAB = 'minesweeper:'
 /** Clocks for places around the world (components/Clocks). */
 export const CLOCKS_TAB = 'clocks:'
+/** Big countdown cards (components/Countdowns). */
+export const COUNTDOWNS_TAB = 'countdowns:'
 /** Monitor brightness, contrast and input (components/Screens). */
 export const SCREENS_TAB = 'screens:'
 /** Download a video from a link into the attachments folder (components/Downloader). */
