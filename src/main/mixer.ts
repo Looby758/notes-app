@@ -42,14 +42,28 @@ interface IOrbitPropertyStore {
 }
 [ComImport, Guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 interface IOrbitSessionManager2 {
-  [PreserveSig] int GetAudioSessionControl(IntPtr guid, int flags, out IntPtr control);
-  [PreserveSig] int GetSimpleAudioVolume(IntPtr guid, int flags, out IntPtr volume);
+  // The first two only hold their places in the table; they're never called. GetSimpleAudioVolume
+  // gives the volume of Orbit's own sound, not another app's: each app's comes from its session.
+  [PreserveSig] int Unused1(IntPtr guid, int flags, out IntPtr control);
+  [PreserveSig] int Unused2(IntPtr guid, int flags, out IntPtr volume);
   [PreserveSig] int GetSessionEnumerator(out IOrbitSessionEnumerator sessions);
 }
 [ComImport, Guid("E2F5BB11-0570-40CA-ACDD-3AA01277DEE8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 interface IOrbitSessionEnumerator {
   [PreserveSig] int GetCount(out int n);
-  [PreserveSig] int GetSession(int i, out IOrbitSessionControl2 session);
+  [PreserveSig] int GetSession(int i, out IOrbitSessionControl session);
+}
+[ComImport, Guid("F4B1A599-7266-4319-A8CA-E70ACB11E8CD"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IOrbitSessionControl {
+  [PreserveSig] int GetState(out int state);
+  [PreserveSig] int GetDisplayName([MarshalAs(UnmanagedType.LPWStr)] out string name);
+  [PreserveSig] int SetDisplayName([MarshalAs(UnmanagedType.LPWStr)] string name, ref Guid ctx);
+  [PreserveSig] int GetIconPath([MarshalAs(UnmanagedType.LPWStr)] out string path);
+  [PreserveSig] int SetIconPath([MarshalAs(UnmanagedType.LPWStr)] string path, ref Guid ctx);
+  [PreserveSig] int GetGroupingParam(out Guid g);
+  [PreserveSig] int SetGroupingParam(ref Guid g, ref Guid ctx);
+  [PreserveSig] int RegisterAudioSessionNotification(IntPtr n);
+  [PreserveSig] int UnregisterAudioSessionNotification(IntPtr n);
 }
 [ComImport, Guid("BFB7FF88-7239-4FC9-8FA2-07C950BE9C6D"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 interface IOrbitSessionControl2 {
@@ -102,6 +116,9 @@ public static class OrbitMixer {
   static Guid Ctx = Guid.Empty;
   class Info { public string exe = ""; public string proc = ""; public string desc = ""; public string title = ""; }
   static Dictionary<uint, Info> infos = new Dictionary<uint, Info>();
+  /** Problems go to Orbit's log once each (the mixer looks twice a second). */
+  static HashSet<string> told = new HashSet<string>();
+  static void Tell(string what, Exception e) { string m = what + ": " + e.GetType().Name + " " + e.Message; if (told.Count < 50 && told.Add(m)) { Console.Error.WriteLine(m); Console.Error.Flush(); } }
   static string Esc(string s) { var b = new StringBuilder(); foreach (char c in s ?? "") { if (c == '"' || c == '\\') b.Append('\\').Append(c); else if (c < ' ') b.Append(' '); else b.Append(c); } return b.ToString(); }
   static string Num(float f) { return (float.IsNaN(f) ? 0 : f).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture); }
   static IOrbitDeviceEnumerator Enumerator() { return (IOrbitDeviceEnumerator)new OrbitMMDeviceEnumerator(); }
@@ -137,16 +154,26 @@ public static class OrbitMixer {
     infos[pid] = info;
     return info;
   }
-  static List<IOrbitSessionControl2> Sessions(IOrbitDevice d) {
-    var list = new List<IOrbitSessionControl2>();
+  /** One app's sound on one device: the session as the list gave it, and the app's own volume, cast straight from it. */
+  class Session { public IOrbitSessionControl control; public IOrbitSimpleVolume volume; public uint pid; public bool sys; }
+  static List<Session> Sessions(IOrbitDevice d) {
+    var list = new List<Session>();
     var m = Activate<IOrbitSessionManager2>(d, IID_Manager);
     IOrbitSessionEnumerator e; int n;
     if (m == null || m.GetSessionEnumerator(out e) != 0 || e.GetCount(out n) != 0) return list;
     for (int i = 0; i < n; i++) {
-      IOrbitSessionControl2 s; int state;
-      if (e.GetSession(i, out s) != 0 || s == null) continue;
-      if (s.GetState(out state) == 0 && state == 2) continue;
-      list.Add(s);
+      IOrbitSessionControl s; int state;
+      try {
+        if (e.GetSession(i, out s) != 0 || s == null) continue;
+        if (s.GetState(out state) == 0 && state == 2) continue;
+        var one = new Session { control = s };
+        // The session control is also the app's ISimpleAudioVolume: the same one Windows' Volume mixer sets.
+        one.volume = (IOrbitSimpleVolume)s;
+        var s2 = s as IOrbitSessionControl2;
+        if (s2 != null) { s2.GetProcessId(out one.pid); one.sys = s2.IsSystemSoundsSession() == 0; }
+        if (!one.sys && one.pid == 0) continue;
+        list.Add(one);
+      } catch (Exception x) { Tell("session", x); }
     }
     return list;
   }
@@ -167,20 +194,19 @@ public static class OrbitMixer {
     foreach (var d in Outputs()) {
       foreach (var s in Sessions(d)) {
         try {
-          uint pid; s.GetProcessId(out pid);
-          bool sys = s.IsSystemSoundsSession() == 0;
-          var v = (IOrbitSimpleVolume)s;
-          float vol, peak = 0; bool mute;
-          v.GetMasterVolume(out vol); v.GetMute(out mute);
-          var meter = s as IOrbitMeter;
-          if (meter != null) meter.GetPeakValue(out peak);
-          string display; s.GetDisplayName(out display);
+          uint pid = s.pid; bool sys = s.sys;
+          float vol = 1, peak = 0; bool mute = false;
+          if (s.volume.GetMasterVolume(out vol) != 0) continue;
+          s.volume.GetMute(out mute);
+          // The level and the name are extras: a session without them still gets its slider.
+          try { var meter = s.control as IOrbitMeter; if (meter != null) meter.GetPeakValue(out peak); } catch { }
+          string display = "";
+          try { s.control.GetDisplayName(out display); } catch { }
           var info = sys ? new Info() : About(pid);
-          if (!sys && pid == 0) continue;
           if (!first) b.Append(",");
           first = false;
           b.Append("{\"pid\":" + pid + ",\"exe\":\"" + Esc(info.exe) + "\",\"proc\":\"" + Esc(info.proc) + "\",\"desc\":\"" + Esc(info.desc) + "\",\"display\":\"" + Esc(display) + "\",\"title\":\"" + Esc(info.title) + "\",\"vol\":" + Num(vol) + ",\"mute\":" + (mute ? "true" : "false") + ",\"peak\":" + Num(peak) + ",\"sys\":" + (sys ? "true" : "false") + "}");
-        } catch { }
+        } catch (Exception x) { Tell("list", x); }
       }
     }
     return b.Append("]}").ToString();
@@ -200,13 +226,10 @@ public static class OrbitMixer {
     foreach (var d in Outputs()) {
       foreach (var s in Sessions(d)) {
         try {
-          uint pid; s.GetProcessId(out pid);
-          bool sys = s.IsSystemSoundsSession() == 0;
-          if (!want.Contains(sys ? "sys" : pid.ToString())) continue;
-          var v = (IOrbitSimpleVolume)s;
-          if (vol >= 0) ok |= v.SetMasterVolume(Math.Min(1f, vol), ref Ctx) == 0;
-          if (mute >= 0) ok |= v.SetMute(mute == 1, ref Ctx) == 0;
-        } catch { }
+          if (!want.Contains(s.sys ? "sys" : s.pid.ToString())) continue;
+          if (vol >= 0) ok |= s.volume.SetMasterVolume(Math.Min(1f, vol), ref Ctx) == 0;
+          if (mute >= 0) ok |= s.volume.SetMute(mute == 1, ref Ctx) == 0;
+        } catch (Exception x) { Tell("set", x); }
       }
     }
     return "{\"ok\":" + (ok ? "true" : "false") + "}";
