@@ -11784,6 +11784,316 @@ body.reduce-motion .theme-loading-text {
   font-size: 12px;
 }
 
+/* ---------- Countdowns ---------- */
+.countdowns-page {
+  overflow-y: auto;
+  min-height: 0;
+}
+.countdowns-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px 32px 60px;
+}
+.countdowns-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.countdowns-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 20px;
+}
+.countdowns-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.countdowns-head .btn,
+.countdowns-empty .btn,
+.countdown-form .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.countdowns-intro {
+  margin: 6px 0 16px;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+.countdowns-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 0;
+  color: var(--text-muted);
+}
+.countdowns-empty > span {
+  font-size: 40px;
+}
+.countdowns-empty p {
+  margin: 0 0 6px;
+}
+.countdown-form {
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-panel);
+}
+.countdown-form-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.countdown-form-row > .text-input {
+  flex: 1;
+}
+.countdown-form-when {
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.countdown-form-when label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--text-faint);
+  font-size: 11.5px;
+}
+.countdown-form-when .text-input {
+  color-scheme: dark;
+}
+.countdown-optional {
+  opacity: 0.7;
+}
+.countdown-form-when label.countdown-yearly {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 7px;
+  color: var(--text);
+  font-size: 13px;
+  accent-color: var(--accent);
+}
+.countdown-form-when .btn {
+  margin-left: auto;
+}
+.countdown-form-when .link-button {
+  padding-bottom: 8px;
+}
+.countdown-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+.countdown-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.countdown-kind:hover {
+  border-color: var(--accent-dim);
+}
+.countdown-kind.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text-strong);
+}
+.countdowns-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.countdowns-grid-wide {
+  grid-column: 1 / -1;
+}
+.countdowns-grid-wide .countdown-form {
+  margin: 0;
+}
+
+/* Each kind gets its own tint, behind the card. */
+.countdown-card,
+.countdowns-home-card {
+  --cd-tint: #60a5fa;
+}
+:is(.countdown-card, .countdowns-home-card).kind-season {
+  --cd-tint: #a78bfa;
+}
+:is(.countdown-card, .countdowns-home-card).kind-game {
+  --cd-tint: #4ade80;
+}
+:is(.countdown-card, .countdowns-home-card).kind-trip {
+  --cd-tint: #38bdf8;
+}
+:is(.countdown-card, .countdowns-home-card).kind-birthday {
+  --cd-tint: #f472b6;
+}
+:is(.countdown-card, .countdowns-home-card).kind-event {
+  --cd-tint: #fbbf24;
+}
+:is(.countdown-card, .countdowns-home-card).kind-other {
+  --cd-tint: #94a3b8;
+}
+.countdown-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--cd-tint) 18%, transparent), transparent 70%), var(--bg-panel);
+}
+.countdown-card.state-done {
+  opacity: 0.6;
+}
+.countdown-card.state-today,
+.countdown-card.state-now {
+  border-color: color-mix(in srgb, var(--cd-tint) 60%, var(--border));
+}
+.countdown-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.countdown-emoji {
+  font-size: 22px;
+  line-height: 1.2;
+}
+.countdown-card-name {
+  flex: 1;
+  min-width: 0;
+}
+.countdown-card-name h3 {
+  margin: 0;
+  font-size: 14.5px;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.countdown-card-name p {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 2px 0 0;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.countdown-repeat {
+  display: inline-flex;
+}
+.countdown-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s var(--ease);
+}
+.countdown-card:hover .countdown-card-actions,
+.countdown-card:focus-within .countdown-card-actions {
+  opacity: 1;
+}
+.countdown-card-actions .link-button.danger {
+  color: #f87171;
+}
+.countdown-big {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 4px;
+}
+.countdown-big strong {
+  font-size: 56px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.countdown-big span {
+  color: var(--text-muted);
+  font-size: 15px;
+}
+.countdown-ticker {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.countdown-progress {
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  overflow: hidden;
+}
+.countdown-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--cd-tint);
+}
+
+/* Home box: the next three, big. */
+.countdowns-home {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+}
+.countdowns-home-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--cd-tint) 20%, transparent), transparent 75%), var(--bg-raised);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+.countdowns-home-card:hover {
+  border-color: color-mix(in srgb, var(--cd-tint) 60%, var(--border));
+}
+.countdowns-home-big {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.countdowns-home-big strong {
+  font-size: 30px;
+  line-height: 1;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+.countdowns-home-big span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.countdowns-home-title {
+  max-width: 100%;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---------- startup notices: broken settings files, what's new ---------- */
 
 .about-note {
