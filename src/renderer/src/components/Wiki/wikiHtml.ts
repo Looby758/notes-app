@@ -78,6 +78,8 @@ function clean(el: Element, page: WikiPageView, base: string): void {
         child.setAttribute('title', link.url)
       }
       child.setAttribute('href', '#')
+      // A link around a picture that wasn't downloaded: nothing left to click.
+      if (!child.textContent?.trim() && !child.querySelector('img')) child.remove()
     }
   }
 }

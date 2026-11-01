@@ -1,7 +1,8 @@
 import type { ExplorerEntry, ExplorerPlace, PasteMode } from './explorer'
 import type { ArchiveEntry } from './archive'
 import type { ComicOpened, ComicPreparing, ComicSettings, ComicShelf } from './comics'
-import type { WikiAnswer, WikiCheck, WikiHit, WikiInfo, WikiPageView, WikiPictureChoice } from './wiki'
+import type { WikiAnswer, WikiCheck, WikiHit, WikiInfo, WikiPageView, WikiPictureChoice, WikiSpoilerView } from './wiki'
+import type { WikiSpoilerSettings } from './wikiSpoilers'
 import type { Prefs } from './prefs'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
@@ -1169,8 +1170,11 @@ export interface NotesApi {
   wikiRemove(id: string): Promise<WikiInfo[]>
   /** Titles of the downloaded pages. */
   wikiTitles(id: string): Promise<string[]>
-  /** A downloaded page (null when it isn't downloaded). */
-  wikiPage(id: string, title: string): Promise<WikiPageView | null>
+  /** A downloaded page (null when it isn't downloaded), with anything past where you are taken out. */
+  wikiPage(id: string, title: string, showUnplaced?: boolean): Promise<WikiPageView | null>
+  /** The spoiler limit, the Show / Comics switch and how far you are, with the shows and comics found in the wiki. */
+  wikiSpoilers(id: string): Promise<WikiSpoilerView>
+  wikiSetSpoilers(id: string, patch: Partial<WikiSpoilerSettings>): Promise<WikiInfo>
   wikiSearch(id: string, query: string): Promise<WikiHit[]>
   /** The wiki brain: the offline AI answers from these wikis only (all of them when empty). */
   wikiAsk(question: string, ids: string[]): Promise<WikiAnswer>

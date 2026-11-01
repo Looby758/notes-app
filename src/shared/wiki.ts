@@ -1,3 +1,5 @@
+import type { TimelineSeries, WikiSpoilerSettings } from './wikiSpoilers'
+
 /**
  * Wikis: any Fandom wiki, downloaded once and read offline (no ads, no internet), with the
  * offline AI answering questions from it. This file is the plain data and text handling (no
@@ -51,6 +53,19 @@ export interface WikiInfo {
   added: number
   /** When the download finished. */
   finished?: number
+  /** The spoiler limit and how far you are (shared with your other computers). */
+  spoilers?: WikiSpoilerSettings
+}
+
+/** What the spoiler settings show for a wiki. */
+export interface WikiSpoilerView {
+  settings: WikiSpoilerSettings
+  /** The shows and comics found in the wiki, with their episodes or issues. */
+  series: TimelineSeries[]
+  /** The timeline has been worked out (it is once some pages have arrived). */
+  ready: boolean
+  /** The whole wiki is downloaded (until then, the timeline may be missing some episodes). */
+  finished: boolean
 }
 
 /** What the download screen shows about a wiki before you download it. */
@@ -75,6 +90,11 @@ export interface WikiPageView {
   categories: string[]
   /** The page on the wiki itself (for the licence's attribution). */
   url: string
+  /** Not shown: it's past where you are, about a part you've switched off, or not checked yet. */
+  blocked?: 'later' | 'part' | 'unchecked' | 'unplaced'
+  /** How many pieces were hidden as past where you are, and as "couldn't tell when this happens". */
+  hiddenLater?: number
+  hiddenUnplaced?: number
 }
 
 export interface WikiHit {
@@ -99,6 +119,8 @@ export interface WikiAnswer {
   sources: WikiSource[]
   /** The answer said which extract each fact came from. */
   cited: boolean
+  /** The final spoiler check stopped the answer. */
+  spoilerHidden?: boolean
 }
 
 /** One downloaded page, as stored (gzipped JSON) in the wiki's folder. */
@@ -417,6 +439,9 @@ export const WIKI_ASK_SYSTEM = `You answer questions about a fan wiki, using ONL
 - If the extracts don't contain the answer, say you couldn't find it in the downloaded wiki. Don't fill gaps with anything you know from elsewhere.
 - Keep it short and plain.
 - After each fact, put the number of the extract it came from in square brackets, like [2].`
+
+/** Added when the spoiler limit is on. */
+export const WIKI_SPOILER_NOTE = 'The reader is part-way through the story. Never mention anything that is not in the extracts, even if you know it, because it may spoil what they have not seen yet.'
 
 export interface WikiExtract {
   wikiName: string

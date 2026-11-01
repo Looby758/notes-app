@@ -7,10 +7,11 @@ import { gunzip, gzip } from 'zlib'
 import { promisify } from 'util'
 import MiniSearch from 'minisearch'
 import { localComplete } from './localAi'
+import type { AppDataStore } from './comics'
+import { mergeSynced, readSynced, sameSynced, type Synced } from '@shared/progressSync'
 import { logError } from './log'
 import { cleanReply, LOCAL_CONTEXT_CHARS } from '@shared/localAi'
 import {
-  chunkSections,
   citedNumbers,
   findImages,
   htmlToSections,
@@ -23,6 +24,7 @@ import {
   plainTitle,
   searchTerm,
   WIKI_ASK_SYSTEM,
+  WIKI_SPOILER_NOTE,
   wikiAskPrompt,
   type StoredWikiPage,
   type WikiAddress,
@@ -33,8 +35,30 @@ import {
   type WikiInfo,
   type WikiPageView,
   type WikiPictureChoice,
-  type WikiSource
+  type WikiSource,
+  type WikiSpoilerView
 } from '@shared/wiki'
+import {
+  allowed,
+  buildTimeline,
+  filterPage,
+  forbiddenNames,
+  mentionsHidden,
+  pageAllowed,
+  partShown,
+  placedChunks,
+  spoilerSettings,
+  timelineFact,
+  type PageFacts,
+  type PlacedChunk,
+  type TimelineFact,
+  type UnitReq,
+  type WikiPart,
+  type WikiSpoilerSettings,
+  type WikiTimeline
+} from '@shared/wikiSpoilers'
+
+const WIKI_SYNC_FILE = 'wiki-progress.json'
 
 /**
  * Downloaded wikis. Each is a folder in the app's settings folder (wikis/<id>/), kept on this
@@ -437,7 +461,7 @@ async function download(w: Loaded, signal: AbortSignal): Promise<void> {
     }
   }
 
-  // 3. The search index for the wiki brain.
+  // 3. The timeline, the spoiler check and the search index for the wiki brain.
   w.meta.status = 'indexing'
   await saveMeta(w)
   tellSoon()
@@ -514,21 +538,52 @@ async function titleMap(id: string): Promise<Map<string, number>> {
   return map
 }
 
-/** The titles of every downloaded page, for the reader's search box. */
+/** Turns any title (or a redirect to a page) into that page's key, as the timeline keeps them. */
+async function keyFor(id: string): Promise<(title: string) => string> {
+  const l = await listOf(id)
+  const redirects = new Map(Object.entries(l.redirects).map(([from, to]) => [from.toLowerCase(), to.toLowerCase()]))
+  return (title) => {
+    const t = normaliseTitle(title).toLowerCase()
+    return redirects.get(t) ?? t
+  }
+}
+
+const settingsOf = (w: Loaded): WikiSpoilerSettings => spoilerSettings(w.meta.spoilers)
+
+/** Whether a page can be shown with your settings ('unchecked': it arrived after the spoiler check last ran). */
+function pageState(w: Loaded, index: Index | null, pageId: number): 'ok' | 'part' | 'later' | 'unchecked' | 'unplaced' {
+  const s = settingsOf(w)
+  if (!s.limit && s.parts === 'both') return 'ok'
+  const facts = index?.facts[pageId]
+  if (!facts) return s.limit ? 'unchecked' : 'ok'
+  return pageAllowed(facts, s)
+}
+
+/** The titles of the downloaded pages you can see, for the reader's search box. */
 export async function wikiTitles(id: string): Promise<string[]> {
   const w = wiki(id)
   const l = await listOf(w.meta.id)
-  return l.pages.filter((p) => w.done.has(p.id)).map((p) => p.title)
+  const s = settingsOf(w)
+  const index = s.limit || s.parts !== 'both' ? await indexOf(w.meta.id) : null
+  return l.pages.filter((p) => w.done.has(p.id) && pageState(w, index, p.id) === 'ok').map((p) => p.title)
 }
 
-/** A downloaded page by its title (or a redirect to it). Null when it isn't downloaded. */
-export async function wikiPage(id: string, title: string): Promise<WikiPageView | null> {
+/** A downloaded page by its title (or a redirect to it), with anything past where you are taken out. Null when it isn't downloaded. */
+export async function wikiPage(id: string, title: string, showUnplaced = false): Promise<WikiPageView | null> {
   const w = wiki(id)
   const pageId = (await titleMap(w.meta.id)).get(normaliseTitle(String(title)).toLowerCase())
   if (pageId === undefined || !w.done.has(pageId)) return null
   const p = await readPage(w.meta.id, pageId)
   if (!p) return null
-  return { wikiId: w.meta.id, title: p.title, displayTitle: p.displayTitle, html: p.html, images: p.images, categories: p.categories, url: pageUrl(w.meta.base, p.title) }
+  const view: WikiPageView = { wikiId: w.meta.id, title: p.title, displayTitle: p.displayTitle, html: p.html, images: p.images, categories: p.categories, url: pageUrl(w.meta.base, p.title) }
+  const s = settingsOf(w)
+  if (!s.limit && s.parts === 'both') return view
+  const index = await indexOf(w.meta.id)
+  const state = pageState(w, index, pageId)
+  if (state !== 'ok' && !(state === 'unplaced' && showUnplaced)) return { ...view, html: '', images: {}, blocked: state }
+  if (!s.limit || !index) return view
+  const filtered = filterPage(p.html, p.title, p.categories, { timeline: index.timeline, key: await keyFor(w.meta.id), base: w.meta.base }, s, showUnplaced)
+  return { ...view, html: filtered.html, hiddenLater: filtered.hiddenLater, hiddenUnplaced: filtered.hiddenUnplaced }
 }
 
 /** vault://wiki/<id>/<picture>: a downloaded picture. */
@@ -543,6 +598,76 @@ export async function wikiImageResponse(url: URL): Promise<Response> {
   return new Response(data, { headers: { 'Content-Type': type, 'Cache-Control': 'max-age=86400' } })
 }
 
+// ---------- the spoiler limit ----------
+
+/** Shows with fewer episodes than this (post-credits scenes, promos) aren't offered in the settings. */
+const MIN_SERIES_POINTS = 6
+
+export async function wikiSpoilers(id: string): Promise<WikiSpoilerView> {
+  const w = wiki(id)
+  const index = await indexOf(w.meta.id).catch(() => null)
+  const series = (index?.timeline.series ?? []).filter((s) => s.points.length >= MIN_SERIES_POINTS)
+  return { settings: settingsOf(w), series, ready: !!index, finished: w.meta.status === 'done' }
+}
+
+export async function setWikiSpoilers(id: string, patch: Partial<WikiSpoilerSettings>): Promise<WikiInfo> {
+  const w = wiki(id)
+  const now = settingsOf(w)
+  w.meta.spoilers = spoilerSettings({ ...now, ...patch, progress: { ...now.progress, ...(patch.progress ?? {}) }, updated: Date.now() })
+  await saveMeta(w)
+  tellSoon()
+  void shareWikiProgress()
+  return info(w)
+}
+
+// ---- sharing "how far I am" with your other computers ----
+
+let sharedStore: () => AppDataStore | null = () => null
+let sharing = false
+let shareAgain = false
+
+/**
+ * The spoiler settings (how far you are) go in the notes folder (.notesapp/wiki-progress.json), so
+ * they're the same on the PC and the MacBook. The wikis themselves stay on each computer. The newest
+ * change to each wiki wins, and settings for a wiki not downloaded here are kept for when it is.
+ */
+export async function shareWikiProgress(): Promise<void> {
+  const store = sharedStore()
+  if (!store) return
+  if (sharing) {
+    shareAgain = true
+    return
+  }
+  sharing = true
+  try {
+    loadAll()
+    const raw = await store.readAppData(WIKI_SYNC_FILE)
+    const remote = readSynced<WikiSpoilerSettings>(raw ? JSON.parse(raw) : {}, (v): v is WikiSpoilerSettings => !!v && typeof v === 'object')
+    const local: Synced<WikiSpoilerSettings> = {}
+    for (const w of wikis.values()) {
+      const s = settingsOf(w)
+      if (s.updated) local[w.meta.id] = { updated: s.updated, value: s }
+    }
+    const merged = mergeSynced(local, remote)
+    for (const [id, entry] of Object.entries(merged)) {
+      const w = wikis.get(id)
+      if (!w || !entry.value || (local[id] && local[id].updated >= entry.updated)) continue
+      w.meta.spoilers = spoilerSettings({ ...entry.value, updated: entry.updated })
+      await saveMeta(w)
+      tellSoon()
+    }
+    if (!sameSynced(merged, remote)) await store.writeAppData(WIKI_SYNC_FILE, JSON.stringify(merged))
+  } catch (err) {
+    logError('sharing wiki progress', err)
+  } finally {
+    sharing = false
+    if (shareAgain) {
+      shareAgain = false
+      void shareWikiProgress()
+    }
+  }
+}
+
 // ---------- searching (and the wiki brain) ----------
 
 interface ChunkDoc {
@@ -550,41 +675,85 @@ interface ChunkDoc {
   title: string
   section: string
   text: string
+  /** How far you need to be (JSON of UnitReq). */
+  req: string
+  part: WikiPart
 }
 
 const SEARCH_OPTIONS = {
   fields: ['title', 'section', 'text'],
+  storeFields: ['req', 'part'],
   processTerm: (term: string) => searchTerm(term),
   searchOptions: { boost: { title: 4, section: 1.5 }, prefix: (t: string) => t.length > 3, fuzzy: (t: string) => (t.length > 4 ? 0.2 : false), combineWith: 'OR' as const }
 }
+
+/** Saved indexes from an older Orbit are made again. */
+const INDEX_VERSION = 2
 
 interface Index {
   search: MiniSearch<ChunkDoc>
   pages: number
   used: number
+  timeline: WikiTimeline
+  /** By page id: which part it's about and when it first appears. */
+  facts: Record<number, PageFacts>
 }
 
 const indexes = new Map<string, Index>()
 const building = new Map<string, Promise<Index>>()
 let dropTimer: ReturnType<typeof setTimeout> | undefined
 
-/** Makes the search index from every downloaded page (a little at a time, so Orbit stays quick), and saves it. */
+const chunkFile = (id: string, pageId: number): string => join(dirOf(id), 'chunks', `${pageId}.json.gz`)
+
+/**
+ * Makes the timeline (from the episode and issue pages), places every part of every page on it,
+ * and makes the search index from those parts (a little at a time, so Orbit stays quick).
+ */
 async function buildIndex(id: string, signal?: AbortSignal): Promise<Index> {
   const w = wiki(id)
-  const search = new MiniSearch<ChunkDoc>(SEARCH_OPTIONS)
+  const pageIds = [...w.done]
+  const key = await keyFor(id)
+  const yieldNow = (): Promise<void> => new Promise((r) => setImmediate(r))
+
+  // 1. The timeline.
+  const facts: TimelineFact[] = []
   let n = 0
-  for (const pageId of [...w.done]) {
+  for (const pageId of pageIds) {
+    if (signal?.aborted) throw new Error('stopped')
+    const p = await readPage(id, pageId)
+    const f = p && timelineFact(p.title, p.categories, p.html, w.meta.base)
+    if (f) facts.push(f)
+    if (++n % 50 === 0) await yieldNow()
+  }
+  const timeline = buildTimeline(facts, key)
+  const ctx = { timeline, key, base: w.meta.base }
+
+  // 2. Every page, placed and indexed.
+  await mkdir(join(dirOf(id), 'chunks'), { recursive: true })
+  const search = new MiniSearch<ChunkDoc>(SEARCH_OPTIONS)
+  const pageFacts: Record<number, PageFacts> = {}
+  for (const pageId of pageIds) {
     if (signal?.aborted) throw new Error('stopped')
     const p = await readPage(id, pageId)
     if (!p) continue
-    search.addAll(chunkSections(p.sections).map((c) => ({ id: `${pageId}:${c.n}`, title: p.title, section: c.section, text: c.text })))
-    if (++n % 40 === 0) await new Promise((r) => setImmediate(r))
+    let placed: ReturnType<typeof placedChunks>
+    try {
+      placed = placedChunks(p.html, p.title, p.categories, ctx)
+    } catch (err) {
+      logError('wiki', `placing ${p.title}: ${err instanceof Error ? err.message : err}`)
+      continue
+    }
+    pageFacts[pageId] = placed.facts
+    await writeFile(chunkFile(id, pageId), await zip(JSON.stringify(placed.chunks)))
+    search.addAll(placed.chunks.map((c, i) => ({ id: `${pageId}:${i}`, title: p.title, section: c.section, text: c.text, req: JSON.stringify(c.req), part: placed.facts.part })))
+    if (++n % 20 === 0) await yieldNow()
   }
-  const index = { search, pages: w.done.size, used: Date.now() }
+  const index: Index = { search, pages: w.done.size, used: Date.now(), timeline, facts: pageFacts }
   const file = join(dirOf(id), 'search.json.gz')
-  await writeFile(`${file}.tmp`, await zip(JSON.stringify({ pages: index.pages, index: search })))
+  await writeFile(`${file}.tmp`, await zip(JSON.stringify({ version: INDEX_VERSION, pages: index.pages, timeline, facts: pageFacts, index: search })))
   await rename(`${file}.tmp`, file)
   indexes.set(id, index)
+  tellSoon()
   return index
 }
 
@@ -595,9 +764,17 @@ async function indexOf(id: string): Promise<Index | null> {
   let index = indexes.get(id) ?? null
   if (!index) {
     try {
-      const saved = JSON.parse((await unzip(await readFile(join(dirOf(id), 'search.json.gz')))).toString('utf8')) as { pages: number; index: unknown }
-      index = { search: MiniSearch.loadJS<ChunkDoc>(saved.index as never, SEARCH_OPTIONS), pages: saved.pages, used: Date.now() }
-      indexes.set(id, index)
+      const saved = JSON.parse((await unzip(await readFile(join(dirOf(id), 'search.json.gz')))).toString('utf8')) as {
+        version?: number
+        pages: number
+        timeline: WikiTimeline
+        facts: Record<number, PageFacts>
+        index: unknown
+      }
+      if (saved.version === INDEX_VERSION) {
+        index = { search: MiniSearch.loadJS<ChunkDoc>(saved.index as never, SEARCH_OPTIONS), pages: saved.pages, used: Date.now(), timeline: saved.timeline, facts: saved.facts }
+        indexes.set(id, index)
+      }
     } catch {
       index = null
     }
@@ -622,9 +799,25 @@ async function indexOf(id: string): Promise<Index | null> {
 
 async function chunkText(id: string, docId: string): Promise<{ title: string; section: string; text: string } | null> {
   const [pageId, n] = docId.split(':').map(Number)
-  const p = await readPage(id, pageId)
-  const c = p ? chunkSections(p.sections)[n] : undefined
-  return p && c ? { title: p.title, section: c.section, text: c.text } : null
+  try {
+    const chunks = JSON.parse((await unzip(await readFile(chunkFile(id, pageId)))).toString('utf8')) as PlacedChunk[]
+    const c = chunks[n]
+    const title = (await listOf(id)).pages.find((p) => p.id === pageId)?.title
+    return c && title ? { title, section: c.section, text: c.text } : null
+  } catch {
+    return null
+  }
+}
+
+/** Only the parts of pages you can see with your settings. */
+function canSee(w: Loaded, index: Index): (r: { id: string; req?: string; part?: WikiPart }) => boolean {
+  const s = settingsOf(w)
+  return (r) => {
+    const pageId = Number(String(r.id).split(':')[0])
+    if (pageState(w, index, pageId) !== 'ok') return false
+    if (!partShown(r.part ?? 'other', s.parts)) return false
+    return allowed(JSON.parse(r.req ?? 'null') as UnitReq, s)
+  }
 }
 
 /** Pages whose text matches, best first (one result per page). */
@@ -633,7 +826,7 @@ export async function wikiSearch(id: string, query: string): Promise<WikiHit[]> 
   const index = await indexOf(w.meta.id)
   if (!index || !query.trim()) return []
   const best = new Map<string, { id: string; score: number }>()
-  for (const r of index.search.search(query.slice(0, 300))) {
+  for (const r of index.search.search(query.slice(0, 300), { filter: canSee(w, index) as never })) {
     const page = String(r.id).split(':')[0]
     if (!best.has(page)) best.set(page, { id: String(r.id), score: r.score })
     if (best.size >= 30) break
@@ -646,10 +839,26 @@ export async function wikiSearch(id: string, query: string): Promise<WikiHit[]> 
   return out
 }
 
+/** Names the wiki brain's answer mustn't say, for each wiki with the spoiler limit on. */
+async function hiddenNames(w: Loaded, index: Index): Promise<string[]> {
+  const s = settingsOf(w)
+  if (!s.limit) return []
+  const l = await listOf(w.meta.id)
+  const hidden: string[] = []
+  const shown: string[] = []
+  for (const p of l.pages) {
+    const state = pageState(w, index, p.id)
+    if (state === 'ok') shown.push(p.title)
+    else if (state === 'later') hidden.push(p.title)
+  }
+  return forbiddenNames(hidden, shown)
+}
+
 /**
  * The wiki brain: a question answered by the offline AI from the downloaded wiki only. It finds
- * the best-matching parts of the pages, gives the AI just those, and says which pages it used.
- * Nothing is sent anywhere: it runs on this computer.
+ * the best-matching parts of the pages you can see, gives the AI just those, and says which pages
+ * it used. Before the answer is shown, it's checked for anything past where you are (the AI may
+ * know the story from elsewhere). Nothing is sent anywhere: it runs on this computer.
  */
 export async function wikiAsk(question: string, ids: string[]): Promise<WikiAnswer> {
   const q = String(question ?? '').trim().slice(0, 600)
@@ -657,15 +866,21 @@ export async function wikiAsk(question: string, ids: string[]): Promise<WikiAnsw
   loadAll()
   const chosen = (ids.length ? ids : [...wikis.keys()]).map((i) => wiki(i))
   const hits: { w: Loaded; docId: string; score: number }[] = []
+  const forbidden: string[] = []
+  let limited = false
   for (const w of chosen) {
     const index = await indexOf(w.meta.id)
     if (!index) continue
-    const results = index.search.search(q).slice(0, 14)
+    if (settingsOf(w).limit) {
+      limited = true
+      forbidden.push(...(await hiddenNames(w, index)))
+    }
+    const results = index.search.search(q, { filter: canSee(w, index) as never }).slice(0, 14)
     const top = results[0]?.score || 1
     // Scores from different wikis aren't alike, so each wiki's are out of its best.
     for (const r of results) hits.push({ w, docId: String(r.id), score: r.score / top })
   }
-  if (!hits.length) throw new Error(chosen.some((w) => w.done.size) ? 'Nothing in the downloaded wiki matches that. Try other words, like a name.' : 'Download a wiki first (or wait for some of its pages to arrive).')
+  if (!hits.length) throw new Error(chosen.some((w) => w.done.size) ? 'Nothing you can see in the downloaded wiki matches that. Try other words, like a name.' : 'Download a wiki first (or wait for some of its pages to arrive).')
   hits.sort((a, b) => b.score - a.score)
 
   const extracts: (WikiExtract & { wikiId: string })[] = []
@@ -689,12 +904,16 @@ export async function wikiAsk(question: string, ids: string[]): Promise<WikiAnsw
 
   const reply = await localComplete(
     [
-      { role: 'system', content: WIKI_ASK_SYSTEM },
+      { role: 'system', content: WIKI_ASK_SYSTEM + (limited ? `\n${WIKI_SPOILER_NOTE}` : '') },
       { role: 'user', content: wikiAskPrompt(q, extracts) }
     ],
     { maxTokens: 700, temperature: 0.2 }
   )
   const text = cleanReply(reply).text
+  // The final check: nothing named that you haven't reached.
+  if (limited && mentionsHidden(text, forbidden)) {
+    return { text: 'Orbit hid this answer because it mentioned something past where you are. Try asking in another way.', sources: [], cited: false, spoilerHidden: true }
+  }
   const cited = citedNumbers(text, extracts.length)
   const source = (n: number): WikiSource => {
     const e = extracts[n - 1]
@@ -705,7 +924,10 @@ export async function wikiAsk(question: string, ids: string[]): Promise<WikiAnsw
 
 // ---------- the app's side ----------
 
-export function setupWiki(): void {
+export function setupWiki(appData: () => AppDataStore | null): void {
+  sharedStore = appData
+  // Back at the window (maybe after changing it on the other computer): pick up how far you are.
+  app.on('browser-window-focus', () => void shareWikiProgress())
   ipcMain.handle('wiki:list', () => wikiList())
   ipcMain.handle('wiki:check', (_e, address: string) => checkWiki(String(address ?? '').slice(0, 500)))
   ipcMain.handle('wiki:add', (_e, address: string, pictures: WikiPictureChoice) => addWiki(String(address ?? '').slice(0, 500), pictureChoice(pictures)))
@@ -713,7 +935,9 @@ export function setupWiki(): void {
   ipcMain.handle('wiki:resume', (_e, id: string) => resumeWiki(String(id)))
   ipcMain.handle('wiki:remove', (_e, id: string) => removeWiki(String(id)))
   ipcMain.handle('wiki:titles', (_e, id: string) => wikiTitles(String(id)))
-  ipcMain.handle('wiki:page', (_e, id: string, title: string) => wikiPage(String(id), String(title ?? '').slice(0, 300)))
+  ipcMain.handle('wiki:page', (_e, id: string, title: string, showUnplaced?: boolean) => wikiPage(String(id), String(title ?? '').slice(0, 300), showUnplaced === true))
+  ipcMain.handle('wiki:spoilers', (_e, id: string) => wikiSpoilers(String(id)))
+  ipcMain.handle('wiki:setSpoilers', (_e, id: string, patch: Partial<WikiSpoilerSettings>) => setWikiSpoilers(String(id), patch && typeof patch === 'object' ? patch : {}))
   ipcMain.handle('wiki:search', (_e, id: string, query: string) => wikiSearch(String(id), String(query ?? '')))
   ipcMain.handle('wiki:ask', (_e, question: string, ids: string[]) => wikiAsk(String(question ?? ''), Array.isArray(ids) ? ids.map(String) : []))
   app.on('will-quit', () => {

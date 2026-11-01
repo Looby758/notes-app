@@ -503,3 +503,50 @@
 .wiki-sources button:hover {
   color: var(--accent-strong);
 }
+
+/* the spoiler limit */
+.wiki-spoiler-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wiki-spoiler-label {
+  margin: 4px 0 2px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.wiki-progress {
+  max-width: none;
+  width: 100%;
+}
+.wiki-spoiler-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.wiki-spoiler-note .btn {
+  flex: none;
+}
+.wiki-html .w-wiki-hidden {
+  margin: 8px 0;
+  padding: 6px 10px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+/* Fandom's picture tabs (S1, S2…): just one picture, the earliest (the last tab), without the tab names. */
+.wiki-html .w-wds-tabs__wrapper,
+.wiki-html .w-wds-tabs {
+  display: none;
+}
+.wiki-html .w-wds-tab__content:not(:last-child) {
+  display: none;
+}

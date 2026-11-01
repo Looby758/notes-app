@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react'
-import { ArrowLeft, ArrowRight, BookOpen, Brain, Download, House, Library, Pause, Play, Search, Trash2, X } from 'lucide-react'
-import { bytesText, DEFAULT_PICTURES, pageUrl, type WikiAnswer, type WikiCheck, type WikiHit, type WikiInfo, type WikiPageView, type WikiPictureChoice } from '@shared/wiki'
+import { ArrowLeft, ArrowRight, BookOpen, Brain, Download, House, Library, Pause, Play, Search, Shield, ShieldCheck, Trash2, X } from 'lucide-react'
+import { bytesText, DEFAULT_PICTURES, pageUrl, type WikiAnswer, type WikiCheck, type WikiHit, type WikiInfo, type WikiPageView, type WikiPictureChoice, type WikiSpoilerView } from '@shared/wiki'
+import type { WikiPartsChoice, WikiSpoilerSettings } from '@shared/wikiSpoilers'
 import { goWiki, useWiki, wikiBack, wikiForward, type WikiPlace } from '../../store/wiki'
 import { notify } from '../../store/notify'
 import { openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
@@ -200,17 +201,27 @@ function AddWiki() {
 function Reader({ wiki, wikis, place }: { wiki: WikiInfo; wikis: WikiInfo[]; place: WikiPlace }) {
   const canBack = useWiki((s) => s.back.length > 0)
   const canForward = useWiki((s) => s.forward.length > 0)
-  const [brain, setBrain] = useState(() => localStorage.getItem('wiki:brain') !== 'off')
+  const [side, setSide] = useState<'brain' | 'spoilers' | null>(() => {
+    try {
+      return localStorage.getItem('wiki:brain') === 'off' ? null : 'brain'
+    } catch {
+      return 'brain'
+    }
+  })
   const title = place.title ?? wiki.mainPage
+  const limit = !!wiki.spoilers?.limit
+  // Pages and search are looked at again when the spoiler settings change.
+  const version = wiki.spoilers?.updated ?? 0
 
-  const toggleBrain = (): void => {
-    setBrain((b) => {
+  const toggle = (which: 'brain' | 'spoilers'): void => {
+    setSide((now) => {
+      const next = now === which ? null : which
       try {
-        localStorage.setItem('wiki:brain', b ? 'off' : 'on')
+        if (which === 'brain') localStorage.setItem('wiki:brain', next ? 'on' : 'off')
       } catch {
         // only a convenience
       }
-      return !b
+      return next
     })
   }
 
@@ -238,15 +249,19 @@ function Reader({ wiki, wikis, place }: { wiki: WikiInfo; wikis: WikiInfo[]; pla
         <button className="btn" onClick={() => goWiki({ wikiId: wiki.id, title: null })} title="The wiki’s main page">
           <House size={14} />
         </button>
-        <TitleSearch wiki={wiki} />
-        <button className={`btn${brain ? ' active' : ''}`} onClick={toggleBrain} title="Wiki brain: ask questions">
+        <TitleSearch key={version} wiki={wiki} />
+        <button className={`btn${side === 'spoilers' ? ' active' : ''}`} onClick={() => toggle('spoilers')} title="Spoiler limit and how far you are">
+          {limit ? <ShieldCheck size={14} /> : <Shield size={14} />} Spoilers
+        </button>
+        <button className={`btn${side === 'brain' ? ' active' : ''}`} onClick={() => toggle('brain')} title="Wiki brain: ask questions">
           <Brain size={14} /> Ask
         </button>
       </div>
       {wiki.status !== 'done' && <div className="wiki-notice">{statusText(wiki)}. Pages that haven’t arrived yet can’t be opened.</div>}
       <div className="wiki-body">
-        {place.search ? <SearchResults wiki={wiki} query={place.search} /> : <Article key={`${wiki.id}/${title}`} wiki={wiki} title={title} fragment={place.fragment} />}
-        {brain && <BrainPanel wiki={wiki} wikis={wikis} />}
+        {place.search ? <SearchResults key={version} wiki={wiki} query={place.search} /> : <Article key={`${wiki.id}/${title}/${version}`} wiki={wiki} title={title} fragment={place.fragment} />}
+        {side === 'brain' && <BrainPanel wiki={wiki} wikis={wikis} />}
+        {side === 'spoilers' && <SpoilerPanel key={wiki.id} wiki={wiki} />}
       </div>
     </div>
   )
@@ -342,6 +357,7 @@ function useLinkClicks(wikiId: string): (e: MouseEvent<HTMLElement>) => void {
 
 function Article({ wiki, title, fragment }: { wiki: WikiInfo; title: string; fragment?: string }) {
   const [page, setPage] = useState<WikiPageView | null | undefined>(undefined)
+  const [showUnplaced, setShowUnplaced] = useState(false)
   const body = useRef<HTMLDivElement>(null)
   const onClick = useLinkClicks(wiki.id)
   // A page that hadn't arrived yet is looked for again as more pages arrive.
@@ -349,7 +365,7 @@ function Article({ wiki, title, fragment }: { wiki: WikiInfo; title: string; fra
 
   useEffect(() => {
     let live = true
-    void window.api.wikiPage(wiki.id, title).then(
+    void window.api.wikiPage(wiki.id, title, showUnplaced).then(
       (p) => live && setPage(p),
       (err) => {
         notify(err)
@@ -359,7 +375,7 @@ function Article({ wiki, title, fragment }: { wiki: WikiInfo; title: string; fra
     return () => {
       live = false
     }
-  }, [wiki.id, title, waiting])
+  }, [wiki.id, title, waiting, showUnplaced])
 
   const html = useMemo(() => (page ? cleanWikiHtml(page.html, page, wiki.base) : ''), [page, wiki.base])
 
@@ -371,6 +387,25 @@ function Article({ wiki, title, fragment }: { wiki: WikiInfo; title: string; fra
   }, [html, fragment])
 
   if (page === undefined) return <div className="wiki-article" />
+  if (page?.blocked)
+    return (
+      <div className="wiki-article">
+        <div className="wiki-missing">
+          <h1>{page.blocked === 'part' ? page.displayTitle : 'Hidden'}</h1>
+          <p>
+            {page.blocked === 'later' && 'This page is about something you haven’t reached yet, so it’s hidden. Change how far you are in Spoilers to see it.'}
+            {page.blocked === 'part' && 'This page is about a part of the story you’ve switched off (in Spoilers).'}
+            {page.blocked === 'unchecked' && 'Orbit hasn’t checked this page for spoilers yet. It will after more of the wiki has downloaded.'}
+            {page.blocked === 'unplaced' && 'Orbit couldn’t tell when anything on this page happens, so it might spoil something.'}
+          </p>
+          {page.blocked === 'unplaced' && (
+            <button className="btn" onClick={() => setShowUnplaced(true)}>
+              Show it anyway
+            </button>
+          )}
+        </div>
+      </div>
+    )
   if (!page)
     return (
       <div className="wiki-article">
@@ -389,6 +424,14 @@ function Article({ wiki, title, fragment }: { wiki: WikiInfo; title: string; fra
     <div className="wiki-article">
       <article className="wiki-content">
         <h1 className="wiki-title">{page.displayTitle}</h1>
+        {!!page.hiddenUnplaced && !showUnplaced && (
+          <div className="wiki-spoiler-note">
+            Some parts are hidden because the wiki doesn’t say when they happen, so they might spoil something.{' '}
+            <button className="btn" onClick={() => setShowUnplaced(true)}>
+              Show them anyway
+            </button>
+          </div>
+        )}
         <div ref={body} className="wiki-html" onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />
         <footer className="wiki-credit">
           From {wiki.name} on Fandom. Its text is shared under{' '}
@@ -548,7 +591,7 @@ function BrainPanel({ wiki, wikis }: { wiki: WikiInfo; wikis: WikiInfo[] }) {
             </button>
           </div>
           <AnswerText answer={answer.a} onSource={openSource} />
-          <p className="wiki-faint">{answer.a.cited ? 'From these pages:' : 'It read these pages:'}</p>
+          {answer.a.sources.length > 0 && <p className="wiki-faint">{answer.a.cited ? 'From these pages:' : 'It read these pages:'}</p>}
           <ul className="wiki-sources">
             {answer.a.sources.map((s) => (
               <li key={s.n}>
@@ -561,6 +604,87 @@ function BrainPanel({ wiki, wikis }: { wiki: WikiInfo; wikis: WikiInfo[] }) {
             ))}
           </ul>
         </div>
+      )}
+    </aside>
+  )
+}
+
+// ---------- the spoiler limit ----------
+
+function SpoilerPanel({ wiki }: { wiki: WikiInfo }) {
+  const [view, setView] = useState<WikiSpoilerView | null>(null)
+  const version = wiki.spoilers?.updated ?? 0
+  const status = wiki.status
+
+  useEffect(() => {
+    let live = true
+    void window.api.wikiSpoilers(wiki.id).then((v) => live && setView(v), notify)
+    return () => {
+      live = false
+    }
+  }, [wiki.id, version, status])
+
+  if (!view) return <aside className="wiki-brain" />
+  const s = view.settings
+  const set = (patch: Partial<WikiSpoilerSettings>): void => {
+    // Shown straight away; the saved setting follows.
+    setView((v) => v && { ...v, settings: { ...v.settings, ...patch, progress: { ...v.settings.progress, ...(patch.progress ?? {}) } } })
+    void window.api.wikiSetSpoilers(wiki.id, patch).catch(notify)
+  }
+  const hasShow = view.series.some((x) => x.part === 'show')
+  const hasComics = view.series.some((x) => x.part === 'comics')
+  const shown = view.series.filter((x) => s.parts === 'both' || x.part === (s.parts === 'show' ? 'show' : 'comics'))
+
+  return (
+    <aside className="wiki-brain wiki-spoilers">
+      <h3>
+        <Shield size={15} /> Spoilers
+      </h3>
+      {hasShow && hasComics && (
+        <div className="wiki-spoiler-group">
+          <p className="wiki-spoiler-label">This wiki has the show and the comics. Show me:</p>
+          {(
+            [
+              ['show', 'The show'],
+              ['comics', 'The comics'],
+              ['both', 'Both']
+            ] as [WikiPartsChoice, string][]
+          ).map(([value, name]) => (
+            <label key={value} className="wiki-tick">
+              <input type="radio" name="wiki-parts" checked={s.parts === value} onChange={() => set({ parts: value })} /> {name}
+            </label>
+          ))}
+          <p className="screens-note">Pages about the other one are hidden everywhere: reading, search and the wiki brain.</p>
+        </div>
+      )}
+      <label className="wiki-tick">
+        <input type="checkbox" checked={s.limit} onChange={(e) => set({ limit: e.target.checked })} /> Spoiler limit: hide anything past where I am
+      </label>
+      {s.limit && (
+        <>
+          {!view.ready && <p className="screens-note">Orbit works out the wiki’s episodes once some pages have downloaded. Until then, pages stay hidden.</p>}
+          {view.ready && shown.length === 0 && <p className="screens-note">Orbit couldn’t find a list of episodes or issues in this wiki, so it can’t tell what’s a spoiler. Everything it can’t place stays hidden.</p>}
+          {shown.map((series) => (
+            <div key={series.name} className="wiki-spoiler-group">
+              <p className="wiki-spoiler-label">
+                {series.name} <span className="wiki-faint">({series.part === 'show' ? 'show' : 'comics'})</span>
+              </p>
+              <select className="wiki-select wiki-progress" value={s.progress[series.name] ?? 0} onChange={(e) => set({ progress: { [series.name]: Number(e.target.value) } })}>
+                <option value={0}>Not started</option>
+                {series.points.map((p) => (
+                  <option key={p.order} value={p.order}>
+                    Up to {p.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
+          <p className="screens-note">
+            Each paragraph is checked against the episodes and issues the wiki links it to. Where the wiki doesn’t say which episode something happens in, it may only be accurate to the season, and parts Orbit can’t place at all are hidden (each page lets you show them).
+            {!view.finished && ' While the wiki is still downloading, some episodes aren’t known yet, so more stays hidden.'}
+          </p>
+          <p className="screens-note">How far you are is shared with your other computers through your notes folder.</p>
+        </>
       )}
     </aside>
   )

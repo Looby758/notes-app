@@ -62,7 +62,7 @@ import { hold, setupUndoBin } from './undoBin'
 import { setupVideoPlayer, videoResponse } from './videoPlayer'
 import { releaseFiles, serveFile } from './fileLocks'
 import { comicResponse, setupComics, shareProgress as shareComicProgress } from './comics'
-import { setupWiki, wikiImageResponse } from './wiki'
+import { setupWiki, shareWikiProgress, wikiImageResponse } from './wiki'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
@@ -346,6 +346,7 @@ function openVault(path: string | null): void {
   vault = path ? new Vault(path) : null
   if (!path) return
   void shareComicProgress()
+  void shareWikiProgress()
   syncOrbitSoon()
   startWatching(path, (paths) => {
     for (const win of BrowserWindow.getAllWindows()) win.webContents.send('vault:changed', paths)
@@ -1041,7 +1042,7 @@ app.whenReady().then(async () => {
   safely('video player', () => setupVideoPlayer(() => vault?.root ?? null))
   safely('video window', () => setupVideoWindow(() => mainWindow))
   safely('comic reader', () => setupComics(() => vault))
-  safely('wikis', () => setupWiki())
+  safely('wikis', () => setupWiki(() => vault))
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))
   safely('Orbit sync', () => setupOrbitSync({ root: () => vault?.root ?? null, enabled: () => currentPrefs().syncOrbit, window: () => mainWindow, parts: orbitParts(themesChanged) }))
