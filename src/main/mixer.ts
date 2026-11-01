@@ -280,6 +280,8 @@ function startHelper(): ChildProcessWithoutNullStreams {
   })
   child.stderr.on('data', (d: Buffer) => logError('volume mixer', new Error(d.toString().trim())))
   child.on('error', (err) => logError('volume mixer', err))
+  // Writing to a helper that has just closed: the exit below answers whoever was waiting.
+  child.stdin.on('error', (err) => logError('volume mixer', err))
   child.on('exit', () => {
     if (helper === child) helper = null
     for (const done of waiting.values()) done('{"ok":false}')
@@ -312,10 +314,17 @@ function ask<T>(command: string, timeout = 8000): Promise<T | null> {
 let targets: Record<string, string[]> = {}
 const icons = new Map<string, string | null>()
 
+/** An app's icon; any trouble getting it just means no icon (the slider matters, not the picture). */
 async function iconFor(exe: string): Promise<string | undefined> {
   if (!icons.has(exe)) {
-    const img = await app.getFileIcon(exe, { size: 'normal' }).catch(() => null)
-    icons.set(exe, img && !img.isEmpty() ? img.toDataURL() : null)
+    let icon: string | null = null
+    try {
+      const img = await app.getFileIcon(exe, { size: 'normal' })
+      icon = img && !img.isEmpty() ? img.toDataURL() : null
+    } catch (err) {
+      logError(`volume mixer icon (${exe})`, err)
+    }
+    icons.set(exe, icon)
   }
   return icons.get(exe) ?? undefined
 }
@@ -440,7 +449,8 @@ export function mixerState(): Promise<MixerState> {
       return state
     } catch (err) {
       logError('volume mixer', err)
-      return { apps: [], problem: 'Couldn’t read the sound settings.' }
+      // The reason goes on screen too, so a screenshot says what went wrong.
+      return { apps: [], problem: `Couldn’t read the sound settings (${err instanceof Error ? err.message : String(err)}).` }
     } finally {
       looking = null
     }
