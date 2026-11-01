@@ -149,3 +149,23 @@ export function discordPayload(message: string): string {
 
 /** Megabytes, for showing a size: "8.4 MB". */
 export const megabytes = (bytes: number): string => `${(bytes / 1_000_000).toFixed(bytes < 10_000_000 ? 1 : 0)} MB`
+
+/**
+ * The bytes a video player asked for ("Range: bytes=1000-" when you jump to a moment), as
+ * inclusive positions. null: the whole file. 'bad': a range outside the file.
+ */
+export function parseRange(header: string | null, size: number): { start: number; end: number } | null | 'bad' {
+  const m = header && /^bytes=(\d*)-(\d*)$/.exec(header.trim())
+  if (!m || (!m[1] && !m[2])) return null
+  let start: number
+  let end: number
+  if (!m[1]) {
+    // "bytes=-500": the last 500 bytes.
+    start = Math.max(0, size - Number(m[2]))
+    end = size - 1
+  } else {
+    start = Number(m[1])
+    end = m[2] ? Math.min(Number(m[2]), size - 1) : size - 1
+  }
+  return start >= size || start > end ? 'bad' : { start, end }
+}

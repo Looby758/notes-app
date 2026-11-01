@@ -8,6 +8,7 @@ import {
   discordPayload,
   discordSettings,
   isClipFile,
+  parseRange,
   segmentsLength,
   segmentsToKeep
 } from './clips'
@@ -114,5 +115,19 @@ describe('Discord webhooks', () => {
   })
   it('never pings everyone', () => {
     expect(JSON.parse(discordPayload(' @everyone look '))).toEqual({ content: '@everyone look', allowed_mentions: { parse: [] } })
+  })
+})
+
+describe('parseRange', () => {
+  it('reads what a video player asks for', () => {
+    expect(parseRange(null, 100)).toBeNull()
+    expect(parseRange('bytes=0-', 100)).toEqual({ start: 0, end: 99 })
+    expect(parseRange('bytes=10-19', 100)).toEqual({ start: 10, end: 19 })
+    expect(parseRange('bytes=90-500', 100)).toEqual({ start: 90, end: 99 })
+    expect(parseRange('bytes=-30', 100)).toEqual({ start: 70, end: 99 })
+  })
+  it('refuses ranges outside the file', () => {
+    expect(parseRange('bytes=100-', 100)).toBe('bad')
+    expect(parseRange('bytes=50-10', 100)).toBe('bad')
   })
 })

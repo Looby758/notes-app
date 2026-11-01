@@ -1,9 +1,10 @@
 import { app, BrowserWindow, desktopCapturer, globalShortcut, ipcMain, nativeImage, net, Notification, safeStorage, screen, shell } from 'electron'
 import { spawn, type ChildProcess } from 'child_process'
 import { randomUUID } from 'crypto'
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
+import { createReadStream, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { mkdir, readdir, readFile, rm, stat, writeFile } from 'fs/promises'
-import { basename, dirname, isAbsolute, join, resolve } from 'path'
+import { basename, dirname, extname, isAbsolute, join, resolve } from 'path'
+import { Readable } from 'stream'
 import { acceleratorLabel, SYSTEM_NAME } from '@shared/platform'
 import {
   clipArgs,
@@ -14,6 +15,7 @@ import {
   DISCORD_LIMIT,
   discordPayload,
   isClipFile,
+  parseRange,
   type ClipExport,
   type DiscordHook
 } from '@shared/clips'
@@ -57,6 +59,34 @@ export function clipFile(name: string): string | null {
   if (!clipsFolder || !name || name.includes('/') || name.includes('\\') || !isClipFile(name)) return null
   const full = join(clipsFolder, name)
   return existsSync(full) ? full : null
+}
+
+const VIDEO_TYPES: Record<string, string> = { '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm' }
+
+/**
+ * Serves vault://clips/<name>, answering "Range" requests itself so the player can jump to any
+ * moment (dragging the trim handles). Readable by the page (CORS), so a frame can be the picture
+ * when dragging a clip out.
+ */
+export function clipResponse(request: Request, name: string): Response {
+  const full = clipFile(name)
+  if (!full) return new Response('Not allowed', { status: 403 })
+  const size = statSync(full).size
+  const range = parseRange(request.headers.get('Range'), size)
+  const headers = new Headers({
+    'Content-Type': VIDEO_TYPES[extname(full).toLowerCase()] ?? 'application/octet-stream',
+    'Accept-Ranges': 'bytes',
+    'Access-Control-Allow-Origin': '*'
+  })
+  if (range === 'bad') {
+    headers.set('Content-Range', `bytes */${size}`)
+    return new Response(null, { status: 416, headers })
+  }
+  const { start, end } = range ?? { start: 0, end: size - 1 }
+  headers.set('Content-Length', String(end - start + 1))
+  if (range) headers.set('Content-Range', `bytes ${start}-${end}/${size}`)
+  const body = size ? (Readable.toWeb(createReadStream(full, { start, end })) as ReadableStream) : null
+  return new Response(body, { status: range ? 206 : 200, headers })
 }
 
 /** A free file name in a folder: "Clip … (2).mp4" when "Clip ….mp4" is taken. */
