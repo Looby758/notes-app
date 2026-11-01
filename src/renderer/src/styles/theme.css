@@ -10683,3 +10683,86 @@ body.reduce-motion .theme-loading-text {
 .ai-source input {
   margin: 0;
 }
+
+/* ---------- Money: your balance, adding and cancelling subscriptions ---------- */
+
+.money-forecast-body {
+  flex: 1;
+  min-width: 0;
+}
+.money-forecast p.money-forecast-balance {
+  margin-top: 6px;
+  font-size: 12px;
+}
+.money-forecast-balance svg {
+  vertical-align: -1px;
+}
+.money-balance-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.money-balance-form input,
+.money-new-sub input {
+  padding: 5px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+.money-balance-form .money-amount input {
+  width: 200px;
+}
+.money-new-sub .money-amount input {
+  width: 72px;
+}
+.money-balance-form .money-hint {
+  flex-basis: 100%;
+  margin: 0;
+}
+.money-add-sub {
+  margin-top: 10px;
+}
+.money-new-sub {
+  margin-top: 10px;
+}
+.money-recurring-row.fresh .money-recurring-name small {
+  color: var(--accent);
+}
+.money-warn-row {
+  background: color-mix(in srgb, #c98500 16%, var(--bg-raised));
+}
+.money-cancelled {
+  margin-top: 12px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.money-cancelled summary {
+  cursor: pointer;
+}
+.money-cancelled ul {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+.money-cancelled li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.money-cancelled li span {
+  flex: 1;
+  color: var(--text);
+}
+.money-new-sub select {
+  width: auto;
+}
+.money-cancelled li {
+  padding-left: 8px;
+}

@@ -6,6 +6,8 @@ import {
   readMoney,
   OTHER,
   OTHER_INCOME,
+  type Balance,
+  type ManualSubscription,
   type MoneyCategory,
   type MoneyData,
   type MoneyEntry,
@@ -42,9 +44,9 @@ function persist(): void {
     return
   }
   writing = true
-  const { categories, entries, budgets, rules, goals, notRecurring } = useMoney.getState()
+  const { categories, entries, budgets, rules, goals, notRecurring, subscriptions, cancelled, balance } = useMoney.getState()
   window.api
-    .writeAppData(FILE, JSON.stringify({ categories, entries, budgets, rules, goals, notRecurring }, null, 2))
+    .writeAppData(FILE, JSON.stringify({ categories, entries, budgets, rules, goals, notRecurring, subscriptions, cancelled, balance }, null, 2))
     .catch(notify)
     .finally(() => {
       writing = false
@@ -161,4 +163,42 @@ export function deleteGoal(id: string): void {
 export function setNotRecurring(key: string, not = true): void {
   const list = useMoney.getState().notRecurring.filter((k) => k !== key)
   save({ notRecurring: not ? [...list, key] : list })
+}
+
+// ---------- subscriptions you manage yourself ----------
+
+/** Adds a subscription or bill the statements haven't shown (yet). */
+export function addSubscription(sub: Omit<ManualSubscription, 'id'>): ManualSubscription {
+  const made: ManualSubscription = { ...sub, id: newId() }
+  save({ subscriptions: [...useMoney.getState().subscriptions, made] })
+  return made
+}
+
+export function updateSubscription(id: string, change: Partial<Omit<ManualSubscription, 'id'>>): void {
+  save({ subscriptions: useMoney.getState().subscriptions.map((s) => (s.id === id ? { ...s, ...change } : s)) })
+}
+
+export function deleteSubscription(id: string): ManualSubscription | undefined {
+  const { subscriptions } = useMoney.getState()
+  const gone = subscriptions.find((s) => s.id === id)
+  save({ subscriptions: subscriptions.filter((s) => s.id !== id) })
+  return gone
+}
+
+/** Puts back one that was just removed. */
+export function restoreSubscription(sub: ManualSubscription): void {
+  save({ subscriptions: [...useMoney.getState().subscriptions.filter((s) => s.id !== sub.id), sub] })
+}
+
+/** "I've cancelled this": stops listing a found subscription until it charges you again after `on`. Pass null to undo. */
+export function setCancelled(key: string, on: string | null): void {
+  const { [key]: _old, ...rest } = useMoney.getState().cancelled
+  save({ cancelled: on ? { ...rest, [key]: on } : rest })
+}
+
+// ---------- your real balance ----------
+
+/** What's in your account right now (pence, negative if overdrawn), or null to go back to statements only. */
+export function setBalance(balance: Balance | null): void {
+  save({ balance })
 }

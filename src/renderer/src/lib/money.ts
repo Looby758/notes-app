@@ -36,6 +36,32 @@ export interface MoneyData {
   goals: SavingsGoal[]
   /** Repeating payments you said aren't subscriptions or bills (by merchantKey), so they aren't listed. */
   notRecurring: string[]
+  /** Subscriptions and bills you added yourself (ones the statements don't show yet, or never will). */
+  subscriptions: ManualSubscription[]
+  /** Found subscriptions you said you've cancelled: merchantKey → the day you said so. A new payment after that day brings it back. */
+  cancelled: Record<string, string>
+  /** What you told Orbit is in your account, so the end-of-month forecast starts from real money rather than statements alone. */
+  balance: Balance | null
+}
+
+export type RepeatInterval = 'weekly' | 'monthly' | 'yearly'
+
+export interface ManualSubscription {
+  id: string
+  name: string
+  /** Pence. */
+  amount: number
+  interval: RepeatInterval
+  /** YYYY-MM-DD of one payment (usually the next one): the others are worked out from it. */
+  date: string
+  category: string
+}
+
+export interface Balance {
+  /** Pence; negative when overdrawn. */
+  amount: number
+  /** YYYY-MM-DD the balance was right on (entries after this day are added on top). */
+  date: string
 }
 
 export interface SavingsGoal {
@@ -71,7 +97,7 @@ export const DEFAULT_CATEGORIES: MoneyCategory[] = [
   { id: OTHER_INCOME, name: 'Other income', color: GREY, income: true }
 ]
 
-export const emptyMoney = (): MoneyData => ({ categories: DEFAULT_CATEGORIES.map((c) => ({ ...c })), entries: [], budgets: {}, rules: {}, goals: [], notRecurring: [] })
+export const emptyMoney = (): MoneyData => ({ categories: DEFAULT_CATEGORIES.map((c) => ({ ...c })), entries: [], budgets: {}, rules: {}, goals: [], notRecurring: [], subscriptions: [], cancelled: {}, balance: null })
 
 /** Reads money.json, keeping whatever is usable from a damaged or older file. */
 export function readMoney(text: string | null): MoneyData {
@@ -135,6 +161,33 @@ export function readMoney(text: string | null): MoneyData {
       }))
   }
   if (Array.isArray(r.notRecurring)) data.notRecurring = (r.notRecurring as unknown[]).filter((k): k is string => typeof k === 'string')
+  const isDay = (d: unknown): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)
+  if (Array.isArray(r.subscriptions)) {
+    data.subscriptions = (r.subscriptions as Record<string, unknown>[])
+      .filter(
+        (x) =>
+          !!x &&
+          typeof x.id === 'string' &&
+          typeof x.name === 'string' &&
+          Number.isFinite(x.amount) &&
+          (x.amount as number) > 0 &&
+          (x.interval === 'weekly' || x.interval === 'monthly' || x.interval === 'yearly') &&
+          isDay(x.date)
+      )
+      .map((x) => ({
+        id: x.id as string,
+        name: (x.name as string).slice(0, 80),
+        amount: Math.round(x.amount as number),
+        interval: x.interval as RepeatInterval,
+        date: x.date as string,
+        category: typeof x.category === 'string' ? x.category : 'subscriptions'
+      }))
+  }
+  if (r.cancelled && typeof r.cancelled === 'object') {
+    for (const [k, v] of Object.entries(r.cancelled as Record<string, unknown>)) if (isDay(v)) data.cancelled[k] = v
+  }
+  const b = r.balance as Record<string, unknown> | null | undefined
+  if (b && typeof b === 'object' && Number.isFinite(b.amount) && isDay(b.date)) data.balance = { amount: Math.round(b.amount as number), date: b.date }
   return data
 }
 
@@ -447,12 +500,17 @@ const KNOWN: [RegExp, string][] = [
   [/uber ?eats|deliveroo|just ?eat|mcdonald|kfc|burger king|greggs|\bpret\b|costa|starbucks|caffe nero|nando|domino|pizza|subway|wagamama|\bleon\b|itsu|restaurant|cafe|coffee/, 'eating-out'],
   [/tesco|sainsbury|asda|aldi|lidl|morrison|waitrose|co-?op|ocado|iceland|marks ?(&|and)? ?spencer|m&s|farmfoods|\bspar\b|budgens/, 'groceries'],
   [/\btfl\b|trainline|national rail|\buber\b|\bbolt\b|addison lee|\bshell\b|\bbp\b|esso|texaco|parking|ringgo|paybyphone|stagecoach|first bus|arriva|gwr|lner|avanti|northern rail|easyjet|ryanair|\bdvla\b/, 'transport'],
-  [/netflix|spotify|disney|prime video|amazon prime|puregym|the gym|david lloyd|apple\.com|itunes|youtube|now tv|audible|patreon|playstation plus|xbox game pass|icloud|google storage|chatgpt|claude/, 'subscriptions'],
+  [/netflix|spotify|disney|prime video|amazon prime|puregym|the gym|david lloyd|apple\.com|itunes|youtube|now ?tv|\bnow\b.*(membership|entertainment|cinema|boost|subscription)|paramount|crunchyroll|dazn|discord|twitch|duolingo|adobe|microsoft 365|ea play|tidal|deezer|nord ?vpn|express ?vpn|google one|audible|patreon|playstation plus|xbox game pass|icloud|google storage|chatgpt|claude/, 'subscriptions'],
   [/british gas|octopus|\bedf\b|\be\.?on\b|\bovo\b|scottish power|thames water|severn trent|anglian water|united utilities|council tax|\bbt\b|\bsky\b|virgin media|vodafone|\bee\b|\bo2\b|\bthree\b|giffgaff|tv licen|insurance|admiral|aviva|direct line|\brent\b|mortgage/, 'bills'],
   [/ikea|b&q|wickes|screwfix|homebase|dunelm|the range|toolstation/, 'home'],
   [/cinema|odeon|vue|cineworld|steam|nintendo|playstation|ticketmaster|eventbrite|see tickets|theatre|museum|bowling/, 'fun'],
   [/amazon|amzn|ebay|argos|asos|primark|john lewis|\bnext\b|h&m|zara|uniqlo|currys|tk ?maxx|boots|superdrug|etsy|shein|temu|vinted/, 'shopping']
 ]
+
+const SUBSCRIPTION_NAMES = KNOWN.find(([, id]) => id === 'subscriptions')![0]
+
+/** Whether a payee's name is a well-known subscription (Netflix, NOW, Spotify…). */
+export const looksLikeSubscription = (description: string): boolean => SUBSCRIPTION_NAMES.test(description.toLowerCase())
 
 /** The category for a statement row: one you've picked for that shop before, then a guess from well-known UK names. */
 export function guessCategory(row: StatementRow, rules: Record<string, string>, categories: MoneyCategory[]): string {
