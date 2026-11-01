@@ -2,6 +2,7 @@ import { app, ipcMain, nativeImage, shell, type NativeImage } from 'electron'
 import { existsSync, readdirSync } from 'fs'
 import { cp, mkdir, open, readdir, rename, rm, stat, writeFile } from 'fs/promises'
 import { homedir } from 'os'
+import { releaseFiles } from './fileLocks'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'path'
 import {
   isHiddenName,
@@ -202,6 +203,7 @@ async function renameItem(path: string, name: string): Promise<string> {
   if (next === path) return path
   // Changing only the capitals ("plan" → "Plan") is the same file on Windows and a Mac, so it's allowed.
   if (next.toLowerCase() !== path.toLowerCase() && existsSync(next)) throw new Error(`There's already something called "${basename(next)}" here.`)
+  await releaseFiles(path)
   await rename(path, next)
   return next
 }
@@ -219,6 +221,7 @@ async function paste(paths: string[], dir: string, mode: PasteMode): Promise<{ f
     taken.push(name)
     const to = join(dir, name)
     if (mode === 'move') {
+      await releaseFiles(from)
       try {
         await rename(from, to)
       } catch (err) {

@@ -75,6 +75,7 @@ import { sendToDevice, useDropTargets } from '../Share/DeviceDrop'
 import { isVideoFile } from '@shared/videoPlayer'
 import { openVideo } from '../../store/videoPlayer'
 import { archiveFolderName, isArchiveFile } from '@shared/archive'
+import { releaseOnUnmount } from '../../lib/media'
 import ArchivePreview, { CompressDialog } from './ArchivePreview'
 
 const PLACE_ICONS: Record<ExplorerPlace['kind'], typeof Folder> = {
@@ -913,6 +914,12 @@ function Preview({
   const [failed, setFailed] = useState(false)
   const kind = entry && !entry.isDir ? previewKind(entry.name) : 'none'
 
+  // Moving on from a file (or closing the explorer) lets go of it, so it can be deleted or moved.
+  useEffect(() => {
+    const path = entry && !entry.isDir ? entry.path : null
+    return () => void (path && window.api.releaseFile(path).catch(() => undefined))
+  }, [entry?.path])
+
   useEffect(() => {
     setText(null)
     setFailed(false)
@@ -953,11 +960,11 @@ function Preview({
           ) : kind === 'image' ? (
             <img src={url} alt="" onError={() => setFailed(true)} draggable={false} />
           ) : kind === 'video' ? (
-            <video src={url} controls onError={() => setFailed(true)} />
+            <video ref={releaseOnUnmount} src={url} controls onError={() => setFailed(true)} />
           ) : kind === 'audio' ? (
             <>
               <Music size={44} strokeWidth={1.2} />
-              <audio src={url} controls onError={() => setFailed(true)} />
+              <audio ref={releaseOnUnmount} src={url} controls onError={() => setFailed(true)} />
             </>
           ) : kind === 'pdf' ? (
             <iframe src={url} title={entry.name} />

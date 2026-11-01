@@ -44,6 +44,8 @@ export interface Settings {
   /** The floating mini music player: where it was left, and whether it was showing. */
   musicMiniWindow?: WindowBounds
   musicMiniOpen?: boolean
+  /** The video player's own window ("Pop out"): where it was left. */
+  videoWindow?: WindowBounds
   /** The paired phone's link (its token, and the port it was on), so the phone reconnects by itself. */
   phoneToken?: string
   phonePort?: number
@@ -678,6 +680,20 @@ export interface NotesApi {
   videoKeyframe(path: string, at: number, fileStart: number): Promise<number>
   /** Stops a page's live video stream. */
   stopVideoStream(session: string): Promise<void>
+  /** The video player closed this video: everything reading it stops, so it can be deleted or moved. */
+  releaseVideo(path: string): Promise<void>
+  /** A viewer closed: Orbit lets go of this file (a full path, or one in the notes folder). */
+  releaseFile(path: string): Promise<void>
+  /** Plays a video in the video player's own window, which can go full screen while Orbit carries on. */
+  popOutVideo(path: string): Promise<void>
+  /** In the video window: the video it was opened with. */
+  videoWindowCurrent(): Promise<string | null>
+  /** In the video window: tells Orbit which video it's showing now. */
+  videoWindowShowing(path: string | null): void
+  /** In the video window: hands the video back to the player tab and closes. */
+  popInVideo(path: string): Promise<void>
+  /** In the video window: Orbit asked it to play another video. In the notes window: a video coming back from it. */
+  onVideoWindow(fn: (event: 'play' | 'popIn', path: string) => void): () => void
   /** The full path of a file in the notes folder. */
   videoInVault(path: string): Promise<string>
   /** Asks for a video, or subtitles (starting beside `near`); null if cancelled. */
@@ -1074,6 +1090,8 @@ export interface NotesApi {
   comicsRemove(id: string): Promise<ComicShelf>
   /** Gets a comic ready to read (the first time, a RAR is unpacked: see onComicsPreparing). */
   comicsOpen(id: string): Promise<ComicOpened>
+  /** The reader closed this comic: its file is let go of. */
+  comicsClose(id: string): Promise<void>
   comicsProgress(id: string, page: number, offset: number, finished?: boolean): Promise<void>
   comicsResetProgress(id: string): Promise<ComicShelf>
   /** Counts pages turned today; returns today's total. */

@@ -1,5 +1,5 @@
 import './video.css'
-import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import {
   ArrowLeft,
   AudioLines,
@@ -16,6 +16,8 @@ import {
   Play,
   RotateCcw,
   RotateCw,
+  SquareArrowDownLeft,
+  SquareArrowOutUpRight,
   Volume2,
   VolumeX,
   X
@@ -41,7 +43,8 @@ import {
 } from '@shared/videoPlayer'
 import { FILE_MANAGER } from '@shared/platform'
 import { notify } from '../../store/notify'
-import { closeVideo, forgetVideo, openVideo, remember, useVideoPlayer, watchedOf, type SubtitleChoice } from '../../store/videoPlayer'
+import { IN_VIDEO_WINDOW, closeVideo, forgetVideo, openVideo, remember, useVideoPlayer, watchedOf, type SubtitleChoice } from '../../store/videoPlayer'
+import { unloadMedia } from '../../lib/media'
 
 /**
  * The video player tab: plays any video on the computer (MKV, AVI, WMV… through the video helper,
@@ -186,7 +189,17 @@ function firstSubtitles(info: VideoInfo): SubtitleChoice {
 }
 
 function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
-  const video = useRef<HTMLVideoElement>(null)
+  const video = useRef<HTMLVideoElement | null>(null)
+  // A video taken off the page is emptied, so the window stops reading its file straight away.
+  const videoRef = useCallback((el: HTMLVideoElement | null) => {
+    video.current = el
+    return el
+      ? () => {
+          if (video.current === el) video.current = null
+          unloadMedia(el)
+        }
+      : undefined
+  }, [])
   const wrap = useRef<HTMLDivElement>(null)
   const session = useMemo(() => Math.random().toString(36).slice(2), [])
   const saved = useMemo(() => watchedOf(path), [path])
@@ -277,6 +290,9 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
   }, [info, failed, audio, streamStart])
 
   useEffect(() => () => void window.api.stopVideoStream(session), [session])
+  // Closing the player (or moving on to another video) lets go of this one, so it can be deleted or
+  // moved without closing Orbit.
+  useEffect(() => () => void window.api.releaseVideo(path).catch(() => undefined), [path])
 
   /** The window couldn't play it this way: try the next. */
   const fail = (mode: PlayMode): void => {
@@ -409,6 +425,20 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
   }
   const flashTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
+  /** Into a window of its own, which can go full screen on its screen while Orbit carries on. */
+  const popOut = async (): Promise<void> => {
+    save()
+    if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined)
+    closeVideo()
+    await window.api.releaseVideo(path).catch(() => undefined)
+    await window.api.popOutVideo(path).catch(notify)
+  }
+  /** From the video window back into the player tab. */
+  const popIn = (): void => {
+    save()
+    void window.api.popInVideo(path).catch(notify)
+  }
+
   const toggleFullscreen = (): void => {
     if (document.fullscreenElement) void document.exitFullscreen()
     else void wrap.current?.requestFullscreen().catch(() => undefined)
@@ -467,6 +497,8 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
     else if (k === 'ArrowDown') (setVolume(volume - 0.05), show(`${Math.round(Math.max(0, volume - 0.05) * 100)}%`))
     else if (k === 'm' || k === 'M') toggleMute()
     else if (k === 'f' || k === 'F') toggleFullscreen()
+    else if ((k === 'o' || k === 'O') && IN_VIDEO_WINDOW) popIn()
+    else if (k === 'o' || k === 'O') void popOut()
     else if (k === 'c' || k === 'C') toggleSubtitles()
     else if (k === ']' || k === '>') changeSpeed(stepSpeed(speed, 1))
     else if (k === '[' || k === '<') changeSpeed(stepSpeed(speed, -1))
@@ -571,7 +603,7 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
     >
       {source && 'src' in source && (
         <video
-          ref={video}
+          ref={videoRef}
           key={source.src}
           className={skipping ? 'skipping' : ''}
           src={source.src}
@@ -654,8 +686,8 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
       {flash && <div className="video-flash">{flash}</div>}
 
       <div className="video-top">
-        <button className="btn video-back" onClick={() => (save(), closeVideo())} title="All videos">
-          <ArrowLeft size={14} />
+        <button className="btn video-back" onClick={() => (save(), closeVideo())} title={IN_VIDEO_WINDOW ? 'Close' : 'All videos'}>
+          {IN_VIDEO_WINDOW ? <X size={14} /> : <ArrowLeft size={14} />}
         </button>
         <span className="video-title" title={path}>
           {name}
@@ -845,6 +877,15 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
                 }}
               >
                 <PictureInPicture2 size={16} />
+              </button>
+            )}
+            {IN_VIDEO_WINDOW ? (
+              <button className="icon-btn" onClick={popIn} title="Back into Orbit (O)" data-video-pop-in>
+                <SquareArrowDownLeft size={16} />
+              </button>
+            ) : (
+              <button className="icon-btn" onClick={() => void popOut()} title="Pop out: its own window, which can go full screen while you use Orbit (O)" data-video-pop-out>
+                <SquareArrowOutUpRight size={16} />
               </button>
             )}
             <button className="icon-btn" onClick={toggleFullscreen} title="Full screen (F)">

@@ -9,6 +9,7 @@ import { systemDark } from './lib/appearance'
 import { runCommandText } from './lib/smartCommands'
 import { saveCapture } from './lib/capture'
 import StartupLogo from './components/Motion/StartupLogo'
+import { openVideo } from './store/videoPlayer'
 
 export default function App() {
   // undefined = still loading, null = no vault chosen yet
@@ -50,6 +51,9 @@ export default function App() {
       }),
     []
   )
+
+  // A video handed back from the video window ("Back into Orbit") carries on in the player tab.
+  useEffect(() => window.api.onVideoWindow((event, path) => event === 'popIn' && openVideo(path)), [])
 
   const pickVault = useCallback(async () => {
     await flushAll()

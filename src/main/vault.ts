@@ -1,6 +1,7 @@
 import { constants as fsConstants, promises as fs } from 'fs'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'path'
 import type { FileNode } from '@shared/types'
+import { releaseFiles } from './fileLocks'
 
 /** Hidden folders (.git, .obsidian, .trash…) and node_modules never show in the tree. */
 export function isIgnoredName(name: string): boolean {
@@ -353,6 +354,7 @@ export class Vault {
     // A case-only rename ("note" → "Note") points at the same file on Windows, so allow it.
     const caseOnly = target.toLowerCase() === src.toLowerCase()
     if (!caseOnly && (await exists(target))) throw new Error(`"${name}" already exists here.`)
+    await releaseFiles(src)
     await fs.rename(src, target)
     return this.rel(target)
   }
@@ -367,6 +369,7 @@ export class Vault {
     }
     const target = join(destDir, basename(src))
     if (await exists(target)) throw new Error(`"${basename(src)}" already exists there.`)
+    await releaseFiles(src)
     await fs.rename(src, target)
     return this.rel(target)
   }

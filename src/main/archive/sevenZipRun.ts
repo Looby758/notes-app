@@ -33,12 +33,32 @@ interface SevenZipModule {
     mkdir(path: string): void
     mount(type: unknown, opts: { root: string }, at: string): void
     chdir(path: string): void
+    /** The files 7-Zip has open (gaps where it closed one). */
+    streams?: unknown[]
+    close?(stream: unknown): void
   }
   NODEFS: unknown
   callMain(args: string[]): number | undefined
 }
 
 export type SevenZipFactory = (opts: Record<string, unknown>) => Promise<SevenZipModule>
+
+/**
+ * 7-Zip stopping with an error (a wrong password, a damaged archive) can leave the archive open,
+ * and the files it opens are real ones on disk that outlive the worker, so Windows would say Orbit
+ * is still using the archive. Anything still open is closed here.
+ */
+function closeLeftOpen(sz: SevenZipModule): void {
+  // The first three are 7-Zip's own input and output, not files.
+  for (const stream of (sz.FS.streams ?? []).slice(3)) {
+    if (!stream) continue
+    try {
+      sz.FS.close?.(stream)
+    } catch {
+      // Already closed.
+    }
+  }
+}
 
 /** A fresh copy of 7-Zip for each command (its runtime can't be reused once a command ends). */
 export async function runSevenZip(factory: SevenZipFactory, job: SevenZipJob): Promise<SevenZipResult> {
@@ -62,6 +82,8 @@ export async function runSevenZip(factory: SevenZipFactory, job: SevenZipJob): P
     // An exit() comes as an object with a status; anything else (a C++ exception) has no code.
     const status = (e as { status?: unknown })?.status
     code = typeof status === 'number' ? status : null
+  } finally {
+    closeLeftOpen(sz)
   }
   return { code, out: out.join('\n'), err: err.join('\n') }
 }

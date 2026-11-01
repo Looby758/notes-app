@@ -56,22 +56,36 @@ function load(): Pick<VideoPlayerState, 'current' | 'history' | 'volume' | 'mute
   }
 }
 
-export const useVideoPlayer = create<VideoPlayerState>(() => load())
+/** True in the video player's own window ("Pop out"), which plays one video beside the notes window. */
+export const IN_VIDEO_WINDOW = typeof location !== 'undefined' && location.hash === '#video'
+
+export const useVideoPlayer = create<VideoPlayerState>(() => (IN_VIDEO_WINDOW ? { ...load(), current: null } : load()))
 
 useVideoPlayer.subscribe((s) => {
   try {
-    localStorage.setItem(KEY, JSON.stringify({ current: s.current, history: s.history, volume: s.volume, muted: s.muted }))
+    // The video window shares the list (and where you're up to) but not which video the tab has open.
+    const current = IN_VIDEO_WINDOW ? load().current : s.current
+    localStorage.setItem(KEY, JSON.stringify({ current, history: s.history, volume: s.volume, muted: s.muted }))
   } catch {
     // Storage full: it still plays, it just won't remember.
   }
 })
+
+// The other window (the video window, or the notes window) remembered something: take it in here too.
+if (typeof window !== 'undefined')
+  window.addEventListener('storage', (e) => {
+    if (e.key !== KEY) return
+    const { history, volume, muted } = load()
+    useVideoPlayer.setState({ history, volume, muted })
+  })
 
 const nameOf = (path: string): string => path.slice(Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1)
 
 /** Opens a video (full path) in the player tab. */
 export function openVideo(path: string): void {
   useVideoPlayer.setState({ current: path })
-  openSpecialTab(VIDEO_TAB)
+  if (IN_VIDEO_WINDOW) window.api.videoWindowShowing(path)
+  else openSpecialTab(VIDEO_TAB)
 }
 
 /** Opens a video from the notes folder (its path in there). */
