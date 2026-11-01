@@ -42,6 +42,36 @@ const api: NotesApi = {
   studioStop: (id) => ipcRenderer.invoke('studio:stop', id),
   studioReveal: (path) => ipcRenderer.invoke('studio:reveal', path),
   studioOpenFolder: (folder) => ipcRenderer.invoke('studio:openFolder', folder),
+  replayStatus: () => ipcRenderer.invoke('replay:status'),
+  replaySaveNow: () => ipcRenderer.invoke('replay:saveNow'),
+  replayScreen: () => ipcRenderer.invoke('replay:screen'),
+  replayRunning: (on) => ipcRenderer.invoke('replay:running', on),
+  replaySave: (folder, parts, ext, seconds) => ipcRenderer.invoke('replay:save', folder, parts, ext, seconds),
+  onReplaySave: (callback) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('replay:save', handler)
+    return () => ipcRenderer.removeListener('replay:save', handler)
+  },
+  onClipsOpen: (callback) => {
+    const handler = (_e: unknown, path: string): void => callback(path)
+    ipcRenderer.on('clips:open', handler)
+    return () => ipcRenderer.removeListener('clips:open', handler)
+  },
+  clipsList: (folder) => ipcRenderer.invoke('clips:list', folder),
+  clipsExport: (folder, request) => ipcRenderer.invoke('clips:export', folder, request),
+  clipsCancel: () => ipcRenderer.invoke('clips:cancel'),
+  onClipsProgress: (callback) => {
+    const handler = (_e: unknown, done: number): void => callback(done)
+    ipcRenderer.on('clips:progress', handler)
+    return () => ipcRenderer.removeListener('clips:progress', handler)
+  },
+  clipsTrash: (folder, path) => ipcRenderer.invoke('clips:trash', folder, path),
+  clipsReveal: (folder, path) => ipcRenderer.invoke('clips:reveal', folder, path),
+  clipsDrag: (folder, path, icon) => ipcRenderer.send('clips:drag', folder, path, icon),
+  discordHooks: () => ipcRenderer.invoke('discord:hooks'),
+  discordAddHook: (name, url) => ipcRenderer.invoke('discord:addHook', name, url),
+  discordRemoveHook: (id) => ipcRenderer.invoke('discord:removeHook', id),
+  discordSend: (folder, hookId, path, message) => ipcRenderer.invoke('discord:send', folder, hookId, path, message),
   liveStatus: () => ipcRenderer.invoke('live:status'),
   onLiveStatus: (callback) => {
     const handler = (_e: unknown, s: Parameters<typeof callback>[0]): void => callback(s)

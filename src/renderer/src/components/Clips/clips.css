@@ -1,0 +1,325 @@
+.clips-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+}
+.clips-top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.clips-top h2 {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-strong);
+}
+.clips-top .btn,
+.clips-box .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.clips-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.clips-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.clips-status kbd,
+.clips-hint kbd {
+  font-family: inherit;
+  font-size: 11px;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-panel);
+  color: var(--text);
+}
+.clips-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e5484d;
+  box-shadow: 0 0 0 3px rgba(229, 72, 77, 0.25);
+}
+.clips-gap {
+  flex: 1;
+}
+.clips-problem {
+  color: #ff6b6b;
+  font-size: 12px;
+  margin: 0;
+}
+.clips-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px;
+  overflow: hidden;
+}
+.clips-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  min-height: 0;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px;
+}
+.clips-list > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px 6px;
+}
+.clips-list h3,
+.clips-box h3 {
+  margin: 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.clips-empty,
+.clips-none {
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 8px;
+}
+.clips-none {
+  display: grid;
+  place-items: center;
+}
+.clips-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.clips-item:hover {
+  background: var(--bg-hover);
+}
+.clips-item.on {
+  background: var(--bg-active, var(--bg-hover));
+  border-color: var(--accent);
+}
+.clips-item-name {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.clips-item-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.clips-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  outline: none;
+}
+.clips-stage {
+  position: relative;
+  flex: 0 0 auto;
+  height: min(60vh, 520px);
+  background: #000;
+  border-radius: 10px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.clips-stage video {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+  display: block;
+  cursor: pointer;
+}
+.clips-stage .clips-problem {
+  padding: 16px;
+  text-align: center;
+}
+.clips-caption-preview {
+  position: absolute;
+  box-sizing: border-box;
+  text-align: center;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  font-family: Impact, 'Arial Black', 'Helvetica Neue', sans-serif;
+  font-weight: 700;
+  line-height: 1.15;
+  color: #fff;
+  -webkit-text-stroke-color: #000;
+  paint-order: stroke fill;
+  pointer-events: none;
+}
+.clips-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.clips-time {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  min-width: 90px;
+}
+.clips-track {
+  position: relative;
+  flex: 1;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  touch-action: none;
+}
+.clips-track-kept {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  border-top: 2px solid var(--accent);
+  border-bottom: 2px solid var(--accent);
+  box-sizing: border-box;
+}
+.clips-handle {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 10px;
+  margin-left: -5px;
+  border-radius: 4px;
+  background: var(--accent);
+  cursor: ew-resize;
+  z-index: 2;
+}
+.clips-playhead {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  background: #fff;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+  z-index: 3;
+}
+.clips-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.clips-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+.clips-box {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.clips-box textarea {
+  resize: vertical;
+  font: inherit;
+}
+.clips-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.clips-row select {
+  flex: 1;
+  min-width: 0;
+}
+.clips-chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+.clips-chip.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.clips-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+.clips-drag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: grab;
+  user-select: none;
+  margin-right: auto;
+}
+.clips-busy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+.clips-meter {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+.clips-meter > div {
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left;
+}
+.clips-add-hook {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
