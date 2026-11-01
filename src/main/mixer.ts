@@ -1,6 +1,8 @@
 import { app, ipcMain } from 'electron'
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'child_process'
 import { promisify } from 'util'
+import { writeFileSync } from 'fs'
+import { join } from 'path'
 import { IS_MAC } from '@shared/platform'
 import { clampVolume, groupSessions, MAC_APPS, macState, type MixerState, type RawList, type RawMacList } from '@shared/mixer'
 import { logError } from './log'
@@ -259,7 +261,12 @@ let nextRequest = 1
 const waiting = new Map<number, (text: string) => void>()
 
 function startHelper(): ChildProcessWithoutNullStreams {
-  const child = spawn('powershell.exe', ['-NoProfile', '-NoLogo', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(WIN_HELPER, 'utf16le').toString('base64')], {
+  // The helper is run from a file: passed on the command line (-EncodedCommand) it's longer than
+  // Windows allows (32,767 characters) and PowerShell never starts (spawn ENAMETOOLONG).
+  // Written each time so it always matches this version of Orbit; the BOM makes PowerShell read it as UTF-8.
+  const script = join(app.getPath('userData'), 'volume-mixer.ps1')
+  writeFileSync(script, '\ufeff' + WIN_HELPER, 'utf8')
+  const child = spawn('powershell.exe', ['-NoProfile', '-NoLogo', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script], {
     windowsHide: true
   })
   let buffer = ''
@@ -291,7 +298,13 @@ function startHelper(): ChildProcessWithoutNullStreams {
 }
 
 function ask<T>(command: string, timeout = 8000): Promise<T | null> {
-  helper ??= startHelper()
+  try {
+    helper ??= startHelper()
+  } catch (err) {
+    // Couldn't write the script or start PowerShell: show "Windows didn't answer", with the reason in the log.
+    logError('volume mixer', err)
+    return Promise.resolve(null)
+  }
   const id = nextRequest++
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
