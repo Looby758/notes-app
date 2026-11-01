@@ -275,7 +275,8 @@ function start(req: VideoDownloadRequest, vault: () => Vault | null): VideoDownl
   const url = parseVideoLink(String(req?.url ?? ''))
   if (!url) throw new Error('That doesn’t look like a link. Copy the video’s address and paste it here.')
   const quality: DownloadQuality = req.quality === '720' || req.quality === 'audio' ? req.quality : '1080'
-  const folder = typeof req.folder === 'string' && req.folder ? req.folder : 'attachments'
+  // The folder picked in the downloader ('' is the top of the notes folder). The vault keeps it inside the notes folder.
+  const folder = typeof req.folder === 'string' ? req.folder.replace(/^\/+|\/+$/g, '') : 'attachments'
   const job: VideoDownload = { id: nextId++, url: url.href, site: siteName(url), quality, status: 'working', stage: 'starting', startedAt: Date.now() }
   jobs.unshift(job)
   // Old finished ones drop off the end.

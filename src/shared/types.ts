@@ -660,7 +660,7 @@ export interface NotesApi {
   /** Sets up the video downloader (yt-dlp and ffmpeg); resolves when it's done or has failed. */
   getVideoDownloader(): Promise<VideoDownloaderState>
   onVideoDownloaderState(callback: (state: VideoDownloaderState) => void): () => void
-  /** Starts downloading the video at a link into the attachments folder. */
+  /** Starts downloading the video at a link into the folder asked for. */
   downloadVideo(request: VideoDownloadRequest): Promise<VideoDownload>
   /** This session's downloads, newest first. Starts sending changes to onVideoDownloads. */
   videoDownloads(): Promise<VideoDownload[]>
@@ -1180,7 +1180,7 @@ export interface VideoDownloaderState {
 export interface VideoDownloadRequest {
   url: string
   quality: import('./videoDownload').DownloadQuality
-  /** The attachments folder, in the notes folder. */
+  /** The folder to save it in, inside the notes folder ('' for the top level). Made if it isn't there. */
   folder: string
 }
 
