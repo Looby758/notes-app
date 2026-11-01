@@ -48,6 +48,7 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'control-mac', name: 'Control the Mac', blurb: 'See and use your MacBook from the PC in a window', group: 'Connect', keywords: 'remote desktop mac macbook screen vnc' },
   { id: 'webcam', name: 'Phone webcam', blurb: 'Your phone’s camera as the PC’s webcam', group: 'Connect', keywords: 'camera video call discord zoom teams iphone obs' },
   { id: 'web', name: 'Web browser', blurb: 'A web page beside your notes', group: 'Connect', command: 'web.open', keywords: 'internet browse google' },
+  { id: 'grok', name: 'Grok', blurb: 'Grok as a tab, or floating over your notes', group: 'Connect', command: 'grok.open', keywords: 'grok bot xai x ai chatbot assistant elon pop out popout float' },
   { id: 'chat', name: 'AI chat', blurb: 'Chat with Claude about anything', group: 'Connect', command: 'ai.chat', keywords: 'claude ai assistant' },
   { id: 'ask', name: 'Ask everything', blurb: 'AI that knows your notes, email, calendar and money', group: 'Connect', command: 'ai.ask', keywords: 'ai question claude' },
 
