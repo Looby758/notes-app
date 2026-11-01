@@ -416,6 +416,17 @@ export const ROBLOX_ID = 'roblox'
 export const ROBLOX_DOWNLOAD = 'https://www.roblox.com/download'
 
 /**
+ * Roblox's logo (the tilted square with a square hole) on a dark tile, as a picture. Used on Windows,
+ * where the icon read from RobloxPlayerBeta.exe often comes back as the blank "program" icon.
+ */
+export const ROBLOX_ICON = `data:image/svg+xml;utf8,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">' +
+    '<rect width="256" height="256" rx="56" fill="#1a1b1f"/>' +
+    '<g transform="rotate(15 128 128)"><path fill="#fff" fill-rule="evenodd" d="M54 54h148v148H54z M110 110h36v36h-36z"/></g>' +
+    '</svg>'
+)}`
+
+/**
  * Which of Roblox's "Versions" folders holds the player to start: the newest one (by when it was
  * changed) that has RobloxPlayerBeta.exe in it. Roblox leaves old versions behind after updating.
  */

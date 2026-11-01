@@ -25,7 +25,7 @@ import {
   X
 } from 'lucide-react'
 import { callClock, callLength, chatParts, memberState, peopleList, type CallRecord, type ChatMessage, type MentionName, type VoiceMember } from '@shared/discord'
-import { ROBLOX_ID, stripGames, type Game } from '@shared/games'
+import { ROBLOX_ICON, ROBLOX_ID, stripGames, type Game } from '@shared/games'
 import type { SoundClip } from '@shared/soundboard'
 import { cleanError, useDiscord, watchDiscord } from '../../store/discord'
 import { CALL_CLIP_SECONDS, closeMic, micLevel, openMic, saveCallClip, startClipBuffer, stopClipBuffer, useCallAudio } from '../../lib/callAudio'
@@ -500,7 +500,7 @@ function GameStrip({ flash }: { flash: (t: string) => void }) {
       <div className="vp-games">
         {games && !hasRoblox && (
           <button className="vp-game vp-game-get" title="Roblox isn’t installed on this computer: get it from roblox.com" onClick={() => void window.api.openRobloxDownload()}>
-            <span className="vp-game-art vp-game-letter">R</span>
+            <img className="vp-game-art" src={ROBLOX_ICON} alt="" />
             <span className="vp-game-name">Get Roblox</span>
           </button>
         )}
@@ -508,6 +508,8 @@ function GameStrip({ flash }: { flash: (t: string) => void }) {
           <button key={g.id} className={`vp-game${g.running ? ' running' : ''}`} title={g.running ? `${g.name} (playing)` : `Play ${g.name}`} onClick={() => void play(g)} disabled={starting === g.id}>
             {g.art ? (
               <img className="vp-game-art" src={g.art} alt="" />
+            ) : g.icon === ROBLOX_ICON ? (
+              <img className="vp-game-art" src={g.icon} alt="" />
             ) : g.icon ? (
               <img className="vp-game-art vp-game-icon" src={g.icon} alt="" />
             ) : (

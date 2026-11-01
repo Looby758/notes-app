@@ -11,6 +11,7 @@ import {
   isInside,
   macGameFromPlist,
   newestRobloxVersion,
+  ROBLOX_ICON,
   ROBLOX_ID,
   playedInWeek,
   plistString,
@@ -51,6 +52,8 @@ interface Found {
   art: string | null
   /** Where to take the icon from (an app), when there's no picture. */
   iconFrom: string | null
+  /** A ready-made icon (a data: URL), used instead of reading one from `iconFrom`. */
+  icon?: string
   steam?: SteamPlaytime
 }
 
@@ -248,7 +251,7 @@ async function findRoblox(): Promise<Found | null> {
     if (!newest) continue
     const program = join(versions, newest, 'RobloxPlayerBeta.exe')
     // The whole Roblox folder counts as "playing", whichever version is running.
-    return { id: ROBLOX_ID, name: 'Roblox', source: 'roblox', path: root, launch: { open: program }, art: null, iconFrom: program }
+    return { id: ROBLOX_ID, name: 'Roblox', source: 'roblox', path: root, launch: { open: program }, art: null, iconFrom: program, icon: ROBLOX_ICON }
   }
   return null
 }
@@ -468,7 +471,7 @@ async function gamesList(rescan: boolean): Promise<GamesList> {
         lastPlayed: last || null,
         running: running.has(g.id),
         art: g.art,
-        icon: !g.art && g.iconFrom ? await iconFor(g.iconFrom) : null,
+        icon: g.art ? null : (g.icon ?? (g.iconFrom ? await iconFor(g.iconFrom) : null)),
         hidden: hidden.has(g.id)
       }
     })
