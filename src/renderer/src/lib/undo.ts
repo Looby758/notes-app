@@ -1,15 +1,20 @@
 import { useEffect, useRef } from 'react'
 import { notify } from '../store/notify'
 import { UndoHistory, type UndoStep } from './undoHistory'
+import { IS_MAC } from '@shared/platform'
 
 /**
  * Ctrl+Z (⌘Z) for everything. While you're typing (a note, a search box, a name), it's the text's
  * own undo, as always. Anywhere else it undoes the last change you made in Orbit: a file moved,
- * renamed or deleted, a playlist changed, a setting, a star… Ctrl+Shift+Z (and Ctrl+Y on Windows)
+ * renamed or deleted, a playlist changed, a setting, a star, a calendar event, tags added to a
+ * batch of notes, a money change… Ctrl+Shift+Z (and Ctrl+Y on Windows)
  * redoes it.
  */
 
 export const history = new UndoHistory()
+
+/** The undo key as this system writes it, for hints like "Deleted. Ctrl+Z to undo." */
+export const UNDO_KEY = IS_MAC ? '⌘Z' : 'Ctrl+Z'
 
 /** Adds a change to the undo list. */
 export const recordUndo = (step: UndoStep): void => history.record(step)

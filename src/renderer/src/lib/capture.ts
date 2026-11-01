@@ -57,7 +57,7 @@ export async function saveCapture(req: CaptureRequest | string): Promise<{ ok: b
       const path = await ensureDaily(day)
       const title = linkFrom(event.title.trim() || text.trim(), path).replace(/\s*\n\s*/g, ' ')
       const line = event.remind && event.time ? `- [ ] ${event.time} ${title} ⏰ ${event.time}` : `- ${event.time ? `${event.time} ` : ''}${title}`
-      await editNote(path, (current) => insertEvent(current, prefs.scheduleHeading, line))
+      await editNote(path, (current) => insertEvent(current, prefs.scheduleHeading, line), { undo: `Added “${title}” to the calendar` })
       await useVault.getState().refresh([path])
       return { ok: true, where: `the calendar (${formatDate(day, 'ddd D MMM')})` }
     }
