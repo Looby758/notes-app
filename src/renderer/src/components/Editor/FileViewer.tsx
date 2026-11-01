@@ -9,6 +9,7 @@ import { loadSketch, useSketchVersions } from '../../lib/sketch'
 import { useUI } from '../../store/ui'
 import SheetView from './SheetView'
 import { openVaultVideo } from '../../store/videoPlayer'
+import { releaseOnUnmount } from '../../lib/media'
 
 /** Notes that show or link to `path` (by its file name, as embeds are written). */
 function usedIn(path: string): string[] {
@@ -51,6 +52,8 @@ export default function FileViewer({ path }: { path: string }) {
   const [actualSize, setActualSize] = useState(false)
   const [failed, setFailed] = useState(false)
   const isSketch = useIsSketch(path)
+  // Closing the tab lets go of the file, so it can be deleted or moved straight away.
+  useEffect(() => () => void window.api.releaseFile(path).catch(() => undefined), [path])
 
   return (
     <div className="file-viewer" data-file-viewer={path}>
@@ -88,11 +91,11 @@ export default function FileViewer({ path }: { path: string }) {
             onError={() => setFailed(true)}
           />
         ) : kind === 'audio' ? (
-          <audio src={url} controls onError={() => setFailed(true)} />
+          <audio ref={releaseOnUnmount} src={url} controls onError={() => setFailed(true)} />
         ) : kind === 'sheet' ? (
           <SheetView path={path} url={url} name={name} />
         ) : kind === 'video' ? (
-          <video src={url} controls onError={() => setFailed(true)} />
+          <video ref={releaseOnUnmount} src={url} controls onError={() => setFailed(true)} />
         ) : (
           <iframe src={url} title={name} />
         )}

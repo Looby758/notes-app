@@ -29,6 +29,7 @@ import { mathDiagrams } from './mathDiagrams'
 const EVENT_TIME = /^(\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?(?:\s*[-–—]\s*\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?)?)\s/i
 import { useNoteIndex } from '../../store/noteIndex'
 import { playSound } from '../../lib/sounds'
+import { unloadMedia } from '../../lib/media'
 import { petCheer } from '../../lib/pet'
 
 /**
@@ -149,6 +150,10 @@ class AudioWidget extends WidgetType {
     audio.src = this.src
     wrap.append(name, audio)
     return wrap
+  }
+  destroy(dom: HTMLElement): void {
+    // Lets go of the recording's file once it's off screen, so it can be deleted or moved.
+    unloadMedia(dom.querySelector('audio'))
   }
   ignoreEvent(): boolean {
     return true

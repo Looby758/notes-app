@@ -9,7 +9,6 @@ import {
   Notification,
   systemPreferences,
   nativeTheme,
-  net,
   protocol,
   screen,
   session,
@@ -21,7 +20,6 @@ import { existsSync, statSync } from 'fs'
 import { readFile } from 'fs/promises'
 import * as fsp from 'fs/promises'
 import { basename, extname, isAbsolute, join, relative } from 'path'
-import { pathToFileURL } from 'url'
 import type { AiAskTurn, AiExtraContext, AiChat, AiChatMessage, AiEngine, AiNote, AiSortRow, ConfirmOptions, EmailFolder, OutgoingEmail } from '@shared/types'
 import type { MusicAction } from '@shared/spotify'
 import { normalizePrefs, type Prefs } from '@shared/prefs'
@@ -38,6 +36,7 @@ import * as spotify from './spotify'
 import * as localMusic from './localMusic'
 import { closeMusicMini, setupMusicMini } from './musicMini'
 import { closePopout, setupPopout } from './popout'
+import { closeVideoWindow, setupVideoWindow } from './videoWindow'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
 import { applySnipShortcut, setupSnip, startSnip } from './snip'
 import { applySongIdShortcut, setupSongId } from './songId'
@@ -60,6 +59,7 @@ import { openOutside } from './openOutside'
 import { openInOrbit, pathsFromArgv, setupOpenInOrbit } from './openInOrbit'
 import { hold, setupUndoBin } from './undoBin'
 import { setupVideoPlayer, videoResponse } from './videoPlayer'
+import { releaseFiles, serveFile } from './fileLocks'
 import { comicResponse, setupComics, shareProgress as shareComicProgress } from './comics'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
@@ -366,6 +366,9 @@ protocol.registerSchemesAsPrivileged([
   THEME_SCHEME
 ])
 
+/** Your own music and soundboard clips go through the Web Audio visualiser, which needs this. */
+const CORS = { 'Access-Control-Allow-Origin': '*' }
+
 function registerVaultProtocol(): void {
   protocol.handle('vault', async (request) => {
     try {
@@ -375,12 +378,7 @@ function registerVaultProtocol(): void {
         const rel = decodeURIComponent(url.pathname.slice(1))
         const full = localMusic.musicFile(rel)
         if (!full || !AUDIO_TYPES.has(extname(full).toLowerCase())) return new Response('Not allowed', { status: 403 })
-        if (url.host === 'music') {
-          const res = await net.fetch(pathToFileURL(full).toString(), { headers: request.headers })
-          const headers = new Headers(res.headers)
-          headers.set('Access-Control-Allow-Origin', '*')
-          return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
-        }
+        if (url.host === 'music') return serveFile(full, request.headers.get('range'), CORS)
         const pic = await localMusic.cover(rel)
         return pic ? new Response(Buffer.from(pic.data), { headers: { 'Content-Type': pic.type, 'Cache-Control': 'max-age=3600' } }) : new Response('No picture', { status: 404 })
       }
@@ -394,21 +392,19 @@ function registerVaultProtocol(): void {
       if (url.host === 'sound') {
         const full = soundFile(decodeURIComponent(url.pathname.slice(1)))
         if (!full) return new Response('Not found', { status: 404 })
-        const res = await net.fetch(pathToFileURL(full).toString(), { headers: request.headers })
-        const headers = new Headers(res.headers)
-        headers.set('Access-Control-Allow-Origin', '*')
-        return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+        return serveFile(full, request.headers.get('range'), CORS)
       }
       // Previews in the file explorer tab (vault://explore/<full path>): pictures, video, sound and PDFs only.
       if (url.host === 'explore') {
         const full = explorerFile(url)
-        return full ? net.fetch(pathToFileURL(full).toString(), { headers: request.headers }) : new Response('Not allowed', { status: 403 })
+        return full ? serveFile(full, request.headers.get('range')) : new Response('Not allowed', { status: 403 })
       }
       const rel = decodeURIComponent(url.pathname.slice(1))
       const full = currentVault().abs(rel)
       const ext = extname(full).toLowerCase()
       if (!IMAGE_TYPES.has(ext) && !AUDIO_TYPES.has(ext) && !VIEWER_TYPES.has(ext)) return new Response('Not allowed', { status: 403 })
-      return net.fetch(pathToFileURL(full).toString(), { headers: request.headers })
+      // Read in a way Orbit can stop, so closing the file (or deleting it) lets go of it.
+      return serveFile(full, request.headers.get('range'))
     } catch {
       return new Response('Not found', { status: 404 })
     }
@@ -535,6 +531,7 @@ function createWindow(): BrowserWindow {
       closeYouTube()
       closeMusicMini()
       closePopout()
+      closeVideoWindow()
     }
   })
   ipcMain.removeHandler('app:ready-to-close')
@@ -731,6 +728,11 @@ function registerIpc(): void {
   ipcMain.handle('fs:createBoard', (_e, folder: string) => currentVault().createBoard(folder))
   ipcMain.handle('fs:createFolder', (_e, folder: string) => currentVault().createFolder(folder))
   ipcMain.handle('fs:rename', (_e, path: string, name: string) => currentVault().rename(path, name))
+  // A viewer closed (a preview, a file's tab, the video player): let go of the file so it can be deleted or moved.
+  ipcMain.handle('files:release', (_e, path: unknown) => {
+    if (typeof path !== 'string' || !path) return
+    return releaseFiles(isAbsolute(path) ? path : currentVault().abs(path))
+  })
   ipcMain.handle('fs:move', (_e, path: string, folder: string) => currentVault().move(path, folder))
   // Image bytes for export (images only, from inside the notes folder).
   ipcMain.handle('fs:readImage', async (_e, path: string) => {
@@ -1031,6 +1033,7 @@ app.whenReady().then(async () => {
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
   safely('undo', () => setupUndoBin(() => vault?.root ?? null))
   safely('video player', () => setupVideoPlayer(() => vault?.root ?? null))
+  safely('video window', () => setupVideoWindow(() => mainWindow))
   safely('comic reader', () => setupComics(() => vault))
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))

@@ -6,6 +6,7 @@ import { basename, extname, join } from 'path'
 import { archiveKind, extractRar, listArchive, ZipArchive } from './archive'
 import { readPrintedText } from './handwriting'
 import { logError } from './log'
+import { onRelease } from './fileLocks'
 import {
   comicDay,
   comicTitle,
@@ -254,18 +255,36 @@ async function sizeOfFile(path: string): Promise<{ w: number; h: number }> {
   }
 }
 
+/** A zip comic nobody has turned a page of for this long is closed (it opens again in a moment). */
+const ZIP_IDLE_MS = 60_000
+const zipTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+function closeZip(id: string): Promise<void> {
+  clearTimeout(zipTimers.get(id))
+  zipTimers.delete(id)
+  const z = zips.get(id)
+  zips.delete(id)
+  return z ? z.then((x) => x.close()).catch(() => undefined) : Promise.resolve()
+}
+
+// Closing the reader, or deleting or moving the comic in Orbit, lets go of it.
+onRelease(async (test) => {
+  const shelfBooks = load().books
+  await Promise.all([...zips.keys()].filter((id) => !shelfBooks[id] || test(shelfBooks[id].path)).map(closeZip))
+})
+
 function zipOf(b: ComicBook): Promise<ZipArchive> {
+  clearTimeout(zipTimers.get(b.id))
+  const idle = setTimeout(() => void closeZip(b.id), ZIP_IDLE_MS)
+  idle.unref?.()
+  zipTimers.set(b.id, idle)
   let z = zips.get(b.id)
   if (!z) {
     z = ZipArchive.open(b.path)
     z.catch(() => zips.delete(b.id))
     zips.set(b.id, z)
     // Keep three open at most.
-    while (zips.size > 3) {
-      const [oldId, oldZip] = zips.entries().next().value as [string, Promise<ZipArchive>]
-      zips.delete(oldId)
-      void oldZip.then((x) => x.close()).catch(() => undefined)
-    }
+    while (zips.size > 3) void closeZip(zips.keys().next().value as string)
   }
   return z
 }
@@ -548,13 +567,14 @@ export function setupComics(appData: () => AppDataStore | null): void {
     const b = book(id)
     delete load().books[b.id]
     indexes.delete(b.id)
-    void zips.get(b.id)?.then((z) => z.close()).catch(() => undefined)
-    zips.delete(b.id)
+    void closeZip(b.id)
     await rm(bookDir(b.id), { recursive: true, force: true }).catch(() => undefined)
     // Where you were up to is kept, so adding it back carries on from there.
     saveNow()
     return shelf()
   })
+  // The reader closed: the comic's file is let go of (its pages stay ready in Orbit's own folder).
+  ipcMain.handle('comics:close', (_e, id: string) => closeZip(String(id)))
   ipcMain.handle('comics:open', (_e, id: string) => {
     let p = opening.get(id)
     if (!p) {
