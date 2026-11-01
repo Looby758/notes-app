@@ -11233,6 +11233,24 @@ body.reduce-motion .theme-loading-text {
   gap: 12px;
   margin-bottom: 14px;
 }
+.dc-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.dc-head-actions > .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dc-history-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  font-size: 14px;
+}
 .dc-head h2 {
   display: flex;
   align-items: center;

@@ -41,7 +41,7 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'passwords', name: 'Passwords', blurb: 'Your saved logins', group: 'Money', command: 'passwords.open', keywords: 'vault logins security' },
 
   { id: 'email', name: 'Email', blurb: 'Gmail inside Orbit', group: 'Connect', command: 'email.open', keywords: 'gmail inbox mail' },
-  { id: 'discord-voice', name: 'Discord voice', blurb: 'Who’s in voice, mute and deafen', group: 'Connect', command: 'discord.open', keywords: 'discord voice call mute deafen deafened mic headphones channel who talking' },
+  { id: 'discord-voice', name: 'Discord voice', blurb: 'Who’s in voice, mute and deafen', group: 'Connect', command: 'discord.open', keywords: 'discord voice call mute deafen deafened mic headphones channel who talking pop out popout second monitor volume push to talk vc history' },
   { id: 'messages', name: 'Messages', blurb: 'WhatsApp and Discord', group: 'Connect', command: 'messages.open', keywords: 'whatsapp discord chat' },
   { id: 'phone', name: 'Phone', blurb: 'Send files, Stream Deck, second screen', group: 'Connect', keywords: 'qr mobile touchpad remote deck' },
   { id: 'second-screen', name: 'Second screen', blurb: 'Use your MacBook as a second screen for the PC', group: 'Connect', keywords: 'mac macbook monitor extend display sidecar' },

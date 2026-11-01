@@ -89,8 +89,18 @@ function create(): BrowserWindow {
   return w
 }
 
-/** Opens the pop-out window (it starts by asking which app to show), or brings it back. */
-export function openPopout(): void {
+/** What the next pop-out should show straight away ('discord': Discord's window), taken once by its page. */
+let hint: string | null = null
+
+/**
+ * Opens the pop-out window (it starts by asking which app to show), or brings it back. With a
+ * hint ('discord', from the voice pop-out's Watch button) it picks that app's window by itself.
+ */
+export function openPopout(withHint: string | null = null): void {
+  if (withHint) {
+    hint = withHint
+    if (win && !win.isDestroyed()) win.webContents.send('popout:hint', withHint)
+  }
   if (win && !win.isDestroyed()) {
     if (win.isMinimized()) win.restore()
     win.show()
@@ -127,6 +137,12 @@ export function setupPopout(getPrefs: () => Prefs): void {
   ipcMain.handle('popout:open', () => openPopout())
   ipcMain.handle('popout:sources', (e) => (fromPopout(e) ? captureSources() : []))
   ipcMain.handle('popout:state', (e) => ({ opacity: fromPopout(e) ? savedOpacity() : 1 }))
+  ipcMain.handle('popout:hint', (e) => {
+    if (!fromPopout(e)) return null
+    const h = hint
+    hint = null
+    return h
+  })
   // Showing an app: the window takes the picture's shape.
   ipcMain.handle('popout:fit', (e, aspect: number) => {
     const w = fromPopout(e)

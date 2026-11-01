@@ -3,7 +3,7 @@
  * apps, and adding up time played. Kept free of Electron and the file system so it can be tested.
  */
 
-export type GameSource = 'steam' | 'epic' | 'app' | 'added'
+export type GameSource = 'steam' | 'epic' | 'roblox' | 'app' | 'added'
 
 /** A game as the Games page shows it. */
 export interface Game {
@@ -407,4 +407,34 @@ export interface CoversStatus {
   hasKey: boolean
   /** False if the system can't encrypt the key (it is then not saved). */
   canEncrypt: boolean
+}
+
+// ---------- Roblox ----------
+
+/** Roblox isn't on Steam or Epic: it has its own installer and keeps each version in its own folder. */
+export const ROBLOX_ID = 'roblox'
+export const ROBLOX_DOWNLOAD = 'https://www.roblox.com/download'
+
+/**
+ * Which of Roblox's "Versions" folders holds the player to start: the newest one (by when it was
+ * changed) that has RobloxPlayerBeta.exe in it. Roblox leaves old versions behind after updating.
+ */
+export function newestRobloxVersion(folders: { name: string; modified: number; hasPlayer: boolean }[]): string | null {
+  const usable = folders.filter((f) => f.hasPlayer && /^version-/i.test(f.name))
+  if (!usable.length) return null
+  return usable.reduce((a, b) => (b.modified > a.modified ? b : a)).name
+}
+
+// ---------- the Discord voice pop-out's strip ----------
+
+/**
+ * The games on the Discord voice pop-out's launcher strip: Roblox first (it's the one played with
+ * friends), then the most recently played, then by name. Hidden games stay out.
+ */
+export function stripGames(games: Game[], max = 10): Game[] {
+  const shown = games.filter((g) => !g.hidden)
+  const rank = (g: Game): number => (g.id === ROBLOX_ID ? 0 : 1)
+  return [...shown]
+    .sort((a, b) => rank(a) - rank(b) || Number(b.running) - Number(a.running) || (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0) || a.name.localeCompare(b.name))
+    .slice(0, max)
 }

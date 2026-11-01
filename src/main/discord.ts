@@ -4,6 +4,10 @@ import { readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
 import {
+  addCall,
+  channelLink,
+  clampVolume,
+  cleanCalls,
   decodeFrames,
   discordError,
   DISCORD_PORTAL,
@@ -15,12 +19,17 @@ import {
   ipcPaths,
   membersFrom,
   memberFrom,
+  messageFrom,
+  messagesFrom,
   OP,
+  patchMember,
+  upsertMessage,
   removeMember,
   setSpeaking,
   tokenError,
   upsertMember,
   validClientId,
+  type CallRecord,
   type DiscordStatus
 } from '@shared/discord'
 import { logError } from './log'
@@ -40,6 +49,8 @@ interface Stored {
   refresh?: string
   /** When the access token runs out (ms). */
   expires?: number
+  /** The scopes the sign-in was given (space-separated, not secret). */
+  scopes?: string
 }
 
 let stored: Stored | null = null
@@ -86,8 +97,82 @@ function broadcast(): void {
 }
 
 function update(patch: Partial<DiscordStatus>): void {
+  const before = status.channel?.id ?? null
   status = { ...status, ...patch }
+  const after = status.channel?.id ?? null
+  if (before !== after) {
+    finishCall()
+    if (!after) status = { ...status, chat: [], chatState: 'none' }
+  }
+  trackCall()
   broadcast()
+  if (before !== after) for (const l of channelListeners) l(before, after, firstLook)
+}
+
+// ---------------------------------------------------------------------------------------------
+// Call history (only on this computer: discord-calls.json in the settings folder)
+
+interface OpenCall {
+  channelId: string
+  record: CallRecord
+  people: Set<string>
+}
+let openCall: OpenCall | null = null
+let calls: CallRecord[] | null = null
+const callsFile = (): string => join(app.getPath('userData'), 'discord-calls.json')
+
+function loadCalls(): CallRecord[] {
+  if (calls) return calls
+  try {
+    calls = cleanCalls(JSON.parse(readFileSync(callsFile(), 'utf8')))
+  } catch {
+    calls = []
+  }
+  return calls
+}
+
+function saveCalls(): void {
+  try {
+    const file = callsFile()
+    writeFileSync(`${file}.tmp`, JSON.stringify(loadCalls()), 'utf8')
+    renameSync(`${file}.tmp`, file)
+  } catch (err) {
+    logError('saving the call history', err)
+  }
+  for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send('discord:calls-changed', loadCalls())
+}
+
+/** Starts a call when you're in a channel, and notes everyone who's been in it. */
+function trackCall(): void {
+  const ch = status.channel
+  if (!ch) return
+  if (!openCall || openCall.channelId !== ch.id) {
+    openCall = { channelId: ch.id, people: new Set(), record: { id: randomUUID(), channel: ch.name, server: ch.server, start: ch.joinedAt, end: ch.joinedAt, people: [] } }
+  }
+  openCall.record.channel = ch.name
+  openCall.record.server = ch.server
+  for (const m of ch.members) if (m.id !== status.me?.id && !m.bot) openCall.people.add(m.name)
+}
+
+/** You left (or Discord closed): the call goes into the history. */
+function finishCall(): void {
+  const c = openCall
+  openCall = null
+  if (!c) return
+  const before = loadCalls()
+  calls = addCall(before, { ...c.record, end: Date.now(), people: [...c.people] })
+  if (calls !== before) saveCalls()
+}
+
+type ChannelListener = (before: string | null, after: string | null, firstLook: boolean) => void
+const channelListeners = new Set<ChannelListener>()
+/** True while the channel being shown is the one you were already in when Orbit connected. */
+let firstLook = false
+
+/** Called when you join, leave or change voice channel (main/discordPopout.ts offers the pop-out). */
+export function onDiscordChannel(listener: ChannelListener): () => void {
+  channelListeners.add(listener)
+  return () => channelListeners.delete(listener)
 }
 
 const hasApp = (): boolean => !!load().clientId && !!load().secret
@@ -211,6 +296,17 @@ function handleFrame(op: number, msg: unknown): void {
     case 'VOICE_CHANNEL_SELECT':
       void followChannel(typeof data.channel_id === 'string' ? data.channel_id : null)
       break
+    case 'MESSAGE_CREATE':
+    case 'MESSAGE_UPDATE': {
+      const msg = messageFrom(data)
+      if (msg && status.channel && data.channel_id === status.channel.id) update({ chat: upsertMessage(status.chat, msg) })
+      break
+    }
+    case 'MESSAGE_DELETE': {
+      const id = (data.message as { id?: unknown } | undefined)?.id
+      if (typeof id === 'string' && data.channel_id === status.channel?.id) update({ chat: status.chat.filter((x) => x.id !== id) })
+      break
+    }
     case 'VOICE_STATE_CREATE':
     case 'VOICE_STATE_UPDATE': {
       const member = memberFrom(data)
@@ -237,24 +333,37 @@ function handleFrame(op: number, msg: unknown): void {
 }
 
 const CHANNEL_EVENTS = ['VOICE_STATE_CREATE', 'VOICE_STATE_UPDATE', 'VOICE_STATE_DELETE', 'SPEAKING_START', 'SPEAKING_STOP']
+const CHAT_EVENTS = ['MESSAGE_CREATE', 'MESSAGE_UPDATE', 'MESSAGE_DELETE']
 
-/** Shows the voice channel you're in (or none), and listens to who comes and goes. */
-async function followChannel(id: string | null): Promise<void> {
+/** The sign-in includes reading messages (sign-ins from before the chat was added don't). */
+const canReadChat = (): boolean => (load().scopes ?? '').split(/\s+/).includes('messages.read')
+
+/**
+ * Shows the voice channel you're in (or none), and listens to who comes and goes and to its chat.
+ * `first`: Orbit just connected and you were already in it (so it isn't a fresh join).
+ */
+async function followChannel(id: string | null, first = false): Promise<void> {
   const gen = generation
   if (channelId && channelId !== id) {
     const old = channelId
-    await Promise.all(CHANNEL_EVENTS.map((evt) => command('UNSUBSCRIBE', { channel_id: old }, evt).catch(() => {})))
+    await Promise.all([...CHANNEL_EVENTS, ...CHAT_EVENTS].map((evt) => command('UNSUBSCRIBE', { channel_id: old }, evt).catch(() => {})))
   }
   if (gen !== generation) return
   channelId = id
+  firstLook = first
   if (!id) return update({ channel: null })
   try {
     const ch = (await command('GET_CHANNEL', { channel_id: id })) as Record<string, unknown> | null
     if (gen !== generation || channelId !== id) return
     await showChannel(ch)
     await Promise.all(CHANNEL_EVENTS.map((evt) => command('SUBSCRIBE', { channel_id: id }, evt).catch(() => {})))
+    if (!canReadChat()) return update({ chatState: 'sign-in' })
+    const ok = await Promise.all(CHAT_EVENTS.map((evt) => command('SUBSCRIBE', { channel_id: id }, evt).then(() => true, () => false)))
+    if (gen === generation && channelId === id) update({ chatState: ok[0] ? 'ok' : 'none' })
   } catch (err) {
     logError('reading the Discord voice channel', err)
+  } finally {
+    firstLook = false
   }
 }
 
@@ -270,7 +379,9 @@ async function showChannel(ch: Record<string, unknown> | null): Promise<void> {
     }
   }
   const name = typeof ch.name === 'string' && ch.name ? ch.name : 'Private call'
-  update({ channel: { id: ch.id, name, server, members: membersFrom(ch) } })
+  const guildId = typeof ch.guild_id === 'string' ? ch.guild_id : null
+  const joinedAt = status.channel?.id === ch.id ? status.channel.joinedAt : Date.now()
+  update({ channel: { id: ch.id, name, server, guildId, joinedAt, members: membersFrom(ch) }, chat: messagesFrom(ch) })
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -295,6 +406,7 @@ async function tokenRequest(params: Record<string, string>): Promise<void> {
   if (!res.ok || typeof json.access_token !== 'string') throw new DiscordError(tokenError(res.status, json), json.error)
   s.access = encrypt(json.access_token)
   if (typeof json.refresh_token === 'string') s.refresh = encrypt(json.refresh_token)
+  if (typeof json.scope === 'string') s.scopes = json.scope
   s.expires = Date.now() + (typeof json.expires_in === 'number' ? json.expires_in : 604_800) * 1000
   save()
 }
@@ -317,6 +429,7 @@ function forgetSignIn(): void {
   delete s.access
   delete s.refresh
   delete s.expires
+  delete s.scopes
   save()
 }
 
@@ -399,7 +512,7 @@ async function connect(interactive: boolean): Promise<void> {
     if (settings) update({ mute: settings.mute === true, deaf: settings.deaf === true })
     const ch = (await command('GET_SELECTED_VOICE_CHANNEL').catch(() => null)) as Record<string, unknown> | null
     if (gen !== generation) return
-    if (ch && typeof ch.id === 'string') await followChannel(ch.id)
+    if (ch && typeof ch.id === 'string') await followChannel(ch.id, true)
     else update({ channel: null })
   } catch (err) {
     if (gen !== generation) return
@@ -433,6 +546,56 @@ export async function setVoice(which: 'mute' | 'deaf', value?: boolean): Promise
   const next = value ?? !status[which]
   const res = (await command('SET_VOICE_SETTINGS', { [which]: next })) as { mute?: unknown; deaf?: unknown } | null
   update({ mute: res?.mute === true, deaf: res?.deaf === true })
+  return status
+}
+
+function needReady(): void {
+  if (status.stage !== 'ready') throw new Error(status.stage === 'no-discord' ? 'Discord isn’t open on this computer.' : 'Sign in to Discord in Orbit first.')
+}
+
+/** How loud you hear one person (0 to 200), and muting them just for you. Nobody else hears a difference. */
+export async function setUserVoice(userId: string, patch: { volume?: number; mute?: boolean }): Promise<DiscordStatus> {
+  needReady()
+  if (!/^\d+$/.test(userId)) throw new Error('Unknown person.')
+  const args: Record<string, unknown> = { user_id: userId }
+  if (patch.volume !== undefined) args.volume = clampVolume(patch.volume)
+  if (patch.mute !== undefined) args.mute = !!patch.mute
+  const res = (await command('SET_USER_VOICE_SETTINGS', args)) as { volume?: unknown; mute?: unknown } | null
+  if (status.channel) {
+    const volume = typeof res?.volume === 'number' ? clampVolume(res.volume) : (args.volume as number | undefined)
+    const localMute = typeof res?.mute === 'boolean' ? res.mute : (args.mute as boolean | undefined)
+    update({
+      channel: {
+        ...status.channel,
+        members: patchMember(status.channel.members, userId, { ...(volume !== undefined ? { volume } : {}), ...(localMute !== undefined ? { localMute } : {}) })
+      }
+    })
+  }
+  return status
+}
+
+/** Leaves the voice channel. */
+export async function leaveVoice(): Promise<void> {
+  needReady()
+  await command('SELECT_VOICE_CHANNEL', { channel_id: null })
+}
+
+/**
+ * The pop-out's push-to-talk button: while it's held you're unmuted, and muted again when it's let
+ * go. It only unmutes if you were muted (and not deafened), so it never mutes you by surprise.
+ */
+let talkingByButton = false
+export async function pushToTalk(down: boolean): Promise<DiscordStatus> {
+  needReady()
+  if (down) {
+    if (status.mute && !status.deaf && !talkingByButton) {
+      talkingByButton = true
+      await setVoice('mute', false)
+    }
+  } else if (talkingByButton) {
+    talkingByButton = false
+    await setVoice('mute', true)
+  }
   return status
 }
 
@@ -482,6 +645,39 @@ export function setupDiscord(): void {
     return setVoice(which, typeof value === 'boolean' ? value : undefined)
   })
   ipcMain.handle('discord:open-portal', () => shell.openExternal(DISCORD_PORTAL))
+  ipcMain.handle('discord:user-voice', (_e, userId: unknown, patch: unknown) => {
+    const p = (patch && typeof patch === 'object' ? patch : {}) as { volume?: unknown; mute?: unknown }
+    return setUserVoice(String(userId ?? ''), {
+      ...(typeof p.volume === 'number' ? { volume: p.volume } : {}),
+      ...(typeof p.mute === 'boolean' ? { mute: p.mute } : {})
+    })
+  })
+  ipcMain.handle('discord:leave', () => leaveVoice())
+  ipcMain.handle('discord:push-to-talk', (_e, down: unknown) => pushToTalk(down === true))
+  // Opens the voice channel in the Discord app (to type in its chat, or watch a stream there).
+  ipcMain.handle('discord:open-channel', () => {
+    const ch = status.channel
+    const link = ch && channelLink(ch.guildId, ch.id)
+    if (link) return shell.openExternal(link)
+    return undefined
+  })
+  // Signs in again, so Discord asks for the newer permissions (reading the chat).
+  ipcMain.handle('discord:reauthorize', () => {
+    forgetSignIn()
+    void connect(true)
+    return status
+  })
+  ipcMain.handle('discord:calls', () => loadCalls())
+  ipcMain.handle('discord:remove-call', (_e, id: unknown) => {
+    calls = loadCalls().filter((c) => c.id !== id)
+    saveCalls()
+    return calls
+  })
+  ipcMain.handle('discord:clear-calls', () => {
+    calls = []
+    saveCalls()
+    return calls
+  })
 
   // A saved sign-in connects quietly at start (and whenever Discord starts later).
   if (hasSignIn()) void connect(false)
@@ -489,5 +685,7 @@ export function setupDiscord(): void {
 
 export function teardownDiscord(): void {
   clearTimeout(retryTimer)
+  // Quitting mid-call still keeps the call in the history.
+  finishCall()
   closeSocket()
 }

@@ -34,7 +34,7 @@ export function segmentsToKeep<T extends ReplaySegment>(segments: T[], seconds: 
 export const segmentsLength = (segments: ReplaySegment[]): number => segments.reduce((sum, s) => sum + Math.max(0, s.end - s.start), 0) / 1000
 
 /** "Replay 2026-10-31 14-05-09.mp4" or "Clip …" (no colons: Windows doesn't allow them). */
-export function clipFileName(kind: 'Replay' | 'Clip', date: Date, ext: string): string {
+export function clipFileName(kind: 'Replay' | 'Clip' | 'Call clip', date: Date, ext: string): string {
   const p = (n: number): string => String(n).padStart(2, '0')
   return `${kind} ${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())} ${p(date.getHours())}-${p(date.getMinutes())}-${p(date.getSeconds())}.${ext}`
 }

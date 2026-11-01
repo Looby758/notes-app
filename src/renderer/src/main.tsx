@@ -6,6 +6,8 @@ import YouTubeMini from './components/YouTube/YouTubeMini'
 import MusicMini from './components/Music/MusicMini'
 import PopoutWindow from './components/Popout/PopoutWindow'
 import VideoWindow from './components/Video/VideoWindow'
+import VoicePopout from './components/Discord/VoicePopout'
+import VoiceToast from './components/Discord/VoiceToast'
 import SnipApp from './components/Snip/SnipApp'
 import ShareCapture from './components/Share/ShareCapture'
 import ShareDrop from './components/Share/ShareDrop'
@@ -28,6 +30,9 @@ const isMusic = location.hash === '#music'
 const isSnip = location.hash === '#snip'
 // The pop-out window: any app, live, floating on top (#popout).
 const isPopout = location.hash === '#popout'
+// The Discord voice pop-out (for a second screen), and the note offering it when you join a call.
+const isVoicePopout = location.hash === '#discord-popout'
+const isVoiceToast = location.hash === '#discord-toast'
 // The video player popped out into a window of its own.
 const isVideo = location.hash === '#video'
 // Mouse sharing's invisible window (holds the mouse while it's on the other computer) and its drop strip.
@@ -40,6 +45,9 @@ if (isScreenSend || isScreenView) {
   document.body.classList.add('screen-window')
 } else if (isShareCapture || isShareDrop) {
   document.body.classList.add(isShareCapture ? 'share-capture-window' : 'share-drop-window')
+  loadPrefs().catch(() => undefined)
+} else if (isVoicePopout || isVoiceToast) {
+  document.body.classList.add(isVoicePopout ? 'voice-popout-window' : 'voice-toast-window')
   loadPrefs().catch(() => undefined)
 } else if (isPopout) {
   document.body.classList.add('popout-window')
@@ -69,6 +77,10 @@ createRoot(document.getElementById('root')!).render(
       <MusicMini />
     ) : isSnip ? (
       <SnipApp />
+    ) : isVoicePopout ? (
+      <VoicePopout />
+    ) : isVoiceToast ? (
+      <VoiceToast />
     ) : isPopout ? (
       <PopoutWindow />
     ) : isVideo ? (

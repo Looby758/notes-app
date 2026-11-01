@@ -152,12 +152,16 @@ function runFfmpeg(args: string[], length: number | null, onProgress?: (done: nu
 
 const tempFolder = (): string => join(app.getPath('temp'), 'orbit-replay')
 
-async function saveReplay(folder: unknown, parts: Uint8Array[], ext: string, seconds: number): Promise<string> {
+/**
+ * Joins the newest pieces of a buffer into one file in the recordings folder. `kind` 'call' is the
+ * Discord voice pop-out's clip button: the same pieces-and-join, but of the call's sound only.
+ */
+async function saveReplay(folder: unknown, parts: Uint8Array[], ext: string, seconds: number, kind: 'replay' | 'call' = 'replay'): Promise<string> {
   if (!Array.isArray(parts) || !parts.length) throw new Error('There’s nothing recorded yet. Give it a few seconds.')
   const type = ext === 'webm' ? 'webm' : 'mp4'
   const dir = folderOf(folder)
   await mkdir(dir, { recursive: true })
-  const out = freeName(dir, clipFileName('Replay', new Date(), type))
+  const out = freeName(dir, clipFileName(kind === 'call' ? 'Call clip' : 'Replay', new Date(), type))
   if (parts.length === 1) {
     // One piece is already a whole video.
     await writeFile(out, Buffer.from(parts[0]))
@@ -182,16 +186,19 @@ async function saveReplay(folder: unknown, parts: Uint8Array[], ext: string, sec
       await rm(work, { recursive: true, force: true })
     }
   }
-  tellSaved(out, seconds)
+  tellSaved(out, seconds, kind)
   return out
 }
 
 const shown = new Set<Notification>()
 
 /** A system notification (you're probably in a game): click it to edit the clip. */
-function tellSaved(path: string, seconds: number): void {
+function tellSaved(path: string, seconds: number, kind: 'replay' | 'call'): void {
   if (!Notification.isSupported()) return
-  const n = new Notification({ title: 'Replay saved', body: `The last ${seconds} seconds. Click to trim it, add a caption or send it to Discord.`, silent: true })
+  const n =
+    kind === 'call'
+      ? new Notification({ title: 'Call clip saved', body: `The last ${seconds} seconds of the call. Click to see it in Clips.`, silent: true })
+      : new Notification({ title: 'Replay saved', body: `The last ${seconds} seconds. Click to trim it, add a caption or send it to Discord.`, silent: true })
   n.on('click', () => {
     hooks.showMain()
     hooks.getMain()?.webContents.send('clips:open', path)
@@ -338,9 +345,9 @@ export function setupClips(h: Hooks): void {
   ipcMain.handle('replay:running', (e, on: boolean) => {
     if (isAppPage(e.sender)) e.sender.setBackgroundThrottling(!on)
   })
-  ipcMain.handle('replay:save', (e, folder: string | null, parts: Uint8Array[], ext: string, seconds: number) => {
+  ipcMain.handle('replay:save', (e, folder: string | null, parts: Uint8Array[], ext: string, seconds: number, kind?: string) => {
     guard(e.sender)
-    return saveReplay(folder, parts, ext, Math.round(Number(seconds) || 30))
+    return saveReplay(folder, parts, ext, Math.round(Number(seconds) || 30), kind === 'call' ? 'call' : 'replay')
   })
 
   ipcMain.handle('clips:list', (e, folder: string | null) => {
