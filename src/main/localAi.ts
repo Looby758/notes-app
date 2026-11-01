@@ -12,12 +12,12 @@ import {
   hfFileInfo,
   LOCAL_CONTEXT_TOKENS,
   localModelById,
-  pickEngine,
+  pickFromReleases,
   sha256Of,
   suggestedModel,
   type EngineKind,
+  type GithubRelease,
   type HfFile,
-  type ReleaseAsset
 } from '@shared/localAi'
 import type { LocalAiState } from '@shared/types'
 import { gameRunning, onGameRunning } from './games'
@@ -41,7 +41,9 @@ const IS_WIN = process.platform === 'win32'
 const IS_MAC = process.platform === 'darwin'
 const SUPPORTED = (IS_WIN && process.arch === 'x64') || (IS_MAC && process.arch === 'arm64')
 
-const RELEASE_API = process.env.NOTES_LLAMA_RELEASE_URL || 'https://api.github.com/repos/ggml-org/llama.cpp/releases/latest'
+// The newest few releases: "latest" is a numbered version with no builds in it, and the builds come
+// in the nightly "b1234" releases (the newest can still be uploading, so it looks further back).
+const RELEASE_API = process.env.NOTES_LLAMA_RELEASE_URL || 'https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=15'
 const HF = 'https://huggingface.co'
 /** Unloaded after this long without a question. */
 const IDLE_MS = 10 * 60_000
@@ -258,10 +260,10 @@ async function install(modelId: string, abort: AbortController): Promise<void> {
   if (!serverPath() || !existsSync(serverPath()!)) {
     download!.stage = 'engine'
     tell()
-    const release = await getJson<{ tag_name?: string; assets?: { name: string; browser_download_url: string; size: number; digest?: string | null }[] }>(RELEASE_API, signal)
-    const assets: ReleaseAsset[] = (release.assets ?? []).map((a) => ({ name: a.name, url: a.browser_download_url, size: a.size, digest: a.digest }))
-    const pick = pickEngine(assets, { platform: process.platform, arch: process.arch, nvidia })
-    if (!pick) throw new Error('Couldn’t find an AI engine for this computer in the latest llama.cpp release.')
+    const releases = await getJson<GithubRelease[] | GithubRelease>(RELEASE_API, signal)
+    const found = pickFromReleases(Array.isArray(releases) ? releases : [releases], { platform: process.platform, arch: process.arch, nvidia })
+    if (!found) throw new Error('Couldn’t find an AI engine for this computer in the recent llama.cpp releases. Try again later.')
+    const { release, pick } = found
     const files = [pick.engine, ...(pick.runtime ? [pick.runtime] : [])]
     const total = files.reduce((n, f) => n + f.size, 0)
     let before = 0

@@ -118,6 +118,24 @@ export function pickEngine(assets: ReleaseAsset[], target: EngineTarget): Engine
   return engine ? { kind: 'vulkan', engine } : null
 }
 
+/** A release as GitHub's API lists it. */
+export interface GithubRelease {
+  tag_name?: string
+  draft?: boolean
+  assets?: { name: string; browser_download_url: string; size: number; digest?: string | null }[]
+}
+
+/** The newest release (in the order GitHub lists them) that has a build for this computer, with every file checkable. */
+export function pickFromReleases(releases: GithubRelease[], target: EngineTarget): { release: GithubRelease; pick: EnginePick } | null {
+  for (const release of releases) {
+    if (release.draft) continue
+    const assets: ReleaseAsset[] = (release.assets ?? []).map((a) => ({ name: a.name, url: a.browser_download_url, size: a.size, digest: a.digest }))
+    const pick = pickEngine(assets, target)
+    if (pick && sha256Of(pick.engine.digest) && (!pick.runtime || sha256Of(pick.runtime.digest))) return { release, pick }
+  }
+  return null
+}
+
 /** The hex SHA-256 in a GitHub digest ("sha256:ab12…"), or null. */
 export function sha256Of(digest: string | null | undefined): string | null {
   const m = /^sha256:([0-9a-f]{64})$/i.exec(digest?.trim() ?? '')
