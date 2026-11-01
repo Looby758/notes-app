@@ -20,7 +20,7 @@ files:
 # node-pty is used as it comes (it's ready-made for Windows and both kinds of Mac), so it isn't rebuilt.
 npmRebuild: false
 # These can't run from inside the app's archive: node-pty's programs and background helper, and
-# the offline handwriting reader's worker thread and the packages it loads.
+# the offline handwriting reader's worker thread and the packages it loads, and 7-Zip's.
 asarUnpack:
   - node_modules/node-pty/**
   - node_modules/tesseract.js/**
@@ -30,6 +30,9 @@ asarUnpack:
   - node_modules/is-url/**
   - node_modules/wasm-feature-detect/**
   - node_modules/bmp-js/**
+  # The zip / RAR / 7z opener's 7-Zip (WebAssembly) and the worker thread that runs it.
+  - node_modules/7z-wasm/**
+  - out/main/**/sevenZipWorker*.js
 win:
   target:
     - target: nsis

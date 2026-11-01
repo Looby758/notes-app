@@ -31,18 +31,18 @@ function closeQuietly(extractor: object): void {
 
 const pause = (): Promise<void> => new Promise((r) => setImmediate(r))
 
-function explain(err: unknown): Error {
+function explain(err: unknown, password?: string): Error {
   const reason = (err as { reason?: string })?.reason
-  if (reason === 'ERAR_MISSING_PASSWORD' || reason === 'ERAR_BAD_PASSWORD') return new Error('This RAR has a password.')
+  if (reason === 'ERAR_MISSING_PASSWORD' || reason === 'ERAR_BAD_PASSWORD') return new Error(password ? 'That password isn’t right.' : 'This RAR has a password.')
   if (reason === 'ERAR_BAD_ARCHIVE' || reason === 'ERAR_UNKNOWN_FORMAT' || reason === 'ERAR_BAD_DATA') return new Error('This RAR is damaged, or isn’t really a RAR.')
   if (reason === 'ERAR_EOPEN') return new Error('Couldn’t open this RAR (is it still downloading, or part of a set?).')
   return err instanceof Error ? err : new Error(String(err))
 }
 
-export function listRar(path: string): Promise<ArchiveEntry[]> {
+export function listRar(path: string, password?: string): Promise<ArchiveEntry[]> {
   return inTurn(async () => {
     try {
-      const extractor = await createExtractorFromFile({ filepath: path })
+      const extractor = await createExtractorFromFile({ filepath: path, password })
       return [...extractor.getFileList().fileHeaders].map((h) => ({
         name: h.name.replace(/\\/g, '/'),
         size: h.unpSize,
@@ -51,7 +51,7 @@ export function listRar(path: string): Promise<ArchiveEntry[]> {
         encrypted: h.flags.encrypted
       }))
     } catch (err) {
-      throw explain(err)
+      throw explain(err, password)
     }
   })
 }
@@ -65,6 +65,8 @@ export interface RarExtractOptions {
   onFile?: (name: string, done: number, total: number) => void
   /** Asked between files; true stops early. */
   cancelled?: () => boolean
+  /** For a RAR with a password. */
+  password?: string
 }
 
 /** Unpacks files from a RAR into `dest` (made if needed). Resolves with the names unpacked. */
@@ -72,11 +74,11 @@ export function extractRar(path: string, dest: string, opts: RarExtractOptions =
   return inTurn(async () => {
     const rename = (name: string): string => safeRelative(opts.rename ? opts.rename(name.replace(/\\/g, '/')) : name) || '_'
     try {
-      const counting = await createExtractorFromFile({ filepath: path })
+      const counting = await createExtractorFromFile({ filepath: path, password: opts.password })
       const wanted = (name: string, isDir: boolean): boolean => !isDir && (!opts.only || opts.only(name.replace(/\\/g, '/')))
       const total = [...counting.getFileList().fileHeaders].filter((h) => wanted(h.name, h.flags.directory)).length
 
-      const extractor = await createExtractorFromFile({ filepath: path, targetPath: dest, filenameTransform: rename })
+      const extractor = await createExtractorFromFile({ filepath: path, password: opts.password, targetPath: dest, filenameTransform: rename })
       const done: string[] = []
       const files = extractor.extract({ files: (h) => wanted(h.name, h.flags.directory) }).files
       try {
@@ -95,7 +97,7 @@ export function extractRar(path: string, dest: string, opts: RarExtractOptions =
       }
       return done
     } catch (err) {
-      throw explain(err)
+      throw explain(err, opts.password)
     }
   })
 }

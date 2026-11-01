@@ -11590,3 +11590,112 @@ body.reduce-motion .theme-loading-text {
     opacity: 0.4;
   }
 }
+/* the zip / RAR / 7z opener in the preview pane */
+.explorer-archive {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.explorer-archive-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.explorer-archive-list {
+  max-height: 40vh;
+  overflow: auto;
+  padding: 4px 0;
+  border-radius: 10px;
+  background: var(--bg);
+}
+.explorer-archive-list.loading {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  color: var(--text-muted);
+}
+.explorer-archive-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 6px;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+.explorer-archive-row:hover {
+  background: var(--bg-hover, color-mix(in srgb, var(--text) 6%, transparent));
+}
+.explorer-archive-row input {
+  margin: 0;
+}
+.explorer-archive-row svg {
+  flex: none;
+  color: var(--text-muted);
+}
+.explorer-archive-row .name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.explorer-archive-row .size {
+  flex: none;
+  color: var(--text-faint);
+  font-size: 11px;
+}
+.explorer-archive-password {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+}
+.explorer-archive-password input,
+.explorer-compress input[type='password'] {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+}
+.explorer-archive-error {
+  margin: 0;
+  color: var(--danger, #e5484d);
+  font-size: 12px;
+}
+.modal.explorer-compress {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 420px;
+  padding: 18px;
+}
+.explorer-compress h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 15px;
+}
+.explorer-compress-formats {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.explorer-compress-formats label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-size: 13px;
+}
+.explorer-compress-formats span {
+  color: var(--text-faint);
+  font-size: 12px;
+}
