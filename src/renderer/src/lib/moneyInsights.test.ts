@@ -97,6 +97,18 @@ describe('subscription finder fixes', () => {
     expect(netflix).toHaveLength(1)
     expect(netflix[0]).toMatchObject({ manual: 'b', amount: 1299, last: '' })
   })
+  it('an edited found subscription replaces it, even under a new name, and survives a reload', () => {
+    const subscriptions = [{ id: 'e', name: 'Netflix', amount: 1099, interval: 'monthly' as const, date: '2026-11-12', category: 'subscriptions', replaces: 'netflix com' }]
+    const all = allRecurring({ ...data, subscriptions }, '2026-10-31')
+    const netflix = all.filter((r) => r.key === 'netflix com')
+    expect(netflix).toHaveLength(1)
+    expect(netflix[0]).toMatchObject({ manual: 'e', edited: true, name: 'Netflix', next: '2026-11-12' })
+    expect(readMoney(JSON.stringify({ subscriptions })).subscriptions[0].replaces).toBe('netflix com')
+    // Taking the edit away brings the found one back.
+    const found = allRecurring({ ...data, subscriptions: [] }, '2026-10-31').find((r) => r.key === 'netflix com')
+    expect(found).toBeTruthy()
+    expect(found!.manual).toBeUndefined()
+  })
   it('reads and keeps the new fields', () => {
     const text = JSON.stringify({
       subscriptions: [{ id: 'a', name: 'NOW TV', amount: 999, interval: 'monthly', date: '2026-11-21', category: 'subscriptions' }, { id: 'bad', name: 'x', amount: -1, interval: 'monthly', date: '2026-11-21' }],

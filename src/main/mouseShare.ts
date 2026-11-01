@@ -26,7 +26,7 @@ import {
 } from '@shared/mouseShare'
 import type { ShareInputEvent, ShareSaved, ShareStatus } from '@shared/types'
 import { deriveKeys, frame, FrameReader, Line, newHandshake, type Handshake } from './shareCrypto'
-import { inputAllowed, leftButtonDown, movePointerTo, pressButton, pressKey, releaseAll, scroll, setSwapCtrlCmd, stopShareInput } from './shareInput'
+import { accessibilityHelp, accessibilityStale, inputAllowed, leftButtonDown, movePointerTo, pressButton, pressKey, releaseAll, scroll, setSwapCtrlCmd, stopShareInput, resetAccessibility } from './shareInput'
 import { loadRenderer } from './capture'
 import { loadSettings, saveSettings } from './settings'
 import { logError } from './log'
@@ -163,6 +163,7 @@ export function shareStatus(): ShareStatus {
     pairing: pairing ? { name: pairing.conn.peer?.name ?? 'Computer', code: pairing.code, weConfirmed: pairing.weOk } : null,
     using: controlled ? 'controlled' : using,
     accessibility: inputAllowed(false),
+    accessibilityStale: accessibilityStale(),
     error: lastError
   }
 }
@@ -578,7 +579,7 @@ function watchEdge(): void {
 
 function goThere(f: number): void {
   if (!live?.ready || using === 'there') return
-  if (!inputAllowed(true)) return fail('Allow Orbit in System Settings → Privacy & Security → Accessibility, then try again.')
+  if (!inputAllowed(true)) return fail(accessibilityHelp())
   lastF = f
   syncClipboard()
   using = 'there'
@@ -761,7 +762,7 @@ const clampN = (n: unknown, max: number): number => Math.max(-max, Math.min(max,
 
 function startBeingControlled(f: number): void {
   if (!inputAllowed(true)) {
-    fail('Allow Orbit in System Settings → Privacy & Security → Accessibility, so the other computer’s mouse can work here.')
+    fail(accessibilityHelp())
     live?.send({ t: 'leave', f })
     return
   }
@@ -1199,7 +1200,19 @@ export function setupMouseShare(mainWindow: () => BrowserWindow | null, secret: 
   ipcMain.handle('share:confirmPairing', () => confirmPairing())
   ipcMain.handle('share:cancelPairing', () => cancelPairing(''))
   ipcMain.handle('share:unpair', () => unpair(true))
-  ipcMain.handle('share:askAccessibility', () => inputAllowed(true))
+  ipcMain.handle('share:askAccessibility', () => {
+    const ok = inputAllowed(true, true)
+    // macOS doesn't always show its prompt (it won't while an old entry is in the list): open the list itself too.
+    if (!ok) void shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility')
+    announce()
+    return ok
+  })
+  ipcMain.handle('share:resetAccessibility', async () => {
+    const ok = await resetAccessibility()
+    if (ok) lastError = ''
+    announce()
+    return ok
+  })
   ipcMain.handle('share:sendFiles', (_e, paths: string[]) => sendFiles(Array.isArray(paths) ? paths.filter((p) => typeof p === 'string') : []))
   ipcMain.on('share:input', (_e, event: ShareInputEvent) => onCaptureInput(event))
   ipcMain.on('share:comeBack', () => comeHome(undefined, true))

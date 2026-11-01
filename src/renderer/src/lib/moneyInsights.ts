@@ -27,6 +27,8 @@ export interface Recurring {
   fresh?: boolean
   /** Set for one you added yourself: its id in MoneyData.subscriptions. */
   manual?: string
+  /** A found subscription you edited (so `manual` is set too): removing yours brings the found one back. */
+  edited?: boolean
 }
 
 const DAY = 86400000
@@ -141,13 +143,13 @@ function manualRecurring(s: MoneyData['subscriptions'][number], today: string): 
     last = next
     next = step(next, s.interval)
   }
-  return { key: payeeKey(s.name), name: s.name, income: false, amount: s.amount, interval: s.interval, category: s.category, last, next, count: 0, manual: s.id }
+  return { key: s.replaces ?? payeeKey(s.name), name: s.name, income: false, amount: s.amount, interval: s.interval, category: s.category, last, next, count: 0, manual: s.id, ...(s.replaces ? { edited: true } : {}) }
 }
 
 /**
  * Everything repeating, as the Money page, Home, the calendar and Ask everything show it: what the
  * statements show, minus the ones you cancelled (until they charge you again), plus the ones you
- * added yourself (which win over a found one for the same payee).
+ * added yourself or edited (which win over a found one for the same payee).
  */
 export function allRecurring(
   data: Pick<MoneyData, 'entries' | 'notRecurring' | 'subscriptions' | 'cancelled'>,

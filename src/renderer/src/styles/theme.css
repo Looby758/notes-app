@@ -10656,6 +10656,12 @@ body.reduce-motion .theme-loading-text {
   border-bottom: 1px solid var(--border);
   font-size: 13.5px;
 }
+.money-recurring-editing {
+  display: block;
+}
+.money-recurring-editing .money-new-sub {
+  margin: 0;
+}
 .money-recurring-name {
   display: flex;
   flex-direction: column;
