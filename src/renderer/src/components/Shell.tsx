@@ -62,6 +62,7 @@ import DefinitionCard from './DefinitionCard'
 import SketchPad from './Sketch/SketchPad'
 import { toggleStreamerMode } from '../store/streamer'
 import Private from './Streamer/Private'
+import DeviceDrop from './Share/DeviceDrop'
 import { startReminders, stopReminders } from '../lib/reminderScheduler'
 
 interface Props {
@@ -384,6 +385,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <EventDetails />
       <Pet />
       <UpdateToast />
+      <DeviceDrop />
       <MusicPlayer />
       <RecordingBar />
       <ZenBar />

@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react'
+import { useSyncExternalStore, type ComponentType } from 'react'
 import type { Prefs } from '@shared/prefs'
 import {
   ArrowRightLeft,
@@ -26,6 +26,8 @@ import {
   MessageSquare,
   MessagesSquare,
   MonitorPlay,
+  MonitorUp,
+  MousePointerClick,
   Moon,
   Music,
   Orbit,
@@ -85,6 +87,47 @@ import { FEATURE_INFO, type FeatureInfo } from './featureInfo'
 
 export { FEATURE_GROUPS, type FeatureGroup } from './featureInfo'
 
+/** Second screen / control the Mac: starts it (or stops it if it's on); without the other computer connected, opens its settings. */
+async function screenFeature(mode: 'extend' | 'control'): Promise<void> {
+  const status = await window.api.screenStatus()
+  if (status.session) {
+    await window.api.screenStop()
+    if (status.session.mode === mode) return
+  }
+  if (!status.available) {
+    openSpecialTab(SETTINGS_TAB)
+    useUI.setState({ settingsSection: 'computers' })
+    return
+  }
+  await window.api.screenStart(mode).catch(() => {
+    openSpecialTab(SETTINGS_TAB)
+    useUI.setState({ settingsSection: 'computers' })
+  })
+}
+
+let screenMode: 'extend' | 'control' | null = null
+const screenWatchers = new Set<() => void>()
+let screenWatching = false
+/** Which screen session is on (for lighting up the button). */
+function useScreenSession(): 'extend' | 'control' | null {
+  return useSyncExternalStore(
+    (changed) => {
+      screenWatchers.add(changed)
+      if (!screenWatching) {
+        screenWatching = true
+        const set = (s: { session: { mode: 'extend' | 'control' } | null }): void => {
+          screenMode = s.session?.mode ?? null
+          for (const fn of screenWatchers) fn()
+        }
+        void window.api.screenStatus().then(set)
+        window.api.onScreenStatus(set)
+      }
+      return () => screenWatchers.delete(changed)
+    },
+    () => screenMode
+  )
+}
+
 interface Behaviour {
   icon: LucideIcon
   run: () => void
@@ -118,6 +161,16 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   email: { icon: Mail, run: () => openSpecialTab(EMAIL_TAB) },
   messages: { icon: MessagesSquare, run: () => openSpecialTab(MESSAGES_TAB), badge: () => <FeatureBadge id="messages" /> },
   phone: { icon: Smartphone, run: () => sendToPhone({ kind: 'pair' }), useActive: () => usePhone((s) => s.connected > 0) },
+  'second-screen': {
+    icon: MonitorUp,
+    run: () => void screenFeature('extend'),
+    useActive: () => useScreenSession() === 'extend'
+  },
+  'control-mac': {
+    icon: MousePointerClick,
+    run: () => void screenFeature('control'),
+    useActive: () => useScreenSession() === 'control'
+  },
   webcam: { icon: Webcam, run: () => sendToPhone({ kind: 'webcam' }), useActive: () => usePhone((s) => !!s.cam?.on) },
   web: { icon: Globe, run: () => openWebTab('', { beside: true }) },
   chat: { icon: MessageSquare, run: () => openSpecialTab(CHAT_TAB) },

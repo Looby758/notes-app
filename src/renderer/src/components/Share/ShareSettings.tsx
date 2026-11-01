@@ -5,6 +5,7 @@ import type { ShareSide } from '@shared/mouseShare'
 import type { ShareStatus } from '@shared/types'
 import { IS_MAC } from '@shared/platform'
 import { errorMessage } from '../../lib/paths'
+import ScreenSettings from './ScreenSettings'
 
 const BACK_KEYS = IS_MAC ? '⌃⌥Esc' : 'Ctrl+Alt+Esc'
 
@@ -231,6 +232,8 @@ export default function ShareSettings() {
             />
           </Row>
 
+          {status.connected && <ScreenSettings peerName={peer.name} peerOs={peer.os} />}
+
           <div className="share-help">
             <h4>Good to know</h4>
             <ul>
@@ -239,6 +242,7 @@ export default function ShareSettings() {
                 own mouse or trackpad.
               </li>
               <li>Drag a file or folder to the edge, then drop it on the strip that appears: it goes to the other computer’s Downloads.</li>
+              <li>Or drag files over Orbit: {peer.name} (and your phone, if its Orbit page is open) pop up at the bottom to drop them on.</li>
               <li>
                 {status.os === 'win'
                   ? 'The Windows key, Alt+Tab and Ctrl+Alt+Delete stay on the PC (pressing them brings the mouse back).'

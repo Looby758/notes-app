@@ -23,6 +23,7 @@ import {
   HardDrive,
   House,
   Image as ImageIcon,
+  Laptop,
   LayoutGrid,
   Link,
   List,
@@ -36,6 +37,7 @@ import {
   RefreshCw,
   Scissors,
   Search,
+  Smartphone,
   Trash2
 } from 'lucide-react'
 import {
@@ -65,6 +67,7 @@ import { openComicFile } from '../../store/comics'
 import { notify } from '../../store/notify'
 import ContextMenu, { type MenuItem } from '../ContextMenu'
 import FileIcon from '../FileIcon'
+import { sendToDevice, useDropTargets } from '../Share/DeviceDrop'
 import { isVideoFile } from '@shared/videoPlayer'
 import { openVideo } from '../../store/videoPlayer'
 
@@ -181,6 +184,7 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
   const [menu, setMenu] = useState<{ x: number; y: number; entry: ExplorerEntry | null; pin?: string } | null>(null)
   const [dropOn, setDropOn] = useState<string | null>(null)
   const [clipped, setClipped] = useState(clip)
+  const devices = useDropTargets()
   const listRef = useRef<HTMLDivElement>(null)
   const crumbsRef = useRef<HTMLDivElement>(null)
   /** What to pick once the folder reloads (a new folder, pasted files). */
@@ -541,6 +545,14 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
       { label: many ? 'Copy paths' : 'Copy path', icon: <Link size={14} />, onClick: () => void navigator.clipboard.writeText(list.map((x) => x.path).join('\n')) },
       ...(entry.isDir && !many ? [{ label: pins.includes(entry.path) ? 'Unpin from sidebar' : 'Pin to sidebar', icon: pins.includes(entry.path) ? <PinOff size={14} /> : <Pin size={14} />, onClick: () => togglePin(entry.path) }] : []),
       { label: `Show in ${FILE_MANAGER}`, icon: <FolderSearch size={14} />, onClick: () => window.api.explorerReveal(entry.path).catch(notify) },
+      // Drop between devices: the other computer takes folders too; the phone only files.
+      ...devices
+        .filter((d) => d.id === 'computer' || list.every((x) => !x.isDir))
+        .map((d) => ({
+          label: `Send to ${d.name}`,
+          icon: d.id === 'phone' ? <Smartphone size={14} /> : <Laptop size={14} />,
+          onClick: () => sendToDevice(d, list.map((x) => x.path))
+        })),
       'separator',
       { label: `Delete${many ? ` ${list.length} items` : ''}`, icon: <Trash2 size={14} />, danger: true, onClick: () => void remove(list) }
     ]

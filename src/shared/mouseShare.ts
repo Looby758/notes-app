@@ -212,6 +212,11 @@ export type ShareMessage =
   | { t: 'file-data'; id: string; data: string }
   | { t: 'file-end'; id: string }
   | { t: 'files-done'; count: number; first: string }
+  /** A screen session (see screenLink.ts): asked for, set up (WebRTC offer/answer/candidates), used, ended. */
+  | { t: 'scr-start'; id: string; mode: 'extend' | 'control' }
+  | { t: 'scr-sig'; id: string; data: unknown }
+  | { t: 'scr-in'; id: string; e: unknown }
+  | { t: 'scr-stop'; id: string; reason?: string }
 
 /** A received file's place under the folder it's saved in: no "..", no drive letters, no odd characters. */
 export function safeRelativePath(name: string): string | null {

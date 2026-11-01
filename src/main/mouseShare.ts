@@ -339,6 +339,7 @@ function connReady(c: Conn): void {
   prepareWindows()
   startWatching()
   announce()
+  for (const fn of linkListeners) fn(true)
 }
 
 function connClosed(c: Conn): void {
@@ -354,6 +355,7 @@ function connClosed(c: Conn): void {
     stopWatching()
     abortIncoming()
     destroyWindows()
+    for (const fn of linkListeners) fn(false)
   }
   announce()
 }
@@ -557,7 +559,7 @@ function stopWatching(): void {
 }
 
 function watchEdge(): void {
-  if (!live?.ready || using !== 'here' || controlled || saved.paused || checkingEdge || dropShown) return
+  if (!live?.ready || using !== 'here' || controlled || saved.paused || crossingHeld || checkingEdge || dropShown) return
   const f = edgeHit(screen.getCursorScreenPoint(), displayRects(), saved.side)
   if (f === null) {
     armed = true
@@ -863,9 +865,60 @@ function onMessage(c: Conn, m: ShareMessage): void {
       // One at a time and in order (each part waits for the disk).
       fileQueue = fileQueue.then(() => receiveFile(m)).catch((err) => logError('mouse sharing (file)', err))
       return
+    case 'scr-start':
+    case 'scr-sig':
+    case 'scr-in':
+    case 'scr-stop':
+      for (const fn of screenListeners) fn(m)
+      return
     case 'pair-ok':
       return
   }
+}
+
+// ---------- For the other features that use this link (screens, dropping files) ----------
+
+type ScreenMessage = Extract<ShareMessage, { t: 'scr-start' | 'scr-sig' | 'scr-in' | 'scr-stop' }>
+const screenListeners = new Set<(m: ScreenMessage) => void>()
+const linkListeners = new Set<(connected: boolean) => void>()
+
+/** Hears screen-session messages from the other computer. */
+export function onScreenMessage(fn: (m: ScreenMessage) => void): () => void {
+  screenListeners.add(fn)
+  return () => screenListeners.delete(fn)
+}
+
+/** Hears the link to the other computer coming and going. */
+export function onLinkChange(fn: (connected: boolean) => void): () => void {
+  linkListeners.add(fn)
+  return () => linkListeners.delete(fn)
+}
+
+/** Sends a screen-session message to the other computer; false if it isn't connected. */
+export function sendScreenMessage(m: ScreenMessage): boolean {
+  if (!live?.ready) return false
+  live.send(m)
+  return true
+}
+
+/** The paired computer, while it's connected. */
+export function linkedPeer(): { name: string; os: ShareOs } | null {
+  return live?.ready && saved.peer ? { name: saved.peer.name, os: saved.peer.os } : null
+}
+
+/** Sends files (or folders) to the other computer's Downloads. */
+export function sendFilesToPeer(paths: string[]): Promise<void> {
+  return sendFiles(paths)
+}
+
+/** On a Mac: whether ⌘ and Ctrl swap places going to the PC (the "Swap ⌘ and Ctrl" setting). */
+export const swapsCtrlCmd = (): boolean => saved.swapCtrlCmd
+
+let crossingHeld = false
+/** Stops the pointer going over the edge for now (while this computer's screen is shown on the other one). */
+export function holdCrossing(on: boolean): void {
+  crossingHeld = on
+  if (on && using === 'there') comeHome(undefined, true)
 }
 
 // ---------- Copy and paste ----------

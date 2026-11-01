@@ -56,6 +56,8 @@ import { dictionaryMenu, setupDictionary } from './dictionary'
 import { setupPhoneLink } from './phoneLink'
 import { phoneNotify, setupPhonePair } from './phonePair'
 import { isShareWindow, setupMouseShare, teardownMouseShare } from './mouseShare'
+import { setupScreenLink, teardownScreenLink } from './screenLink'
+import { setupDeviceDrop } from './deviceDrop'
 import { setupPhoneCam } from './phoneCam'
 import { setupWebTitle } from './webTitle'
 import { setupPlaces } from './places'
@@ -83,6 +85,11 @@ logCrashes()
 
 // The app used to be called Notes: keep its data folder so settings and sign-ins carry over.
 app.setPath('userData', join(app.getPath('appData'), 'Notes'))
+
+// Screens between the two computers: the picture goes straight across the home network, so the
+// computers need each other's real local addresses (Chromium hides them behind made-up names by
+// default, which don't always resolve between a PC and a Mac).
+app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns')
 
 // Windows shows notifications under this app id (it matches the installer's).
 if (process.platform === 'win32') app.setAppUserModelId('com.notesapp.desktop')
@@ -929,6 +936,8 @@ app.whenReady().then(async () => {
   safely('screen snip', () => setupSnip({ getMain: () => mainWindow, showMain }))
   // A password copied from the vault isn't passed to the other computer.
   safely('mouse sharing', () => setupMouseShare(() => mainWindow, (text) => text === copiedSecret))
+  safely('screens between computers', () => setupScreenLink(() => mainWindow))
+  safely('drop between devices', () => setupDeviceDrop(() => mainWindow))
   safely('system settings', () => applySystemPrefs(currentPrefs()))
   safely('updates', () => setupUpdater(() => currentPrefs().checkForUpdates))
 })
@@ -955,6 +964,7 @@ app.on('before-quit', () => {
 })
 app.on('will-quit', () => {
   teardownCapture()
+  safely('screens between computers', teardownScreenLink)
   safely('mouse sharing', teardownMouseShare)
   clearSecret()
 })

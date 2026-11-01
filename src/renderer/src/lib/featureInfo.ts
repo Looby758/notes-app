@@ -42,6 +42,8 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'email', name: 'Email', blurb: 'Gmail inside Orbit', group: 'Connect', command: 'email.open', keywords: 'gmail inbox mail' },
   { id: 'messages', name: 'Messages', blurb: 'WhatsApp and Discord', group: 'Connect', command: 'messages.open', keywords: 'whatsapp discord chat' },
   { id: 'phone', name: 'Phone', blurb: 'Send files, Stream Deck, second screen', group: 'Connect', keywords: 'qr mobile touchpad remote deck' },
+  { id: 'second-screen', name: 'Second screen', blurb: 'Use your MacBook as a second screen for the PC', group: 'Connect', keywords: 'mac macbook monitor extend display sidecar' },
+  { id: 'control-mac', name: 'Control the Mac', blurb: 'See and use your MacBook from the PC in a window', group: 'Connect', keywords: 'remote desktop mac macbook screen vnc' },
   { id: 'webcam', name: 'Phone webcam', blurb: 'Your phone’s camera as the PC’s webcam', group: 'Connect', keywords: 'camera video call discord zoom teams iphone obs' },
   { id: 'web', name: 'Web browser', blurb: 'A web page beside your notes', group: 'Connect', command: 'web.open', keywords: 'internet browse google' },
   { id: 'chat', name: 'AI chat', blurb: 'Chat with Claude about anything', group: 'Connect', command: 'ai.chat', keywords: 'claude ai assistant' },

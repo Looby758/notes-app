@@ -7,6 +7,8 @@ import MusicMini from './components/Music/MusicMini'
 import SnipApp from './components/Snip/SnipApp'
 import ShareCapture from './components/Share/ShareCapture'
 import ShareDrop from './components/Share/ShareDrop'
+import ScreenSend from './components/Screen/ScreenSend'
+import ScreenView from './components/Screen/ScreenView'
 import { loadPrefs } from './store/prefs'
 import { startInterfaceSounds } from './lib/sounds'
 import { IS_MAC } from '@shared/platform'
@@ -25,7 +27,12 @@ const isSnip = location.hash === '#snip'
 // Mouse sharing's invisible window (holds the mouse while it's on the other computer) and its drop strip.
 const isShareCapture = location.hash === '#share-capture'
 const isShareDrop = location.hash === '#share-drop'
-if (isShareCapture || isShareDrop) {
+// Screens between the two computers: the hidden window that sends this screen, and the one showing the other's.
+const isScreenSend = location.hash === '#screen-send'
+const isScreenView = location.hash === '#screen-view'
+if (isScreenSend || isScreenView) {
+  document.body.classList.add('screen-window')
+} else if (isShareCapture || isShareDrop) {
   document.body.classList.add(isShareCapture ? 'share-capture-window' : 'share-drop-window')
   loadPrefs().catch(() => undefined)
 } else if (isCapture || isYouTube || isMusic || isSnip) {
@@ -37,7 +44,11 @@ if (isShareCapture || isShareDrop) {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {isShareCapture ? (
+    {isScreenSend ? (
+      <ScreenSend />
+    ) : isScreenView ? (
+      <ScreenView />
+    ) : isShareCapture ? (
       <ShareCapture />
     ) : isShareDrop ? (
       <ShareDrop />

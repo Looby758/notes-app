@@ -68,6 +68,7 @@ textarea{min-height:110px;resize:vertical}
   <div data-view="timer" hidden><div id="timerBig">–</div><div id="timerLabel">No timer running. Start one in Zen mode.</div></div>
 </section>
 <section id="send" class="on">
+  <div id="gotWrap" hidden><h2>From your computer</h2><div class="log" id="got"></div></div>
   <h2>Send to your computer</h2>
   <button class="btn" data-pick="note">Into the open note</button>
   <button class="btn alt" data-pick="folder">Into the attachments folder</button>
@@ -152,6 +153,7 @@ function listen() {
     if (m.type === 'deck') drawDeck(m.buttons)
     if (m.type === 'screen') { screen = m; drawScreen() }
     if (m.type === 'notify') heads(m.title, m.body)
+    if (m.type === 'incoming') incoming(m.items)
     if (m.type === 'music') {
       $('song').textContent = m.name || 'Nothing playing'
       $('artist').textContent = m.artist || ''
@@ -225,6 +227,26 @@ function heads(title, body) {
   if (beepCtx) { try { var o = beepCtx.createOscillator(), g = beepCtx.createGain(); o.frequency.value = 880; g.gain.value = 0.08; o.connect(g); g.connect(beepCtx.destination); o.start(); o.stop(beepCtx.currentTime + 0.15) } catch (e) {} }
 }
 $('banner').onclick = function () { $('banner').style.display = 'none' }
+
+// Files dropped on the phone in Orbit: a Save button each (the phone asks where, or opens it).
+function incoming(items) {
+  var list = $('got')
+  items.forEach(function (it) {
+    var row = document.createElement('div'); row.className = 'card'
+    var text = document.createElement('div'); text.style.flex = '1'
+    var b = document.createElement('b'); b.textContent = it.name
+    var s = document.createElement('span'); s.textContent = it.size > 1048576 ? (it.size / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(it.size / 1024)) + ' KB'
+    text.appendChild(b); text.appendChild(s)
+    var a = document.createElement('a'); a.className = 'btn'; a.style.width = 'auto'; a.style.margin = '0'; a.style.padding = '10px 16px'; a.textContent = 'Save'
+    a.href = it.url; a.setAttribute('download', it.name)
+    row.appendChild(text); row.appendChild(a)
+    row.style.marginBottom = '8px'
+    list.insertBefore(row, list.firstChild)
+  })
+  $('gotWrap').hidden = false
+  show('send')
+  heads(items.length === 1 ? 'Got ' + items[0].name : 'Got ' + items.length + ' files', 'From your computer. Tap Save to keep it.')
+}
 
 document.addEventListener('visibilitychange', function () { if (!document.hidden && events.readyState === 2) listen() })
 
