@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { MusicMiniCommand, MusicMiniState, NotesApi } from '@shared/types'
+import type { LocalAiState, MusicMiniCommand, MusicMiniState, NotesApi } from '@shared/types'
 
 /** Listens for a message from the main process; returns the way to stop. */
 function on<T>(channel: string, callback: (value: T) => void): () => void {
@@ -98,6 +98,7 @@ const api: NotesApi = {
   webTitle: (url) => ipcRenderer.invoke('web:title', url),
   searchPlaces: (query) => ipcRenderer.invoke('places:search', query),
   mapTile: (z, x, y) => ipcRenderer.invoke('places:tile', z, x, y),
+  zoneAt: (lat, lon) => ipcRenderer.invoke('places:zone', lat, lon),
   weather: (force) => ipcRenderer.invoke('weather:get', force),
   setWeatherPlace: (place) => ipcRenderer.invoke('weather:setPlace', place),
   clearWebData: () => ipcRenderer.invoke('web:clear'),
@@ -152,6 +153,28 @@ const api: NotesApi = {
   exportFiles: (folderName, files) => ipcRenderer.invoke('export:files', folderName, files),
   showExported: (path) => ipcRenderer.invoke('export:show', path),
   decodeHeic: (data) => ipcRenderer.invoke('convert:heic', data),
+  comicsShelf: () => ipcRenderer.invoke('comics:shelf'),
+  comicsAdd: (paths) => ipcRenderer.invoke('comics:add', paths),
+  comicsAddFolder: () => ipcRenderer.invoke('comics:addFolder'),
+  comicsRemove: (id) => ipcRenderer.invoke('comics:remove', id),
+  comicsOpen: (id) => ipcRenderer.invoke('comics:open', id),
+  comicsProgress: (id, page, offset, finished) => ipcRenderer.invoke('comics:progress', id, page, offset, finished),
+  comicsResetProgress: (id) => ipcRenderer.invoke('comics:resetProgress', id),
+  comicsTurned: (pages) => ipcRenderer.invoke('comics:turned', pages),
+  comicsSettings: (id, patch) => ipcRenderer.invoke('comics:settings', id, patch),
+  comicsRename: (id, title) => ipcRenderer.invoke('comics:rename', id, title),
+  comicsReveal: (id) => ipcRenderer.invoke('comics:reveal', id),
+  comicsReadText: (png) => ipcRenderer.invoke('comics:readText', png),
+  onComicsChanged: (callback) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('comics:changed', handler)
+    return () => ipcRenderer.removeListener('comics:changed', handler)
+  },
+  onComicsPreparing: (callback) => {
+    const handler = (_e: unknown, p: Parameters<typeof callback>[0]): void => callback(p)
+    ipcRenderer.on('comics:preparing', handler)
+    return () => ipcRenderer.removeListener('comics:preparing', handler)
+  },
   pathForFile: (file) => {
     try {
       return webUtils.getPathForFile(file)
@@ -172,6 +195,32 @@ const api: NotesApi = {
     const handler = (_e: unknown, id: number, done: number): void => callback(id, done)
     ipcRenderer.on('convert:video-progress', handler)
     return () => ipcRenderer.removeListener('convert:video-progress', handler)
+  },
+
+  videoInfo: (path) => ipcRenderer.invoke('video:info', path),
+  videoSubtitles: (path, source) => ipcRenderer.invoke('video:subtitles', path, source),
+  videoKeyframe: (path, at, fileStart) => ipcRenderer.invoke('video:keyframe', path, at, fileStart),
+  stopVideoStream: (session) => ipcRenderer.invoke('video:stop', session),
+  videoInVault: (path) => ipcRenderer.invoke('video:inVault', path),
+  pickVideoFile: (kind, near) => ipcRenderer.invoke('video:pick', kind, near),
+  soundboardGet: () => ipcRenderer.invoke('soundboard:get'),
+  soundboardPick: () => ipcRenderer.invoke('soundboard:pick'),
+  soundboardAddFiles: (paths) => ipcRenderer.invoke('soundboard:add-files', paths),
+  soundboardUpdate: (id, patch) => ipcRenderer.invoke('soundboard:update', id, patch),
+  soundboardSetBoardHotkey: (which, accel) => ipcRenderer.invoke('soundboard:board-hotkey', which, accel),
+  soundboardRemove: (id) => ipcRenderer.invoke('soundboard:remove', id),
+  soundboardMove: (id, to) => ipcRenderer.invoke('soundboard:move', id, to),
+  soundboardOpenLink: (which) => ipcRenderer.invoke('soundboard:open-link', which),
+  soundboardShowFolder: () => ipcRenderer.invoke('soundboard:show-folder'),
+  onSoundboardHotkey: (callback) => {
+    const handler = (_e: unknown, action: Parameters<typeof callback>[0]): void => callback(action)
+    ipcRenderer.on('soundboard:hotkey', handler)
+    return () => ipcRenderer.removeListener('soundboard:hotkey', handler)
+  },
+  onSoundboardChanged: (callback) => {
+    const handler = (_e: unknown, status: Parameters<typeof callback>[0]): void => callback(status)
+    ipcRenderer.on('soundboard:changed', handler)
+    return () => ipcRenderer.removeListener('soundboard:changed', handler)
   },
 
   startSnip: () => ipcRenderer.invoke('snip:start'),
@@ -283,7 +332,21 @@ const api: NotesApi = {
   aiSummarise: (title, text) => ipcRenderer.invoke('ai:summarise', title, text),
   aiTidy: (text, kind) => ipcRenderer.invoke('ai:tidy', text, kind),
   aiInterpret: (text, context) => ipcRenderer.invoke('ai:interpret', text, context),
-  aiAsk: (question, notes, history, extra) => ipcRenderer.invoke('ai:ask', question, notes, history, extra),
+  aiAsk: (question, notes, history, extra, engine) => ipcRenderer.invoke('ai:ask', question, notes, history, extra, engine),
+  aiSetEngine: (use) => ipcRenderer.invoke('ai:setEngine', use),
+  aiSortMoney: (rows, categories) => ipcRenderer.invoke('ai:sortMoney', rows, categories),
+  aiMeaning: (word, sentence) => ipcRenderer.invoke('ai:meaning', word, sentence),
+  localAiState: () => ipcRenderer.invoke('localAi:state'),
+  localAiInstall: (model) => ipcRenderer.invoke('localAi:install', model),
+  localAiCancel: () => ipcRenderer.invoke('localAi:cancel'),
+  localAiRemove: () => ipcRenderer.invoke('localAi:remove'),
+  localAiUnload: () => ipcRenderer.invoke('localAi:unload'),
+  localAiSetUnloadForGames: (on) => ipcRenderer.invoke('localAi:setUnloadForGames', on),
+  onLocalAiState: (callback) => {
+    const handler = (_e: Electron.IpcRendererEvent, state: LocalAiState): void => callback(state)
+    ipcRenderer.on('localAi:state', handler)
+    return () => ipcRenderer.removeListener('localAi:state', handler)
+  },
   gamesList: (rescan) => ipcRenderer.invoke('games:list', rescan),
   gamesPlay: (id) => ipcRenderer.invoke('games:play', id),
   gamesLaunchArt: (id) => ipcRenderer.invoke('games:launchArt', id),
@@ -314,7 +377,7 @@ const api: NotesApi = {
     ipcRenderer.on('term:exit', handler)
     return () => ipcRenderer.removeListener('term:exit', handler)
   },
-  aiChat: (messages) => ipcRenderer.invoke('ai:chat', messages),
+  aiChat: (messages, engine) => ipcRenderer.invoke('ai:chat', messages, engine),
   aiLoadChats: () => ipcRenderer.invoke('ai:loadChats'),
   aiSaveChats: (chats) => ipcRenderer.invoke('ai:saveChats', chats),
   readHandwriting: (png, reader) => ipcRenderer.invoke('handwriting:read', png, reader),

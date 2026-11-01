@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ArrowRightLeft, Bomb, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, FolderSearch, Gamepad2, GitCompare, Globe, Grid3x3, HardDrive, House, KeyRound, Layers, Mail, MessageSquare, MessagesSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
+import { ArrowRightLeft, AudioLines, Bomb, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Grid3x3, HardDrive, House, KeyRound, Layers, LibraryBig, Mail, MessageSquare, MessagesSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
 import Private from '../Streamer/Private'
 import { useHideNames } from '../../store/streamer'
 import { useEditor } from '../../store/editor'
@@ -23,10 +23,14 @@ import {
   CONVERT_TAB,
   EXPLORER_TAB,
   SUDOKU_TAB,
+  COMICS_TAB,
   MINESWEEPER_TAB,
+  CLOCKS_TAB,
   STUDIO_TAB,
+  SOUNDBOARD_TAB,
   MESSAGES_TAB,
   GAMES_TAB,
+  VIDEO_TAB,
   closePane,
   closeTab,
   closeTabUnlessPinned,
@@ -55,6 +59,7 @@ import { displayUrl } from '@shared/web'
 import { FILE_MANAGER, showKeys } from '@shared/platform'
 import { animateOut } from '../../lib/motion'
 import { playSound } from '../../lib/sounds'
+import { useVideoPlayer } from '../../store/videoPlayer'
 
 /** Closing with the mouse lets the tab shrink away first. (Ctrl+W stays instant, so it can be pressed quickly.) */
 function closeWithAnimation(el: HTMLElement | null, id: string, pane: string, unlessPinned = false): void {
@@ -82,10 +87,17 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === MONEY_TAB) return 'Money'
   if (id === CONVERT_TAB) return 'Convert files'
   if (id === SUDOKU_TAB) return 'Sudoku'
+  if (id === COMICS_TAB) return 'Comics'
   if (id === MINESWEEPER_TAB) return 'Minesweeper'
+  if (id === CLOCKS_TAB) return 'World clocks'
   if (id === STUDIO_TAB) return 'Studio'
+  if (id === SOUNDBOARD_TAB) return 'Soundboard'
   if (id === MESSAGES_TAB) return 'Messages'
   if (id === GAMES_TAB) return 'Games'
+  if (id === VIDEO_TAB) {
+    const current = useVideoPlayer.getState().current
+    return current ? current.slice(Math.max(current.lastIndexOf('/'), current.lastIndexOf('\\')) + 1) : 'Video player'
+  }
   if (id === EXPLORER_TAB) return 'Files'
   if (isFileTab(id)) return fileOfTab(id).slice(fileOfTab(id).lastIndexOf('/') + 1).replace(/\.canvas$/i, '')
   return noteTitle(id)
@@ -98,6 +110,8 @@ export default function TabBar({ pane }: { pane: string }) {
   const isActivePane = useEditor((s) => s.activePane === pane)
   const paneCount = useEditor((s) => Object.keys(s.panes).length)
   const status = useEditor((s) => s.status)
+  // The video player's tab is named after the video in it.
+  useVideoPlayer((s) => s.current)
   const pinned = useEditor((s) => s.panes[pane]?.pinned ?? NO_PINS)
   const hideNames = useHideNames()
   const mindMap = useUI((s) => isMindMap(s, pane, active))
@@ -261,10 +275,14 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === MONEY_TAB && <PoundSterling size={13} className="tab-icon" />}
               {id === CONVERT_TAB && <ArrowRightLeft size={13} className="tab-icon" />}
               {id === SUDOKU_TAB && <Grid3x3 size={13} className="tab-icon" />}
+              {id === COMICS_TAB && <LibraryBig size={13} className="tab-icon" />}
               {id === MINESWEEPER_TAB && <Bomb size={13} className="tab-icon" />}
+              {id === CLOCKS_TAB && <Globe2 size={13} className="tab-icon" />}
               {id === STUDIO_TAB && <Clapperboard size={13} className="tab-icon" />}
+              {id === SOUNDBOARD_TAB && <AudioLines size={13} className="tab-icon" />}
               {id === MESSAGES_TAB && <MessagesSquare size={13} className="tab-icon" />}
               {id === GAMES_TAB && <Gamepad2 size={13} className="tab-icon" />}
+              {id === VIDEO_TAB && <Film size={13} className="tab-icon" />}
               {id === EXPLORER_TAB && <HardDrive size={13} className="tab-icon" />}
               {isFileTab(id) && <FileIcon path={fileOfTab(id)} size={13} className="tab-icon" />}
               {icons.get(id) && <span className="tab-emoji">{icons.get(id)}</span>}

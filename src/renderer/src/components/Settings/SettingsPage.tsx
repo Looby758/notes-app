@@ -13,6 +13,7 @@ import PlaceholderHelp from './PlaceholderHelp'
 import RemindersSettings from './RemindersSettings'
 import NavEditor from '../Nav/NavEditor'
 import AiSettings from '../Ai/AiSettings'
+import OfflineAiSettings from '../Ai/OfflineAiSettings'
 import MusicSettings from '../Music/MusicSettings'
 import StudioSettings from '../Studio/LiveSetup'
 import ShareSettings from '../Share/ShareSettings'
@@ -311,6 +312,7 @@ export default function SettingsPage() {
                   {section === 'navigation' && <NavEditor />}
                   {section === 'capture' && <CaptureShortcutStatus />}
                   {section === 'capture' && <SnipShortcutStatus />}
+                  {section === 'ai' && <OfflineAiSettings />}
                   {section === 'ai' && <AiSettings />}
                   {section === 'music' && <MusicSettings />}
                   {section === 'studio' && <StudioSettings />}

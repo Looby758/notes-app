@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { ArrowUp, Check, Copy, FilePlus2, Loader2, MessageSquare, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import type { AiChat } from '@shared/types'
 import { refreshAiStatus, useAi } from '../../store/ai'
-import { deleteChat, loadChats, openChat, renameChat, retryChat, sendChat, useChat } from '../../store/chat'
+import { askChatOnline, deleteChat, loadChats, openChat, renameChat, retryChat, sendChat, useChat } from '../../store/chat'
 import { useNoteIndex } from '../../store/noteIndex'
 import { useVault } from '../../store/vault'
 import { notify } from '../../store/notify'
@@ -11,6 +11,7 @@ import { openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
 import { chatAsNote, chatHtml, freeNoteName } from '../../lib/chat'
 import { openAiSettings } from './AiSettings'
 import EmptyArt from '../Motion/EmptyArt'
+import OnlineOffer from './OnlineOffer'
 
 const EXAMPLES = ['Explain how compound interest works', 'Help me plan a week of healthy dinners', 'Write a polite email asking for a deadline extension']
 
@@ -134,7 +135,7 @@ export default function ChatPage({ autoFocus }: { autoFocus: boolean }) {
   }, [])
   useEffect(() => {
     if (autoFocus) input.current?.focus()
-  }, [autoFocus, status?.hasKey, current])
+  }, [autoFocus, status?.ready, current])
   useEffect(() => end.current?.scrollIntoView({ block: 'end' }), [chat?.messages.length, waiting, current])
 
   const send = (text = draft): void => {
@@ -143,14 +144,16 @@ export default function ChatPage({ autoFocus }: { autoFocus: boolean }) {
     sendChat(text)
   }
 
-  if (status && !status.hasKey) {
+  const offline = status?.use === 'offline' && status.offline.state === 'ready'
+  const who = offline ? 'the offline AI' : 'Claude'
+  if (status && !status.ready) {
     return (
       <div className="ai-page" data-chat-page>
         <div className="ai-empty">
           <EmptyArt kind="chat" size={64} />
           <h2>Chat with Claude</h2>
           <p>Ask Claude anything: questions, explanations, writing help, ideas. Your chats are kept so you can come back to them.</p>
-          <p>To start, add your Anthropic API key in Settings.</p>
+          <p>To start, add your Anthropic API key in Settings, or download the offline AI there.</p>
           <button
             className="btn btn-primary"
             onClick={() => {
@@ -182,8 +185,8 @@ export default function ChatPage({ autoFocus }: { autoFocus: boolean }) {
           {messages.length === 0 && (
             <div className="ai-empty">
               <EmptyArt kind="chat" size={64} />
-              <h2>Chat with Claude</h2>
-              <p>Ask anything at all. For questions about what you’ve written, use “Ask everything” instead.</p>
+              <h2>{offline ? 'Chat with the offline AI' : 'Chat with Claude'}</h2>
+              <p>{offline ? 'It runs on this computer, so nothing you type leaves it. ' : ''}Ask anything at all. For questions about what you’ve written, use “Ask everything” instead.</p>
               <div className="ai-examples">
                 {EXAMPLES.map((e) => (
                   <button key={e} className="btn" onClick={() => send(e)}>
@@ -199,12 +202,17 @@ export default function ChatPage({ autoFocus }: { autoFocus: boolean }) {
                 {m.text}
               </div>
             ) : (
-              <Reply key={i} text={m.text} />
+              <div key={i}>
+                <Reply text={m.text} />
+                {m.offline && (
+                  <OnlineOffer hard={m.hard} busy={waiting} onAsk={i === messages.length - 1 ? () => askChatOnline(chat!.id) : undefined} />
+                )}
+              </div>
             )
           )}
           {waiting && (
             <p className="ai-working">
-              <Loader2 size={14} className="spin" /> Claude is thinking…
+              <Loader2 size={14} className="spin" /> {offline ? 'The offline AI is thinking…' : 'Claude is thinking…'}
             </p>
           )}
           {error && !waiting && (
@@ -222,7 +230,7 @@ export default function ChatPage({ autoFocus }: { autoFocus: boolean }) {
             ref={input}
             rows={1}
             value={draft}
-            placeholder={chat ? 'Reply to Claude…' : 'Ask Claude anything…'}
+            placeholder={chat ? `Reply to ${who}…` : `Ask ${who} anything…`}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {

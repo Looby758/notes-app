@@ -343,3 +343,84 @@
   border: none;
   border-top: 1px solid var(--border);
 }
+
+/* Under an offline answer: where it came from, and the offer to ask Claude. */
+.ai-offline-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.ai-offline-note.hard {
+  color: var(--text);
+}
+.ai-offline-note .btn {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.ai-offline-hint {
+  color: var(--text-muted);
+}
+
+/* Settings → AI helper → Offline AI */
+.offline-ai .offline-ai-models {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+}
+.offline-ai-model {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.offline-ai-model.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.offline-ai-model input {
+  margin-top: 3px;
+}
+.offline-ai-model strong {
+  color: var(--text-strong);
+}
+.offline-ai-model small {
+  display: block;
+  color: var(--text-muted);
+}
+.offline-ai-bar {
+  height: 6px;
+  margin: 8px 0;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+.offline-ai-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.25s;
+}
+.offline-ai-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+.offline-ai-engine {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 14px;
+}
+.offline-ai-engine .btn.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text-strong);
+}

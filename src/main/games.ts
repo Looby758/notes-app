@@ -359,6 +359,17 @@ const TICK = 60_000
 let running = new Set<string>()
 let lastTick = 0
 
+const runningListeners = new Set<(playing: boolean) => void>()
+
+/** Whether a game is running right now (checked once a minute). */
+export const gameRunning = (): boolean => running.size > 0
+
+/** Calls back when a game starts (true) or the last one closes (false). */
+export function onGameRunning(listener: (playing: boolean) => void): () => void {
+  runningListeners.add(listener)
+  return () => runningListeners.delete(listener)
+}
+
 function broadcast(): void {
   for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send('games:changed')
 }
@@ -376,7 +387,9 @@ async function tick(): Promise<void> {
   const s = loadStore()
   for (const id of playing) s.play[id] = addPlay(s.play[id], running.has(id) ? seconds : 0, new Date(now))
   const changed = playing.size !== running.size || [...playing].some((id) => !running.has(id))
+  const wasPlaying = running.size > 0
   running = playing
+  if (wasPlaying !== playing.size > 0) for (const l of runningListeners) l(playing.size > 0)
   if (playing.size) saveStore()
   if (changed || playing.size) broadcast()
 }

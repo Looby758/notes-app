@@ -1,13 +1,16 @@
 import type { ExplorerEntry, ExplorerPlace, PasteMode } from './explorer'
+import type { ComicOpened, ComicPreparing, ComicSettings, ComicShelf } from './comics'
 import type { Prefs } from './prefs'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
 import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
 import type { LocalLibrary } from './localMusic'
+import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
 import type { WifiNetwork } from './wifi'
 import type { MusicAction, MusicDevice, MusicItem, MusicQueue, MusicSearchResults, MusicState, MusicStatus } from './spotify'
 import type { CoversStatus, GamesList, LaunchArt } from './games'
+import type { VideoInfo } from './videoPlayer'
 import type { Theme } from './themes'
 import type { ShareButton, ShareOs, ShareSide } from './mouseShare'
 
@@ -271,6 +274,55 @@ export interface AiStatus {
   hasKey: boolean
   /** False if the system can't encrypt the key (it is then not saved). */
   canEncrypt: boolean
+  /** Which AI the AI features use: the offline one on this computer, or Claude online. */
+  use: AiEngine
+  /** Whether the AI features can run now with that choice (a key for Claude, the download for offline). */
+  ready: boolean
+  offline: LocalAiState
+}
+
+/** Where an AI answer comes from: the offline AI on this computer, or Claude online. */
+export type AiEngine = 'offline' | 'online'
+
+/** An answer to a question or chat message. */
+export interface AiReply {
+  text: string
+  /** Answered by the offline AI. */
+  offline: boolean
+  /** The offline AI thinks Claude would answer this better (Orbit offers, never switches by itself). */
+  hard: boolean
+}
+
+/** The offline AI (src/main/localAi.ts): an optional download that runs on this computer's graphics card. */
+export interface LocalAiState {
+  state: 'missing' | 'downloading' | 'ready' | 'unsupported'
+  /** While downloading: which part, and how far (0–1). */
+  stage?: 'engine' | 'model'
+  progress?: number
+  /** Bytes in all, while downloading. */
+  bytes?: number
+  error?: string
+  /** The model installed (or being downloaded), from LOCAL_MODELS. */
+  model?: string
+  /** How it runs: NVIDIA CUDA, Vulkan (any graphics card) or Metal (Mac). */
+  engine?: 'cuda' | 'vulkan' | 'metal'
+  /** In the graphics card's memory right now. */
+  loaded: boolean
+  loading: boolean
+  /** Unloaded because a game is running (it comes back when the game closes). */
+  gamePaused: boolean
+  unloadForGames: boolean
+  /** The graphics card found (or the Mac's memory). */
+  gpu: { name: string; memoryGb: number } | null
+  /** The model suggested for this computer. */
+  suggested: string
+}
+
+/** A bank statement line for the offline AI to sort into a category. */
+export interface AiSortRow {
+  description: string
+  /** Pence: negative is money out. */
+  amount: number
 }
 
 /** A note handed to the AI helper as context for a question. */
@@ -289,6 +341,10 @@ export interface AiAskTurn {
 export interface AiChatMessage {
   role: 'user' | 'assistant'
   text: string
+  /** A reply from the offline AI (not Claude). */
+  offline?: boolean
+  /** The offline AI thought Claude would do better with this one. */
+  hard?: boolean
 }
 
 /** A saved AI chat conversation. */
@@ -465,6 +521,8 @@ export interface NotesApi {
   searchPlaces(query: string): Promise<{ places: Place[]; error?: string }>
   /** One square of a map preview as a data: URL; null if it couldn't be fetched. */
   mapTile(z: number, x: number, y: number): Promise<string | null>
+  /** The time zone at a spot (e.g. "Europe/London", from Open-Meteo); null if it couldn't be found. */
+  zoneAt(lat: number, lon: number): Promise<string | null>
   /** Your town and its forecast (from Open-Meteo), fetched again if it's old or `force`. */
   weather(force?: boolean): Promise<WeatherState>
   /** Sets (or, with null, forgets) the town the weather is for, and fetches its forecast. */
@@ -541,8 +599,38 @@ export interface NotesApi {
   /** How far along a video conversion is (0…1). Returns a function that stops listening. */
   onVideoProgress(callback: (id: number, done: number) => void): () => void
 
+  // Video player
+  /** What's in a video (its tracks need the video helper, ffmpeg) and the subtitle files beside it. */
+  videoInfo(path: string): Promise<VideoInfo>
+  /** Subtitles as text: a subtitle file, or one of the video's own tracks (as WebVTT). */
+  videoSubtitles(path: string, source: { stream?: number; file?: string }): Promise<string>
+  /** Where a stream that copies the picture from `at` really starts (the keyframe before). */
+  videoKeyframe(path: string, at: number, fileStart: number): Promise<number>
+  /** Stops a page's live video stream. */
+  stopVideoStream(session: string): Promise<void>
+  /** The full path of a file in the notes folder. */
+  videoInVault(path: string): Promise<string>
+  /** Asks for a video, or subtitles (starting beside `near`); null if cancelled. */
+  pickVideoFile(kind: 'video' | 'subtitles', near?: string): Promise<string | null>
+
   // Quick capture
   /** Opens the quick capture window. */
+  // Soundboard (main/soundboard.ts; the sound itself is played in lib/soundboard.ts)
+  soundboardGet(): Promise<SoundboardStatus>
+  /** Asks for sound files and adds a button for each. */
+  soundboardPick(): Promise<{ status: SoundboardStatus; skipped: string[] }>
+  /** Adds sound files dropped on the board (full paths). */
+  soundboardAddFiles(paths: string[]): Promise<{ status: SoundboardStatus; skipped: string[] }>
+  soundboardUpdate(id: string, patch: Partial<Pick<SoundClip, 'name' | 'hotkey' | 'volume' | 'colour' | 'emoji'>>): Promise<SoundboardStatus>
+  soundboardSetBoardHotkey(which: keyof BoardHotkeys, accel: string): Promise<SoundboardStatus>
+  soundboardRemove(id: string): Promise<SoundboardStatus>
+  soundboardMove(id: string, to: number): Promise<SoundboardStatus>
+  soundboardOpenLink(which: 'cable' | 'blackhole'): Promise<void>
+  soundboardShowFolder(): Promise<void>
+  /** A soundboard hotkey was pressed (anywhere, even in a game). */
+  onSoundboardHotkey(callback: (action: SoundboardAction) => void): () => void
+  onSoundboardChanged(callback: (status: SoundboardStatus) => void): () => void
+
   // Screen snip (main/snip.ts)
   /** Takes a picture of the screen under the pointer and opens the snip window over it. */
   startSnip(): Promise<void>
@@ -665,7 +753,23 @@ export interface NotesApi {
   /** A quick capture is tidied as one list item; a note can get headings and lists. */
   aiTidy(text: string, kind: 'note' | 'capture'): Promise<string>
   /** `extra`: digests of money, calendar and email for Ask everything (lib/askContext.ts). */
-  aiAsk(question: string, notes: AiNote[], history: AiAskTurn[], extra?: AiExtraContext): Promise<string>
+  aiAsk(question: string, notes: AiNote[], history: AiAskTurn[], extra?: AiExtraContext, engine?: AiEngine): Promise<AiReply>
+  /** Offline AI or Claude for the AI features. */
+  aiSetEngine(use: AiEngine): Promise<AiStatus>
+  /** Money tracker: a category id for each statement line (by its number), sorted by the offline AI only. */
+  aiSortMoney(rows: AiSortRow[], categories: { id: string; name: string; income?: boolean }[]): Promise<Record<number, string>>
+  /** The dictionary card: what a word means in its sentence, from the offline AI. */
+  aiMeaning(word: string, sentence: string): Promise<string>
+  // The offline AI
+  localAiState(): Promise<LocalAiState>
+  /** Downloads the engine and a model (resumes a stopped download); resolves when it's done or has failed. */
+  localAiInstall(model: string): Promise<LocalAiState>
+  localAiCancel(): Promise<void>
+  localAiRemove(): Promise<LocalAiState>
+  /** Frees the graphics card now (it loads again the next time it's needed). */
+  localAiUnload(): Promise<void>
+  localAiSetUnloadForGames(on: boolean): Promise<LocalAiState>
+  onLocalAiState(callback: (state: LocalAiState) => void): () => void
   /** Ctrl+K: the action a sentence asks for, as Claude reads it (checked by validSmart before anything runs). */
   aiInterpret(text: string, context: string): Promise<unknown>
   // Games
@@ -702,7 +806,7 @@ export interface NotesApi {
   /** The command line ended (you typed exit, or it closed). */
   onTerminalExit(callback: (code: number) => void): () => void
   /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */
-  aiChat(messages: AiChatMessage[]): Promise<string>
+  aiChat(messages: AiChatMessage[], engine?: AiEngine): Promise<AiReply>
   /** Saved chats, kept in the settings folder on this computer. */
   aiLoadChats(): Promise<AiChat[]>
   aiSaveChats(chats: AiChat[]): Promise<void>
@@ -834,6 +938,27 @@ export interface NotesApi {
   explorerTrash(paths: string[]): Promise<string[]>
   /** Finds names under a folder and all its subfolders. */
   explorerSearch(dir: string, query: string, showHidden: boolean): Promise<ExplorerEntry[]>
+  // Comic book reader
+  comicsShelf(): Promise<ComicShelf>
+  /** Adds comic files (asks which, when no paths are given). */
+  comicsAdd(paths?: string[]): Promise<{ shelf: ComicShelf; added: string[]; skipped: number }>
+  /** Asks for a folder and adds every comic in it. */
+  comicsAddFolder(): Promise<{ shelf: ComicShelf; added: string[]; skipped: number }>
+  /** Takes a comic off the shelf (the file stays where it is). */
+  comicsRemove(id: string): Promise<ComicShelf>
+  /** Gets a comic ready to read (the first time, a RAR is unpacked: see onComicsPreparing). */
+  comicsOpen(id: string): Promise<ComicOpened>
+  comicsProgress(id: string, page: number, offset: number, finished?: boolean): Promise<void>
+  comicsResetProgress(id: string): Promise<ComicShelf>
+  /** Counts pages turned today; returns today's total. */
+  comicsTurned(pages: number): Promise<number>
+  comicsSettings(id: string, patch: Partial<ComicSettings>): Promise<ComicSettings>
+  comicsRename(id: string, title: string): Promise<ComicShelf>
+  comicsReveal(id: string): Promise<void>
+  /** Reads the text in a picture of part of a page (offline). */
+  comicsReadText(png: Uint8Array): Promise<string>
+  onComicsChanged(callback: () => void): () => void
+  onComicsPreparing(callback: (p: ComicPreparing) => void): () => void
   /** Copies files/folders from the computer into a notes folder ('' is the top); ones already in the notes folder are moved. Returns their notes-folder paths. */
   explorerToVault(paths: string[], folder: string): Promise<string[]>
   /** Starts dragging files out as real files (into Discord, a browser, File Explorer / Finder, or back into Orbit). Call it from dragstart, after preventDefault. */

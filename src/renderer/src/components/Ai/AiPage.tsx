@@ -1,13 +1,14 @@
 import './ai.css'
 import { useEffect, useRef, useState } from 'react'
 import { ArrowUp, Loader2, RotateCcw } from 'lucide-react'
-import { askNotes, clearAsk, refreshAiStatus, setAskSource, useAi, type AskSources } from '../../store/ai'
+import { askNotes, askOnline, clearAsk, refreshAiStatus, setAskSource, useAi, usesOffline, type AskSources } from '../../store/ai'
 import { useNoteIndex } from '../../store/noteIndex'
 import { notify } from '../../store/notify'
 import { openNote, openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
 import { answerParts } from '../../lib/ai'
 import { openAiSettings } from './AiSettings'
 import EmptyArt from '../Motion/EmptyArt'
+import OnlineOffer from './OnlineOffer'
 
 const EXAMPLES = ['What’s on this week?', 'How much did I spend on takeaways last month?', 'Any emails I need to reply to?', 'What’s still on my to-do lists?']
 
@@ -69,7 +70,7 @@ export default function AiPage({ autoFocus }: { autoFocus: boolean }) {
   }, [])
   useEffect(() => {
     if (autoFocus) input.current?.focus()
-  }, [autoFocus, status?.hasKey])
+  }, [autoFocus, status?.ready])
   useEffect(() => end.current?.scrollIntoView({ block: 'end' }), [turns])
 
   const send = (q = question): void => {
@@ -78,14 +79,15 @@ export default function AiPage({ autoFocus }: { autoFocus: boolean }) {
     askNotes(q)
   }
 
-  if (status && !status.hasKey) {
+  const offline = usesOffline(status)
+  if (status && !status.ready) {
     return (
       <div className="ai-page" data-ai-page>
         <div className="ai-empty">
           <EmptyArt kind="sparkle" size={64} />
           <h2>Ask everything</h2>
           <p>Ask a question in your own words and Claude answers from your notes, email, calendar and money, with links to the notes it used.</p>
-          <p>To start, add your Anthropic API key in Settings.</p>
+          <p>To start, download the offline AI (it runs on this computer) or add your Anthropic API key, both in Settings.</p>
           <button
             className="btn btn-primary"
             onClick={() => {
@@ -107,7 +109,10 @@ export default function AiPage({ autoFocus }: { autoFocus: boolean }) {
           <div className="ai-empty">
             <EmptyArt kind="sparkle" size={64} />
             <h2>Ask everything</h2>
-            <p>Ask anything about your notes, emails, calendar or money. Orbit picks out what matches your question and Claude answers from it. Nothing is sent until you ask.</p>
+            <p>
+              Ask anything about your notes, emails, calendar or money. Orbit picks out what matches your question and{' '}
+              {offline ? 'the offline AI answers from it, right here on this computer.' : 'Claude answers from it. Nothing is sent until you ask.'}
+            </p>
             <Sources />
             <div className="ai-examples">
               {EXAMPLES.map((e) => (
@@ -122,6 +127,7 @@ export default function AiPage({ autoFocus }: { autoFocus: boolean }) {
           <div key={i} className="ai-turn">
             <div className="ai-question">{t.question}</div>
             {t.answer && <Answer text={t.answer} />}
+            {t.answer && t.offline && <OnlineOffer hard={t.hard} privately={t.private} busy={waiting} onAsk={() => void askOnline(t)} />}
             {t.error && <p className="setting-warning">{t.error}</p>}
             {!t.answer && !t.error && (
               <p className="ai-working">

@@ -22,7 +22,7 @@ import { readFile } from 'fs/promises'
 import * as fsp from 'fs/promises'
 import { basename, extname, isAbsolute, join, relative } from 'path'
 import { pathToFileURL } from 'url'
-import type { AiAskTurn, AiExtraContext, AiChat, AiChatMessage, AiNote, ConfirmOptions, EmailFolder, OutgoingEmail } from '@shared/types'
+import type { AiAskTurn, AiExtraContext, AiChat, AiChatMessage, AiEngine, AiNote, AiSortRow, ConfirmOptions, EmailFolder, OutgoingEmail } from '@shared/types'
 import type { MusicAction } from '@shared/spotify'
 import { normalizePrefs, type Prefs } from '@shared/prefs'
 import { activeThemeId, getTheme } from '@shared/themes'
@@ -42,9 +42,13 @@ import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
 import { setupConverter } from './converter'
 import { isAppPage, setupStudio } from './studio'
+import { setupLocalAi } from './localAi'
+import { setupSoundboard, soundFile } from './soundboard'
 import { setupLive } from './live'
 import { explorerFile, setupExplorer } from './explorer'
 import { hold, setupUndoBin } from './undoBin'
+import { setupVideoPlayer, videoResponse } from './videoPlayer'
+import { comicResponse, setupComics } from './comics'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
@@ -297,6 +301,19 @@ function registerVaultProtocol(): void {
         const pic = await localMusic.cover(rel)
         return pic ? new Response(Buffer.from(pic.data), { headers: { 'Content-Type': pic.type, 'Cache-Control': 'max-age=3600' } }) : new Response('No picture', { status: 404 })
       }
+      // The video player: files played as they are, and ffmpeg's live stream of the rest.
+      if (url.host === 'video' || url.host === 'videostream') return await videoResponse(url, request)
+      // Comic pages (vault://comic/<id>/<page>) and covers (vault://comiccover/<id>), from the comic shelf.
+      if (url.host === 'comic' || url.host === 'comiccover') return await comicResponse(url)
+      // Soundboard clips (vault://sound/<file>), from Orbit's own soundboard folder.
+      if (url.host === 'sound') {
+        const full = soundFile(decodeURIComponent(url.pathname.slice(1)))
+        if (!full) return new Response('Not found', { status: 404 })
+        const res = await net.fetch(pathToFileURL(full).toString(), { headers: request.headers })
+        const headers = new Headers(res.headers)
+        headers.set('Access-Control-Allow-Origin', '*')
+        return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+      }
       // Previews in the file explorer tab (vault://explore/<full path>): pictures, video, sound and PDFs only.
       if (url.host === 'explore') {
         const full = explorerFile(url)
@@ -356,7 +373,9 @@ function createWindow(): BrowserWindow {
       // Chromium's PDF viewer, for PDFs opened from the file list.
       plugins: true,
       // The web browser tab (browser.ts locks each page down as it's created).
-      webviewTag: true
+      webviewTag: true,
+      // Soundboard hotkeys are pressed in a game, not in Orbit, and must still be able to start the sound.
+      autoplayPolicy: 'no-user-gesture-required'
     }
   })
 
@@ -688,8 +707,18 @@ function registerIpc(): void {
   ipcMain.handle('ai:summarise', (_e, title: string, text: string) => ai.summarise(title, text))
   ipcMain.handle('ai:tidy', (_e, text: string, kind: 'note' | 'capture') => ai.tidy(text, kind === 'capture' ? 'capture' : 'note'))
   ipcMain.handle('ai:interpret', (_e, text: string, context: string) => ai.interpret(String(text).slice(0, 1000), String(context).slice(0, 8000)))
-  ipcMain.handle('ai:ask', (_e, question: string, notes: AiNote[], history: AiAskTurn[], extra?: AiExtraContext) => ai.askNotes(question, notes, history, extra))
-  ipcMain.handle('ai:chat', (_e, messages: AiChatMessage[]) => ai.chat(messages))
+  ipcMain.handle('ai:ask', (_e, question: string, notes: AiNote[], history: AiAskTurn[], extra?: AiExtraContext, engine?: AiEngine) =>
+    ai.askNotes(question, notes, history, extra, engine)
+  )
+  ipcMain.handle('ai:chat', (_e, messages: AiChatMessage[], engine?: AiEngine) => ai.chat(messages, engine))
+  ipcMain.handle('ai:setEngine', (_e, use: AiEngine) => ai.setEngine(use))
+  ipcMain.handle('ai:sortMoney', (_e, rows: AiSortRow[], categories: { id: string; name: string; income?: boolean }[]) =>
+    ai.sortMoney(
+      (Array.isArray(rows) ? rows : []).slice(0, 2000).map((r) => ({ description: String(r?.description ?? ''), amount: Number(r?.amount) || 0 })),
+      (Array.isArray(categories) ? categories : []).map((c) => ({ id: String(c.id), name: String(c.name), income: c.income === true }))
+    )
+  )
+  ipcMain.handle('ai:meaning', (_e, word: string, sentence: string) => ai.meaning(String(word), String(sentence)))
   ipcMain.handle('ai:loadChats', () => ai.loadChats())
   ipcMain.handle('ai:saveChats', (_e, chats: AiChat[]) => ai.saveChats(chats))
   ipcMain.handle('handwriting:read', (_e, png: Uint8Array, reader: 'ai' | 'offline') => (reader === 'ai' ? ai.readHandwriting(png) : readHandwritingOffline(png)))
@@ -810,7 +839,7 @@ function registerIpc(): void {
 }
 
 /** Only the browser features the app actually uses; everything else (camera, location…) is refused. */
-const ALLOWED_PERMISSIONS = new Set(['clipboard-sanitized-write', 'clipboard-read', 'fullscreen', 'local-fonts'])
+const ALLOWED_PERMISSIONS = new Set(['clipboard-sanitized-write', 'clipboard-read', 'fullscreen', 'local-fonts', 'speaker-selection'])
 
 /**
  * On a Mac, apps should live in Applications. Run from the disk image (or Downloads), macOS gives
@@ -884,9 +913,13 @@ app.whenReady().then(async () => {
   safely('export', setupExport)
   safely('converter', setupConverter)
   safely('studio', setupStudio)
+  safely('offline AI', setupLocalAi)
+  safely('soundboard', setupSoundboard)
   safely('live streaming', setupLive)
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
   safely('undo', () => setupUndoBin(() => vault?.root ?? null))
+  safely('video player', () => setupVideoPlayer(() => vault?.root ?? null))
+  safely('comic reader', () => setupComics())
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))
   mainWindow = createWindow()

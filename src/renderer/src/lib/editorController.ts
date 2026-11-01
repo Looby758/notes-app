@@ -68,12 +68,19 @@ export const HOME_TAB = 'home:'
 export const MONEY_TAB = 'money:'
 export const CONVERT_TAB = 'convert:'
 export const SUDOKU_TAB = 'sudoku:'
+export const COMICS_TAB = 'comics:'
 export const MINESWEEPER_TAB = 'minesweeper:'
+/** Clocks for places around the world (components/Clocks). */
+export const CLOCKS_TAB = 'clocks:'
 /** Scenes, webcam and screen recording (components/Studio). */
 export const STUDIO_TAB = 'studio:'
+/** Sound clips with hotkeys, the voice changer and music into a voice call (components/Soundboard). */
+export const SOUNDBOARD_TAB = 'soundboard:'
 /** WhatsApp and Discord in one tab (components/Messages). */
 export const MESSAGES_TAB = 'messages:'
 export const GAMES_TAB = 'games:'
+/** The video player (components/Video); which video it shows is in store/videoPlayer. */
+export const VIDEO_TAB = 'video:'
 /** Browse the whole computer and Google Drive (components/Explorer). */
 export const EXPLORER_TAB = 'explorer:'
 /** A picture, recording, PDF… from the notes folder, shown in a tab: "file:attachments/a.png". */

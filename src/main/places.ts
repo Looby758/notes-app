@@ -1,5 +1,6 @@
 import { app, ipcMain, net } from 'electron'
 import { placesFromSearch, type Place } from '@shared/places'
+import { isZone } from '@shared/worldClock'
 import { logError } from './log'
 
 /**
@@ -62,6 +63,24 @@ function tile(z: number, x: number, y: number): Promise<string | null> {
   return found
 }
 
+/**
+ * The time zone at a spot, for world clocks of towns that aren't in the built-in list. Open-Meteo
+ * (the weather service, free and keyless) says which zone a spot is in.
+ */
+async function zoneAt(lat: number, lon: number): Promise<string | null> {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null
+  try {
+    const q = `latitude=${Math.round(lat * 1e4) / 1e4}&longitude=${Math.round(lon * 1e4) / 1e4}&timezone=auto&forecast_days=1&daily=sunrise`
+    const res = await fetchWithin(`https://api.open-meteo.com/v1/forecast?${q}`, 8000, 'application/json')
+    if (!res.ok) return null
+    const zone = ((await res.json()) as { timezone?: unknown })?.timezone
+    return isZone(zone) && zone !== 'GMT' ? zone : null
+  } catch (err) {
+    logError('time zone lookup', err)
+    return null
+  }
+}
+
 export function setupPlaces(): void {
   ipcMain.handle('places:search', async (_e, query: string) => {
     try {
@@ -72,4 +91,5 @@ export function setupPlaces(): void {
     }
   })
   ipcMain.handle('places:tile', (_e, z: number, x: number, y: number) => tile(z, x, y))
+  ipcMain.handle('places:zone', (_e, lat: number, lon: number) => zoneAt(Number(lat), Number(lon)))
 }

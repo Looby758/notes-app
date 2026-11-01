@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AiChat } from '@shared/types'
+import type { AiChat, AiEngine } from '@shared/types'
 import { chatTitle, recentMessages } from '../lib/chat'
 import { errorMessage } from '../lib/paths'
 import { notify } from './notify'
@@ -91,21 +91,31 @@ export async function sendChat(text: string): Promise<void> {
   await reply(chatId)
 }
 
-async function reply(id: string): Promise<void> {
+async function reply(id: string, engine?: AiEngine, replaceLast = false): Promise<void> {
   const chat = useChat.getState().chats.find((c) => c.id === id)
   if (!chat) return
   setError(id, null)
   useChat.setState((s) => ({ waiting: [...s.waiting, id] }))
   try {
-    const answer = await window.api.aiChat(recentMessages(chat.messages))
+    const sent = replaceLast ? chat.messages.slice(0, -1) : chat.messages
+    const answer = await window.api.aiChat(recentMessages(sent).map(({ role, text }) => ({ role, text })), engine)
+    const message = { role: 'assistant' as const, text: answer.text, ...(answer.offline ? { offline: true, hard: answer.hard } : {}) }
     setChats((chats) =>
-      chats.map((c) => (c.id === id ? { ...c, updated: new Date().toISOString(), messages: [...c.messages, { role: 'assistant', text: answer }] } : c))
+      chats.map((c) => (c.id === id ? { ...c, updated: new Date().toISOString(), messages: [...(replaceLast ? c.messages.slice(0, -1) : c.messages), message] } : c))
     )
   } catch (err) {
     setError(id, errorMessage(err))
   } finally {
     useChat.setState((s) => ({ waiting: s.waiting.filter((w) => w !== id) }))
   }
+}
+
+/** Swaps the offline AI's last reply for Claude's (only when you press the button). */
+export function askChatOnline(id: string): void {
+  const chat = useChat.getState().chats.find((c) => c.id === id)
+  const last = chat?.messages.at(-1)
+  if (!chat || last?.role !== 'assistant' || !last.offline || useChat.getState().waiting.includes(id)) return
+  void reply(id, 'online', true)
 }
 
 /** Tries again after a message that failed. */

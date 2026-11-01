@@ -165,6 +165,19 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     }
   }, [vault])
 
+  // Soundboard hotkeys work from any app, so the sound side starts with the window (and reopens the mic if it was left on).
+  useEffect(() => {
+    let off: (() => void) | undefined
+    let gone = false
+    void import('../lib/soundboard').then((m) => {
+      if (!gone) off = m.startSoundboard()
+    })
+    return () => {
+      gone = true
+      off?.()
+    }
+  }, [])
+
   // Keep the tree's highlight on the note being edited.
   useEffect(() => {
     if (isNoteTab(active)) {

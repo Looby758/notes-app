@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState, type FormEvent } from 'react'
-import { AlertTriangle, ChevronLeft, ChevronRight, Pencil, Plus, PoundSterling, Trash2, Upload, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { AlertTriangle, ChevronLeft, ChevronRight, Cpu, Loader2, Pencil, Plus, PoundSterling, Trash2, Upload, X } from 'lucide-react'
 import Private from '../Streamer/Private'
 import {
   addCategory,
@@ -43,6 +43,8 @@ import { statementFromPdf } from '../../lib/pdfStatement'
 import MoneyHomeCard from './MoneyHomeCard'
 import MoneyPlans, { AskMoney, ForecastCard } from './MoneyPlans'
 import EmptyArt from '../Motion/EmptyArt'
+import { refreshAiStatus, useAi } from '../../store/ai'
+import { errorMessage } from '../../lib/paths'
 
 addHomeCard({ id: 'money', order: 25, title: 'Spending this month', Card: MoneyHomeCard })
 
@@ -522,6 +524,13 @@ function Import({ done }: { done: () => void }) {
   /** A PDF waiting for its password. */
   const [locked, setLocked] = useState<{ file: File; wrong: boolean } | null>(null)
   const [password, setPassword] = useState('')
+  /** Categories the offline AI picked, by row number, and whether it's working on them. */
+  const [aiPicked, setAiPicked] = useState<Record<number, string>>({})
+  const [sorting, setSorting] = useState(false)
+  const offlineReady = useAi((s) => s.status?.offline.state === 'ready')
+  useEffect(() => {
+    refreshAiStatus().catch(() => undefined)
+  }, [])
 
   const open = async (file: File, pdfPassword?: string): Promise<void> => {
     setReading(true)
@@ -530,6 +539,7 @@ function Import({ done }: { done: () => void }) {
       if (!rows.length) throw new Error('That file is empty.')
       setPreview({ name: file.name, rows, cols: detectColumns(rows) })
       setPicked({})
+      setAiPicked({})
       setSkipped(new Set())
       setLocked(null)
       setPassword('')
@@ -549,7 +559,28 @@ function Import({ done }: { done: () => void }) {
   const freshCount = fresh.filter(Boolean).length
   const chosen = statement.map((_, i) => fresh[i] && !skipped.has(i))
   const chosenCount = chosen.filter(Boolean).length
-  const categoryOf = (i: number): string => picked[i] ?? guessCategory(statement[i], rules, categories)
+  /** A shop you've picked a category for before keeps it; the offline AI's pick comes next, then Orbit's own guess. */
+  const learnedFor = (i: number): boolean => !!rules[merchantKey(statement[i].description)]
+  const categoryOf = (i: number): string => picked[i] ?? (!learnedFor(i) ? aiPicked[i] : undefined) ?? guessCategory(statement[i], rules, categories)
+  const toSort = statement.map((_, i) => i).filter((i) => fresh[i] && picked[i] === undefined && !learnedFor(i))
+
+  /** Sorts the payments with the offline AI, on this computer (only when you press the button). */
+  const sortWithAi = async (): Promise<void> => {
+    setSorting(true)
+    try {
+      const rows = toSort.map((i) => ({ description: statement[i].description, amount: statement[i].amount }))
+      const result = await window.api.aiSortMoney(rows, categories.map((c) => ({ id: c.id, name: c.name, income: c.income })))
+      const next: Record<number, string> = {}
+      for (const [k, id] of Object.entries(result)) next[toSort[Number(k)]] = id
+      setAiPicked((p) => ({ ...p, ...next }))
+      const n = Object.keys(next).length
+      notify(n ? `The offline AI sorted ${n} ${n === 1 ? 'payment' : 'payments'}. Check them before adding.` : 'The offline AI couldn’t sort these.', 'info')
+    } catch (err) {
+      notify(errorMessage(err))
+    } finally {
+      setSorting(false)
+    }
+  }
 
   const run = (): void => {
     const rows: Omit<MoneyEntry, 'id'>[] = []
@@ -697,6 +728,15 @@ function Import({ done }: { done: () => void }) {
                 {statement.length > freshCount && `, ${statement.length - freshCount} already added before (skipped)`}. Untick
                 any you don't want.
               </p>
+              {offlineReady && toSort.length > 0 && (
+                <div className="money-ai-sort" data-money-ai-sort>
+                  <Cpu size={14} />
+                  <span>Sort {toSort.length === 1 ? 'this payment' : `these ${toSort.length} payments`} into categories with the offline AI? It runs on this computer, so your bank details stay here.</span>
+                  <button className="btn" disabled={sorting} onClick={() => void sortWithAi()} data-money-ai-sort-go>
+                    {sorting ? <Loader2 size={13} className="spin" /> : <Cpu size={13} />} {sorting ? 'Sorting…' : 'Sort them'}
+                  </button>
+                </div>
+              )}
               <div className="money-import-table">
                 <table>
                   <tbody>
@@ -720,7 +760,14 @@ function Import({ done }: { done: () => void }) {
                         <td className="money-import-desc">{r.description}</td>
                         <td>
                           {fresh[i] ? (
-                            <CategorySelect value={categoryOf(i)} income={r.amount > 0} onChange={(id) => setPicked((p) => ({ ...p, [i]: id }))} />
+                            <span className="money-import-cat">
+                              <CategorySelect value={categoryOf(i)} income={r.amount > 0} onChange={(id) => setPicked((p) => ({ ...p, [i]: id }))} />
+                              {picked[i] === undefined && !learnedFor(i) && aiPicked[i] && (
+                                <span className="palette-ai-tag" title="Picked by the offline AI">
+                                  AI
+                                </span>
+                              )}
+                            </span>
                           ) : (
                             <span className="money-hint">Already added</span>
                           )}
