@@ -38,6 +38,7 @@ import {
   SquareTerminal,
   Webcam,
   Zap,
+  Headphones,
   type LucideIcon
 } from 'lucide-react'
 import { useVault } from '../store/vault'
@@ -57,6 +58,7 @@ import {
   CONVERT_TAB,
   STUDIO_TAB,
   SOUNDBOARD_TAB,
+  DISCORD_TAB,
   EMAIL_TAB,
   EXPLORER_TAB,
   FLASHCARDS_TAB,
@@ -141,6 +143,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   },
   studio: { icon: Clapperboard, run: () => openSpecialTab(STUDIO_TAB) },
   soundboard: { icon: AudioLines, run: () => openSpecialTab(SOUNDBOARD_TAB) },
+  'discord-voice': { icon: Headphones, run: () => openSpecialTab(DISCORD_TAB) },
   terminal: { icon: SquareTerminal, run: () => openSpecialTab(TERMINAL_TAB) },
   streamer: { icon: Eye, run: toggleStreamerMode, useActive: () => usePrefs((s) => s.prefs.streamerMode) },
   settings: { icon: Settings, run: () => openSpecialTab(SETTINGS_TAB) }

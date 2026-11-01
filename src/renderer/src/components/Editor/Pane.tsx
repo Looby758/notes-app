@@ -31,6 +31,7 @@ import {
   CLOCKS_TAB,
   STUDIO_TAB,
   SOUNDBOARD_TAB,
+  DISCORD_TAB,
   MESSAGES_TAB,
   GAMES_TAB,
   VIDEO_TAB,
@@ -65,6 +66,7 @@ import ComicsPage from '../Comics/ComicsPage'
 import WorldClocksPage from '../Clocks/WorldClocksPage'
 import StudioPage from '../Studio/StudioPage'
 import SoundboardPage from '../Soundboard/SoundboardPage'
+import DiscordVoicePage from '../Discord/DiscordVoicePage'
 import MinesweeperPage from '../Minesweeper/MinesweeperPage'
 import GamesPage from '../Games/GamesPage'
 import VideoPage from '../Video/VideoPage'
@@ -198,6 +200,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === CLOCKS_TAB && <WorldClocksPage />}
         {active === STUDIO_TAB && <StudioPage />}
         {active === SOUNDBOARD_TAB && <SoundboardPage />}
+        {active === DISCORD_TAB && <DiscordVoicePage />}
         {active === GAMES_TAB && <GamesPage />}
         {active === VIDEO_TAB && <VideoPage autoFocus={isActivePane} />}
         {active === EXPLORER_TAB && <ExplorerPage autoFocus={isActivePane} />}

@@ -44,6 +44,7 @@ import { setupConverter } from './converter'
 import { isAppPage, setupStudio } from './studio'
 import { setupLocalAi } from './localAi'
 import { setupSoundboard, soundFile } from './soundboard'
+import { setupDiscord, teardownDiscord } from './discord'
 import { setupLive } from './live'
 import { explorerFile, setupExplorer } from './explorer'
 import { hold, setupUndoBin } from './undoBin'
@@ -916,6 +917,7 @@ app.whenReady().then(async () => {
   safely('studio', setupStudio)
   safely('offline AI', setupLocalAi)
   safely('soundboard', setupSoundboard)
+  safely('Discord voice', setupDiscord)
   safely('live streaming', setupLive)
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
   safely('undo', () => setupUndoBin(() => vault?.root ?? null))
@@ -956,6 +958,7 @@ app.on('before-quit', () => {
 app.on('will-quit', () => {
   teardownCapture()
   safely('mouse sharing', teardownMouseShare)
+  safely('Discord voice', teardownDiscord)
   clearSecret()
 })
 
