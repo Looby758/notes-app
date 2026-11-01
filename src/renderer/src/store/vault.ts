@@ -13,6 +13,7 @@ import { notify } from './notify'
 import { TRASH_NAME } from '@shared/platform'
 import { resetIndex, syncIndex } from './noteIndex'
 import { loadStarred, putBackStars, remapStars, removeStarsWithin, useStarred } from './starred'
+import { loadVideoProgress } from './videoPlayer'
 import { loadFlashcards, putBackFlashcards, remapFlashcards, removeFlashcardsWithin, useFlashcards } from './flashcards'
 import { loadMoney } from './money'
 import { loadLockedFolders, putBackLockedFolders, remapLockedFolders, removeLockedFoldersWithin, useLockedFolders } from '../lib/lock/folders'
@@ -229,6 +230,7 @@ export const useVault = create<VaultState>((set, get) => {
       void loadSavedSearches()
       loadStarred()
       void loadFlashcards()
+      loadVideoProgress()
       void loadMoney()
       get().refresh()
     },

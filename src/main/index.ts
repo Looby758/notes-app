@@ -48,7 +48,7 @@ import { setupLive } from './live'
 import { explorerFile, setupExplorer } from './explorer'
 import { hold, setupUndoBin } from './undoBin'
 import { setupVideoPlayer, videoResponse } from './videoPlayer'
-import { comicResponse, setupComics } from './comics'
+import { comicResponse, setupComics, shareProgress as shareComicProgress } from './comics'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
@@ -262,6 +262,7 @@ function openVault(path: string | null): void {
   stopWatching()
   vault = path ? new Vault(path) : null
   if (!path) return
+  void shareComicProgress()
   startWatching(path, (paths) => {
     for (const win of BrowserWindow.getAllWindows()) win.webContents.send('vault:changed', paths)
   })
@@ -919,7 +920,7 @@ app.whenReady().then(async () => {
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
   safely('undo', () => setupUndoBin(() => vault?.root ?? null))
   safely('video player', () => setupVideoPlayer(() => vault?.root ?? null))
-  safely('comic reader', () => setupComics())
+  safely('comic reader', () => setupComics(() => vault))
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))
   mainWindow = createWindow()
