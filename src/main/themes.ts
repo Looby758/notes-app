@@ -23,7 +23,7 @@ import { logError } from './log'
 
 export const THEME_SCHEME = { scheme: 'notestheme', privileges: { standard: true, secure: true, supportFetchAPI: true } }
 
-const themesDir = (): string => join(app.getPath('userData'), 'themes')
+export const themesDir = (): string => join(app.getPath('userData'), 'themes')
 const slugOf = (id: string): string => id.slice(IMPORTED_PREFIX.length)
 
 let themes: Theme[] = []

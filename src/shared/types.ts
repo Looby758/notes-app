@@ -470,6 +470,38 @@ export interface NotesApi {
   studioStop(id: number): Promise<string | null>
   studioReveal(path: string): Promise<void>
   studioOpenFolder(folder: string | null): Promise<string>
+
+  // Instant replay and the clip editor (main/clips.ts). `folder` is the Studio's recordings folder (null = the usual one).
+  /** The system-wide "save replay" shortcut as registered, or why it couldn't be. */
+  replayStatus(): Promise<{ shortcut: string; error?: string }>
+  /** Saves the replay now (the same as pressing the shortcut). */
+  replaySaveNow(): Promise<void>
+  /** The main screen's capture id, which replays record. */
+  replayScreen(): Promise<string | null>
+  /** Tells the window the replay buffer is (or isn't) running, so it keeps going in the background. */
+  replayRunning(on: boolean): Promise<void>
+  /** Joins the buffer's pieces into one video in the recordings folder; resolves to its path. */
+  replaySave(folder: string | null, parts: Uint8Array[], ext: 'mp4' | 'webm', seconds: number): Promise<string>
+  /** Main window: the "save replay" shortcut was pressed. */
+  onReplaySave(callback: () => void): () => void
+  /** Main window: open this clip in the clip editor (a click on the "Replay saved" notification). */
+  onClipsOpen(callback: (path: string) => void): () => void
+  /** The videos in the recordings folder, newest first. */
+  clipsList(folder: string | null): Promise<ClipInfo[]>
+  /** Makes a trimmed (and maybe captioned) copy; resolves to the new file. */
+  clipsExport(folder: string | null, request: import('./clips').ClipExport): Promise<{ path: string; size: number }>
+  clipsCancel(): Promise<void>
+  onClipsProgress(callback: (done: number) => void): () => void
+  clipsTrash(folder: string | null, path: string): Promise<void>
+  clipsReveal(folder: string | null, path: string): Promise<void>
+  /** Starts dragging a clip out of Orbit (into Discord, a folder…). Call from a dragstart. */
+  clipsDrag(folder: string | null, path: string, icon: string): void
+  /** Saved Discord webhooks (their links stay in the main process, encrypted). */
+  discordHooks(): Promise<import('./clips').DiscordHook[]>
+  discordAddHook(name: string, url: string): Promise<import('./clips').DiscordHook[]>
+  discordRemoveHook(id: string): Promise<import('./clips').DiscordHook[]>
+  /** Posts a clip (and a message) to a saved webhook's channel. */
+  discordSend(folder: string | null, hookId: string, path: string, message: string): Promise<void>
   /** Going live (main/live.ts). */
   liveStatus(): Promise<import('./live').LiveStatus>
   onLiveStatus(callback: (s: import('./live').LiveStatus) => void): () => void
@@ -1085,6 +1117,14 @@ export interface VideoDownload {
 }
 
 /** Whether ffmpeg (downloaded only when asked, for converting videos and streaming) is on this computer. */
+/** A video in the recordings folder, for the clip editor. */
+export interface ClipInfo {
+  name: string
+  path: string
+  size: number
+  modified: number
+}
+
 export interface FfmpegState {
   state: 'ready' | 'missing' | 'downloading' | 'unsupported'
   progress?: number

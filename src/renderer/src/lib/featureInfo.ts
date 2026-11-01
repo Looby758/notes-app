@@ -61,6 +61,8 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'explorer', name: 'Files', blurb: 'Files on this computer', group: 'Tools', command: 'explorer.open', keywords: 'explorer finder folders drive' },
   { id: 'convert', name: 'Convert files', blurb: 'Photos, documents, audio and more', group: 'Tools', command: 'convert.open', keywords: 'pdf mp3 mp4 gif video png jpg word' },
   { id: 'downloader', name: 'Download a video', blurb: 'Paste a YouTube, X, Instagram or TikTok link', group: 'Tools', command: 'downloader.open', keywords: 'youtube twitter x instagram tiktok reddit twitch save video link mp4 mp3 yt-dlp' },
+  { id: 'clips', name: 'Clips', blurb: 'Instant replay: save the last 30 seconds, trim it, send it', group: 'Tools', command: 'clips.open', keywords: 'instant replay shadowplay clip highlight discord trim caption game' },
+  { id: 'replay', name: 'Save replay', blurb: 'Save the last 30 seconds of your screen', group: 'Tools', command: 'replay.save', keywords: 'instant replay clip that save highlight' },
   { id: 'offline-ai', name: 'Offline AI', blurb: 'AI on your own graphics card: get it or manage it', group: 'Tools', keywords: 'ai local gpu llm private download model qwen llama' },
   { id: 'studio', name: 'Studio', blurb: 'Record your screen and webcam, or go live', group: 'Tools', command: 'studio.open', keywords: 'record obs stream twitch youtube webcam live' },
   { id: 'terminal', name: 'Terminal', blurb: 'Command line in your notes folder', group: 'Tools', command: 'terminal.open', keywords: 'shell cmd powershell' },
