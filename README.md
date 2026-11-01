@@ -162,6 +162,18 @@ Use one mouse and keyboard on a Windows PC and a Mac side by side, both running 
 - **Ctrl works as ⌘ on the Mac** (so Ctrl+C, Ctrl+V and Ctrl+Z work the same on both); you can turn this off in the Mac's Orbit settings.
 - On a Mac, allow Orbit under System Settings → Privacy & Security → **Accessibility** so the PC's mouse can work there, and allow it on the local network when asked. Windows asks once whether Orbit may accept connections: allow it on private networks.
 - Everything goes straight between the two computers over your Wi-Fi, encrypted with keys only they know (what you type is passwords too). Nothing goes through the internet.
+## Comic books
+
+Open **Comics** (in All features, or "Read comics" in the command list) and add .cbz or .cbr files, or a whole folder of them. Comics also open straight from the Files tab. Your files stay where they are; Orbit only reads them. A .cbr is unpacked into Orbit's settings folder the first time you open it (the last few you've read are kept, older ones are cleared away), and a .cbz is read straight from the file.
+
+- **Shelf**: covers with a progress bar, and the one you're reading at the top to carry on with.
+- **One page, two-page spreads or a long scroll**, fit to the screen or to the width, and right to left for manga. Orbit remembers the exact page (and how far down it, in the long scroll).
+- **Issues and chapters**: found from the folders or file names inside big compendiums, to jump between. If none are found, mark where they start yourself.
+- **Panel zoom** (Z): click a panel and it fills the screen; → goes to the next panel, then the next page.
+- **Zen mode** (F): full screen, dark, Orbit's pop-ups and reminders wait until you're done. Pick a Spotify playlist when you start (or have it remembered for that comic), with a reading timer and pages read today.
+- **Scan text** (S): draw a box round a speech bubble or caption to copy its text or add it to a note (read offline). Save a page, a panel or the part you boxed into a note as a picture.
+
+Orbit never makes notes for you: you choose what goes where. Where you're up to is kept by the comic's file name and size, ready to follow you to another computer once Orbit syncs its settings.
 
 ## Features
 

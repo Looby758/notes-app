@@ -46,6 +46,7 @@ import { setupLive } from './live'
 import { explorerFile, setupExplorer } from './explorer'
 import { hold, setupUndoBin } from './undoBin'
 import { setupVideoPlayer, videoResponse } from './videoPlayer'
+import { comicResponse, setupComics } from './comics'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
@@ -300,6 +301,8 @@ function registerVaultProtocol(): void {
       }
       // The video player: files played as they are, and ffmpeg's live stream of the rest.
       if (url.host === 'video' || url.host === 'videostream') return await videoResponse(url, request)
+      // Comic pages (vault://comic/<id>/<page>) and covers (vault://comiccover/<id>), from the comic shelf.
+      if (url.host === 'comic' || url.host === 'comiccover') return await comicResponse(url)
       // Previews in the file explorer tab (vault://explore/<full path>): pictures, video, sound and PDFs only.
       if (url.host === 'explore') {
         const full = explorerFile(url)
@@ -891,6 +894,7 @@ app.whenReady().then(async () => {
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
   safely('undo', () => setupUndoBin(() => vault?.root ?? null))
   safely('video player', () => setupVideoPlayer(() => vault?.root ?? null))
+  safely('comic reader', () => setupComics())
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))
   mainWindow = createWindow()

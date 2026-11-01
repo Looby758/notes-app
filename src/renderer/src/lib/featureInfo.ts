@@ -48,6 +48,7 @@ export const FEATURE_INFO: FeatureInfo[] = [
 
   { id: 'music', name: 'Music', blurb: 'Spotify and your own songs', group: 'Media', command: 'music.player', keywords: 'spotify songs player' },
   { id: 'video', name: 'Video player', blurb: 'Plays any video, with subtitles and speed', group: 'Media', command: 'video.open', keywords: 'mkv avi wmv mp4 movie film watch subtitles player vlc' },
+  { id: 'comics', name: 'Comics', blurb: 'Read .cbz and .cbr comic books', group: 'Media', command: 'comics.open', keywords: 'comic book cbr cbz manga graphic novel read zen' },
   { id: 'youtube', name: 'YouTube', blurb: 'A mini window that floats on top', group: 'Media', command: 'youtube.open', keywords: 'video' },
 
   { id: 'games', name: 'Games', blurb: 'Your Steam and other games', group: 'Play', command: 'games.open', keywords: 'steam epic play' },

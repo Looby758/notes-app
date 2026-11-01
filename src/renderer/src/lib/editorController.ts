@@ -68,6 +68,7 @@ export const HOME_TAB = 'home:'
 export const MONEY_TAB = 'money:'
 export const CONVERT_TAB = 'convert:'
 export const SUDOKU_TAB = 'sudoku:'
+export const COMICS_TAB = 'comics:'
 export const MINESWEEPER_TAB = 'minesweeper:'
 /** Scenes, webcam and screen recording (components/Studio). */
 export const STUDIO_TAB = 'studio:'

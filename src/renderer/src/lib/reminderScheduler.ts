@@ -1,4 +1,5 @@
 import { useNoteIndex, getNoteText } from '../store/noteIndex'
+import { isQuiet } from '../store/quiet'
 import { usePrefs } from '../store/prefs'
 import { notify } from '../store/notify'
 import { dailyDateOf } from './dailyPaths'
@@ -49,6 +50,8 @@ export function allReminders(): { reminders: Reminder[]; undated: Map<string, nu
 }
 
 async function check(): Promise<void> {
+  // Reading in zen mode: reminders wait, and show as missed afterwards.
+  if (isQuiet()) return
   const { reminders, undated } = allReminders()
   // "⏰ 15:00" outside a daily note means today: write the date in, so it's clear and fires once.
   if (undated.size && !filling) {
@@ -75,7 +78,7 @@ async function check(): Promise<void> {
       path: missed[0].path,
       line: missed[0].line
     })
-    notify(`Missed while Orbit was closed: ${names}${missed.length > 4 ? '…' : ''}`, 'info')
+    notify(`Missed: ${names}${missed.length > 4 ? '…' : ''}`, 'info')
     for (const r of missed) fired.add(r.key)
   }
   await saveFired()

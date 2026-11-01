@@ -1,4 +1,5 @@
 import type { ExplorerEntry, ExplorerPlace, PasteMode } from './explorer'
+import type { ComicOpened, ComicPreparing, ComicSettings, ComicShelf } from './comics'
 import type { Prefs } from './prefs'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
@@ -849,6 +850,27 @@ export interface NotesApi {
   explorerTrash(paths: string[]): Promise<string[]>
   /** Finds names under a folder and all its subfolders. */
   explorerSearch(dir: string, query: string, showHidden: boolean): Promise<ExplorerEntry[]>
+  // Comic book reader
+  comicsShelf(): Promise<ComicShelf>
+  /** Adds comic files (asks which, when no paths are given). */
+  comicsAdd(paths?: string[]): Promise<{ shelf: ComicShelf; added: string[]; skipped: number }>
+  /** Asks for a folder and adds every comic in it. */
+  comicsAddFolder(): Promise<{ shelf: ComicShelf; added: string[]; skipped: number }>
+  /** Takes a comic off the shelf (the file stays where it is). */
+  comicsRemove(id: string): Promise<ComicShelf>
+  /** Gets a comic ready to read (the first time, a RAR is unpacked: see onComicsPreparing). */
+  comicsOpen(id: string): Promise<ComicOpened>
+  comicsProgress(id: string, page: number, offset: number, finished?: boolean): Promise<void>
+  comicsResetProgress(id: string): Promise<ComicShelf>
+  /** Counts pages turned today; returns today's total. */
+  comicsTurned(pages: number): Promise<number>
+  comicsSettings(id: string, patch: Partial<ComicSettings>): Promise<ComicSettings>
+  comicsRename(id: string, title: string): Promise<ComicShelf>
+  comicsReveal(id: string): Promise<void>
+  /** Reads the text in a picture of part of a page (offline). */
+  comicsReadText(png: Uint8Array): Promise<string>
+  onComicsChanged(callback: () => void): () => void
+  onComicsPreparing(callback: (p: ComicPreparing) => void): () => void
   /** Copies files/folders from the computer into a notes folder ('' is the top); ones already in the notes folder are moved. Returns their notes-folder paths. */
   explorerToVault(paths: string[], folder: string): Promise<string[]>
   /** Starts dragging files out as real files (into Discord, a browser, File Explorer / Finder, or back into Orbit). Call it from dragstart, after preventDefault. */

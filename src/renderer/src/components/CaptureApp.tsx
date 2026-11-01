@@ -22,7 +22,7 @@ function summonAction(text: string): SmartAction | null {
   return a && a.kind !== 'event' && a.kind !== 'jot' && a.kind !== 'ask' ? a : null
 }
 
-type Dest = NonNullable<CaptureRequest['target']>
+export type Dest = NonNullable<CaptureRequest['target']>
 
 const RECENT_KEY = 'capture:recent'
 const LAST_KEY = 'capture:last'
@@ -380,7 +380,7 @@ export default function CaptureApp() {
 }
 
 /** "Where should this go?": today's note, the inbox, recent places, or any folder or note. */
-function DestPicker({ current, label, onPick, onClose }: { current: Dest | null; label: (d: Dest | null) => string; onPick: (d: Dest) => void; onClose: () => void }) {
+export function DestPicker({ current, label, onPick, onClose }: { current: Dest | null; label: (d: Dest | null) => string; onPick: (d: Dest) => void; onClose: () => void }) {
   const [query, setQuery] = useState('')
   const [all, setAll] = useState<Dest[]>([])
   const [index, setIndex] = useState(0)

@@ -152,6 +152,28 @@ const api: NotesApi = {
   exportFiles: (folderName, files) => ipcRenderer.invoke('export:files', folderName, files),
   showExported: (path) => ipcRenderer.invoke('export:show', path),
   decodeHeic: (data) => ipcRenderer.invoke('convert:heic', data),
+  comicsShelf: () => ipcRenderer.invoke('comics:shelf'),
+  comicsAdd: (paths) => ipcRenderer.invoke('comics:add', paths),
+  comicsAddFolder: () => ipcRenderer.invoke('comics:addFolder'),
+  comicsRemove: (id) => ipcRenderer.invoke('comics:remove', id),
+  comicsOpen: (id) => ipcRenderer.invoke('comics:open', id),
+  comicsProgress: (id, page, offset, finished) => ipcRenderer.invoke('comics:progress', id, page, offset, finished),
+  comicsResetProgress: (id) => ipcRenderer.invoke('comics:resetProgress', id),
+  comicsTurned: (pages) => ipcRenderer.invoke('comics:turned', pages),
+  comicsSettings: (id, patch) => ipcRenderer.invoke('comics:settings', id, patch),
+  comicsRename: (id, title) => ipcRenderer.invoke('comics:rename', id, title),
+  comicsReveal: (id) => ipcRenderer.invoke('comics:reveal', id),
+  comicsReadText: (png) => ipcRenderer.invoke('comics:readText', png),
+  onComicsChanged: (callback) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('comics:changed', handler)
+    return () => ipcRenderer.removeListener('comics:changed', handler)
+  },
+  onComicsPreparing: (callback) => {
+    const handler = (_e: unknown, p: Parameters<typeof callback>[0]): void => callback(p)
+    ipcRenderer.on('comics:preparing', handler)
+    return () => ipcRenderer.removeListener('comics:preparing', handler)
+  },
   pathForFile: (file) => {
     try {
       return webUtils.getPathForFile(file)
