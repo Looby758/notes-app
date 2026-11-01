@@ -1,4 +1,4 @@
-import { app, ipcMain, shell } from 'electron'
+import { app, ipcMain, nativeImage, shell, type NativeImage } from 'electron'
 import { existsSync, readdirSync } from 'fs'
 import { cp, mkdir, open, readdir, rename, rm, stat, writeFile } from 'fs/promises'
 import { homedir } from 'os'
@@ -17,12 +17,15 @@ import {
   type PasteMode
 } from '@shared/explorer'
 import { IS_MAC } from '@shared/platform'
+import { logError } from './log'
+import { hold } from './undoBin'
 
 /**
  * The file explorer tab's side of things: the places to start from, folder listings, text
  * previews and opening files. Pictures, video, sound and PDFs are previewed through
  * vault://explore/… (see explorerFile). File actions (new, rename, copy, move) never overwrite
- * anything: a name that's taken gets " (2)". Deleting only ever goes to the Recycle Bin / Bin.
+ * anything: a name that's taken gets " (2)". Deleting goes to the Recycle Bin / Bin (by way of
+ * undoBin.ts, so Ctrl+Z can bring it back).
  */
 
 /** Programs and scripts are only ever shown in File Explorer / Finder, never run from here. */
@@ -200,9 +203,9 @@ async function renameItem(path: string, name: string): Promise<string> {
   return next
 }
 
-/** Copies or moves each item into `dir`, never over something already there. Returns the new paths. */
-async function paste(paths: string[], dir: string, mode: PasteMode): Promise<string[]> {
-  const done: string[] = []
+/** Copies or moves each item into `dir`, never over something already there. Returns where each went. */
+async function paste(paths: string[], dir: string, mode: PasteMode): Promise<{ from: string; to: string }[]> {
+  const done: { from: string; to: string }[] = []
   const taken = await namesIn(dir)
   for (const from of paths) {
     const info = await stat(from)
@@ -224,7 +227,7 @@ async function paste(paths: string[], dir: string, mode: PasteMode): Promise<str
     } else {
       await cp(from, to, { recursive: true, errorOnExist: true, force: false, preserveTimestamps: true })
     }
-    done.push(to)
+    done.push({ from, to })
   }
   return done
 }
@@ -262,7 +265,41 @@ const checkPaths = (paths: unknown): string[] => {
   return paths.map(checkPath)
 }
 
+/** A see-through 1×1 picture: macOS won't start a drag without some icon. */
+const BLANK_ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+
+const DRAG_PICTURE = /\.(png|jpe?g|gif|webp|bmp|ico)$/i
+
+/** What follows the pointer while files are dragged out: the picture itself, or the file's usual icon. */
+async function dragIcon(path: string): Promise<NativeImage> {
+  try {
+    if (DRAG_PICTURE.test(path)) {
+      const picture = nativeImage.createFromPath(path)
+      if (!picture.isEmpty()) {
+        const { width, height } = picture.getSize()
+        return width >= height ? picture.resize({ width: Math.min(width, 64) }) : picture.resize({ height: Math.min(height, 64) })
+      }
+    }
+    const icon = await app.getFileIcon(path, { size: 'normal' })
+    if (!icon.isEmpty()) return icon
+  } catch {
+    // Falls through to the blank one.
+  }
+  return nativeImage.createFromDataURL(BLANK_ICON)
+}
+
 export function setupExplorer(vaultRoot: () => string | null): void {
+  // Dragging files out of the Files tab as real files, so they can be dropped into Discord, a
+  // browser, File Explorer / Finder or any other app (a drag the page starts itself stays inside it).
+  ipcMain.on('explorer:startDrag', async (e, paths: unknown) => {
+    try {
+      const files = checkPaths(paths).filter((p) => existsSync(p))
+      if (!files.length) return
+      e.sender.startDrag({ file: files[0], files, icon: await dragIcon(files[0]) })
+    } catch (err) {
+      logError('dragging files out', err)
+    }
+  })
   ipcMain.handle('explorer:places', () => places(vaultRoot()))
   ipcMain.handle('explorer:list', (_e, dir: string) => list(vaultRoot(), checkPath(dir)))
   ipcMain.handle('explorer:readText', (_e, path: string) => {
@@ -288,7 +325,7 @@ export function setupExplorer(vaultRoot: () => string | null): void {
     for (const p of checkPaths(paths)) {
       // The top of a drive can't go in the Bin.
       if (dirname(p) === p) continue
-      await shell.trashItem(p)
+      await hold(p)
       done.push(p)
     }
     return done
@@ -304,7 +341,7 @@ export function setupExplorer(vaultRoot: () => string | null): void {
     const inside = sources.filter((p) => inVault(root, p))
     const outside = sources.filter((p) => !inVault(root, p))
     const done = [...(await paste(inside, target, 'move')), ...(await paste(outside, target, 'copy'))]
-    return done.map((p) => inVault(root, p)).filter((p): p is string => !!p)
+    return done.map((p) => inVault(root, p.to)).filter((p): p is string => !!p)
   })
   ipcMain.handle('explorer:search', (_e, dir: string, query: string, showHidden: boolean) => search(vaultRoot(), checkPath(dir), String(query ?? ''), !!showHidden))
 }

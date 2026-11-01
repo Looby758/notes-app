@@ -803,3 +803,16 @@ body.reduce-motion .music-popup.leaving {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+/* The grip for dragging the player out of the corner. */
+.music-side .music-move {
+  display: grid;
+  place-items: center;
+  cursor: grab;
+  touch-action: none;
+}
+body.music-player-dragging,
+body.music-player-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}

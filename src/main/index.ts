@@ -14,6 +14,7 @@ import {
   screen,
   session,
   shell,
+  webContents,
   type MenuItemConstructorOptions
 } from 'electron'
 import { existsSync, statSync } from 'fs'
@@ -21,7 +22,7 @@ import { readFile } from 'fs/promises'
 import * as fsp from 'fs/promises'
 import { basename, extname, isAbsolute, join, relative } from 'path'
 import { pathToFileURL } from 'url'
-import type { AiAskTurn, AiExtraContext, AiChat, AiChatMessage, AiNote, ConfirmOptions, EmailFolder, OutgoingEmail } from '@shared/types'
+import type { AiAskTurn, AiExtraContext, AiChat, AiChatMessage, AiEngine, AiNote, AiSortRow, ConfirmOptions, EmailFolder, OutgoingEmail } from '@shared/types'
 import type { MusicAction } from '@shared/spotify'
 import { normalizePrefs, type Prefs } from '@shared/prefs'
 import { activeThemeId, getTheme } from '@shared/themes'
@@ -42,14 +43,21 @@ import { setupExport } from './exporter'
 import { setupConverter } from './converter'
 import { isAppPage, setupStudio } from './studio'
 import { applyReplayShortcut, clipResponse, setupClips } from './clips'
+import { setupLocalAi } from './localAi'
+import { setupSoundboard, soundFile } from './soundboard'
 import { setupLive } from './live'
 import { explorerFile, setupExplorer } from './explorer'
+import { hold, setupUndoBin } from './undoBin'
+import { setupVideoPlayer, videoResponse } from './videoPlayer'
+import { comicResponse, setupComics, shareProgress as shareComicProgress } from './comics'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
 import { dictionaryMenu, setupDictionary } from './dictionary'
 import { setupPhoneLink } from './phoneLink'
 import { phoneNotify, setupPhonePair } from './phonePair'
+import { isShareWindow, setupMouseShare, teardownMouseShare } from './mouseShare'
+import { setupPhoneCam } from './phoneCam'
 import { setupWebTitle } from './webTitle'
 import { setupPlaces } from './places'
 import { setupWeather } from './weather'
@@ -183,8 +191,9 @@ function setAppMenu(): void {
       {
         label: 'Edit',
         submenu: [
-          { role: 'undo' },
-          { role: 'redo' },
+          // Orbit decides what's undone: the text you're typing in, or the last change you made anywhere else.
+          { label: 'Undo', accelerator: 'CmdOrCtrl+Z', click: () => editCommand('undo') },
+          { label: 'Redo', accelerator: 'Shift+CmdOrCtrl+Z', click: () => editCommand('redo') },
           { type: 'separator' },
           { role: 'cut' },
           { role: 'copy' },
@@ -197,6 +206,15 @@ function setAppMenu(): void {
       { label: 'Window', submenu: [{ role: 'minimize' }, { role: 'zoom' }, { type: 'separator' }, { role: 'front' }] }
     ])
   )
+}
+
+/** Undo / Redo from the Edit menu (or ⌘Z when the page didn't use it): Orbit's own windows decide, web pages undo their text. */
+function editCommand(which: 'undo' | 'redo'): void {
+  const wc = webContents.getFocusedWebContents()
+  if (!wc) return
+  if (mainWindow && wc === mainWindow.webContents) wc.send('edit:command', which)
+  else if (which === 'undo') wc.undo()
+  else wc.redo()
 }
 
 /** The theme showing now (yours, or your light/dark one when matching the system). */
@@ -246,6 +264,7 @@ function openVault(path: string | null): void {
   stopWatching()
   vault = path ? new Vault(path) : null
   if (!path) return
+  void shareComicProgress()
   startWatching(path, (paths) => {
     for (const win of BrowserWindow.getAllWindows()) win.webContents.send('vault:changed', paths)
   })
@@ -287,6 +306,19 @@ function registerVaultProtocol(): void {
       }
       // The clip editor's videos (vault://clips/<name>), from the recordings folder.
       if (url.host === 'clips') return clipResponse(request, decodeURIComponent(url.pathname.slice(1)))
+      // The video player: files played as they are, and ffmpeg's live stream of the rest.
+      if (url.host === 'video' || url.host === 'videostream') return await videoResponse(url, request)
+      // Comic pages (vault://comic/<id>/<page>) and covers (vault://comiccover/<id>), from the comic shelf.
+      if (url.host === 'comic' || url.host === 'comiccover') return await comicResponse(url)
+      // Soundboard clips (vault://sound/<file>), from Orbit's own soundboard folder.
+      if (url.host === 'sound') {
+        const full = soundFile(decodeURIComponent(url.pathname.slice(1)))
+        if (!full) return new Response('Not found', { status: 404 })
+        const res = await net.fetch(pathToFileURL(full).toString(), { headers: request.headers })
+        const headers = new Headers(res.headers)
+        headers.set('Access-Control-Allow-Origin', '*')
+        return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+      }
       // Previews in the file explorer tab (vault://explore/<full path>): pictures, video, sound and PDFs only.
       if (url.host === 'explore') {
         const full = explorerFile(url)
@@ -346,7 +378,9 @@ function createWindow(): BrowserWindow {
       // Chromium's PDF viewer, for PDFs opened from the file list.
       plugins: true,
       // The web browser tab (browser.ts locks each page down as it's created).
-      webviewTag: true
+      webviewTag: true,
+      // Soundboard hotkeys are pressed in a game, not in Orbit, and must still be able to start the sound.
+      autoplayPolicy: 'no-user-gesture-required'
     }
   })
 
@@ -487,6 +521,9 @@ function createWindow(): BrowserWindow {
     if (/^(https?|mailto):/i.test(url)) shell.openExternal(url)
     return { action: 'deny' }
   })
+  // A file let go where nothing takes it (like one dragged out of the Files tab and dropped on the
+  // toolbar) would otherwise replace the whole app with that file. The app never leaves its page.
+  win.webContents.on('will-navigate', (e) => e.preventDefault())
 
   if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
     win.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -549,6 +586,7 @@ function registerIpc(): void {
     () => mainWindow,
     (name, data) => currentVault().saveAttachment(currentPrefs().attachmentFolder, name, data)
   )
+  setupPhoneCam(() => mainWindow)
   setupWebTitle()
   setupPlaces()
   setupWeather()
@@ -644,6 +682,7 @@ function registerIpc(): void {
   ipcMain.handle('music:nowPlaying', () => spotify.nowPlaying())
   ipcMain.handle('music:control', (_e, action: MusicAction) => spotify.control(action))
   ipcMain.handle('music:seek', (_e, ms: number) => spotify.seek(ms))
+  ipcMain.handle('music:skip', (_e, count: number) => spotify.skip(Number(count)))
   ipcMain.handle('music:play', (_e, uri: string, context?: string) => spotify.play(uri, context))
   ipcMain.handle('music:search', (_e, query: string) => spotify.search(query))
   ipcMain.handle('music:playlists', () => spotify.playlists())
@@ -658,7 +697,10 @@ function registerIpc(): void {
   ipcMain.handle('music:createPlaylist', (_e, name: string) => spotify.createPlaylist(String(name)))
   ipcMain.handle('music:renamePlaylist', (_e, uri: string, name: string) => spotify.renamePlaylist(String(uri), String(name)))
   ipcMain.handle('music:deletePlaylist', (_e, uri: string) => spotify.deletePlaylist(String(uri)))
-  ipcMain.handle('music:addToPlaylist', (_e, uri: string, songs: string[]) => spotify.addToPlaylist(String(uri), Array.isArray(songs) ? songs.map(String) : []))
+  ipcMain.handle('music:addToPlaylist', (_e, uri: string, songs: string[], position?: number) =>
+    spotify.addToPlaylist(String(uri), Array.isArray(songs) ? songs.map(String) : [], typeof position === 'number' ? position : undefined)
+  )
+  ipcMain.handle('music:restorePlaylist', (_e, uri: string) => spotify.restorePlaylist(String(uri)))
   ipcMain.handle('music:removeFromPlaylist', (_e, uri: string, song: string) => spotify.removeFromPlaylist(String(uri), String(song)))
   ipcMain.handle('music:moveInPlaylist', (_e, uri: string, from: number, to: number) => spotify.moveInPlaylist(String(uri), Number(from), Number(to)))
   ipcMain.handle('music:transfer', (_e, deviceId: string) => spotify.transfer(String(deviceId)))
@@ -670,8 +712,18 @@ function registerIpc(): void {
   ipcMain.handle('ai:summarise', (_e, title: string, text: string) => ai.summarise(title, text))
   ipcMain.handle('ai:tidy', (_e, text: string, kind: 'note' | 'capture') => ai.tidy(text, kind === 'capture' ? 'capture' : 'note'))
   ipcMain.handle('ai:interpret', (_e, text: string, context: string) => ai.interpret(String(text).slice(0, 1000), String(context).slice(0, 8000)))
-  ipcMain.handle('ai:ask', (_e, question: string, notes: AiNote[], history: AiAskTurn[], extra?: AiExtraContext) => ai.askNotes(question, notes, history, extra))
-  ipcMain.handle('ai:chat', (_e, messages: AiChatMessage[]) => ai.chat(messages))
+  ipcMain.handle('ai:ask', (_e, question: string, notes: AiNote[], history: AiAskTurn[], extra?: AiExtraContext, engine?: AiEngine) =>
+    ai.askNotes(question, notes, history, extra, engine)
+  )
+  ipcMain.handle('ai:chat', (_e, messages: AiChatMessage[], engine?: AiEngine) => ai.chat(messages, engine))
+  ipcMain.handle('ai:setEngine', (_e, use: AiEngine) => ai.setEngine(use))
+  ipcMain.handle('ai:sortMoney', (_e, rows: AiSortRow[], categories: { id: string; name: string; income?: boolean }[]) =>
+    ai.sortMoney(
+      (Array.isArray(rows) ? rows : []).slice(0, 2000).map((r) => ({ description: String(r?.description ?? ''), amount: Number(r?.amount) || 0 })),
+      (Array.isArray(categories) ? categories : []).map((c) => ({ id: String(c.id), name: String(c.name), income: c.income === true }))
+    )
+  )
+  ipcMain.handle('ai:meaning', (_e, word: string, sentence: string) => ai.meaning(String(word), String(sentence)))
   ipcMain.handle('ai:loadChats', () => ai.loadChats())
   ipcMain.handle('ai:saveChats', (_e, chats: AiChat[]) => ai.saveChats(chats))
   ipcMain.handle('handwriting:read', (_e, png: Uint8Array, reader: 'ai' | 'offline') => (reader === 'ai' ? ai.readHandwriting(png) : readHandwritingOffline(png)))
@@ -759,7 +811,7 @@ function registerIpc(): void {
     const done: string[] = []
     for (const p of items) {
       try {
-        await shell.trashItem(v.abs(p))
+        await hold(v.abs(p))
         done.push(p)
       } catch (err) {
         logError('delete', err)
@@ -786,13 +838,13 @@ function registerIpc(): void {
         : `The note will be moved to the ${TRASH_NAME}.`
     })
     if (response !== 0) return false
-    await shell.trashItem(full)
+    await hold(full)
     return true
   })
 }
 
 /** Only the browser features the app actually uses; everything else (camera, location…) is refused. */
-const ALLOWED_PERMISSIONS = new Set(['clipboard-sanitized-write', 'clipboard-read', 'fullscreen', 'local-fonts'])
+const ALLOWED_PERMISSIONS = new Set(['clipboard-sanitized-write', 'clipboard-read', 'fullscreen', 'local-fonts', 'speaker-selection'])
 
 /**
  * On a Mac, apps should live in Applications. Run from the disk image (or Downloads), macOS gives
@@ -837,7 +889,12 @@ app.whenReady().then(async () => {
   const audioOnly = (details: { mediaTypes?: string[] } | undefined): boolean =>
     !!details?.mediaTypes?.length && details.mediaTypes.every((t) => t === 'audio')
   session.defaultSession.setPermissionRequestHandler((wc, permission, callback, details) =>
-    callback(ALLOWED_PERMISSIONS.has(permission) || (permission === 'media' && (audioOnly(details as { mediaTypes?: string[] }) || isAppPage(wc))))
+    callback(
+      ALLOWED_PERMISSIONS.has(permission) ||
+        (permission === 'media' && (audioOnly(details as { mediaTypes?: string[] }) || isAppPage(wc))) ||
+        // Mouse sharing's invisible window takes the pointer while it's on the other computer.
+        (permission === 'pointerLock' && isShareWindow(wc))
+    )
   )
   session.defaultSession.setPermissionCheckHandler(
     (wc, permission, _origin, details) =>
@@ -861,8 +918,13 @@ app.whenReady().then(async () => {
   safely('export', setupExport)
   safely('converter', setupConverter)
   safely('studio', setupStudio)
+  safely('offline AI', setupLocalAi)
+  safely('soundboard', setupSoundboard)
   safely('live streaming', setupLive)
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
+  safely('undo', () => setupUndoBin(() => vault?.root ?? null))
+  safely('video player', () => setupVideoPlayer(() => vault?.root ?? null))
+  safely('comic reader', () => setupComics(() => vault))
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))
   mainWindow = createWindow()
@@ -870,6 +932,8 @@ app.whenReady().then(async () => {
   safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: () => void startSnip() }))
   safely('screen snip', () => setupSnip({ getMain: () => mainWindow, showMain }))
   safely('instant replay', () => setupClips({ getMain: () => mainWindow, showMain }))
+  // A password copied from the vault isn't passed to the other computer.
+  safely('mouse sharing', () => setupMouseShare(() => mainWindow, (text) => text === copiedSecret))
   safely('system settings', () => applySystemPrefs(currentPrefs()))
   safely('updates', () => setupUpdater(() => currentPrefs().checkForUpdates))
 })
@@ -896,6 +960,7 @@ app.on('before-quit', () => {
 })
 app.on('will-quit', () => {
   teardownCapture()
+  safely('mouse sharing', teardownMouseShare)
   clearSecret()
 })
 

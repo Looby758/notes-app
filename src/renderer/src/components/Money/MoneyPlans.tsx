@@ -1,9 +1,21 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { ArrowUp, CalendarClock, EyeOff, Minus, PiggyBank, Plus, Repeat, Sparkles, Trash2, TrendingDown, TrendingUp } from 'lucide-react'
-import { addGoal, addToGoal, deleteGoal, setNotRecurring, updateGoal, useMoney } from '../../store/money'
+import { ArrowUp, Ban, CalendarClock, EyeOff, Landmark, Minus, PiggyBank, Plus, Repeat, Sparkles, Trash2, TrendingDown, TrendingUp, X } from 'lucide-react'
+import {
+  addGoal,
+  addSubscription,
+  addToGoal,
+  deleteGoal,
+  deleteSubscription,
+  restoreSubscription,
+  setBalance,
+  setCancelled,
+  setNotRecurring,
+  updateGoal,
+  useMoney
+} from '../../store/money'
 import { askEverything, useAi } from '../../store/ai'
-import { dayOf, formatPounds, monthName, parseAmount, type SavingsGoal } from '../../lib/money'
-import { findRecurring, forecastMonth, monthlyCost, weeklyToGoal, type Recurring } from '../../lib/moneyInsights'
+import { dayOf, formatPounds, monthName, parseAmount, type ManualSubscription, type RepeatInterval, type SavingsGoal } from '../../lib/money'
+import { allRecurring, chargedAfterCancelling, forecastMonth, payeeKey, monthlyCost, weeklyToGoal, type Recurring } from '../../lib/moneyInsights'
 
 const shortDate = (key: string): string => new Date(`${key}T12:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
 const typedPence = (text: string): number | null => {
@@ -15,22 +27,31 @@ const typedPence = (text: string): number | null => {
 export function useRecurring(): Recurring[] {
   const entries = useMoney((s) => s.entries)
   const notRecurring = useMoney((s) => s.notRecurring)
-  return useMemo(() => findRecurring(entries, dayOf(new Date()), notRecurring), [entries, notRecurring])
+  const subscriptions = useMoney((s) => s.subscriptions)
+  const cancelled = useMoney((s) => s.cancelled)
+  const today = dayOf(new Date())
+  return useMemo(
+    () => allRecurring({ entries, notRecurring, subscriptions, cancelled }, today),
+    [entries, notRecurring, subscriptions, cancelled, today]
+  )
 }
 
 /** "At this rate you'll end October with £230 left": shown on This month for the current month. */
 export function ForecastCard() {
   const entries = useMoney((s) => s.entries)
+  const balance = useMoney((s) => s.balance)
   const recurring = useRecurring()
   const today = dayOf(new Date())
-  const f = useMemo(() => forecastMonth(entries, recurring, today), [entries, recurring, today])
-  if (!entries.length) return null
+  const f = useMemo(() => forecastMonth(entries, recurring, today, balance), [entries, recurring, today, balance])
+  const [editing, setEditing] = useState(false)
+  if (!entries.length && !balance && !recurring.length) return null
   const ok = f.endOfMonth >= 0
   const month = monthName(today.slice(0, 7)).split(' ')[0]
+  const stale = balance ? Math.round((new Date(`${today}T12:00`).getTime() - new Date(`${balance.date}T12:00`).getTime()) / 86400000) : 0
   return (
     <section className={`money-forecast ${ok ? 'ok' : 'short'}`} data-money-forecast>
       <div className="money-forecast-icon">{ok ? <TrendingUp size={18} /> : <TrendingDown size={18} />}</div>
-      <div>
+      <div className="money-forecast-body">
         <strong>
           At this rate you’ll end {month} {ok ? 'with ' : ''}
           {formatPounds(Math.abs(f.endOfMonth))} {ok ? 'left' : 'short'}
@@ -56,8 +77,79 @@ export function ForecastCard() {
             </>
           )}
         </p>
+        {editing ? (
+          <BalanceForm
+            start={f.balanceNow}
+            onDone={(pence) => {
+              if (pence !== undefined) setBalance({ amount: pence, date: today })
+              setEditing(false)
+            }}
+          />
+        ) : balance && f.balanceNow !== undefined ? (
+          <p className="money-forecast-balance" data-money-balance>
+            <Landmark size={12} /> Starting from your balance: about {formatPounds(f.balanceNow)} now
+            {stale > 0 && (
+              <>
+                {' '}
+                (you said {formatPounds(balance.amount)} {stale === 1 ? 'yesterday' : `${stale} days ago`}
+                {stale > 7 ? ', worth updating' : ''})
+              </>
+            )}
+            .{' '}
+            <button className="link-button" onClick={() => setEditing(true)}>
+              Update
+            </button>{' '}
+            ·{' '}
+            <button className="link-button" onClick={() => setBalance(null)} title="Go back to working it out from your statements only">
+              Stop using it
+            </button>
+          </p>
+        ) : (
+          <p className="money-forecast-balance">
+            Worked out from your statements only.{' '}
+            <button className="link-button" onClick={() => setEditing(true)} data-set-balance>
+              Tell Orbit your real balance
+            </button>{' '}
+            for a truer figure.
+          </p>
+        )}
       </div>
     </section>
+  )
+}
+
+/** "How much is in your account right now?" */
+function BalanceForm({ start, onDone }: { start?: number; onDone: (pence?: number) => void }) {
+  const [text, setText] = useState(start !== undefined ? (start / 100).toFixed(2) : '')
+  const pence = parseAmount(text)
+  return (
+    <form
+      className="money-balance-form"
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (pence !== null) onDone(pence)
+      }}
+    >
+      <label className="money-amount">
+        How much is in your account right now? £
+        <input
+          autoFocus
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Escape' && onDone()}
+          placeholder="e.g. 342.18 (or -50 if overdrawn)"
+          inputMode="decimal"
+          aria-label="Current balance"
+        />
+      </label>
+      <button className="btn btn-primary" disabled={pence === null}>
+        Save
+      </button>
+      <button type="button" className="btn" onClick={() => onDone()}>
+        Cancel
+      </button>
+      <span className="money-hint">Anything you log or import after today is added on top, so you only need to set it once in a while.</span>
+    </form>
   )
 }
 
@@ -67,10 +159,12 @@ const ASK_EXAMPLES = ['How much did I spend on takeaways last month?', 'What are
 export function AskMoney() {
   const [q, setQ] = useState('')
   const moneyOn = useAi((s) => s.sources.money)
+  const offline = useAi((s) => s.status?.offline.state === 'ready')
   const ask = (question: string): void => {
     if (!question.trim()) return
     setQ('')
-    void askEverything(question)
+    // With the offline AI, money questions stay on this computer.
+    void askEverything(question, { private: true })
   }
   return (
     <section className="money-section money-ask" data-money-ask>
@@ -95,10 +189,17 @@ export function AskMoney() {
           </button>
         ))}
       </div>
-      <p className="money-hint">
-        Claude answers from your money tracker{moneyOn ? '' : ' (switched off on the Ask everything page, so it can’t see it yet)'}. Nothing is sent until you
-        ask. Needs your Anthropic key in Settings → AI helper.
-      </p>
+      {offline ? (
+        <p className="money-hint">
+          The offline AI answers from your money tracker{moneyOn ? '' : ' (switched off on the Ask everything page, so it can’t see it yet)'}, privately: it runs on
+          this computer, so your money never leaves it.
+        </p>
+      ) : (
+        <p className="money-hint">
+          Claude answers from your money tracker{moneyOn ? '' : ' (switched off on the Ask everything page, so it can’t see it yet)'}. Nothing is sent until you
+          ask. Needs your Anthropic key in Settings → AI helper, or get the offline AI there to keep it all on this computer.
+        </p>
+      )}
     </section>
   )
 }
@@ -108,9 +209,24 @@ export default function MoneyPlans() {
   const recurring = useRecurring()
   const goals = useMoney((s) => s.goals)
   const notRecurring = useMoney((s) => s.notRecurring)
+  const cancelled = useMoney((s) => s.cancelled)
+  const entries = useMoney((s) => s.entries)
+  const [removed, setRemoved] = useState<ManualSubscription | null>(null)
   const subs = recurring.filter((r) => !r.income)
   const pay = recurring.filter((r) => r.income)
   const monthly = subs.reduce((n, r) => n + monthlyCost(r), 0)
+  const warned = chargedAfterCancelling(recurring, cancelled)
+  const cancelledList = Object.entries(cancelled).filter(([key]) => !warned.some((r) => r.key === key))
+  // A readable name for each cancelled one: how it last appeared on a statement.
+  const names = useMemo(() => {
+    const m = new Map<string, string>()
+    const keys = new Set(Object.keys(cancelled))
+    for (const e of [...entries].sort((a, b) => a.date.localeCompare(b.date))) {
+      const k = payeeKey(e.note)
+      if (!e.income && keys.has(k)) m.set(k, e.note)
+    }
+    return m
+  }, [entries, cancelled])
 
   return (
     <>
@@ -132,37 +248,77 @@ export default function MoneyPlans() {
         <h3>
           <Repeat size={15} /> Subscriptions & bills
         </h3>
+        {warned.map((r) => (
+          <div key={r.key} className="money-undo money-warn-row" data-charged-again={r.key}>
+            ⚠️ {r.name} charged you {formatPounds(r.amount)} on {shortDate(r.last)}, after you marked it cancelled.
+            <button className="link-button" onClick={() => setCancelled(r.key, null)}>
+              Keep it listed
+            </button>
+            <button className="link-button" onClick={() => setCancelled(r.key, r.last)}>
+              Still cancelled
+            </button>
+          </div>
+        ))}
+        {removed && (
+          <div className="money-undo">
+            Removed “{removed.name}”.
+            <button
+              className="link-button"
+              onClick={() => {
+                restoreSubscription(removed)
+                setRemoved(null)
+              }}
+            >
+              Undo
+            </button>
+          </div>
+        )}
         {subs.length ? (
           <>
             <div className="money-tiles">
               <div className="money-tile">
                 <span>A month</span>
-                <strong>
-                  {formatPounds(monthly)}
-                </strong>
+                <strong>{formatPounds(monthly)}</strong>
               </div>
               <div className="money-tile">
                 <span>A year</span>
-                <strong>
-                  {formatPounds(monthly * 12, true)}
-                </strong>
+                <strong>{formatPounds(monthly * 12, true)}</strong>
               </div>
               <div className="money-tile">
-                <span>Found</span>
+                <span>Active</span>
                 <strong>{subs.length}</strong>
               </div>
             </div>
             <ul className="money-recurring">
               {subs.map((r) => (
-                <RecurringRow key={r.key} r={r} />
+                <RecurringRow key={r.manual ?? r.key} r={r} onRemoved={setRemoved} />
               ))}
             </ul>
           </>
         ) : (
           <p className="money-hint">
             Nothing repeating yet. Import a couple of months of bank statements and Orbit spots the payments that come round every week, month or year
-            (Netflix, the phone bill, the gym…) and shows them here and on the calendar.
+            (Netflix, the phone bill, the gym…) and shows them here and on the calendar. Or add one yourself.
           </p>
+        )}
+        <NewSubscription />
+        {cancelledList.length > 0 && (
+          <details className="money-cancelled" data-money-cancelled>
+            <summary>
+              {cancelledList.length} you’ve cancelled
+            </summary>
+            <ul>
+              {cancelledList.map(([key, on]) => (
+                <li key={key}>
+                  <span>{names.get(key) ?? key}</span>
+                  <small>cancelled {shortDate(on)}</small>
+                  <button className="link-button" onClick={() => setCancelled(key, null)}>
+                    Still have it
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </details>
         )}
       </section>
 
@@ -191,29 +347,104 @@ export default function MoneyPlans() {
   )
 }
 
-function RecurringRow({ r }: { r: Recurring }) {
+const EVERY: Record<RepeatInterval, string> = { weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly' }
+
+function RecurringRow({ r, onRemoved }: { r: Recurring; onRemoved?: (sub: ManualSubscription) => void }) {
   const categories = useMoney((s) => s.categories)
   const cat = categories.find((c) => c.id === r.category)
-  const days = Math.round((new Date(`${r.next}T12:00`).getTime() - Date.now()) / 86400000)
+  const days = Math.round((new Date(`${r.next}T12:00`).getTime() - new Date(`${dayOf(new Date())}T12:00`).getTime()) / 86400000)
+  const about = r.manual ? 'added by you' : r.fresh ? 'new: 1 payment so far' : `${r.count} payments so far`
   return (
-    <li className="money-recurring-row" data-recurring={r.key}>
+    <li className={`money-recurring-row ${r.fresh ? 'fresh' : ''}`} data-recurring={r.key}>
       <span className="money-swatch" style={{ background: cat?.color ?? '#8a8e9a' }} />
       <span className="money-recurring-name">
         {r.name}
         <small>
-          {r.interval} · {r.count} payments so far{cat ? ` · ${cat.name}` : ''}
+          {EVERY[r.interval].toLowerCase()} · {about}
+          {cat ? ` · ${cat.name}` : ''}
         </small>
       </span>
-      <span className="money-recurring-next" title={`Last one ${shortDate(r.last)}`}>
+      <span className="money-recurring-next" title={r.last ? `Last one ${shortDate(r.last)}` : undefined}>
         {r.income ? 'Next' : 'Due'} {days <= 0 ? 'today' : days === 1 ? 'tomorrow' : shortDate(r.next)}
       </span>
-      <strong>
-        {formatPounds(r.amount)}
-      </strong>
-      <button className="icon-btn" title="Not a repeating payment: stop listing it" onClick={() => setNotRecurring(r.key)}>
-        <EyeOff size={13} />
-      </button>
+      <strong>{formatPounds(r.amount)}</strong>
+      {r.manual ? (
+        <button
+          className="icon-btn"
+          title="Remove (cancelled, or added by mistake)"
+          onClick={() => {
+            const gone = deleteSubscription(r.manual!)
+            if (gone) onRemoved?.(gone)
+          }}
+        >
+          <Trash2 size={13} />
+        </button>
+      ) : (
+        <>
+          {!r.income && (
+            <button className="icon-btn" title="I’ve cancelled this: stop listing it (it comes back with a warning if it charges you again)" onClick={() => setCancelled(r.key, dayOf(new Date()))} data-cancel-sub>
+              <Ban size={13} />
+            </button>
+          )}
+          <button className="icon-btn" title={`Not a repeating ${r.income ? 'payment' : 'subscription or bill'}: stop listing it`} onClick={() => setNotRecurring(r.key)}>
+            <EyeOff size={13} />
+          </button>
+        </>
+      )}
     </li>
+  )
+}
+
+/** "+ Add a subscription": for ones the statements don't show yet, like one you've just started. */
+function NewSubscription() {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [amount, setAmount] = useState('')
+  const [interval, setEvery] = useState<RepeatInterval>('monthly')
+  const [date, setDate] = useState(dayOf(new Date()))
+  const pence = typedPence(amount)
+  if (!open) {
+    return (
+      <button className="btn money-add-sub" onClick={() => setOpen(true)} data-add-sub>
+        <Plus size={13} /> Add a subscription or bill
+      </button>
+    )
+  }
+  const submit = (e: FormEvent): void => {
+    e.preventDefault()
+    if (!name.trim() || !pence || !date) return
+    addSubscription({ name: name.trim(), amount: pence, interval, date, category: 'subscriptions' })
+    setName('')
+    setAmount('')
+    setOpen(false)
+  }
+  return (
+    <form className="money-new-goal money-new-sub" onSubmit={submit} data-new-sub>
+      <div className="money-new-goal-row">
+        <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="What is it? (NOW TV, gym…)" aria-label="Name" />
+        <label className="money-amount">
+          £<input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="9.99" inputMode="decimal" aria-label="Amount" />
+        </label>
+        <select className="select" value={interval} onChange={(e) => setEvery(e.target.value as RepeatInterval)} aria-label="How often">
+          {(Object.keys(EVERY) as RepeatInterval[]).map((k) => (
+            <option key={k} value={k}>
+              {EVERY[k]}
+            </option>
+          ))}
+        </select>
+        <label className="money-goal-due">
+          Next payment
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </label>
+        <button className="btn btn-primary" disabled={!name.trim() || !pence || !date}>
+          <Plus size={13} /> Add
+        </button>
+        <button type="button" className="icon-btn" title="Cancel" onClick={() => setOpen(false)}>
+          <X size={13} />
+        </button>
+      </div>
+      <p className="money-hint">It goes in the totals, the forecast and the calendar. If your statements find it later, yours is the one shown.</p>
+    </form>
   )
 }
 

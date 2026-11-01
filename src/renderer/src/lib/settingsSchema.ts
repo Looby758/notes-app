@@ -8,7 +8,19 @@ import { formatDate } from './dates'
  * and search looks through labels, descriptions and keywords.
  */
 
-export type SectionId = 'appearance' | 'navigation' | 'editor' | 'files' | 'calendar' | 'capture' | 'ai' | 'music' | 'studio' | 'shortcuts' | 'about'
+export type SectionId =
+  | 'appearance'
+  | 'navigation'
+  | 'editor'
+  | 'files'
+  | 'calendar'
+  | 'capture'
+  | 'ai'
+  | 'music'
+  | 'studio'
+  | 'computers'
+  | 'shortcuts'
+  | 'about'
 
 interface Base {
   key: keyof Prefs
@@ -686,7 +698,7 @@ export const SETTINGS: SettingDef[] = [
     group: 'Ctrl+K',
     type: 'toggle',
     label: 'Offer to ask the AI when Ctrl+K doesn’t understand',
-    description: 'Sentences like “spent 12 on food” are understood on this computer. For anything else, Ctrl+K asks first before sending the sentence to Claude.',
+    description: 'Sentences like “spent 12 on food” are understood on this computer. For anything else, Ctrl+K asks first before the AI reads the sentence (the offline AI if you have it, otherwise Claude).',
     keywords: 'command palette ai smart sentence natural language ctrl k'
   },
 
@@ -865,6 +877,7 @@ export const SECTIONS: { id: SectionId; label: string }[] = [
   { id: 'ai', label: 'AI helper' },
   { id: 'music', label: 'Music' },
   { id: 'studio', label: 'Studio' },
+  { id: 'computers', label: 'Two computers' },
   { id: 'shortcuts', label: 'Shortcuts' },
   { id: 'about', label: 'About' }
 ]

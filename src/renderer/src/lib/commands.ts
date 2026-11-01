@@ -19,12 +19,16 @@ import {
   MONEY_TAB,
   CONVERT_TAB,
   SUDOKU_TAB,
+  COMICS_TAB,
   MINESWEEPER_TAB,
+  CLOCKS_TAB,
   STUDIO_TAB,
   CLIPS_TAB,
+  SOUNDBOARD_TAB,
   EXPLORER_TAB,
   MESSAGES_TAB,
   GAMES_TAB,
+  VIDEO_TAB,
   closePane,
   closeTabUnlessPinned,
   cycleTab,
@@ -48,6 +52,7 @@ import { clearBrowsingData } from '../components/Web/WebPage'
 import { showMessages } from '../store/messages'
 import { FILE_MANAGER } from '@shared/platform'
 import { openRandomNote } from './random'
+import { redo, undo } from './undo'
 import { notify } from '../store/notify'
 import { parentOf } from './paths'
 import { newBoard } from './boards'
@@ -309,13 +314,18 @@ export const commands: Command[] = [
   { id: 'money.open', group: 'Navigation', title: 'Open money tracker', shortcut: 'Ctrl+Shift+B', run: () => openSpecialTab(MONEY_TAB) },
   { id: 'convert.open', group: 'Navigation', title: 'Convert files (photos, Word, audio…)', run: () => openSpecialTab(CONVERT_TAB) },
   { id: 'explorer.open', group: 'Navigation', title: 'Browse files on this computer (and Google Drive)', run: () => openSpecialTab(EXPLORER_TAB) },
+  { id: 'comics.open', group: 'Navigation', title: 'Read comics (your comic book shelf)', run: () => openSpecialTab(COMICS_TAB) },
   { id: 'sudoku.open', group: 'Navigation', title: 'Play sudoku (take a quick break)', run: () => openSpecialTab(SUDOKU_TAB) },
+  { id: 'soundboard.open', group: 'Navigation', title: 'Open the soundboard and voice changer', run: () => openSpecialTab(SOUNDBOARD_TAB) },
+  { id: 'soundboard.stop', group: 'Navigation', title: 'Stop all soundboard sounds', run: () => void import('./soundboard').then((m) => m.stopAll()) },
   { id: 'studio.open', group: 'Navigation', title: 'Open the Studio (record your screen and webcam)', run: () => openSpecialTab(STUDIO_TAB) },
   { id: 'clips.open', group: 'Navigation', title: 'Open clips (instant replay and the clip editor)', run: () => openSpecialTab(CLIPS_TAB) },
   { id: 'replay.save', group: 'Navigation', title: 'Save the last 30 seconds (instant replay)', run: () => void import('./replay').then((m) => m.saveReplay()) },
   { id: 'replay.toggle', group: 'Navigation', title: 'Turn instant replay on or off', run: () => setPrefs({ replayOn: !usePrefs.getState().prefs.replayOn }) },
   { id: 'studio.record', group: 'Navigation', title: 'Start or stop recording (Studio)', run: () => void import('./studio').then((m) => m.toggleRecording()) },
   { id: 'minesweeper.open', group: 'Navigation', title: 'Play minesweeper (take a quick break)', run: () => openSpecialTab(MINESWEEPER_TAB) },
+  { id: 'video.open', group: 'Navigation', title: 'Video player (play any video, MKV, AVI…)', run: () => openSpecialTab(VIDEO_TAB) },
+  { id: 'clocks.open', group: 'Navigation', title: 'World clocks (the time in other places)', run: () => openSpecialTab(CLOCKS_TAB) },
   { id: 'games.open', group: 'Navigation', title: 'Games (play your Steam and other games)', run: () => openSpecialTab(GAMES_TAB) },
   { id: 'web.open', group: 'Web', title: 'Open a web page', shortcut: 'Ctrl+Shift+I', run: () => openWebTab() },
   { id: 'web.beside', group: 'Web', title: 'Open a web page beside this note', run: () => openWebTab('', { beside: true }) },
@@ -372,6 +382,9 @@ export const commands: Command[] = [
   { id: 'font.bigger', group: 'View', title: 'Bigger text', shortcut: 'Ctrl+=', run: () => changeFontSize(1) },
   { id: 'font.smaller', group: 'View', title: 'Smaller text', shortcut: 'Ctrl+-', run: () => changeFontSize(-1) },
   { id: 'font.reset', group: 'View', title: 'Reset text size', shortcut: 'Ctrl+0', run: () => changeFontSize(null) },
+
+  { id: 'undo', group: 'Notes', title: 'Undo the last change (files, playlists, settings…)', run: () => void undo() },
+  { id: 'redo', group: 'Notes', title: 'Redo', run: () => void redo() },
 
   { id: 'vault.reveal', group: 'Notes folder', title: `Open notes folder in ${FILE_MANAGER}`, run: () => window.api.revealVault() },
   { id: 'vault.switch', group: 'Notes folder', title: 'Switch notes folder…', run: () => useUI.getState().vaultActions.switchVault() },

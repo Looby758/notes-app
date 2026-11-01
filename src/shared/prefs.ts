@@ -1,5 +1,6 @@
 import { allThemes } from './themes'
 import { IS_MAC } from './platform'
+import { cleanClocks, type WorldClock } from './worldClock'
 
 /**
  * Everything you can customise in Settings. Stored in settings.json under "prefs", which you can
@@ -88,6 +89,8 @@ export interface Prefs {
   homeOrder: string[]
   /** Home page boxes you've hidden. */
   homeHidden: string[]
+  /** The places on the World clocks page (and its Home box), in your order. */
+  worldClocks: WorldClock[]
   /** Every note opens read-only (links open with a plain click) until you switch back to writing. */
   readingMode: boolean
   /** The file list shows pictures, recordings and other files, not just notes. */
@@ -249,6 +252,7 @@ export const DEFAULT_PREFS: Prefs = {
   homeOnStart: true,
   homeOrder: [],
   homeHidden: [],
+  worldClocks: [],
   readingMode: false,
   randomIncludeDaily: false,
   showAttachments: true,
@@ -382,7 +386,7 @@ export function cleanFolder(v: unknown, fallback: string): string {
 /** Turns anything (a hand-edited file, an old version) into valid preferences. */
 export function normalizePrefs(raw: unknown): Prefs {
   const input = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
-  const out: Prefs = { ...DEFAULT_PREFS, homeOrder: [], homeHidden: [], shortcuts: {} }
+  const out: Prefs = { ...DEFAULT_PREFS, homeOrder: [], homeHidden: [], worldClocks: [], shortcuts: {} }
 
   for (const key of Object.keys(DEFAULT_PREFS) as (keyof Prefs)[]) {
     const value = input[key]
@@ -438,6 +442,7 @@ export function normalizePrefs(raw: unknown): Prefs {
   out.captureInbox = cleanFolder(input.captureInbox ?? DEFAULT_PREFS.captureInbox, DEFAULT_PREFS.captureInbox) || DEFAULT_PREFS.captureInbox
   out.homeOrder = cleanIds(input.homeOrder)
   out.homeHidden = cleanIds(input.homeHidden)
+  out.worldClocks = cleanClocks(input.worldClocks)
   for (const k of ['topbarFeatures', 'dockFeatures', 'radialFeatures', 'phoneDeck'] as const) {
     out[k] = input[k] === undefined ? [...DEFAULT_PREFS[k]] : cleanIds(input[k])
   }

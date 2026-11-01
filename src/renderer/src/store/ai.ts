@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AiStatus } from '@shared/types'
+import type { AiEngine, AiStatus } from '@shared/types'
 import { useEditor } from './editor'
 import { getNoteText, notesForQuestion } from './noteIndex'
 import { useUI } from './ui'
@@ -25,6 +25,19 @@ export interface AskTurn {
   question: string
   answer?: string
   error?: string
+  /** Answered by the offline AI. */
+  offline?: boolean
+  /** The offline AI thinks Claude would answer this better. */
+  hard?: boolean
+  /** Asked privately (money questions): stays on the offline AI, never offered to Claude. */
+  private?: boolean
+}
+
+export interface AskOptions {
+  /** Which AI to ask; unset means the one chosen in Settings. */
+  engine?: AiEngine
+  /** Keep it on this computer (the offline AI only). */
+  private?: boolean
 }
 
 /** What "Ask everything" may look at. Notes always; the rest can be switched off on the page. */
@@ -90,7 +103,7 @@ export async function runNoteJob(kind: NoteJob['kind'], path = activeNote()): Pr
     return
   }
   const status = await refreshAiStatus()
-  if (!status.hasKey) {
+  if (!status.ready) {
     useAi.setState({ job: { kind, path, state: 'nokey' } })
     return
   }
@@ -119,35 +132,55 @@ export function openAsk(): void {
   openSpecialTab(AI_TAB)
 }
 
-export async function askNotes(question: string): Promise<void> {
+/** Whether asking now would use the offline AI. */
+export const usesOffline = (status: AiStatus | null, engine?: AiEngine): boolean =>
+  (engine ?? status?.use) === 'offline' && status?.offline.state === 'ready'
+
+export async function askNotes(question: string, opts: AskOptions = {}): Promise<void> {
   const q = question.trim()
   if (!q) return
+  const status = useAi.getState().status ?? (await refreshAiStatus())
+  const privately = !!opts.private && status.offline.state === 'ready'
+  const engine: AiEngine | undefined = privately ? 'offline' : opts.engine
+  const offline = usesOffline(status, engine) || engine === 'offline'
   const earlier = useAi.getState().turns.filter((t) => t.answer).slice(-4)
-  const turn: AskTurn = { question: q }
+  const turn: AskTurn = { question: q, private: privately }
   useAi.setState((s) => ({ turns: [...s.turns, turn] }))
   const update = (patch: Partial<AskTurn>): void =>
     useAi.setState((s) => ({ turns: s.turns.map((t) => (t === turn ? { ...t, ...patch } : t)) }))
   try {
     // Follow-ups like "and when is it?" find little on their own, so earlier questions help pick notes.
     const searchText = [...earlier.map((t) => t.question), q].join(' ')
-    const notes = pickContext(notesForQuestion(searchText)).map(({ title, text }) => ({ title, text }))
+    // The offline AI reads less at once, so it gets fewer notes.
+    const notes = pickContext(notesForQuestion(searchText), offline ? 16000 : 60000, offline ? 8 : 25).map(({ title, text }) => ({ title, text }))
     const extra = await gatherContext(searchText)
-    const answer = await window.api.aiAsk(
+    const reply = await window.api.aiAsk(
       q,
       notes,
       earlier.map((t) => ({ question: t.question, answer: t.answer! })),
-      extra
+      extra,
+      engine
     )
-    update({ answer })
+    update({ answer: reply.text, offline: reply.offline, hard: reply.hard })
   } catch (err) {
     update({ error: errorMessage(err) })
   }
 }
 
 /** Opens Ask everything and asks a question (from Ctrl+K or the summon bar). */
-export async function askEverything(question: string): Promise<void> {
+export async function askEverything(question: string, opts: AskOptions = {}): Promise<void> {
   openAsk()
-  await askNotes(question)
+  await askNotes(question, opts)
+}
+
+/** Asks Claude the same question an offline answer was for (only when you press the button). */
+export function askOnline(turn: AskTurn): Promise<void> {
+  return askNotes(turn.question, { engine: 'online' })
+}
+
+/** Offline AI or Claude for the AI features. */
+export async function setAiEngine(use: AiEngine): Promise<void> {
+  useAi.setState({ status: await window.api.aiSetEngine(use) })
 }
 
 /** Money, calendar and email as text for the AI, for the sources that are switched on. Anything unavailable is skipped. */

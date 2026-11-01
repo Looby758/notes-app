@@ -1,7 +1,7 @@
 {
   "name": "notesapp",
   "productName": "Orbit",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "A dark, fast markdown notes app",
   "main": "./out/main/index.js",
   "private": true,
@@ -22,6 +22,7 @@
     "chokidar": "^4.0.3",
     "electron-updater": "^6.8.11",
     "node-pty": "1.1.0",
+    "node-unrar-js": "^2.0.2",
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {

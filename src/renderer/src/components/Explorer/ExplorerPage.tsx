@@ -56,12 +56,17 @@ import {
   type PasteMode
 } from '@shared/explorer'
 import { FILE_MANAGER, TRASH_NAME } from '@shared/platform'
-import { setDrag } from '../../lib/dnd'
+import { computerPaths, dragFilesOut, getDrag, setDrag } from '../../lib/dnd'
+import { recordUndo, undoChanged, useUndoChanges } from '../../lib/undo'
 import { openFileTab, openNote } from '../../lib/editorController'
 import { fileKind } from '../../lib/fileKinds'
+import { isComicFile } from '@shared/comics'
+import { openComicFile } from '../../store/comics'
 import { notify } from '../../store/notify'
 import ContextMenu, { type MenuItem } from '../ContextMenu'
 import FileIcon from '../FileIcon'
+import { isVideoFile } from '@shared/videoPlayer'
+import { openVideo } from '../../store/videoPlayer'
 
 const PLACE_ICONS: Record<ExplorerPlace['kind'], typeof Folder> = {
   home: House,
@@ -79,8 +84,6 @@ const PLACE_ICONS: Record<ExplorerPlace['kind'], typeof Folder> = {
 /** Big folders are drawn this many at a time (typing in the search box narrows them). */
 const MAX_SHOWN = 2000
 
-/** Explorer items being dragged (to move into a folder, or Ctrl to copy). */
-const DRAG_TYPE = 'application/x-orbit-explorer'
 
 /** Where you were and how you liked it, kept while the app is open. */
 const last: { dir: string | null; view: 'list' | 'grid'; sort: ExplorerSort; showHidden: boolean } = {
@@ -104,6 +107,53 @@ const loadPins = (): string[] => {
 }
 const nameOf = (path: string): string => crumbsOf(path).pop()?.name ?? path
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
+const what = (paths: string[]): string => (paths.length === 1 ? `“${nameOf(paths[0])}”` : plural(paths.length, 'item'))
+
+// ---- undo (Ctrl+Z outside a text box; lib/undo.ts) ----
+
+/** Undo for something new here (a new file, or copies): it goes into Orbit's short-term bin, and redo brings it back. */
+function recordAdded(label: string, paths: string[]): void {
+  let at = paths
+  recordUndo({
+    label,
+    undo: async () => {
+      await window.api.undoHold(at, false)
+      undoChanged('explorer')
+    },
+    redo: async () => {
+      at = await window.api.undoRestore(at, false)
+      undoChanged('explorer')
+    },
+    forget: (done) => !done && void window.api.undoRelease(at, false)
+  })
+}
+
+function recordMoved(label: string, moves: { from: string; to: string }[]): void {
+  let last = moves
+  const flip = async (): Promise<void> => {
+    last = await window.api.undoMoveBack(last)
+    undoChanged('explorer')
+  }
+  recordUndo({ label, undo: flip, redo: flip })
+}
+
+async function recordDeleted(paths: string[]): Promise<void> {
+  const held = await window.api.undoHeld(paths, false).catch(() => [] as string[])
+  if (!held.length) return
+  let at = held
+  recordUndo({
+    label: `Deleted ${what(held)}`,
+    undo: async () => {
+      at = await window.api.undoRestore(at, false)
+      undoChanged('explorer')
+    },
+    redo: async () => {
+      await window.api.undoHold(at, false)
+      undoChanged('explorer')
+    },
+    forget: (done) => done && void window.api.undoRelease(at, false)
+  })
+}
 
 /** The file explorer: browse every folder on the computer (and Google Drive), manage files, preview them and drag them into notes. */
 export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
@@ -220,6 +270,8 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
   const current = shown.find((e) => e.path === selected) ?? null
   const pickedEntries = shown.filter((e) => picked.has(e.path))
   const refresh = (): void => setReload((n) => n + 1)
+  useUndoChanges('explorer', refresh)
+  useUndoChanges('files', refresh)
 
   const pickOnly = (path: string | null): void => {
     setSelected(path)
@@ -254,9 +306,13 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
 
   const open = (entry: ExplorerEntry): void => {
     if (entry.isDir) return go(entry.path)
+    // Videos (anywhere on the computer) play in the video player.
+    if (isVideoFile(entry.name)) return openVideo(entry.path)
     // Notes and files in the notes folder open here, in a tab of their own.
     if (entry.vaultPath && /\.md$/i.test(entry.name)) return openNote(entry.vaultPath, { newTab: true })
     if (entry.vaultPath && fileKind(entry.vaultPath) !== 'other') return openFileTab(entry.vaultPath, { newTab: true })
+    // Comics open in Orbit's comic reader (and go on its shelf).
+    if (isComicFile(entry.name)) return void openComicFile(entry.path)
     window.api.explorerOpen(entry.path).catch(notify)
   }
 
@@ -274,6 +330,7 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
       .then((path) => {
         pickAfter.current = { paths: [path], rename: true }
         refresh()
+        recordAdded(`Made “${nameOf(path)}”`, [path])
       })
       .catch(notify)
   }
@@ -289,6 +346,7 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
       .then((path) => {
         pickAfter.current = { paths: [path] }
         refresh()
+        if (path !== entry.path) recordMoved(`Renamed “${entry.name}” to “${nameOf(path)}”`, [{ from: entry.path, to: path }])
       })
       .catch(notify)
   }
@@ -304,10 +362,14 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
     if (!paths.length) return
     window.api
       .explorerPaste(paths, into, mode)
-      .then((done) => {
+      .then((moves) => {
+        const done = moves.map((m) => m.to)
         if (into === dir) pickAfter.current = { paths: done }
         refresh()
         if (into !== dir && done.length) notify(`${mode === 'move' ? 'Moved' : 'Copied'} ${plural(done.length, 'item')} to "${nameOf(into)}".`, 'info')
+        if (!done.length) return
+        if (mode === 'move') recordMoved(`Moved ${what(moves.map((m) => m.from))} to “${nameOf(into)}”`, moves)
+        else recordAdded(`Copied ${what(done)} to “${nameOf(into)}”`, done)
       })
       .catch((err) => {
         notify(err)
@@ -336,7 +398,7 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
     })
     if (!ok) return
     try {
-      await window.api.explorerTrash(list.map((e) => e.path))
+      await recordDeleted(await window.api.explorerTrash(list.map((e) => e.path)))
     } catch (err) {
       notify(err)
     }
@@ -422,22 +484,20 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
 
   const onDragStart = (e: DragEvent, entry: ExplorerEntry): void => {
     if (!picked.has(entry.path)) pickOnly(entry.path)
-    const list = picked.has(entry.path) ? pickedEntries : [entry]
-    e.dataTransfer.effectAllowed = 'copyMove'
-    e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(list.map((x) => x.path)))
-    e.dataTransfer.setData('text/plain', list.map((x) => x.path).join('\n'))
-    // A single file can also be dropped into a note;
-    // The notes tree in the sidebar takes any of them.
-    setDrag(list.length === 1 && !entry.isDir ? { kind: 'computer', path: entry.path } : { kind: 'computerMany', paths: list.map((x) => x.path) })
+    const paths = (picked.has(entry.path) ? pickedEntries : [entry]).map((x) => x.path)
+    // Dragged as real files, so they drop into Discord, a browser or File Explorer / Finder too.
+    // In Orbit, a single file can also be dropped into a note; the notes tree in the sidebar takes any of them.
+    dragFilesOut(e, paths, paths.length === 1 && !entry.isDir ? { kind: 'computer', path: entry.path } : { kind: 'computerMany', paths })
   }
 
   const dropProps = (target: string) => ({
     onDragOver: (e: DragEvent) => {
-      const ours = e.dataTransfer.types.includes(DRAG_TYPE)
-      if (!ours && !e.dataTransfer.types.includes('Files')) return
+      if (!e.dataTransfer.types.includes('Files')) return
       e.preventDefault()
       e.stopPropagation()
-      e.dataTransfer.dropEffect = !ours || e.ctrlKey || e.altKey ? 'copy' : 'move'
+      // The computer only lets files dragged out be copied or linked, so the cursor says copy even
+      // when moving within the Files tab (the drop below still moves them unless Ctrl / Alt is held).
+      e.dataTransfer.dropEffect = 'copy'
       setDropOn(target)
     },
     onDragLeave: (e: DragEvent) => {
@@ -447,10 +507,10 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
       e.preventDefault()
       e.stopPropagation()
       setDropOn(null)
+      const ours = computerPaths(getDrag())
       setDrag(null)
-      const ours = e.dataTransfer.getData(DRAG_TYPE)
-      if (ours) {
-        const paths = (JSON.parse(ours) as string[]).filter((p) => p !== target)
+      if (ours.length) {
+        const paths = ours.filter((p) => p !== target)
         return pasteInto(paths, target, e.ctrlKey || e.altKey ? 'copy' : 'move')
       }
       // Dropped in from File Explorer / Finder: copied here.
@@ -675,7 +735,6 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
                 data-path={entry.path}
                 draggable={renaming !== entry.path}
                 onDragStart={(e) => onDragStart(e, entry)}
-                onDragEnd={() => (setDrag(null), setDropOn(null))}
                 onClick={(e) => onItemClick(e, entry)}
                 onDoubleClick={() => renaming !== entry.path && open(entry)}
                 onContextMenu={(e) => {

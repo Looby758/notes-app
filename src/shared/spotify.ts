@@ -97,6 +97,8 @@ export interface MusicItem {
   uri: string
   /** Playlists: you own it (or it's shared with you to edit), so its songs can be listed and changed. */
   editable?: boolean
+  /** It's your Liked Songs: its songs can be listed, and taking one out unlikes it. */
+  liked?: boolean
 }
 
 export interface MusicSearchResults {
@@ -244,6 +246,27 @@ export function parsePlaylistSongs(body: unknown): MusicItem[] {
   return usable(arr(obj(body).items).map((e) => obj(e).item ?? obj(e).track))
     .filter((t) => !str(t.uri).startsWith('spotify:local:'))
     .map(trackItem)
+}
+
+/**
+ * Your Liked Songs, shown with your playlists. Spotify doesn't give it a playlist link, so Notes uses
+ * this one and turns it into what Spotify wants when it's played (see likedContext).
+ */
+export const LIKED_SONGS_URI = 'spotify:collection:tracks'
+
+/** What Spotify calls your Liked Songs when playing them: spotify:user:<your id>:collection. */
+export const likedContext = (userId: string): string => `spotify:user:${userId}:collection`
+
+/** The Liked Songs row in Playlists. GET /me/tracks?limit=1 tells how many there are (`total`). */
+export function likedSongsItem(body: unknown): MusicItem {
+  const count = Number(obj(body).total)
+  return {
+    kind: 'playlist',
+    name: 'Liked Songs',
+    detail: Number.isFinite(count) ? `${count} ${count === 1 ? 'song' : 'songs'}` : '',
+    uri: LIKED_SONGS_URI,
+    liked: true
+  }
 }
 
 /** The id in spotify:playlist:<id>, or null. */

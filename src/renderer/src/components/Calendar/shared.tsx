@@ -8,7 +8,7 @@ import { openNote } from '../../lib/editorController'
 import { addEvent, displayTime, toggleCalendarTask } from '../../lib/daily'
 import { addDays, dayKey, formatDate, fromDayKey } from '../../lib/dates'
 import { useMoney } from '../../store/money'
-import { findRecurring, occurrences } from '../../lib/moneyInsights'
+import { allRecurring, occurrences } from '../../lib/moneyInsights'
 import { formatPounds } from '../../lib/money'
 import type { DatedItem } from '../../lib/schedule'
 import { EventWeather } from '../Weather/Weather'
@@ -96,12 +96,14 @@ export function useExternalRange(from: Date, to: Date): Map<string, ExternalItem
 function useBillItems(from: Date, to: Date): ExternalItem[] {
   const entries = useMoney((s) => s.entries)
   const notRecurring = useMoney((s) => s.notRecurring)
+  const subscriptions = useMoney((s) => s.subscriptions)
+  const cancelled = useMoney((s) => s.cancelled)
   const fromDay = dayKey(from)
   const toDay = dayKey(new Date(to.getTime() - 1))
   return useMemo(() => {
     const today = dayKey(new Date())
     const items: ExternalItem[] = []
-    for (const r of findRecurring(entries, today, notRecurring)) {
+    for (const r of allRecurring({ entries, notRecurring, subscriptions, cancelled }, today)) {
       // Only from today on: earlier ones are already in your spending log.
       for (const date of occurrences(r, fromDay > today ? fromDay : today, toDay)) {
         const end = dayKey(addDays(fromDayKey(date)!, 1))
@@ -122,7 +124,7 @@ function useBillItems(from: Date, to: Date): ExternalItem[] {
       }
     }
     return items
-  }, [entries, notRecurring, fromDay, toDay])
+  }, [entries, notRecurring, subscriptions, cancelled, fromDay, toDay])
 }
 
 /** "Offline, showing saved events" / "Your Google sign-in expired…", when there's something to say. */

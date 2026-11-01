@@ -41,6 +41,7 @@ const FEATURE_EMOJI: Record<string, string> = {
   random: '🎲',
   reading: '📖',
   calendar: '🗓️',
+  clocks: '🌍',
   flashcards: '🃏',
   zen: '🌙',
   money: '💷',
@@ -52,7 +53,9 @@ const FEATURE_EMOJI: Record<string, string> = {
   chat: '🤖',
   ask: '✨',
   music: '🎵',
+  comics: '📚',
   youtube: '📺',
+  video: '🎞️',
   games: '🎮',
   sudoku: '🔢',
   minesweeper: '💣',
@@ -62,8 +65,10 @@ const FEATURE_EMOJI: Record<string, string> = {
   studio: '🎬',
   clips: '🎞️',
   replay: '⏪',
+  soundboard: '🔊',
   terminal: '⌨️',
   streamer: '🙈',
+  webcam: '📷',
   settings: '⚙️'
 }
 
@@ -73,7 +78,7 @@ const QUIET = new Set(['music', 'reading', 'streamer', 'capture', 'snip', 'youtu
 /** Everything that can go on the deck, for Settings. */
 export const DECK_CHOICES = [
   ...DECK_EXTRAS.map((x) => ({ id: x.id, name: x.name })),
-  ...FEATURE_INFO.filter((f) => f.id !== 'phone').map((f) => ({ id: f.id, name: f.name }))
+  ...FEATURE_INFO.filter((f) => f.id !== 'phone' && f.id !== 'webcam').map((f) => ({ id: f.id, name: f.name }))
 ]
 
 function deckButtons(ids: string[]): DeckButton[] {

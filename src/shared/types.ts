@@ -1,14 +1,18 @@
 import type { ExplorerEntry, ExplorerPlace, PasteMode } from './explorer'
+import type { ComicOpened, ComicPreparing, ComicSettings, ComicShelf } from './comics'
 import type { Prefs } from './prefs'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
 import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
 import type { LocalLibrary } from './localMusic'
+import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
 import type { WifiNetwork } from './wifi'
 import type { MusicAction, MusicDevice, MusicItem, MusicQueue, MusicSearchResults, MusicState, MusicStatus } from './spotify'
 import type { CoversStatus, GamesList, LaunchArt } from './games'
+import type { VideoInfo } from './videoPlayer'
 import type { Theme } from './themes'
+import type { ShareButton, ShareOs, ShareSide } from './mouseShare'
 
 export interface WindowBounds {
   x?: number
@@ -38,7 +42,79 @@ export interface Settings {
   /** The paired phone's link (its token, and the port it was on), so the phone reconnects by itself. */
   phoneToken?: string
   phonePort?: number
+  /** One mouse, two computers: whether it's on, the paired computer, and how it's set up. */
+  mouseShare?: ShareSaved
+  /** The phone webcam: whether it's on, its https link (token and port), and how the picture is made. */
+  camOn?: boolean
+  camToken?: string
+  camPort?: number
+  camQuality?: 'sd' | 'hd'
+  camFill?: boolean
 }
+
+/** How the phone webcam is doing, for its window in Orbit. */
+export interface CamStatus {
+  on: boolean
+  /** The https address the phone opens (empty while off). */
+  url: string
+  /** Whether the phone is sending frames right now, and how many a second. */
+  phone: boolean
+  fps: number
+  /**
+   * The PC camera: running; starting; "no-driver" (OBS Studio's camera isn't installed); "in-use"
+   * (OBS itself, or something else, is the virtual camera); "error"; "mac" (not needed there); "off".
+   */
+  camera: 'running' | 'starting' | 'no-driver' | 'in-use' | 'error' | 'mac' | 'off'
+  message: string
+  quality: 'sd' | 'hd'
+  fill: boolean
+}
+
+/** Mouse sharing, as saved. `side` is where the other computer sits, seen from this one. */
+export interface ShareSaved {
+  enabled: boolean
+  /** This computer's own id (made once). */
+  id: string
+  peer?: { id: string; name: string; os: ShareOs; secret: string; host?: string; port?: number }
+  side: ShareSide
+  swapCtrlCmd: boolean
+  shareClipboard: boolean
+  speed: number
+  /** Keep the mouse on this computer for now. */
+  paused?: boolean
+  /** The other computer's address, typed in, for networks that don't let them find each other. */
+  manualHost?: string
+}
+
+/** Mouse sharing, for the Settings page. */
+export interface ShareStatus {
+  enabled: boolean
+  name: string
+  os: ShareOs
+  paired: { name: string; os: ShareOs } | null
+  connected: boolean
+  side: ShareSide
+  swapCtrlCmd: boolean
+  shareClipboard: boolean
+  speed: number
+  paused: boolean
+  manualHost: string
+  /** Other computers running Orbit with sharing on, not paired yet. */
+  nearby: { id: string; name: string; os: ShareOs }[]
+  pairing: { name: string; code: string; weConfirmed: boolean } | null
+  /** Where the mouse is: on this computer, over on the other one, or this one is being driven. */
+  using: 'here' | 'there' | 'controlled'
+  /** Mac: Orbit is allowed to move the pointer (Accessibility). Always true on Windows. */
+  accessibility: boolean
+  error: string
+}
+
+/** Something done in the invisible window while the mouse is on the other computer. */
+export type ShareInputEvent =
+  | { t: 'move'; dx: number; dy: number }
+  | { t: 'btn'; b: ShareButton; down: boolean }
+  | { t: 'wheel'; dx: number; dy: number }
+  | { t: 'key'; code: string; down: boolean }
 
 /** What the notes window's music player tells the floating mini player. */
 export interface MusicMiniState {
@@ -198,6 +274,55 @@ export interface AiStatus {
   hasKey: boolean
   /** False if the system can't encrypt the key (it is then not saved). */
   canEncrypt: boolean
+  /** Which AI the AI features use: the offline one on this computer, or Claude online. */
+  use: AiEngine
+  /** Whether the AI features can run now with that choice (a key for Claude, the download for offline). */
+  ready: boolean
+  offline: LocalAiState
+}
+
+/** Where an AI answer comes from: the offline AI on this computer, or Claude online. */
+export type AiEngine = 'offline' | 'online'
+
+/** An answer to a question or chat message. */
+export interface AiReply {
+  text: string
+  /** Answered by the offline AI. */
+  offline: boolean
+  /** The offline AI thinks Claude would answer this better (Orbit offers, never switches by itself). */
+  hard: boolean
+}
+
+/** The offline AI (src/main/localAi.ts): an optional download that runs on this computer's graphics card. */
+export interface LocalAiState {
+  state: 'missing' | 'downloading' | 'ready' | 'unsupported'
+  /** While downloading: which part, and how far (0–1). */
+  stage?: 'engine' | 'model'
+  progress?: number
+  /** Bytes in all, while downloading. */
+  bytes?: number
+  error?: string
+  /** The model installed (or being downloaded), from LOCAL_MODELS. */
+  model?: string
+  /** How it runs: NVIDIA CUDA, Vulkan (any graphics card) or Metal (Mac). */
+  engine?: 'cuda' | 'vulkan' | 'metal'
+  /** In the graphics card's memory right now. */
+  loaded: boolean
+  loading: boolean
+  /** Unloaded because a game is running (it comes back when the game closes). */
+  gamePaused: boolean
+  unloadForGames: boolean
+  /** The graphics card found (or the Mac's memory). */
+  gpu: { name: string; memoryGb: number } | null
+  /** The model suggested for this computer. */
+  suggested: string
+}
+
+/** A bank statement line for the offline AI to sort into a category. */
+export interface AiSortRow {
+  description: string
+  /** Pence: negative is money out. */
+  amount: number
 }
 
 /** A note handed to the AI helper as context for a question. */
@@ -216,6 +341,10 @@ export interface AiAskTurn {
 export interface AiChatMessage {
   role: 'user' | 'assistant'
   text: string
+  /** A reply from the offline AI (not Claude). */
+  offline?: boolean
+  /** The offline AI thought Claude would do better with this one. */
+  hard?: boolean
 }
 
 /** A saved AI chat conversation. */
@@ -294,6 +423,19 @@ export interface NotesApi {
   setPrefs(patch: Partial<Prefs>): Promise<Prefs>
   /** Called when preferences change (including hand edits to settings.json). */
   onPrefsChanged(callback: (prefs: Prefs) => void): () => void
+  // Undo for files (main/undoBin.ts). Paths are notes-folder paths when `inVault`, else full paths.
+  /** Deletes without asking, into Orbit's short-term bin. Returns the ones that can be brought back. */
+  undoHold(paths: string[], inVault: boolean): Promise<string[]>
+  /** Which of these were just deleted in a way that can be undone. */
+  undoHeld(paths: string[], inVault: boolean): Promise<string[]>
+  /** Brings deleted things back. Returns where each went, in the same order. */
+  undoRestore(paths: string[], inVault: boolean): Promise<string[]>
+  /** They can't be undone any more: on to the Recycle Bin / Bin. */
+  undoRelease(paths: string[], inVault: boolean): Promise<void>
+  /** Moves things back (full paths): each `to` goes back to `from`. Returns the moves made. */
+  undoMoveBack(items: { from: string; to: string }[]): Promise<{ from: string; to: string }[]>
+  /** Undo / Redo from the Mac's Edit menu. */
+  onEditCommand(callback: (which: 'undo' | 'redo') => void): () => void
   /** Spell-check languages Windows has available (none on a Mac, which picks them itself), e.g. ['en-GB', 'en-US']. */
   spellcheckLanguages(): Promise<string[]>
   /** Opens settings.json in your default editor. */
@@ -411,6 +553,8 @@ export interface NotesApi {
   searchPlaces(query: string): Promise<{ places: Place[]; error?: string }>
   /** One square of a map preview as a data: URL; null if it couldn't be fetched. */
   mapTile(z: number, x: number, y: number): Promise<string | null>
+  /** The time zone at a spot (e.g. "Europe/London", from Open-Meteo); null if it couldn't be found. */
+  zoneAt(lat: number, lon: number): Promise<string | null>
   /** Your town and its forecast (from Open-Meteo), fetched again if it's old or `force`. */
   weather(force?: boolean): Promise<WeatherState>
   /** Sets (or, with null, forgets) the town the weather is for, and fetches its forecast. */
@@ -487,8 +631,38 @@ export interface NotesApi {
   /** How far along a video conversion is (0…1). Returns a function that stops listening. */
   onVideoProgress(callback: (id: number, done: number) => void): () => void
 
+  // Video player
+  /** What's in a video (its tracks need the video helper, ffmpeg) and the subtitle files beside it. */
+  videoInfo(path: string): Promise<VideoInfo>
+  /** Subtitles as text: a subtitle file, or one of the video's own tracks (as WebVTT). */
+  videoSubtitles(path: string, source: { stream?: number; file?: string }): Promise<string>
+  /** Where a stream that copies the picture from `at` really starts (the keyframe before). */
+  videoKeyframe(path: string, at: number, fileStart: number): Promise<number>
+  /** Stops a page's live video stream. */
+  stopVideoStream(session: string): Promise<void>
+  /** The full path of a file in the notes folder. */
+  videoInVault(path: string): Promise<string>
+  /** Asks for a video, or subtitles (starting beside `near`); null if cancelled. */
+  pickVideoFile(kind: 'video' | 'subtitles', near?: string): Promise<string | null>
+
   // Quick capture
   /** Opens the quick capture window. */
+  // Soundboard (main/soundboard.ts; the sound itself is played in lib/soundboard.ts)
+  soundboardGet(): Promise<SoundboardStatus>
+  /** Asks for sound files and adds a button for each. */
+  soundboardPick(): Promise<{ status: SoundboardStatus; skipped: string[] }>
+  /** Adds sound files dropped on the board (full paths). */
+  soundboardAddFiles(paths: string[]): Promise<{ status: SoundboardStatus; skipped: string[] }>
+  soundboardUpdate(id: string, patch: Partial<Pick<SoundClip, 'name' | 'hotkey' | 'volume' | 'colour' | 'emoji'>>): Promise<SoundboardStatus>
+  soundboardSetBoardHotkey(which: keyof BoardHotkeys, accel: string): Promise<SoundboardStatus>
+  soundboardRemove(id: string): Promise<SoundboardStatus>
+  soundboardMove(id: string, to: number): Promise<SoundboardStatus>
+  soundboardOpenLink(which: 'cable' | 'blackhole'): Promise<void>
+  soundboardShowFolder(): Promise<void>
+  /** A soundboard hotkey was pressed (anywhere, even in a game). */
+  onSoundboardHotkey(callback: (action: SoundboardAction) => void): () => void
+  onSoundboardChanged(callback: (status: SoundboardStatus) => void): () => void
+
   // Screen snip (main/snip.ts)
   /** Takes a picture of the screen under the pointer and opens the snip window over it. */
   startSnip(): Promise<void>
@@ -553,6 +727,8 @@ export interface NotesApi {
   musicControl(action: MusicAction): Promise<void>
   musicSeek(ms: number): Promise<void>
   /** Plays a spotify: URI; a song can be played within a playlist or album (`context`). */
+  /** Skips `count` songs on (playing a song further down Up next, keeping the playlist going). */
+  musicSkip(count: number): Promise<void>
   musicPlay(uri: string, context?: string): Promise<void>
   /** Needs your account. */
   musicSearch(query: string): Promise<MusicSearchResults>
@@ -592,7 +768,10 @@ export interface NotesApi {
   musicCreatePlaylist(name: string): Promise<MusicItem>
   musicRenamePlaylist(uri: string, name: string): Promise<void>
   musicDeletePlaylist(uri: string): Promise<void>
-  musicAddToPlaylist(uri: string, songs: string[]): Promise<void>
+  /** Puts a deleted playlist back in your library. */
+  musicRestorePlaylist(uri: string): Promise<void>
+  /** Adds to the end, or at `position` (counting from 0). */
+  musicAddToPlaylist(uri: string, songs: string[], position?: number): Promise<void>
   musicRemoveFromPlaylist(uri: string, song: string): Promise<void>
   /** Positions count from 0. */
   musicMoveInPlaylist(uri: string, from: number, to: number): Promise<void>
@@ -606,7 +785,23 @@ export interface NotesApi {
   /** A quick capture is tidied as one list item; a note can get headings and lists. */
   aiTidy(text: string, kind: 'note' | 'capture'): Promise<string>
   /** `extra`: digests of money, calendar and email for Ask everything (lib/askContext.ts). */
-  aiAsk(question: string, notes: AiNote[], history: AiAskTurn[], extra?: AiExtraContext): Promise<string>
+  aiAsk(question: string, notes: AiNote[], history: AiAskTurn[], extra?: AiExtraContext, engine?: AiEngine): Promise<AiReply>
+  /** Offline AI or Claude for the AI features. */
+  aiSetEngine(use: AiEngine): Promise<AiStatus>
+  /** Money tracker: a category id for each statement line (by its number), sorted by the offline AI only. */
+  aiSortMoney(rows: AiSortRow[], categories: { id: string; name: string; income?: boolean }[]): Promise<Record<number, string>>
+  /** The dictionary card: what a word means in its sentence, from the offline AI. */
+  aiMeaning(word: string, sentence: string): Promise<string>
+  // The offline AI
+  localAiState(): Promise<LocalAiState>
+  /** Downloads the engine and a model (resumes a stopped download); resolves when it's done or has failed. */
+  localAiInstall(model: string): Promise<LocalAiState>
+  localAiCancel(): Promise<void>
+  localAiRemove(): Promise<LocalAiState>
+  /** Frees the graphics card now (it loads again the next time it's needed). */
+  localAiUnload(): Promise<void>
+  localAiSetUnloadForGames(on: boolean): Promise<LocalAiState>
+  onLocalAiState(callback: (state: LocalAiState) => void): () => void
   /** Ctrl+K: the action a sentence asks for, as Claude reads it (checked by validSmart before anything runs). */
   aiInterpret(text: string, context: string): Promise<unknown>
   // Games
@@ -643,7 +838,7 @@ export interface NotesApi {
   /** The command line ended (you typed exit, or it closed). */
   onTerminalExit(callback: (code: number) => void): () => void
   /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */
-  aiChat(messages: AiChatMessage[]): Promise<string>
+  aiChat(messages: AiChatMessage[], engine?: AiEngine): Promise<AiReply>
   /** Saved chats, kept in the settings folder on this computer. */
   aiLoadChats(): Promise<AiChat[]>
   aiSaveChats(chats: AiChat[]): Promise<void>
@@ -697,6 +892,42 @@ export interface NotesApi {
   phoneNotify(title: string, body: string): Promise<void>
   /** The Wi-Fi this computer is on, for a guest QR code (blank where it can't be read). */
   phoneWifi(): Promise<WifiNetwork>
+  /** One mouse, two computers (see main/mouseShare.ts). */
+  shareStatus(): Promise<ShareStatus>
+  shareSet(patch: Partial<Omit<ShareSaved, 'id' | 'peer'>>): Promise<ShareStatus>
+  onShareStatus(callback: (status: ShareStatus) => void): () => void
+  /** Starts pairing with a computer found on the network (by id) or typed in (host). */
+  sharePair(target: { id?: string; host?: string }): Promise<void>
+  shareConfirmPairing(): Promise<void>
+  shareCancelPairing(): Promise<void>
+  shareUnpair(): Promise<void>
+  shareAskAccessibility(): Promise<boolean>
+  shareSendFiles(paths: string[]): Promise<void>
+  /** A file came over from the other computer (it's in Downloads). */
+  onShareReceived(callback: (info: { title: string; path: string }) => void): () => void
+  /** The other computer started pairing: open Settings to show the code. */
+  onShareOpenSettings(callback: () => void): () => void
+  /** The invisible window: what you do, and "come back". */
+  shareInput(event: ShareInputEvent): void
+  shareComeBack(): void
+  onShareCapture(callback: (info: { name: string; os: ShareOs }) => void): () => void
+  /** The drop strip: files dropped on it, or nothing to send. */
+  shareDropped(paths: string[]): void
+  shareDropCancel(): void
+  onShareDrop(callback: (info: { name: string; side: ShareSide }) => void): () => void
+  /** The phone webcam (Windows): turn it on/off, its status and settings, and a live preview of the phone's frames. */
+  camStatus(): Promise<CamStatus>
+  camOn(): Promise<CamStatus>
+  camOff(): Promise<CamStatus>
+  /** Checks again for OBS's camera (after installing it) and starts the camera. */
+  camRetry(): Promise<CamStatus>
+  camSet(patch: { quality?: 'sd' | 'hd'; fill?: boolean }): Promise<CamStatus>
+  /** A new link (the old code and Home Screen page stop working). */
+  camNewLink(): Promise<CamStatus>
+  camPreview(on: boolean): Promise<void>
+  onCamStatus(callback: (status: CamStatus) => void): () => void
+  /** The phone's frames as JPEGs, a dozen or so a second, while the preview is on. */
+  onCamFrame(callback: (jpeg: Uint8Array) => void): () => void
   /** Reads/writes a small app file kept in the vault's hidden ".notesapp" folder (synced with your notes). */
   readAppData(name: string): Promise<string | null>
   writeAppData(name: string, content: string): Promise<void>
@@ -733,14 +964,37 @@ export interface NotesApi {
   explorerCreate(dir: string, name: string, kind: 'folder' | 'file'): Promise<string>
   /** Returns the new path. */
   explorerRename(path: string, name: string): Promise<string>
-  /** Copies or moves items into a folder, never over anything. Returns the new paths. */
-  explorerPaste(paths: string[], dir: string, mode: PasteMode): Promise<string[]>
+  /** Copies or moves items into a folder, never over anything. Returns where each one went. */
+  explorerPaste(paths: string[], dir: string, mode: PasteMode): Promise<{ from: string; to: string }[]>
   /** Moves items to the Recycle Bin / Bin (no question asked here). Returns the ones moved. */
   explorerTrash(paths: string[]): Promise<string[]>
   /** Finds names under a folder and all its subfolders. */
   explorerSearch(dir: string, query: string, showHidden: boolean): Promise<ExplorerEntry[]>
+  // Comic book reader
+  comicsShelf(): Promise<ComicShelf>
+  /** Adds comic files (asks which, when no paths are given). */
+  comicsAdd(paths?: string[]): Promise<{ shelf: ComicShelf; added: string[]; skipped: number }>
+  /** Asks for a folder and adds every comic in it. */
+  comicsAddFolder(): Promise<{ shelf: ComicShelf; added: string[]; skipped: number }>
+  /** Takes a comic off the shelf (the file stays where it is). */
+  comicsRemove(id: string): Promise<ComicShelf>
+  /** Gets a comic ready to read (the first time, a RAR is unpacked: see onComicsPreparing). */
+  comicsOpen(id: string): Promise<ComicOpened>
+  comicsProgress(id: string, page: number, offset: number, finished?: boolean): Promise<void>
+  comicsResetProgress(id: string): Promise<ComicShelf>
+  /** Counts pages turned today; returns today's total. */
+  comicsTurned(pages: number): Promise<number>
+  comicsSettings(id: string, patch: Partial<ComicSettings>): Promise<ComicSettings>
+  comicsRename(id: string, title: string): Promise<ComicShelf>
+  comicsReveal(id: string): Promise<void>
+  /** Reads the text in a picture of part of a page (offline). */
+  comicsReadText(png: Uint8Array): Promise<string>
+  onComicsChanged(callback: () => void): () => void
+  onComicsPreparing(callback: (p: ComicPreparing) => void): () => void
   /** Copies files/folders from the computer into a notes folder ('' is the top); ones already in the notes folder are moved. Returns their notes-folder paths. */
   explorerToVault(paths: string[], folder: string): Promise<string[]>
+  /** Starts dragging files out as real files (into Discord, a browser, File Explorer / Finder, or back into Orbit). Call it from dragstart, after preventDefault. */
+  explorerStartDrag(paths: string[]): void
   /** Opens a vault file (like a PDF) in its usual app. */
   openFile(path: string): Promise<void>
   /** Reads a note's markdown. */
