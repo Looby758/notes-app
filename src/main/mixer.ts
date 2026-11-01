@@ -110,11 +110,24 @@ public static class OrbitMixer {
   static Guid IID_Endpoint = new Guid("5CDF2C82-841E-4546-9722-0CF74078229A");
   static Guid IID_Meter = new Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064");
   static Guid Ctx = Guid.Empty;
+  static Guid IID_Volume = new Guid("87CE5498-68D6-44E5-9215-6F24A2B8C2F4");
   class Info { public string exe = ""; public string proc = ""; public string desc = ""; public string title = ""; }
   static Dictionary<uint, Info> infos = new Dictionary<uint, Info>();
   /** The first thing that went wrong in the last look, so Orbit's log says why an app is missing. */
   static string problem = "";
-  static void Note(string where, Exception ex) { if (problem == "") problem = where + ": " + ex.GetType().Name + " " + ex.Message; }
+  static int seen = 0, read = 0;
+  /** Adds a distinct complaint (up to four), so the log and the mixer page say everything that went wrong. */
+  static void Fail(string what) { if (problem.Contains(what) || problem.Split(';').Length > 4) return; problem += (problem == "" ? "" : "; ") + what; }
+  static void Note(string where, Exception ex) { Fail(where + ": " + ex.GetType().Name + " 0x" + Marshal.GetHRForException(ex).ToString("X8")); }
+  /** Asks a session for another of its interfaces by hand, so a refusal comes with its error code. */
+  static T Ask<T>(object o, Guid iid, string name) where T : class {
+    IntPtr unk = Marshal.GetIUnknownForObject(o), p;
+    try {
+      int hr = Marshal.QueryInterface(unk, ref iid, out p);
+      if (hr != 0) { Fail(name + " refused 0x" + hr.ToString("X8")); return null; }
+      try { return Marshal.GetObjectForIUnknown(p) as T; } finally { Marshal.Release(p); }
+    } finally { Marshal.Release(unk); }
+  }
   /** Runs the COM work on an MTA thread (see the note in mixer.ts), whatever thread PowerShell is on. */
   static string OnMta(Func<string> work) {
     if (Thread.CurrentThread.GetApartmentState() == ApartmentState.MTA) return work();
@@ -166,9 +179,9 @@ public static class OrbitMixer {
     try {
       var m = Activate<IOrbitSessionManager2>(d, IID_Manager);
       IOrbitSessionEnumerator e; int n;
-      if (m == null) { if (problem == "") problem = "no session manager for " + Name(d); return list; }
+      if (m == null) { Fail("no session manager for " + Name(d)); return list; }
       int hr = m.GetSessionEnumerator(out e);
-      if (hr != 0 || e == null) { if (problem == "") problem = "GetSessionEnumerator 0x" + hr.ToString("X8"); return list; }
+      if (hr != 0 || e == null) { Fail("GetSessionEnumerator 0x" + hr.ToString("X8")); return list; }
       if (e.GetCount(out n) != 0) return list;
       for (int i = 0; i < n; i++) {
         try {
@@ -184,7 +197,7 @@ public static class OrbitMixer {
   static IOrbitDevice Default() { IOrbitDevice d; return Enumerator().GetDefaultAudioEndpoint(0, 1, out d) == 0 ? d : null; }
   public static string List() { return OnMta(ListNow); }
   static string ListNow() {
-    problem = "";
+    problem = ""; seen = 0; read = 0;
     var b = new StringBuilder("{\"ok\":true,\"master\":");
     var def = Default();
     var ev = def == null ? null : Activate<IOrbitEndpointVolume>(def, IID_Endpoint);
@@ -202,12 +215,14 @@ public static class OrbitMixer {
         try {
           uint pid; s.GetProcessId(out pid);
           bool sys = s.IsSystemSoundsSession() == 0;
-          var v = s as IOrbitSimpleVolume;
-          if (v == null) { if (problem == "") problem = "a session has no ISimpleAudioVolume"; continue; }
+          seen++;
+          var v = s as IOrbitSimpleVolume ?? Ask<IOrbitSimpleVolume>(s, IID_Volume, "volume of " + (sys ? "system sounds" : About(pid).proc));
+          if (v == null) continue;
           float vol, peak = 0; bool mute;
           v.GetMasterVolume(out vol); v.GetMute(out mute);
           var meter = s as IOrbitMeter;
           if (meter != null) meter.GetPeakValue(out peak);
+          read++;
           string display; s.GetDisplayName(out display);
           var info = sys ? new Info() : About(pid);
           if (!sys && pid == 0) continue;
@@ -217,7 +232,7 @@ public static class OrbitMixer {
         } catch (Exception ex) { Note("reading a session", ex); }
       }
     }
-    return b.Append("],\"err\":\"" + Esc(problem) + "\"}").ToString();
+    return b.Append("],\"err\":\"" + Esc(problem == "" ? "" : "read " + read + " of " + seen + " sound sessions; " + problem) + "\"}").ToString();
   }
   /** targets: 'master', 'sys' or process ids, comma separated. vol is 0..1, or -1 to leave it; mute is 0, 1, or -1 to leave it. */
   public static string Set(string targets, float vol, int mute) { return OnMta(() => SetNow(targets, vol, mute)); }
@@ -295,7 +310,11 @@ function startHelper(): ChildProcessWithoutNullStreams {
       }
     }
   })
-  child.stderr.on('data', (d: Buffer) => logError('volume mixer', new Error(d.toString().trim())))
+  // PowerShell reports its own progress on stderr as '#< CLIXML ...'; that isn't an error.
+  child.stderr.on('data', (d: Buffer) => {
+    const text = d.toString().trim()
+    if (text && !text.startsWith('#< CLIXML')) logError('volume mixer', new Error(text))
+  })
   child.on('error', (err) => logError('volume mixer', err))
   child.on('exit', () => {
     if (helper === child) helper = null
