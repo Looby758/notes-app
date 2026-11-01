@@ -1,5 +1,5 @@
 import type { Prefs } from '@shared/prefs'
-import { CAPTURE_SHORTCUTS, RANGES, SNIP_SHORTCUTS } from '@shared/prefs'
+import { CAPTURE_SHORTCUTS, RANGES, REPLAY_SHORTCUTS, SNIP_SHORTCUTS } from '@shared/prefs'
 import { acceleratorLabel, IS_MAC, showKeys, TRAY_NAME } from '@shared/platform'
 import { formatDate } from './dates'
 
@@ -712,6 +712,72 @@ export const SETTINGS: SettingDef[] = [
     label: 'Shortcut',
     description: `Opens the summon bar over any app, as long as Orbit is running (it can wait in the ${TRAY_NAME}). Jot a thought, or type a command like “spent 12 on food”, “play Drake” or “open money”.`,
     keywords: 'capture hotkey global win key summon bar spotlight'
+  },
+  // ---------- Studio: instant replay ----------
+  {
+    key: 'replayOn',
+    section: 'studio',
+    group: 'Instant replay',
+    type: 'toggle',
+    label: 'Instant replay',
+    description:
+      'Keeps the last few seconds of your main screen ready, so one key saves what just happened, even in a game. Nothing is saved until you press it. Needs the free video add-on (ffmpeg); Clips offers to download it.',
+    keywords: 'instant replay clip shadowplay highlight game record buffer'
+  },
+  {
+    key: 'replayShortcut',
+    section: 'studio',
+    group: 'Instant replay',
+    type: 'choice',
+    options: REPLAY_SHORTCUTS.map((value) => ({ value, label: value ? acceleratorLabel(value) : 'Off' })),
+    label: 'Save shortcut',
+    description: 'Works from any app or game while Orbit is running. A key on its own (like F9) stops doing anything else while instant replay is on.',
+    keywords: 'replay hotkey save clip key'
+  },
+  {
+    key: 'replaySeconds',
+    section: 'studio',
+    group: 'Instant replay',
+    type: 'slider',
+    ...RANGES.replaySeconds,
+    format: (v) => `${v} seconds`,
+    label: 'How much to save',
+    description: 'More seconds use a little more memory (about 50 MB for 30 seconds at 1080p 60 fps).',
+    keywords: 'replay length seconds duration'
+  },
+  {
+    key: 'replayQuality',
+    section: 'studio',
+    group: 'Instant replay',
+    type: 'choice',
+    options: [
+      { value: '1080p60', label: '1080p · 60 fps (smooth, for games)' },
+      { value: '1080p30', label: '1080p · 30 fps' },
+      { value: '720p30', label: '720p · 30 fps (lightest)' }
+    ],
+    label: 'Quality',
+    keywords: 'replay resolution fps quality'
+  },
+  ...(IS_MAC
+    ? []
+    : [
+        {
+          key: 'replaySound',
+          section: 'studio',
+          group: 'Instant replay',
+          type: 'toggle',
+          label: 'Record what you hear',
+          description: 'Game sound, Discord, music: everything coming out of your speakers or headphones.',
+          keywords: 'replay desktop audio sound game'
+        } satisfies SettingDef
+      ]),
+  {
+    key: 'replayMic',
+    section: 'studio',
+    group: 'Instant replay',
+    type: 'toggle',
+    label: 'Record your microphone',
+    keywords: 'replay mic voice commentary'
   },
   {
     key: 'snipShortcut',

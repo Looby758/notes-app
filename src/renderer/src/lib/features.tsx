@@ -38,6 +38,8 @@ import {
   SquareTerminal,
   Webcam,
   Zap,
+  History,
+  Scissors,
   type LucideIcon
 } from 'lucide-react'
 import { useVault } from '../store/vault'
@@ -56,6 +58,7 @@ import {
   COMICS_TAB,
   CONVERT_TAB,
   STUDIO_TAB,
+  CLIPS_TAB,
   SOUNDBOARD_TAB,
   EMAIL_TAB,
   EXPLORER_TAB,
@@ -140,6 +143,8 @@ const BEHAVIOUR: Record<string, Behaviour> = {
     }
   },
   studio: { icon: Clapperboard, run: () => openSpecialTab(STUDIO_TAB) },
+  clips: { icon: Scissors, run: () => openSpecialTab(CLIPS_TAB) },
+  replay: { icon: History, run: () => void import('./replay').then((m) => m.saveReplay()), useActive: () => usePrefs((s) => s.prefs.replayOn) },
   soundboard: { icon: AudioLines, run: () => openSpecialTab(SOUNDBOARD_TAB) },
   terminal: { icon: SquareTerminal, run: () => openSpecialTab(TERMINAL_TAB) },
   streamer: { icon: Eye, run: toggleStreamerMode, useActive: () => usePrefs((s) => s.prefs.streamerMode) },

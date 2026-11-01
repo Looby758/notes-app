@@ -42,6 +42,7 @@ import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
 import { setupConverter } from './converter'
 import { isAppPage, setupStudio } from './studio'
+import { applyReplayShortcut, clipResponse, setupClips } from './clips'
 import { setupLocalAi } from './localAi'
 import { setupSoundboard, soundFile } from './soundboard'
 import { setupLive } from './live'
@@ -160,6 +161,7 @@ function appIconFile(prefs: Prefs): { id: string; file?: string } {
 function applySystemPrefs(prefs: Prefs): void {
   applyCaptureShortcut(prefs.captureShortcut)
   applySnipShortcut(prefs.snipShortcut)
+  applyReplayShortcut(prefs.replayOn ? prefs.replayShortcut : '')
   safely('app icon', () => applyAppIcon(prefs))
   // Only the installed app registers itself (in development it would register electron.exe).
   if (!app.isPackaged) return
@@ -302,6 +304,8 @@ function registerVaultProtocol(): void {
         const pic = await localMusic.cover(rel)
         return pic ? new Response(Buffer.from(pic.data), { headers: { 'Content-Type': pic.type, 'Cache-Control': 'max-age=3600' } }) : new Response('No picture', { status: 404 })
       }
+      // The clip editor's videos (vault://clips/<name>), from the recordings folder.
+      if (url.host === 'clips') return clipResponse(request, decodeURIComponent(url.pathname.slice(1)))
       // The video player: files played as they are, and ffmpeg's live stream of the rest.
       if (url.host === 'video' || url.host === 'videostream') return await videoResponse(url, request)
       // Comic pages (vault://comic/<id>/<page>) and covers (vault://comiccover/<id>), from the comic shelf.
@@ -927,6 +931,7 @@ app.whenReady().then(async () => {
   // The extras: if one of them fails on some computer, the app itself still works.
   safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: () => void startSnip() }))
   safely('screen snip', () => setupSnip({ getMain: () => mainWindow, showMain }))
+  safely('instant replay', () => setupClips({ getMain: () => mainWindow, showMain }))
   // A password copied from the vault isn't passed to the other computer.
   safely('mouse sharing', () => setupMouseShare(() => mainWindow, (text) => text === copiedSecret))
   safely('system settings', () => applySystemPrefs(currentPrefs()))

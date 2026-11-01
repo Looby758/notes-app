@@ -74,6 +74,8 @@ export const MINESWEEPER_TAB = 'minesweeper:'
 export const CLOCKS_TAB = 'clocks:'
 /** Scenes, webcam and screen recording (components/Studio). */
 export const STUDIO_TAB = 'studio:'
+/** Instant replay and the clip editor (components/Clips). */
+export const CLIPS_TAB = 'clips:'
 /** Sound clips with hotkeys, the voice changer and music into a voice call (components/Soundboard). */
 export const SOUNDBOARD_TAB = 'soundboard:'
 /** WhatsApp and Discord in one tab (components/Messages). */

@@ -47,6 +47,7 @@ import LockDialog from './Lock/LockDialog'
 import SendToPhone from './Phone/SendToPhone'
 import { startPhone } from '../store/phone'
 import { watchSnips } from '../lib/snip'
+import { watchReplay } from '../lib/replay'
 import { startFormatMenu } from '../lib/formatMenu'
 import { startDictionary } from '../lib/dictionary'
 import { EventDetails } from './Calendar/shared'
@@ -131,6 +132,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     })
     const offShareFile = window.api.onShareReceived(({ title }) => notify(`${title}. It’s in Downloads.`, 'info'))
     const offSnips = watchSnips()
+    const offReplay = watchReplay()
     const offChanged = window.api.onVaultChanged((paths) => {
       useVault.getState().refresh(paths)
       handleExternalChanges(paths)
@@ -161,6 +163,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       offSharePair()
       offShareFile()
       offSnips()
+      offReplay()
       stopReminders()
     }
   }, [vault])
