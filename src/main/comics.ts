@@ -25,6 +25,7 @@ import {
   type ComicShelf,
   type ComicShelfItem
 } from '@shared/comics'
+import { COMIC_SYNC_FILE, mergeSynced, readSynced, sameSynced, type Synced } from '@shared/progressSync'
 
 /**
  * The comic book reader's side of things: the shelf (comics.json in the app's settings folder),
@@ -35,7 +36,8 @@ import {
  * comics you read are kept unpacked, so it doesn't fill the disk). Your comics are never changed.
  *
  * Progress and how you like to read each comic are kept by the file's name and size rather than
- * where it is, so they'll carry over to another computer once Orbit syncs its settings.
+ * where it is, and shared with your other computers through the notes folder
+ * (.notesapp/comic-progress.json), so reading on one carries on from the same page on the other.
  */
 
 interface Stored {
@@ -46,6 +48,10 @@ interface Stored {
   settings: Record<string, ComicSettings>
   /** Pages turned on each day ("2026-10-31"). */
   daily: Record<string, number>
+  /** By syncKey: when its settings were last changed (ms), so the newer computer's win. */
+  settingsUpdated: Record<string, number>
+  /** By syncKey: when you chose "start again" (ms), so the other computer forgets it too. */
+  cleared: Record<string, number>
 }
 
 /** Kept beside each comic's unpacked pages, so a changed file is noticed. */
@@ -75,9 +81,9 @@ function load(): Stored {
   try {
     const s = JSON.parse(readFileSync(storeFile(), 'utf8'))
     const obj = <T>(v: unknown): Record<string, T> => (v && typeof v === 'object' ? (v as Record<string, T>) : {})
-    stored = { books: obj(s.books), progress: obj(s.progress), settings: obj(s.settings), daily: obj(s.daily) }
+    stored = { books: obj(s.books), progress: obj(s.progress), settings: obj(s.settings), daily: obj(s.daily), settingsUpdated: obj(s.settingsUpdated), cleared: obj(s.cleared) }
   } catch {
-    stored = { books: {}, progress: {}, settings: {}, daily: {} }
+    stored = { books: {}, progress: {}, settings: {}, daily: {}, settingsUpdated: {}, cleared: {} }
   }
   return stored
 }
@@ -410,9 +416,110 @@ export async function comicResponse(url: URL): Promise<Response> {
   return data ? picture(data, ext) : new Response('Not found', { status: 404 })
 }
 
+// ---- sharing with your other computers ----
+
+/** The notes folder's .notesapp/ files (stars, flashcards… and this). */
+export interface AppDataStore {
+  readAppData(name: string): Promise<string | null>
+  writeAppData(name: string, content: string): Promise<void>
+}
+
+let sharedStore: () => AppDataStore | null = () => null
+let shareTimer: ReturnType<typeof setTimeout> | undefined
+let sharing = false
+let shareAgain = false
+
+const isObject = <T>(v: unknown): v is T => !!v && typeof v === 'object'
+
+function localShared(): { progress: Synced<ComicProgress>; settings: Synced<ComicSettings> } {
+  const s = load()
+  const progress: Synced<ComicProgress> = {}
+  for (const [key, when] of Object.entries(s.cleared)) progress[key] = { updated: when, value: null }
+  for (const [key, p] of Object.entries(s.progress)) {
+    if (!progress[key] || (p.updated ?? 0) >= progress[key].updated) progress[key] = { updated: p.updated ?? 0, value: p }
+  }
+  const settings: Synced<ComicSettings> = {}
+  for (const [key, value] of Object.entries(s.settings)) settings[key] = { updated: s.settingsUpdated[key] ?? 0, value }
+  return { progress, settings }
+}
+
+/**
+ * Reads the notes folder's comic-progress.json, takes in anything newer from another computer, and
+ * writes back anything newer from this one. The newest change to each comic wins.
+ */
+export async function shareProgress(): Promise<void> {
+  clearTimeout(shareTimer)
+  shareTimer = undefined
+  const store = sharedStore()
+  if (!store) return
+  if (sharing) {
+    shareAgain = true
+    return
+  }
+  sharing = true
+  try {
+    const raw = await store.readAppData(COMIC_SYNC_FILE)
+    const file = raw ? JSON.parse(raw) : {}
+    const remote = { progress: readSynced(file?.progress, isObject<ComicProgress>), settings: readSynced(file?.settings, isObject<ComicSettings>) }
+    const local = localShared()
+    const merged = { progress: mergeSynced(local.progress, remote.progress), settings: mergeSynced(local.settings, remote.settings) }
+
+    const s = load()
+    let tookIn = false
+    for (const [key, entry] of Object.entries(merged.progress)) {
+      const mine = local.progress[key]
+      if (mine && mine.updated >= entry.updated) continue
+      tookIn = true
+      if (entry.value) {
+        s.progress[key] = entry.value
+        delete s.cleared[key]
+      } else {
+        delete s.progress[key]
+        s.cleared[key] = entry.updated
+      }
+    }
+    for (const [key, entry] of Object.entries(merged.settings)) {
+      const mine = local.settings[key]
+      if (!entry.value || (mine && mine.updated >= entry.updated)) continue
+      tookIn = true
+      s.settings[key] = entry.value
+      s.settingsUpdated[key] = entry.updated
+    }
+    if (tookIn) {
+      // Comics read on the other computer move up to "carry on reading" here too.
+      for (const b of Object.values(s.books)) {
+        const p = s.progress[keyOf(b)]
+        if (p && p.updated > b.lastRead) b.lastRead = p.updated
+      }
+      saveSoon()
+      changed()
+    }
+    if (!sameSynced(merged.progress, remote.progress) || !sameSynced(merged.settings, remote.settings)) {
+      await store.writeAppData(COMIC_SYNC_FILE, JSON.stringify(merged))
+    }
+  } catch (err) {
+    logError('sharing comic progress', err)
+  } finally {
+    sharing = false
+    if (shareAgain) {
+      shareAgain = false
+      void shareProgress()
+    }
+  }
+}
+
+/** Page turns come thick and fast: share a few seconds after the last one. */
+function shareSoon(): void {
+  clearTimeout(shareTimer)
+  shareTimer = setTimeout(() => void shareProgress(), 3000)
+}
+
 // ---- setup ----
 
-export function setupComics(): void {
+export function setupComics(appData: () => AppDataStore | null): void {
+  sharedStore = appData
+  // Back at the window (maybe after reading on the other computer): pick up where you got to.
+  app.on('browser-window-focus', () => void shareProgress())
   ipcMain.handle('comics:shelf', () => {
     void makeCovers()
     return shelf()
@@ -466,12 +573,17 @@ export function setupComics(): void {
       updated: Date.now(),
       finished: finished ?? (prev?.finished || (b.pageCount > 0 && p >= b.pageCount - 1))
     }
+    delete load().cleared[keyOf(b)]
     b.lastRead = Date.now()
     saveSoon()
+    shareSoon()
   })
   ipcMain.handle('comics:resetProgress', (_e, id: string) => {
-    delete load().progress[keyOf(book(id))]
+    const key = keyOf(book(id))
+    delete load().progress[key]
+    load().cleared[key] = Date.now()
     saveNow()
+    shareSoon()
     return shelf()
   })
   ipcMain.handle('comics:turned', (_e, pages: number) => {
@@ -487,7 +599,9 @@ export function setupComics(): void {
     const b = book(id)
     const next = { ...settingsOf(b), ...(patch && typeof patch === 'object' ? patch : {}) }
     load().settings[keyOf(b)] = next
+    load().settingsUpdated[keyOf(b)] = Date.now()
     saveSoon()
+    shareSoon()
     return next
   })
   ipcMain.handle('comics:rename', (_e, id: string, title: string) => {
@@ -500,5 +614,6 @@ export function setupComics(): void {
   ipcMain.handle('comics:readText', async (_e, png: Uint8Array) => (await readPrintedText(png)).replace(/[ \t]+\n/g, '\n').trim())
   app.on('will-quit', () => {
     if (saveTimer) saveNow()
+    if (shareTimer) void shareProgress()
   })
 }
