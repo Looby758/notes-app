@@ -57,3 +57,10 @@ export function removeLockedFoldersWithin(path: string): void {
   const { folders } = useLockedFolders.getState()
   if (folders.some((f) => isWithin(f, path))) save(folders.filter((f) => !isWithin(f, path)))
 }
+
+/** Brings back locked folders that came back (undoing a delete). */
+export function putBackLockedFolders(back: string[]): void {
+  const { folders } = useLockedFolders.getState()
+  const missing = back.filter((f) => !folders.includes(f))
+  if (missing.length) save([...folders, ...missing])
+}

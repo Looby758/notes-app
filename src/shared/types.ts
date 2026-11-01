@@ -367,6 +367,19 @@ export interface NotesApi {
   setPrefs(patch: Partial<Prefs>): Promise<Prefs>
   /** Called when preferences change (including hand edits to settings.json). */
   onPrefsChanged(callback: (prefs: Prefs) => void): () => void
+  // Undo for files (main/undoBin.ts). Paths are notes-folder paths when `inVault`, else full paths.
+  /** Deletes without asking, into Orbit's short-term bin. Returns the ones that can be brought back. */
+  undoHold(paths: string[], inVault: boolean): Promise<string[]>
+  /** Which of these were just deleted in a way that can be undone. */
+  undoHeld(paths: string[], inVault: boolean): Promise<string[]>
+  /** Brings deleted things back. Returns where each went, in the same order. */
+  undoRestore(paths: string[], inVault: boolean): Promise<string[]>
+  /** They can't be undone any more: on to the Recycle Bin / Bin. */
+  undoRelease(paths: string[], inVault: boolean): Promise<void>
+  /** Moves things back (full paths): each `to` goes back to `from`. Returns the moves made. */
+  undoMoveBack(items: { from: string; to: string }[]): Promise<{ from: string; to: string }[]>
+  /** Undo / Redo from the Mac's Edit menu. */
+  onEditCommand(callback: (which: 'undo' | 'redo') => void): () => void
   /** Spell-check languages Windows has available (none on a Mac, which picks them itself), e.g. ['en-GB', 'en-US']. */
   spellcheckLanguages(): Promise<string[]>
   /** Opens settings.json in your default editor. */
@@ -635,7 +648,10 @@ export interface NotesApi {
   musicCreatePlaylist(name: string): Promise<MusicItem>
   musicRenamePlaylist(uri: string, name: string): Promise<void>
   musicDeletePlaylist(uri: string): Promise<void>
-  musicAddToPlaylist(uri: string, songs: string[]): Promise<void>
+  /** Puts a deleted playlist back in your library. */
+  musicRestorePlaylist(uri: string): Promise<void>
+  /** Adds to the end, or at `position` (counting from 0). */
+  musicAddToPlaylist(uri: string, songs: string[], position?: number): Promise<void>
   musicRemoveFromPlaylist(uri: string, song: string): Promise<void>
   /** Positions count from 0. */
   musicMoveInPlaylist(uri: string, from: number, to: number): Promise<void>
@@ -812,8 +828,8 @@ export interface NotesApi {
   explorerCreate(dir: string, name: string, kind: 'folder' | 'file'): Promise<string>
   /** Returns the new path. */
   explorerRename(path: string, name: string): Promise<string>
-  /** Copies or moves items into a folder, never over anything. Returns the new paths. */
-  explorerPaste(paths: string[], dir: string, mode: PasteMode): Promise<string[]>
+  /** Copies or moves items into a folder, never over anything. Returns where each one went. */
+  explorerPaste(paths: string[], dir: string, mode: PasteMode): Promise<{ from: string; to: string }[]>
   /** Moves items to the Recycle Bin / Bin (no question asked here). Returns the ones moved. */
   explorerTrash(paths: string[]): Promise<string[]>
   /** Finds names under a folder and all its subfolders. */

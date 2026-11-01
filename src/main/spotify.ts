@@ -605,11 +605,18 @@ export async function deletePlaylist(uri: string): Promise<void> {
   await api(`/me/library?${new URLSearchParams({ uris: uri })}`, { method: 'DELETE' })
 }
 
-/** Adds songs to the end of a playlist. */
-export async function addToPlaylist(uri: string, songs: string[]): Promise<void> {
+/** Puts a removed playlist back in your library (undoing deletePlaylist). */
+export async function restorePlaylist(uri: string): Promise<void> {
+  idOf(uri)
+  await api(`/me/library?${new URLSearchParams({ uris: uri })}`, { method: 'PUT' })
+}
+
+/** Adds songs to the end of a playlist (or at `position`, counting from 0). */
+export async function addToPlaylist(uri: string, songs: string[], position?: number): Promise<void> {
   const uris = songs.filter((u) => SONG_URI.test(u)).slice(0, 100)
   if (!uris.length) throw new Error('Only songs can be added to a playlist.')
-  await api(`/playlists/${idOf(uri)}/items`, { method: 'POST', body: { uris } })
+  const at = position !== undefined && Number.isInteger(position) && position >= 0 ? { position } : {}
+  await api(`/playlists/${idOf(uri)}/items`, { method: 'POST', body: { uris, ...at } })
 }
 
 /** Takes a song out of a playlist (every time it's in there, which is how Spotify does it). */

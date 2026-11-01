@@ -17,12 +17,14 @@ import {
   type PasteMode
 } from '@shared/explorer'
 import { IS_MAC } from '@shared/platform'
+import { hold } from './undoBin'
 
 /**
  * The file explorer tab's side of things: the places to start from, folder listings, text
  * previews and opening files. Pictures, video, sound and PDFs are previewed through
  * vault://explore/… (see explorerFile). File actions (new, rename, copy, move) never overwrite
- * anything: a name that's taken gets " (2)". Deleting only ever goes to the Recycle Bin / Bin.
+ * anything: a name that's taken gets " (2)". Deleting goes to the Recycle Bin / Bin (by way of
+ * undoBin.ts, so Ctrl+Z can bring it back).
  */
 
 /** Programs and scripts are only ever shown in File Explorer / Finder, never run from here. */
@@ -200,9 +202,9 @@ async function renameItem(path: string, name: string): Promise<string> {
   return next
 }
 
-/** Copies or moves each item into `dir`, never over something already there. Returns the new paths. */
-async function paste(paths: string[], dir: string, mode: PasteMode): Promise<string[]> {
-  const done: string[] = []
+/** Copies or moves each item into `dir`, never over something already there. Returns where each went. */
+async function paste(paths: string[], dir: string, mode: PasteMode): Promise<{ from: string; to: string }[]> {
+  const done: { from: string; to: string }[] = []
   const taken = await namesIn(dir)
   for (const from of paths) {
     const info = await stat(from)
@@ -224,7 +226,7 @@ async function paste(paths: string[], dir: string, mode: PasteMode): Promise<str
     } else {
       await cp(from, to, { recursive: true, errorOnExist: true, force: false, preserveTimestamps: true })
     }
-    done.push(to)
+    done.push({ from, to })
   }
   return done
 }
@@ -288,7 +290,7 @@ export function setupExplorer(vaultRoot: () => string | null): void {
     for (const p of checkPaths(paths)) {
       // The top of a drive can't go in the Bin.
       if (dirname(p) === p) continue
-      await shell.trashItem(p)
+      await hold(p)
       done.push(p)
     }
     return done
@@ -304,7 +306,7 @@ export function setupExplorer(vaultRoot: () => string | null): void {
     const inside = sources.filter((p) => inVault(root, p))
     const outside = sources.filter((p) => !inVault(root, p))
     const done = [...(await paste(inside, target, 'move')), ...(await paste(outside, target, 'copy'))]
-    return done.map((p) => inVault(root, p)).filter((p): p is string => !!p)
+    return done.map((p) => inVault(root, p.to)).filter((p): p is string => !!p)
   })
   ipcMain.handle('explorer:search', (_e, dir: string, query: string, showHidden: boolean) => search(vaultRoot(), checkPath(dir), String(query ?? ''), !!showHidden))
 }
