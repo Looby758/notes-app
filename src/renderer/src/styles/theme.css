@@ -5061,6 +5061,17 @@ body.zen .pane-body {
   white-space: nowrap;
 }
 
+/* ---------- Videos in a note ---------- */
+
+.cm-video {
+  display: block;
+  width: min(100%, 560px);
+  aspect-ratio: 16 / 9;
+  margin: 6px 0;
+  border-radius: 8px;
+  background: #000;
+}
+
 /* ---------- Voice notes ---------- */
 
 .cm-audio {
@@ -6983,8 +6994,9 @@ body.theme-light .flashcard-grade.grade-easy span {
   flex: 1;
   background: #fff;
 }
-/* A web page is a separate page that would swallow drags and resizes passing over it. */
-body.dragging .web-view,
+/* A web page is a separate page that would swallow drags and resizes passing over it. Files dragged
+   from the Files tab are let through, so they can be dropped into Discord, WhatsApp or any web page. */
+body.dragging:not(.dragging-files) .web-view,
 body.resizing .web-view,
 body.resizing-rows .web-view {
   pointer-events: none;

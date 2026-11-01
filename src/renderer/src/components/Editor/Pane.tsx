@@ -38,7 +38,7 @@ import {
   MESSAGES_TAB,
   GAMES_TAB,
   VIDEO_TAB,
-  EXPLORER_TAB,
+  isExplorerTab,
   SETTINGS_TAB,
   splitPane
 } from '../../lib/editorController'
@@ -212,7 +212,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === DISCORD_TAB && <DiscordVoicePage />}
         {active === GAMES_TAB && <GamesPage />}
         {active === VIDEO_TAB && <VideoPage autoFocus={isActivePane} />}
-        {active === EXPLORER_TAB && <ExplorerPage autoFocus={isActivePane} />}
+        {isExplorerTab(active) && <ExplorerPage key={active} tab={active} autoFocus={isActivePane} />}
         {zone && <div className={`drop-zone ${zone}`} />}
       </div>
     </div>

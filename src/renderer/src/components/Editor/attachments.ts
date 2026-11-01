@@ -3,13 +3,16 @@ import { notePath } from './facets'
 import { usePrefs } from '../../store/prefs'
 import { notify } from '../../store/notify'
 import { useVault } from '../../store/vault'
-import { getDrag } from '../../lib/dnd'
+import { computerFiles, getDrag } from '../../lib/dnd'
 import { formatDate } from '../../lib/dates'
 import { relativePath } from '../../lib/links'
 import { parentOf } from '../../lib/paths'
 import { AUDIO_EXT } from '../../lib/voice'
+import { fileUrl, vaultRelative } from '../../lib/fileUrl'
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i
+/** Videos are embedded too: they show a player in the note (only loaded once you press play). */
+export const VIDEO_EMBED_EXT = /\.(mp4|m4v|webm|mov|ogv)$/i
 
 const EXT_FOR_TYPE: Record<string, string> = {
   'image/png': '.png',
@@ -26,8 +29,14 @@ export function attachmentLink(file: string, fromNote: string): string {
   const url = relativePath(parentOf(fromNote), file).split('/').map(encodeURIComponent).join('/')
   const name = file.slice(file.lastIndexOf('/') + 1)
   const label = name.replace(/\.[^.]+$/, '')
-  // Pictures and voice notes are embedded (shown / playable); other files are links.
-  return IMAGE_EXT.test(name) || AUDIO_EXT.test(name) ? `![${label}](${url})` : `[${name}](${url})`
+  // Pictures, videos and voice notes are embedded (shown / playable); other files are links.
+  return IMAGE_EXT.test(name) || AUDIO_EXT.test(name) || VIDEO_EMBED_EXT.test(name) ? `![${label}](${url})` : `[${name}](${url})`
+}
+
+/** Markdown for a link to a file where it is on the computer, without copying it into your notes. */
+export function computerLink(path: string): string {
+  const name = path.slice(Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1)
+  return `[${name}](${fileUrl(path)})`
 }
 
 /** Inserts links at `pos`, adding line breaks so images sit on their own lines. */
@@ -64,15 +73,32 @@ async function attachFiles(view: EditorView, files: File[], pos: number): Promis
   }
 }
 
-/** Links a file dragged from the file explorer tab, copying it into the attachments folder if it's from outside the notes folder. */
-async function attachFromComputer(view: EditorView, source: string, pos: number): Promise<void> {
-  try {
-    const saved = await window.api.attachFromComputer(usePrefs.getState().prefs.attachmentFolder, source)
-    insertLinks(view, [attachmentLink(saved, view.state.facet(notePath))], pos)
-    useVault.getState().refresh()
-  } catch (err) {
-    notify(err)
+/**
+ * Links files dragged from the file explorer tab, copying them into the attachments folder if
+ * they're from outside the notes folder. With `linkOnly` (Alt held), nothing is copied: the note
+ * links to each file where it is (files already in your notes are linked as usual).
+ */
+async function attachFromComputer(view: EditorView, sources: string[], pos: number, linkOnly = false): Promise<void> {
+  const links: string[] = []
+  let copied = false
+  const root = linkOnly ? await window.api.getVault().catch(() => null) : null
+  for (const source of sources) {
+    try {
+      const inside = root ? vaultRelative(root, source) : null
+      if (linkOnly && inside === null) {
+        links.push(computerLink(source))
+        continue
+      }
+      const saved = await window.api.attachFromComputer(usePrefs.getState().prefs.attachmentFolder, source)
+      links.push(attachmentLink(saved, view.state.facet(notePath)))
+      copied = true
+    } catch (err) {
+      notify(err)
+    }
   }
+  if (!links.length) return
+  insertLinks(view, links, pos)
+  if (copied) useVault.getState().refresh()
 }
 
 /** Lets you pick images (or any files) from disk, copies them in and links them at the cursor. */
@@ -96,7 +122,7 @@ export const attachmentHandlers = EditorView.domEventHandlers({
     return true
   },
   dragover(e) {
-    if (e.dataTransfer?.types.includes('Files') || getDrag()?.kind === 'file' || getDrag()?.kind === 'computer') {
+    if (e.dataTransfer?.types.includes('Files') || getDrag()?.kind === 'file' || computerFiles(getDrag()).length) {
       e.preventDefault()
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
       return true
@@ -113,18 +139,19 @@ export const attachmentHandlers = EditorView.domEventHandlers({
       insertLinks(view, [attachmentLink(drag.path, view.state.facet(notePath))], pos)
       return true
     }
-    if (drag?.kind === 'computer') {
+    const files = computerFiles(drag)
+    if (files.length) {
       e.preventDefault()
       const pos = view.posAtCoords({ x: e.clientX, y: e.clientY }) ?? view.state.selection.main.head
-      void attachFromComputer(view, drag.path, pos)
+      void attachFromComputer(view, files, pos, e.altKey)
       return true
     }
     if (drag) return true
-    const files = [...(e.dataTransfer?.files ?? [])]
-    if (files.length === 0) return false
+    const dropped = [...(e.dataTransfer?.files ?? [])]
+    if (dropped.length === 0) return false
     e.preventDefault()
     const pos = view.posAtCoords({ x: e.clientX, y: e.clientY }) ?? view.state.selection.main.head
-    attachFiles(view, files, pos)
+    attachFiles(view, dropped, pos)
     return true
   }
 })
