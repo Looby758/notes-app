@@ -6,6 +6,7 @@ import type { Sheet } from './sheet'
 import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
 import type { LocalLibrary } from './localMusic'
+import type { MonitorAction, MonitorSaved, MonitorSetting, MonitorsStatus, MonitorTarget } from './monitors'
 import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
 import type { DiscordStatus } from './discord'
 import type { WifiNetwork } from './wifi'
@@ -648,6 +649,18 @@ export interface NotesApi {
 
   // Quick capture
   /** Opens the quick capture window. */
+  // Screen controls (main/monitors.ts): brightness, contrast and input over DDC/CI
+  /** Your screens and their settings (looks for them the first time). */
+  monitorsGet(): Promise<MonitorsStatus>
+  /** Looks for screens again. */
+  monitorsRescan(): Promise<MonitorsStatus>
+  /** Sets one screen's brightness, contrast (in the screen's own units) or input; false if it didn't answer. */
+  monitorSet(id: string, setting: MonitorSetting, value: number): Promise<boolean>
+  /** Does what a screen hotkey does, on one screen or all. */
+  monitorAction(target: MonitorTarget, action: MonitorAction): Promise<void>
+  /** Saves screen names, input names and hotkeys. */
+  monitorsSave(saved: MonitorSaved): Promise<MonitorsStatus>
+  onMonitorsChanged(callback: (status: MonitorsStatus) => void): () => void
   // Soundboard (main/soundboard.ts; the sound itself is played in lib/soundboard.ts)
   soundboardGet(): Promise<SoundboardStatus>
   /** Asks for sound files and adds a button for each. */

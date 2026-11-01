@@ -233,6 +233,16 @@ const api: NotesApi = {
   stopVideoStream: (session) => ipcRenderer.invoke('video:stop', session),
   videoInVault: (path) => ipcRenderer.invoke('video:inVault', path),
   pickVideoFile: (kind, near) => ipcRenderer.invoke('video:pick', kind, near),
+  monitorsGet: () => ipcRenderer.invoke('monitors:get'),
+  monitorsRescan: () => ipcRenderer.invoke('monitors:rescan'),
+  monitorSet: (id, setting, value) => ipcRenderer.invoke('monitors:set', id, setting, value),
+  monitorAction: (target, action) => ipcRenderer.invoke('monitors:action', target, action),
+  monitorsSave: (saved) => ipcRenderer.invoke('monitors:save', saved),
+  onMonitorsChanged: (callback) => {
+    const handler = (_e: unknown, status: Parameters<typeof callback>[0]): void => callback(status)
+    ipcRenderer.on('monitors:changed', handler)
+    return () => ipcRenderer.removeListener('monitors:changed', handler)
+  },
   soundboardGet: () => ipcRenderer.invoke('soundboard:get'),
   soundboardPick: () => ipcRenderer.invoke('soundboard:pick'),
   soundboardAddFiles: (paths) => ipcRenderer.invoke('soundboard:add-files', paths),

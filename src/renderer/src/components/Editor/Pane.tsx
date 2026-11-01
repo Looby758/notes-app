@@ -29,6 +29,7 @@ import {
   COMICS_TAB,
   MINESWEEPER_TAB,
   CLOCKS_TAB,
+  SCREENS_TAB,
   STUDIO_TAB,
   CLIPS_TAB,
   SOUNDBOARD_TAB,
@@ -65,6 +66,7 @@ import ConvertPage from '../Convert/ConvertPage'
 import SudokuPage from '../Sudoku/SudokuPage'
 import ComicsPage from '../Comics/ComicsPage'
 import WorldClocksPage from '../Clocks/WorldClocksPage'
+import ScreensPage from '../Screens/ScreensPage'
 import StudioPage from '../Studio/StudioPage'
 import ClipsPage from '../Clips/ClipsPage'
 import SoundboardPage from '../Soundboard/SoundboardPage'
@@ -200,6 +202,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === COMICS_TAB && <ComicsPage />}
         {active === MINESWEEPER_TAB && <MinesweeperPage />}
         {active === CLOCKS_TAB && <WorldClocksPage />}
+        {active === SCREENS_TAB && <ScreensPage />}
         {active === STUDIO_TAB && <StudioPage />}
         {active === CLIPS_TAB && <ClipsPage />}
         {active === SOUNDBOARD_TAB && <SoundboardPage />}

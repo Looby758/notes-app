@@ -59,6 +59,7 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'minesweeper', name: 'Minesweeper', blurb: 'A quick break', group: 'Play', command: 'minesweeper.open' },
 
   { id: 'snip', name: 'Screen snip', blurb: 'Grab text from anywhere on screen', group: 'Tools', command: 'snip.start', keywords: 'ocr screenshot copy text translate' },
+  { id: 'screens', name: 'Screens', blurb: 'Monitor brightness, contrast and input, with hotkeys', group: 'Tools', command: 'screens.open', keywords: 'monitor display brightness contrast input hdmi displayport usb-c ddc dim switch' },
   { id: 'explorer', name: 'Files', blurb: 'Files on this computer', group: 'Tools', command: 'explorer.open', keywords: 'explorer finder folders drive' },
   { id: 'convert', name: 'Convert files', blurb: 'Photos, documents, audio and more', group: 'Tools', command: 'convert.open', keywords: 'pdf mp3 mp4 gif video png jpg word' },
   { id: 'clips', name: 'Clips', blurb: 'Instant replay: save the last 30 seconds, trim it, send it', group: 'Tools', command: 'clips.open', keywords: 'instant replay shadowplay clip highlight discord trim caption game' },

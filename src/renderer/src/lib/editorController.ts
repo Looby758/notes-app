@@ -72,6 +72,8 @@ export const COMICS_TAB = 'comics:'
 export const MINESWEEPER_TAB = 'minesweeper:'
 /** Clocks for places around the world (components/Clocks). */
 export const CLOCKS_TAB = 'clocks:'
+/** Monitor brightness, contrast and input (components/Screens). */
+export const SCREENS_TAB = 'screens:'
 /** Scenes, webcam and screen recording (components/Studio). */
 export const STUDIO_TAB = 'studio:'
 /** Instant replay and the clip editor (components/Clips). */
