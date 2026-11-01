@@ -1,3 +1,4 @@
+import { undoGroup } from './undo'
 import { useNoteIndex } from '../store/noteIndex'
 import { useVault } from '../store/vault'
 import { toggleStar, useStarred } from '../store/starred'
@@ -39,7 +40,12 @@ export async function moveMany(paths: string[], folder: string): Promise<void> {
         cancel: "Don't update"
       })
     : false
-  for (const p of items) await useVault.getState().move(p, folder, update)
+  await undoGroup(
+    (n) => `Moved ${n} items`,
+    async () => {
+      for (const p of items) await useVault.getState().move(p, folder, update)
+    }
+  )
   clearSelection()
 }
 
@@ -53,7 +59,12 @@ export function starMany(paths: string[]): void {
   const targets = notesIn(paths)
   const starred = useStarred.getState().paths
   const allStarred = targets.every((p) => starred.includes(p))
-  for (const p of targets) if (starred.includes(p) === allStarred) toggleStar(p)
+  void undoGroup(
+    (n) => `${allStarred ? 'Unstarred' : 'Starred'} ${n} notes`,
+    async () => {
+      for (const p of targets) if (starred.includes(p) === allStarred) toggleStar(p)
+    }
+  )
 }
 
 async function eachNote(paths: string[], change: (text: string) => string | null): Promise<number> {

@@ -1,6 +1,13 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { MusicMiniCommand, MusicMiniState, NotesApi } from '@shared/types'
 
+/** Listens for a message from the main process; returns the way to stop. */
+function on<T>(channel: string, callback: (value: T) => void): () => void {
+  const handler = (_e: unknown, value: T): void => callback(value)
+  ipcRenderer.on(channel, handler)
+  return () => ipcRenderer.removeListener(channel, handler)
+}
+
 const api: NotesApi = {
   confirm: (options) => ipcRenderer.invoke('app:confirm', options),
   copySecret: (text, seconds) => ipcRenderer.invoke('clipboard:copySecret', text, seconds),
@@ -241,7 +248,8 @@ const api: NotesApi = {
   musicCreatePlaylist: (name) => ipcRenderer.invoke('music:createPlaylist', name),
   musicRenamePlaylist: (uri, name) => ipcRenderer.invoke('music:renamePlaylist', uri, name),
   musicDeletePlaylist: (uri) => ipcRenderer.invoke('music:deletePlaylist', uri),
-  musicAddToPlaylist: (uri, songs) => ipcRenderer.invoke('music:addToPlaylist', uri, songs),
+  musicAddToPlaylist: (uri, songs, position) => ipcRenderer.invoke('music:addToPlaylist', uri, songs, position),
+  musicRestorePlaylist: (uri) => ipcRenderer.invoke('music:restorePlaylist', uri),
   musicRemoveFromPlaylist: (uri, song) => ipcRenderer.invoke('music:removeFromPlaylist', uri, song),
   musicMoveInPlaylist: (uri, from, to) => ipcRenderer.invoke('music:moveInPlaylist', uri, from, to),
   localMusicLibrary: (fresh) => ipcRenderer.invoke('localMusic:library', fresh),
@@ -342,6 +350,23 @@ const api: NotesApi = {
     return () => ipcRenderer.removeListener('phone:event', handler)
   },
   phoneWifi: () => ipcRenderer.invoke('phone:wifi'),
+  shareStatus: () => ipcRenderer.invoke('share:status'),
+  shareSet: (patch) => ipcRenderer.invoke('share:set', patch),
+  onShareStatus: (callback) => on('share:status', callback),
+  sharePair: (target) => ipcRenderer.invoke('share:pair', target),
+  shareConfirmPairing: () => ipcRenderer.invoke('share:confirmPairing'),
+  shareCancelPairing: () => ipcRenderer.invoke('share:cancelPairing'),
+  shareUnpair: () => ipcRenderer.invoke('share:unpair'),
+  shareAskAccessibility: () => ipcRenderer.invoke('share:askAccessibility'),
+  shareSendFiles: (paths) => ipcRenderer.invoke('share:sendFiles', paths),
+  onShareReceived: (callback) => on('share:received', callback),
+  onShareOpenSettings: (callback) => on('share:openSettings', callback),
+  shareInput: (event) => ipcRenderer.send('share:input', event),
+  shareComeBack: () => ipcRenderer.send('share:comeBack'),
+  onShareCapture: (callback) => on('share:capture', callback),
+  shareDropped: (paths) => ipcRenderer.send('share:dropped', paths),
+  shareDropCancel: () => ipcRenderer.send('share:dropCancel'),
+  onShareDrop: (callback) => on('share:drop', callback),
   camStatus: () => ipcRenderer.invoke('cam:status'),
   camOn: () => ipcRenderer.invoke('cam:on'),
   camOff: () => ipcRenderer.invoke('cam:off'),
@@ -401,7 +426,17 @@ const api: NotesApi = {
     ipcRenderer.on('app:before-close', handler)
     return () => ipcRenderer.removeListener('app:before-close', handler)
   },
-  readyToClose: () => ipcRenderer.invoke('app:ready-to-close')
+  readyToClose: () => ipcRenderer.invoke('app:ready-to-close'),
+  undoHold: (paths, inVault) => ipcRenderer.invoke('undo:hold', paths, inVault),
+  undoHeld: (paths, inVault) => ipcRenderer.invoke('undo:held', paths, inVault),
+  undoRestore: (paths, inVault) => ipcRenderer.invoke('undo:restore', paths, inVault),
+  undoRelease: (paths, inVault) => ipcRenderer.invoke('undo:release', paths, inVault),
+  undoMoveBack: (items) => ipcRenderer.invoke('undo:moveBack', items),
+  onEditCommand: (callback) => {
+    const handler = (_e: unknown, which: 'undo' | 'redo'): void => callback(which)
+    ipcRenderer.on('edit:command', handler)
+    return () => ipcRenderer.removeListener('edit:command', handler)
+  }
 }
 
 contextBridge.exposeInMainWorld('api', api)

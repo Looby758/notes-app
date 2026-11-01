@@ -9,6 +9,7 @@ import type { WifiNetwork } from './wifi'
 import type { MusicAction, MusicDevice, MusicItem, MusicQueue, MusicSearchResults, MusicState, MusicStatus } from './spotify'
 import type { CoversStatus, GamesList, LaunchArt } from './games'
 import type { Theme } from './themes'
+import type { ShareButton, ShareOs, ShareSide } from './mouseShare'
 
 export interface WindowBounds {
   x?: number
@@ -38,6 +39,8 @@ export interface Settings {
   /** The paired phone's link (its token, and the port it was on), so the phone reconnects by itself. */
   phoneToken?: string
   phonePort?: number
+  /** One mouse, two computers: whether it's on, the paired computer, and how it's set up. */
+  mouseShare?: ShareSaved
   /** The phone webcam: whether it's on, its https link (token and port), and how the picture is made. */
   camOn?: boolean
   camToken?: string
@@ -63,6 +66,52 @@ export interface CamStatus {
   quality: 'sd' | 'hd'
   fill: boolean
 }
+
+/** Mouse sharing, as saved. `side` is where the other computer sits, seen from this one. */
+export interface ShareSaved {
+  enabled: boolean
+  /** This computer's own id (made once). */
+  id: string
+  peer?: { id: string; name: string; os: ShareOs; secret: string; host?: string; port?: number }
+  side: ShareSide
+  swapCtrlCmd: boolean
+  shareClipboard: boolean
+  speed: number
+  /** Keep the mouse on this computer for now. */
+  paused?: boolean
+  /** The other computer's address, typed in, for networks that don't let them find each other. */
+  manualHost?: string
+}
+
+/** Mouse sharing, for the Settings page. */
+export interface ShareStatus {
+  enabled: boolean
+  name: string
+  os: ShareOs
+  paired: { name: string; os: ShareOs } | null
+  connected: boolean
+  side: ShareSide
+  swapCtrlCmd: boolean
+  shareClipboard: boolean
+  speed: number
+  paused: boolean
+  manualHost: string
+  /** Other computers running Orbit with sharing on, not paired yet. */
+  nearby: { id: string; name: string; os: ShareOs }[]
+  pairing: { name: string; code: string; weConfirmed: boolean } | null
+  /** Where the mouse is: on this computer, over on the other one, or this one is being driven. */
+  using: 'here' | 'there' | 'controlled'
+  /** Mac: Orbit is allowed to move the pointer (Accessibility). Always true on Windows. */
+  accessibility: boolean
+  error: string
+}
+
+/** Something done in the invisible window while the mouse is on the other computer. */
+export type ShareInputEvent =
+  | { t: 'move'; dx: number; dy: number }
+  | { t: 'btn'; b: ShareButton; down: boolean }
+  | { t: 'wheel'; dx: number; dy: number }
+  | { t: 'key'; code: string; down: boolean }
 
 /** What the notes window's music player tells the floating mini player. */
 export interface MusicMiniState {
@@ -318,6 +367,19 @@ export interface NotesApi {
   setPrefs(patch: Partial<Prefs>): Promise<Prefs>
   /** Called when preferences change (including hand edits to settings.json). */
   onPrefsChanged(callback: (prefs: Prefs) => void): () => void
+  // Undo for files (main/undoBin.ts). Paths are notes-folder paths when `inVault`, else full paths.
+  /** Deletes without asking, into Orbit's short-term bin. Returns the ones that can be brought back. */
+  undoHold(paths: string[], inVault: boolean): Promise<string[]>
+  /** Which of these were just deleted in a way that can be undone. */
+  undoHeld(paths: string[], inVault: boolean): Promise<string[]>
+  /** Brings deleted things back. Returns where each went, in the same order. */
+  undoRestore(paths: string[], inVault: boolean): Promise<string[]>
+  /** They can't be undone any more: on to the Recycle Bin / Bin. */
+  undoRelease(paths: string[], inVault: boolean): Promise<void>
+  /** Moves things back (full paths): each `to` goes back to `from`. Returns the moves made. */
+  undoMoveBack(items: { from: string; to: string }[]): Promise<{ from: string; to: string }[]>
+  /** Undo / Redo from the Mac's Edit menu. */
+  onEditCommand(callback: (which: 'undo' | 'redo') => void): () => void
   /** Spell-check languages Windows has available (none on a Mac, which picks them itself), e.g. ['en-GB', 'en-US']. */
   spellcheckLanguages(): Promise<string[]>
   /** Opens settings.json in your default editor. */
@@ -586,7 +648,10 @@ export interface NotesApi {
   musicCreatePlaylist(name: string): Promise<MusicItem>
   musicRenamePlaylist(uri: string, name: string): Promise<void>
   musicDeletePlaylist(uri: string): Promise<void>
-  musicAddToPlaylist(uri: string, songs: string[]): Promise<void>
+  /** Puts a deleted playlist back in your library. */
+  musicRestorePlaylist(uri: string): Promise<void>
+  /** Adds to the end, or at `position` (counting from 0). */
+  musicAddToPlaylist(uri: string, songs: string[], position?: number): Promise<void>
   musicRemoveFromPlaylist(uri: string, song: string): Promise<void>
   /** Positions count from 0. */
   musicMoveInPlaylist(uri: string, from: number, to: number): Promise<void>
@@ -691,6 +756,29 @@ export interface NotesApi {
   phoneNotify(title: string, body: string): Promise<void>
   /** The Wi-Fi this computer is on, for a guest QR code (blank where it can't be read). */
   phoneWifi(): Promise<WifiNetwork>
+  /** One mouse, two computers (see main/mouseShare.ts). */
+  shareStatus(): Promise<ShareStatus>
+  shareSet(patch: Partial<Omit<ShareSaved, 'id' | 'peer'>>): Promise<ShareStatus>
+  onShareStatus(callback: (status: ShareStatus) => void): () => void
+  /** Starts pairing with a computer found on the network (by id) or typed in (host). */
+  sharePair(target: { id?: string; host?: string }): Promise<void>
+  shareConfirmPairing(): Promise<void>
+  shareCancelPairing(): Promise<void>
+  shareUnpair(): Promise<void>
+  shareAskAccessibility(): Promise<boolean>
+  shareSendFiles(paths: string[]): Promise<void>
+  /** A file came over from the other computer (it's in Downloads). */
+  onShareReceived(callback: (info: { title: string; path: string }) => void): () => void
+  /** The other computer started pairing: open Settings to show the code. */
+  onShareOpenSettings(callback: () => void): () => void
+  /** The invisible window: what you do, and "come back". */
+  shareInput(event: ShareInputEvent): void
+  shareComeBack(): void
+  onShareCapture(callback: (info: { name: string; os: ShareOs }) => void): () => void
+  /** The drop strip: files dropped on it, or nothing to send. */
+  shareDropped(paths: string[]): void
+  shareDropCancel(): void
+  onShareDrop(callback: (info: { name: string; side: ShareSide }) => void): () => void
   /** The phone webcam (Windows): turn it on/off, its status and settings, and a live preview of the phone's frames. */
   camStatus(): Promise<CamStatus>
   camOn(): Promise<CamStatus>
@@ -740,8 +828,8 @@ export interface NotesApi {
   explorerCreate(dir: string, name: string, kind: 'folder' | 'file'): Promise<string>
   /** Returns the new path. */
   explorerRename(path: string, name: string): Promise<string>
-  /** Copies or moves items into a folder, never over anything. Returns the new paths. */
-  explorerPaste(paths: string[], dir: string, mode: PasteMode): Promise<string[]>
+  /** Copies or moves items into a folder, never over anything. Returns where each one went. */
+  explorerPaste(paths: string[], dir: string, mode: PasteMode): Promise<{ from: string; to: string }[]>
   /** Moves items to the Recycle Bin / Bin (no question asked here). Returns the ones moved. */
   explorerTrash(paths: string[]): Promise<string[]>
   /** Finds names under a folder and all its subfolders. */

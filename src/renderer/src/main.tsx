@@ -5,6 +5,8 @@ import CaptureApp from './components/CaptureApp'
 import YouTubeMini from './components/YouTube/YouTubeMini'
 import MusicMini from './components/Music/MusicMini'
 import SnipApp from './components/Snip/SnipApp'
+import ShareCapture from './components/Share/ShareCapture'
+import ShareDrop from './components/Share/ShareDrop'
 import { loadPrefs } from './store/prefs'
 import { startInterfaceSounds } from './lib/sounds'
 import { IS_MAC } from '@shared/platform'
@@ -20,7 +22,13 @@ const isCapture = location.hash === '#capture'
 const isYouTube = location.hash === '#youtube'
 const isMusic = location.hash === '#music'
 const isSnip = location.hash === '#snip'
-if (isCapture || isYouTube || isMusic || isSnip) {
+// Mouse sharing's invisible window (holds the mouse while it's on the other computer) and its drop strip.
+const isShareCapture = location.hash === '#share-capture'
+const isShareDrop = location.hash === '#share-drop'
+if (isShareCapture || isShareDrop) {
+  document.body.classList.add(isShareCapture ? 'share-capture-window' : 'share-drop-window')
+  loadPrefs().catch(() => undefined)
+} else if (isCapture || isYouTube || isMusic || isSnip) {
   document.body.classList.add(isCapture ? 'capture-window' : isYouTube ? 'youtube-window' : isSnip ? 'snip-window' : 'music-window')
   loadPrefs().catch(() => undefined)
 } else {
@@ -28,5 +36,21 @@ if (isCapture || isYouTube || isMusic || isSnip) {
 }
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>{isCapture ? <CaptureApp /> : isYouTube ? <YouTubeMini /> : isMusic ? <MusicMini /> : isSnip ? <SnipApp /> : <App />}</StrictMode>
+  <StrictMode>
+    {isShareCapture ? (
+      <ShareCapture />
+    ) : isShareDrop ? (
+      <ShareDrop />
+    ) : isCapture ? (
+      <CaptureApp />
+    ) : isYouTube ? (
+      <YouTubeMini />
+    ) : isMusic ? (
+      <MusicMini />
+    ) : isSnip ? (
+      <SnipApp />
+    ) : (
+      <App />
+    )}
+  </StrictMode>
 )

@@ -4,6 +4,35 @@ import type { MusicItem } from '@shared/spotify'
 import { musicPlay, useMusic } from '../../store/music'
 import { errorMessage } from '../../lib/paths'
 import { ItemArt, ItemList } from './ItemList'
+import { recordUndo, undoChanged, useUndoChanges } from '../../lib/undo'
+import type { UndoStep } from '../../lib/undoHistory'
+
+// ---- undo (Ctrl+Z outside a text box; lib/undo.ts) ----
+
+/** After an undo or redo here: the list of playlists and the open playlist reload. */
+const changed = (uri: string): void => undoChanged('playlists', `playlist:${uri}`)
+
+/** Where a song is in a playlist (it can be in more than once). */
+const positionsOf = (songs: MusicItem[], uri: string): number[] => songs.flatMap((s, i) => (s.uri === uri ? [i] : []))
+
+/** Puts a song back at each of its old positions (lowest first, so each lands where it was). */
+async function addAt(playlist: string, song: string, positions: number[]): Promise<void> {
+  for (const at of positions) await window.api.musicAddToPlaylist(playlist, [song], at)
+}
+
+function recordNewPlaylist(made: MusicItem): void {
+  recordUndo({
+    label: `Made the playlist “${made.name}”`,
+    undo: async () => {
+      await window.api.musicDeletePlaylist(made.uri)
+      changed(made.uri)
+    },
+    redo: async () => {
+      await window.api.musicRestorePlaylist(made.uri)
+      changed(made.uri)
+    }
+  })
+}
 
 /** The Playlists tab: your playlists (press one to play it), making new ones, and opening yours to change. */
 export function Playlists() {
@@ -12,16 +41,19 @@ export function Playlists() {
   const [open, setOpen] = useState<MusicItem | null>(null)
   const [making, setMaking] = useState(false)
 
-  const load = (): void => {
+  /** `closeGone`: an undo took away the open playlist (one you'd just made), so go back to the list. */
+  const load = (closeGone = false): void => {
     window.api.musicPlaylists().then(
       (list) => {
         setItems(list)
         setError(null)
+        if (closeGone) setOpen((o) => (o && !o.liked && !list.some((i) => i.uri === o.uri) ? null : o))
       },
       (err) => setError(errorMessage(err))
     )
   }
-  useEffect(load, [])
+  useEffect(() => load(), [])
+  useUndoChanges('playlists', () => load(true))
 
   if (open) {
     return (
@@ -44,6 +76,7 @@ export function Playlists() {
             const made = await window.api.musicCreatePlaylist(name)
             setMaking(false)
             setOpen(made)
+            recordNewPlaylist(made)
           }}
         />
       ) : (
@@ -129,29 +162,74 @@ function PlaylistView({ playlist, onBack }: { playlist: MusicItem; onBack: () =>
     window.api.musicPlaylistSongs(playlist.uri).then(setSongs, (err) => setError(errorMessage(err)))
   }
   useEffect(load, [playlist.uri])
+  useUndoChanges(`playlist:${playlist.uri}`, load)
 
   /** Changes the list straight away, and puts it back the way Spotify has it if the change didn't work. */
-  const change = async (next: MusicItem[], job: () => Promise<void>): Promise<void> => {
+  const change = async (next: MusicItem[], job: () => Promise<void>, undo: UndoStep): Promise<void> => {
     setSongs(next)
     setError(null)
     try {
       await job()
+      recordUndo(undo)
     } catch (err) {
       setError(errorMessage(err))
       load()
     }
   }
-  const add = (song: MusicItem): Promise<void> => change([...(songs ?? []), song], () => window.api.musicAddToPlaylist(playlist.uri, [song.uri]))
-  const remove = (song: MusicItem): Promise<void> =>
-    change(
+  const add = (song: MusicItem): Promise<void> => {
+    // Undoing takes it out again: Spotify takes out every copy, so any earlier ones go back after.
+    const earlier = positionsOf(songs ?? [], song.uri)
+    const step: UndoStep = {
+      label: `Added “${song.name}” to “${name}”`,
+      undo: async () => {
+        await window.api.musicRemoveFromPlaylist(playlist.uri, song.uri)
+        await addAt(playlist.uri, song.uri, earlier)
+        changed(playlist.uri)
+      },
+      redo: async () => {
+        await window.api.musicAddToPlaylist(playlist.uri, [song.uri])
+        changed(playlist.uri)
+      }
+    }
+    return change([...(songs ?? []), song], () => window.api.musicAddToPlaylist(playlist.uri, [song.uri]), step)
+  }
+  const remove = (song: MusicItem): Promise<void> => {
+    const at = positionsOf(songs ?? [], song.uri)
+    const step: UndoStep = {
+      label: liked ? `Unliked “${song.name}”` : `Took “${song.name}” out of “${name}”`,
+      undo: async () => {
+        if (liked) await window.api.musicSetLiked(song.uri, true)
+        else await addAt(playlist.uri, song.uri, at)
+        changed(playlist.uri)
+      },
+      redo: async () => {
+        if (liked) await window.api.musicSetLiked(song.uri, false)
+        else await window.api.musicRemoveFromPlaylist(playlist.uri, song.uri)
+        changed(playlist.uri)
+      }
+    }
+    return change(
       (songs ?? []).filter((s) => s.uri !== song.uri),
-      () => (liked ? window.api.musicSetLiked(song.uri, false) : window.api.musicRemoveFromPlaylist(playlist.uri, song.uri))
+      () => (liked ? window.api.musicSetLiked(song.uri, false) : window.api.musicRemoveFromPlaylist(playlist.uri, song.uri)),
+      step
     )
+  }
   const move = (from: number, to: number): Promise<void> => {
     const next = [...(songs ?? [])]
     const [song] = next.splice(from, 1)
     next.splice(to, 0, song)
-    return change(next, () => window.api.musicMoveInPlaylist(playlist.uri, from, to))
+    const step: UndoStep = {
+      label: `Moved “${song.name}” in “${name}”`,
+      undo: async () => {
+        await window.api.musicMoveInPlaylist(playlist.uri, to, from)
+        changed(playlist.uri)
+      },
+      redo: async () => {
+        await window.api.musicMoveInPlaylist(playlist.uri, from, to)
+        changed(playlist.uri)
+      }
+    }
+    return change(next, () => window.api.musicMoveInPlaylist(playlist.uri, from, to), step)
   }
 
   return (
@@ -168,8 +246,23 @@ function PlaylistView({ playlist, onBack }: { playlist: MusicItem; onBack: () =>
               onCancel={() => setRenaming(false)}
               onDone={async (n) => {
                 await window.api.musicRenamePlaylist(playlist.uri, n)
+                const old = name
                 setName(n)
                 setRenaming(false)
+                if (n === old) return
+                recordUndo({
+                  label: `Renamed “${old}” to “${n}”`,
+                  undo: async () => {
+                    await window.api.musicRenamePlaylist(playlist.uri, old)
+                    setName(old)
+                    changed(playlist.uri)
+                  },
+                  redo: async () => {
+                    await window.api.musicRenamePlaylist(playlist.uri, n)
+                    setName(n)
+                    changed(playlist.uri)
+                  }
+                })
               }}
             />
           </div>
@@ -192,6 +285,17 @@ function PlaylistView({ playlist, onBack }: { playlist: MusicItem; onBack: () =>
                 onClick={async () => {
                   try {
                     await window.api.musicDeletePlaylist(playlist.uri)
+                    recordUndo({
+                      label: `Deleted the playlist “${name}”`,
+                      undo: async () => {
+                        await window.api.musicRestorePlaylist(playlist.uri)
+                        changed(playlist.uri)
+                      },
+                      redo: async () => {
+                        await window.api.musicDeletePlaylist(playlist.uri)
+                        changed(playlist.uri)
+                      }
+                    })
                     onBack()
                   } catch (err) {
                     setError(errorMessage(err))

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { isWithin, replacePrefix } from '../lib/paths'
+import { isWithin, noteTitle, replacePrefix } from '../lib/paths'
+import { recordUndo } from '../lib/undo'
 import { notify } from './notify'
 
 /**
@@ -58,7 +59,14 @@ export const justStarred = (path: string): boolean => performance.now() - (starr
 /** Stars a note (at `index`, default the end) or, if it's starred already, unstars it. */
 export function toggleStar(path: string, index?: number): void {
   const { paths } = useStarred.getState()
-  if (paths.includes(path)) save(paths.filter((p) => p !== path))
+  const was = paths.indexOf(path)
+  const name = noteTitle(path)
+  recordUndo({
+    label: was >= 0 ? `Unstarred “${name}”` : `Starred “${name}”`,
+    undo: () => toggleStar(path, was >= 0 ? was : undefined),
+    redo: () => toggleStar(path, index)
+  })
+  if (was >= 0) save(paths.filter((p) => p !== path))
   else {
     const next = [...paths]
     next.splice(index ?? next.length, 0, path)
@@ -69,6 +77,8 @@ export function toggleStar(path: string, index?: number): void {
 
 /** Puts a note at position `index` in the starred list (starring it if needed). */
 export function placeStar(path: string, index: number): void {
+  const before = useStarred.getState().paths
+  recordUndo({ label: `Moved “${noteTitle(path)}” in Starred`, undo: () => save(before), redo: () => placeStar(path, index) })
   const without = useStarred.getState().paths.filter((p) => p !== path)
   if (!isStarred(path)) starredAt.set(path, performance.now())
   const at = Math.max(0, Math.min(index, without.length))
@@ -86,4 +96,11 @@ export function remapStars(from: string, to: string): void {
 export function removeStarsWithin(path: string): void {
   const { paths } = useStarred.getState()
   if (paths.some((p) => isWithin(p, path))) save(paths.filter((p) => !isWithin(p, path)))
+}
+
+/** Brings back stars for notes that came back (undoing a delete). */
+export function putBackStars(paths: string[]): void {
+  const current = useStarred.getState().paths
+  const back = paths.filter((p) => !current.includes(p))
+  if (back.length) save([...current, ...back])
 }

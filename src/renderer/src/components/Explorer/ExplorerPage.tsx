@@ -57,6 +57,7 @@ import {
 } from '@shared/explorer'
 import { FILE_MANAGER, TRASH_NAME } from '@shared/platform'
 import { computerPaths, dragFilesOut, getDrag, setDrag } from '../../lib/dnd'
+import { recordUndo, undoChanged, useUndoChanges } from '../../lib/undo'
 import { openFileTab, openNote } from '../../lib/editorController'
 import { fileKind } from '../../lib/fileKinds'
 import { notify } from '../../store/notify'
@@ -102,6 +103,53 @@ const loadPins = (): string[] => {
 }
 const nameOf = (path: string): string => crumbsOf(path).pop()?.name ?? path
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
+const what = (paths: string[]): string => (paths.length === 1 ? `“${nameOf(paths[0])}”` : plural(paths.length, 'item'))
+
+// ---- undo (Ctrl+Z outside a text box; lib/undo.ts) ----
+
+/** Undo for something new here (a new file, or copies): it goes into Orbit's short-term bin, and redo brings it back. */
+function recordAdded(label: string, paths: string[]): void {
+  let at = paths
+  recordUndo({
+    label,
+    undo: async () => {
+      await window.api.undoHold(at, false)
+      undoChanged('explorer')
+    },
+    redo: async () => {
+      at = await window.api.undoRestore(at, false)
+      undoChanged('explorer')
+    },
+    forget: (done) => !done && void window.api.undoRelease(at, false)
+  })
+}
+
+function recordMoved(label: string, moves: { from: string; to: string }[]): void {
+  let last = moves
+  const flip = async (): Promise<void> => {
+    last = await window.api.undoMoveBack(last)
+    undoChanged('explorer')
+  }
+  recordUndo({ label, undo: flip, redo: flip })
+}
+
+async function recordDeleted(paths: string[]): Promise<void> {
+  const held = await window.api.undoHeld(paths, false).catch(() => [] as string[])
+  if (!held.length) return
+  let at = held
+  recordUndo({
+    label: `Deleted ${what(held)}`,
+    undo: async () => {
+      at = await window.api.undoRestore(at, false)
+      undoChanged('explorer')
+    },
+    redo: async () => {
+      await window.api.undoHold(at, false)
+      undoChanged('explorer')
+    },
+    forget: (done) => done && void window.api.undoRelease(at, false)
+  })
+}
 
 /** The file explorer: browse every folder on the computer (and Google Drive), manage files, preview them and drag them into notes. */
 export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
@@ -218,6 +266,8 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
   const current = shown.find((e) => e.path === selected) ?? null
   const pickedEntries = shown.filter((e) => picked.has(e.path))
   const refresh = (): void => setReload((n) => n + 1)
+  useUndoChanges('explorer', refresh)
+  useUndoChanges('files', refresh)
 
   const pickOnly = (path: string | null): void => {
     setSelected(path)
@@ -272,6 +322,7 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
       .then((path) => {
         pickAfter.current = { paths: [path], rename: true }
         refresh()
+        recordAdded(`Made “${nameOf(path)}”`, [path])
       })
       .catch(notify)
   }
@@ -287,6 +338,7 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
       .then((path) => {
         pickAfter.current = { paths: [path] }
         refresh()
+        if (path !== entry.path) recordMoved(`Renamed “${entry.name}” to “${nameOf(path)}”`, [{ from: entry.path, to: path }])
       })
       .catch(notify)
   }
@@ -302,10 +354,14 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
     if (!paths.length) return
     window.api
       .explorerPaste(paths, into, mode)
-      .then((done) => {
+      .then((moves) => {
+        const done = moves.map((m) => m.to)
         if (into === dir) pickAfter.current = { paths: done }
         refresh()
         if (into !== dir && done.length) notify(`${mode === 'move' ? 'Moved' : 'Copied'} ${plural(done.length, 'item')} to "${nameOf(into)}".`, 'info')
+        if (!done.length) return
+        if (mode === 'move') recordMoved(`Moved ${what(moves.map((m) => m.from))} to “${nameOf(into)}”`, moves)
+        else recordAdded(`Copied ${what(done)} to “${nameOf(into)}”`, done)
       })
       .catch((err) => {
         notify(err)
@@ -334,7 +390,7 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
     })
     if (!ok) return
     try {
-      await window.api.explorerTrash(list.map((e) => e.path))
+      await recordDeleted(await window.api.explorerTrash(list.map((e) => e.path)))
     } catch (err) {
       notify(err)
     }

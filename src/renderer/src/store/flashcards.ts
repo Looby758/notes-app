@@ -76,3 +76,8 @@ export function removeFlashcardsWithin(path: string): void {
   if (!ids.some((id) => isWithin(pathOfId(id), path))) return
   save(Object.fromEntries(Object.entries(progress).filter(([id]) => !isWithin(pathOfId(id), path))))
 }
+
+/** Brings back progress for notes that came back (undoing a delete). */
+export function putBackFlashcards(entries: Record<string, CardProgress>): void {
+  if (Object.keys(entries).length) save({ ...entries, ...useFlashcards.getState().progress })
+}

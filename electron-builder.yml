@@ -70,6 +70,8 @@ mac:
     # Asked when you import from Apple Notes (Orbit reads them from the Notes app), and when the
     # music player first controls the Spotify app.
     NSAppleEventsUsageDescription: Orbit reads your Apple Notes to import them, and controls Spotify for the music player.
+    # Asked when mouse sharing first looks for (and connects to) your other computer on the Wi-Fi.
+    NSLocalNetworkUsageDescription: Orbit finds and connects to your other computer on this network to share one mouse and keyboard, and to reach your phone.
   notarize: false
   # Used by the zip; the dmg (the one to download) gets the simpler name below.
   artifactName: Orbit-${version}-${arch}-mac.${ext}

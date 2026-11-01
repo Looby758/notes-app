@@ -12,6 +12,7 @@ import {
   Settings as SettingsIcon
 } from 'lucide-react'
 import { useVault } from '../store/vault'
+import { notify } from '../store/notify'
 import { useEditor, type SaveStatus } from '../store/editor'
 import { useNoteIndex } from '../store/noteIndex'
 import { setPrefs, usePrefs } from '../store/prefs'
@@ -33,6 +34,7 @@ import {
   setZenEditor
 } from '../lib/editorController'
 import { openLink, openWikiLink } from '../lib/openLink'
+import { watchUndoKeys } from '../lib/undo'
 import Sidebar from './Sidebar/Sidebar'
 import Dock, { TopbarFeatures } from './Nav/Dock'
 import Launcher, { LauncherButton } from './Nav/Launcher'
@@ -122,6 +124,12 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     const offFormat = startFormatMenu()
     const offDictionary = startDictionary()
     const offPhone = startPhone()
+    // Mouse sharing: the other computer started pairing (show the code), or sent a file over.
+    const offSharePair = window.api.onShareOpenSettings(() => {
+      openSpecialTab(SETTINGS_TAB)
+      useUI.setState({ settingsSection: 'computers' })
+    })
+    const offShareFile = window.api.onShareReceived(({ title }) => notify(`${title}. It’s in Downloads.`, 'info'))
     const offSnips = watchSnips()
     const offChanged = window.api.onVaultChanged((paths) => {
       useVault.getState().refresh(paths)
@@ -150,6 +158,8 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       offFormat()
       offDictionary()
       offPhone()
+      offSharePair()
+      offShareFile()
       offSnips()
       stopReminders()
     }
@@ -195,6 +205,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     setZenEditor(zen)
     remeasure()
   }, [zen])
+
+  // Ctrl+Z / Ctrl+Shift+Z for everything that isn't typing (moved files, playlists, settings…).
+  useEffect(() => watchUndoKeys(IS_MAC), [])
 
   // Every keyboard shortcut comes from the command list, so Ctrl+K shows exactly what works.
   useEffect(() => {
