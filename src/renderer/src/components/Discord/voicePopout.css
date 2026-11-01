@@ -460,6 +460,19 @@ body.voice-toast-window {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.vp-mention {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, #5865f2 22%, transparent);
+  color: color-mix(in srgb, #5865f2 55%, var(--text-strong));
+  font-weight: 500;
+}
+.vp-mention-emoji,
+.vp-mention-time {
+  background: var(--bg-raised);
+  color: var(--text);
+  font-weight: 400;
+}
 .vp-reply {
   display: inline-flex;
   align-items: center;

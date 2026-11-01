@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  chatParts,
   decodeFrames,
   discordError,
   encodeFrame,
@@ -241,5 +242,38 @@ describe('the pop-out’s place', () => {
   })
   it('puts the note in the corner', () => {
     expect(cornerOf(right.workArea, 320, 76)).toEqual({ x: 1920 + 2560 - 336, y: 1400 - 92, width: 320, height: 76 })
+  })
+})
+
+describe('mentions in the chat', () => {
+  const names: Record<string, { name: string; username: string | null }> = { '42': { name: 'Sam', username: 'sam_rblx' } }
+  const look = (id: string) => names[id] ?? null
+  it('shows @name instead of the number', () => {
+    expect(chatParts('hey <@42> and <@!42>!', look)).toEqual([
+      { text: 'hey ' },
+      { mention: '@Sam', kind: 'user', title: '@sam_rblx' },
+      { text: ' and ' },
+      { mention: '@Sam', kind: 'user', title: '@sam_rblx' },
+      { text: '!' }
+    ])
+  })
+  it('never shows the raw number for someone unknown, a role or a channel', () => {
+    const text = chatParts('<@7> <@&8> <#9> <:pog:123> <a:dance:456>', look)
+      .map((p) => ('text' in p ? p.text : p.mention))
+      .join('')
+    expect(text).toBe('@unknown user @role #channel :pog: :dance:')
+  })
+  it('reads the people a message mentions', () => {
+    const m = messageFrom({
+      id: '1',
+      content: '<@5>',
+      timestamp: '2026-11-01T10:00:00Z',
+      author: { id: '9', username: 'a' },
+      mentions: [{ id: '5', username: 'alex.k', global_name: 'Alex', member: { nick: 'Big Al' } }, { id: '6', username: 'jo' }]
+    })!
+    expect(m.mentions).toEqual({ '5': { name: 'Big Al', username: 'alex.k' }, '6': { name: 'jo', username: 'jo' } })
+  })
+  it('leaves plain text alone', () => {
+    expect(chatParts('no codes <here>', look)).toEqual([{ text: 'no codes <here>' }])
   })
 })

@@ -1,5 +1,5 @@
 import './voicePopout.css'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   Clock,
   Gamepad2,
@@ -24,7 +24,7 @@ import {
   VolumeX,
   X
 } from 'lucide-react'
-import { callClock, callLength, memberState, peopleList, type CallRecord, type ChatMessage, type VoiceMember } from '@shared/discord'
+import { callClock, callLength, chatParts, memberState, peopleList, type CallRecord, type ChatMessage, type MentionName, type VoiceMember } from '@shared/discord'
 import { ROBLOX_ID, stripGames, type Game } from '@shared/games'
 import type { SoundClip } from '@shared/soundboard'
 import { cleanError, useDiscord, watchDiscord } from '../../store/discord'
@@ -573,7 +573,16 @@ const timeOf = (at: number): string => new Date(at).toLocaleTimeString(undefined
 function Chat({ run }: { run: (f: () => Promise<unknown>) => Promise<void> }) {
   const chat = useDiscord((s) => s.chat)
   const chatState = useDiscord((s) => s.chatState)
+  const members = useDiscord((s) => s.channel?.members)
   const list = useRef<HTMLDivElement>(null)
+  // Names for @mentions a message didn't come with: anyone mentioned elsewhere in the chat, in the call, or who wrote in it.
+  const known = useMemo(() => {
+    const names = new Map<string, MentionName>()
+    for (const m of chat) if (!names.has(m.authorId)) names.set(m.authorId, { name: m.author, username: null })
+    for (const m of members ?? []) names.set(m.id, { name: m.name, username: null })
+    for (const m of chat) for (const [id, n] of Object.entries(m.mentions)) names.set(id, n)
+    return names
+  }, [chat, members])
   const stick = useRef(true)
   useEffect(() => {
     const el = list.current
@@ -601,7 +610,7 @@ function Chat({ run }: { run: (f: () => Promise<unknown>) => Promise<void> }) {
         {chatState === 'none' && <p className="vp-faint vp-pad">This call’s chat can’t be read by Orbit.</p>}
         {chatState === 'ok' && !chat.length && <p className="vp-faint vp-pad">No messages yet.</p>}
         {chat.map((m, i) => (
-          <ChatLine key={m.id} m={m} grouped={i > 0 && chat[i - 1].authorId === m.authorId && m.at - chat[i - 1].at < 5 * 60_000} />
+          <ChatLine key={m.id} m={m} known={known} grouped={i > 0 && chat[i - 1].authorId === m.authorId && m.at - chat[i - 1].at < 5 * 60_000} />
         ))}
       </div>
       <button className="btn vp-reply" onClick={() => void run(() => window.api.discordOpenChannel())} title="Discord only lets apps read the chat, so replies are typed in Discord">
@@ -611,7 +620,7 @@ function Chat({ run }: { run: (f: () => Promise<unknown>) => Promise<void> }) {
   )
 }
 
-function ChatLine({ m, grouped }: { m: ChatMessage; grouped: boolean }) {
+function ChatLine({ m, known, grouped }: { m: ChatMessage; known: Map<string, MentionName>; grouped: boolean }) {
   return (
     <div className={`vp-msg${grouped ? ' grouped' : ''}`}>
       {!grouped && <Avatar m={{ avatar: m.avatar, name: m.author, speaking: false }} />}
@@ -621,7 +630,19 @@ function ChatLine({ m, grouped }: { m: ChatMessage; grouped: boolean }) {
             <b>{m.author}</b> <span className="vp-faint">{timeOf(m.at)}</span>
           </div>
         )}
-        {m.content && <div className="vp-msg-text">{m.content}</div>}
+        {m.content && (
+          <div className="vp-msg-text">
+            {chatParts(m.content, (id) => m.mentions[id] ?? known.get(id) ?? null).map((p, i) =>
+              'text' in p ? (
+                p.text
+              ) : (
+                <span key={i} className={`vp-mention vp-mention-${p.kind}`} title={p.title}>
+                  {p.mention}
+                </span>
+              )
+            )}
+          </div>
+        )}
         {m.attachments > 0 && (
           <div className="vp-faint">
             + {m.attachments} attachment{m.attachments === 1 ? '' : 's'} (open Discord to see)

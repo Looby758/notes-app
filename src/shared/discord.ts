@@ -69,6 +69,13 @@ export interface ChatMessage {
   at: number
   /** It had a picture, a file or an embed (only the text is shown). */
   attachments: number
+  /** The people mentioned in it, by id: the name Discord shows (server nickname first) and their username. */
+  mentions: Record<string, MentionName>
+}
+
+export interface MentionName {
+  name: string
+  username: string | null
 }
 
 /** A finished call, for the call history (kept only on this computer). */
@@ -294,8 +301,67 @@ export function messageFrom(raw: unknown): ChatMessage | null {
     avatar: avatarUrl(authorId, str(author.avatar)),
     content: typeof msg.content === 'string' ? msg.content : '',
     at: Number.isFinite(at) ? at : Date.now(),
-    attachments: count(msg.attachments) + count(msg.embeds)
+    attachments: count(msg.attachments) + count(msg.embeds),
+    mentions: mentionsFrom(msg.mentions)
   }
+}
+
+/** A message's `mentions` (the users it @s) as names by id. */
+function mentionsFrom(raw: unknown): Record<string, MentionName> {
+  const out: Record<string, MentionName> = {}
+  if (!Array.isArray(raw)) return out
+  for (const u of raw) {
+    if (!isObj(u)) continue
+    const id = str(u.id)
+    if (!id) continue
+    const member = isObj(u.member) ? u.member : {}
+    const username = str(u.username)
+    out[id] = { name: str(member.nick) ?? str(u.nick) ?? str(u.global_name) ?? username ?? 'someone', username }
+  }
+  return out
+}
+
+/** A piece of a chat message: plain text, or a mention / emoji / time shown as a highlighted name. */
+export type ChatPart = { text: string } | { mention: string; kind: 'user' | 'role' | 'channel' | 'emoji' | 'time'; title?: string }
+
+/**
+ * Turns Discord's codes in a message into what Discord itself shows: <@123> and <@!123> become
+ * @name (looked up with `userName`: the message's own mentions first, then whoever else Orbit
+ * knows), <@&123> a role, <#123> a channel, <:smile:123> :smile:, and <t:1700000000:R> the time.
+ */
+export function chatParts(content: string, userName: (id: string) => MentionName | null): ChatPart[] {
+  const parts: ChatPart[] = []
+  const re = /<(@!?|@&|#)(\d+)>|<a?:(\w+):\d+>|<t:(-?\d+)(?::([tTdDfFR]))?>/g
+  let at = 0
+  for (let m = re.exec(content); m; m = re.exec(content)) {
+    if (m.index > at) parts.push({ text: content.slice(at, m.index) })
+    at = m.index + m[0].length
+    if (m[1] === '@' || m[1] === '@!') {
+      const who = userName(m[2])
+      parts.push(who ? { mention: `@${who.name}`, kind: 'user', ...(who.username ? { title: `@${who.username}` } : {}) } : { mention: '@unknown user', kind: 'user' })
+    } else if (m[1] === '@&') parts.push({ mention: '@role', kind: 'role' })
+    else if (m[1] === '#') parts.push({ mention: '#channel', kind: 'channel' })
+    else if (m[3]) parts.push({ mention: `:${m[3]}:`, kind: 'emoji' })
+    else {
+      const when = new Date(Number(m[4]) * 1000)
+      parts.push({ mention: discordTime(when, m[5] ?? 'f'), kind: 'time', title: when.toLocaleString() })
+    }
+  }
+  if (at < content.length) parts.push({ text: content.slice(at) })
+  return parts
+}
+
+/** A <t:…> timestamp in its style (R: "in 5 minutes" / "2 hours ago"). */
+function discordTime(when: Date, style: string, now = Date.now()): string {
+  if (style === 'R') {
+    const mins = Math.round((when.getTime() - now) / 60_000)
+    const abs = Math.abs(mins)
+    const n = abs < 60 ? `${abs} minute${abs === 1 ? '' : 's'}` : abs < 1440 ? `${Math.round(abs / 60)} hour${Math.round(abs / 60) === 1 ? '' : 's'}` : `${Math.round(abs / 1440)} day${Math.round(abs / 1440) === 1 ? '' : 's'}`
+    return mins >= 0 ? `in ${n}` : `${n} ago`
+  }
+  if (style === 't' || style === 'T') return when.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  if (style === 'd' || style === 'D') return when.toLocaleDateString()
+  return when.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 export const CHAT_KEEP = 60
