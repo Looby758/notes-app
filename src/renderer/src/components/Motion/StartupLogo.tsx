@@ -22,12 +22,12 @@ export default function StartupLogo() {
   return (
     <div className={`startup-logo ${phase === 'leave' ? 'leaving' : ''}`} onAnimationEnd={(e) => e.target === e.currentTarget && phase === 'leave' && setPhase('gone')} aria-hidden>
       <div className="startup-tile">
-        <div className="startup-page">
-          <i />
-          <i />
-          <i />
-          <i />
-        </div>
+        {/* The Orbit mark: a planet with a ring and a small moon (as in build/app-icons.cjs). */}
+        <svg className="startup-orbit" viewBox="64 64 384 384" width="72" height="72">
+          <circle className="so-ring" cx="256" cy="256" r="148" />
+          <circle className="so-planet" cx="256" cy="256" r="72" />
+          <circle className="so-moon" cx="361" cy="151" r="30" />
+        </svg>
       </div>
     </div>
   )

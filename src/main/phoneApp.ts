@@ -11,7 +11,7 @@ const PAGE = String.raw`<!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Notes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Orbit">
 <meta name="theme-color" content="#16161c"><title>Notes</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -394,7 +394,7 @@ function saveScan(kind) {
   setTimeout(function () {
     straighten().then(function (blob) {
       return upload(blob, (kind === 'receipt' ? 'Receipt ' : 'Scan ') + stamp() + '.jpg', kind === 'receipt' ? 'receipt' : 'note')
-    }).then(function (ok) { if (ok) { toast(kind === 'receipt' ? 'Sent. Notes is reading the receipt…' : 'Saved in Notes'); $('scanEdit').hidden = true; img = null } })
+    }).then(function (ok) { if (ok) { toast(kind === 'receipt' ? 'Sent. Orbit is reading the receipt…' : 'Saved in Orbit'); $('scanEdit').hidden = true; img = null } })
   }, 30)
 }
 $('saveScan').onclick = function () { saveScan('scan') }

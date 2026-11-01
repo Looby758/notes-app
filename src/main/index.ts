@@ -71,7 +71,7 @@ import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
 import { setupGames } from './games'
 import { setupGameCovers } from './gameCovers'
-import { applyIconOutsideApp } from './appIcon'
+import { applyIconOutsideApp, taskbarIcon } from './appIcon'
 import { broadcastThemes, loadImportedThemes, setupThemes, THEME_SCHEME, themeFilePath, themesDir } from './themes'
 import { CODE_SANDBOX_SCHEME, registerCodeSandbox } from './codeSandbox'
 import { readHandwritingOffline } from './handwriting'
@@ -130,6 +130,12 @@ function keepOnScreen(win: BrowserWindow): void {
 
 // Empty at start, so the icon is checked once each launch (an update puts the original back on shortcuts).
 let appliedIcon = ''
+/** Windows: the icon file the taskbar shows for every window (null: the one built into the app). */
+let taskbarIconFile: string | null = null
+// Windows opened later (the mini player, pop-outs) get the picked icon too.
+app.on('browser-window-created', (_e, win) => {
+  if (taskbarIconFile) safely('taskbar icon', () => taskbarIcon(win, taskbarIconFile!))
+})
 
 /**
  * The app icon you picked (Settings → Appearance): the Dock icon on a Mac; on Windows the window's
@@ -140,11 +146,16 @@ function applyAppIcon(prefs: Prefs): void {
   if (id === appliedIcon || !file) return
   appliedIcon = id
   const image = nativeImage.createFromPath(file)
-  safely('app icon outside the app', () => applyIconOutsideApp(id, file))
+  safely('app icon outside the app', () => {
+    taskbarIconFile = applyIconOutsideApp(id, file)
+  })
   if (IS_MAC) {
     app.dock?.setIcon(image)
   } else {
-    for (const win of BrowserWindow.getAllWindows()) win.setIcon(image)
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.setIcon(image)
+      if (taskbarIconFile) safely('taskbar icon', () => taskbarIcon(win, taskbarIconFile!))
+    }
     setTrayIcon(image)
   }
 }
@@ -917,7 +928,7 @@ async function offerMoveToApplications(): Promise<boolean> {
     })
   } catch (err) {
     logError('move to Applications', err)
-    dialog.showErrorBox('Couldn’t move Notes', 'Drag Notes from the disk image into your Applications folder instead, then open it from there.')
+    dialog.showErrorBox('Couldn’t move Orbit', 'Drag Orbit from the disk image into your Applications folder instead, then open it from there.')
     return false
   }
 }

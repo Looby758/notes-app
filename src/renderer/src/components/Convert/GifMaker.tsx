@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { Pause, Play, X } from 'lucide-react'
 import type { GifCaption, GifSettings } from '@shared/types'
 import { CAPTION_FONTS, DEFAULT_CAPTION, drawCaption } from '../../lib/convert'
@@ -194,7 +195,8 @@ export default function GifMaker({ file, initial, onClose, onMake }: Props) {
   const crop = gif.crop
   const cropStyle = crop && { left: crop.x * shown, top: crop.y * shown, width: crop.w * shown, height: crop.h * shown }
 
-  return (
+  // Over the whole window, not just this pane (a pane beside it in split view used to cover it).
+  return createPortal(
     <div className="modal-backdrop gif-backdrop" onMouseDown={onClose}>
       <div className="modal gif-maker" onMouseDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === 'Escape' && onClose()} data-gif-maker>
         <header className="gif-head">
@@ -376,6 +378,7 @@ export default function GifMaker({ file, initial, onClose, onMake }: Props) {
           </button>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 export type MenuItem =
   | { label: string; icon?: ReactNode; danger?: boolean; onClick: () => void }
@@ -45,7 +46,9 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
     }
   }, [onClose])
 
-  return (
+  // Drawn at the top of the page, not inside whatever was right-clicked: panes and the sidebar each
+  // keep their own layer (for theme pictures), so a menu left inside one went under the panes beside it.
+  return createPortal(
     <div ref={ref} className="menu fixed" style={{ left: pos.x, top: pos.y }} onContextMenu={(e) => e.preventDefault()}>
       {items.map((item, i) =>
         item === 'separator' ? (
@@ -63,6 +66,7 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
           </button>
         )
       )}
-    </div>
+    </div>,
+    document.body
   )
 }
