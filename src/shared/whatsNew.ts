@@ -15,7 +15,16 @@ export const RELEASE_NOTES: readonly ReleaseNotes[] = [
     version: '1.10.2',
     items: [
       'A “What’s new” pop-up like this one after each update, on every computer. Open it again any time from Settings → About.',
-      'If a settings file breaks, or was saved by an older copy of the app (like a calendar sign-in from before the rename), Orbit offers a reset button for just that part. The old file is kept as a backup.'
+      'If a settings file breaks, or was saved by an older copy of the app (like a calendar sign-in from before the rename), Orbit offers a reset button for just that part. The old file is kept as a backup.',
+      'Volume mixer: set the volume of each app from Orbit or the phone.',
+      'Countdowns: big cards counting down to a new season, game update, trip or birthday.',
+      'Quick picture editor: crop, resize, add arrows, blur and text.',
+      'Pop-out window: keep any app live in a small window that floats on top, and pop the video player out too.',
+      'Writing autocomplete: the offline AI suggests the next few words, Tab to take them.',
+      'The Files tab has several tabs and drag and drop to and from the sidebar and notes.',
+      'Ctrl+Z now undoes calendar events, bulk tag edits and money changes.',
+      'The offline AI can read full emails and find things by meaning.',
+      'Edit subscriptions that were found in your statements.'
     ]
   },
   {
