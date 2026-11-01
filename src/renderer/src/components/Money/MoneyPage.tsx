@@ -7,7 +7,6 @@ import {
   deleteCategory,
   deleteEntry,
   importEntries,
-  restoreEntry,
   setBudget,
   updateCategory,
   updateEntry,
@@ -37,6 +36,7 @@ import {
   type MoneyEntry
 } from '../../lib/money'
 import { notify } from '../../store/notify'
+import { UNDO_KEY } from '../../lib/undo'
 import { addHomeCard } from '../../lib/home'
 import { readWorkbook } from '../../lib/sheets'
 import { statementFromPdf } from '../../lib/pdfStatement'
@@ -411,7 +411,6 @@ function Entries({ month, edit }: { month: string; edit: (e: MoneyEntry) => void
   const categories = useMoney((s) => s.categories)
   const [filter, setFilter] = useState('')
   const [search, setSearch] = useState('')
-  const [deleted, setDeleted] = useState<MoneyEntry | null>(null)
   const names = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
 
   const days = useMemo(() => {
@@ -426,7 +425,10 @@ function Entries({ month, edit }: { month: string; edit: (e: MoneyEntry) => void
     return [...map]
   }, [entries, month, filter, search, names])
 
-  const remove = (id: string): void => setDeleted(deleteEntry(id) ?? null)
+  const remove = (id: string): void => {
+    const gone = deleteEntry(id)
+    if (gone) notify(`Deleted ${gone.note ? `“${gone.note}”` : 'that entry'}. ${UNDO_KEY} to undo.`, 'info')
+  }
 
   return (
     <section className="money-section">
@@ -441,20 +443,6 @@ function Entries({ month, edit }: { month: string; edit: (e: MoneyEntry) => void
         </select>
         <input className="text-input" placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
-      {deleted && (
-        <div className="money-undo">
-          Deleted {deleted.note ? `"${deleted.note}"` : 'that entry'}.
-          <button
-            className="link-button"
-            onClick={() => {
-              restoreEntry(deleted)
-              setDeleted(null)
-            }}
-          >
-            Undo
-          </button>
-        </div>
-      )}
       {days.length === 0 && <p className="money-hint">Nothing here for {monthName(month)}.</p>}
       {days.map(([day, list]) => (
         <div key={day} className="money-day">

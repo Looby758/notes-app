@@ -6,15 +6,16 @@ import {
   addToGoal,
   deleteGoal,
   deleteSubscription,
-  restoreSubscription,
   setBalance,
   setCancelled,
   setNotRecurring,
   updateGoal,
   useMoney
 } from '../../store/money'
+import { notify } from '../../store/notify'
+import { UNDO_KEY } from '../../lib/undo'
 import { askEverything, useAi } from '../../store/ai'
-import { dayOf, formatPounds, monthName, parseAmount, type ManualSubscription, type RepeatInterval, type SavingsGoal } from '../../lib/money'
+import { dayOf, formatPounds, monthName, parseAmount, type RepeatInterval, type SavingsGoal } from '../../lib/money'
 import { allRecurring, chargedAfterCancelling, forecastMonth, payeeKey, monthlyCost, weeklyToGoal, type Recurring } from '../../lib/moneyInsights'
 
 const shortDate = (key: string): string => new Date(`${key}T12:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
@@ -211,7 +212,6 @@ export default function MoneyPlans() {
   const notRecurring = useMoney((s) => s.notRecurring)
   const cancelled = useMoney((s) => s.cancelled)
   const entries = useMoney((s) => s.entries)
-  const [removed, setRemoved] = useState<ManualSubscription | null>(null)
   const subs = recurring.filter((r) => !r.income)
   const pay = recurring.filter((r) => r.income)
   const monthly = subs.reduce((n, r) => n + monthlyCost(r), 0)
@@ -259,20 +259,6 @@ export default function MoneyPlans() {
             </button>
           </div>
         ))}
-        {removed && (
-          <div className="money-undo">
-            Removed “{removed.name}”.
-            <button
-              className="link-button"
-              onClick={() => {
-                restoreSubscription(removed)
-                setRemoved(null)
-              }}
-            >
-              Undo
-            </button>
-          </div>
-        )}
         {subs.length ? (
           <>
             <div className="money-tiles">
@@ -291,7 +277,7 @@ export default function MoneyPlans() {
             </div>
             <ul className="money-recurring">
               {subs.map((r) => (
-                <RecurringRow key={r.manual ?? r.key} r={r} onRemoved={setRemoved} />
+                <RecurringRow key={r.manual ?? r.key} r={r} />
               ))}
             </ul>
           </>
@@ -349,7 +335,7 @@ export default function MoneyPlans() {
 
 const EVERY: Record<RepeatInterval, string> = { weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly' }
 
-function RecurringRow({ r, onRemoved }: { r: Recurring; onRemoved?: (sub: ManualSubscription) => void }) {
+function RecurringRow({ r }: { r: Recurring }) {
   const categories = useMoney((s) => s.categories)
   const cat = categories.find((c) => c.id === r.category)
   const days = Math.round((new Date(`${r.next}T12:00`).getTime() - new Date(`${dayOf(new Date())}T12:00`).getTime()) / 86400000)
@@ -374,7 +360,7 @@ function RecurringRow({ r, onRemoved }: { r: Recurring; onRemoved?: (sub: Manual
           title="Remove (cancelled, or added by mistake)"
           onClick={() => {
             const gone = deleteSubscription(r.manual!)
-            if (gone) onRemoved?.(gone)
+            if (gone) notify(`Removed “${gone.name}”. ${UNDO_KEY} to undo.`, 'info')
           }}
         >
           <Trash2 size={13} />
