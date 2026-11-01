@@ -69,14 +69,15 @@ import { recordUndo, undoChanged, useUndoChanges } from '../../lib/undo'
 import { explorerStartDirs, openExplorerTab, openFileTab, openNote, EXPLORER_TAB } from '../../lib/editorController'
 import { setExplorerTabDir } from '../../store/explorerTabs'
 import { fileKind } from '../../lib/fileKinds'
-import { isComicFile } from '@shared/comics'
-import { openComicFile } from '../../store/comics'
+import { isComicBookFile } from '@shared/comics'
+import { shelveComicFile } from '../../store/comics'
+import { useFilesReveal } from '../../store/filesReveal'
 import { notify } from '../../store/notify'
 import ContextMenu, { type MenuItem } from '../ContextMenu'
 import FileIcon from '../FileIcon'
 import { sendToDevice, useDropTargets } from '../Share/DeviceDrop'
 import { isVideoFile } from '@shared/videoPlayer'
-import { openVideo } from '../../store/videoPlayer'
+import { queueVideo } from '../../store/videoPlayer'
 import { archiveFolderName, isArchiveFile } from '@shared/archive'
 import ArchivePreview, { CompressDialog } from './ArchivePreview'
 
@@ -232,6 +233,22 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
 
   useEffect(() => localStorage.setItem(PINS_KEY, JSON.stringify(pins)), [pins])
 
+  // A file to show from elsewhere ("Open in Orbit" on a zip): open its folder with it picked.
+  useEffect(() => {
+    const show = (path: string | null): void => {
+      if (!path) return
+      useFilesReveal.setState({ path: null })
+      const folder = parentPath(path)
+      if (!folder) return
+      pickAfter.current = { paths: [path] }
+      setQuery('')
+      setDir(folder)
+      setReload((n) => n + 1)
+    }
+    show(useFilesReveal.getState().path)
+    return useFilesReveal.subscribe((st) => show(st.path))
+  }, [])
+
   useEffect(() => {
     if (!dir) return
     let live = true
@@ -337,16 +354,21 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
 
   const open = (entry: ExplorerEntry): void => {
     if (entry.isDir) return go(entry.path)
-    // Videos (anywhere on the computer) play in the video player.
-    if (isVideoFile(entry.name)) return openVideo(entry.path)
+    // Opening a file never kicks off something unexpected.
+    // Videos (anywhere on the computer) go in the video player's Up next, without playing.
+    if (isVideoFile(entry.name)) return queueVideo(entry.path)
     // Notes and files in the notes folder open here, in a tab of their own.
     if (entry.vaultPath && /\.md$/i.test(entry.name)) return openNote(entry.vaultPath, { newTab: true })
     if (entry.vaultPath && fileKind(entry.vaultPath) !== 'other') return openFileTab(entry.vaultPath, { newTab: true })
-    // Comics open in Orbit's comic reader (and go on its shelf).
-    if (isComicFile(entry.name)) return void openComicFile(entry.path)
-    // Zips, RARs and 7z files unpack into a folder next to them, which then opens.
-    if (isArchiveFile(entry.name)) return void extract(entry, { intoFolder: true, go: true }).catch((err) => notify(/password/i.test(String(err)) ? 'This archive has a password: type it in on the right, then Extract.' : err))
-    window.api.explorerOpen(entry.path).catch(notify)
+    // Comics go on Orbit's comic shelf (without opening the comic).
+    if (isComicBookFile(entry.name)) return void shelveComicFile(entry.path)
+    // Zips, RARs and 7z files show what's inside on the right; nothing is unpacked until you press Extract.
+    if (isArchiveFile(entry.name)) {
+      pickOnly(entry.path)
+      return notify('What’s inside is shown on the right. Press Extract there to unpack it.', 'info')
+    }
+    // Anything else asks before opening in another app.
+    window.api.explorerOpen(entry.path, true).catch(notify)
   }
 
   // ---- file actions ----

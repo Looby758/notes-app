@@ -76,6 +76,21 @@ mac:
     # Asked when mouse sharing first looks for (and connects to) your other computer on the Wi-Fi.
     NSLocalNetworkUsageDescription: Orbit finds and connects to your other computer on this network to share one mouse and keyboard, and to reach your phone.
   notarize: false
+  # Finder: right-click → Open With → Orbit for videos, comics and zips ("Alternate": Orbit never
+  # becomes what opens them on a double-click). Orbit gets them through the open-file event.
+  fileAssociations:
+    - name: Video
+      role: Viewer
+      rank: Alternate
+      ext: [mp4, m4v, mov, webm, mkv, avi, wmv, asf, flv, f4v, m2ts, mts, mpg, mpeg, vob, 3gp, 3g2, ogv, divx, rm, rmvb]
+    - name: Comic
+      role: Viewer
+      rank: Alternate
+      ext: [cbz, cbr]
+    - name: Archive
+      role: Viewer
+      rank: Alternate
+      ext: [zip, rar, 7z]
   # Used by the zip; the dmg (the one to download) gets the simpler name below.
   artifactName: Orbit-${version}-${arch}-mac.${ext}
 dmg:
