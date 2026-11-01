@@ -44,6 +44,7 @@ import { setupConverter } from './converter'
 import { isAppPage, setupStudio } from './studio'
 import { setupLocalAi } from './localAi'
 import { setupSoundboard, soundFile } from './soundboard'
+import { setupMonitors, teardownMonitors } from './monitors'
 import { setupLive } from './live'
 import { explorerFile, setupExplorer } from './explorer'
 import { hold, setupUndoBin } from './undoBin'
@@ -927,6 +928,7 @@ app.whenReady().then(async () => {
   // The extras: if one of them fails on some computer, the app itself still works.
   safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: () => void startSnip() }))
   safely('screen snip', () => setupSnip({ getMain: () => mainWindow, showMain }))
+  safely('screen controls', setupMonitors)
   // A password copied from the vault isn't passed to the other computer.
   safely('mouse sharing', () => setupMouseShare(() => mainWindow, (text) => text === copiedSecret))
   safely('system settings', () => applySystemPrefs(currentPrefs()))
@@ -956,6 +958,7 @@ app.on('before-quit', () => {
 app.on('will-quit', () => {
   teardownCapture()
   safely('mouse sharing', teardownMouseShare)
+  safely('screen controls', teardownMonitors)
   clearSecret()
 })
 
