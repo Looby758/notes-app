@@ -70,6 +70,8 @@ export const MONEY_TAB = 'money:'
 export const CONVERT_TAB = 'convert:'
 export const SUDOKU_TAB = 'sudoku:'
 export const COMICS_TAB = 'comics:'
+/** Downloaded wikis, read offline (components/Wiki). */
+export const WIKI_TAB = 'wiki:'
 export const MINESWEEPER_TAB = 'minesweeper:'
 /** Clocks for places around the world (components/Clocks). */
 export const CLOCKS_TAB = 'clocks:'

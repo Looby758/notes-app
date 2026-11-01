@@ -27,6 +27,7 @@ import {
   CONVERT_TAB,
   SUDOKU_TAB,
   COMICS_TAB,
+  WIKI_TAB,
   MINESWEEPER_TAB,
   CLOCKS_TAB,
   COUNTDOWNS_TAB,
@@ -69,6 +70,7 @@ import ConvertPage from '../Convert/ConvertPage'
 import VideoDownloaderPage from '../Downloader/VideoDownloaderPage'
 import SudokuPage from '../Sudoku/SudokuPage'
 import ComicsPage from '../Comics/ComicsPage'
+import WikiPage from '../Wiki/WikiPage'
 import WorldClocksPage from '../Clocks/WorldClocksPage'
 import CountdownsPage from '../Countdowns/CountdownsPage'
 import ScreensPage from '../Screens/ScreensPage'
@@ -206,6 +208,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === CONVERT_TAB && <ConvertPage />}
         {active === SUDOKU_TAB && <SudokuPage />}
         {active === COMICS_TAB && <ComicsPage />}
+        {active === WIKI_TAB && <WikiPage />}
         {active === MINESWEEPER_TAB && <MinesweeperPage />}
         {active === CLOCKS_TAB && <WorldClocksPage />}
         {active === COUNTDOWNS_TAB && <CountdownsPage />}

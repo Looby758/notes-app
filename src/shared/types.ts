@@ -1,6 +1,7 @@
 import type { ExplorerEntry, ExplorerPlace, PasteMode } from './explorer'
 import type { ArchiveEntry } from './archive'
 import type { ComicOpened, ComicPreparing, ComicSettings, ComicShelf } from './comics'
+import type { WikiAnswer, WikiCheck, WikiHit, WikiInfo, WikiPageView, WikiPictureChoice } from './wiki'
 import type { Prefs } from './prefs'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
@@ -1156,6 +1157,24 @@ export interface NotesApi {
   comicsReadText(png: Uint8Array): Promise<string>
   onComicsChanged(callback: () => void): () => void
   onComicsPreparing(callback: (p: ComicPreparing) => void): () => void
+  // Wikis (downloaded Fandom wikis, read offline)
+  wikiList(): Promise<WikiInfo[]>
+  /** Looks a wiki up before downloading it: its name, size, licence and biggest categories. */
+  wikiCheck(address: string): Promise<WikiCheck>
+  /** Starts downloading a wiki (or carries on with one already there). */
+  wikiAdd(address: string, pictures: WikiPictureChoice): Promise<WikiInfo>
+  wikiPause(id: string): Promise<WikiInfo>
+  wikiResume(id: string): Promise<WikiInfo>
+  /** Deletes a downloaded wiki from this computer. */
+  wikiRemove(id: string): Promise<WikiInfo[]>
+  /** Titles of the downloaded pages. */
+  wikiTitles(id: string): Promise<string[]>
+  /** A downloaded page (null when it isn't downloaded). */
+  wikiPage(id: string, title: string): Promise<WikiPageView | null>
+  wikiSearch(id: string, query: string): Promise<WikiHit[]>
+  /** The wiki brain: the offline AI answers from these wikis only (all of them when empty). */
+  wikiAsk(question: string, ids: string[]): Promise<WikiAnswer>
+  onWikiChanged(callback: (wikis: WikiInfo[]) => void): () => void
   /** Copies files/folders from the computer into a notes folder ('' is the top); ones already in the notes folder are moved. Returns their notes-folder paths. */
   explorerToVault(paths: string[], folder: string): Promise<string[]>
   /** Starts dragging files out as real files (into Discord, a browser, File Explorer / Finder, or back into Orbit). Call it from dragstart, after preventDefault. */

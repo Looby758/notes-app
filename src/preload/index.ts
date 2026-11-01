@@ -217,6 +217,21 @@ const api: NotesApi = {
     ipcRenderer.on('comics:preparing', handler)
     return () => ipcRenderer.removeListener('comics:preparing', handler)
   },
+  wikiList: () => ipcRenderer.invoke('wiki:list'),
+  wikiCheck: (address) => ipcRenderer.invoke('wiki:check', address),
+  wikiAdd: (address, pictures) => ipcRenderer.invoke('wiki:add', address, pictures),
+  wikiPause: (id) => ipcRenderer.invoke('wiki:pause', id),
+  wikiResume: (id) => ipcRenderer.invoke('wiki:resume', id),
+  wikiRemove: (id) => ipcRenderer.invoke('wiki:remove', id),
+  wikiTitles: (id) => ipcRenderer.invoke('wiki:titles', id),
+  wikiPage: (id, title) => ipcRenderer.invoke('wiki:page', id, title),
+  wikiSearch: (id, query) => ipcRenderer.invoke('wiki:search', id, query),
+  wikiAsk: (question, ids) => ipcRenderer.invoke('wiki:ask', question, ids),
+  onWikiChanged: (callback) => {
+    const handler = (_e: unknown, wikis: Parameters<typeof callback>[0]): void => callback(wikis)
+    ipcRenderer.on('wiki:changed', handler)
+    return () => ipcRenderer.removeListener('wiki:changed', handler)
+  },
   pathForFile: (file) => {
     try {
       return webUtils.getPathForFile(file)

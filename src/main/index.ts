@@ -62,6 +62,7 @@ import { hold, setupUndoBin } from './undoBin'
 import { setupVideoPlayer, videoResponse } from './videoPlayer'
 import { releaseFiles, serveFile } from './fileLocks'
 import { comicResponse, setupComics, shareProgress as shareComicProgress } from './comics'
+import { setupWiki, wikiImageResponse } from './wiki'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
@@ -389,6 +390,8 @@ function registerVaultProtocol(): void {
       if (url.host === 'video' || url.host === 'videostream') return await videoResponse(url, request)
       // Comic pages (vault://comic/<id>/<page>) and covers (vault://comiccover/<id>), from the comic shelf.
       if (url.host === 'comic' || url.host === 'comiccover') return await comicResponse(url)
+      // Pictures from downloaded wikis (vault://wiki/<wiki>/<file>).
+      if (url.host === 'wiki') return await wikiImageResponse(url)
       // Soundboard clips (vault://sound/<file>), from Orbit's own soundboard folder.
       if (url.host === 'sound') {
         const full = soundFile(decodeURIComponent(url.pathname.slice(1)))
@@ -1038,6 +1041,7 @@ app.whenReady().then(async () => {
   safely('video player', () => setupVideoPlayer(() => vault?.root ?? null))
   safely('video window', () => setupVideoWindow(() => mainWindow))
   safely('comic reader', () => setupComics(() => vault))
+  safely('wikis', () => setupWiki())
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))
   safely('Orbit sync', () => setupOrbitSync({ root: () => vault?.root ?? null, enabled: () => currentPrefs().syncOrbit, window: () => mainWindow, parts: orbitParts(themesChanged) }))
