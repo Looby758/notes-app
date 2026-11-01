@@ -6,10 +6,11 @@ import { isComicBookFile } from '@shared/comics'
 import { shelveComicFile } from '../store/comics'
 import { isArchiveFile } from '@shared/archive'
 import { showInFiles } from '../store/filesReveal'
+import { isTextFile } from '@shared/textFiles'
 
 /** What kind of file something in the notes folder is, and how Notes opens it. */
 
-export type FileKind = 'image' | 'audio' | 'video' | 'pdf' | 'sheet' | 'board' | 'other'
+export type FileKind = 'image' | 'audio' | 'video' | 'pdf' | 'sheet' | 'board' | 'text' | 'other'
 
 export function fileKind(path: string): FileKind {
   const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
@@ -23,6 +24,8 @@ export function fileKind(path: string): FileKind {
   if (['xlsx', 'xlsm', 'csv', 'tsv', 'gsheet'].includes(ext)) return 'sheet'
   // Canvas boards made here (or in Obsidian).
   if (ext === 'canvas') return 'board'
+  // .txt, .json, config files and code open in a plain text editor.
+  if (isTextFile(path)) return 'text'
   return 'other'
 }
 
@@ -31,7 +34,7 @@ export const vaultUrl = (path: string): string => `vault://local/${path.split('/
 
 /**
  * What clicking a file in the notes folder does. It never kicks off something unexpected:
- * pictures, recordings, PDFs, spreadsheets and boards open in a tab (paused); videos go in the
+ * pictures, recordings, PDFs, spreadsheets, boards and text files (.txt, .json…) open in a tab (paused); videos go in the
  * video player's Up next (nothing starts playing); comics go on the comic shelf (unopened); zips
  * show what's inside in the Files tab;
  * anything else only opens in another app after Orbit asks.

@@ -2,6 +2,7 @@ import { constants as fsConstants, promises as fs } from 'fs'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'path'
 import type { FileNode } from '@shared/types'
 import { releaseFiles } from './fileLocks'
+import { isTextFile, looksLikeText, MAX_TEXT_FILE_BYTES } from '@shared/textFiles'
 
 /** Hidden folders (.git, .obsidian, .trash…) and node_modules never show in the tree. */
 export function isIgnoredName(name: string): boolean {
@@ -121,10 +122,21 @@ export class Vault {
     return fs.readFile(this.abs(rel), 'utf8')
   }
 
-  /** Atomic save: write a hidden temp file next to the note, then swap it in. */
+  /** A .txt, .json or other plain text file's contents, for editing in a tab. Refuses big or binary files. */
+  async readTextFile(rel: string): Promise<string> {
+    const full = this.abs(rel)
+    if (!isTextFile(full)) throw new Error('That isn’t a text file Orbit can edit.')
+    const { size } = await fs.stat(full)
+    if (size > MAX_TEXT_FILE_BYTES) throw new Error('This file is too big to edit here. Open it in its usual app instead.')
+    const bytes = await fs.readFile(full)
+    if (!looksLikeText(bytes)) throw new Error('This file doesn’t look like text. Open it in its usual app instead.')
+    return bytes.toString('utf8')
+  }
+
+  /** Atomic save (of a note, board or text file): write a hidden temp file next to it, then swap it in. */
   async write(rel: string, content: string): Promise<void> {
     const full = this.abs(rel)
-    if (!isMarkdown(full) && !isBoard(full)) throw new Error('Only .md notes and .canvas boards can be saved.')
+    if (!isMarkdown(full) && !isBoard(full) && !isTextFile(full)) throw new Error('Only notes, boards and text files can be saved.')
     const tmp = join(dirname(full), `.${basename(full)}.${tempSuffix()}.tmp`)
     await fs.writeFile(tmp, content, 'utf8')
     try {

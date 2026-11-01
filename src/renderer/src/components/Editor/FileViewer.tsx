@@ -8,6 +8,7 @@ import { FILE_MANAGER } from '@shared/platform'
 import { loadSketch, useSketchVersions } from '../../lib/sketch'
 import { useUI } from '../../store/ui'
 import SheetView from './SheetView'
+import TextFileEditor from './TextFileEditor'
 import { openVaultVideo } from '../../store/videoPlayer'
 import { releaseOnUnmount } from '../../lib/media'
 
@@ -40,7 +41,7 @@ function useIsSketch(path: string): boolean {
   return isSketch
 }
 
-/** A picture, recording, video, PDF or spreadsheet from the notes folder, in its own tab. */
+/** A picture, recording, video, PDF, spreadsheet or text file (.txt, .json…) from the notes folder, in its own tab. */
 export default function FileViewer({ path }: { path: string }) {
   const kind = fileKind(path)
   // Bumped when a sketch is saved, so the new drawing shows instead of the old one.
@@ -99,6 +100,8 @@ export default function FileViewer({ path }: { path: string }) {
           <audio ref={releaseOnUnmount} src={url} controls onError={() => setFailed(true)} />
         ) : kind === 'sheet' ? (
           <SheetView path={path} url={url} name={name} />
+        ) : kind === 'text' ? (
+          <TextFileEditor path={path} />
         ) : kind === 'video' ? (
           <video ref={releaseOnUnmount} src={url} controls onError={() => setFailed(true)} />
         ) : (

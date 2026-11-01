@@ -242,6 +242,7 @@ Orbit never makes notes for you: you choose what goes where. Where you're up to 
 - **Text snippets** — save bits of text in Settings → Editor; type `;name` and a space to insert one (`{{date}}` and friends work in them).
 - **Smart paste** — a pasted web address becomes a link with the page's title (or links the selected text); a table copied from Excel or a web page becomes a markdown table. Ctrl+Shift+V pastes plain text.
 - **All your files** — pictures, recordings, videos and PDFs show in the file list and open in a tab; other files open in their usual app. Drag one into a note to show it there. Renaming or moving them keeps your notes' links working.
+- **Text files** — .txt, .json, .yaml, .ini and other config files, code and other plain text files open in a tab where you can edit them, with line numbers and colours for the language. Changes save as you type (Ctrl+S saves straight away), and Windows line endings are kept. JSON files show whether they're valid and have a *Format* button to lay them out neatly.
 - **A font per note** — add a *Font* property: serif, sans, mono, handwriting or any installed font.
 - **Saved searches** — click the bookmark in the search box to keep a search in the file list.
 - **Sync copies** — when Google Drive keeps two versions of a note (*Plan (1)*), Notes points it out and lets you compare them, combine them or keep one.
