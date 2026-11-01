@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react'
 import type { Prefs } from '@shared/prefs'
 import {
+  Ear,
   ArrowRightLeft,
   AudioLines,
   Clapperboard,
@@ -45,6 +46,7 @@ import { setPrefs, usePrefs } from '../store/prefs'
 import { showSearch, toggleZen, useUI } from '../store/ui'
 import { toggleStreamerMode } from '../store/streamer'
 import { toggleMusic, useMusic } from '../store/music'
+import { showAndFindSong, useSongId } from '../store/songId'
 import { sendToPhone, usePhone } from '../store/phone'
 import { openAsk } from '../store/ai'
 import { openToday } from './daily'
@@ -123,6 +125,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   chat: { icon: MessageSquare, run: () => openSpecialTab(CHAT_TAB) },
   ask: { icon: Sparkles, run: () => openAsk() },
   music: { icon: Music, run: toggleMusic, useActive: () => useMusic((s) => s.open) },
+  songid: { icon: Ear, run: showAndFindSong, useActive: () => useSongId((s) => s.phase === 'listening' || s.phase === 'thinking') },
   video: { icon: Film, run: () => openSpecialTab(VIDEO_TAB) },
   comics: { icon: LibraryBig, run: () => openSpecialTab(COMICS_TAB) },
   youtube: { icon: MonitorPlay, run: () => void window.api.openYouTube() },

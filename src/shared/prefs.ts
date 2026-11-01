@@ -164,6 +164,8 @@ export interface Prefs {
   captureTimestamp: boolean
   /** System-wide shortcut for a screen snip (grab text from anywhere on screen); '' for none. */
   snipShortcut: string
+  /** System-wide shortcut for "What's this song?" (listen to what's playing and find it); '' for none. */
+  songIdShortcut: string
   /** Closing the window keeps Notes running in the tray (so quick capture still works). */
   closeToTray: boolean
   launchAtStartup: boolean
@@ -283,6 +285,7 @@ export const DEFAULT_PREFS: Prefs = {
   captureTimestamp: true,
   captureRememberTarget: false,
   snipShortcut: IS_MAC ? 'Control+Alt+S' : 'Alt+Shift+S',
+  songIdShortcut: IS_MAC ? 'Control+Alt+W' : 'Alt+Shift+W',
   closeToTray: true,
   launchAtStartup: false,
 
@@ -330,11 +333,15 @@ const CHOICES = {
   captureShortcut: IS_MAC
     ? ['Control+Alt+Space', 'Alt+Space', 'Control+Shift+Space', 'Super+Alt+N', '']
     : ['Super+Shift+N', 'Control+Alt+Space', 'Control+Shift+Space', 'Alt+Shift+N', ''],
-  snipShortcut: IS_MAC ? ['Control+Alt+S', 'Control+Shift+S', 'Alt+Shift+S', ''] : ['Alt+Shift+S', 'Control+Alt+S', 'Super+Shift+T', '']
+  snipShortcut: IS_MAC ? ['Control+Alt+S', 'Control+Shift+S', 'Alt+Shift+S', ''] : ['Alt+Shift+S', 'Control+Alt+S', 'Super+Shift+T', ''],
+  songIdShortcut: IS_MAC ? ['Control+Alt+W', 'Control+Shift+W', 'Alt+Shift+W', ''] : ['Alt+Shift+W', 'Control+Alt+W', 'Super+Shift+W', '']
 } as const
 
 /** Shortcuts offered for screen snip (system-wide). */
 export const SNIP_SHORTCUTS = CHOICES.snipShortcut
+
+/** Shortcuts offered for "What's this song?" (system-wide). */
+export const SONG_ID_SHORTCUTS = CHOICES.songIdShortcut
 
 /** Shortcuts offered for quick capture (system-wide, so they're picked from a safe list). */
 export const CAPTURE_SHORTCUTS = CHOICES.captureShortcut

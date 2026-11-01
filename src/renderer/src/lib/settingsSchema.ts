@@ -1,5 +1,5 @@
 import type { Prefs } from '@shared/prefs'
-import { CAPTURE_SHORTCUTS, RANGES, SNIP_SHORTCUTS } from '@shared/prefs'
+import { CAPTURE_SHORTCUTS, RANGES, SNIP_SHORTCUTS, SONG_ID_SHORTCUTS } from '@shared/prefs'
 import { acceleratorLabel, IS_MAC, showKeys, TRAY_NAME } from '@shared/platform'
 import { formatDate } from './dates'
 
@@ -560,6 +560,16 @@ export const SETTINGS: SettingDef[] = [
     label: 'Show a pop-up when the song changes',
     description: 'The song’s name, artist and picture appear in the corner for a few seconds when the next one starts.',
     keywords: 'music song now playing popup notification toast spotify'
+  },
+  {
+    key: 'songIdShortcut',
+    section: 'music',
+    group: 'What’s this song?',
+    type: 'choice',
+    options: SONG_ID_SHORTCUTS.map((value) => ({ value, label: value ? acceleratorLabel(value) : 'Off' })),
+    label: 'Shortcut',
+    description: 'Works in any app, even a full-screen game: Orbit listens for 10 seconds and tells you the song, then you can add it to a playlist from the music player. Also Ctrl+K → “What’s this song?”.',
+    keywords: 'whats this song identify recognise recognize shazam music hotkey game stream video'
   },
   {
     key: 'musicVisualiser',

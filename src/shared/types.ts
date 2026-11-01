@@ -9,6 +9,7 @@ import type { LocalLibrary } from './localMusic'
 import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
 import type { WifiNetwork } from './wifi'
 import type { MusicAction, MusicDevice, MusicItem, MusicQueue, MusicSearchResults, MusicState, MusicStatus } from './spotify'
+import type { FoundSong, SongIdStatus } from './songId'
 import type { CoversStatus, GamesList, LaunchArt } from './games'
 import type { VideoInfo } from './videoPlayer'
 import type { Theme } from './themes'
@@ -745,6 +746,14 @@ export interface NotesApi {
   musicMoveInPlaylist(uri: string, from: number, to: number): Promise<void>
   /** Opens the Spotify app, or (Mac) where you let Notes control it in System Settings. */
   musicOpen(what: 'app' | 'automation'): Promise<void>
+  // What's this song? (src/main/songId.ts)
+  songIdStatus(): Promise<SongIdStatus>
+  /** Saves your AudD key encrypted ('' removes it). */
+  songIdSetKey(key: string): Promise<SongIdStatus>
+  /** Sends a mono WAV clip to AudD; null when it didn't recognise a song. */
+  songIdIdentify(clip: Uint8Array): Promise<FoundSong | null>
+  /** The system-wide "What's this song?" shortcut was pressed. */
+  onSongIdListen(callback: () => void): () => void
   aiStatus(): Promise<AiStatus>
   /** Checks the key with Anthropic, then stores it encrypted. */
   aiSetKey(key: string): Promise<AiStatus>
