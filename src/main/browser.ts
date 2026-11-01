@@ -1,5 +1,5 @@
 import { join } from 'path'
-import { app, clipboard, ipcMain, Menu, powerMonitor, session, shell, webContents, type MenuItemConstructorOptions, type WebContents } from 'electron'
+import { app, BrowserWindow, clipboard, ipcMain, Menu, powerMonitor, session, shell, webContents, type MenuItemConstructorOptions, type WebContents } from 'electron'
 import { firefoxUserAgent, isGoogleSignIn, isWebUrl, plainUserAgent, searchUrl, WEB_PARTITION } from '@shared/web'
 import { isMessagesUrl, MESSAGES_PARTITION } from '@shared/messages'
 import { shortcutFromEvent } from '@shared/shortcuts'
@@ -60,8 +60,10 @@ export function setupBrowser(quiet: () => boolean = () => false): void {
   web.setUserAgent(plainUserAgent(web.getUserAgent()))
   web.setPermissionRequestHandler((_wc, permission, callback) => callback(WEB_PERMISSIONS.has(permission)))
   web.setPermissionCheckHandler((_wc, permission) => WEB_PERMISSIONS.has(permission))
-  // Google's sign-in pages hear "Firefox", without the Chrome-only hints that would give it away.
-  web.webRequest.onBeforeSendHeaders({ urls: ['https://accounts.google.com/*'] }, (details, callback) => {
+  // Google's sign-in pages (every one the sign-in passes through, see isGoogleSignIn) hear
+  // "Firefox", without the Chrome-only hints that would give it away.
+  web.webRequest.onBeforeSendHeaders({ urls: ['https://*/*'] }, (details, callback) => {
+    if (!isGoogleSignIn(details.url)) return callback({})
     const headers = Object.fromEntries(Object.entries(details.requestHeaders).filter(([name]) => !/^sec-ch-ua/i.test(name)))
     callback({ requestHeaders: { ...headers, 'User-Agent': SIGN_IN_AGENT } })
   })
@@ -154,6 +156,14 @@ export function guardPage(page: WebContents, host: () => WebContents | null): vo
           height: 720,
           autoHideMenuBar: true,
           webPreferences: { partition: inHub() ? MESSAGES_PARTITION : WEB_PARTITION, sandbox: true, contextIsolation: true, nodeIntegration: false }
+        },
+        // The pop-up is made here so it has the right browser name before its first page loads: a
+        // Google sign-in pop-up that opened as "Chrome" and then became "Firefox" sends you back to
+        // "Choose an account" each time you pick one.
+        createWindow: (options) => {
+          const popup = new BrowserWindow(options)
+          if (isGoogleSignIn(url)) popup.webContents.setUserAgent(SIGN_IN_AGENT)
+          return popup.webContents
         }
       }
     }

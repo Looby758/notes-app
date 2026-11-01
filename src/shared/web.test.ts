@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { displayUrl, firefoxUserAgent, isGoogleSignIn, isWebUrl, plainUserAgent, toWebUrl } from './web'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { displayUrl, firefoxOnGoogleSignIn, firefoxUserAgent, isGoogleSignIn, isWebUrl, plainUserAgent, toWebUrl } from './web'
 
 describe('toWebUrl', () => {
   it('opens addresses', () => {
@@ -56,9 +56,53 @@ describe('Google sign-in', () => {
     expect(isGoogleSignIn('not a url')).toBe(false)
   })
 
+  it('spots the other pages a Google sign-in passes through', () => {
+    expect(isGoogleSignIn('https://accounts.youtube.com/accounts/SetSID?ssdc=1')).toBe(true)
+    expect(isGoogleSignIn('https://www.google.com/accounts/SetSID')).toBe(true)
+    expect(isGoogleSignIn('https://accounts.google.co.uk/accounts/SetSID')).toBe(true)
+    expect(isGoogleSignIn('https://accounts.google.de/')).toBe(true)
+    expect(isGoogleSignIn('https://www.google.com/maps')).toBe(false)
+    expect(isGoogleSignIn('https://www.youtube.com/watch?v=x')).toBe(false)
+    expect(isGoogleSignIn('http://accounts.google.com/')).toBe(false)
+    expect(isGoogleSignIn('https://accounts.google.evil.example/')).toBe(false)
+  })
+
   it('names Firefox for each system', () => {
     expect(firefoxUserAgent('win32')).toBe('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0')
     expect(firefoxUserAgent('darwin')).toContain('Macintosh')
     expect(firefoxUserAgent('linux')).toContain('Linux')
+  })
+})
+
+describe('firefoxOnGoogleSignIn', () => {
+  const agent = firefoxUserAgent('win32')
+  class FakeNavigator {
+    get userAgent(): string {
+      return 'Chrome'
+    }
+    get userAgentData(): unknown {
+      return { brands: [] }
+    }
+  }
+  const run = (href: string): FakeNavigator => {
+    const { protocol, hostname, pathname } = new URL(href)
+    vi.stubGlobal('location', { protocol, hostname, pathname })
+    vi.stubGlobal('Navigator', class extends FakeNavigator {})
+    const Nav = (globalThis as unknown as { Navigator: new () => FakeNavigator }).Navigator
+    firefoxOnGoogleSignIn(agent)
+    return new Nav()
+  }
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('shows Google sign-in pages the same Firefox the request said', () => {
+    const nav = run('https://accounts.google.com/v3/signin/accountchooser')
+    expect(nav.userAgent).toBe(agent)
+    expect(nav.userAgentData).toBeUndefined()
+    expect(run('https://accounts.youtube.com/accounts/SetSID').userAgent).toBe(agent)
+  })
+
+  it('leaves every other page alone', () => {
+    expect(run('https://grok.com/').userAgent).toBe('Chrome')
+    expect(run('https://www.google.com/search?q=x').userAgent).toBe('Chrome')
   })
 })
