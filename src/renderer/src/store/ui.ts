@@ -29,6 +29,8 @@ interface UIState {
   voiceOpen: boolean
   /** The sketch pad is open: a new sketch (path null) or editing a saved one. A new sketch goes into the note at the cursor, or to `onSaved` (a board) if given. */
   sketch: { path: string | null; onSaved?: (path: string) => void } | null
+  /** The quick picture editor is open on a picture in the notes folder. */
+  picEdit: { path: string } | null
   /** Graph tab: how many steps out the neighbourhood reaches, and whether unlinked notes show. */
   graphDepth: 1 | 2
   graphOrphans: boolean
@@ -83,6 +85,7 @@ export const useUI = create<UIState>(() => ({
   zen: false,
   voiceOpen: false,
   sketch: null,
+  picEdit: null,
   graphDepth: saved.graphDepth === 1 ? 1 : 2,
   graphOrphans: saved.graphOrphans ?? true,
   mindMaps: [],

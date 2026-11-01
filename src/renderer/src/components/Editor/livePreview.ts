@@ -83,17 +83,22 @@ class HrWidget extends WidgetType {
   }
 }
 
+/** Pictures the picture editor can open (the ones Orbit can read the bytes of). */
+const EDITABLE_IMAGE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i
+
 class ImageWidget extends WidgetType {
   constructor(
     readonly src: string,
     readonly alt: string,
-    /** The picture's path in the notes folder, if it's a sketch drawn in Notes (offers Edit). */
-    readonly sketch: string | null = null
+    /** The picture's path in the notes folder (offers Edit); null for pictures on the web. */
+    readonly file: string | null = null,
+    /** It's a sketch drawn in Notes, so Edit opens the sketch pad instead of the picture editor. */
+    readonly sketch = false
   ) {
     super()
   }
   eq(other: ImageWidget): boolean {
-    return other.src === this.src && other.alt === this.alt && other.sketch === this.sketch
+    return other.src === this.src && other.alt === this.alt && other.file === this.file && other.sketch === this.sketch
   }
   toDOM(): HTMLElement {
     const img = document.createElement('img')
@@ -107,18 +112,20 @@ class ImageWidget extends WidgetType {
       missing.textContent = `Image not found: ${this.alt || this.src}`
       ;(wrap ?? img).replaceWith(missing)
     }
-    if (!this.sketch) return img
+    const file = this.file
+    if (!file || !EDITABLE_IMAGE.test(file)) return img
     const sketch = this.sketch
     wrap = document.createElement('span')
-    wrap.className = 'cm-sketch'
+    wrap.className = sketch ? 'cm-sketch' : 'cm-picture'
     const edit = document.createElement('button')
     edit.className = 'cm-sketch-edit'
-    edit.textContent = '✏️ Edit sketch'
-    edit.title = 'Draw more on this sketch'
+    edit.textContent = sketch ? '✏️ Edit sketch' : '✏️ Edit'
+    edit.title = sketch ? 'Draw more on this sketch' : 'Crop, resize, add arrows, blur or text'
     edit.addEventListener('mousedown', (e) => {
       e.preventDefault()
       e.stopPropagation()
-      useUI.setState({ sketch: { path: sketch } })
+      if (sketch) useUI.setState({ sketch: { path: file } })
+      else useUI.setState({ picEdit: { path: file } })
     })
     wrap.append(img, edit)
     return wrap
@@ -430,7 +437,7 @@ function buildInline(view: EditorView): DecorationSet {
                 const file = imagePath(raw, path)
                 const widget = AUDIO_EXT.test(raw)
                   ? new AudioWidget(src, alt)
-                  : new ImageWidget(src, alt, file && looksLikeSketch(file) ? file : null)
+                  : new ImageWidget(src, alt, file, !!file && looksLikeSketch(file))
                 out.push(Decoration.replace({ widget }).range(node.from, node.to))
                 return false
               }
