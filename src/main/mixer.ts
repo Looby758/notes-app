@@ -120,7 +120,8 @@ public static class OrbitMixer {
   static Dictionary<uint, Info> infos = new Dictionary<uint, Info>();
   /** Problems go to Orbit's log once each (the mixer looks twice a second). */
   static HashSet<string> told = new HashSet<string>();
-  static void Tell(string what, Exception e) { string m = what + ": " + e.GetType().Name + " " + e.Message; if (told.Count < 50 && told.Add(m)) { Console.Error.WriteLine(m); Console.Error.Flush(); } }
+  static void Note(string m) { if (told.Count < 50 && told.Add(m)) { Console.Error.WriteLine(m); Console.Error.Flush(); } }
+  static void Tell(string what, Exception e) { Note(what + ": " + e.GetType().Name + " " + e.Message); }
   static string Esc(string s) { var b = new StringBuilder(); foreach (char c in s ?? "") { if (c == '"' || c == '\\') b.Append('\\').Append(c); else if (c < ' ') b.Append(' '); else b.Append(c); } return b.ToString(); }
   static string Num(float f) { return (float.IsNaN(f) ? 0 : f).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture); }
   static IOrbitDeviceEnumerator Enumerator() { return (IOrbitDeviceEnumerator)new OrbitMMDeviceEnumerator(); }
@@ -163,20 +164,25 @@ public static class OrbitMixer {
     var m = Activate<IOrbitSessionManager2>(d, IID_Manager);
     IOrbitSessionEnumerator e; int n;
     if (m == null || m.GetSessionEnumerator(out e) != 0 || e.GetCount(out n) != 0) return list;
+    int found = 0;
     for (int i = 0; i < n; i++) {
       IOrbitSessionControl s; int state;
+      var one = new Session();
       try {
         if (e.GetSession(i, out s) != 0 || s == null) continue;
         if (s.GetState(out state) == 0 && state == 2) continue;
-        var one = new Session { control = s };
-        // The session control is also the app's ISimpleAudioVolume: the same one Windows' Volume mixer sets.
-        one.volume = (IOrbitSimpleVolume)s;
+        one.control = s;
         var s2 = s as IOrbitSessionControl2;
         if (s2 != null) { s2.GetProcessId(out one.pid); one.sys = s2.IsSystemSoundsSession() == 0; }
         if (!one.sys && one.pid == 0) continue;
+        found++;
+        // The session control is also the app's ISimpleAudioVolume: the same one Windows' Volume mixer sets.
+        one.volume = (IOrbitSimpleVolume)s;
         list.Add(one);
-      } catch (Exception x) { Tell("session", x); }
+      } catch (Exception x) { Tell("session " + (one.sys ? "system sounds" : one.pid + " " + About(one.pid).proc), x); }
     }
+    // Logged when it changes: how many sessions each device has, and how many gave their volume.
+    Note("device \"" + Name(d) + "\": " + found + " sessions, " + list.Count + " with a volume, thread " + Thread.CurrentThread.GetApartmentState());
     return list;
   }
   static IOrbitDevice Default() { IOrbitDevice d; return Enumerator().GetDefaultAudioEndpoint(0, 1, out d) == 0 ? d : null; }
