@@ -16,7 +16,7 @@ import { logError } from './log'
 
 const WIN_HELPER = String.raw`
 $src = @'
-using System; using System.Text; using System.Collections.Generic; using System.Diagnostics; using System.Runtime.InteropServices;
+using System; using System.Text; using System.Collections.Generic; using System.Diagnostics; using System.Runtime.InteropServices; using System.Threading;
 [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")] class OrbitMMDeviceEnumerator {}
 [ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 interface IOrbitDeviceEnumerator {
@@ -180,7 +180,24 @@ public static class OrbitMixer {
     return list;
   }
   static IOrbitDevice Default() { IOrbitDevice d; return Enumerator().GetDefaultAudioEndpoint(0, 1, out d) == 0 ? d : null; }
-  public static string List() {
+  /**
+   * Windows PowerShell runs scripts on an STA thread, where Core Audio's objects come through a COM
+   * proxy that won't hand out ISimpleAudioVolume (E_NOINTERFACE). On an MTA thread the session is
+   * the object itself, and casting it to ISimpleAudioVolume works.
+   */
+  static T OnMta<T>(Func<T> work) {
+    if (Thread.CurrentThread.GetApartmentState() == ApartmentState.MTA) return work();
+    T result = default(T); Exception failed = null;
+    var t = new Thread(() => { try { result = work(); } catch (Exception x) { failed = x; } });
+    t.SetApartmentState(ApartmentState.MTA);
+    t.IsBackground = true;
+    t.Start();
+    t.Join();
+    if (failed != null) throw failed;
+    return result;
+  }
+  public static string List() { return OnMta<string>(ListNow); }
+  static string ListNow() {
     var b = new StringBuilder("{\"ok\":true,\"master\":");
     var def = Default();
     var ev = def == null ? null : Activate<IOrbitEndpointVolume>(def, IID_Endpoint);
@@ -214,7 +231,8 @@ public static class OrbitMixer {
     return b.Append("]}").ToString();
   }
   /** targets: 'master', 'sys' or process ids, comma separated. vol is 0..1, or -1 to leave it; mute is 0, 1, or -1 to leave it. */
-  public static string Set(string targets, float vol, int mute) {
+  public static string Set(string targets, float vol, int mute) { return OnMta<string>(() => SetNow(targets, vol, mute)); }
+  static string SetNow(string targets, float vol, int mute) {
     var want = new HashSet<string>(targets.Split(','));
     bool ok = false;
     if (want.Contains("master")) {
