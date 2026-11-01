@@ -412,6 +412,7 @@ const api: NotesApi = {
   aiTidy: (text, kind) => ipcRenderer.invoke('ai:tidy', text, kind),
   aiInterpret: (text, context) => ipcRenderer.invoke('ai:interpret', text, context),
   aiAsk: (question, notes, history, extra, engine) => ipcRenderer.invoke('ai:ask', question, notes, history, extra, engine),
+  aiEmailContext: (question, engine) => ipcRenderer.invoke('ai:emailContext', question, engine),
   aiSetEngine: (use) => ipcRenderer.invoke('ai:setEngine', use),
   aiSortMoney: (rows, categories) => ipcRenderer.invoke('ai:sortMoney', rows, categories),
   aiMeaning: (word, sentence) => ipcRenderer.invoke('ai:meaning', word, sentence),

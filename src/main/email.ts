@@ -6,7 +6,8 @@ import { buildMessage, header, parseAddress, parseAddresses, readBodies, type Gm
 /**
  * Gmail, for the Email page. It uses the same Google sign-in as the calendar (calendarSources.ts),
  * with Gmail access added the first time you connect from the Email page. Emails are fetched from
- * Google when you look at them and aren't stored on this computer.
+ * Google when you look at them. Ask everything keeps an encrypted copy of recent ones on this
+ * computer so it can answer without the internet (emailAsk.ts).
  */
 
 // Overridable for tests, which point it at a local fake server.
@@ -117,6 +118,12 @@ export async function list(folder: EmailFolder, query: string, next?: string): P
     for (const m of batch) if (m) emails.push(summary(m as unknown as GmailMessage))
   }
   return { emails, next: page.nextPageToken as string | undefined }
+}
+
+/** Just the ids of the newest emails (or those matching a Gmail search), without fetching them. */
+export async function ids(query: string, max: number): Promise<string[]> {
+  const page = await gmail('/messages', { params: { maxResults: String(max), ...(query.trim() ? { q: query.trim() } : {}) } })
+  return ((page.messages as { id: string }[] | undefined) ?? []).map((m) => m.id)
 }
 
 export async function get(id: string): Promise<EmailMessage> {
