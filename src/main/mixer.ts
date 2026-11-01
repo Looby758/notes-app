@@ -356,7 +356,10 @@ async function windowsState(): Promise<MixerState> {
   return {
     apps: grouped.apps,
     device: raw.master?.name || undefined,
-    note: grouped.apps.length <= 1 ? 'Apps show here once they’ve played a sound. Start a song, a call or a game.' : undefined
+    note:
+      grouped.apps.length <= 1
+        ? 'Apps show here once they’ve played a sound. Start a song, a call or a game.' + (raw.err ? ` (Windows said: ${raw.err})` : '')
+        : undefined
   }
 }
 
