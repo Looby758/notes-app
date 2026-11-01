@@ -467,6 +467,8 @@ export interface NotesApi {
   searchPlaces(query: string): Promise<{ places: Place[]; error?: string }>
   /** One square of a map preview as a data: URL; null if it couldn't be fetched. */
   mapTile(z: number, x: number, y: number): Promise<string | null>
+  /** The time zone at a spot (e.g. "Europe/London", from Open-Meteo); null if it couldn't be found. */
+  zoneAt(lat: number, lon: number): Promise<string | null>
   /** Your town and its forecast (from Open-Meteo), fetched again if it's old or `force`. */
   weather(force?: boolean): Promise<WeatherState>
   /** Sets (or, with null, forgets) the town the weather is for, and fetches its forecast. */
