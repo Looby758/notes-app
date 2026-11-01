@@ -13,15 +13,13 @@ import { logError } from './log'
  */
 
 /**
- * Why the helper runs on an MTA thread: Windows' per-app sound sessions (IAudioSessionControl2,
- * ISimpleAudioVolume, IAudioMeterInformation) only answer properly in a multi-threaded COM
- * apartment. powershell.exe runs scripts single-threaded (STA) by default, and there the session
- * objects come back as cross-apartment proxies that won't hand over their volume ("No such
- * interface supported"). Every session then failed inside a silent catch, so only the master slider
- * (IAudioEndpointVolume, which is fine in an STA) ever showed.
+ * The helper's C#. The COM interface IDs here must be exact: a wrong one makes Windows answer "no
+ * such interface" and the app is silently missing. (ISimpleAudioVolume's ID ending ...6DA47EF883D8
+ * was once written with the wrong ending, which is why only the master slider showed.)
  *
- * The C# is passed in an environment variable rather than the command line, which Windows caps at
- * 32,767 characters (the old encoded script was already over 31,000).
+ * It runs on an MTA thread as a precaution (Core Audio's session objects are meant for one), and
+ * reports what failed instead of swallowing it. The C# is passed in an environment variable
+ * rather than the command line, which Windows caps at 32,767 characters.
  */
 const WIN_HELPER_CS = String.raw`
 using System; using System.Text; using System.Threading; using System.Collections.Generic; using System.Diagnostics; using System.Runtime.InteropServices;
@@ -77,7 +75,7 @@ interface IOrbitSessionControl2 {
   [PreserveSig] int GetProcessId(out uint pid);
   [PreserveSig] int IsSystemSoundsSession();
 }
-[ComImport, Guid("87CE5498-68D6-44E5-9215-6F24A2B8C2F4"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+[ComImport, Guid("87CE5498-68D6-44E5-9215-6DA47EF883D8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 interface IOrbitSimpleVolume {
   [PreserveSig] int SetMasterVolume(float level, ref Guid ctx);
   [PreserveSig] int GetMasterVolume(out float level);
@@ -110,7 +108,7 @@ public static class OrbitMixer {
   static Guid IID_Endpoint = new Guid("5CDF2C82-841E-4546-9722-0CF74078229A");
   static Guid IID_Meter = new Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064");
   static Guid Ctx = Guid.Empty;
-  static Guid IID_Volume = new Guid("87CE5498-68D6-44E5-9215-6F24A2B8C2F4");
+  static Guid IID_Volume = new Guid("87CE5498-68D6-44E5-9215-6DA47EF883D8");
   class Info { public string exe = ""; public string proc = ""; public string desc = ""; public string title = ""; }
   static Dictionary<uint, Info> infos = new Dictionary<uint, Info>();
   /** The first thing that went wrong in the last look, so Orbit's log says why an app is missing. */
