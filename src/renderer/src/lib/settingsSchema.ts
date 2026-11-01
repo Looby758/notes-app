@@ -787,6 +787,18 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'startup login boot'
   },
 
+  // ---------- Two computers ----------
+  {
+    key: 'syncOrbit',
+    section: 'computers',
+    group: 'Sync',
+    type: 'toggle',
+    label: 'Sync Orbit with your other computers',
+    description:
+      'Settings, themes, the Home layout, the soundboard and calendar links are kept in your notes folder, so Google Drive takes them to your other computers. If something changed on both, Orbit asks which version to keep. Money, passwords (still locked with your master password), stars and flashcards are always in the notes folder.',
+    keywords: 'sync google drive macbook pc mac other computer everywhere share settings themes'
+  },
+
   // ---------- About ----------
   {
     key: 'checkForUpdates',
