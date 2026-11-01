@@ -61,6 +61,7 @@ import { newBoard } from './boards'
 import { newSpreadsheet } from './newSheet'
 import { openAsk, runNoteJob } from '../store/ai'
 import { musicControl, musicToggleLike, setMusicMini, shareSongToNote, toggleMusic, useMusic } from '../store/music'
+import { showAndFindSong } from '../store/songId'
 import { sendToPhone } from '../store/phone'
 import { toggleDiscord } from '../store/discord'
 import { openRadial } from '../components/Nav/RadialMenu'
@@ -238,6 +239,7 @@ export const commands: Command[] = [
   { id: 'music.previous', group: 'Music', title: 'Music: previous song', run: () => void musicControl('previous') },
   { id: 'music.mini', group: 'Music', title: 'Music: floating mini player (on top of other apps)', run: () => void setMusicMini(!useMusic.getState().miniOpen) },
   { id: 'music.share', group: 'Music', title: 'Music: add the song playing to this note', run: shareSongToNote },
+  { id: 'music.whatsThisSong', group: 'Music', title: 'Music: what’s this song? (listen to a video, game or stream and find it)', run: showAndFindSong },
   { id: 'music.like', group: 'Music', title: 'Music: like the song playing (Liked Songs)', run: () => void musicToggleLike() },
 
   ...EDITOR_COMMANDS.map(

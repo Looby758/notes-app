@@ -2,6 +2,7 @@ import './music.css'
 import { useEffect, useRef, useState } from 'react'
 import {
   AudioLines,
+  Ear,
   GripHorizontal,
   Heart,
   Laptop,
@@ -54,6 +55,8 @@ import { SleepButton, SleepTimer } from './SleepTimer'
 import { LocalMusic, LocalUpNext } from './LocalMusic'
 import { Visualiser } from './Visualiser'
 import { SongPopup } from './SongPopup'
+import { SongFinder } from './SongFinder'
+import { useSongId, watchSongIdShortcut } from '../../store/songId'
 import { setPrefs, usePrefs } from '../../store/prefs'
 import { addHomeCard } from '../../lib/home'
 import MusicHomeCard from './MusicHomeCard'
@@ -61,7 +64,7 @@ import ThemePicture from '../Theme/ThemePicture'
 
 addHomeCard({ id: 'music', order: 35, title: 'Now playing', Card: MusicHomeCard })
 
-type Tab = 'playlists' | 'search' | 'queue' | 'recent' | 'local' | 'link' | 'devices' | 'sleep'
+type Tab = 'playlists' | 'search' | 'queue' | 'recent' | 'local' | 'link' | 'devices' | 'sleep' | 'find'
 
 const backToSpotify = (): void => {
   stopLocal()
@@ -77,6 +80,7 @@ const setUp = (): void => {
 export default function MusicPlayer() {
   const open = useMusic((s) => s.open)
   useEffect(() => startMusic(), [])
+  useEffect(() => watchSongIdShortcut(), [])
   return (
     <>
       <SongPopup />
@@ -167,6 +171,9 @@ function useMovable(): { ref: React.RefObject<HTMLDivElement | null>; style: Rea
   return { ref, style: place ? { left: place.left, bottom: place.bottom } : undefined, grip }
 }
 
+/** The last "show What's this song?" ask the player has acted on (so reopening it doesn't again). */
+let shownFindAsk = 0
+
 function Player() {
   const movable = useMovable()
   const state = useMusic((s) => s.state)
@@ -177,6 +184,13 @@ function Player() {
   const [tab, setTab] = useState<Tab | null>(null)
 
   const toggleTab = (t: Tab): void => setTab(tab === t ? null : t)
+  // Ctrl+K or the system-wide shortcut asked for "What's this song?".
+  const showFind = useSongId((s) => s.showAsk)
+  useEffect(() => {
+    if (showFind === shownFindAsk) return
+    shownFindAsk = showFind
+    setTab('find')
+  }, [showFind])
 
   return (
     <div className="music-player" ref={movable.ref} style={movable.style} data-music-player>
@@ -199,11 +213,16 @@ function Player() {
             <button className={tab === 'local' ? 'active' : ''} onClick={() => setTab('local')} data-music-tab="local">
               My music
             </button>
+            <button className={tab === 'find' ? 'active' : ''} onClick={() => setTab('find')} title="What’s this song? Listen to a video, game or stream and find the song" data-music-tab="find">
+              <Ear size={13} />
+            </button>
             <button className={tab === 'link' ? 'active' : ''} onClick={() => setTab('link')} title="Play a Spotify link">
               <Link2 size={13} />
             </button>
           </div>
-          {tab === 'link' ? (
+          {tab === 'find' ? (
+            <SongFinder />
+          ) : tab === 'link' ? (
             <LinkBox />
           ) : tab === 'sleep' ? (
             <SleepTimer onPicked={() => setTab(null)} />

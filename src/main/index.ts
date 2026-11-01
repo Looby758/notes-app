@@ -38,6 +38,7 @@ import * as localMusic from './localMusic'
 import { closeMusicMini, setupMusicMini } from './musicMini'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
 import { applySnipShortcut, setupSnip, startSnip } from './snip'
+import { applySongIdShortcut, setupSongId } from './songId'
 import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
 import { setupConverter } from './converter'
@@ -176,6 +177,7 @@ function appIconFile(prefs: Prefs): { id: string; file?: string } {
 function applySystemPrefs(prefs: Prefs): void {
   applyCaptureShortcut(prefs.captureShortcut)
   applySnipShortcut(prefs.snipShortcut)
+  applySongIdShortcut(prefs.songIdShortcut)
   applyReplayShortcut(prefs.replayOn ? prefs.replayShortcut : '')
   safely('app icon', () => applyAppIcon(prefs))
   // Only the installed app registers itself (in development it would register electron.exe).
@@ -992,6 +994,7 @@ app.whenReady().then(async () => {
   // The extras: if one of them fails on some computer, the app itself still works.
   safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: () => void startSnip() }))
   safely('screen snip', () => setupSnip({ getMain: () => mainWindow, showMain }))
+  safely('what’s this song', () => setupSongId({ getMain: () => mainWindow }))
   safely('instant replay', () => setupClips({ getMain: () => mainWindow, showMain }))
   safely('screen controls', setupMonitors)
   // A password copied from the vault isn't passed to the other computer.

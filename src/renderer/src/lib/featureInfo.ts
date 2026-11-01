@@ -49,6 +49,7 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'ask', name: 'Ask everything', blurb: 'AI that knows your notes, email, calendar and money', group: 'Connect', command: 'ai.ask', keywords: 'ai question claude' },
 
   { id: 'music', name: 'Music', blurb: 'Spotify and your own songs', group: 'Media', command: 'music.player', keywords: 'spotify songs player' },
+  { id: 'songid', name: 'What’s this song?', blurb: 'Find the song in a video, game or stream', group: 'Media', command: 'music.whatsThisSong', keywords: 'identify recognise recognize shazam music playlist' },
   { id: 'video', name: 'Video player', blurb: 'Plays any video, with subtitles and speed', group: 'Media', command: 'video.open', keywords: 'mkv avi wmv mp4 movie film watch subtitles player vlc' },
   { id: 'comics', name: 'Comics', blurb: 'Read .cbz and .cbr comic books', group: 'Media', command: 'comics.open', keywords: 'comic book cbr cbz manga graphic novel read zen' },
   { id: 'soundboard', name: 'Soundboard', blurb: 'Sounds with hotkeys and a voice changer, into Discord', group: 'Media', command: 'soundboard.open', keywords: 'sound effects meme mic discord voice changer robot deep chipmunk hotkey' },
