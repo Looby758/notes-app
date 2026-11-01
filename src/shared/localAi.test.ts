@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pickFromReleases, cleanReply, fitTexts, hfFileInfo, moneySortPrompt, parseMoneySort, pickEngine, sentenceAround, sha256Of, suggestedModel, type ReleaseAsset } from './localAi'
+import { pickFromReleases, cleanReply, cleanSuggestion, shouldSuggest, suggestPrompt, fitTexts, hfFileInfo, moneySortPrompt, parseMoneySort, pickEngine, sentenceAround, sha256Of, suggestedModel, type ReleaseAsset } from './localAi'
 
 const asset = (name: string): ReleaseAsset => ({ name, url: `https://example.com/${name}`, size: 100, digest: `sha256:${'a'.repeat(64)}` })
 const RELEASE = [
@@ -148,5 +148,45 @@ describe('pickFromReleases', () => {
   it('skips builds GitHub gives no checksum for', () => {
     const noDigest = [{ tag_name: 'b1', assets: releases[1].assets.map((a) => ({ ...a, digest: null })) }]
     expect(pickFromReleases(noDigest, { platform: 'win32', arch: 'x64', nvidia: true })).toBeNull()
+  })
+})
+
+describe('writing autocomplete', () => {
+  it('only guesses at the end of a line of writing', () => {
+    expect(shouldSuggest('I went to the shops and', '')).toBe(true)
+    expect(shouldSuggest('I went to the shops and ', '')).toBe(true)
+    expect(shouldSuggest('The plan is done.', '  ')).toBe(true)
+    expect(shouldSuggest('I went to the', ' shops')).toBe(false)
+    expect(shouldSuggest('Hi', '')).toBe(false)
+    expect(shouldSuggest('## ', '')).toBe(false)
+    expect(shouldSuggest('- [ ] ', '')).toBe(false)
+    expect(shouldSuggest('- [ ] Buy milk and', '')).toBe(true)
+  })
+
+  it('stays out of links, commands, tags and tables', () => {
+    expect(shouldSuggest('See [[Walking De', '')).toBe(false)
+    expect(shouldSuggest('Some words then /tab', '')).toBe(false)
+    expect(shouldSuggest('Some words then #ide', '')).toBe(false)
+    expect(shouldSuggest('Go to https://exam', '')).toBe(false)
+    expect(shouldSuggest('| Name | Price', '')).toBe(false)
+    expect(shouldSuggest('Some words (', '')).toBe(false)
+    expect(shouldSuggest('Some words  ', '')).toBe(false)
+  })
+
+  it('gives the model the note name and the end of the writing', () => {
+    expect(suggestPrompt('Shopping', 'Milk and')).toBe('# Shopping\n\nMilk and')
+    expect(suggestPrompt('Shopping', '# Shopping list\nMilk')).toBe('# Shopping list\nMilk')
+    const long = 'a'.repeat(4000) + '\nlast line'
+    expect(suggestPrompt('', long)).toBe('last line')
+  })
+
+  it('cleans what the model sends back', () => {
+    expect(cleanSuggestion(' bread and eggs\nNext line', 'milk ', false)).toBe('bread and eggs')
+    expect(cleanSuggestion(' bread and eg', 'milk and', true)).toBe(' bread and')
+    expect(cleanSuggestion('ing to the shop', 'I was go', false)).toBe('ing to the shop')
+    expect(cleanSuggestion('<think>hmm</think> eggs', 'milk and', false)).toBe(' eggs')
+    expect(cleanSuggestion('\n\nNew paragraph', 'milk', false)).toBe('')
+    expect(cleanSuggestion(' ...', 'milk', false)).toBe('')
+    expect(cleanSuggestion('x'.repeat(50) + ' ' + 'y'.repeat(60), 'a ', false)).toBe('x'.repeat(50))
   })
 })

@@ -350,6 +350,15 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'paste link url title table excel spreadsheet'
   },
   {
+    key: 'aiAutocomplete',
+    section: 'editor',
+    group: 'Writing',
+    type: 'toggle',
+    label: 'Writing autocomplete',
+    description: `As you type, the offline AI guesses the next few words and shows them in grey. Press Tab to take them, ${IS_MAC ? '⌥→' : 'Ctrl+→'} for one word, Esc to hide them, or just keep typing. Needs the offline AI (Settings → AI helper); nothing leaves your computer.`,
+    keywords: 'autocomplete suggest suggestion predict prediction ghost text tab complete ai offline copilot'
+  },
+  {
     key: 'vimMode',
     section: 'editor',
     group: 'Writing',

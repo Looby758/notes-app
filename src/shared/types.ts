@@ -866,6 +866,8 @@ export interface NotesApi {
   aiSortMoney(rows: AiSortRow[], categories: { id: string; name: string; income?: boolean }[]): Promise<Record<number, string>>
   /** The dictionary card: what a word means in its sentence, from the offline AI. */
   aiMeaning(word: string, sentence: string): Promise<string>
+  /** Writing autocomplete: the next few words after `before`, from the offline AI (empty when there's no guess). */
+  aiSuggest(title: string, before: string): Promise<string>
   // The offline AI
   localAiState(): Promise<LocalAiState>
   /** Downloads the engine and a model (resumes a stopped download); resolves when it's done or has failed. */
