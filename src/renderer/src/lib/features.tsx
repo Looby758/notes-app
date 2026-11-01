@@ -38,7 +38,8 @@ import {
   SquareTerminal,
   Webcam,
   Zap,
-  type LucideIcon
+  type LucideIcon,
+  CloudDownload
 } from 'lucide-react'
 import { useVault } from '../store/vault'
 import { setPrefs, usePrefs } from '../store/prefs'
@@ -67,6 +68,7 @@ import {
   MESSAGES_TAB,
   MINESWEEPER_TAB,
   CLOCKS_TAB,
+  DOWNLOADER_TAB,
   MONEY_TAB,
   PASSWORDS_TAB,
   SETTINGS_TAB,
@@ -132,6 +134,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   snip: { icon: Scan, run: () => void startSnip() },
   explorer: { icon: HardDrive, run: () => openSpecialTab(EXPLORER_TAB) },
   convert: { icon: ArrowRightLeft, run: () => openSpecialTab(CONVERT_TAB) },
+  downloader: { icon: CloudDownload, run: () => openSpecialTab(DOWNLOADER_TAB) },
   'offline-ai': {
     icon: Cpu,
     run: () => {

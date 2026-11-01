@@ -72,6 +72,8 @@ export const COMICS_TAB = 'comics:'
 export const MINESWEEPER_TAB = 'minesweeper:'
 /** Clocks for places around the world (components/Clocks). */
 export const CLOCKS_TAB = 'clocks:'
+/** Download a video from a link into the attachments folder (components/Downloader). */
+export const DOWNLOADER_TAB = 'downloader:'
 /** Scenes, webcam and screen recording (components/Studio). */
 export const STUDIO_TAB = 'studio:'
 /** Sound clips with hotkeys, the voice changer and music into a voice call (components/Soundboard). */

@@ -1,4 +1,4 @@
-import { promises as fs } from 'fs'
+import { constants as fsConstants, promises as fs } from 'fs'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'path'
 import type { FileNode } from '@shared/types'
 
@@ -303,6 +303,21 @@ export class Vault {
     await fs.mkdir(dir, { recursive: true })
     const target = await this.uniquePath(dir, ...splitName(safeFileName(basename(source))))
     await fs.copyFile(source, target)
+    return this.rel(target)
+  }
+
+  /** Moves a finished download (any size) into the attachments folder; returns its path in the notes folder. */
+  async moveInAttachment(folderRel: string, source: string, fileName: string): Promise<string> {
+    const dir = this.abs(folderRel)
+    await fs.mkdir(dir, { recursive: true })
+    const target = await this.uniquePath(dir, ...splitName(safeFileName(fileName)))
+    try {
+      await fs.rename(source, target)
+    } catch {
+      // A different drive from the temporary folder: copy it over instead.
+      await fs.copyFile(source, target, fsConstants.COPYFILE_EXCL)
+      await fs.rm(source, { force: true })
+    }
     return this.rel(target)
   }
 

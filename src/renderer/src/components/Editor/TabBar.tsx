@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ArrowRightLeft, AudioLines, Bomb, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Grid3x3, HardDrive, House, KeyRound, Layers, LibraryBig, Mail, MessageSquare, MessagesSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
+import { ArrowRightLeft, AudioLines, CloudDownload, Bomb, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Grid3x3, HardDrive, House, KeyRound, Layers, LibraryBig, Mail, MessageSquare, MessagesSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
 import Private from '../Streamer/Private'
 import { useHideNames } from '../../store/streamer'
 import { useEditor } from '../../store/editor'
@@ -26,6 +26,7 @@ import {
   COMICS_TAB,
   MINESWEEPER_TAB,
   CLOCKS_TAB,
+  DOWNLOADER_TAB,
   STUDIO_TAB,
   SOUNDBOARD_TAB,
   MESSAGES_TAB,
@@ -90,6 +91,7 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === COMICS_TAB) return 'Comics'
   if (id === MINESWEEPER_TAB) return 'Minesweeper'
   if (id === CLOCKS_TAB) return 'World clocks'
+  if (id === DOWNLOADER_TAB) return 'Download a video'
   if (id === STUDIO_TAB) return 'Studio'
   if (id === SOUNDBOARD_TAB) return 'Soundboard'
   if (id === MESSAGES_TAB) return 'Messages'
@@ -278,6 +280,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === COMICS_TAB && <LibraryBig size={13} className="tab-icon" />}
               {id === MINESWEEPER_TAB && <Bomb size={13} className="tab-icon" />}
               {id === CLOCKS_TAB && <Globe2 size={13} className="tab-icon" />}
+              {id === DOWNLOADER_TAB && <CloudDownload size={13} className="tab-icon" />}
               {id === STUDIO_TAB && <Clapperboard size={13} className="tab-icon" />}
               {id === SOUNDBOARD_TAB && <AudioLines size={13} className="tab-icon" />}
               {id === MESSAGES_TAB && <MessagesSquare size={13} className="tab-icon" />}
