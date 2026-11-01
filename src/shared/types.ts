@@ -624,6 +624,18 @@ export interface NotesApi {
   checkForUpdates(): Promise<UpdateStatus>
   /** Restarts into a downloaded update (Windows), or opens the download page (Mac). */
   installUpdate(): Promise<void>
+  /** What's new since this computer last opened Orbit (empty when nothing is). */
+  whatsNewPending(): Promise<import('./whatsNew').ReleaseNotes[]>
+  /** Every version's notes up to this one, newest first. */
+  whatsNewAll(): Promise<import('./whatsNew').ReleaseNotes[]>
+  /** This computer has seen this version's notes. */
+  whatsNewSeen(): Promise<void>
+
+  // Settings files
+  /** Settings files that are damaged or locked to an older copy of the app. */
+  checkSettingsFiles(): Promise<import('./settingsHealth').BrokenSettingsFile[]>
+  /** Starts that part fresh (the old file is kept as a .broken copy). Some parts restart Orbit. */
+  resetSettingsFile(file: string): Promise<{ restarting: boolean }>
   onUpdateStatus(callback: (status: UpdateStatus) => void): () => void
 
   // Export
