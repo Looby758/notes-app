@@ -33,6 +33,7 @@ import * as calendars from './calendarSources'
 import { readGoogleSheet } from './googleSheets'
 import * as ai from './ai'
 import * as email from './email'
+import * as emailAsk from './emailAsk'
 import * as spotify from './spotify'
 import * as localMusic from './localMusic'
 import { closeMusicMini, setupMusicMini } from './musicMini'
@@ -724,7 +725,11 @@ function registerIpc(): void {
   ipcMain.handle('cal:status', () => calendars.status())
   ipcMain.handle('cal:setClient', (_e, id: string, secret: string) => calendars.setClient(id, secret))
   ipcMain.handle('cal:connect', () => calendars.connect())
-  ipcMain.handle('cal:disconnect', () => calendars.disconnect())
+  ipcMain.handle('cal:disconnect', async () => {
+    const result = await calendars.disconnect()
+    emailAsk.clear()
+    return result
+  })
   ipcMain.handle('cal:setEnabled', (_e, id: string, enabled: boolean) => calendars.setCalendarEnabled(id, enabled))
   ipcMain.handle('cal:addFeed', (_e, name: string, url: string) => calendars.addFeed(name, url))
   ipcMain.handle('cal:removeFeed', (_e, id: string) => calendars.removeFeed(id))
@@ -732,12 +737,19 @@ function registerIpc(): void {
   ipcMain.handle('email:status', () => email.status())
   ipcMain.handle('email:connect', () => email.connect())
   ipcMain.handle('email:list', (_e, folder: EmailFolder, query: string, next?: string) => email.list(folder, query, next))
-  ipcMain.handle('email:get', (_e, id: string) => email.get(id))
+  ipcMain.handle('email:get', async (_e, id: string) => {
+    const message = await email.get(id)
+    emailAsk.remember(message)
+    return message
+  })
   ipcMain.handle('email:send', (_e, message: OutgoingEmail) => email.send(message))
   ipcMain.handle('email:markRead', (_e, id: string, read: boolean) => email.markRead(id, read))
   ipcMain.handle('email:star', (_e, id: string, starred: boolean) => email.star(id, starred))
   ipcMain.handle('email:archive', (_e, id: string) => email.archive(id))
-  ipcMain.handle('email:trash', (_e, id: string) => email.trash(id))
+  ipcMain.handle('email:trash', async (_e, id: string) => {
+    await email.trash(id)
+    emailAsk.forget(id)
+  })
   ipcMain.handle('gsheet:read', (_e, rel: string) => readGoogleSheet(currentVault().abs(rel)))
   ipcMain.handle('music:status', () => spotify.status())
   ipcMain.handle('music:setClient', (_e, id: string) => spotify.setClient(id))
@@ -779,6 +791,7 @@ function registerIpc(): void {
   ipcMain.handle('ai:ask', (_e, question: string, notes: AiNote[], history: AiAskTurn[], extra?: AiExtraContext, engine?: AiEngine) =>
     ai.askNotes(question, notes, history, extra, engine)
   )
+  ipcMain.handle('ai:emailContext', (_e, question: string, engine?: AiEngine) => ai.emailContext(question, engine))
   ipcMain.handle('ai:chat', (_e, messages: AiChatMessage[], engine?: AiEngine) => ai.chat(messages, engine))
   ipcMain.handle('ai:setEngine', (_e, use: AiEngine) => ai.setEngine(use))
   ipcMain.handle('ai:sortMoney', (_e, rows: AiSortRow[], categories: { id: string; name: string; income?: boolean }[]) =>
@@ -944,6 +957,9 @@ async function offerMoveToApplications(): Promise<boolean> {
 }
 
 app.whenReady().then(async () => {
+  // Ask everything's copy of recent emails, so it can answer without the internet (emailAsk.ts).
+  setTimeout(() => void emailAsk.catchUp(), 60_000)
+  setInterval(() => void emailAsk.catchUp(), 30 * 60_000)
   // Imported themes first: settings that use one are only valid once it's known.
   safely('imported themes', loadImportedThemes)
   if (await offerMoveToApplications()) return

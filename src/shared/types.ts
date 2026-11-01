@@ -860,6 +860,8 @@ export interface NotesApi {
   aiTidy(text: string, kind: 'note' | 'capture'): Promise<string>
   /** `extra`: digests of money, calendar and email for Ask everything (lib/askContext.ts). */
   aiAsk(question: string, notes: AiNote[], history: AiAskTurn[], extra?: AiExtraContext, engine?: AiEngine): Promise<AiReply>
+  /** Ask everything: the emails that best answer a question as text (the best few in full), from Gmail or the copy on this computer. */
+  aiEmailContext(question: string, engine?: AiEngine): Promise<string>
   /** Offline AI or Claude for the AI features. */
   aiSetEngine(use: AiEngine): Promise<AiStatus>
   /** Money tracker: a category id for each statement line (by its number), sorted by the offline AI only. */

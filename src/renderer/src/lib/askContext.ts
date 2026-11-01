@@ -1,10 +1,10 @@
-import type { CalEvent, EmailSummary } from '@shared/types'
+import type { CalEvent } from '@shared/types'
 import { formatPounds, monthName, monthTotals, addMonths, type MoneyData } from './money'
 import { allRecurring, forecastMonth, monthlyCost } from './moneyInsights'
 
 /**
  * "Ask everything": besides the notes that match, the AI gets a short, plain-text digest of your
- * money, calendar and inbox, so it can answer things like "when did I last pay the gas bill?" or
+ * money and calendar (email comes from src/main/emailAsk.ts), so it can answer things like "when did I last pay the gas bill?" or
  * "what's on this week?". Only built when you ask a question, and only for the sources you've
  * left switched on.
  */
@@ -61,14 +61,4 @@ export function calendarContext(events: CalEvent[]): string {
       return line([when, e.title, e.location, e.calendarName])
     })
   return rows.slice(0, 300).join('\n')
-}
-
-/** Emails as text: who from, when, subject and Gmail's preview. */
-export function emailContext(emails: EmailSummary[]): string {
-  const seen = new Set<string>()
-  return emails
-    .filter((e) => !seen.has(e.id) && seen.add(e.id))
-    .slice(0, 60)
-    .map((e) => line([e.date.slice(0, 10), `${e.from.name || e.from.email} <${e.from.email}>`, e.subject, e.snippet.slice(0, 220), e.unread ? 'unread' : '']))
-    .join('\n')
 }
