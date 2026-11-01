@@ -1,5 +1,5 @@
 /**
- * The page a paired phone opens: Deck, Screen, Send, Clipboard, Remote, Touchpad, Talk and Scan. It's plain
+ * The page a paired phone opens: Deck, Screen, Send, Clipboard, Remote (with Volume), Touchpad, Talk and Scan. It's plain
  * HTML and JavaScript (no framework) so it loads instantly from Notes over the Wi-Fi, and works in
  * the phone's own browser with nothing installed. `base` is the paired session's address.
  */
@@ -46,6 +46,7 @@ textarea{min-height:110px;resize:vertical}
 #deckGrid button{aspect-ratio:1;border:0;border-radius:18px;background:linear-gradient(160deg,#2c2c38,#1f1f28);color:#e8e8ee;font-size:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 4px 12px rgba(0,0,0,.25);transition:transform .08s}
 #deckGrid button b{font-size:30px;line-height:1;font-weight:400}
 #deckGrid button:active{transform:scale(.94);background:#7c6cf0}
+.mix{display:flex;align-items:center;gap:10px;background:#22222b;border-radius:14px;padding:10px 12px;margin-bottom:8px}.mix div{flex:1;min-width:0}.mix b{display:flex;justify-content:space-between;font-weight:500;font-size:15px}.mix b span{color:#9a9aa8;font-weight:400}.mix input{width:100%;accent-color:#7c6cf0;margin:8px 0 2px}.mix button{background:#2a2a33;color:#e8e8ee;border:0;border-radius:10px;width:44px;height:44px;font-size:18px}.mix.muted div{opacity:.5}.mix.muted button{background:#5a2a2e}
 .modes{display:flex;gap:6px;margin:6px 0 10px}.modes button{flex:1;background:#22222b;color:#9a9aa8;border:0;border-radius:10px;padding:9px 0;font-size:13px}.modes button.on{background:#7c6cf0;color:#fff}
 #clock{font-size:64px;font-weight:200;text-align:center;letter-spacing:1px;margin:10px 0 0}#date{text-align:center;color:#9a9aa8;margin-bottom:12px}
 .plan div{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #26262e;font-size:15px}.plan div span{color:#a99cff;min-width:46px;font-variant-numeric:tabular-nums}.plan div.done{opacity:.45;text-decoration:line-through}
@@ -90,6 +91,8 @@ textarea{min-height:110px;resize:vertical}
   <div class="row"><button class="btn alt" data-music="previous">⏮</button><button class="btn" data-music="toggle" id="playBtn">⏯</button><button class="btn alt" data-music="next">⏭</button></div>
   <h2>YouTube mini window</h2>
   <div class="row"><button class="btn alt" data-yt="back">−10s</button><button class="btn" data-yt="toggle">⏯</button><button class="btn alt" data-yt="forward">+10s</button><button class="btn alt" data-yt="next">⏭</button></div>
+  <h2>Volume</h2>
+  <div id="mixer"><p class="note">Looking at what’s playing…</p></div>
 </section>
 <section id="touch">
   <div id="pad">Drag to move · tap to click<br>two-finger tap to right-click · two fingers to scroll</div>
@@ -145,7 +148,7 @@ try { if (localStorage.getItem('tab')) show(localStorage.getItem('tab')) } catch
 var events
 function listen() {
   events = new EventSource(BASE + '/events')
-  events.onopen = function () { $('dot').className = 'on'; $('state').textContent = 'Connected' }
+  events.onopen = function () { $('dot').className = 'on'; $('state').textContent = 'Connected'; askMixer() }
   events.onerror = function () { $('dot').className = ''; $('state').textContent = 'Reconnecting… (is Notes open?)' }
   events.onmessage = function (e) {
     var m = JSON.parse(e.data)
@@ -154,6 +157,7 @@ function listen() {
     if (m.type === 'screen') { screen = m; drawScreen() }
     if (m.type === 'notify') heads(m.title, m.body)
     if (m.type === 'incoming') incoming(m.items)
+    if (m.type === 'mixer') drawMixer(m)
     if (m.type === 'music') {
       $('song').textContent = m.name || 'Nothing playing'
       $('artist').textContent = m.artist || ''
@@ -277,6 +281,40 @@ $('copy').onclick = function () {
 }
 $('sendClip').onclick = function () { cmd({ kind: 'clip', text: $('toPc').value }).then(function () { toast('On your computer’s clipboard'); $('toPc').value = '' }) }
 
+// Volume: a slider for each app on the computer, looked at again every few seconds while it shows.
+var sliding = {}
+function drawMixer(m) {
+  var box = $('mixer')
+  if (m.problem && !m.apps.length) { box.innerHTML = '<p class="note">' + esc(m.problem) + '</p>'; return }
+  var ids = m.apps.map(function (a) { return a.id }).join('|')
+  if (box.dataset.ids !== ids) {
+    box.dataset.ids = ids; box.innerHTML = ''
+    m.apps.forEach(function (a) {
+      var row = document.createElement('div'); row.className = 'mix'; row.dataset.id = a.id
+      row.innerHTML = '<div><b><em></em><span></span></b><input type="range" min="0" max="100" step="1"></div><button></button>'
+      var input = row.querySelector('input'), timer = null
+      input.oninput = function () {
+        sliding[a.id] = Date.now(); row.querySelector('span').textContent = input.value + '%'
+        clearTimeout(timer); timer = setTimeout(function () { cmd({ kind: 'volume', id: a.id, volume: Number(input.value) }) }, 60)
+      }
+      row.querySelector('button').onclick = function () { cmd({ kind: 'volume', id: a.id, muted: !row.classList.contains('muted') }).then(askMixer) }
+      box.appendChild(row)
+    })
+    if (!m.apps.length) box.innerHTML = '<p class="note">Nothing is playing on the computer.</p>'
+  }
+  m.apps.forEach(function (a) {
+    var row = box.querySelector('[data-id="' + a.id.replace(/"/g, '') + '"]'); if (!row) return
+    row.classList.toggle('muted', a.muted)
+    row.querySelector('em').textContent = a.name; row.querySelector('em').style.fontStyle = 'normal'
+    row.querySelector('button').textContent = a.muted ? '🔇' : '🔊'
+    if (Date.now() - (sliding[a.id] || 0) < 3000) return
+    row.querySelector('input').value = a.volume
+    row.querySelector('span').textContent = a.muted ? 'Muted' : a.volume + '%'
+  })
+}
+function askMixer() { if (!document.hidden && $('remote').classList.contains('on')) cmd({ kind: 'mixer' }) }
+setInterval(askMixer, 3000)
+document.querySelectorAll('nav button').forEach(function (b) { b.addEventListener('click', askMixer) })
 // Remote.
 document.querySelectorAll('[data-music]').forEach(function (b) { b.onclick = function () { cmd({ kind: 'music', action: b.dataset.music }) } })
 document.querySelectorAll('[data-yt]').forEach(function (b) { b.onclick = function () { cmd({ kind: 'youtube', action: b.dataset.yt }) } })

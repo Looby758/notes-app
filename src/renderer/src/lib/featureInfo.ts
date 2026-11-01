@@ -63,6 +63,7 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'minesweeper', name: 'Minesweeper', blurb: 'A quick break', group: 'Play', command: 'minesweeper.open' },
 
   { id: 'snip', name: 'Screen snip', blurb: 'Grab text from anywhere on screen', group: 'Tools', command: 'snip.start', keywords: 'ocr screenshot copy text translate' },
+  { id: 'mixer', name: 'Volume mixer', blurb: 'A volume for each app: games, Discord, Spotify', group: 'Tools', command: 'mixer.open', keywords: 'sound audio volume loud quiet mute discord spotify game per app levels' },
   { id: 'screens', name: 'Screens', blurb: 'Monitor brightness, contrast and input, with hotkeys', group: 'Tools', command: 'screens.open', keywords: 'monitor display brightness contrast input hdmi displayport usb-c ddc dim switch' },
   { id: 'explorer', name: 'Files', blurb: 'Files on this computer', group: 'Tools', command: 'explorer.open', keywords: 'explorer finder folders drive' },
   { id: 'convert', name: 'Convert files', blurb: 'Photos, documents, audio and more', group: 'Tools', command: 'convert.open', keywords: 'pdf mp3 mp4 gif video png jpg word' },
