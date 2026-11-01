@@ -12,8 +12,8 @@ export type DragPayload =
   | { kind: 'file'; path: string }
   /** A file from the file explorer tab (its full path on the computer): dropped into a note, it's attached. */
   | { kind: 'computer'; path: string }
-  /** Several items, or folders, from the file explorer tab: they can be dropped into the notes tree, not a note. */
-  | { kind: 'computerMany'; paths: string[] }
+  /** Several items, or folders, from the file explorer tab: the notes tree takes them all, a note the files among them. */
+  | { kind: 'computerMany'; paths: string[]; files: string[] }
 
 let current: DragPayload | null = null
 
@@ -21,11 +21,25 @@ let current: DragPayload | null = null
 export const computerPaths = (drag: DragPayload | null): string[] =>
   drag?.kind === 'computer' ? [drag.path] : drag?.kind === 'computerMany' ? drag.paths : []
 
+/**
+ * Notes, attachments and folders dragged from the notes tree in the sidebar (paths inside the
+ * notes folder), so a Files tab can take them too. Set on dragstart, cleared on dragend.
+ */
+let fromTree: string[] = []
+export const getTreeDrag = (): string[] => fromTree
+export const setTreeDrag = (paths: string[]): void => void (fromTree = paths)
+
+/** The files (not folders) being dragged from the file explorer tab, which a note can take. */
+export const computerFiles = (drag: DragPayload | null): string[] =>
+  drag?.kind === 'computer' ? [drag.path] : drag?.kind === 'computerMany' ? drag.files : []
+
 export const getDrag = (): DragPayload | null => current
 export const setDrag = (payload: DragPayload | null): void => {
   current = payload
-  // Web pages would swallow the drag (they're separate pages): see theme.css.
+  // Web pages would swallow the drag (they're separate pages): see theme.css. Files from the Files
+  // tab are a real drag of files, though, so web pages (Discord, WhatsApp…) can take them.
   document.body.classList.toggle('dragging', !!payload)
+  document.body.classList.toggle('dragging-files', computerPaths(payload).length > 0)
 }
 
 /**

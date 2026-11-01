@@ -91,6 +91,11 @@ export const GAMES_TAB = 'games:'
 export const VIDEO_TAB = 'video:'
 /** Browse the whole computer and Google Drive (components/Explorer). */
 export const EXPLORER_TAB = 'explorer:'
+/** Any Files tab: the first is "explorer:", more are "explorer:<id>" (each remembers its own folder). */
+export const isExplorerTab = (id: string | null): id is string => !!id && id.startsWith(EXPLORER_TAB)
+const explorerId = (): string => `${EXPLORER_TAB}${Date.now()}${Math.random().toString(36).slice(2, 5)}`
+/** The folder a new Files tab starts in, read once by its page (components/Explorer). */
+export const explorerStartDirs = new Map<string, string>()
 /** A picture, recording, PDF… from the notes folder, shown in a tab: "file:attachments/a.png". */
 export const FILE_TAB = 'file:'
 export const fileTab = (path: string): string => FILE_TAB + path
@@ -586,8 +591,8 @@ export function splitPane(side: Side, opts: { pane?: string; tab?: string; moveF
     moveTab(tab, opts.moveFrom, id)
   } else {
     // Settings and other pages aren't duplicated; the new pane gets a blank tab instead.
-    // (A web tab goes there only when it's a new one, from openWebTab.)
-    const first = tab && (isNoteTab(tab) || (isWebTab(tab) && !paneWithTab(tab))) ? tab : blankId()
+    // (A web or Files tab goes there only when it's a new one, from openWebTab / openExplorerTab.)
+    const first = tab && (isNoteTab(tab) || ((isWebTab(tab) || isExplorerTab(tab)) && !paneWithTab(tab))) ? tab : blankId()
     updatePane(id, { tabs: [first], active: first })
   }
   persist()
@@ -826,6 +831,22 @@ export function openSpecialTab(id: string): void {
     return
   }
   addTab(activePane(), id)
+}
+
+/**
+ * Opens another Files tab, in `dir` (or where the last one was). `beside` puts it in the pane next
+ * to this one (or a new pane on the right), so files can be dragged from one folder to the other.
+ */
+export function openExplorerTab(dir?: string, { beside = false }: { beside?: boolean } = {}): void {
+  const id = explorerId()
+  if (dir) explorerStartDirs.set(id, dir)
+  const here = activePane()
+  if (!beside) return addTab(here, id)
+  const order = paneOrder(useEditor.getState().layout)
+  const i = order.indexOf(here)
+  const other = order[i + 1] ?? order[i - 1]
+  if (other) return addTab(other, id)
+  splitPane('right', { pane: here, tab: id })
 }
 
 /**

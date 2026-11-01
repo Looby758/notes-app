@@ -33,7 +33,7 @@ import { useVault } from '../../store/vault'
 import { displayName, isWithin, parentOf } from '../../lib/paths'
 import ContextMenu, { type MenuItem } from '../ContextMenu'
 import { focusEditor, openNote, splitPane } from '../../lib/editorController'
-import { computerPaths, getDrag, setDrag } from '../../lib/dnd'
+import { computerPaths, getDrag, setDrag, setTreeDrag } from '../../lib/dnd'
 import { notify } from '../../store/notify'
 import { useEditor } from '../../store/editor'
 import { useNoteIndex } from '../../store/noteIndex'
@@ -413,6 +413,9 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
 
   const onDragStart = (e: DragEvent): void => {
     dragging = node.path
+    // A Files tab can take any of them (all the picked ones, if this is one of them).
+    const picked = useSelection.getState().paths
+    setTreeDrag(picked.includes(node.path) ? picked : [node.path])
     // Notes can also be dropped onto a pane to open them there (or on its edge to split).
     setDrag(isFolder ? null : node.type === 'attachment' ? { kind: 'file', path: node.path } : { kind: 'note', path: node.path })
     // Reveals drop targets that only matter while a note is being dragged (like "drop here to star").
@@ -456,6 +459,7 @@ function TreeNode({ node, depth, dropTarget, setDropTarget, onDrop, onContextMen
         onDragEnd={() => {
           dragging = null
           setDrag(null)
+          setTreeDrag([])
           document.body.classList.remove('dragging-note')
           setDropTarget(null)
         }}

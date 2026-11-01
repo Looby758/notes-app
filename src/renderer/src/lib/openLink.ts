@@ -2,7 +2,8 @@ import { useVault } from '../store/vault'
 import { useNoteIndex } from '../store/noteIndex'
 import { notify } from '../store/notify'
 import { usePrefs } from '../store/prefs'
-import { openNote, openWebTab } from './editorController'
+import { openExplorerTab, openNote, openWebTab } from './editorController'
+import { folderOf, pathFromFileUrl } from './fileUrl'
 import { parseWikiInner } from './links'
 import { songTarget } from '@shared/songLinks'
 import { playSongTarget } from '../store/music'
@@ -14,6 +15,12 @@ export function openLink(href: string, fromNote: string): void {
   const song = songTarget(href)
   if (song) {
     void playSongTarget(song)
+    return
+  }
+  // A file linked where it is on the computer: its folder opens in a Files tab (nothing is run).
+  const local = /^file:/i.test(href) ? pathFromFileUrl(href) : null
+  if (local) {
+    openExplorerTab(folderOf(local), { beside: true })
     return
   }
   if (/^[a-z][a-z0-9+.-]*:/i.test(href)) {

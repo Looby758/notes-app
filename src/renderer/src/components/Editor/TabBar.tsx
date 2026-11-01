@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type DragEvent, type MouseEvent } from 'react'
 import { ArrowRightLeft, AudioLines, Headphones, Bomb, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Grid3x3, HardDrive, House, KeyRound, Layers, LibraryBig, Mail, MessageSquare, MessagesSquare, Monitor, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Scissors, Settings, Sparkles, SquareTerminal, Star, StarOff, X, CloudDownload } from 'lucide-react'
 import Private from '../Streamer/Private'
 import { useHideNames } from '../../store/streamer'
@@ -21,7 +21,7 @@ import {
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
-  EXPLORER_TAB,
+  isExplorerTab,
   SUDOKU_TAB,
   COMICS_TAB,
   MINESWEEPER_TAB,
@@ -64,6 +64,7 @@ import { FILE_MANAGER, showKeys } from '@shared/platform'
 import { animateOut } from '../../lib/motion'
 import { playSound } from '../../lib/sounds'
 import { useVideoPlayer } from '../../store/videoPlayer'
+import { useExplorerTabs } from '../../store/explorerTabs'
 
 /** Closing with the mouse lets the tab shrink away first. (Ctrl+W stays instant, so it can be pressed quickly.) */
 function closeWithAnimation(el: HTMLElement | null, id: string, pane: string, unlessPinned = false): void {
@@ -106,7 +107,11 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
     const current = useVideoPlayer.getState().current
     return current ? current.slice(Math.max(current.lastIndexOf('/'), current.lastIndexOf('\\')) + 1) : 'Video player'
   }
-  if (id === EXPLORER_TAB) return 'Files'
+  if (isExplorerTab(id)) {
+    const dir = useExplorerTabs.getState().dirs[id]
+    const name = dir?.replace(/[\\/]+$/, '').split(/[\\/]/).pop()
+    return name ? `Files: ${name}` : 'Files'
+  }
   if (isFileTab(id)) return fileOfTab(id).slice(fileOfTab(id).lastIndexOf('/') + 1).replace(/\.canvas$/i, '')
   return noteTitle(id)
 }
@@ -120,6 +125,8 @@ export default function TabBar({ pane }: { pane: string }) {
   const status = useEditor((s) => s.status)
   // The video player's tab is named after the video in it.
   useVideoPlayer((s) => s.current)
+  // Files tabs are named after the folder they're in.
+  useExplorerTabs((s) => s.dirs)
   const pinned = useEditor((s) => s.panes[pane]?.pinned ?? NO_PINS)
   const hideNames = useHideNames()
   const mindMap = useUI((s) => isMindMap(s, pane, active))
@@ -143,8 +150,27 @@ export default function TabBar({ pane }: { pane: string }) {
     return i === -1 ? els.length : i
   }
 
+  /** Files dragged from a Files tab and held over another tab switch to it, to drop them there. */
+  const hover = useRef<{ id: string; timer: ReturnType<typeof setTimeout> } | null>(null)
+  const stopHover = (): void => {
+    if (hover.current) clearTimeout(hover.current.timer)
+    hover.current = null
+  }
+  useEffect(() => stopHover, [])
+
   const onDragOver = (e: DragEvent): void => {
-    if (!getDrag() || getDrag()!.kind === 'computer') return
+    const drag = getDrag()
+    if (drag?.kind === 'computer' || drag?.kind === 'computerMany' || (!drag && e.dataTransfer.types.includes('Files'))) {
+      const el = (e.target as HTMLElement).closest<HTMLElement>('.tab')
+      const i = el ? [...(bar.current?.querySelectorAll('.tab') ?? [])].indexOf(el) : -1
+      const id = i === -1 ? null : tabs[i]
+      if (!id || id === active) return stopHover()
+      if (hover.current?.id === id) return
+      stopHover()
+      hover.current = { id, timer: setTimeout(() => (stopHover(), activateTab(id, pane)), 450) }
+      return
+    }
+    if (!drag) return
     e.preventDefault()
     e.stopPropagation()
     e.dataTransfer.dropEffect = 'move'
@@ -154,6 +180,7 @@ export default function TabBar({ pane }: { pane: string }) {
   const onDrop = (e: DragEvent): void => {
     const drag = getDrag()
     setDropIndex(null)
+    stopHover()
     if (!drag || drag.kind === 'computer' || drag.kind === 'computerMany') return
     e.preventDefault()
     e.stopPropagation()
@@ -234,7 +261,7 @@ export default function TabBar({ pane }: { pane: string }) {
       // Double-clicking empty space in the bar opens a new tab, like a browser.
       onDoubleClick={(e) => e.target === e.currentTarget && newTab(pane)}
       onDragOver={onDragOver}
-      onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setDropIndex(null)}
+      onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && (setDropIndex(null), stopHover())}
       onDrop={onDrop}
     >
       {/* Tabs scroll on their own so the pane buttons on the right always stay visible. */}
@@ -295,7 +322,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === MESSAGES_TAB && <MessagesSquare size={13} className="tab-icon" />}
               {id === GAMES_TAB && <Gamepad2 size={13} className="tab-icon" />}
               {id === VIDEO_TAB && <Film size={13} className="tab-icon" />}
-              {id === EXPLORER_TAB && <HardDrive size={13} className="tab-icon" />}
+              {isExplorerTab(id) && <HardDrive size={13} className="tab-icon" />}
               {isFileTab(id) && <FileIcon path={fileOfTab(id)} size={13} className="tab-icon" />}
               {icons.get(id) && <span className="tab-emoji">{icons.get(id)}</span>}
               <span className="tab-title">

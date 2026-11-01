@@ -19,6 +19,7 @@ import { properties } from './properties'
 import { calloutIcon } from './calloutIcons'
 import { TableWidget } from './tableEditor'
 import { AUDIO_EXT } from '../../lib/voice'
+import { VIDEO_EMBED_EXT } from './attachments'
 import { looksLikeSketch, withSketchVersion } from '../../lib/sketch'
 import { useUI } from '../../store/ui'
 import { CLICK_MOD } from '@shared/platform'
@@ -148,6 +149,32 @@ class AudioWidget extends WidgetType {
     audio.src = this.src
     wrap.append(name, audio)
     return wrap
+  }
+  ignoreEvent(): boolean {
+    return true
+  }
+}
+
+/** A video embedded in a note: ![name](clip.mp4). Nothing is loaded until you press play. */
+class VideoWidget extends WidgetType {
+  constructor(
+    readonly src: string,
+    readonly label: string
+  ) {
+    super()
+  }
+  eq(other: VideoWidget): boolean {
+    return other.src === this.src && other.label === this.label
+  }
+  toDOM(): HTMLElement {
+    const video = document.createElement('video')
+    video.className = 'cm-video'
+    video.controls = true
+    // "none", so the file isn't opened (and held on to) just because the note is showing.
+    video.preload = 'none'
+    video.src = this.src
+    video.title = this.label
+    return video
   }
   ignoreEvent(): boolean {
     return true
@@ -430,7 +457,9 @@ function buildInline(view: EditorView): DecorationSet {
                 const file = imagePath(raw, path)
                 const widget = AUDIO_EXT.test(raw)
                   ? new AudioWidget(src, alt)
-                  : new ImageWidget(src, alt, file && looksLikeSketch(file) ? file : null)
+                  : VIDEO_EMBED_EXT.test(raw)
+                    ? new VideoWidget(src, alt)
+                    : new ImageWidget(src, alt, file && looksLikeSketch(file) ? file : null)
                 out.push(Decoration.replace({ widget }).range(node.from, node.to))
                 return false
               }
