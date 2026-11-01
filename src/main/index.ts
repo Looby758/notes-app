@@ -42,9 +42,12 @@ import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
 import { setupConverter } from './converter'
 import { isAppPage, setupStudio } from './studio'
+import { applyReplayShortcut, clipResponse, setupClips } from './clips'
 import { setupLocalAi } from './localAi'
-import { setupSoundboard, soundFile } from './soundboard'
+import { reloadSoundboard, setupSoundboard, soundboardFolder, soundFile } from './soundboard'
 import { setupDiscord, teardownDiscord } from './discord'
+import { setupOrbitSync, syncOrbitSoon, type PartHandler } from './orbitSync'
+import { cleanPrefsPart, prefsPart } from '@shared/orbitSync'
 import { setupLive } from './live'
 import { explorerFile, setupExplorer } from './explorer'
 import { hold, setupUndoBin } from './undoBin'
@@ -68,7 +71,7 @@ import { setupTerminal } from './terminal'
 import { setupGames } from './games'
 import { setupGameCovers } from './gameCovers'
 import { applyIconOutsideApp } from './appIcon'
-import { broadcastThemes, loadImportedThemes, setupThemes, THEME_SCHEME, themeFilePath } from './themes'
+import { broadcastThemes, loadImportedThemes, setupThemes, THEME_SCHEME, themeFilePath, themesDir } from './themes'
 import { CODE_SANDBOX_SCHEME, registerCodeSandbox } from './codeSandbox'
 import { readHandwritingOffline } from './handwriting'
 
@@ -161,6 +164,7 @@ function appIconFile(prefs: Prefs): { id: string; file?: string } {
 function applySystemPrefs(prefs: Prefs): void {
   applyCaptureShortcut(prefs.captureShortcut)
   applySnipShortcut(prefs.snipShortcut)
+  applyReplayShortcut(prefs.replayOn ? prefs.replayShortcut : '')
   safely('app icon', () => applyAppIcon(prefs))
   // Only the installed app registers itself (in development it would register electron.exe).
   if (!app.isPackaged) return
@@ -259,11 +263,49 @@ function broadcastPrefs(prefs: Prefs): void {
   safely('system settings', () => applySystemPrefs(prefs))
 }
 
+/** The parts of Orbit kept in the notes folder for your other computers (see orbitSync.ts). */
+function orbitParts(themesChanged: () => void): Record<'settings' | 'home' | 'themes' | 'soundboard' | 'calendar', PartHandler> {
+  const prefsHandler = (part: 'settings' | 'home'): PartHandler => ({
+    kind: 'value',
+    // Never changed from how Orbit starts: nothing to share, so another computer's is taken in.
+    read: () => {
+      if (!loadSettings().prefs) return null
+      const value = prefsPart(currentPrefs(), part)
+      return JSON.stringify(value) === JSON.stringify(prefsPart(normalizePrefs({}), part)) ? null : value
+    },
+    write: (value) => {
+      if (value === null) return
+      const prefs = normalizePrefs({ ...currentPrefs(), ...cleanPrefsPart(value, part) })
+      saveSettings({ prefs })
+      broadcastPrefs(prefs)
+    }
+  })
+  return {
+    settings: prefsHandler('settings'),
+    home: prefsHandler('home'),
+    themes: {
+      kind: 'folder',
+      folder: themesDir,
+      reload: () => {
+        loadImportedThemes()
+        themesChanged()
+      }
+    },
+    soundboard: { kind: 'folder', folder: soundboardFolder, reload: reloadSoundboard },
+    calendar: {
+      kind: 'value',
+      read: () => calendars.syncedCalendars(),
+      write: (value) => calendars.applySyncedCalendars(value ?? {})
+    }
+  }
+}
+
 function openVault(path: string | null): void {
   stopWatching()
   vault = path ? new Vault(path) : null
   if (!path) return
   void shareComicProgress()
+  syncOrbitSoon()
   startWatching(path, (paths) => {
     for (const win of BrowserWindow.getAllWindows()) win.webContents.send('vault:changed', paths)
   })
@@ -303,6 +345,8 @@ function registerVaultProtocol(): void {
         const pic = await localMusic.cover(rel)
         return pic ? new Response(Buffer.from(pic.data), { headers: { 'Content-Type': pic.type, 'Cache-Control': 'max-age=3600' } }) : new Response('No picture', { status: 404 })
       }
+      // The clip editor's videos (vault://clips/<name>), from the recordings folder.
+      if (url.host === 'clips') return clipResponse(request, decodeURIComponent(url.pathname.slice(1)))
       // The video player: files played as they are, and ffmpeg's live stream of the rest.
       if (url.host === 'video' || url.host === 'videostream') return await videoResponse(url, request)
       // Comic pages (vault://comic/<id>/<page>) and covers (vault://comiccover/<id>), from the comic shelf.
@@ -551,6 +595,7 @@ function registerIpc(): void {
     const prefs = normalizePrefs({ ...currentPrefs(), ...patch })
     saveSettings({ prefs })
     broadcastPrefs(prefs)
+    syncOrbitSoon()
     return prefs
   })
   // A reminder: a system notification; clicking it brings Notes up at that note.
@@ -900,13 +945,18 @@ app.whenReady().then(async () => {
   registerVaultProtocol()
   registerCodeSandbox()
   registerIpc()
+  // A theme was imported or removed (here, or on another computer): a removed theme that was in
+  // use falls back to the default.
+  const themesChanged = (): void => {
+    const prefs = normalizePrefs(loadSettings().prefs)
+    if (loadSettings().prefs) saveSettings({ prefs })
+    broadcastThemes()
+    broadcastPrefs(prefs)
+  }
   safely('themes', () =>
     setupThemes(() => {
-      // A removed theme that was in use falls back to the default.
-      const prefs = normalizePrefs(loadSettings().prefs)
-      if (loadSettings().prefs) saveSettings({ prefs })
-      broadcastThemes()
-      broadcastPrefs(prefs)
+      themesChanged()
+      syncOrbitSoon()
     })
   )
   safely('web browser', () => setupBrowser(() => currentPrefs().streamerMode))
@@ -925,10 +975,12 @@ app.whenReady().then(async () => {
   safely('comic reader', () => setupComics(() => vault))
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))
+  safely('Orbit sync', () => setupOrbitSync({ root: () => vault?.root ?? null, enabled: () => currentPrefs().syncOrbit, window: () => mainWindow, parts: orbitParts(themesChanged) }))
   mainWindow = createWindow()
   // The extras: if one of them fails on some computer, the app itself still works.
   safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: () => void startSnip() }))
   safely('screen snip', () => setupSnip({ getMain: () => mainWindow, showMain }))
+  safely('instant replay', () => setupClips({ getMain: () => mainWindow, showMain }))
   // A password copied from the vault isn't passed to the other computer.
   safely('mouse sharing', () => setupMouseShare(() => mainWindow, (text) => text === copiedSecret))
   safely('system settings', () => applySystemPrefs(currentPrefs()))

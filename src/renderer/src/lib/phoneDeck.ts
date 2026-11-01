@@ -66,6 +66,8 @@ const FEATURE_EMOJI: Record<string, string> = {
   explorer: '🗂️',
   convert: '🔄',
   studio: '🎬',
+  clips: '🎞️',
+  replay: '⏪',
   soundboard: '🔊',
   'discord-voice': '🎧',
   terminal: '⌨️',
@@ -75,7 +77,7 @@ const FEATURE_EMOJI: Record<string, string> = {
 }
 
 // Features that are toggles or run in the background: pressing them shouldn't pull Orbit to the front.
-const QUIET = new Set(['music', 'reading', 'streamer', 'capture', 'snip', 'youtube', 'phone'])
+const QUIET = new Set(['music', 'reading', 'streamer', 'capture', 'snip', 'youtube', 'phone', 'replay'])
 
 /** Everything that can go on the deck, for Settings. */
 export const DECK_CHOICES = [
