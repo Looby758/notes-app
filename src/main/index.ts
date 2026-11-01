@@ -37,6 +37,7 @@ import * as emailAsk from './emailAsk'
 import * as spotify from './spotify'
 import * as localMusic from './localMusic'
 import { closeMusicMini, setupMusicMini } from './musicMini'
+import { closePopout, setupPopout } from './popout'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
 import { applySnipShortcut, setupSnip, startSnip } from './snip'
 import { applySongIdShortcut, setupSongId } from './songId'
@@ -519,6 +520,7 @@ function createWindow(): BrowserWindow {
     if (win === mainWindow) {
       closeYouTube()
       closeMusicMini()
+      closePopout()
     }
   })
   ipcMain.removeHandler('app:ready-to-close')
@@ -1002,6 +1004,7 @@ app.whenReady().then(async () => {
   safely('web browser', () => setupBrowser(() => currentPrefs().streamerMode))
   safely('YouTube mini window', () => setupYouTube(currentPrefs))
   safely('Music mini player', () => setupMusicMini(currentPrefs, () => mainWindow))
+  safely('pop-out window', () => setupPopout(currentPrefs))
   safely('export', setupExport)
   safely('converter', setupConverter)
   safely('video downloader', () => setupVideoDownloader(() => vault))
