@@ -200,6 +200,7 @@ const EDITOR_PREF_KEYS = [
   'wrapSelection',
   'selectionToolbar',
   'smartPaste',
+  'aiAutocomplete',
   'vimMode',
   'cursorBlink',
   'typewriterCenter',

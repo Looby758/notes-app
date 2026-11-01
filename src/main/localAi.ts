@@ -9,12 +9,15 @@ import { Readable, Transform, Writable } from 'stream'
 import { pipeline } from 'stream/promises'
 import {
   cleanReply,
+  cleanSuggestion,
   hfFileInfo,
   LOCAL_CONTEXT_TOKENS,
   localModelById,
   pickFromReleases,
   sha256Of,
+  SUGGEST_BEFORE_CHARS,
   suggestedModel,
+  suggestPrompt,
   type EngineKind,
   type GithubRelease,
   type HfFile,
@@ -559,7 +562,57 @@ export async function localComplete(messages: LocalMessage[], opts: { maxTokens?
   }
 }
 
+let suggesting: AbortController | null = null
+
+/**
+ * Writing autocomplete: the next few words of a note, guessed by the offline AI. Plain text
+ * continuation (not chat), so it's quick, and llama.cpp keeps the note it has already read, so
+ * each new guess only reads what you've typed since. A newer guess cancels an older one. Gives
+ * back an empty string whenever it can't (not downloaded, a game is running, a problem).
+ */
+export async function localSuggest(title: string, before: string): Promise<string> {
+  if (!localAiInstalled()) return ''
+  if (loadConfig().unloadForGames && (paused || gameRunning())) return ''
+  suggesting?.abort()
+  const abort = new AbortController()
+  suggesting = abort
+  busy++
+  inflight.add(abort)
+  const timeout = setTimeout(() => abort.abort(), 20_000)
+  try {
+    const s = await startServer()
+    if (abort.signal.aborted) return ''
+    const res = await fetch(`http://127.0.0.1:${s.port}/completion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: suggestPrompt(title, before),
+        n_predict: 16,
+        temperature: 0.2,
+        top_k: 20,
+        stop: ['\n'],
+        cache_prompt: true,
+        stream: false
+      }),
+      signal: abort.signal
+    })
+    if (!res.ok) return ''
+    const data = (await res.json()) as { content?: string; stop_type?: string; stopped_limit?: boolean }
+    const cutOff = data.stop_type === 'limit' || data.stopped_limit === true
+    return cleanSuggestion(data.content ?? '', before, cutOff)
+  } catch {
+    return ''
+  } finally {
+    clearTimeout(timeout)
+    if (suggesting === abort) suggesting = null
+    inflight.delete(abort)
+    busy--
+    if (!busy) idleLater()
+  }
+}
+
 export function setupLocalAi(): void {
+  ipcMain.handle('ai:suggest', (_e, title: string, before: string) => localSuggest(String(title ?? '').slice(0, 200), String(before ?? '').slice(-SUGGEST_BEFORE_CHARS * 2)))
   ipcMain.handle('localAi:state', async () => {
     await findGpu()
     return localAiState()

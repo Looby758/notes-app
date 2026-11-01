@@ -424,6 +424,7 @@ const api: NotesApi = {
   aiSetEngine: (use) => ipcRenderer.invoke('ai:setEngine', use),
   aiSortMoney: (rows, categories) => ipcRenderer.invoke('ai:sortMoney', rows, categories),
   aiMeaning: (word, sentence) => ipcRenderer.invoke('ai:meaning', word, sentence),
+  aiSuggest: (title, before) => ipcRenderer.invoke('ai:suggest', title, before),
   localAiState: () => ipcRenderer.invoke('localAi:state'),
   localAiInstall: (model) => ipcRenderer.invoke('localAi:install', model),
   localAiCancel: () => ipcRenderer.invoke('localAi:cancel'),
