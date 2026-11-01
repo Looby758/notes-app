@@ -7,6 +7,7 @@ import type { Sheet } from './sheet'
 import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
 import type { LocalLibrary } from './localMusic'
+import type { MixerState } from './mixer'
 import type { MonitorAction, MonitorSaved, MonitorSetting, MonitorsStatus, MonitorTarget } from './monitors'
 import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
 import type { DiscordStatus } from './discord'
@@ -697,6 +698,12 @@ export interface NotesApi {
   /** Saves screen names, input names and hotkeys. */
   monitorsSave(saved: MonitorSaved): Promise<MonitorsStatus>
   onMonitorsChanged(callback: (status: MonitorsStatus) => void): () => void
+  // Volume mixer (main/mixer.ts): a volume for each app, and the whole computer's
+  /** Every app making sound, with its volume and how loud it is now. */
+  mixerGet(): Promise<MixerState>
+  /** Sets an app's volume (0 to 100); 'master' is the whole computer. False if it didn't take. */
+  mixerVolume(id: string, volume: number): Promise<boolean>
+  mixerMute(id: string, muted: boolean): Promise<boolean>
   // Soundboard (main/soundboard.ts; the sound itself is played in lib/soundboard.ts)
   soundboardGet(): Promise<SoundboardStatus>
   /** Asks for sound files and adds a button for each. */

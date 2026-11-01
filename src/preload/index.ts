@@ -259,6 +259,9 @@ const api: NotesApi = {
     ipcRenderer.on('monitors:changed', handler)
     return () => ipcRenderer.removeListener('monitors:changed', handler)
   },
+  mixerGet: () => ipcRenderer.invoke('mixer:get'),
+  mixerVolume: (id, volume) => ipcRenderer.invoke('mixer:volume', id, volume),
+  mixerMute: (id, muted) => ipcRenderer.invoke('mixer:mute', id, muted),
   soundboardGet: () => ipcRenderer.invoke('soundboard:get'),
   soundboardPick: () => ipcRenderer.invoke('soundboard:pick'),
   soundboardAddFiles: (paths) => ipcRenderer.invoke('soundboard:add-files', paths),

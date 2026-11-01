@@ -51,6 +51,7 @@ import { setupDiscord, teardownDiscord } from './discord'
 import { setupOrbitSync, syncOrbitSoon, type PartHandler } from './orbitSync'
 import { cleanPrefsPart, prefsPart } from '@shared/orbitSync'
 import { setupMonitors, teardownMonitors } from './monitors'
+import { setupMixer, teardownMixer } from './mixer'
 import { setupLive } from './live'
 import { explorerFile, setupExplorer } from './explorer'
 import { hold, setupUndoBin } from './undoBin'
@@ -1006,6 +1007,7 @@ app.whenReady().then(async () => {
   safely('what’s this song', () => setupSongId({ getMain: () => mainWindow }))
   safely('instant replay', () => setupClips({ getMain: () => mainWindow, showMain }))
   safely('screen controls', setupMonitors)
+  safely('volume mixer', setupMixer)
   // A password copied from the vault isn't passed to the other computer.
   safely('mouse sharing', () => setupMouseShare(() => mainWindow, (text) => text === copiedSecret))
   safely('screens between computers', () => setupScreenLink(() => mainWindow))
@@ -1040,6 +1042,7 @@ app.on('will-quit', () => {
   safely('mouse sharing', teardownMouseShare)
   safely('Discord voice', teardownDiscord)
   safely('screen controls', teardownMonitors)
+  safely('volume mixer', teardownMixer)
   clearSecret()
 })
 

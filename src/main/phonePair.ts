@@ -11,6 +11,7 @@ import { sendInput, type PhoneInput } from './phoneInput'
 import { lastMusic, musicCommand, onMusic } from './musicMini'
 import { youTubeControl, type YouTubeAction } from './youtube'
 import { readPrintedText } from './handwriting'
+import { mixerSet, mixerSlide, mixerState } from './mixer'
 import { currentWifi } from './wifi'
 import { loadSettings, saveSettings } from './settings'
 import { logError } from './log'
@@ -161,6 +162,20 @@ async function command(cmd: { kind?: string; [key: string]: unknown }): Promise<
       return sendInput(cmd as PhoneInput)
     case 'dictate':
       toWindow({ type: 'dictate', id: String(cmd.id ?? ''), text: String(cmd.text ?? '').slice(0, 20_000), done: cmd.done === true })
+      return
+    case 'mixer': {
+      // The phone's Volume list asks every few seconds while it's showing.
+      const state = await mixerState()
+      broadcast({ type: 'mixer', problem: state.problem ?? '', apps: state.apps.map((a) => ({ id: a.id, name: a.name, volume: a.volume, muted: a.muted })) })
+      return
+    }
+    case 'volume':
+      if (typeof cmd.id !== 'string') return
+      if (typeof cmd.volume === 'number') {
+        if (!(await mixerSlide(cmd.id, cmd.volume))) throw new Error('That app didn’t take the change. It may have closed.')
+      } else if (typeof cmd.muted === 'boolean') {
+        if (!(await mixerSet(cmd.id, null, cmd.muted))) throw new Error('That app didn’t take the change. It may have closed.')
+      }
       return
     case 'clip':
       lastClip = String(cmd.text ?? '')
