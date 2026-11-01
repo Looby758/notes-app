@@ -94,7 +94,8 @@ interface PageList {
   listed: boolean
   apcontinue?: string
   redirected: boolean
-  gapcontinue?: string
+  /** Where the list of redirects carries on from (the wiki's "continue" values). */
+  redirectsNext?: Record<string, string>
   failed: number[]
 }
 
@@ -419,14 +420,16 @@ async function download(w: Loaded, signal: AbortSignal): Promise<void> {
     tellSoon()
   }
   while (!list.redirected) {
+    // Each page with the other names that lead to it (Fandom won't list redirects the other way round).
     const q = await api(
       address,
-      { action: 'query', generator: 'allpages', gapnamespace: 0, gapfilterredir: 'redirects', gaplimit: 500, redirects: 1, ...(list.gapcontinue ? { gapcontinue: list.gapcontinue } : {}) },
+      { action: 'query', generator: 'allpages', gapnamespace: 0, gapfilterredir: 'nonredirects', gaplimit: 500, prop: 'redirects', rdprop: 'title', rdnamespace: 0, rdlimit: 'max', ...(list.redirectsNext ?? {}) },
       signal
     )
-    for (const r of q.query?.redirects ?? []) list.redirects[normaliseTitle(String(r.from))] = normaliseTitle(String(r.to))
-    list.gapcontinue = q.continue?.gapcontinue
-    if (!list.gapcontinue) list.redirected = true
+    for (const page of q.query?.pages ?? []) for (const r of page.redirects ?? []) list.redirects[normaliseTitle(String(r.title))] = normaliseTitle(String(page.title))
+    const next = q.continue as Record<string, string> | undefined
+    list.redirectsNext = next ? Object.fromEntries(Object.entries(next).map(([k, v]) => [k, String(v)])) : undefined
+    if (!next) list.redirected = true
     await saveList(id, list)
     titleMaps.delete(id)
   }
