@@ -12,9 +12,19 @@ import { logError } from './log'
  * macOS has no per-app volume, so it's the Mac's volume plus the apps that let Orbit set theirs.
  */
 
-const WIN_HELPER = String.raw`
-$src = @'
-using System; using System.Text; using System.Collections.Generic; using System.Diagnostics; using System.Runtime.InteropServices;
+/**
+ * Why the helper runs on an MTA thread: Windows' per-app sound sessions (IAudioSessionControl2,
+ * ISimpleAudioVolume, IAudioMeterInformation) only answer properly in a multi-threaded COM
+ * apartment. powershell.exe runs scripts single-threaded (STA) by default, and there the session
+ * objects come back as cross-apartment proxies that won't hand over their volume ("No such
+ * interface supported"). Every session then failed inside a silent catch, so only the master slider
+ * (IAudioEndpointVolume, which is fine in an STA) ever showed.
+ *
+ * The C# is passed in an environment variable rather than the command line, which Windows caps at
+ * 32,767 characters (the old encoded script was already over 31,000).
+ */
+const WIN_HELPER_CS = String.raw`
+using System; using System.Text; using System.Threading; using System.Collections.Generic; using System.Diagnostics; using System.Runtime.InteropServices;
 [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")] class OrbitMMDeviceEnumerator {}
 [ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 interface IOrbitDeviceEnumerator {
@@ -102,6 +112,20 @@ public static class OrbitMixer {
   static Guid Ctx = Guid.Empty;
   class Info { public string exe = ""; public string proc = ""; public string desc = ""; public string title = ""; }
   static Dictionary<uint, Info> infos = new Dictionary<uint, Info>();
+  /** The first thing that went wrong in the last look, so Orbit's log says why an app is missing. */
+  static string problem = "";
+  static void Note(string where, Exception ex) { if (problem == "") problem = where + ": " + ex.GetType().Name + " " + ex.Message; }
+  /** Runs the COM work on an MTA thread (see the note in mixer.ts), whatever thread PowerShell is on. */
+  static string OnMta(Func<string> work) {
+    if (Thread.CurrentThread.GetApartmentState() == ApartmentState.MTA) return work();
+    string result = null; Exception error = null;
+    var t = new Thread(() => { try { result = work(); } catch (Exception ex) { error = ex; } });
+    t.SetApartmentState(ApartmentState.MTA);
+    t.IsBackground = true;
+    t.Start(); t.Join();
+    if (error != null) throw error;
+    return result;
+  }
   static string Esc(string s) { var b = new StringBuilder(); foreach (char c in s ?? "") { if (c == '"' || c == '\\') b.Append('\\').Append(c); else if (c < ' ') b.Append(' '); else b.Append(c); } return b.ToString(); }
   static string Num(float f) { return (float.IsNaN(f) ? 0 : f).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture); }
   static IOrbitDeviceEnumerator Enumerator() { return (IOrbitDeviceEnumerator)new OrbitMMDeviceEnumerator(); }
@@ -139,19 +163,28 @@ public static class OrbitMixer {
   }
   static List<IOrbitSessionControl2> Sessions(IOrbitDevice d) {
     var list = new List<IOrbitSessionControl2>();
-    var m = Activate<IOrbitSessionManager2>(d, IID_Manager);
-    IOrbitSessionEnumerator e; int n;
-    if (m == null || m.GetSessionEnumerator(out e) != 0 || e.GetCount(out n) != 0) return list;
-    for (int i = 0; i < n; i++) {
-      IOrbitSessionControl2 s; int state;
-      if (e.GetSession(i, out s) != 0 || s == null) continue;
-      if (s.GetState(out state) == 0 && state == 2) continue;
-      list.Add(s);
-    }
+    try {
+      var m = Activate<IOrbitSessionManager2>(d, IID_Manager);
+      IOrbitSessionEnumerator e; int n;
+      if (m == null) { if (problem == "") problem = "no session manager for " + Name(d); return list; }
+      int hr = m.GetSessionEnumerator(out e);
+      if (hr != 0 || e == null) { if (problem == "") problem = "GetSessionEnumerator 0x" + hr.ToString("X8"); return list; }
+      if (e.GetCount(out n) != 0) return list;
+      for (int i = 0; i < n; i++) {
+        try {
+          IOrbitSessionControl2 s; int state;
+          if (e.GetSession(i, out s) != 0 || s == null) continue;
+          if (s.GetState(out state) == 0 && state == 2) continue;
+          list.Add(s);
+        } catch (Exception ex) { Note("session " + i, ex); }
+      }
+    } catch (Exception ex) { Note("sessions", ex); }
     return list;
   }
   static IOrbitDevice Default() { IOrbitDevice d; return Enumerator().GetDefaultAudioEndpoint(0, 1, out d) == 0 ? d : null; }
-  public static string List() {
+  public static string List() { return OnMta(ListNow); }
+  static string ListNow() {
+    problem = "";
     var b = new StringBuilder("{\"ok\":true,\"master\":");
     var def = Default();
     var ev = def == null ? null : Activate<IOrbitEndpointVolume>(def, IID_Endpoint);
@@ -169,7 +202,8 @@ public static class OrbitMixer {
         try {
           uint pid; s.GetProcessId(out pid);
           bool sys = s.IsSystemSoundsSession() == 0;
-          var v = (IOrbitSimpleVolume)s;
+          var v = s as IOrbitSimpleVolume;
+          if (v == null) { if (problem == "") problem = "a session has no ISimpleAudioVolume"; continue; }
           float vol, peak = 0; bool mute;
           v.GetMasterVolume(out vol); v.GetMute(out mute);
           var meter = s as IOrbitMeter;
@@ -180,13 +214,14 @@ public static class OrbitMixer {
           if (!first) b.Append(",");
           first = false;
           b.Append("{\"pid\":" + pid + ",\"exe\":\"" + Esc(info.exe) + "\",\"proc\":\"" + Esc(info.proc) + "\",\"desc\":\"" + Esc(info.desc) + "\",\"display\":\"" + Esc(display) + "\",\"title\":\"" + Esc(info.title) + "\",\"vol\":" + Num(vol) + ",\"mute\":" + (mute ? "true" : "false") + ",\"peak\":" + Num(peak) + ",\"sys\":" + (sys ? "true" : "false") + "}");
-        } catch { }
+        } catch (Exception ex) { Note("reading a session", ex); }
       }
     }
-    return b.Append("]}").ToString();
+    return b.Append("],\"err\":\"" + Esc(problem) + "\"}").ToString();
   }
   /** targets: 'master', 'sys' or process ids, comma separated. vol is 0..1, or -1 to leave it; mute is 0, 1, or -1 to leave it. */
-  public static string Set(string targets, float vol, int mute) {
+  public static string Set(string targets, float vol, int mute) { return OnMta(() => SetNow(targets, vol, mute)); }
+  static string SetNow(string targets, float vol, int mute) {
     var want = new HashSet<string>(targets.Split(','));
     bool ok = false;
     if (want.Contains("master")) {
@@ -203,7 +238,8 @@ public static class OrbitMixer {
           uint pid; s.GetProcessId(out pid);
           bool sys = s.IsSystemSoundsSession() == 0;
           if (!want.Contains(sys ? "sys" : pid.ToString())) continue;
-          var v = (IOrbitSimpleVolume)s;
+          var v = s as IOrbitSimpleVolume;
+          if (v == null) continue;
           if (vol >= 0) ok |= v.SetMasterVolume(Math.Min(1f, vol), ref Ctx) == 0;
           if (mute >= 0) ok |= v.SetMute(mute == 1, ref Ctx) == 0;
         } catch { }
@@ -212,8 +248,11 @@ public static class OrbitMixer {
     return "{\"ok\":" + (ok ? "true" : "false") + "}";
   }
 }
-'@
-Add-Type -TypeDefinition $src
+`
+
+/** Builds the C# helper above (from ORBIT_MIXER_CS) and answers Orbit's requests, one per line. */
+const WIN_HELPER = String.raw`
+Add-Type -TypeDefinition $env:ORBIT_MIXER_CS
 while ($null -ne ($line = [Console]::In.ReadLine())) {
   $p = $line.Split(' ')
   $out = '{"ok":false}'
@@ -236,8 +275,9 @@ let nextRequest = 1
 const waiting = new Map<number, (text: string) => void>()
 
 function startHelper(): ChildProcessWithoutNullStreams {
-  const child = spawn('powershell.exe', ['-NoProfile', '-NoLogo', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(WIN_HELPER, 'utf16le').toString('base64')], {
-    windowsHide: true
+  const child = spawn('powershell.exe', ['-Mta', '-NoProfile', '-NoLogo', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(WIN_HELPER, 'utf16le').toString('base64')], {
+    windowsHide: true,
+    env: { ...process.env, ORBIT_MIXER_CS: WIN_HELPER_CS }
   })
   let buffer = ''
   child.stdout.on('data', (d: Buffer) => {
@@ -288,6 +328,8 @@ function ask<T>(command: string, timeout = 8000): Promise<T | null> {
 /** Each app's sessions from the last look, so a slider knows which ones to change. */
 let targets: Record<string, string[]> = {}
 const icons = new Map<string, string | null>()
+/** The helper's last complaint, so the log gets each one once rather than twice a second. */
+let lastHelperProblem = ''
 
 async function iconFor(exe: string): Promise<string | undefined> {
   if (!icons.has(exe)) {
@@ -301,6 +343,8 @@ async function windowsState(): Promise<MixerState> {
   // The first look starts PowerShell and builds the helper, which takes a few seconds.
   const raw = await ask<RawList>('list', helper ? 5000 : 30000)
   if (!raw?.ok) return { apps: [], problem: 'Windows didn’t answer about its sound. Press Look again.' }
+  if (raw.err && raw.err !== lastHelperProblem) logError('volume mixer', new Error(raw.err))
+  lastHelperProblem = raw.err ?? ''
   const grouped = groupSessions(raw)
   targets = grouped.targets
   await Promise.all(

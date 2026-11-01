@@ -64,6 +64,8 @@ export interface RawList {
   ok: boolean
   master: RawMaster | null
   sessions: RawSession[]
+  /** The first thing that went wrong reading the apps, if anything ('' when all went well). */
+  err?: string
 }
 
 export const clampVolume = (v: unknown): number => {
