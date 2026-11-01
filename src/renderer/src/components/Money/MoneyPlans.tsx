@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { ArrowUp, Ban, CalendarClock, EyeOff, Landmark, Minus, PiggyBank, Plus, Repeat, Sparkles, Trash2, TrendingDown, TrendingUp, X } from 'lucide-react'
+import { ArrowUp, Ban, CalendarClock, Check, EyeOff, Landmark, Minus, Pencil, PiggyBank, Plus, Repeat, RotateCcw, Sparkles, Trash2, TrendingDown, TrendingUp, X } from 'lucide-react'
 import {
   addGoal,
   addSubscription,
@@ -11,6 +11,7 @@ import {
   setCancelled,
   setNotRecurring,
   updateGoal,
+  updateSubscription,
   useMoney
 } from '../../store/money'
 import { askEverything, useAi } from '../../store/ai'
@@ -261,7 +262,7 @@ export default function MoneyPlans() {
         ))}
         {removed && (
           <div className="money-undo">
-            Removed “{removed.name}”.
+            {removed.replaces ? `Put “${removed.name}” back to what the statements show.` : `Removed “${removed.name}”.`}
             <button
               className="link-button"
               onClick={() => {
@@ -351,9 +352,27 @@ const EVERY: Record<RepeatInterval, string> = { weekly: 'Weekly', monthly: 'Mont
 
 function RecurringRow({ r, onRemoved }: { r: Recurring; onRemoved?: (sub: ManualSubscription) => void }) {
   const categories = useMoney((s) => s.categories)
+  const [editing, setEditing] = useState(false)
   const cat = categories.find((c) => c.id === r.category)
   const days = Math.round((new Date(`${r.next}T12:00`).getTime() - new Date(`${dayOf(new Date())}T12:00`).getTime()) / 86400000)
-  const about = r.manual ? 'added by you' : r.fresh ? 'new: 1 payment so far' : `${r.count} payments so far`
+  const about = r.edited ? 'edited by you' : r.manual ? 'added by you' : r.fresh ? 'new: 1 payment so far' : `${r.count} payments so far`
+  if (editing) {
+    return (
+      <li className="money-recurring-row money-recurring-editing" data-recurring={r.key}>
+        <SubscriptionForm
+          start={{ name: r.name, amount: r.amount, interval: r.interval, date: r.next }}
+          action="Save"
+          hint={r.manual ? undefined : 'Your version is shown instead of what the statements found. Remove it later to go back to theirs.'}
+          onDone={(sub) => {
+            setEditing(false)
+            if (!sub) return
+            if (r.manual) updateSubscription(r.manual, sub)
+            else addSubscription({ ...sub, category: r.category, replaces: r.key })
+          }}
+        />
+      </li>
+    )
+  }
   return (
     <li className={`money-recurring-row ${r.fresh ? 'fresh' : ''}`} data-recurring={r.key}>
       <span className="money-swatch" style={{ background: cat?.color ?? '#8a8e9a' }} />
@@ -368,16 +387,21 @@ function RecurringRow({ r, onRemoved }: { r: Recurring; onRemoved?: (sub: Manual
         {r.income ? 'Next' : 'Due'} {days <= 0 ? 'today' : days === 1 ? 'tomorrow' : shortDate(r.next)}
       </span>
       <strong>{formatPounds(r.amount)}</strong>
+      {!r.income && (
+        <button className="icon-btn" title="Edit (name, amount, how often, next date)" onClick={() => setEditing(true)} data-edit-sub>
+          <Pencil size={13} />
+        </button>
+      )}
       {r.manual ? (
         <button
           className="icon-btn"
-          title="Remove (cancelled, or added by mistake)"
+          title={r.edited ? 'Undo your changes (go back to what the statements show)' : 'Remove (cancelled, or added by mistake)'}
           onClick={() => {
             const gone = deleteSubscription(r.manual!)
             if (gone) onRemoved?.(gone)
           }}
         >
-          <Trash2 size={13} />
+          {r.edited ? <RotateCcw size={13} /> : <Trash2 size={13} />}
         </button>
       ) : (
         <>
@@ -395,28 +419,19 @@ function RecurringRow({ r, onRemoved }: { r: Recurring; onRemoved?: (sub: Manual
   )
 }
 
-/** "+ Add a subscription": for ones the statements don't show yet, like one you've just started. */
-function NewSubscription() {
-  const [open, setOpen] = useState(false)
-  const [name, setName] = useState('')
-  const [amount, setAmount] = useState('')
-  const [interval, setEvery] = useState<RepeatInterval>('monthly')
-  const [date, setDate] = useState(dayOf(new Date()))
+type SubDraft = Pick<ManualSubscription, 'name' | 'amount' | 'interval' | 'date'>
+
+/** The name / amount / how often / next payment form, for adding a subscription or editing one. */
+function SubscriptionForm({ start, action, hint, onDone }: { start?: SubDraft; action: string; hint?: string; onDone: (sub?: SubDraft) => void }) {
+  const [name, setName] = useState(start?.name ?? '')
+  const [amount, setAmount] = useState(start ? (start.amount / 100).toFixed(2) : '')
+  const [interval, setEvery] = useState<RepeatInterval>(start?.interval ?? 'monthly')
+  const [date, setDate] = useState(start?.date ?? dayOf(new Date()))
   const pence = typedPence(amount)
-  if (!open) {
-    return (
-      <button className="btn money-add-sub" onClick={() => setOpen(true)} data-add-sub>
-        <Plus size={13} /> Add a subscription or bill
-      </button>
-    )
-  }
   const submit = (e: FormEvent): void => {
     e.preventDefault()
     if (!name.trim() || !pence || !date) return
-    addSubscription({ name: name.trim(), amount: pence, interval, date, category: 'subscriptions' })
-    setName('')
-    setAmount('')
-    setOpen(false)
+    onDone({ name: name.trim(), amount: pence, interval, date })
   }
   return (
     <form className="money-new-goal money-new-sub" onSubmit={submit} data-new-sub>
@@ -437,14 +452,36 @@ function NewSubscription() {
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
         <button className="btn btn-primary" disabled={!name.trim() || !pence || !date}>
-          <Plus size={13} /> Add
+          {action === 'Add' ? <Plus size={13} /> : <Check size={13} />} {action}
         </button>
-        <button type="button" className="icon-btn" title="Cancel" onClick={() => setOpen(false)}>
+        <button type="button" className="icon-btn" title="Cancel" onClick={() => onDone()}>
           <X size={13} />
         </button>
       </div>
-      <p className="money-hint">It goes in the totals, the forecast and the calendar. If your statements find it later, yours is the one shown.</p>
+      {hint && <p className="money-hint">{hint}</p>}
     </form>
+  )
+}
+
+/** "+ Add a subscription": for ones the statements don't show yet, like one you've just started. */
+function NewSubscription() {
+  const [open, setOpen] = useState(false)
+  if (!open) {
+    return (
+      <button className="btn money-add-sub" onClick={() => setOpen(true)} data-add-sub>
+        <Plus size={13} /> Add a subscription or bill
+      </button>
+    )
+  }
+  return (
+    <SubscriptionForm
+      action="Add"
+      hint="It goes in the totals, the forecast and the calendar. If your statements find it later, yours is the one shown."
+      onDone={(sub) => {
+        setOpen(false)
+        if (sub) addSubscription({ ...sub, category: 'subscriptions' })
+      }}
+    />
   )
 }
 

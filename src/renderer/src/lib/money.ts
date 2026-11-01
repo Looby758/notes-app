@@ -55,6 +55,8 @@ export interface ManualSubscription {
   /** YYYY-MM-DD of one payment (usually the next one): the others are worked out from it. */
   date: string
   category: string
+  /** Set when this is a found (statement) subscription you edited: that one's payee key, so yours is shown instead of it. */
+  replaces?: string
 }
 
 export interface Balance {
@@ -180,7 +182,8 @@ export function readMoney(text: string | null): MoneyData {
         amount: Math.round(x.amount as number),
         interval: x.interval as RepeatInterval,
         date: x.date as string,
-        category: typeof x.category === 'string' ? x.category : 'subscriptions'
+        category: typeof x.category === 'string' ? x.category : 'subscriptions',
+        ...(typeof x.replaces === 'string' && x.replaces ? { replaces: x.replaces } : {})
       }))
   }
   if (r.cancelled && typeof r.cancelled === 'object') {

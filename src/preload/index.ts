@@ -495,6 +495,7 @@ const api: NotesApi = {
   shareCancelPairing: () => ipcRenderer.invoke('share:cancelPairing'),
   shareUnpair: () => ipcRenderer.invoke('share:unpair'),
   shareAskAccessibility: () => ipcRenderer.invoke('share:askAccessibility'),
+  shareResetAccessibility: () => ipcRenderer.invoke('share:resetAccessibility'),
   shareSendFiles: (paths) => ipcRenderer.invoke('share:sendFiles', paths),
   onShareReceived: (callback) => on('share:received', callback),
   onShareOpenSettings: (callback) => on('share:openSettings', callback),

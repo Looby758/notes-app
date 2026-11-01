@@ -1,8 +1,9 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'child_process'
-import { screen, systemPreferences } from 'electron'
+import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'child_process'
+import { app, screen, systemPreferences } from 'electron'
 import { IS_MAC } from '@shared/platform'
 import { macKey, swapCtrlCmd, windowsKey, type ShareButton } from '@shared/mouseShare'
 import { logError } from './log'
+import { loadSettings, saveSettings } from './settings'
 
 /**
  * Moving the pointer, pressing buttons and keys on this computer for the other one (one mouse, two
@@ -176,9 +177,74 @@ function write(line: string): void {
   helper.stdin.write(line + '\n')
 }
 
-/** Whether Orbit may move the pointer here; on a Mac, `ask` shows the Accessibility prompt. */
-export function inputAllowed(ask = false): boolean {
-  return !IS_MAC || systemPreferences.isTrustedAccessibilityClient(ask)
+// ---------- Mac Accessibility ----------
+//
+// Orbit is signed "ad hoc" (no paid Apple certificate), so to macOS every update is a different
+// app. The Accessibility list keeps showing Orbit switched on, but that entry belongs to the old
+// copy and does nothing for this one. Asking again just shows macOS's prompt over and over (it
+// used to, every time the pointer reached the edge), so: macOS's prompt at most once per version,
+// and after that Orbit explains the real fix (remove Orbit from the list and add it again).
+
+let askedThisRun = false
+
+const accessNotes = (): { workedIn?: string; askedIn?: string } => loadSettings().accessibility ?? {}
+
+function trusted(): boolean {
+  const ok = systemPreferences.isTrustedAccessibilityClient(false)
+  if (ok && accessNotes().workedIn !== app.getVersion()) saveSettings({ accessibility: { ...accessNotes(), workedIn: app.getVersion() } })
+  return ok
+}
+
+/**
+ * Accessibility is off, but it isn't the first time: it worked in an older version (so this is an
+ * update), or macOS's prompt was already shown for this version and it's still off.
+ */
+export function accessibilityStale(): boolean {
+  if (!IS_MAC || trusted()) return false
+  const { workedIn, askedIn } = accessNotes()
+  return (!!workedIn && workedIn !== app.getVersion()) || askedIn === app.getVersion()
+}
+
+/**
+ * Whether Orbit may move the pointer here. On a Mac, `ask` shows macOS's Accessibility prompt,
+ * but only once per version (and never when the permission looks stale): see above.
+ * `force` (a button you pressed) shows it regardless.
+ */
+export function inputAllowed(ask = false, force = false): boolean {
+  if (!IS_MAC || trusted()) return true
+  if (!ask) return false
+  if (!force && (askedThisRun || accessibilityStale())) return false
+  askedThisRun = true
+  saveSettings({ accessibility: { ...accessNotes(), askedIn: app.getVersion() } })
+  return systemPreferences.isTrustedAccessibilityClient(true)
+}
+
+/** What to tell you when Accessibility is off. */
+export function accessibilityHelp(): string {
+  return accessibilityStale()
+    ? 'If Orbit already shows as switched on in System Settings → Privacy & Security → Accessibility, macOS is holding that permission for an older copy of Orbit (each update counts as a new app to it), so it does nothing. Select Orbit there, remove it with −, then add it again with + (or press “Fix the permission” in Settings → Mouse sharing).'
+    : 'Allow Orbit in System Settings → Privacy & Security → Accessibility, then try again.'
+}
+
+/**
+ * Clears macOS's Accessibility entry for Orbit (the stale one for an older copy), then shows the
+ * prompt so this copy can be added. Only touches Orbit's own entry.
+ */
+export function resetAccessibility(): Promise<boolean> {
+  if (!IS_MAC) return Promise.resolve(true)
+  const bundleId = app.isPackaged ? 'com.notesapp.desktop' : ''
+  return new Promise((resolve) => {
+    if (!bundleId) return resolve(false)
+    execFile('/usr/bin/tccutil', ['reset', 'Accessibility', bundleId], (err) => {
+      if (err) {
+        logError('accessibility reset', err)
+        return resolve(false)
+      }
+      saveSettings({ accessibility: {} })
+      askedThisRun = false
+      resolve(inputAllowed(true, true))
+    })
+  })
 }
 
 /** Swap Ctrl and ⌘ on a Mac (so Ctrl+C on the PC's keyboard is ⌘C here). */

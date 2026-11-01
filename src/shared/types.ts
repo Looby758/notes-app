@@ -57,6 +57,8 @@ export interface Settings {
   camPort?: number
   camQuality?: 'sd' | 'hd'
   camFill?: boolean
+  /** Mac Accessibility: the Orbit version that last had it working, and the one we last showed macOS's prompt for. */
+  accessibility?: { workedIn?: string; askedIn?: string }
 }
 
 /** How the phone webcam is doing, for its window in Orbit. */
@@ -113,6 +115,11 @@ export interface ShareStatus {
   using: 'here' | 'there' | 'controlled'
   /** Mac: Orbit is allowed to move the pointer (Accessibility). Always true on Windows. */
   accessibility: boolean
+  /**
+   * Mac: Accessibility is still off after you were asked, or after an update: macOS is most likely
+   * holding the permission for an older copy of Orbit, which has to be removed and added again.
+   */
+  accessibilityStale?: boolean
   error: string
 }
 
@@ -976,6 +983,8 @@ export interface NotesApi {
   shareCancelPairing(): Promise<void>
   shareUnpair(): Promise<void>
   shareAskAccessibility(): Promise<boolean>
+  /** Mac: clears macOS's (stale) Accessibility entry for Orbit, then asks again. False if it couldn't. */
+  shareResetAccessibility(): Promise<boolean>
   shareSendFiles(paths: string[]): Promise<void>
   /** A file came over from the other computer (it's in Downloads). */
   onShareReceived(callback: (info: { title: string; path: string }) => void): () => void
