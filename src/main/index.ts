@@ -53,6 +53,8 @@ import { cleanPrefsPart, prefsPart } from '@shared/orbitSync'
 import { setupMonitors, teardownMonitors } from './monitors'
 import { setupLive } from './live'
 import { explorerFile, setupExplorer } from './explorer'
+import { openOutside } from './openOutside'
+import { openInOrbit, pathsFromArgv, setupOpenInOrbit } from './openInOrbit'
 import { hold, setupUndoBin } from './undoBin'
 import { setupVideoPlayer, videoResponse } from './videoPlayer'
 import { comicResponse, setupComics, shareProgress as shareComicProgress } from './comics'
@@ -105,8 +107,20 @@ if (process.platform === 'win32') app.setAppUserModelId('com.notesapp.desktop')
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
-  app.on('second-instance', () => showMain())
+  // "Open in Orbit" from File Explorer while Orbit is running starts a second copy, which hands the file over here.
+  app.on('second-instance', (_e, argv) => {
+    showMain()
+    pathsFromArgv(argv).forEach(openInOrbit)
+  })
+  // …or this copy was started by it.
+  pathsFromArgv(process.argv).forEach(openInOrbit)
 }
+
+// Mac: a file opened with Orbit from Finder (Open With → Orbit). Can come before start-up finishes.
+app.on('open-file', (e, path) => {
+  e.preventDefault()
+  openInOrbit(path)
+})
 
 // Clicking the Dock icon (Mac) brings the window back. Set up first thing, so that nothing that
 // goes wrong later in start-up can leave Notes running with no way to see it.
@@ -848,12 +862,12 @@ function registerIpc(): void {
     return Promise.all(result.filePaths.map((p) => currentVault().copyAttachment(folder, p)))
   })
   // Opens an attachment (PDF, document…) in its usual app. Notes and folders stay in the app.
-  ipcMain.handle('fs:openFile', async (_e, path: string) => {
+  // `ask`: a plain click, so Orbit asks before another app opens.
+  ipcMain.handle('fs:openFile', async (e, path: string, ask?: boolean) => {
     const full = currentVault().abs(path)
     if (!statSync(full).isFile()) throw new Error('That is not a file.')
     if (/\.(exe|bat|cmd|com|msi|ps1|vbs|js|lnk|scr|app|command|sh|pkg|workflow|terminal|tool|scpt)$/i.test(full)) throw new Error('For safety, programs and scripts are not opened from notes.')
-    const error = await shell.openPath(full)
-    if (error) throw new Error(error)
+    await openOutside(e.sender, full, !!ask)
   })
 
   // Several at once: one question, then each to the Bin. Returns the ones moved.
@@ -967,6 +981,7 @@ app.whenReady().then(async () => {
   registerVaultProtocol()
   registerCodeSandbox()
   registerIpc()
+  setupOpenInOrbit(() => mainWindow, showMain)
   // A theme was imported or removed (here, or on another computer): a removed theme that was in
   // use falls back to the default.
   const themesChanged = (): void => {

@@ -476,6 +476,10 @@ export interface NotesApi {
   showLog(): Promise<void>
   /** Puts the window into (or out of) full screen. */
   setFullScreen(on: boolean): Promise<void>
+  /** Files opened with "Open in Orbit" (File Explorer / Finder) before the window was listening. Call once listening. */
+  takeOpenedFiles(): Promise<string[]>
+  /** A file opened with "Open in Orbit" while Orbit is running (its full path). */
+  onOpenFile(callback: (path: string) => void): () => void
   /** A reminder notification; clicking it opens the note at that line (onReminderOpen). */
   /** Resolves false if this system can't show notifications at all. */
   showReminder(r: { title: string; body: string; path: string; line: number }): Promise<boolean>
@@ -1051,8 +1055,8 @@ export interface NotesApi {
   explorerList(dir: string): Promise<ExplorerEntry[]>
   /** The start of a text file, for its preview. */
   explorerReadText(path: string): Promise<string>
-  /** Opens a file in its usual app (programs are shown in File Explorer / Finder instead). */
-  explorerOpen(path: string): Promise<void>
+  /** Opens a file in its usual app (programs are shown in File Explorer / Finder instead). `ask`: ask first (a plain click). */
+  explorerOpen(path: string, ask?: boolean): Promise<void>
   explorerReveal(path: string): Promise<void>
   /** A new empty folder or file, renamed " (2)" if the name's taken. Returns its path. */
   explorerCreate(dir: string, name: string, kind: 'folder' | 'file'): Promise<string>
@@ -1095,8 +1099,8 @@ export interface NotesApi {
   explorerExtract(path: string, opts: { names?: string[]; password?: string; intoFolder?: boolean }): Promise<string[]>
   /** Packs files and folders into a new zip or 7z next to the first one. Resolves with its path. */
   explorerCompress(paths: string[], format: 'zip' | '7z', password?: string): Promise<string>
-  /** Opens a vault file (like a PDF) in its usual app. */
-  openFile(path: string): Promise<void>
+  /** Opens a vault file (like a PDF) in its usual app. `ask`: ask first (a plain click). */
+  openFile(path: string, ask?: boolean): Promise<void>
   /** Reads a note's markdown. */
   readNote(path: string): Promise<string>
   /** Saves a note (or a .canvas board) atomically. */

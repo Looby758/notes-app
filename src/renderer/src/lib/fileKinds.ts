@@ -1,7 +1,11 @@
 import { notify } from '../store/notify'
 import { openFileTab } from './editorController'
 import { isVideoFile } from '@shared/videoPlayer'
-import { openVaultVideo } from '../store/videoPlayer'
+import { queueVaultVideo } from '../store/videoPlayer'
+import { isComicBookFile } from '@shared/comics'
+import { shelveComicFile } from '../store/comics'
+import { isArchiveFile } from '@shared/archive'
+import { showInFiles } from '../store/filesReveal'
 
 /** What kind of file something in the notes folder is, and how Notes opens it. */
 
@@ -25,13 +29,23 @@ export function fileKind(path: string): FileKind {
 /** The address Notes serves a vault file at (see the vault: protocol in the main process). */
 export const vaultUrl = (path: string): string => `vault://local/${path.split('/').map(encodeURIComponent).join('/')}`
 
-/** Pictures, recordings, PDFs, spreadsheets and boards open in a tab, videos in the video player; anything else in its usual app. */
+/**
+ * What clicking a file in the notes folder does. It never kicks off something unexpected:
+ * pictures, recordings, PDFs, spreadsheets and boards open in a tab (paused); videos go in the
+ * video player's Up next (nothing starts playing); comics go on the comic shelf (unopened); zips
+ * show what's inside in the Files tab;
+ * anything else only opens in another app after Orbit asks.
+ */
 export function openAttachment(path: string, opts: { newTab?: boolean; pane?: string } = {}): void {
-  if (fileKind(path) === 'other') openExternally(path)
-  else if (fileKind(path) === 'video') openVaultVideo(path)
+  if (isComicBookFile(path)) void shelveComicFile(path, true)
+  else if (fileKind(path) === 'video') queueVaultVideo(path)
+  // Zips, RARs and 7z files show what's inside in the Files tab; nothing is unpacked.
+  else if (isArchiveFile(path)) window.api.videoInVault(path).then(showInFiles).catch(notify)
+  else if (fileKind(path) === 'other') window.api.openFile(path, true).catch(notify)
   else openFileTab(path, opts)
 }
 
+/** Opens a file in its usual app straight away (for an "Open in its usual app" menu item, which says so). */
 export function openExternally(path: string): void {
   window.api.openFile(path).catch(notify)
 }

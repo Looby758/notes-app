@@ -7,6 +7,7 @@ import { parseWikiInner } from './links'
 import { songTarget } from '@shared/songLinks'
 import { playSongTarget } from '../store/music'
 import { findNode, parentOf, resolveRelative } from './paths'
+import { openAttachment } from './fileKinds'
 
 /** Opens a markdown link clicked in a note: web links in a web tab (or the browser), relative links as notes. */
 export function openLink(href: string, fromNote: string): void {
@@ -30,9 +31,11 @@ export function openLink(href: string, fromNote: string): void {
   if (!target) return
   const tree = useVault.getState().tree
   let path = resolveRelative(parentOf(fromNote), target)
-  // Attachments (PDFs, documents, images…) open in their usual Windows app.
+  // Attachments open the same way as clicking them in the sidebar (pictures and PDFs in a tab,
+  // videos in Up next, comics on the shelf); anything else asks before opening in another app.
   if (/\.[a-z0-9]{1,5}$/i.test(path) && !/\.md$/i.test(path)) {
-    window.api.openFile(path).catch(() => notify(`File not found: ${target}`))
+    if (findNode(tree, path)?.type === 'attachment') openAttachment(path)
+    else window.api.openFile(path, true).catch(() => notify(`File not found: ${target}`))
     return
   }
   if (!findNode(tree, path) && !/\.md$/i.test(path)) path += '.md'

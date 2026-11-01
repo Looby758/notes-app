@@ -162,6 +162,12 @@ const api: NotesApi = {
   readImport: (path) => ipcRenderer.invoke('import:read', path),
   md5: (data) => ipcRenderer.invoke('import:md5', data),
   appleNotes: () => ipcRenderer.invoke('import:appleNotes'),
+  takeOpenedFiles: () => ipcRenderer.invoke('orbit:takeOpened'),
+  onOpenFile: (callback) => {
+    const handler = (_e: unknown, path: string): void => callback(path)
+    ipcRenderer.on('orbit:open-path', handler)
+    return () => ipcRenderer.removeListener('orbit:open-path', handler)
+  },
   onReminderOpen: (callback) => {
     const handler = (_e: unknown, path: string, line: number): void => callback(path, line)
     ipcRenderer.on('reminder:open', handler)
@@ -557,7 +563,7 @@ const api: NotesApi = {
   explorerPlaces: () => ipcRenderer.invoke('explorer:places'),
   explorerList: (dir) => ipcRenderer.invoke('explorer:list', dir),
   explorerReadText: (path) => ipcRenderer.invoke('explorer:readText', path),
-  explorerOpen: (path) => ipcRenderer.invoke('explorer:open', path),
+  explorerOpen: (path, ask) => ipcRenderer.invoke('explorer:open', path, ask),
   explorerReveal: (path) => ipcRenderer.invoke('explorer:reveal', path),
   explorerCreate: (dir, name, kind) => ipcRenderer.invoke('explorer:create', dir, name, kind),
   explorerRename: (path, name) => ipcRenderer.invoke('explorer:rename', path, name),
@@ -569,7 +575,7 @@ const api: NotesApi = {
   explorerArchiveList: (path, password) => ipcRenderer.invoke('explorer:archiveList', path, password),
   explorerExtract: (path, opts) => ipcRenderer.invoke('explorer:extract', path, opts),
   explorerCompress: (paths, format, password) => ipcRenderer.invoke('explorer:compress', paths, format, password),
-  openFile: (path) => ipcRenderer.invoke('fs:openFile', path),
+  openFile: (path, ask) => ipcRenderer.invoke('fs:openFile', path, ask),
   readNote: (path) => ipcRenderer.invoke('fs:read', path),
   writeNote: (path, content) => ipcRenderer.invoke('fs:write', path, content),
 
