@@ -628,6 +628,18 @@ export interface NotesApi {
   checkForUpdates(): Promise<UpdateStatus>
   /** Restarts into a downloaded update (Windows), or opens the download page (Mac). */
   installUpdate(): Promise<void>
+  /** What's new since this computer last opened Orbit (empty when nothing is). */
+  whatsNewPending(): Promise<import('./whatsNew').ReleaseNotes[]>
+  /** Every version's notes up to this one, newest first. */
+  whatsNewAll(): Promise<import('./whatsNew').ReleaseNotes[]>
+  /** This computer has seen this version's notes. */
+  whatsNewSeen(): Promise<void>
+
+  // Settings files
+  /** Settings files that are damaged or locked to an older copy of the app. */
+  checkSettingsFiles(): Promise<import('./settingsHealth').BrokenSettingsFile[]>
+  /** Starts that part fresh (the old file is kept as a .broken copy). Some parts restart Orbit. */
+  resetSettingsFile(file: string): Promise<{ restarting: boolean }>
   onUpdateStatus(callback: (status: UpdateStatus) => void): () => void
 
   // Export
@@ -664,7 +676,7 @@ export interface NotesApi {
   /** Sets up the video downloader (yt-dlp and ffmpeg); resolves when it's done or has failed. */
   getVideoDownloader(): Promise<VideoDownloaderState>
   onVideoDownloaderState(callback: (state: VideoDownloaderState) => void): () => void
-  /** Starts downloading the video at a link into the attachments folder. */
+  /** Starts downloading the video at a link into the folder asked for. */
   downloadVideo(request: VideoDownloadRequest): Promise<VideoDownload>
   /** This session's downloads, newest first. Starts sending changes to onVideoDownloads. */
   videoDownloads(): Promise<VideoDownload[]>
@@ -1184,7 +1196,7 @@ export interface VideoDownloaderState {
 export interface VideoDownloadRequest {
   url: string
   quality: import('./videoDownload').DownloadQuality
-  /** The attachments folder, in the notes folder. */
+  /** The folder to save it in, inside the notes folder ('' for the top level). Made if it isn't there. */
   folder: string
 }
 

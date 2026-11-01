@@ -40,6 +40,7 @@ import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, tear
 import { applySnipShortcut, setupSnip, startSnip } from './snip'
 import { applySongIdShortcut, setupSongId } from './songId'
 import { setupUpdater } from './updater'
+import { setupSettingsHealth } from './settingsHealth'
 import { setupExport } from './exporter'
 import { setupConverter } from './converter'
 import { setupVideoDownloader } from './videoDownload'
@@ -982,6 +983,7 @@ app.whenReady().then(async () => {
   registerCodeSandbox()
   registerIpc()
   setupOpenInOrbit(() => mainWindow, showMain)
+  safely('settings check', setupSettingsHealth)
   // A theme was imported or removed (here, or on another computer): a removed theme that was in
   // use falls back to the default.
   const themesChanged = (): void => {

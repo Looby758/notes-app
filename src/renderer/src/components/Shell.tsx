@@ -54,6 +54,7 @@ import { startDictionary } from '../lib/dictionary'
 import { EventDetails } from './Calendar/shared'
 import Resizer from './Resizer'
 import UpdateToast from './UpdateToast'
+import StartupNotices from './Notices/StartupNotices'
 import Screensaver from './Screensaver/Screensaver'
 import Pet from './Motion/Pet'
 import MusicPlayer from './Music/MusicPlayer'
@@ -393,6 +394,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <EventDetails />
       <Pet />
       <UpdateToast />
+      <StartupNotices />
       <DeviceDrop />
       <MusicPlayer />
       <RecordingBar />
