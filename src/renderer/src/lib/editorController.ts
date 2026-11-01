@@ -23,6 +23,7 @@ import { isWithin, replacePrefix } from './paths'
 import { noteLockState, onBeforeLock, openText, remapLock, sealText, useLock, type NoteLock } from './lock/session'
 import { currentHeadingIndex, extractHeadings } from './outline'
 import { flushBoards } from './boards'
+import { flushTextFiles } from './textFiles'
 import { forgetWebPage, loadInWebTab, setWebPage } from '../store/web'
 import {
   isValidLayout,
@@ -1153,7 +1154,7 @@ async function flush(f: NoteFile): Promise<void> {
 }
 
 export async function flushAll(): Promise<void> {
-  await Promise.all([...[...files.values()].map(flush), flushBoards()])
+  await Promise.all([...[...files.values()].map(flush), flushBoards(), flushTextFiles()])
 }
 
 /** Ctrl+S: save right away instead of waiting for the pause. */

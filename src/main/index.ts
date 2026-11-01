@@ -722,6 +722,7 @@ function registerIpc(): void {
 
   ipcMain.handle('fs:tree', () => currentVault().tree())
   ipcMain.handle('fs:read', (_e, path: string) => currentVault().read(path))
+  ipcMain.handle('fs:readTextFile', (_e, path: string) => currentVault().readTextFile(path))
   ipcMain.handle('fs:write', (_e, path: string, content: string) => currentVault().write(path, content))
   ipcMain.handle('fs:readAll', () => currentVault().readAll())
   ipcMain.handle('fs:createNote', (_e, folder: string) => currentVault().createNote(folder))

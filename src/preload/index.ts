@@ -615,6 +615,7 @@ const api: NotesApi = {
   openFile: (path, ask) => ipcRenderer.invoke('fs:openFile', path, ask),
   readNote: (path) => ipcRenderer.invoke('fs:read', path),
   writeNote: (path, content) => ipcRenderer.invoke('fs:write', path, content),
+  readTextFile: (path) => ipcRenderer.invoke('fs:readTextFile', path),
 
   onVaultChanged: (callback) => {
     const handler = (_e: unknown, paths: string[]): void => callback(paths)

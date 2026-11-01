@@ -1170,8 +1170,10 @@ export interface NotesApi {
   openFile(path: string, ask?: boolean): Promise<void>
   /** Reads a note's markdown. */
   readNote(path: string): Promise<string>
-  /** Saves a note (or a .canvas board) atomically. */
+  /** Saves a note (or a .canvas board, or a .txt, .json or other text file) atomically. */
   writeNote(path: string, content: string): Promise<void>
+  /** Reads a .txt, .json or other plain text file for editing (refuses big or binary files). */
+  readTextFile(path: string): Promise<string>
 
   /** Called with the changed paths whenever files in the vault change on disk. Returns an unsubscribe function. */
   onVaultChanged(callback: (paths: string[]) => void): () => void

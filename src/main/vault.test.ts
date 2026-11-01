@@ -46,3 +46,22 @@ describe('app data (money, passwords…)', () => {
     expect(left).not.toContain('money-2020-01-01.json')
   })
 })
+
+describe('text files (.txt, .json…)', () => {
+  it('reads and saves them like notes', async () => {
+    const vault = new Vault(root)
+    await writeFile(join(root, 'todo.txt'), 'milk\r\neggs')
+    expect(await vault.readTextFile('todo.txt')).toBe('milk\r\neggs')
+    await vault.write('settings.json', '{"a": 1}\n')
+    expect(await readFile(join(root, 'settings.json'), 'utf8')).toBe('{"a": 1}\n')
+  })
+
+  it('refuses binary files and anything that isn’t a text file', async () => {
+    const vault = new Vault(root)
+    await writeFile(join(root, 'odd.txt'), Buffer.from([0x50, 0x4b, 0, 0, 1]))
+    await expect(vault.readTextFile('odd.txt')).rejects.toThrow(/doesn’t look like text/)
+    await writeFile(join(root, 'photo.png'), 'x')
+    await expect(vault.readTextFile('photo.png')).rejects.toThrow()
+    await expect(vault.write('photo.png', 'x')).rejects.toThrow()
+  })
+})
