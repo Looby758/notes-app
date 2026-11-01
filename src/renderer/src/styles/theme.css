@@ -1178,6 +1178,7 @@ body.hide-statusbar .statusbar {
 }
 .about-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -11763,4 +11764,89 @@ body.reduce-motion .theme-loading-text {
 .explorer-compress-formats span {
   color: var(--text-faint);
   font-size: 12px;
+}
+
+/* ---------- startup notices: broken settings files, what's new ---------- */
+
+.about-note {
+  align-self: center;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.modal.notice-dialog {
+  width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 22px;
+  outline: none;
+  max-height: 76vh;
+}
+.notice-dialog h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.notice-dialog h4 {
+  margin: 4px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.notice-intro,
+.notice-small {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.notice-small {
+  font-size: 12px;
+}
+.notice-broken {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.notice-broken li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.notice-broken p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.notice-releases {
+  overflow-y: auto;
+  min-height: 0;
+}
+.notice-releases ul {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.notice-releases li + li {
+  margin-top: 4px;
+}
+.notice-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }

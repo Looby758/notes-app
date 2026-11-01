@@ -5,6 +5,7 @@ import { createServer, type Server } from 'http'
 import { join } from 'path'
 import type { CalEvent, CalendarSourcesStatus, GoogleAuthStatus } from '@shared/types'
 import { parseIcs } from '@shared/ics'
+import { onSettingsReset } from './settingsHealth'
 
 /**
  * Read-only calendars: Google Calendar (you sign in with Google in your browser) and calendar
@@ -71,7 +72,22 @@ function save(): void {
 }
 
 const encrypt = (text: string): string => safeStorage.encryptString(text).toString('base64')
-const decrypt = (text: string): string => safeStorage.decryptString(Buffer.from(text, 'base64'))
+function decrypt(text: string): string {
+  try {
+    return safeStorage.decryptString(Buffer.from(text, 'base64'))
+  } catch {
+    // Saved by an older copy of the app (e.g. "Notes" before the rename), whose lock this copy can't open.
+    throw new Error('Your calendar sign-in was saved by an older copy of the app. Reset calendar settings in Settings → About → Check settings files, then sign in again.')
+  }
+}
+
+// After "Reset calendar settings": forget what was loaded, so it starts fresh without a restart.
+onSettingsReset('calendars.json', () => {
+  stored = null
+  accessToken = null
+  googleError = undefined
+  feedErrors.clear()
+})
 
 export function status(): CalendarSourcesStatus {
   const s = load()
