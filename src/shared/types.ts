@@ -44,6 +44,9 @@ export interface Settings {
   /** The floating mini music player: where it was left, and whether it was showing. */
   musicMiniWindow?: WindowBounds
   musicMiniOpen?: boolean
+  /** The pop-out window (any app, floating on top): where it was left, and how see-through it was. */
+  popoutWindow?: WindowBounds
+  popoutOpacity?: number
   /** The paired phone's link (its token, and the port it was on), so the phone reconnects by itself. */
   phoneToken?: string
   phonePort?: number
@@ -812,6 +815,18 @@ export interface NotesApi {
   musicDevices(): Promise<MusicDevice[]>
   musicTransfer(deviceId: string): Promise<void>
   // The floating mini music player
+  /** Pop-out window: opens it (it asks which app to show), or brings it back. */
+  openPopout(): Promise<void>
+  /** Pop-out window's own page: the apps and screens it can show. */
+  popoutSources(): Promise<StudioCaptureSource[]>
+  popoutState(): Promise<{ opacity: number }>
+  /** Pop-out window's own page: take the shape of the picture (width ÷ height). */
+  fitPopout(aspect: number): Promise<void>
+  /** Pop-out window's own page: make room to pick an app. */
+  popoutPicker(): Promise<void>
+  setPopoutOpacity(opacity: number): Promise<void>
+  minimizePopout(): Promise<void>
+  closePopout(): Promise<void>
   setMusicMini(open: boolean): Promise<boolean>
   isMusicMiniOpen(): Promise<boolean>
   /** It was showing when Notes last closed. */

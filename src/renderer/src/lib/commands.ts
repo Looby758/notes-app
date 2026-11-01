@@ -238,6 +238,7 @@ export const commands: Command[] = [
   { id: 'music.toggle', group: 'Music', title: 'Music: play / pause', run: () => void musicControl('toggle') },
   { id: 'music.next', group: 'Music', title: 'Music: next song', run: () => void musicControl('next') },
   { id: 'music.previous', group: 'Music', title: 'Music: previous song', run: () => void musicControl('previous') },
+  { id: 'popout.open', group: 'Tools', title: 'Pop out any app: show a game, video or app live in a small window on top', run: () => void window.api.openPopout() },
   { id: 'music.mini', group: 'Music', title: 'Music: floating mini player (on top of other apps)', run: () => void setMusicMini(!useMusic.getState().miniOpen) },
   { id: 'music.share', group: 'Music', title: 'Music: add the song playing to this note', run: shareSongToNote },
   { id: 'music.whatsThisSong', group: 'Music', title: 'Music: what’s this song? (listen to a video, game or stream and find it)', run: showAndFindSong },
