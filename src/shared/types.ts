@@ -7,6 +7,7 @@ import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
 import type { LocalLibrary } from './localMusic'
 import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
+import type { DiscordStatus } from './discord'
 import type { WifiNetwork } from './wifi'
 import type { MusicAction, MusicDevice, MusicItem, MusicQueue, MusicSearchResults, MusicState, MusicStatus } from './spotify'
 import type { CoversStatus, GamesList, LaunchArt } from './games'
@@ -662,6 +663,22 @@ export interface NotesApi {
   /** A soundboard hotkey was pressed (anywhere, even in a game). */
   onSoundboardHotkey(callback: (action: SoundboardAction) => void): () => void
   onSoundboardChanged(callback: (status: SoundboardStatus) => void): () => void
+
+  // Discord voice controls (main/discord.ts, through Discord's official local RPC)
+  discordGet(): Promise<DiscordStatus>
+  /** Saves your own Discord application's id and client secret (encrypted). */
+  discordSaveApp(clientId: string, secret: string): Promise<DiscordStatus>
+  /** Connects and, if needed, asks Discord to show its Authorize window. */
+  discordSignIn(): Promise<DiscordStatus>
+  /** Tries the saved sign-in again (e.g. after starting Discord). */
+  discordRetry(): Promise<DiscordStatus>
+  discordSignOut(): Promise<DiscordStatus>
+  /** Removes the application and sign-in. */
+  discordForget(): Promise<DiscordStatus>
+  /** Mutes or deafens (or un-); flips it when `value` is left out. */
+  discordSet(which: 'mute' | 'deaf', value?: boolean): Promise<DiscordStatus>
+  discordOpenPortal(): Promise<void>
+  onDiscordChanged(callback: (status: DiscordStatus) => void): () => void
 
   // Screen snip (main/snip.ts)
   /** Takes a picture of the screen under the pointer and opens the snip window over it. */

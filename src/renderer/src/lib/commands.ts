@@ -25,6 +25,7 @@ import {
   STUDIO_TAB,
   CLIPS_TAB,
   SOUNDBOARD_TAB,
+  DISCORD_TAB,
   EXPLORER_TAB,
   MESSAGES_TAB,
   GAMES_TAB,
@@ -60,6 +61,7 @@ import { newSpreadsheet } from './newSheet'
 import { openAsk, runNoteJob } from '../store/ai'
 import { musicControl, musicToggleLike, setMusicMini, shareSongToNote, toggleMusic, useMusic } from '../store/music'
 import { sendToPhone } from '../store/phone'
+import { toggleDiscord } from '../store/discord'
 import { openRadial } from '../components/Nav/RadialMenu'
 import { startSnip } from './snip'
 import { changeNotesPassword, lockAllNow, lockFolder, lockNote, lockNoteOwn, removeLock } from './lock/actions'
@@ -316,6 +318,9 @@ export const commands: Command[] = [
   { id: 'explorer.open', group: 'Navigation', title: 'Browse files on this computer (and Google Drive)', run: () => openSpecialTab(EXPLORER_TAB) },
   { id: 'comics.open', group: 'Navigation', title: 'Read comics (your comic book shelf)', run: () => openSpecialTab(COMICS_TAB) },
   { id: 'sudoku.open', group: 'Navigation', title: 'Play sudoku (take a quick break)', run: () => openSpecialTab(SUDOKU_TAB) },
+  { id: 'discord.open', group: 'Navigation', title: 'Discord voice (who’s in voice, mute, deafen)', run: () => openSpecialTab(DISCORD_TAB) },
+  { id: 'discord.mute', group: 'Discord', title: 'Discord: mute / unmute', run: () => void toggleDiscord('mute') },
+  { id: 'discord.deafen', group: 'Discord', title: 'Discord: deafen / undeafen', run: () => void toggleDiscord('deaf') },
   { id: 'soundboard.open', group: 'Navigation', title: 'Open the soundboard and voice changer', run: () => openSpecialTab(SOUNDBOARD_TAB) },
   { id: 'soundboard.stop', group: 'Navigation', title: 'Stop all soundboard sounds', run: () => void import('./soundboard').then((m) => m.stopAll()) },
   { id: 'studio.open', group: 'Navigation', title: 'Open the Studio (record your screen and webcam)', run: () => openSpecialTab(STUDIO_TAB) },

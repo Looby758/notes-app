@@ -253,6 +253,20 @@ const api: NotesApi = {
     return () => ipcRenderer.removeListener('soundboard:changed', handler)
   },
 
+  discordGet: () => ipcRenderer.invoke('discord:get'),
+  discordSaveApp: (clientId, secret) => ipcRenderer.invoke('discord:save-app', clientId, secret),
+  discordSignIn: () => ipcRenderer.invoke('discord:sign-in'),
+  discordRetry: () => ipcRenderer.invoke('discord:retry'),
+  discordSignOut: () => ipcRenderer.invoke('discord:sign-out'),
+  discordForget: () => ipcRenderer.invoke('discord:forget'),
+  discordSet: (which, value) => ipcRenderer.invoke('discord:set', which, value),
+  discordOpenPortal: () => ipcRenderer.invoke('discord:open-portal'),
+  onDiscordChanged: (callback) => {
+    const handler = (_e: unknown, status: Parameters<typeof callback>[0]): void => callback(status)
+    ipcRenderer.on('discord:changed', handler)
+    return () => ipcRenderer.removeListener('discord:changed', handler)
+  },
+
   startSnip: () => ipcRenderer.invoke('snip:start'),
   snipStatus: () => ipcRenderer.invoke('snip:status'),
   snipImage: () => ipcRenderer.invoke('snip:image'),

@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ArrowRightLeft, AudioLines, Bomb, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Grid3x3, HardDrive, House, KeyRound, Layers, LibraryBig, Mail, MessageSquare, MessagesSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Scissors, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
+import { ArrowRightLeft, AudioLines, Headphones, Bomb, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Grid3x3, HardDrive, House, KeyRound, Layers, LibraryBig, Mail, MessageSquare, MessagesSquare, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Scissors, Settings, Sparkles, SquareTerminal, Star, StarOff, X } from 'lucide-react'
 import Private from '../Streamer/Private'
 import { useHideNames } from '../../store/streamer'
 import { useEditor } from '../../store/editor'
@@ -29,6 +29,7 @@ import {
   STUDIO_TAB,
   CLIPS_TAB,
   SOUNDBOARD_TAB,
+  DISCORD_TAB,
   MESSAGES_TAB,
   GAMES_TAB,
   VIDEO_TAB,
@@ -94,6 +95,7 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === STUDIO_TAB) return 'Studio'
   if (id === CLIPS_TAB) return 'Clips'
   if (id === SOUNDBOARD_TAB) return 'Soundboard'
+  if (id === DISCORD_TAB) return 'Discord voice'
   if (id === MESSAGES_TAB) return 'Messages'
   if (id === GAMES_TAB) return 'Games'
   if (id === VIDEO_TAB) {
@@ -283,6 +285,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === STUDIO_TAB && <Clapperboard size={13} className="tab-icon" />}
               {id === CLIPS_TAB && <Scissors size={13} className="tab-icon" />}
               {id === SOUNDBOARD_TAB && <AudioLines size={13} className="tab-icon" />}
+              {id === DISCORD_TAB && <Headphones size={13} className="tab-icon" />}
               {id === MESSAGES_TAB && <MessagesSquare size={13} className="tab-icon" />}
               {id === GAMES_TAB && <Gamepad2 size={13} className="tab-icon" />}
               {id === VIDEO_TAB && <Film size={13} className="tab-icon" />}

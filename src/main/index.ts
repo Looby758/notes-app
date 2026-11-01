@@ -45,6 +45,7 @@ import { isAppPage, setupStudio } from './studio'
 import { applyReplayShortcut, clipResponse, setupClips } from './clips'
 import { setupLocalAi } from './localAi'
 import { reloadSoundboard, setupSoundboard, soundboardFolder, soundFile } from './soundboard'
+import { setupDiscord, teardownDiscord } from './discord'
 import { setupOrbitSync, syncOrbitSoon, type PartHandler } from './orbitSync'
 import { cleanPrefsPart, prefsPart } from '@shared/orbitSync'
 import { setupLive } from './live'
@@ -966,6 +967,7 @@ app.whenReady().then(async () => {
   safely('studio', setupStudio)
   safely('offline AI', setupLocalAi)
   safely('soundboard', setupSoundboard)
+  safely('Discord voice', setupDiscord)
   safely('live streaming', setupLive)
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
   safely('undo', () => setupUndoBin(() => vault?.root ?? null))
@@ -1008,6 +1010,7 @@ app.on('before-quit', () => {
 app.on('will-quit', () => {
   teardownCapture()
   safely('mouse sharing', teardownMouseShare)
+  safely('Discord voice', teardownDiscord)
   clearSecret()
 })
 

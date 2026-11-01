@@ -78,6 +78,8 @@ export const STUDIO_TAB = 'studio:'
 export const CLIPS_TAB = 'clips:'
 /** Sound clips with hotkeys, the voice changer and music into a voice call (components/Soundboard). */
 export const SOUNDBOARD_TAB = 'soundboard:'
+/** Who's in your Discord voice channel, with mute and deafen (components/Discord). */
+export const DISCORD_TAB = 'discord-voice:'
 /** WhatsApp and Discord in one tab (components/Messages). */
 export const MESSAGES_TAB = 'messages:'
 export const GAMES_TAB = 'games:'
