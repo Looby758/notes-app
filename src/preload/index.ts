@@ -171,6 +171,11 @@ const api: NotesApi = {
   updateStatus: () => ipcRenderer.invoke('update:status'),
   checkForUpdates: () => ipcRenderer.invoke('update:check'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
+  whatsNewPending: () => ipcRenderer.invoke('whatsNew:pending'),
+  whatsNewAll: () => ipcRenderer.invoke('whatsNew:all'),
+  whatsNewSeen: () => ipcRenderer.invoke('whatsNew:seen'),
+  checkSettingsFiles: () => ipcRenderer.invoke('settingsHealth:check'),
+  resetSettingsFile: (file) => ipcRenderer.invoke('settingsHealth:reset', file),
   onUpdateStatus: (callback) => {
     const handler = (_e: unknown, status: Parameters<typeof callback>[0]): void => callback(status)
     ipcRenderer.on('update:status', handler)

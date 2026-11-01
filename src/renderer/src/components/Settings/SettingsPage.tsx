@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { CalendarDays, Clapperboard, Compass, FileJson, MonitorSmartphone, Music, FolderCog, Info, Keyboard, Palette, PenLine, RefreshCw, RotateCcw, ScrollText, Search, Sparkles, X, Zap } from 'lucide-react'
+import { CalendarDays, Clapperboard, Compass, FileJson, MonitorSmartphone, Music, FolderCog, Info, Keyboard, Palette, PenLine, RefreshCw, RotateCcw, ScrollText, Search, ShieldCheck, Sparkles, X, Zap } from 'lucide-react'
 import { checkForUpdates, useUpdates, watchUpdates } from '../../store/updates'
+import { checkSettingsNow, showWhatsNew } from '../../store/notices'
 import { DEFAULT_PREFS } from '@shared/prefs'
 import type { CaptureStatus } from '@shared/types'
 import { resetPrefs, usePrefs } from '../../store/prefs'
@@ -193,6 +194,28 @@ function UpdateStatusRow() {
   )
 }
 
+/** Looks for damaged settings files (or ones an older copy of the app locked) and offers a reset for each. */
+function CheckSettingsButton() {
+  const [result, setResult] = useState('')
+  return (
+    <>
+      <button
+        className="btn"
+        data-check-settings
+        onClick={async () => {
+          setResult('')
+          const broken = await checkSettingsNow().catch(() => -1)
+          if (broken === 0) setResult('All settings files are fine.')
+          else if (broken < 0) setResult('Couldn’t check the settings files.')
+        }}
+      >
+        <ShieldCheck size={14} /> Check settings files
+      </button>
+      {result && <span className="about-note">{result}</span>}
+    </>
+  )
+}
+
 function About() {
   return (
     <section className="settings-group about">
@@ -212,6 +235,10 @@ function About() {
         <button className="btn" onClick={() => window.api.showLog()} title="Problems Notes ran into in the background, if any">
           <ScrollText size={14} /> Show log file
         </button>
+        <button className="btn" onClick={() => void showWhatsNew()} data-show-whats-new>
+          <Sparkles size={14} /> What’s new
+        </button>
+        <CheckSettingsButton />
       </div>
     </section>
   )
