@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cleanReply, fitTexts, hfFileInfo, moneySortPrompt, parseMoneySort, pickEngine, sentenceAround, sha256Of, suggestedModel, type ReleaseAsset } from './localAi'
+import { pickFromReleases, cleanReply, fitTexts, hfFileInfo, moneySortPrompt, parseMoneySort, pickEngine, sentenceAround, sha256Of, suggestedModel, type ReleaseAsset } from './localAi'
 
 const asset = (name: string): ReleaseAsset => ({ name, url: `https://example.com/${name}`, size: 100, digest: `sha256:${'a'.repeat(64)}` })
 const RELEASE = [
@@ -114,5 +114,39 @@ describe('sentenceAround', () => {
     const text = '- [ ] fix the bank thing'
     const at = text.indexOf('bank')
     expect(sentenceAround(text, at, at + 4)).toBe('fix the bank thing')
+  })
+})
+
+describe('pickFromReleases', () => {
+  const gh = (name: string) => ({ name, browser_download_url: `https://example.com/${name}`, size: 100, digest: `sha256:${'b'.repeat(64)}` })
+  // Real names: "latest" (v0.7.0) has no builds; the nightly b11669 does.
+  const releases = [
+    { tag_name: 'v0.7.0', assets: [gh('nightly-tag.txt')] },
+    {
+      tag_name: 'b11669',
+      assets: [
+        'cudart-llama-bin-win-cuda-12.4-x64.zip',
+        'cudart-llama-bin-win-cuda-13.4-arm64.zip',
+        'cudart-llama-bin-win-cuda-13.4-x64.zip',
+        'llama-b11669-bin-macos-arm64.tar.gz',
+        'llama-b11669-bin-win-cuda-12.4-x64.zip',
+        'llama-b11669-bin-win-cuda-13.4-arm64.zip',
+        'llama-b11669-bin-win-cuda-13.4-x64.zip',
+        'llama-b11669-bin-win-vulkan-x64.zip'
+      ].map(gh)
+    }
+  ]
+  it('skips a release without builds and finds CUDA 13.4 for an RTX PC', () => {
+    const r = pickFromReleases(releases, { platform: 'win32', arch: 'x64', nvidia: true })
+    expect(r?.release.tag_name).toBe('b11669')
+    expect(r?.pick.engine.name).toBe('llama-b11669-bin-win-cuda-13.4-x64.zip')
+    expect(r?.pick.runtime?.name).toBe('cudart-llama-bin-win-cuda-13.4-x64.zip')
+  })
+  it('finds the Mac build', () => {
+    expect(pickFromReleases(releases, { platform: 'darwin', arch: 'arm64', nvidia: false })?.pick.engine.name).toBe('llama-b11669-bin-macos-arm64.tar.gz')
+  })
+  it('skips builds GitHub gives no checksum for', () => {
+    const noDigest = [{ tag_name: 'b1', assets: releases[1].assets.map((a) => ({ ...a, digest: null })) }]
+    expect(pickFromReleases(noDigest, { platform: 'win32', arch: 'x64', nvidia: true })).toBeNull()
   })
 })
