@@ -1,4 +1,5 @@
 import type { ExplorerEntry, ExplorerPlace, PasteMode } from './explorer'
+import type { ArchiveEntry } from './archive'
 import type { ComicOpened, ComicPreparing, ComicSettings, ComicShelf } from './comics'
 import type { Prefs } from './prefs'
 import type { DictionaryEntry } from './dictionary'
@@ -963,6 +964,12 @@ export interface NotesApi {
   explorerToVault(paths: string[], folder: string): Promise<string[]>
   /** Starts dragging files out as real files (into Discord, a browser, File Explorer / Finder, or back into Orbit). Call it from dragstart, after preventDefault. */
   explorerStartDrag(paths: string[]): void
+  /** What's inside a zip, RAR or 7z. Rejects with a message containing "password" when one is needed or wrong. */
+  explorerArchiveList(path: string, password?: string): Promise<ArchiveEntry[]>
+  /** Unpacks an archive (or just `names` in it) into a new folder next to it, or straight into its folder. Resolves with what was made. */
+  explorerExtract(path: string, opts: { names?: string[]; password?: string; intoFolder?: boolean }): Promise<string[]>
+  /** Packs files and folders into a new zip or 7z next to the first one. Resolves with its path. */
+  explorerCompress(paths: string[], format: 'zip' | '7z', password?: string): Promise<string>
   /** Opens a vault file (like a PDF) in its usual app. */
   openFile(path: string): Promise<void>
   /** Reads a note's markdown. */

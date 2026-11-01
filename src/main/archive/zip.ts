@@ -61,6 +61,11 @@ export class ZipArchive {
     return this.items.map(({ name, size, packedSize, isDir, encrypted }) => ({ name, size, packedSize, isDir, encrypted }))
   }
 
+  /** How a file is squashed (0 stored, 8 deflate, others 7-Zip reads). */
+  methodOf(name: string): number {
+    return this.items.find((i) => i.name === name)?.method ?? 0
+  }
+
   /** One file's contents. */
   async read(name: string): Promise<Buffer> {
     const item = this.items.find((i) => i.name === name)

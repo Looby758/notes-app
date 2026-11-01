@@ -12,12 +12,15 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  FileArchive,
   File,
   FilePlus,
   FileText,
   Film,
   Folder,
+  FolderInput,
   FolderOpen,
+  FolderOutput,
   FolderPlus,
   FolderSearch,
   HardDrive,
@@ -27,6 +30,7 @@ import {
   Link,
   List,
   Loader2,
+  Lock,
   Monitor,
   Music,
   NotebookPen,
@@ -67,6 +71,8 @@ import ContextMenu, { type MenuItem } from '../ContextMenu'
 import FileIcon from '../FileIcon'
 import { isVideoFile } from '@shared/videoPlayer'
 import { openVideo } from '../../store/videoPlayer'
+import { archiveFolderName, isArchiveFile } from '@shared/archive'
+import ArchivePreview, { CompressDialog } from './ArchivePreview'
 
 const PLACE_ICONS: Record<ExplorerPlace['kind'], typeof Folder> = {
   home: House,
@@ -181,6 +187,8 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
   const [menu, setMenu] = useState<{ x: number; y: number; entry: ExplorerEntry | null; pin?: string } | null>(null)
   const [dropOn, setDropOn] = useState<string | null>(null)
   const [clipped, setClipped] = useState(clip)
+  /** Items waiting for a password before they're compressed. */
+  const [compressing, setCompressing] = useState<string[] | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const crumbsRef = useRef<HTMLDivElement>(null)
   /** What to pick once the folder reloads (a new folder, pasted files). */
@@ -313,10 +321,43 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
     if (entry.vaultPath && fileKind(entry.vaultPath) !== 'other') return openFileTab(entry.vaultPath, { newTab: true })
     // Comics open in Orbit's comic reader (and go on its shelf).
     if (isComicFile(entry.name)) return void openComicFile(entry.path)
+    // Zips, RARs and 7z files unpack into a folder next to them, which then opens.
+    if (isArchiveFile(entry.name)) return void extract(entry, { intoFolder: true, go: true }).catch((err) => notify(/password/i.test(String(err)) ? 'This archive has a password: type it in on the right, then Extract.' : err))
     window.api.explorerOpen(entry.path).catch(notify)
   }
 
   // ---- file actions ----
+
+  /** Unpacks an archive (see ArchivePreview). Ctrl+Z puts what came out in the bin. Rejects so the preview can ask for a password. */
+  const extract = async (entry: ExplorerEntry, opts: { names?: string[]; password?: string; intoFolder: boolean; go?: boolean }): Promise<boolean> => {
+    const folder = parentPath(entry.path) ?? dir
+    notify(`Unpacking “${entry.name}”…`, 'info')
+    const made = await window.api.explorerExtract(entry.path, opts)
+    if (!made.length) return false
+    recordAdded(`Unpacked “${entry.name}”`, made)
+    if (opts.go && made.length === 1) go(made[0])
+    else {
+      if (folder === dir) pickAfter.current = { paths: made }
+      refresh()
+    }
+    notify(opts.intoFolder ? `Unpacked into “${nameOf(made[0])}”.` : `Unpacked ${plural(made.length, 'item')} here.`, 'info')
+    return true
+  }
+
+  /** Packs items into a new zip or 7z next to them, which is then picked. */
+  const compress = (paths: string[], format: 'zip' | '7z', password?: string): void => {
+    if (!paths.length) return
+    notify(`Compressing ${what(paths)}…`, 'info')
+    window.api
+      .explorerCompress(paths, format, password)
+      .then((out) => {
+        if (parentPath(out) === dir) pickAfter.current = { paths: [out] }
+        refresh()
+        recordAdded(`Compressed ${what(paths)}`, [out])
+        notify(`Made “${nameOf(out)}”.`, 'info')
+      })
+      .catch(notify)
+  }
 
   /** The ones an action works on: everything picked, or the one right-clicked. */
   const targets = (entry?: ExplorerEntry | null): ExplorerEntry[] =>
@@ -537,6 +578,16 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
       ...(entry.isDir && !many && clipped ? [{ label: 'Paste into this folder', icon: <ClipboardPaste size={14} />, onClick: () => paste(entry.path) }] : []),
       { label: 'Duplicate', icon: <CopyPlus size={14} />, onClick: () => pasteInto(list.map((x) => x.path), parentPath(entry.path) ?? dir!, 'copy') },
       ...(!many ? [{ label: 'Rename', icon: <Pencil size={14} />, onClick: () => setRenaming(entry.path) }] : []),
+      'separator',
+      ...(!many && isArchiveFile(entry.name)
+        ? [
+            { label: `Extract to “${archiveFolderName(entry.name)}”`, icon: <FolderOutput size={14} />, onClick: () => void extract(entry, { intoFolder: true }).catch(notify) },
+            { label: 'Extract here', icon: <FolderInput size={14} />, onClick: () => void extract(entry, { intoFolder: false }).catch(notify) }
+          ]
+        : []),
+      { label: 'Compress to .zip', icon: <FileArchive size={14} />, onClick: () => compress(list.map((x) => x.path), 'zip') },
+      { label: 'Compress to .7z', icon: <FileArchive size={14} />, onClick: () => compress(list.map((x) => x.path), '7z') },
+      { label: 'Compress with a password…', icon: <Lock size={14} />, onClick: () => setCompressing(list.map((x) => x.path)) },
       'separator',
       { label: many ? 'Copy paths' : 'Copy path', icon: <Link size={14} />, onClick: () => void navigator.clipboard.writeText(list.map((x) => x.path).join('\n')) },
       ...(entry.isDir && !many ? [{ label: pins.includes(entry.path) ? 'Unpin from sidebar' : 'Pin to sidebar', icon: pins.includes(entry.path) ? <PinOff size={14} /> : <Pin size={14} />, onClick: () => togglePin(entry.path) }] : []),
@@ -776,8 +827,18 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
           </div>
         </section>
 
-        <Preview entry={picked.size > 1 ? null : current} count={picked.size} onOpen={open} onRename={(e) => setRenaming(e.path)} onDelete={(e) => void remove([e])} />
+        <Preview entry={picked.size > 1 ? null : current} count={picked.size} onOpen={open} onRename={(e) => setRenaming(e.path)} onDelete={(e) => void remove([e])} onExtract={extract} />
       </div>
+      {compressing && (
+        <CompressDialog
+          count={compressing.length}
+          onClose={() => setCompressing(null)}
+          onDone={(format, password) => {
+            compress(compressing, format, password)
+            setCompressing(null)
+          }}
+        />
+      )}
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} items={menu.pin ? pinMenu(menu.pin) : menu.entry ? itemMenu(menu.entry) : folderMenu()} onClose={closeMenu} />
       )}
@@ -826,13 +887,15 @@ function Preview({
   count,
   onOpen,
   onRename,
-  onDelete
+  onDelete,
+  onExtract
 }: {
   entry: ExplorerEntry | null
   count: number
   onOpen: (e: ExplorerEntry) => void
   onRename: (e: ExplorerEntry) => void
   onDelete: (e: ExplorerEntry) => void
+  onExtract: (e: ExplorerEntry, opts: { names?: string[]; password?: string; intoFolder: boolean }) => Promise<boolean>
 }) {
   const [text, setText] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
@@ -866,28 +929,33 @@ function Preview({
   }
 
   const url = explorerUrl(entry.path)
+  const archive = !entry.isDir && isArchiveFile(entry.name)
   return (
     <aside className="explorer-preview" key={entry.path} data-explorer-preview>
-      <div className={`explorer-look ${kind}`}>
-        {failed || kind === 'none' ? (
-          entry.isDir ? <FolderOpen size={56} strokeWidth={1.2} /> : <FileIcon path={entry.name} size={56} />
-        ) : kind === 'image' ? (
-          <img src={url} alt="" onError={() => setFailed(true)} draggable={false} />
-        ) : kind === 'video' ? (
-          <video src={url} controls onError={() => setFailed(true)} />
-        ) : kind === 'audio' ? (
-          <>
-            <Music size={44} strokeWidth={1.2} />
-            <audio src={url} controls onError={() => setFailed(true)} />
-          </>
-        ) : kind === 'pdf' ? (
-          <iframe src={url} title={entry.name} />
-        ) : text === null ? (
-          <Loader2 size={18} className="spin" />
-        ) : (
-          <pre>{text || 'This file is empty.'}</pre>
-        )}
-      </div>
+      {archive ? (
+        <ArchivePreview entry={entry} onExtract={(opts) => onExtract(entry, opts)} />
+      ) : (
+        <div className={`explorer-look ${kind}`}>
+          {failed || kind === 'none' ? (
+            entry.isDir ? <FolderOpen size={56} strokeWidth={1.2} /> : <FileIcon path={entry.name} size={56} />
+          ) : kind === 'image' ? (
+            <img src={url} alt="" onError={() => setFailed(true)} draggable={false} />
+          ) : kind === 'video' ? (
+            <video src={url} controls onError={() => setFailed(true)} />
+          ) : kind === 'audio' ? (
+            <>
+              <Music size={44} strokeWidth={1.2} />
+              <audio src={url} controls onError={() => setFailed(true)} />
+            </>
+          ) : kind === 'pdf' ? (
+            <iframe src={url} title={entry.name} />
+          ) : text === null ? (
+            <Loader2 size={18} className="spin" />
+          ) : (
+            <pre>{text || 'This file is empty.'}</pre>
+          )}
+        </div>
+      )}
       <h3 title={entry.name}>{entry.name}</h3>
       <dl>
         {!entry.isDir && (
