@@ -11537,3 +11537,56 @@ body.reduce-motion .theme-loading-text {
   align-items: center;
   gap: 10px;
 }
+
+/* Video downloader (components/Downloader) */
+.vdl-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.vdl-link {
+  flex: 1;
+  min-width: 0;
+}
+.vdl-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.vdl-done {
+  margin: 0 6px;
+  color: var(--accent);
+}
+.vdl-bar {
+  position: relative;
+  height: 3px;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--border);
+}
+.vdl-bar > div {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: width 0.25s var(--ease);
+}
+.vdl-bar > .vdl-bar-busy {
+  width: 30%;
+  animation: vdl-busy 1.2s ease-in-out infinite;
+}
+@keyframes vdl-busy {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vdl-bar > .vdl-bar-busy {
+    animation: none;
+    width: 100%;
+    opacity: 0.4;
+  }
+}

@@ -219,6 +219,22 @@ const api: NotesApi = {
     ipcRenderer.on('convert:ffmpeg-status', handler)
     return () => ipcRenderer.removeListener('convert:ffmpeg-status', handler)
   },
+  videoDownloaderState: () => ipcRenderer.invoke('vdl:state'),
+  getVideoDownloader: () => ipcRenderer.invoke('vdl:get'),
+  onVideoDownloaderState: (callback) => {
+    const handler = (_e: unknown, state: Parameters<typeof callback>[0]): void => callback(state)
+    ipcRenderer.on('vdl:state', handler)
+    return () => ipcRenderer.removeListener('vdl:state', handler)
+  },
+  downloadVideo: (request) => ipcRenderer.invoke('vdl:start', request),
+  videoDownloads: () => ipcRenderer.invoke('vdl:jobs'),
+  onVideoDownloads: (callback) => {
+    const handler = (_e: unknown, list: Parameters<typeof callback>[0]): void => callback(list)
+    ipcRenderer.on('vdl:jobs', handler)
+    return () => ipcRenderer.removeListener('vdl:jobs', handler)
+  },
+  cancelVideoDownload: (id) => ipcRenderer.invoke('vdl:cancel', id),
+  forgetVideoDownload: (id) => ipcRenderer.invoke('vdl:forget', id),
   convertVideo: (request) => ipcRenderer.invoke('convert:video', request),
   cancelVideo: (id) => ipcRenderer.invoke('convert:video-cancel', id),
   onVideoProgress: (callback) => {

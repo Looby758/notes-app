@@ -633,6 +633,19 @@ export interface NotesApi {
   cancelVideo(id: number): Promise<void>
   /** How far along a video conversion is (0…1). Returns a function that stops listening. */
   onVideoProgress(callback: (id: number, done: number) => void): () => void
+  /** Whether the video downloader (yt-dlp, and ffmpeg for HD) is set up. Starts sending its changes to onVideoDownloaderState. */
+  videoDownloaderState(): Promise<VideoDownloaderState>
+  /** Sets up the video downloader (yt-dlp and ffmpeg); resolves when it's done or has failed. */
+  getVideoDownloader(): Promise<VideoDownloaderState>
+  onVideoDownloaderState(callback: (state: VideoDownloaderState) => void): () => void
+  /** Starts downloading the video at a link into the attachments folder. */
+  downloadVideo(request: VideoDownloadRequest): Promise<VideoDownload>
+  /** This session's downloads, newest first. Starts sending changes to onVideoDownloads. */
+  videoDownloads(): Promise<VideoDownload[]>
+  onVideoDownloads(callback: (downloads: VideoDownload[]) => void): () => void
+  cancelVideoDownload(id: number): Promise<void>
+  /** Takes a finished or failed download off the list (the file stays). */
+  forgetVideoDownload(id: number): Promise<void>
 
   // Video player
   /** What's in a video (its tracks need the video helper, ffmpeg) and the subtitle files beside it. */
@@ -1106,6 +1119,41 @@ export interface ConvertedFile {
 
 /** What an exported file holds: its bytes, its text, or a converted video waiting to be saved. */
 export type ExportData = Uint8Array | string | ConvertedFile
+
+/** The video downloader's set-up: yt-dlp, plus ffmpeg (which joins HD picture and sound). */
+export interface VideoDownloaderState {
+  state: 'ready' | 'missing' | 'downloading' | 'unsupported'
+  progress?: number
+  error?: string
+  ffmpeg: FfmpegState['state']
+  ffmpegProgress?: number
+}
+
+export interface VideoDownloadRequest {
+  url: string
+  quality: import('./videoDownload').DownloadQuality
+  /** The attachments folder, in the notes folder. */
+  folder: string
+}
+
+/** One video being downloaded from a link (or done, or failed). */
+export interface VideoDownload {
+  id: number
+  url: string
+  /** "YouTube", "TikTok"… */
+  site: string
+  quality: import('./videoDownload').DownloadQuality
+  status: 'working' | 'done' | 'failed' | 'cancelled'
+  stage: import('./videoDownload').DownloadStage
+  /** Of the current part (0…1), when it's known. */
+  progress?: number
+  title?: string
+  /** Where it was saved, in the notes folder. */
+  path?: string
+  size?: number
+  error?: string
+  startedAt: number
+}
 
 /** Whether ffmpeg (downloaded only when asked, for converting videos and streaming) is on this computer. */
 /** A video in the recordings folder, for the clip editor. */
