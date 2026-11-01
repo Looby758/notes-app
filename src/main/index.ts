@@ -44,7 +44,9 @@ import { setupConverter } from './converter'
 import { isAppPage, setupStudio } from './studio'
 import { applyReplayShortcut, clipResponse, setupClips } from './clips'
 import { setupLocalAi } from './localAi'
-import { setupSoundboard, soundFile } from './soundboard'
+import { reloadSoundboard, setupSoundboard, soundboardFolder, soundFile } from './soundboard'
+import { setupOrbitSync, syncOrbitSoon, type PartHandler } from './orbitSync'
+import { cleanPrefsPart, prefsPart } from '@shared/orbitSync'
 import { setupLive } from './live'
 import { explorerFile, setupExplorer } from './explorer'
 import { hold, setupUndoBin } from './undoBin'
@@ -68,7 +70,7 @@ import { setupTerminal } from './terminal'
 import { setupGames } from './games'
 import { setupGameCovers } from './gameCovers'
 import { applyIconOutsideApp } from './appIcon'
-import { broadcastThemes, loadImportedThemes, setupThemes, THEME_SCHEME, themeFilePath } from './themes'
+import { broadcastThemes, loadImportedThemes, setupThemes, THEME_SCHEME, themeFilePath, themesDir } from './themes'
 import { CODE_SANDBOX_SCHEME, registerCodeSandbox } from './codeSandbox'
 import { readHandwritingOffline } from './handwriting'
 
@@ -260,11 +262,49 @@ function broadcastPrefs(prefs: Prefs): void {
   safely('system settings', () => applySystemPrefs(prefs))
 }
 
+/** The parts of Orbit kept in the notes folder for your other computers (see orbitSync.ts). */
+function orbitParts(themesChanged: () => void): Record<'settings' | 'home' | 'themes' | 'soundboard' | 'calendar', PartHandler> {
+  const prefsHandler = (part: 'settings' | 'home'): PartHandler => ({
+    kind: 'value',
+    // Never changed from how Orbit starts: nothing to share, so another computer's is taken in.
+    read: () => {
+      if (!loadSettings().prefs) return null
+      const value = prefsPart(currentPrefs(), part)
+      return JSON.stringify(value) === JSON.stringify(prefsPart(normalizePrefs({}), part)) ? null : value
+    },
+    write: (value) => {
+      if (value === null) return
+      const prefs = normalizePrefs({ ...currentPrefs(), ...cleanPrefsPart(value, part) })
+      saveSettings({ prefs })
+      broadcastPrefs(prefs)
+    }
+  })
+  return {
+    settings: prefsHandler('settings'),
+    home: prefsHandler('home'),
+    themes: {
+      kind: 'folder',
+      folder: themesDir,
+      reload: () => {
+        loadImportedThemes()
+        themesChanged()
+      }
+    },
+    soundboard: { kind: 'folder', folder: soundboardFolder, reload: reloadSoundboard },
+    calendar: {
+      kind: 'value',
+      read: () => calendars.syncedCalendars(),
+      write: (value) => calendars.applySyncedCalendars(value ?? {})
+    }
+  }
+}
+
 function openVault(path: string | null): void {
   stopWatching()
   vault = path ? new Vault(path) : null
   if (!path) return
   void shareComicProgress()
+  syncOrbitSoon()
   startWatching(path, (paths) => {
     for (const win of BrowserWindow.getAllWindows()) win.webContents.send('vault:changed', paths)
   })
@@ -554,6 +594,7 @@ function registerIpc(): void {
     const prefs = normalizePrefs({ ...currentPrefs(), ...patch })
     saveSettings({ prefs })
     broadcastPrefs(prefs)
+    syncOrbitSoon()
     return prefs
   })
   // A reminder: a system notification; clicking it brings Notes up at that note.
@@ -903,13 +944,18 @@ app.whenReady().then(async () => {
   registerVaultProtocol()
   registerCodeSandbox()
   registerIpc()
+  // A theme was imported or removed (here, or on another computer): a removed theme that was in
+  // use falls back to the default.
+  const themesChanged = (): void => {
+    const prefs = normalizePrefs(loadSettings().prefs)
+    if (loadSettings().prefs) saveSettings({ prefs })
+    broadcastThemes()
+    broadcastPrefs(prefs)
+  }
   safely('themes', () =>
     setupThemes(() => {
-      // A removed theme that was in use falls back to the default.
-      const prefs = normalizePrefs(loadSettings().prefs)
-      if (loadSettings().prefs) saveSettings({ prefs })
-      broadcastThemes()
-      broadcastPrefs(prefs)
+      themesChanged()
+      syncOrbitSoon()
     })
   )
   safely('web browser', () => setupBrowser(() => currentPrefs().streamerMode))
@@ -927,6 +973,7 @@ app.whenReady().then(async () => {
   safely('comic reader', () => setupComics(() => vault))
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))
+  safely('Orbit sync', () => setupOrbitSync({ root: () => vault?.root ?? null, enabled: () => currentPrefs().syncOrbit, window: () => mainWindow, parts: orbitParts(themesChanged) }))
   mainWindow = createWindow()
   // The extras: if one of them fails on some computer, the app itself still works.
   safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: () => void startSnip() }))

@@ -181,6 +181,8 @@ export interface Prefs {
 
   /** Look for a newer version on GitHub now and then. */
   checkForUpdates: boolean
+  /** Keep settings, themes, Home, the soundboard and calendar links in the notes folder, so your other computers get them too. */
+  syncOrbit: boolean
 
   // Finding features
   /** Feature ids (lib/features.tsx) shown as buttons in the top bar, in order. */
@@ -304,6 +306,7 @@ export const DEFAULT_PREFS: Prefs = {
   launchAtStartup: false,
 
   checkForUpdates: true,
+  syncOrbit: true,
 
   topbarFeatures: ['home', 'today', 'calendar', 'email', 'messages', 'money', 'music', 'phone'],
   showDock: true,

@@ -417,6 +417,49 @@ export function addFeed(name: string, url: string): CalendarSourcesStatus {
   return status()
 }
 
+/** What's shared with your other computers: your calendar links (and which calendars are off). Not the Google sign-in. */
+export interface SyncedCalendars {
+  disabled: string[]
+  feeds: { id: string; name: string; color: string; url: string }[]
+}
+
+/** This computer's calendar links, readable, for syncing (null if there are none). */
+export function syncedCalendars(): SyncedCalendars | null {
+  const s = load()
+  const feeds: SyncedCalendars['feeds'] = []
+  for (const f of s.feeds) {
+    try {
+      feeds.push({ id: f.id, name: f.name, color: f.color, url: decrypt(f.url) })
+    } catch {
+      // Saved on a different computer's protection: can't be read here.
+    }
+  }
+  if (feeds.length === 0 && s.disabled.length === 0) return null
+  return { disabled: [...s.disabled], feeds }
+}
+
+/** Takes in the calendar links from another computer (saved protected, like ones you add). */
+export function applySyncedCalendars(raw: unknown): void {
+  const s = load()
+  const input = raw && typeof raw === 'object' ? (raw as Partial<SyncedCalendars>) : {}
+  const feeds: Stored['feeds'] = []
+  if (Array.isArray(input.feeds)) {
+    if (input.feeds.length && !safeStorage.isEncryptionAvailable()) throw new Error('This computer can’t protect saved links.')
+    for (const f of input.feeds.slice(0, 50)) {
+      if (!f || typeof f.id !== 'string' || typeof f.url !== 'string') continue
+      try {
+        feeds.push({ id: f.id.slice(0, 40), name: String(f.name ?? 'Calendar').slice(0, 100), color: typeof f.color === 'string' ? f.color.slice(0, 20) : FEED_COLORS[0], url: encrypt(normalizeFeedUrl(f.url)) })
+      } catch {
+        // Not a calendar link Orbit accepts: skip it.
+      }
+    }
+  }
+  s.feeds = feeds
+  s.disabled = Array.isArray(input.disabled) ? input.disabled.filter((d): d is string => typeof d === 'string').slice(0, 200) : []
+  feedErrors.clear()
+  save()
+}
+
 export function removeFeed(id: string): CalendarSourcesStatus {
   const s = load()
   s.feeds = s.feeds.filter((f) => f.id !== id)

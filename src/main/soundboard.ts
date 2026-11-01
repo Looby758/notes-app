@@ -101,6 +101,17 @@ function changed(): SoundboardStatus {
   return s
 }
 
+/** The soundboard's folder (board.json and the clips), for syncing with your other computers. */
+export const soundboardFolder = folder
+
+/** The folder was replaced (synced from another computer): read it again and tell the windows. */
+export function reloadSoundboard(): void {
+  load()
+  applyHotkeys()
+  const s = status()
+  for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send('soundboard:changed', s)
+}
+
 /** Copies sound files into the soundboard folder and adds a button for each. */
 function addFiles(paths: string[]): { status: SoundboardStatus; skipped: string[] } {
   mkdirSync(clipsFolder(), { recursive: true })
