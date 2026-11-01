@@ -36,6 +36,7 @@ import * as spotify from './spotify'
 import * as localMusic from './localMusic'
 import { closeMusicMini, setupMusicMini } from './musicMini'
 import { closePopout, setupPopout } from './popout'
+import { closeDiscordPopout, setupDiscordPopout } from './discordPopout'
 import { closeVideoWindow, setupVideoWindow } from './videoWindow'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
 import { applySnipShortcut, setupSnip, startSnip } from './snip'
@@ -532,6 +533,7 @@ function createWindow(): BrowserWindow {
       closeYouTube()
       closeMusicMini()
       closePopout()
+      closeDiscordPopout()
       closeVideoWindow()
     }
   })
@@ -1032,6 +1034,7 @@ app.whenReady().then(async () => {
   safely('offline AI', setupLocalAi)
   safely('soundboard', setupSoundboard)
   safely('Discord voice', setupDiscord)
+  safely('Discord voice pop-out', () => setupDiscordPopout(currentPrefs))
   safely('live streaming', setupLive)
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
   safely('undo', () => setupUndoBin(() => vault?.root ?? null))

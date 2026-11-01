@@ -160,6 +160,10 @@ export function setupSoundboard(): void {
   applyHotkeys()
 
   ipcMain.handle('soundboard:get', () => status())
+  // The Discord voice pop-out's buttons: the main window (which makes the sound) plays them.
+  ipcMain.handle('soundboard:trigger', (_e, action: SoundboardAction) => {
+    if (action && (action.kind === 'stopAll' || (action.kind === 'clip' && typeof action.id === 'string'))) send(action)
+  })
   ipcMain.handle('soundboard:pick', async (e) => {
     const win = BrowserWindow.fromWebContents(e.sender) ?? undefined
     const opts = {

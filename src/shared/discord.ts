@@ -9,8 +9,12 @@
  * These are the pure parts (shared with tests); the socket itself is in main/discord.ts.
  */
 
-/** Scopes asked for: read who's in voice and change your own mute / deafen. */
-export const DISCORD_SCOPES = ['rpc', 'rpc.voice.read', 'rpc.voice.write'] as const
+/**
+ * Scopes asked for: read who's in voice, change your own mute / deafen (and each person's volume
+ * for you), and read the voice channel's text chat. A sign-in made before the chat was added
+ * doesn't have `messages.read`; the pop-out then asks you to sign in again to see the chat.
+ */
+export const DISCORD_SCOPES = ['rpc', 'rpc.voice.read', 'rpc.voice.write', 'messages.read'] as const
 export const DISCORD_TOKEN_URL = 'https://discord.com/api/oauth2/token'
 /** Must also be added under OAuth2 → Redirects in the Developer Portal (Discord checks it matches). */
 export const DISCORD_REDIRECT = 'http://localhost'
@@ -45,6 +49,45 @@ export interface VoiceMember {
   /** Talking right now. */
   speaking: boolean
   bot: boolean
+  /** How loud you hear them, 0 to 200 (100 is normal). Only changes it for you. */
+  volume: number
+  /** Muted just for you (they can still talk to everyone else). */
+  localMute: boolean
+  /** Sharing their screen ("Go Live") or their camera, when Discord says so. */
+  streaming: boolean
+  video: boolean
+}
+
+/** One message of the voice channel's text chat. */
+export interface ChatMessage {
+  id: string
+  authorId: string
+  author: string
+  avatar: string | null
+  content: string
+  /** When it was sent (ms). */
+  at: number
+  /** It had a picture, a file or an embed (only the text is shown). */
+  attachments: number
+  /** The people mentioned in it, by id: the name Discord shows (server nickname first) and their username. */
+  mentions: Record<string, MentionName>
+}
+
+export interface MentionName {
+  name: string
+  username: string | null
+}
+
+/** A finished call, for the call history (kept only on this computer). */
+export interface CallRecord {
+  id: string
+  channel: string
+  server: string | null
+  /** When you joined and left (ms). */
+  start: number
+  end: number
+  /** Everyone else who was in it at some point. */
+  people: string[]
 }
 
 export interface DiscordStatus {
@@ -60,7 +103,22 @@ export interface DiscordStatus {
   mute: boolean
   deaf: boolean
   /** The voice channel you're in, or null. */
-  channel: { id: string; name: string; server: string | null; members: VoiceMember[] } | null
+  channel: VoiceChannel | null
+  /** The voice channel's text chat, newest last (only while you're in a channel). */
+  chat: ChatMessage[]
+  /** Whether the chat can be read: 'ok', 'sign-in' (the sign-in is older than the chat), or 'none' (this kind of channel has none). */
+  chatState: 'ok' | 'sign-in' | 'none'
+}
+
+export interface VoiceChannel {
+  id: string
+  name: string
+  server: string | null
+  /** The server's id, for opening the channel in Discord; null for a private call. */
+  guildId: string | null
+  /** When you joined (ms): for the call timer. If Orbit connected mid-call, when Orbit saw you there. */
+  joinedAt: number
+  members: VoiceMember[]
 }
 
 export const EMPTY_DISCORD: DiscordStatus = {
@@ -71,7 +129,9 @@ export const EMPTY_DISCORD: DiscordStatus = {
   me: null,
   mute: false,
   deaf: false,
-  channel: null
+  channel: null,
+  chat: [],
+  chatState: 'none'
 }
 
 /** A Discord application id is a snowflake: 17 to 20 digits. */
@@ -151,9 +211,22 @@ export function memberFrom(raw: unknown, speaking = false): VoiceMember | null {
     serverMute: vs.mute === true || vs.suppress === true,
     serverDeaf: vs.deaf === true,
     speaking,
-    bot: user.bot === true
+    bot: user.bot === true,
+    volume: clampVolume(raw.volume),
+    localMute: raw.mute === true,
+    streaming: vs.self_stream === true,
+    video: vs.self_video === true
   }
 }
+
+/** Discord's per-person volume: 0 to 200, 100 when it isn't given. */
+export function clampVolume(v: unknown): number {
+  const n = typeof v === 'number' && Number.isFinite(v) ? v : 100
+  return Math.round(Math.min(200, Math.max(0, n)))
+}
+
+/** Changes one member (by id). */
+export const patchMember = (list: VoiceMember[], id: string, patch: Partial<VoiceMember>): VoiceMember[] => list.map((x) => (x.id === id ? { ...x, ...patch } : x))
 
 /** Adds or replaces a member (keeping whether they're talking); the list stays in name order. */
 export function upsertMember(list: VoiceMember[], m: VoiceMember): VoiceMember[] {
@@ -206,4 +279,235 @@ export function tokenError(status: number, body: unknown): string {
     return `Add ${DISCORD_REDIRECT} under OAuth2 → Redirects in the Developer Portal, then try again.`
   if (err === 'invalid_grant') return 'That sign-in ran out. Try again.'
   return `Discord’s sign-in answered ${status}${desc ? `: ${desc}` : ''}.`
+}
+
+// ---------------------------------------------------------------------------------------------
+// The text chat
+
+/** A message from GET_CHANNEL's `messages` or a MESSAGE_CREATE / UPDATE event; null if it isn't one. */
+export function messageFrom(raw: unknown): ChatMessage | null {
+  if (!isObj(raw)) return null
+  const msg = isObj(raw.message) ? raw.message : raw
+  const id = str(msg.id)
+  const author = isObj(msg.author) ? msg.author : null
+  const authorId = author ? str(author.id) : null
+  if (!id || !author || !authorId) return null
+  const at = Date.parse(String(msg.timestamp ?? ''))
+  const count = (x: unknown): number => (Array.isArray(x) ? x.length : 0)
+  return {
+    id,
+    authorId,
+    author: str(msg.nick) ?? str(author.global_name) ?? str(author.username) ?? 'Someone',
+    avatar: avatarUrl(authorId, str(author.avatar)),
+    content: typeof msg.content === 'string' ? msg.content : '',
+    at: Number.isFinite(at) ? at : Date.now(),
+    attachments: count(msg.attachments) + count(msg.embeds),
+    mentions: mentionsFrom(msg.mentions)
+  }
+}
+
+/** A message's `mentions` (the users it @s) as names by id. */
+function mentionsFrom(raw: unknown): Record<string, MentionName> {
+  const out: Record<string, MentionName> = {}
+  if (!Array.isArray(raw)) return out
+  for (const u of raw) {
+    if (!isObj(u)) continue
+    const id = str(u.id)
+    if (!id) continue
+    const member = isObj(u.member) ? u.member : {}
+    const username = str(u.username)
+    out[id] = { name: str(member.nick) ?? str(u.nick) ?? str(u.global_name) ?? username ?? 'someone', username }
+  }
+  return out
+}
+
+/** A piece of a chat message: plain text, or a mention / emoji / time shown as a highlighted name. */
+export type ChatPart = { text: string } | { mention: string; kind: 'user' | 'role' | 'channel' | 'emoji' | 'time'; title?: string }
+
+/**
+ * Turns Discord's codes in a message into what Discord itself shows: <@123> and <@!123> become
+ * @name (looked up with `userName`: the message's own mentions first, then whoever else Orbit
+ * knows), <@&123> a role, <#123> a channel, <:smile:123> :smile:, and <t:1700000000:R> the time.
+ */
+export function chatParts(content: string, userName: (id: string) => MentionName | null): ChatPart[] {
+  const parts: ChatPart[] = []
+  const re = /<(@!?|@&|#)(\d+)>|<a?:(\w+):\d+>|<t:(-?\d+)(?::([tTdDfFR]))?>/g
+  let at = 0
+  for (let m = re.exec(content); m; m = re.exec(content)) {
+    if (m.index > at) parts.push({ text: content.slice(at, m.index) })
+    at = m.index + m[0].length
+    if (m[1] === '@' || m[1] === '@!') {
+      const who = userName(m[2])
+      parts.push(who ? { mention: `@${who.name}`, kind: 'user', ...(who.username ? { title: `@${who.username}` } : {}) } : { mention: '@unknown user', kind: 'user' })
+    } else if (m[1] === '@&') parts.push({ mention: '@role', kind: 'role' })
+    else if (m[1] === '#') parts.push({ mention: '#channel', kind: 'channel' })
+    else if (m[3]) parts.push({ mention: `:${m[3]}:`, kind: 'emoji' })
+    else {
+      const when = new Date(Number(m[4]) * 1000)
+      parts.push({ mention: discordTime(when, m[5] ?? 'f'), kind: 'time', title: when.toLocaleString() })
+    }
+  }
+  if (at < content.length) parts.push({ text: content.slice(at) })
+  return parts
+}
+
+/** A <t:…> timestamp in its style (R: "in 5 minutes" / "2 hours ago"). */
+function discordTime(when: Date, style: string, now = Date.now()): string {
+  if (style === 'R') {
+    const mins = Math.round((when.getTime() - now) / 60_000)
+    const abs = Math.abs(mins)
+    const n = abs < 60 ? `${abs} minute${abs === 1 ? '' : 's'}` : abs < 1440 ? `${Math.round(abs / 60)} hour${Math.round(abs / 60) === 1 ? '' : 's'}` : `${Math.round(abs / 1440)} day${Math.round(abs / 1440) === 1 ? '' : 's'}`
+    return mins >= 0 ? `in ${n}` : `${n} ago`
+  }
+  if (style === 't' || style === 'T') return when.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  if (style === 'd' || style === 'D') return when.toLocaleDateString()
+  return when.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+export const CHAT_KEEP = 60
+
+/** Adds or replaces a message; keeps the newest CHAT_KEEP, oldest first. */
+export function upsertMessage(list: ChatMessage[], m: ChatMessage): ChatMessage[] {
+  const i = list.findIndex((x) => x.id === m.id)
+  const next = i >= 0 ? list.map((x, j) => (j === i ? m : x)) : [...list, m].sort((a, b) => a.at - b.at)
+  return next.slice(-CHAT_KEEP)
+}
+
+/** All the messages of a GET_CHANNEL answer. */
+export function messagesFrom(channel: unknown): ChatMessage[] {
+  if (!isObj(channel) || !Array.isArray(channel.messages)) return []
+  let list: ChatMessage[] = []
+  for (const raw of channel.messages) {
+    const m = messageFrom(raw)
+    if (m) list = upsertMessage(list, m)
+  }
+  return list
+}
+
+/** The link that opens a channel in the Discord app (to reply in the chat). */
+export function channelLink(guildId: string | null, channelId: string): string | null {
+  if (!/^\d+$/.test(channelId) || (guildId && !/^\d+$/.test(guildId))) return null
+  return `discord://-/channels/${guildId ?? '@me'}/${channelId}`
+}
+
+// ---------------------------------------------------------------------------------------------
+// The call timer and history
+
+/** The call timer: "4:07", "12:30", "1:02:03". */
+export function callClock(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000))
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  const two = (n: number): string => String(n).padStart(2, '0')
+  return h ? `${h}:${two(m)}:${two(s)}` : `${m}:${two(s)}`
+}
+
+/** How long a call lasted, in words: "under a minute", "25 min", "1 h 05 min". */
+export function callLength(ms: number): string {
+  const min = Math.round(Math.max(0, ms) / 60_000)
+  if (min < 1) return 'under a minute'
+  if (min < 60) return `${min} min`
+  return `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')} min`
+}
+
+/** Calls shorter than this (joined by mistake, hopped straight through) aren't kept. */
+export const MIN_CALL_MS = 15_000
+export const CALLS_KEEP = 300
+
+/** Adds a finished call to the history (newest first); too-short ones are left out. */
+export function addCall(list: CallRecord[], call: CallRecord): CallRecord[] {
+  if (call.end - call.start < MIN_CALL_MS) return list
+  return [call, ...list.filter((c) => c.id !== call.id)].slice(0, CALLS_KEEP)
+}
+
+/** The saved history, with anything damaged dropped. */
+export function cleanCalls(raw: unknown): CallRecord[] {
+  if (!Array.isArray(raw)) return []
+  const out: CallRecord[] = []
+  for (const c of raw) {
+    if (!isObj(c) || typeof c.id !== 'string' || typeof c.channel !== 'string') continue
+    if (typeof c.start !== 'number' || typeof c.end !== 'number' || !(c.end >= c.start)) continue
+    out.push({
+      id: c.id,
+      channel: c.channel,
+      server: typeof c.server === 'string' ? c.server : null,
+      start: c.start,
+      end: c.end,
+      people: Array.isArray(c.people) ? c.people.filter((p): p is string => typeof p === 'string').slice(0, 50) : []
+    })
+  }
+  return out.sort((a, b) => b.start - a.start).slice(0, CALLS_KEEP)
+}
+
+/** "Sam, Alex and 3 others" for the history list. */
+export function peopleList(people: string[], max = 3): string {
+  if (!people.length) return 'Just you'
+  if (people.length <= max) return people.length === 1 ? people[0] : `${people.slice(0, -1).join(', ')} and ${people[people.length - 1]}`
+  const rest = people.length - max
+  return `${people.slice(0, max).join(', ')} and ${rest} other${rest === 1 ? '' : 's'}`
+}
+
+// ---------------------------------------------------------------------------------------------
+// The "pop it out?" note when you join
+
+/**
+ * Whether joining should offer the pop-out: only on a real join (not Orbit connecting while you're
+ * already in a call, and not hopping between channels), when the note is turned on and the pop-out
+ * isn't already open.
+ */
+export function offerPopout(prevChannel: string | null, nextChannel: string | null, firstLook: boolean, enabled: boolean, popoutOpen: boolean): boolean {
+  return enabled && !popoutOpen && !firstLook && !prevChannel && !!nextChannel
+}
+
+// ---------------------------------------------------------------------------------------------
+// The pop-out's place on screen
+
+export interface Rect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/** Where the pop-out was left: its place, and which screen it was on (and where on that screen). */
+export interface SavedPlace extends Rect {
+  maximized?: boolean
+  /** The screen's id, and the window's top-left corner measured from that screen's corner. */
+  displayId?: number
+  offsetX?: number
+  offsetY?: number
+}
+
+/**
+ * Where to open the pop-out: exactly where it was left when that's still on a screen; on the same
+ * screen (same spot on it) when the screens were rearranged; null when that screen is gone (the
+ * caller then picks a default). It's always made to fit the screen it lands on.
+ */
+export function restorePlace(saved: SavedPlace | null | undefined, displays: { id: number; workArea: Rect }[]): Rect | null {
+  if (!saved || !(saved.width > 0) || !(saved.height > 0)) return null
+  const fit = (r: Rect, a: Rect): Rect => {
+    const width = Math.min(r.width, a.width)
+    const height = Math.min(r.height, a.height)
+    return {
+      x: Math.round(Math.min(Math.max(r.x, a.x), a.x + a.width - width)),
+      y: Math.round(Math.min(Math.max(r.y, a.y), a.y + a.height - height)),
+      width: Math.round(width),
+      height: Math.round(height)
+    }
+  }
+  // Mostly on one screen (its title bar can be reached): keep it there.
+  const home = displays.find(({ workArea: a }) => saved.x + 60 < a.x + a.width && saved.x + saved.width - 60 > a.x && saved.y >= a.y - 10 && saved.y + 30 < a.y + a.height)
+  const same = displays.find((d) => d.id === saved.displayId)
+  if (home && (!same || same === home)) return fit(saved, home.workArea)
+  if (same) {
+    const a = same.workArea
+    return fit({ ...saved, x: a.x + (saved.offsetX ?? 0), y: a.y + (saved.offsetY ?? 0) }, a)
+  }
+  return home ? fit(saved, home.workArea) : null
+}
+
+/** The corner note's place: bottom right of a screen's work area. */
+export function cornerOf(area: Rect, width: number, height: number, margin = 16): Rect {
+  return { x: Math.round(area.x + area.width - width - margin), y: Math.round(area.y + area.height - height - margin), width, height }
 }

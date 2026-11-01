@@ -799,6 +799,15 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'replay mic voice commentary'
   },
   {
+    key: 'discordPopoutPrompt',
+    section: 'studio',
+    group: 'Discord voice',
+    type: 'toggle',
+    label: 'Offer the voice pop-out when you join a call',
+    description: 'A small note in the corner when you join a Discord voice call. Ignore it and it goes away by itself after a few seconds; nothing pops out unless you click it.',
+    keywords: 'discord voice call pop out popout second monitor screen notification join vc'
+  },
+  {
     key: 'snipShortcut',
     section: 'capture',
     group: 'Screen snip',

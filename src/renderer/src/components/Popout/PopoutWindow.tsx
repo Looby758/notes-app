@@ -2,7 +2,7 @@ import './popout.css'
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { AppWindow, Crop, Eye, LayoutGrid, Loader2, Minus, Monitor, RefreshCw, Scan, X } from 'lucide-react'
 import type { StudioCaptureSource } from '@shared/types'
-import { FULL, composeCrop, cropFromDrag, cropStyle, isFull, nextOpacity, shownAspect, type CropBox } from '@shared/popout'
+import { FULL, composeCrop, cropFromDrag, cropStyle, discordSource, isFull, nextOpacity, shownAspect, type CropBox } from '@shared/popout'
 
 /**
  * The pop-out window (its own floating window, opened with #popout; main/popout.ts keeps it on
@@ -36,15 +36,31 @@ export default function PopoutWindow() {
   const video = useRef<HTMLVideoElement>(null)
   const area = useRef<HTMLDivElement>(null)
 
-  const loadSources = useCallback(async () => {
+  const loadSources = useCallback(async (): Promise<StudioCaptureSource[]> => {
     setSources(null)
-    setSources(await window.api.popoutSources().catch(() => []))
+    const list = await window.api.popoutSources().catch(() => [])
+    setSources(list)
+    return list
   }, [])
+
+  // "Watch in Orbit" from the Discord voice pop-out: show Discord's window straight away.
+  const showDiscord = useRef<(list: StudioCaptureSource[]) => void>(() => undefined)
+  showDiscord.current = (list) => {
+    const found = discordSource(list)
+    if (found) void show(found)
+    else setProblem('Discord’s window wasn’t found. Open the stream in Discord (or pop it out of Discord), then pick it here.')
+  }
 
   useEffect(() => {
     void window.api.popoutState().then((s) => setOpacity(s.opacity))
     void window.api.popoutPicker()
-    void loadSources()
+    void (async () => {
+      const [list, hint] = await Promise.all([loadSources(), window.api.popoutHint().catch(() => null)])
+      if (hint === 'discord') showDiscord.current(list)
+    })()
+    return window.api.onPopoutHint((hint) => {
+      if (hint === 'discord') void window.api.popoutSources().then((list) => showDiscord.current(list))
+    })
   }, [loadSources])
 
   // Stops capturing when the stream is replaced or the window closes.

@@ -142,7 +142,7 @@ function updateTrayMenu(): void {
       { label: 'Open Orbit', click: () => hooks.showMain() },
       { label: `Summon bar${shortcut}`, click: openCapture },
       { label: 'Screen snip', click: () => void hooks.snip?.() },
-      { label: 'Pop out an app…', click: openPopout },
+      { label: 'Pop out an app…', click: () => openPopout() },
       { type: 'separator' },
       { label: 'Quit Orbit', click: () => app.quit() }
     ])

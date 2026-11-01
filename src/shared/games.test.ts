@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   addPlay,
+  newestRobloxVersion,
+  stripGames,
+  ROBLOX_ID,
   ANIMATED_COVER_QUERY,
   coverLookupFresh,
   describeLastPlayed,
@@ -216,5 +219,41 @@ describe('animated covers', () => {
     expect(coverLookupFresh({ url: 'https://x', checked: 0 }, 31 * day)).toBe(false)
     expect(coverLookupFresh({ url: null, checked: 0 }, 6 * day)).toBe(true)
     expect(coverLookupFresh({ url: null, checked: 0 }, 8 * day)).toBe(false)
+  })
+})
+
+describe('Roblox', () => {
+  it('starts the newest version that has the player in it', () => {
+    expect(
+      newestRobloxVersion([
+        { name: 'version-old', modified: 1, hasPlayer: true },
+        { name: 'version-new', modified: 3, hasPlayer: true },
+        { name: 'version-studio', modified: 5, hasPlayer: false },
+        { name: 'logs', modified: 9, hasPlayer: true }
+      ])
+    ).toBe('version-new')
+    expect(newestRobloxVersion([])).toBeNull()
+  })
+})
+
+describe('the voice pop-out’s game strip', () => {
+  const game = (id: string, name: string, lastPlayed: number | null, extra: Partial<Game> = {}): Game => ({
+    id,
+    name,
+    source: 'steam',
+    path: '',
+    played: 0,
+    playedWeek: 0,
+    lastPlayed,
+    running: false,
+    art: null,
+    icon: null,
+    hidden: false,
+    ...extra
+  })
+  it('puts Roblox first, then what was played last, leaving hidden games out', () => {
+    const list = stripGames([game('a', 'Alpha', 5), game('b', 'Beta', 50), game(ROBLOX_ID, 'Roblox', null, { source: 'roblox' }), game('h', 'Hidden', 99, { hidden: true })])
+    expect(list.map((g) => g.id)).toEqual([ROBLOX_ID, 'b', 'a'])
+    expect(stripGames([game('a', 'A', 1), game('b', 'B', 2)], 1).map((g) => g.id)).toEqual(['b'])
   })
 })

@@ -92,3 +92,14 @@ export function nextOpacity(now: number): number {
   const i = OPACITY_STEPS.findIndex((o) => Math.abs(o - now) < 0.01)
   return OPACITY_STEPS[(i + 1) % OPACITY_STEPS.length]
 }
+
+/**
+ * The window to show for "Watch in Orbit" (from the Discord voice pop-out): Discord's own window,
+ * or a stream you popped out of it. Popped-out windows come before the main one, which is called
+ * just "Discord" or ends in "- Discord".
+ */
+export function discordSource<T extends { name: string; kind: 'screen' | 'window' }>(sources: T[]): T | null {
+  const discord = sources.filter((s) => s.kind === 'window' && /discord/i.test(s.name))
+  const main = (s: T): boolean => /^discord$/i.test(s.name.trim()) || /[-–]\s*discord$/i.test(s.name.trim())
+  return discord.find((s) => !main(s)) ?? discord[0] ?? null
+}

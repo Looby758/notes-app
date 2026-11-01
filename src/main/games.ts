@@ -10,6 +10,9 @@ import {
   epicLaunchUrl,
   isInside,
   macGameFromPlist,
+  newestRobloxVersion,
+  ROBLOX_ICON,
+  ROBLOX_ID,
   playedInWeek,
   plistString,
   steamAppFromManifest,
@@ -49,6 +52,8 @@ interface Found {
   art: string | null
   /** Where to take the icon from (an app), when there's no picture. */
   iconFrom: string | null
+  /** A ready-made icon (a data: URL), used instead of reading one from `iconFrom`. */
+  icon?: string
   steam?: SteamPlaytime
 }
 
@@ -219,6 +224,38 @@ async function findEpic(): Promise<{ games: Found[]; installed: boolean }> {
   return { games, installed }
 }
 
+/**
+ * Roblox, which has its own installer. On Windows it's in the user's AppData (or Program Files if
+ * installed for everyone), one folder per version; starting RobloxPlayerBeta.exe on its own opens
+ * the Roblox app. On a Mac it's Roblox.app.
+ */
+async function findRoblox(): Promise<Found | null> {
+  if (IS_MAC) {
+    for (const path of ['/Applications/Roblox.app', join(home, 'Applications/Roblox.app')]) {
+      if (await exists(path)) return { id: ROBLOX_ID, name: 'Roblox', source: 'roblox', path, launch: { open: path }, art: null, iconFrom: path }
+    }
+    return null
+  }
+  if (!IS_WIN) return null
+  const roots = [process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'Roblox') : join(home, 'AppData', 'Local', 'Roblox'), 'C:\\Program Files (x86)\\Roblox', 'C:\\Program Files\\Roblox']
+  for (const root of roots) {
+    const versions = join(root, 'Versions')
+    const folders = await Promise.all(
+      (await list(versions)).map(async (name) => {
+        const player = join(versions, name, 'RobloxPlayerBeta.exe')
+        const s = await stat(player).catch(() => null)
+        return { name, modified: s?.mtimeMs ?? 0, hasPlayer: !!s?.isFile() }
+      })
+    )
+    const newest = newestRobloxVersion(folders)
+    if (!newest) continue
+    const program = join(versions, newest, 'RobloxPlayerBeta.exe')
+    // The whole Roblox folder counts as "playing", whichever version is running.
+    return { id: ROBLOX_ID, name: 'Roblox', source: 'roblox', path: root, launch: { open: program }, art: null, iconFrom: program, icon: ROBLOX_ICON }
+  }
+  return null
+}
+
 /** An app's Info.plist as XML (Mac apps keep it in Contents/, iPhone and iPad apps one level in). */
 async function readPlist(appPath: string): Promise<string | null> {
   for (const p of [join(appPath, 'Contents', 'Info.plist'), join(appPath, 'WrappedBundle', 'Info.plist')]) {
@@ -293,11 +330,16 @@ let installed = { steam: false, epic: false }
 function scan(): Promise<void> {
   scanning ??= (async () => {
     try {
-      const [steam, epic, mac] = await Promise.all([findSteam(), findEpic(), findMacGames().catch((err) => (logError('finding Mac games', err), []))])
+      const [steam, epic, roblox, mac] = await Promise.all([
+        findSteam(),
+        findEpic(),
+        findRoblox().catch((err) => (logError('finding Roblox', err), null)),
+        findMacGames().catch((err) => (logError('finding Mac games', err), []))
+      ])
       const added = (await Promise.all(loadStore().added.map(addedGame))).filter((g): g is Found => !!g)
       // The same game can turn up twice (an app you added that's also found): keep the first.
       const byPath = new Set<string>()
-      found = [...steam.games, ...epic.games, ...mac, ...added].filter((g) => {
+      found = [...steam.games, ...epic.games, ...(roblox ? [roblox] : []), ...mac, ...added].filter((g) => {
         const key = g.path.toLowerCase()
         if (byPath.has(key)) return false
         byPath.add(key)
@@ -429,7 +471,7 @@ async function gamesList(rescan: boolean): Promise<GamesList> {
         lastPlayed: last || null,
         running: running.has(g.id),
         art: g.art,
-        icon: !g.art && g.iconFrom ? await iconFor(g.iconFrom) : null,
+        icon: g.art ? null : (g.icon ?? (g.iconFrom ? await iconFor(g.iconFrom) : null)),
         hidden: hidden.has(g.id)
       }
     })
@@ -458,6 +500,7 @@ export function setupGames(): void {
       }
     } catch (err) {
       logError('starting a game', err)
+      if (g.source === 'roblox') return "Couldn't start Roblox. Try opening it once yourself, so it can finish updating."
       return g.source === 'steam' ? "Couldn't open Steam to start it. Is Steam installed?" : g.source === 'epic' ? "Couldn't open the Epic Games Launcher to start it." : "Couldn't start it."
     }
     // Look again soon, so it shows as playing without waiting a whole minute.

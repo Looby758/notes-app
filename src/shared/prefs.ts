@@ -182,6 +182,8 @@ export interface Prefs {
   /** Record what you hear (Windows) and your microphone in replays. */
   replaySound: boolean
   replayMic: boolean
+  /** Joining a Discord voice call shows a small note in the corner offering the voice pop-out (it goes away by itself). */
+  discordPopoutPrompt: boolean
   /** Closing the window keeps Notes running in the tray (so quick capture still works). */
   closeToTray: boolean
   launchAtStartup: boolean
@@ -312,6 +314,7 @@ export const DEFAULT_PREFS: Prefs = {
   replayQuality: '1080p60',
   replaySound: true,
   replayMic: false,
+  discordPopoutPrompt: true,
   closeToTray: true,
   launchAtStartup: false,
 
