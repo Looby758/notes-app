@@ -52,6 +52,8 @@ describe('Steam', () => {
       installDir: 'Portal 2'
     })
     expect(steamAppFromManifest(`"AppState" { "appid" "228980" "name" "Steamworks Common Redistributables" "installdir" "Steamworks Shared" }`)).toBeNull()
+    // Wallpaper Engine runs all day: it isn't a game, and its time mustn't count as playing.
+    expect(steamAppFromManifest(`"AppState" { "appid" "431960" "name" "Wallpaper Engine" "installdir" "wallpaper_engine" }`)).toBeNull()
     expect(steamAppFromManifest('nonsense')).toBeNull()
   })
 

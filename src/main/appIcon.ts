@@ -1,4 +1,4 @@
-import { app, nativeImage, shell, type NativeImage } from 'electron'
+import { app, nativeImage, shell, type BrowserWindow, type NativeImage } from 'electron'
 import { execFile } from 'child_process'
 import { createHash } from 'crypto'
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'fs'
@@ -35,7 +35,7 @@ export function icoFromImage(image: NativeImage): Buffer {
   return Buffer.concat([header, ...pngs])
 }
 
-/** Folders where Windows keeps shortcuts to Notes. */
+/** Folders where Windows keeps shortcuts to Orbit. */
 function shortcutFolders(): string[] {
   const appData = app.getPath('appData')
   return [
@@ -74,7 +74,8 @@ function updateShortcuts(icon: string): number {
   return changed
 }
 
-function windowsIcon(id: string, image: NativeImage): void {
+/** The .ico for icon `id` (made once, in the app's data folder), or the app's own .exe for the original. */
+function windowsIconFile(id: string, image: NativeImage): string {
   let icon = process.execPath
   if (id !== 'default') {
     const dir = join(app.getPath('userData'), 'app-icons')
@@ -96,18 +97,40 @@ function windowsIcon(id: string, image: NativeImage): void {
       }
     }
   }
-  // Explorer caches icons: ask it to look again.
-  if (updateShortcuts(icon) > 0) execFile('ie4uinit.exe', ['-show'], () => undefined)
+  return icon
 }
 
 /**
- * Windows shortcuts follow the icon you picked. (Not done on a Mac: macOS protects apps from being
- * changed, even by themselves, so the Dock icon is all that changes there.)
+ * Windows: the taskbar and shortcuts follow the icon you picked. Returns the icon file for the
+ * taskbar (see `taskbarIcon`), or null when there's nothing to do.
+ * (Not done on a Mac: macOS protects apps from being changed, even by themselves, so the Dock icon
+ * is all that changes there.)
  */
-export function applyIconOutsideApp(id: string, file: string): void {
-  if (process.platform !== 'win32') return
-  if (!app.isPackaged && !process.env.NOTES_TEST_SHORTCUTS) return
+export function applyIconOutsideApp(id: string, file: string): string | null {
+  if (process.platform !== 'win32') return null
   const image = nativeImage.createFromPath(file)
-  if (image.isEmpty()) return
-  if (process.platform === 'win32') windowsIcon(id, image)
+  if (image.isEmpty()) return null
+  // In development the "app" is electron.exe, so its shortcuts are left alone.
+  const packaged = app.isPackaged || !!process.env.NOTES_TEST_SHORTCUTS
+  const icon = packaged || id !== 'default' ? windowsIconFile(id, image) : null
+  if (!icon) return null
+  // Explorer caches icons: ask it to look again.
+  if (packaged && updateShortcuts(icon) > 0) execFile('ie4uinit.exe', ['-show'], () => undefined)
+  return icon
+}
+
+/**
+ * Windows: the taskbar button shows the icon stored on the window's "relaunch" details (the same
+ * place pinning reads from), not the window's own icon, so the picked icon goes there too.
+ * Windows only uses that icon when a relaunch command is set alongside it.
+ */
+export function taskbarIcon(win: BrowserWindow, icon: string): void {
+  if (process.platform !== 'win32' || win.isDestroyed()) return
+  win.setAppDetails({
+    appId: 'com.notesapp.desktop',
+    appIconPath: icon,
+    appIconIndex: 0,
+    relaunchCommand: `"${process.execPath}"`,
+    relaunchDisplayName: 'Orbit'
+  })
 }

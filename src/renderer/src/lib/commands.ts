@@ -22,9 +22,12 @@ import {
   COMICS_TAB,
   MINESWEEPER_TAB,
   CLOCKS_TAB,
+  SCREENS_TAB,
+  DOWNLOADER_TAB,
   STUDIO_TAB,
   CLIPS_TAB,
   SOUNDBOARD_TAB,
+  DISCORD_TAB,
   EXPLORER_TAB,
   MESSAGES_TAB,
   GAMES_TAB,
@@ -59,7 +62,9 @@ import { newBoard } from './boards'
 import { newSpreadsheet } from './newSheet'
 import { openAsk, runNoteJob } from '../store/ai'
 import { musicControl, musicToggleLike, setMusicMini, shareSongToNote, toggleMusic, useMusic } from '../store/music'
+import { showAndFindSong } from '../store/songId'
 import { sendToPhone } from '../store/phone'
+import { toggleDiscord } from '../store/discord'
 import { openRadial } from '../components/Nav/RadialMenu'
 import { startSnip } from './snip'
 import { changeNotesPassword, lockAllNow, lockFolder, lockNote, lockNoteOwn, removeLock } from './lock/actions'
@@ -235,6 +240,7 @@ export const commands: Command[] = [
   { id: 'music.previous', group: 'Music', title: 'Music: previous song', run: () => void musicControl('previous') },
   { id: 'music.mini', group: 'Music', title: 'Music: floating mini player (on top of other apps)', run: () => void setMusicMini(!useMusic.getState().miniOpen) },
   { id: 'music.share', group: 'Music', title: 'Music: add the song playing to this note', run: shareSongToNote },
+  { id: 'music.whatsThisSong', group: 'Music', title: 'Music: what’s this song? (listen to a video, game or stream and find it)', run: showAndFindSong },
   { id: 'music.like', group: 'Music', title: 'Music: like the song playing (Liked Songs)', run: () => void musicToggleLike() },
 
   ...EDITOR_COMMANDS.map(
@@ -316,6 +322,9 @@ export const commands: Command[] = [
   { id: 'explorer.open', group: 'Navigation', title: 'Browse files on this computer (and Google Drive)', run: () => openSpecialTab(EXPLORER_TAB) },
   { id: 'comics.open', group: 'Navigation', title: 'Read comics (your comic book shelf)', run: () => openSpecialTab(COMICS_TAB) },
   { id: 'sudoku.open', group: 'Navigation', title: 'Play sudoku (take a quick break)', run: () => openSpecialTab(SUDOKU_TAB) },
+  { id: 'discord.open', group: 'Navigation', title: 'Discord voice (who’s in voice, mute, deafen)', run: () => openSpecialTab(DISCORD_TAB) },
+  { id: 'discord.mute', group: 'Discord', title: 'Discord: mute / unmute', run: () => void toggleDiscord('mute') },
+  { id: 'discord.deafen', group: 'Discord', title: 'Discord: deafen / undeafen', run: () => void toggleDiscord('deaf') },
   { id: 'soundboard.open', group: 'Navigation', title: 'Open the soundboard and voice changer', run: () => openSpecialTab(SOUNDBOARD_TAB) },
   { id: 'soundboard.stop', group: 'Navigation', title: 'Stop all soundboard sounds', run: () => void import('./soundboard').then((m) => m.stopAll()) },
   { id: 'studio.open', group: 'Navigation', title: 'Open the Studio (record your screen and webcam)', run: () => openSpecialTab(STUDIO_TAB) },
@@ -325,6 +334,10 @@ export const commands: Command[] = [
   { id: 'studio.record', group: 'Navigation', title: 'Start or stop recording (Studio)', run: () => void import('./studio').then((m) => m.toggleRecording()) },
   { id: 'minesweeper.open', group: 'Navigation', title: 'Play minesweeper (take a quick break)', run: () => openSpecialTab(MINESWEEPER_TAB) },
   { id: 'video.open', group: 'Navigation', title: 'Video player (play any video, MKV, AVI…)', run: () => openSpecialTab(VIDEO_TAB) },
+  { id: 'screens.open', group: 'Navigation', title: 'Screens (monitor brightness, contrast and input)', run: () => openSpecialTab(SCREENS_TAB) },
+  { id: 'screens.brighter', group: 'Navigation', title: 'Make every screen brighter', run: () => void window.api.monitorAction('all', { kind: 'brightness', mode: 'up', amount: 10 }) },
+  { id: 'screens.dimmer', group: 'Navigation', title: 'Make every screen dimmer', run: () => void window.api.monitorAction('all', { kind: 'brightness', mode: 'down', amount: 10 }) },
+  { id: 'downloader.open', group: 'Navigation', title: 'Download a video from a link (YouTube, X, Instagram, TikTok…)', run: () => openSpecialTab(DOWNLOADER_TAB) },
   { id: 'clocks.open', group: 'Navigation', title: 'World clocks (the time in other places)', run: () => openSpecialTab(CLOCKS_TAB) },
   { id: 'games.open', group: 'Navigation', title: 'Games (play your Steam and other games)', run: () => openSpecialTab(GAMES_TAB) },
   { id: 'web.open', group: 'Web', title: 'Open a web page', shortcut: 'Ctrl+Shift+I', run: () => openWebTab() },

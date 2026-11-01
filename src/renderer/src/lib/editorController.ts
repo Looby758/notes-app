@@ -72,12 +72,18 @@ export const COMICS_TAB = 'comics:'
 export const MINESWEEPER_TAB = 'minesweeper:'
 /** Clocks for places around the world (components/Clocks). */
 export const CLOCKS_TAB = 'clocks:'
+/** Monitor brightness, contrast and input (components/Screens). */
+export const SCREENS_TAB = 'screens:'
+/** Download a video from a link into the attachments folder (components/Downloader). */
+export const DOWNLOADER_TAB = 'downloader:'
 /** Scenes, webcam and screen recording (components/Studio). */
 export const STUDIO_TAB = 'studio:'
 /** Instant replay and the clip editor (components/Clips). */
 export const CLIPS_TAB = 'clips:'
 /** Sound clips with hotkeys, the voice changer and music into a voice call (components/Soundboard). */
 export const SOUNDBOARD_TAB = 'soundboard:'
+/** Who's in your Discord voice channel, with mute and deafen (components/Discord). */
+export const DISCORD_TAB = 'discord-voice:'
 /** WhatsApp and Discord in one tab (components/Messages). */
 export const MESSAGES_TAB = 'messages:'
 export const GAMES_TAB = 'games:'

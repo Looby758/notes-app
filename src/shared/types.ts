@@ -1,4 +1,5 @@
 import type { ExplorerEntry, ExplorerPlace, PasteMode } from './explorer'
+import type { ArchiveEntry } from './archive'
 import type { ComicOpened, ComicPreparing, ComicSettings, ComicShelf } from './comics'
 import type { Prefs } from './prefs'
 import type { DictionaryEntry } from './dictionary'
@@ -6,13 +7,17 @@ import type { Sheet } from './sheet'
 import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
 import type { LocalLibrary } from './localMusic'
+import type { MonitorAction, MonitorSaved, MonitorSetting, MonitorsStatus, MonitorTarget } from './monitors'
 import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
+import type { DiscordStatus } from './discord'
 import type { WifiNetwork } from './wifi'
 import type { MusicAction, MusicDevice, MusicItem, MusicQueue, MusicSearchResults, MusicState, MusicStatus } from './spotify'
+import type { FoundSong, SongIdStatus } from './songId'
 import type { CoversStatus, GamesList, LaunchArt } from './games'
 import type { VideoInfo } from './videoPlayer'
 import type { Theme } from './themes'
 import type { ShareButton, ShareOs, ShareSide } from './mouseShare'
+import type { ScreenInput, ScreenMode, ScreenStatus } from './screenLink'
 
 export interface WindowBounds {
   x?: number
@@ -44,6 +49,8 @@ export interface Settings {
   phonePort?: number
   /** One mouse, two computers: whether it's on, the paired computer, and how it's set up. */
   mouseShare?: ShareSaved
+  /** Screens between the two computers: which of this computer's screens goes on the other one ('' = worked out). */
+  screenLink?: { extendDisplay?: string }
   /** The phone webcam: whether it's on, its https link (token and port), and how the picture is made. */
   camOn?: boolean
   camToken?: string
@@ -107,6 +114,24 @@ export interface ShareStatus {
   /** Mac: Orbit is allowed to move the pointer (Accessibility). Always true on Windows. */
   accessibility: boolean
   error: string
+}
+
+/** What a screen window is for (see main/screenLink.ts). `sourceId` etc. are for the sending side. */
+export interface ScreenSetup {
+  role: 'send' | 'view'
+  mode: ScreenMode
+  peerName: string
+  peerOs: ShareOs
+  sourceId?: string
+  width?: number
+  height?: number
+}
+
+/** Somewhere a file can be dropped to send it: the paired computer or the phone. */
+export interface DropTarget {
+  id: 'computer' | 'phone'
+  name: string
+  os?: ShareOs
 }
 
 /** Something done in the invisible window while the mouse is on the other computer. */
@@ -630,6 +655,19 @@ export interface NotesApi {
   cancelVideo(id: number): Promise<void>
   /** How far along a video conversion is (0…1). Returns a function that stops listening. */
   onVideoProgress(callback: (id: number, done: number) => void): () => void
+  /** Whether the video downloader (yt-dlp, and ffmpeg for HD) is set up. Starts sending its changes to onVideoDownloaderState. */
+  videoDownloaderState(): Promise<VideoDownloaderState>
+  /** Sets up the video downloader (yt-dlp and ffmpeg); resolves when it's done or has failed. */
+  getVideoDownloader(): Promise<VideoDownloaderState>
+  onVideoDownloaderState(callback: (state: VideoDownloaderState) => void): () => void
+  /** Starts downloading the video at a link into the attachments folder. */
+  downloadVideo(request: VideoDownloadRequest): Promise<VideoDownload>
+  /** This session's downloads, newest first. Starts sending changes to onVideoDownloads. */
+  videoDownloads(): Promise<VideoDownload[]>
+  onVideoDownloads(callback: (downloads: VideoDownload[]) => void): () => void
+  cancelVideoDownload(id: number): Promise<void>
+  /** Takes a finished or failed download off the list (the file stays). */
+  forgetVideoDownload(id: number): Promise<void>
 
   // Video player
   /** What's in a video (its tracks need the video helper, ffmpeg) and the subtitle files beside it. */
@@ -647,6 +685,18 @@ export interface NotesApi {
 
   // Quick capture
   /** Opens the quick capture window. */
+  // Screen controls (main/monitors.ts): brightness, contrast and input over DDC/CI
+  /** Your screens and their settings (looks for them the first time). */
+  monitorsGet(): Promise<MonitorsStatus>
+  /** Looks for screens again. */
+  monitorsRescan(): Promise<MonitorsStatus>
+  /** Sets one screen's brightness, contrast (in the screen's own units) or input; false if it didn't answer. */
+  monitorSet(id: string, setting: MonitorSetting, value: number): Promise<boolean>
+  /** Does what a screen hotkey does, on one screen or all. */
+  monitorAction(target: MonitorTarget, action: MonitorAction): Promise<void>
+  /** Saves screen names, input names and hotkeys. */
+  monitorsSave(saved: MonitorSaved): Promise<MonitorsStatus>
+  onMonitorsChanged(callback: (status: MonitorsStatus) => void): () => void
   // Soundboard (main/soundboard.ts; the sound itself is played in lib/soundboard.ts)
   soundboardGet(): Promise<SoundboardStatus>
   /** Asks for sound files and adds a button for each. */
@@ -662,6 +712,22 @@ export interface NotesApi {
   /** A soundboard hotkey was pressed (anywhere, even in a game). */
   onSoundboardHotkey(callback: (action: SoundboardAction) => void): () => void
   onSoundboardChanged(callback: (status: SoundboardStatus) => void): () => void
+
+  // Discord voice controls (main/discord.ts, through Discord's official local RPC)
+  discordGet(): Promise<DiscordStatus>
+  /** Saves your own Discord application's id and client secret (encrypted). */
+  discordSaveApp(clientId: string, secret: string): Promise<DiscordStatus>
+  /** Connects and, if needed, asks Discord to show its Authorize window. */
+  discordSignIn(): Promise<DiscordStatus>
+  /** Tries the saved sign-in again (e.g. after starting Discord). */
+  discordRetry(): Promise<DiscordStatus>
+  discordSignOut(): Promise<DiscordStatus>
+  /** Removes the application and sign-in. */
+  discordForget(): Promise<DiscordStatus>
+  /** Mutes or deafens (or un-); flips it when `value` is left out. */
+  discordSet(which: 'mute' | 'deaf', value?: boolean): Promise<DiscordStatus>
+  discordOpenPortal(): Promise<void>
+  onDiscordChanged(callback: (status: DiscordStatus) => void): () => void
 
   // Screen snip (main/snip.ts)
   /** Takes a picture of the screen under the pointer and opens the snip window over it. */
@@ -777,6 +843,14 @@ export interface NotesApi {
   musicMoveInPlaylist(uri: string, from: number, to: number): Promise<void>
   /** Opens the Spotify app, or (Mac) where you let Notes control it in System Settings. */
   musicOpen(what: 'app' | 'automation'): Promise<void>
+  // What's this song? (src/main/songId.ts)
+  songIdStatus(): Promise<SongIdStatus>
+  /** Saves your AudD key encrypted ('' removes it). */
+  songIdSetKey(key: string): Promise<SongIdStatus>
+  /** Sends a mono WAV clip to AudD; null when it didn't recognise a song. */
+  songIdIdentify(clip: Uint8Array): Promise<FoundSong | null>
+  /** The system-wide "What's this song?" shortcut was pressed. */
+  onSongIdListen(callback: () => void): () => void
   aiStatus(): Promise<AiStatus>
   /** Checks the key with Anthropic, then stores it encrypted. */
   aiSetKey(key: string): Promise<AiStatus>
@@ -915,6 +989,26 @@ export interface NotesApi {
   shareDropped(paths: string[]): void
   shareDropCancel(): void
   onShareDrop(callback: (info: { name: string; side: ShareSide }) => void): () => void
+  /** Screens between the two computers (see main/screenLink.ts): the Mac as a second screen, and controlling the Mac. */
+  screenStatus(): Promise<ScreenStatus>
+  onScreenStatus(callback: (status: ScreenStatus) => void): () => void
+  screenStart(mode: ScreenMode): Promise<void>
+  screenStop(): Promise<void>
+  screenSetDisplay(id: string): Promise<void>
+  screenInstallVirtual(): Promise<void>
+  /** The screen windows themselves: what they're for, the WebRTC setting up, the mouse and keys. */
+  screenReady(): Promise<ScreenSetup | null>
+  screenSignal(data: unknown): void
+  onScreenSignal(callback: (data: unknown) => void): () => void
+  screenLive(): void
+  screenInput(input: ScreenInput): void
+  screenFailed(reason: string): void
+  screenClose(): void
+  screenFullscreen(): void
+  /** Drop between devices: the paired computer and the phone, while they're there, and sending to them. */
+  dropTargets(): Promise<DropTarget[]>
+  onDropTargets(callback: (targets: DropTarget[]) => void): () => void
+  dropSend(target: DropTarget['id'], paths: string[]): Promise<string>
   /** The phone webcam (Windows): turn it on/off, its status and settings, and a live preview of the phone's frames. */
   camStatus(): Promise<CamStatus>
   camOn(): Promise<CamStatus>
@@ -995,6 +1089,12 @@ export interface NotesApi {
   explorerToVault(paths: string[], folder: string): Promise<string[]>
   /** Starts dragging files out as real files (into Discord, a browser, File Explorer / Finder, or back into Orbit). Call it from dragstart, after preventDefault. */
   explorerStartDrag(paths: string[]): void
+  /** What's inside a zip, RAR or 7z. Rejects with a message containing "password" when one is needed or wrong. */
+  explorerArchiveList(path: string, password?: string): Promise<ArchiveEntry[]>
+  /** Unpacks an archive (or just `names` in it) into a new folder next to it, or straight into its folder. Resolves with what was made. */
+  explorerExtract(path: string, opts: { names?: string[]; password?: string; intoFolder?: boolean }): Promise<string[]>
+  /** Packs files and folders into a new zip or 7z next to the first one. Resolves with its path. */
+  explorerCompress(paths: string[], format: 'zip' | '7z', password?: string): Promise<string>
   /** Opens a vault file (like a PDF) in its usual app. */
   openFile(path: string): Promise<void>
   /** Reads a note's markdown. */
@@ -1067,6 +1167,41 @@ export interface ConvertedFile {
 
 /** What an exported file holds: its bytes, its text, or a converted video waiting to be saved. */
 export type ExportData = Uint8Array | string | ConvertedFile
+
+/** The video downloader's set-up: yt-dlp, plus ffmpeg (which joins HD picture and sound). */
+export interface VideoDownloaderState {
+  state: 'ready' | 'missing' | 'downloading' | 'unsupported'
+  progress?: number
+  error?: string
+  ffmpeg: FfmpegState['state']
+  ffmpegProgress?: number
+}
+
+export interface VideoDownloadRequest {
+  url: string
+  quality: import('./videoDownload').DownloadQuality
+  /** The attachments folder, in the notes folder. */
+  folder: string
+}
+
+/** One video being downloaded from a link (or done, or failed). */
+export interface VideoDownload {
+  id: number
+  url: string
+  /** "YouTube", "TikTok"… */
+  site: string
+  quality: import('./videoDownload').DownloadQuality
+  status: 'working' | 'done' | 'failed' | 'cancelled'
+  stage: import('./videoDownload').DownloadStage
+  /** Of the current part (0…1), when it's known. */
+  progress?: number
+  title?: string
+  /** Where it was saved, in the notes folder. */
+  path?: string
+  size?: number
+  error?: string
+  startedAt: number
+}
 
 /** Whether ffmpeg (downloaded only when asked, for converting videos and streaming) is on this computer. */
 /** A video in the recordings folder, for the clip editor. */

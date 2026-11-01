@@ -157,7 +157,7 @@ function createTray(): void {
     image = nativeImage.createFromPath(ICON).resize({ width: 16, height: 16, quality: 'best' })
   }
   tray = new Tray(image)
-  tray.setToolTip('Notes')
+  tray.setToolTip('Orbit')
   tray.on('click', () => hooks.showMain())
   updateTrayMenu()
 }
@@ -199,7 +199,7 @@ export function setupCapture(h: Hooks): void {
   // The capture window submits text; the main window saves it and reports back.
   ipcMain.handle('capture:submit', async (_e, request: CaptureRequest): Promise<CaptureResult> => {
     const main = hooks.getMain()
-    if (!main || main.isDestroyed()) return { ok: false, error: 'Notes isn’t ready yet. Try again in a moment.' }
+    if (!main || main.isDestroyed()) return { ok: false, error: 'Orbit isn’t ready yet. Try again in a moment.' }
     const id = nextRequest++
     const result = new Promise<CaptureResult>((resolve) => {
       pending.set(id, resolve)

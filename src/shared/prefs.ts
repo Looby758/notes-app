@@ -164,6 +164,8 @@ export interface Prefs {
   captureTimestamp: boolean
   /** System-wide shortcut for a screen snip (grab text from anywhere on screen); '' for none. */
   snipShortcut: string
+  /** System-wide shortcut for "What's this song?" (listen to what's playing and find it); '' for none. */
+  songIdShortcut: string
   /** Instant replay: keep the last few seconds of the screen ready to save (lib/replay.ts). */
   replayOn: boolean
   /** System-wide shortcut that saves the replay; '' for none. */
@@ -296,6 +298,7 @@ export const DEFAULT_PREFS: Prefs = {
   captureTimestamp: true,
   captureRememberTarget: false,
   snipShortcut: IS_MAC ? 'Control+Alt+S' : 'Alt+Shift+S',
+  songIdShortcut: IS_MAC ? 'Control+Alt+W' : 'Alt+Shift+W',
   replayOn: false,
   replayShortcut: IS_MAC ? 'Control+Alt+R' : 'Alt+Shift+R',
   replaySeconds: 30,
@@ -352,6 +355,7 @@ const CHOICES = {
     ? ['Control+Alt+Space', 'Alt+Space', 'Control+Shift+Space', 'Super+Alt+N', '']
     : ['Super+Shift+N', 'Control+Alt+Space', 'Control+Shift+Space', 'Alt+Shift+N', ''],
   snipShortcut: IS_MAC ? ['Control+Alt+S', 'Control+Shift+S', 'Alt+Shift+S', ''] : ['Alt+Shift+S', 'Control+Alt+S', 'Super+Shift+T', ''],
+  songIdShortcut: IS_MAC ? ['Control+Alt+W', 'Control+Shift+W', 'Alt+Shift+W', ''] : ['Alt+Shift+W', 'Control+Alt+W', 'Super+Shift+W', ''],
   // F-keys too: they work in games, where Alt or Ctrl combinations may do something else.
   replayShortcut: IS_MAC ? ['Control+Alt+R', 'Control+Shift+R', 'F9', 'F10', ''] : ['Alt+Shift+R', 'Control+Shift+R', 'Alt+F9', 'F9', 'F10', ''],
   replayQuality: ['720p30', '1080p30', '1080p60']
@@ -362,6 +366,9 @@ export const REPLAY_SHORTCUTS = CHOICES.replayShortcut
 
 /** Shortcuts offered for screen snip (system-wide). */
 export const SNIP_SHORTCUTS = CHOICES.snipShortcut
+
+/** Shortcuts offered for "What's this song?" (system-wide). */
+export const SONG_ID_SHORTCUTS = CHOICES.songIdShortcut
 
 /** Shortcuts offered for quick capture (system-wide, so they're picked from a safe list). */
 export const CAPTURE_SHORTCUTS = CHOICES.captureShortcut

@@ -17,6 +17,9 @@ import {
   type PasteMode
 } from '@shared/explorer'
 import { IS_MAC } from '@shared/platform'
+import { newArchiveName } from '@shared/archive'
+import { listArchive } from './archive'
+import { pack, unpack } from './archive/unpack'
 import { logError } from './log'
 import { hold } from './undoBin'
 
@@ -342,6 +345,21 @@ export function setupExplorer(vaultRoot: () => string | null): void {
     const outside = sources.filter((p) => !inVault(root, p))
     const done = [...(await paste(inside, target, 'move')), ...(await paste(outside, target, 'copy'))]
     return done.map((p) => inVault(root, p.to)).filter((p): p is string => !!p)
+  })
+  // The zip / RAR / 7z opener: look inside, unpack, and make new ones.
+  const pw = (password: unknown): string | undefined => (typeof password === 'string' && password ? password : undefined)
+  ipcMain.handle('explorer:archiveList', (_e, path: string, password?: string) => listArchive(checkPath(path), pw(password)))
+  ipcMain.handle('explorer:extract', (_e, path: string, opts: { names?: unknown; password?: unknown; intoFolder?: unknown } = {}) =>
+    unpack(checkPath(path), {
+      names: Array.isArray(opts.names) ? opts.names.filter((n): n is string => typeof n === 'string') : undefined,
+      password: pw(opts.password),
+      intoFolder: opts.intoFolder !== false
+    })
+  )
+  ipcMain.handle('explorer:compress', (_e, paths: string[], format: string, password?: string) => {
+    const items = checkPaths(paths)
+    const kind = format === '7z' ? '7z' : 'zip'
+    return pack(items, kind, { name: newArchiveName(items.map((p) => basename(p)), kind), password: pw(password) })
   })
   ipcMain.handle('explorer:search', (_e, dir: string, query: string, showHidden: boolean) => search(vaultRoot(), checkPath(dir), String(query ?? ''), !!showHidden))
 }

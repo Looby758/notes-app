@@ -219,6 +219,22 @@ const api: NotesApi = {
     ipcRenderer.on('convert:ffmpeg-status', handler)
     return () => ipcRenderer.removeListener('convert:ffmpeg-status', handler)
   },
+  videoDownloaderState: () => ipcRenderer.invoke('vdl:state'),
+  getVideoDownloader: () => ipcRenderer.invoke('vdl:get'),
+  onVideoDownloaderState: (callback) => {
+    const handler = (_e: unknown, state: Parameters<typeof callback>[0]): void => callback(state)
+    ipcRenderer.on('vdl:state', handler)
+    return () => ipcRenderer.removeListener('vdl:state', handler)
+  },
+  downloadVideo: (request) => ipcRenderer.invoke('vdl:start', request),
+  videoDownloads: () => ipcRenderer.invoke('vdl:jobs'),
+  onVideoDownloads: (callback) => {
+    const handler = (_e: unknown, list: Parameters<typeof callback>[0]): void => callback(list)
+    ipcRenderer.on('vdl:jobs', handler)
+    return () => ipcRenderer.removeListener('vdl:jobs', handler)
+  },
+  cancelVideoDownload: (id) => ipcRenderer.invoke('vdl:cancel', id),
+  forgetVideoDownload: (id) => ipcRenderer.invoke('vdl:forget', id),
   convertVideo: (request) => ipcRenderer.invoke('convert:video', request),
   cancelVideo: (id) => ipcRenderer.invoke('convert:video-cancel', id),
   onVideoProgress: (callback) => {
@@ -233,6 +249,16 @@ const api: NotesApi = {
   stopVideoStream: (session) => ipcRenderer.invoke('video:stop', session),
   videoInVault: (path) => ipcRenderer.invoke('video:inVault', path),
   pickVideoFile: (kind, near) => ipcRenderer.invoke('video:pick', kind, near),
+  monitorsGet: () => ipcRenderer.invoke('monitors:get'),
+  monitorsRescan: () => ipcRenderer.invoke('monitors:rescan'),
+  monitorSet: (id, setting, value) => ipcRenderer.invoke('monitors:set', id, setting, value),
+  monitorAction: (target, action) => ipcRenderer.invoke('monitors:action', target, action),
+  monitorsSave: (saved) => ipcRenderer.invoke('monitors:save', saved),
+  onMonitorsChanged: (callback) => {
+    const handler = (_e: unknown, status: Parameters<typeof callback>[0]): void => callback(status)
+    ipcRenderer.on('monitors:changed', handler)
+    return () => ipcRenderer.removeListener('monitors:changed', handler)
+  },
   soundboardGet: () => ipcRenderer.invoke('soundboard:get'),
   soundboardPick: () => ipcRenderer.invoke('soundboard:pick'),
   soundboardAddFiles: (paths) => ipcRenderer.invoke('soundboard:add-files', paths),
@@ -251,6 +277,20 @@ const api: NotesApi = {
     const handler = (_e: unknown, status: Parameters<typeof callback>[0]): void => callback(status)
     ipcRenderer.on('soundboard:changed', handler)
     return () => ipcRenderer.removeListener('soundboard:changed', handler)
+  },
+
+  discordGet: () => ipcRenderer.invoke('discord:get'),
+  discordSaveApp: (clientId, secret) => ipcRenderer.invoke('discord:save-app', clientId, secret),
+  discordSignIn: () => ipcRenderer.invoke('discord:sign-in'),
+  discordRetry: () => ipcRenderer.invoke('discord:retry'),
+  discordSignOut: () => ipcRenderer.invoke('discord:sign-out'),
+  discordForget: () => ipcRenderer.invoke('discord:forget'),
+  discordSet: (which, value) => ipcRenderer.invoke('discord:set', which, value),
+  discordOpenPortal: () => ipcRenderer.invoke('discord:open-portal'),
+  onDiscordChanged: (callback) => {
+    const handler = (_e: unknown, status: Parameters<typeof callback>[0]): void => callback(status)
+    ipcRenderer.on('discord:changed', handler)
+    return () => ipcRenderer.removeListener('discord:changed', handler)
   },
 
   startSnip: () => ipcRenderer.invoke('snip:start'),
@@ -356,6 +396,10 @@ const api: NotesApi = {
   },
   musicTransfer: (deviceId) => ipcRenderer.invoke('music:transfer', deviceId),
   musicOpen: (what) => ipcRenderer.invoke('music:open', what),
+  songIdStatus: () => ipcRenderer.invoke('songId:status'),
+  songIdSetKey: (key) => ipcRenderer.invoke('songId:setKey', key),
+  songIdIdentify: (clip) => ipcRenderer.invoke('songId:identify', clip),
+  onSongIdListen: (callback) => on<void>('songId:listen', () => callback()),
   aiStatus: () => ipcRenderer.invoke('ai:status'),
   aiSetKey: (key) => ipcRenderer.invoke('ai:setKey', key),
   aiClearKey: () => ipcRenderer.invoke('ai:clearKey'),
@@ -460,6 +504,23 @@ const api: NotesApi = {
   shareDropped: (paths) => ipcRenderer.send('share:dropped', paths),
   shareDropCancel: () => ipcRenderer.send('share:dropCancel'),
   onShareDrop: (callback) => on('share:drop', callback),
+  screenStatus: () => ipcRenderer.invoke('screen:status'),
+  onScreenStatus: (callback) => on('screen:status', callback),
+  screenStart: (mode) => ipcRenderer.invoke('screen:start', mode),
+  screenStop: () => ipcRenderer.invoke('screen:stop'),
+  screenSetDisplay: (id) => ipcRenderer.invoke('screen:setDisplay', id),
+  screenInstallVirtual: () => ipcRenderer.invoke('screen:installVirtual'),
+  screenReady: () => ipcRenderer.invoke('screen:ready'),
+  screenSignal: (data) => ipcRenderer.send('screen:signal', data),
+  onScreenSignal: (callback) => on('screen:signal', callback),
+  screenLive: () => ipcRenderer.send('screen:live'),
+  screenInput: (input) => ipcRenderer.send('screen:input', input),
+  screenFailed: (reason) => ipcRenderer.send('screen:failed', reason),
+  screenClose: () => ipcRenderer.send('screen:close'),
+  screenFullscreen: () => ipcRenderer.send('screen:fullscreen'),
+  dropTargets: () => ipcRenderer.invoke('drop:targets'),
+  onDropTargets: (callback) => on('drop:targets', callback),
+  dropSend: (target, paths) => ipcRenderer.invoke('drop:send', target, paths),
   camStatus: () => ipcRenderer.invoke('cam:status'),
   camOn: () => ipcRenderer.invoke('cam:on'),
   camOff: () => ipcRenderer.invoke('cam:off'),
@@ -505,6 +566,9 @@ const api: NotesApi = {
   explorerSearch: (dir, query, showHidden) => ipcRenderer.invoke('explorer:search', dir, query, showHidden),
   explorerToVault: (paths, folder) => ipcRenderer.invoke('explorer:toVault', paths, folder),
   explorerStartDrag: (paths) => ipcRenderer.send('explorer:startDrag', paths),
+  explorerArchiveList: (path, password) => ipcRenderer.invoke('explorer:archiveList', path, password),
+  explorerExtract: (path, opts) => ipcRenderer.invoke('explorer:extract', path, opts),
+  explorerCompress: (paths, format, password) => ipcRenderer.invoke('explorer:compress', paths, format, password),
   openFile: (path) => ipcRenderer.invoke('fs:openFile', path),
   readNote: (path) => ipcRenderer.invoke('fs:read', path),
   writeNote: (path, content) => ipcRenderer.invoke('fs:write', path, content),

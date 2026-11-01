@@ -38,15 +38,19 @@ import * as localMusic from './localMusic'
 import { closeMusicMini, setupMusicMini } from './musicMini'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
 import { applySnipShortcut, setupSnip, startSnip } from './snip'
+import { applySongIdShortcut, setupSongId } from './songId'
 import { setupUpdater } from './updater'
 import { setupExport } from './exporter'
 import { setupConverter } from './converter'
+import { setupVideoDownloader } from './videoDownload'
 import { isAppPage, setupStudio } from './studio'
 import { applyReplayShortcut, clipResponse, setupClips } from './clips'
 import { setupLocalAi } from './localAi'
 import { reloadSoundboard, setupSoundboard, soundboardFolder, soundFile } from './soundboard'
+import { setupDiscord, teardownDiscord } from './discord'
 import { setupOrbitSync, syncOrbitSoon, type PartHandler } from './orbitSync'
 import { cleanPrefsPart, prefsPart } from '@shared/orbitSync'
+import { setupMonitors, teardownMonitors } from './monitors'
 import { setupLive } from './live'
 import { explorerFile, setupExplorer } from './explorer'
 import { hold, setupUndoBin } from './undoBin'
@@ -59,6 +63,8 @@ import { dictionaryMenu, setupDictionary } from './dictionary'
 import { setupPhoneLink } from './phoneLink'
 import { phoneNotify, setupPhonePair } from './phonePair'
 import { isShareWindow, setupMouseShare, teardownMouseShare } from './mouseShare'
+import { setupScreenLink, teardownScreenLink } from './screenLink'
+import { setupDeviceDrop } from './deviceDrop'
 import { setupPhoneCam } from './phoneCam'
 import { setupWebTitle } from './webTitle'
 import { setupPlaces } from './places'
@@ -69,7 +75,7 @@ import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
 import { setupGames } from './games'
 import { setupGameCovers } from './gameCovers'
-import { applyIconOutsideApp } from './appIcon'
+import { applyIconOutsideApp, taskbarIcon } from './appIcon'
 import { broadcastThemes, loadImportedThemes, setupThemes, THEME_SCHEME, themeFilePath, themesDir } from './themes'
 import { CODE_SANDBOX_SCHEME, registerCodeSandbox } from './codeSandbox'
 import { readHandwritingOffline } from './handwriting'
@@ -86,6 +92,11 @@ logCrashes()
 
 // The app used to be called Notes: keep its data folder so settings and sign-ins carry over.
 app.setPath('userData', join(app.getPath('appData'), 'Notes'))
+
+// Screens between the two computers: the picture goes straight across the home network, so the
+// computers need each other's real local addresses (Chromium hides them behind made-up names by
+// default, which don't always resolve between a PC and a Mac).
+app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns')
 
 // Windows shows notifications under this app id (it matches the installer's).
 if (process.platform === 'win32') app.setAppUserModelId('com.notesapp.desktop')
@@ -128,6 +139,12 @@ function keepOnScreen(win: BrowserWindow): void {
 
 // Empty at start, so the icon is checked once each launch (an update puts the original back on shortcuts).
 let appliedIcon = ''
+/** Windows: the icon file the taskbar shows for every window (null: the one built into the app). */
+let taskbarIconFile: string | null = null
+// Windows opened later (the mini player, pop-outs) get the picked icon too.
+app.on('browser-window-created', (_e, win) => {
+  if (taskbarIconFile) safely('taskbar icon', () => taskbarIcon(win, taskbarIconFile!))
+})
 
 /**
  * The app icon you picked (Settings → Appearance): the Dock icon on a Mac; on Windows the window's
@@ -138,11 +155,16 @@ function applyAppIcon(prefs: Prefs): void {
   if (id === appliedIcon || !file) return
   appliedIcon = id
   const image = nativeImage.createFromPath(file)
-  safely('app icon outside the app', () => applyIconOutsideApp(id, file))
+  safely('app icon outside the app', () => {
+    taskbarIconFile = applyIconOutsideApp(id, file)
+  })
   if (IS_MAC) {
     app.dock?.setIcon(image)
   } else {
-    for (const win of BrowserWindow.getAllWindows()) win.setIcon(image)
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.setIcon(image)
+      if (taskbarIconFile) safely('taskbar icon', () => taskbarIcon(win, taskbarIconFile!))
+    }
     setTrayIcon(image)
   }
 }
@@ -163,6 +185,7 @@ function appIconFile(prefs: Prefs): { id: string; file?: string } {
 function applySystemPrefs(prefs: Prefs): void {
   applyCaptureShortcut(prefs.captureShortcut)
   applySnipShortcut(prefs.snipShortcut)
+  applySongIdShortcut(prefs.songIdShortcut)
   applyReplayShortcut(prefs.replayOn ? prefs.replayShortcut : '')
   safely('app icon', () => applyAppIcon(prefs))
   // Only the installed app registers itself (in development it would register electron.exe).
@@ -915,7 +938,7 @@ async function offerMoveToApplications(): Promise<boolean> {
     })
   } catch (err) {
     logError('move to Applications', err)
-    dialog.showErrorBox('Couldn’t move Notes', 'Drag Notes from the disk image into your Applications folder instead, then open it from there.')
+    dialog.showErrorBox('Couldn’t move Orbit', 'Drag Orbit from the disk image into your Applications folder instead, then open it from there.')
     return false
   }
 }
@@ -963,9 +986,11 @@ app.whenReady().then(async () => {
   safely('Music mini player', () => setupMusicMini(currentPrefs, () => mainWindow))
   safely('export', setupExport)
   safely('converter', setupConverter)
+  safely('video downloader', () => setupVideoDownloader(() => vault))
   safely('studio', setupStudio)
   safely('offline AI', setupLocalAi)
   safely('soundboard', setupSoundboard)
+  safely('Discord voice', setupDiscord)
   safely('live streaming', setupLive)
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
   safely('undo', () => setupUndoBin(() => vault?.root ?? null))
@@ -978,9 +1003,13 @@ app.whenReady().then(async () => {
   // The extras: if one of them fails on some computer, the app itself still works.
   safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: () => void startSnip() }))
   safely('screen snip', () => setupSnip({ getMain: () => mainWindow, showMain }))
+  safely('what’s this song', () => setupSongId({ getMain: () => mainWindow }))
   safely('instant replay', () => setupClips({ getMain: () => mainWindow, showMain }))
+  safely('screen controls', setupMonitors)
   // A password copied from the vault isn't passed to the other computer.
   safely('mouse sharing', () => setupMouseShare(() => mainWindow, (text) => text === copiedSecret))
+  safely('screens between computers', () => setupScreenLink(() => mainWindow))
+  safely('drop between devices', () => setupDeviceDrop(() => mainWindow))
   safely('system settings', () => applySystemPrefs(currentPrefs()))
   safely('updates', () => setupUpdater(() => currentPrefs().checkForUpdates))
 })
@@ -1007,7 +1036,10 @@ app.on('before-quit', () => {
 })
 app.on('will-quit', () => {
   teardownCapture()
+  safely('screens between computers', teardownScreenLink)
   safely('mouse sharing', teardownMouseShare)
+  safely('Discord voice', teardownDiscord)
+  safely('screen controls', teardownMonitors)
   clearSecret()
 })
 

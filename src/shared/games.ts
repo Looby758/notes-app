@@ -117,8 +117,10 @@ export interface SteamApp {
   installDir: string
 }
 
-// Steam's own runtimes and tools, which aren't games.
-const STEAM_NOT_GAMES = new Set(['228980', '1070560', '1391110', '1628350', '1493710', '2180100', '961940', '1245040', '1580130', '1887720', '2348590', '1826330'])
+// Steam's own runtimes and tools, which aren't games. Some of these (Wallpaper Engine above all)
+// run whenever the computer's on, so counting them filled up the week's time played.
+// 431960 Wallpaper Engine, 250820 SteamVR, 629520 Soundpad, 993090 Lossless Scaling, 1905180 OBS Studio.
+const STEAM_NOT_GAMES = new Set(['431960', '250820', '629520', '993090', '1905180', '228980', '1070560', '1391110', '1628350', '1493710', '2180100', '961940', '1245040', '1580130', '1887720', '2348590', '1826330'])
 
 /** An installed Steam game, from one appmanifest_<id>.acf; null if it isn't a game you can play. */
 export function steamAppFromManifest(acfText: string): SteamApp | null {
@@ -128,7 +130,7 @@ export function steamAppFromManifest(acfText: string): SteamApp | null {
   const name = typeof state.name === 'string' ? state.name : ''
   const installDir = typeof state.installdir === 'string' ? state.installdir : ''
   if (!/^\d+$/.test(appId) || !name || !installDir) return null
-  if (STEAM_NOT_GAMES.has(appId) || /redistributable|steamworks common|steam linux runtime|proton \d|dedicated server|\bsdk\b/i.test(name)) return null
+  if (STEAM_NOT_GAMES.has(appId) || /redistributable|steamworks common|steam linux runtime|proton \d|dedicated server|\bsdk\b|wallpaper engine/i.test(name)) return null
   return { appId, name, installDir }
 }
 

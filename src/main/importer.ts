@@ -86,7 +86,7 @@ export function setupImporter(): void {
           rej(
             new Error(
               denied
-                ? 'Notes isn’t allowed to read Apple Notes. Turn it on in System Settings → Privacy & Security → Automation → Notes, then try again.'
+                ? 'Orbit isn’t allowed to read Apple Notes. Turn it on in System Settings → Privacy & Security → Automation → Orbit, then try again.'
                 : `Couldn’t read Apple Notes: ${err.message.split('\n')[0]}`
             )
           )

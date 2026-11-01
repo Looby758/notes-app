@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { createPortal } from 'react-dom'
 import {
   ArrowLeftRight,
   BringToFront,
@@ -1087,12 +1088,14 @@ function NotePicker({ onPick, onClose }: { onPick: (path: string) => void; onClo
         onClose()
       }
     }))
-  return (
+  // Over the whole window, not just this pane (a pane beside it in split view used to cover it).
+  return createPortal(
     <div className="modal-backdrop" onMouseDown={onClose}>
       <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
         <Picker query={query} onQuery={setQuery} items={items} placeholder="Find a note to put on the board…" empty="No notes match" onEscape={onClose} />
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

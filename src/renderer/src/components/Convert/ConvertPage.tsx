@@ -3,7 +3,7 @@ import { ArrowRightLeft, AudioLines, Check, Download, FileText, Film, FolderOpen
 import type { ExportData, FfmpegState, GifSettings, SaveFormat } from '@shared/types'
 import GifMaker from './GifMaker'
 import { FILE_MANAGER } from '@shared/platform'
-import { getDrag } from '../../lib/dnd'
+import { computerPaths, getDrag } from '../../lib/dnd'
 import { convertFile, preferredConvertFormat, describeSize, kindOf, outputName, targetsFor, whyNot, type ImageOptions, type Kind } from '../../lib/convert'
 
 interface Item {
@@ -116,7 +116,9 @@ export default function ConvertPage() {
     if (folder) setSaved(folder)
   }
 
-  const isFileDrag = (e: DragEvent): boolean => !getDrag() && e.dataTransfer.types.includes('Files')
+  // Files from your computer, including ones dragged over from the Files tab (in a pane beside this
+  // one, say): those come as real files too, so they're taken the same way.
+  const isFileDrag = (e: DragEvent): boolean => (!getDrag() || computerPaths(getDrag()).length > 0) && e.dataTransfer.types.includes('Files')
   const onDragOver = (e: DragEvent<HTMLDivElement>): void => {
     if (!isFileDrag(e)) return
     e.preventDefault()

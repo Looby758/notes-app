@@ -56,3 +56,30 @@ export function safeRelative(name: string): string {
     .map((part) => (RESERVED.test(part) ? `_${part}` : part))
     .join('/')
 }
+
+/** Files the file explorer opens as archives (comics, .cbz / .cbr / .cb7, go to the comic reader). */
+export const isArchiveFile = (name: string): boolean => /\.(zip|rar|7z)$/i.test(name)
+
+/** The folder an archive unpacks into: "Holiday photos.zip" → "Holiday photos", "Film.part1.rar" → "Film". */
+export function archiveFolderName(name: string): string {
+  const stem = name.replace(/\.(zip|rar|7z|cbz|cbr|cb7)$/i, '').replace(/\.part0*1$/i, '')
+  return safeRelative(stem).replace(/\//g, '_') || 'Unpacked'
+}
+
+/** The name for a new archive of these items: the one item's own name, or "Archive". */
+export function newArchiveName(itemNames: string[], format: 'zip' | '7z'): string {
+  const one = itemNames.length === 1 ? itemNames[0].replace(/\.[^./\\]+$/, '') : ''
+  return `${(one && !one.startsWith('.') ? one : itemNames.length === 1 ? itemNames[0] : 'Archive') || 'Archive'}.${format}`
+}
+
+/** "3 files, 2 folders" for what's inside an archive. */
+export function describeContents(entries: ArchiveEntry[]): string {
+  const files = entries.filter((e) => !e.isDir).length
+  const folders = new Set<string>()
+  for (const e of entries) {
+    const parts = e.name.replace(/\/$/, '').split('/')
+    for (let i = 1; i < parts.length + (e.isDir ? 1 : 0); i++) folders.add(parts.slice(0, i).join('/'))
+  }
+  const say = (n: number, w: string): string => `${n} ${w}${n === 1 ? '' : 's'}`
+  return folders.size ? `${say(files, 'file')}, ${say(folders.size, 'folder')}` : say(files, 'file')
+}

@@ -1,9 +1,11 @@
 import './music.css'
 import { useEffect, useState } from 'react'
-import { Check, ChevronDown, Copy, ExternalLink, LogOut, Music } from 'lucide-react'
+import { Check, ChevronDown, Copy, Ear, ExternalLink, LogOut, Music } from 'lucide-react'
+import type { SongIdStatus } from '@shared/songId'
+import { usePrefs } from '../../store/prefs'
 import { refreshMusicStatus, setMusicOpen, useMusic } from '../../store/music'
 import { errorMessage } from '../../lib/paths'
-import { SYSTEM_NAME } from '@shared/platform'
+import { IS_MAC, SYSTEM_NAME } from '@shared/platform'
 
 /** Settings → Music: what the player can do straight away, and connecting your Spotify account. */
 export default function MusicSettings() {
@@ -146,6 +148,78 @@ export default function MusicSettings() {
       )}
       {status.error && !error && <p className="setting-warning">{status.error}</p>}
       {!status.canEncrypt && <p className="setting-warning">This computer can’t encrypt the sign-in, so Spotify can’t be connected.</p>}
+      {error && <p className="setting-warning">{error}</p>}
+    </section>
+  )
+}
+
+/** Settings → Music: your AudD key for "What's this song?" (optional). */
+export function SongIdSettings() {
+  const [status, setStatus] = useState<SongIdStatus | null>(null)
+  const [key, setKey] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const prefShortcut = usePrefs((s) => s.prefs.songIdShortcut)
+  useEffect(() => {
+    // The shortcut is set up just after the setting changes.
+    const t = setTimeout(() => window.api.songIdStatus().then(setStatus), 400)
+    return () => clearTimeout(t)
+  }, [prefShortcut])
+  if (!status) return null
+  const save = async (value: string): Promise<void> => {
+    setError(null)
+    try {
+      setStatus(await window.api.songIdSetKey(value))
+      setKey('')
+    } catch (err) {
+      setError(errorMessage(err).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''))
+    }
+  }
+  return (
+    <section className="settings-group cal-sources" data-section="song-id">
+      <h3>What’s this song?</h3>
+      <p className="cal-sources-intro">
+        Hear a song in a video, game or stream? Press <Ear size={12} /> in the music player (or{' '}
+        {status.shortcut ? <kbd>{status.shortcut}</kbd> : 'Ctrl+K → “What’s this song?”'}). Orbit listens for 10 seconds,
+        {IS_MAC ? ' through the microphone,' : ''} sends the clip to <strong>AudD</strong> (a song-recognition service) and shows the
+        song, ready to add to one of your Spotify playlists. Nothing is recorded until you press it.
+      </p>
+      <p className="cal-sources-intro">
+        A few songs a day work straight away. For more, make a free account at{' '}
+        <button className="link-btn" onClick={() => window.open('https://dashboard.audd.io/')}>
+          dashboard.audd.io <ExternalLink size={11} />
+        </button>{' '}
+        and paste your API token here.
+      </p>
+      {status.hasKey ? (
+        <div className="cal-connected">
+          <span className="cal-connected-dot" />
+          <span>Your AudD key is saved.</span>
+          <button className="btn" onClick={() => void save('')} data-song-id-forget>
+            Remove
+          </button>
+        </div>
+      ) : (
+        <div className="cal-client">
+          <label style={{ gridColumn: '1 / -1' }}>
+            AudD API token (optional)
+            <input
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && key.trim() && void save(key)}
+              placeholder="Paste it here"
+              spellCheck={false}
+              type="password"
+              data-song-id-key
+            />
+          </label>
+          <div className="cal-client-actions">
+            <button className="btn btn-primary" disabled={!key.trim() || !status.canEncrypt} onClick={() => void save(key)}>
+              Save key
+            </button>
+          </div>
+        </div>
+      )}
+      {status.shortcutError && <p className="setting-warning">{status.shortcutError}</p>}
       {error && <p className="setting-warning">{error}</p>}
     </section>
   )

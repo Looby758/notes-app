@@ -15,6 +15,7 @@ import { splitFrontmatter } from './ai'
 import { noteTitle } from './paths'
 import { dayKey } from './dates'
 import { notify } from '../store/notify'
+import { toggleDiscord } from '../store/discord'
 
 /**
  * Your phone as a Stream Deck and a second screen.
@@ -28,6 +29,8 @@ export const DECK_EXTRAS: { id: string; name: string; icon: string; run: () => v
   { id: 'play-pause', name: 'Play / pause', icon: '⏯️', run: () => void musicControl('toggle') },
   { id: 'next-song', name: 'Next song', icon: '⏭️', run: () => void musicControl('next') },
   { id: 'previous-song', name: 'Previous song', icon: '⏮️', run: () => void musicControl('previous') },
+  { id: 'discord-mute', name: 'Discord: mute', icon: '🎙️', run: () => void toggleDiscord('mute') },
+  { id: 'discord-deafen', name: 'Discord: deafen', icon: '🎧', run: () => void toggleDiscord('deaf') },
   { id: 'lock-all', name: 'Lock notes & passwords', icon: '🔒', run: lockAllNow }
 ]
 
@@ -42,6 +45,7 @@ const FEATURE_EMOJI: Record<string, string> = {
   reading: '📖',
   calendar: '🗓️',
   clocks: '🌍',
+  screens: '🖥️',
   flashcards: '🃏',
   zen: '🌙',
   money: '💷',
@@ -53,6 +57,7 @@ const FEATURE_EMOJI: Record<string, string> = {
   chat: '🤖',
   ask: '✨',
   music: '🎵',
+  songid: '👂',
   comics: '📚',
   youtube: '📺',
   video: '🎞️',
@@ -66,6 +71,7 @@ const FEATURE_EMOJI: Record<string, string> = {
   clips: '🎞️',
   replay: '⏪',
   soundboard: '🔊',
+  'discord-voice': '🎧',
   terminal: '⌨️',
   streamer: '🙈',
   webcam: '📷',
