@@ -45,6 +45,9 @@ export interface Settings {
   /** The floating mini music player: where it was left, and whether it was showing. */
   musicMiniWindow?: WindowBounds
   musicMiniOpen?: boolean
+  /** The pop-out window (any app, floating on top): where it was left, and how see-through it was. */
+  popoutWindow?: WindowBounds
+  popoutOpacity?: number
   /** The paired phone's link (its token, and the port it was on), so the phone reconnects by itself. */
   phoneToken?: string
   phonePort?: number
@@ -477,6 +480,10 @@ export interface NotesApi {
   showLog(): Promise<void>
   /** Puts the window into (or out of) full screen. */
   setFullScreen(on: boolean): Promise<void>
+  /** Files opened with "Open in Orbit" (File Explorer / Finder) before the window was listening. Call once listening. */
+  takeOpenedFiles(): Promise<string[]>
+  /** A file opened with "Open in Orbit" while Orbit is running (its full path). */
+  onOpenFile(callback: (path: string) => void): () => void
   /** A reminder notification; clicking it opens the note at that line (onReminderOpen). */
   /** Resolves false if this system can't show notifications at all. */
   showReminder(r: { title: string; body: string; path: string; line: number }): Promise<boolean>
@@ -625,6 +632,18 @@ export interface NotesApi {
   checkForUpdates(): Promise<UpdateStatus>
   /** Restarts into a downloaded update (Windows), or opens the download page (Mac). */
   installUpdate(): Promise<void>
+  /** What's new since this computer last opened Orbit (empty when nothing is). */
+  whatsNewPending(): Promise<import('./whatsNew').ReleaseNotes[]>
+  /** Every version's notes up to this one, newest first. */
+  whatsNewAll(): Promise<import('./whatsNew').ReleaseNotes[]>
+  /** This computer has seen this version's notes. */
+  whatsNewSeen(): Promise<void>
+
+  // Settings files
+  /** Settings files that are damaged or locked to an older copy of the app. */
+  checkSettingsFiles(): Promise<import('./settingsHealth').BrokenSettingsFile[]>
+  /** Starts that part fresh (the old file is kept as a .broken copy). Some parts restart Orbit. */
+  resetSettingsFile(file: string): Promise<{ restarting: boolean }>
   onUpdateStatus(callback: (status: UpdateStatus) => void): () => void
 
   // Export
@@ -819,6 +838,18 @@ export interface NotesApi {
   musicDevices(): Promise<MusicDevice[]>
   musicTransfer(deviceId: string): Promise<void>
   // The floating mini music player
+  /** Pop-out window: opens it (it asks which app to show), or brings it back. */
+  openPopout(): Promise<void>
+  /** Pop-out window's own page: the apps and screens it can show. */
+  popoutSources(): Promise<StudioCaptureSource[]>
+  popoutState(): Promise<{ opacity: number }>
+  /** Pop-out window's own page: take the shape of the picture (width ÷ height). */
+  fitPopout(aspect: number): Promise<void>
+  /** Pop-out window's own page: make room to pick an app. */
+  popoutPicker(): Promise<void>
+  setPopoutOpacity(opacity: number): Promise<void>
+  minimizePopout(): Promise<void>
+  closePopout(): Promise<void>
   setMusicMini(open: boolean): Promise<boolean>
   isMusicMiniOpen(): Promise<boolean>
   /** It was showing when Notes last closed. */
@@ -867,12 +898,16 @@ export interface NotesApi {
   aiTidy(text: string, kind: 'note' | 'capture'): Promise<string>
   /** `extra`: digests of money, calendar and email for Ask everything (lib/askContext.ts). */
   aiAsk(question: string, notes: AiNote[], history: AiAskTurn[], extra?: AiExtraContext, engine?: AiEngine): Promise<AiReply>
+  /** Ask everything: the emails that best answer a question as text (the best few in full), from Gmail or the copy on this computer. */
+  aiEmailContext(question: string, engine?: AiEngine): Promise<string>
   /** Offline AI or Claude for the AI features. */
   aiSetEngine(use: AiEngine): Promise<AiStatus>
   /** Money tracker: a category id for each statement line (by its number), sorted by the offline AI only. */
   aiSortMoney(rows: AiSortRow[], categories: { id: string; name: string; income?: boolean }[]): Promise<Record<number, string>>
   /** The dictionary card: what a word means in its sentence, from the offline AI. */
   aiMeaning(word: string, sentence: string): Promise<string>
+  /** Writing autocomplete: the next few words after `before`, from the offline AI (empty when there's no guess). */
+  aiSuggest(title: string, before: string): Promise<string>
   // The offline AI
   localAiState(): Promise<LocalAiState>
   /** Downloads the engine and a model (resumes a stopped download); resolves when it's done or has failed. */
@@ -1058,8 +1093,8 @@ export interface NotesApi {
   explorerList(dir: string): Promise<ExplorerEntry[]>
   /** The start of a text file, for its preview. */
   explorerReadText(path: string): Promise<string>
-  /** Opens a file in its usual app (programs are shown in File Explorer / Finder instead). */
-  explorerOpen(path: string): Promise<void>
+  /** Opens a file in its usual app (programs are shown in File Explorer / Finder instead). `ask`: ask first (a plain click). */
+  explorerOpen(path: string, ask?: boolean): Promise<void>
   explorerReveal(path: string): Promise<void>
   /** A new empty folder or file, renamed " (2)" if the name's taken. Returns its path. */
   explorerCreate(dir: string, name: string, kind: 'folder' | 'file'): Promise<string>
@@ -1102,8 +1137,8 @@ export interface NotesApi {
   explorerExtract(path: string, opts: { names?: string[]; password?: string; intoFolder?: boolean }): Promise<string[]>
   /** Packs files and folders into a new zip or 7z next to the first one. Resolves with its path. */
   explorerCompress(paths: string[], format: 'zip' | '7z', password?: string): Promise<string>
-  /** Opens a vault file (like a PDF) in its usual app. */
-  openFile(path: string): Promise<void>
+  /** Opens a vault file (like a PDF) in its usual app. `ask`: ask first (a plain click). */
+  openFile(path: string, ask?: boolean): Promise<void>
   /** Reads a note's markdown. */
   readNote(path: string): Promise<string>
   /** Saves a note (or a .canvas board) atomically. */

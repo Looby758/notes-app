@@ -32,3 +32,23 @@ export async function openComicFile(path: string): Promise<void> {
     notify(err)
   }
 }
+
+/**
+ * A comic clicked in the notes folder or Files: it goes on the shelf and the Comics tab opens on
+ * the shelf, without opening the comic itself (or any other app). `vault`: the path is in the notes folder.
+ */
+export async function shelveComicFile(path: string, vault = false): Promise<void> {
+  try {
+    const full = vault ? await window.api.videoInVault(path) : path
+    const { added } = await window.api.comicsAdd([full])
+    if (!added[0]) {
+      notify('That isn’t a comic Orbit can open. Comics need to be .cbz or .cbr files.')
+      return
+    }
+    readComic(null)
+    openSpecialTab(COMICS_TAB)
+    notify('It’s on your comic shelf. Click its cover to read it.', 'info')
+  } catch (err) {
+    notify(err)
+  }
+}

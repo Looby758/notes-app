@@ -33,7 +33,8 @@ export function isAppPage(wc: WebContents | null | undefined): boolean {
   return url.startsWith('file://') || (!!dev && url.startsWith(dev))
 }
 
-async function sources(): Promise<StudioCaptureSource[]> {
+/** The screens and other apps' windows you can capture (Orbit's own windows left out). */
+export async function captureSources(): Promise<StudioCaptureSource[]> {
   const list = await desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { width: 320, height: 180 }, fetchWindowIcons: false })
   const own = new Set(BrowserWindow.getAllWindows().map((w) => w.getMediaSourceId()))
   return list
@@ -42,7 +43,7 @@ async function sources(): Promise<StudioCaptureSource[]> {
 }
 
 export function setupStudio(): void {
-  ipcMain.handle('studio:sources', (e) => (isAppPage(e.sender) ? sources() : []))
+  ipcMain.handle('studio:sources', (e) => (isAppPage(e.sender) ? captureSources() : []))
 
   ipcMain.handle('studio:access', async (_e, what: 'camera' | 'screen') => {
     if (!IS_MAC) return true

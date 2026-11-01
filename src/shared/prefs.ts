@@ -76,6 +76,8 @@ export interface Prefs {
   selectionToolbar: boolean
   /** Pasting a web address fetches its title; pasting a table (Excel, a web page) makes a markdown table. */
   smartPaste: boolean
+  /** Writing autocomplete: the offline AI shows the next few words in grey as you type; Tab takes them. */
+  aiAutocomplete: boolean
   vimMode: boolean
   cursorBlink: boolean
   showWordCount: boolean
@@ -248,6 +250,7 @@ export const DEFAULT_PREFS: Prefs = {
   wrapSelection: true,
   selectionToolbar: true,
   smartPaste: true,
+  aiAutocomplete: true,
   vimMode: false,
   cursorBlink: true,
   showWordCount: true,

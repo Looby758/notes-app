@@ -67,18 +67,23 @@ export function starMany(paths: string[]): void {
   )
 }
 
-async function eachNote(paths: string[], change: (text: string) => string | null): Promise<number> {
+/** Changes each note; one Ctrl+Z puts them all back. `label` names the change from how many notes it touched. */
+async function eachNote(paths: string[], change: (text: string) => string | null, label: (count: number) => string): Promise<number> {
   let changed = 0
-  for (const p of notesIn(paths)) {
-    try {
-      if (await editNote(p, change)) changed++
-    } catch (err) {
-      notify(err)
+  await undoGroup(label, async () => {
+    for (const p of notesIn(paths)) {
+      try {
+        if (await editNote(p, change, { undo: label(1) })) changed++
+      } catch (err) {
+        notify(err)
+      }
     }
-  }
+  })
   await useVault.getState().refresh(notesIn(paths))
   return changed
 }
+
+const notes = (n: number): string => (n === 1 ? '1 note' : `${n} notes`)
 
 const tagsOf = (text: string): string[] => {
   const p = readFrontmatter(text)?.properties.find((x) => x.key === 'tags' || x.key === 'tag')
@@ -91,7 +96,7 @@ export function addTagMany(paths: string[], tag: string): Promise<number> {
     const tags = tagsOf(text)
     if (!t || tags.some((x) => x.toLowerCase() === t.toLowerCase())) return null
     return setProperty(text, 'tags', [...tags, t])
-  })
+  }, (n) => `Added #${t} to ${notes(n)}`)
 }
 
 /** Removes a tag from the notes' properties (#tags written in the text itself are left alone). */
@@ -101,11 +106,11 @@ export function removeTagMany(paths: string[], tag: string): Promise<number> {
     const tags = tagsOf(text)
     if (!tags.some((x) => x.toLowerCase() === t)) return null
     return setProperty(text, 'tags', tags.filter((x) => x.toLowerCase() !== t))
-  })
+  }, (n) => `Removed #${t} from ${notes(n)}`)
 }
 
 export function setPropertyMany(paths: string[], key: string, value: string | undefined): Promise<number> {
   const k = key.trim().replace(/:/g, '')
   if (!k) return Promise.resolve(0)
-  return eachNote(paths, (text) => setProperty(text, k, value))
+  return eachNote(paths, (text) => setProperty(text, k, value), (n) => `${value === undefined ? 'Removed' : 'Set'} “${k}” ${value === undefined ? 'from' : 'on'} ${notes(n)}`)
 }

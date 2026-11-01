@@ -162,6 +162,12 @@ const api: NotesApi = {
   readImport: (path) => ipcRenderer.invoke('import:read', path),
   md5: (data) => ipcRenderer.invoke('import:md5', data),
   appleNotes: () => ipcRenderer.invoke('import:appleNotes'),
+  takeOpenedFiles: () => ipcRenderer.invoke('orbit:takeOpened'),
+  onOpenFile: (callback) => {
+    const handler = (_e: unknown, path: string): void => callback(path)
+    ipcRenderer.on('orbit:open-path', handler)
+    return () => ipcRenderer.removeListener('orbit:open-path', handler)
+  },
   onReminderOpen: (callback) => {
     const handler = (_e: unknown, path: string, line: number): void => callback(path, line)
     ipcRenderer.on('reminder:open', handler)
@@ -171,6 +177,11 @@ const api: NotesApi = {
   updateStatus: () => ipcRenderer.invoke('update:status'),
   checkForUpdates: () => ipcRenderer.invoke('update:check'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
+  whatsNewPending: () => ipcRenderer.invoke('whatsNew:pending'),
+  whatsNewAll: () => ipcRenderer.invoke('whatsNew:all'),
+  whatsNewSeen: () => ipcRenderer.invoke('whatsNew:seen'),
+  checkSettingsFiles: () => ipcRenderer.invoke('settingsHealth:check'),
+  resetSettingsFile: (file) => ipcRenderer.invoke('settingsHealth:reset', file),
   onUpdateStatus: (callback) => {
     const handler = (_e: unknown, status: Parameters<typeof callback>[0]): void => callback(status)
     ipcRenderer.on('update:status', handler)
@@ -376,6 +387,14 @@ const api: NotesApi = {
   musicMoveInPlaylist: (uri, from, to) => ipcRenderer.invoke('music:moveInPlaylist', uri, from, to),
   localMusicLibrary: (fresh) => ipcRenderer.invoke('localMusic:library', fresh),
   localMusicChooseFolder: () => ipcRenderer.invoke('localMusic:chooseFolder'),
+  openPopout: () => ipcRenderer.invoke('popout:open'),
+  popoutSources: () => ipcRenderer.invoke('popout:sources'),
+  popoutState: () => ipcRenderer.invoke('popout:state'),
+  fitPopout: (aspect) => ipcRenderer.invoke('popout:fit', aspect),
+  popoutPicker: () => ipcRenderer.invoke('popout:picker'),
+  setPopoutOpacity: (opacity) => ipcRenderer.invoke('popout:opacity', opacity),
+  minimizePopout: () => ipcRenderer.invoke('popout:minimize'),
+  closePopout: () => ipcRenderer.invoke('popout:close'),
   setMusicMini: (open) => ipcRenderer.invoke('musicMini:set', open),
   isMusicMiniOpen: () => ipcRenderer.invoke('musicMini:isOpen'),
   musicMiniWasOpen: () => ipcRenderer.invoke('musicMini:wasOpen'),
@@ -410,9 +429,11 @@ const api: NotesApi = {
   aiTidy: (text, kind) => ipcRenderer.invoke('ai:tidy', text, kind),
   aiInterpret: (text, context) => ipcRenderer.invoke('ai:interpret', text, context),
   aiAsk: (question, notes, history, extra, engine) => ipcRenderer.invoke('ai:ask', question, notes, history, extra, engine),
+  aiEmailContext: (question, engine) => ipcRenderer.invoke('ai:emailContext', question, engine),
   aiSetEngine: (use) => ipcRenderer.invoke('ai:setEngine', use),
   aiSortMoney: (rows, categories) => ipcRenderer.invoke('ai:sortMoney', rows, categories),
   aiMeaning: (word, sentence) => ipcRenderer.invoke('ai:meaning', word, sentence),
+  aiSuggest: (title, before) => ipcRenderer.invoke('ai:suggest', title, before),
   localAiState: () => ipcRenderer.invoke('localAi:state'),
   localAiInstall: (model) => ipcRenderer.invoke('localAi:install', model),
   localAiCancel: () => ipcRenderer.invoke('localAi:cancel'),
@@ -560,7 +581,7 @@ const api: NotesApi = {
   explorerPlaces: () => ipcRenderer.invoke('explorer:places'),
   explorerList: (dir) => ipcRenderer.invoke('explorer:list', dir),
   explorerReadText: (path) => ipcRenderer.invoke('explorer:readText', path),
-  explorerOpen: (path) => ipcRenderer.invoke('explorer:open', path),
+  explorerOpen: (path, ask) => ipcRenderer.invoke('explorer:open', path, ask),
   explorerReveal: (path) => ipcRenderer.invoke('explorer:reveal', path),
   explorerCreate: (dir, name, kind) => ipcRenderer.invoke('explorer:create', dir, name, kind),
   explorerRename: (path, name) => ipcRenderer.invoke('explorer:rename', path, name),
@@ -572,7 +593,7 @@ const api: NotesApi = {
   explorerArchiveList: (path, password) => ipcRenderer.invoke('explorer:archiveList', path, password),
   explorerExtract: (path, opts) => ipcRenderer.invoke('explorer:extract', path, opts),
   explorerCompress: (paths, format, password) => ipcRenderer.invoke('explorer:compress', paths, format, password),
-  openFile: (path) => ipcRenderer.invoke('fs:openFile', path),
+  openFile: (path, ask) => ipcRenderer.invoke('fs:openFile', path, ask),
   readNote: (path) => ipcRenderer.invoke('fs:read', path),
   writeNote: (path, content) => ipcRenderer.invoke('fs:write', path, content),
 

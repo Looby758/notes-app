@@ -21,6 +21,7 @@ import { newArchiveName } from '@shared/archive'
 import { listArchive } from './archive'
 import { pack, unpack } from './archive/unpack'
 import { logError } from './log'
+import { openOutside } from './openOutside'
 import { hold } from './undoBin'
 
 /**
@@ -310,14 +311,14 @@ export function setupExplorer(vaultRoot: () => string | null): void {
     if (previewKind(full) !== 'text') throw new Error('That file can’t be previewed as text.')
     return readText(full)
   })
-  ipcMain.handle('explorer:open', async (_e, path: string) => {
+  // `ask`: a double-click on a file, so Orbit asks before another app opens.
+  ipcMain.handle('explorer:open', async (e, path: string, ask?: boolean) => {
     const full = checkPath(path)
     if (PROGRAMS.test(full)) {
       shell.showItemInFolder(full)
       return
     }
-    const error = await shell.openPath(full)
-    if (error) throw new Error(error)
+    await openOutside(e.sender, full, !!ask)
   })
   ipcMain.handle('explorer:reveal', (_e, path: string) => shell.showItemInFolder(checkPath(path)))
   ipcMain.handle('explorer:create', (_e, dir: string, name: string, kind: 'folder' | 'file') => create(checkPath(dir), name, kind === 'folder' ? 'folder' : 'file'))

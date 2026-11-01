@@ -34,6 +34,7 @@ import { toCodeMirrorKey } from '../../lib/shortcuts'
 import { typewriter } from './typewriter'
 import { calculator } from './calculator'
 import { codeRunner } from './codeRunner'
+import { autocomplete } from './autocomplete'
 import { usePrefs } from '../../store/prefs'
 
 /** Zen mode turns typewriter mode on for as long as it lasts (without changing your settings). */
@@ -65,6 +66,7 @@ export function prefsExtensions(p: Prefs): Extension {
     p.wrapSelection && !p.vimMode ? wrapOnType : [],
     p.selectionToolbar && !p.readingMode ? selectionToolbar : [],
     p.smartPaste ? smartPaste : [],
+    p.aiAutocomplete && !p.readingMode ? autocomplete : [],
     drawSelection({ cursorBlinkRate: p.cursorBlink ? 1200 : 0 }),
     // Typewriter mode is for writing; reading mode turns it off.
     p.readingMode ? [] : typewriter(p),

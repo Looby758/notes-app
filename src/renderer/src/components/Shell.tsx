@@ -34,6 +34,7 @@ import {
   setZenEditor
 } from '../lib/editorController'
 import { openLink, openWikiLink } from '../lib/openLink'
+import { openFromComputer } from '../lib/openFromComputer'
 import { watchUndoKeys } from '../lib/undo'
 import Sidebar from './Sidebar/Sidebar'
 import Dock, { TopbarFeatures } from './Nav/Dock'
@@ -53,6 +54,7 @@ import { startDictionary } from '../lib/dictionary'
 import { EventDetails } from './Calendar/shared'
 import Resizer from './Resizer'
 import UpdateToast from './UpdateToast'
+import StartupNotices from './Notices/StartupNotices'
 import Screensaver from './Screensaver/Screensaver'
 import Pet from './Motion/Pet'
 import MusicPlayer from './Music/MusicPlayer'
@@ -121,6 +123,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     void startReminders()
     // (The test notification from Settings has no note to open.)
     const offReminder = window.api.onReminderOpen((path, line) => path && openNote(path, { line }))
+    // "Open in Orbit" from File Explorer / Finder: any that came in while Orbit was starting, then each new one.
+    const offOpenFile = window.api.onOpenFile(openFromComputer)
+    void window.api.takeOpenedFiles().then((paths) => paths.forEach(openFromComputer))
     const offVoice = window.api.onVoiceStart(() => useUI.setState({ voiceOpen: true }))
     const offSketch = window.api.onSketchStart(() => useUI.setState({ sketch: { path: null } }))
     const offFormat = startFormatMenu()
@@ -156,6 +161,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       offChanged()
       offIndex()
       offReminder()
+      offOpenFile()
       offVoice()
       offSketch()
       offFormat()
@@ -388,6 +394,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <EventDetails />
       <Pet />
       <UpdateToast />
+      <StartupNotices />
       <DeviceDrop />
       <MusicPlayer />
       <RecordingBar />

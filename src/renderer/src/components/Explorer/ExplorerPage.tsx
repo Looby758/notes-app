@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react'
 import {
   ArrowLeft,
+  Columns2,
+  Plus,
   ArrowRight,
   ArrowUp,
   ChevronRight,
@@ -62,18 +64,20 @@ import {
   type PasteMode
 } from '@shared/explorer'
 import { FILE_MANAGER, TRASH_NAME } from '@shared/platform'
-import { computerPaths, dragFilesOut, getDrag, setDrag } from '../../lib/dnd'
+import { computerPaths, dragFilesOut, getDrag, getTreeDrag, setDrag, setTreeDrag } from '../../lib/dnd'
 import { recordUndo, undoChanged, useUndoChanges } from '../../lib/undo'
-import { openFileTab, openNote } from '../../lib/editorController'
+import { explorerStartDirs, openExplorerTab, openFileTab, openNote, EXPLORER_TAB } from '../../lib/editorController'
+import { setExplorerTabDir } from '../../store/explorerTabs'
 import { fileKind } from '../../lib/fileKinds'
-import { isComicFile } from '@shared/comics'
-import { openComicFile } from '../../store/comics'
+import { isComicBookFile } from '@shared/comics'
+import { shelveComicFile } from '../../store/comics'
+import { useFilesReveal } from '../../store/filesReveal'
 import { notify } from '../../store/notify'
 import ContextMenu, { type MenuItem } from '../ContextMenu'
 import FileIcon from '../FileIcon'
 import { sendToDevice, useDropTargets } from '../Share/DeviceDrop'
 import { isVideoFile } from '@shared/videoPlayer'
-import { openVideo } from '../../store/videoPlayer'
+import { queueVideo } from '../../store/videoPlayer'
 import { archiveFolderName, isArchiveFile } from '@shared/archive'
 import ArchivePreview, { CompressDialog } from './ArchivePreview'
 
@@ -94,12 +98,25 @@ const PLACE_ICONS: Record<ExplorerPlace['kind'], typeof Folder> = {
 const MAX_SHOWN = 2000
 
 
-/** Where you were and how you liked it, kept while the app is open. */
-const last: { dir: string | null; view: 'list' | 'grid'; sort: ExplorerSort; showHidden: boolean } = {
+type Remembered = { dir: string | null; view: 'list' | 'grid'; sort: ExplorerSort; showHidden: boolean }
+/** Where you were and how you liked it, kept while the app is open: a new Files tab starts like this. */
+const last: Remembered = {
   dir: null,
   view: 'list',
   sort: 'name',
   showHidden: false
+}
+/** The same, for each Files tab, so switching between them keeps each one's folder. */
+const tabsLast = new Map<string, Remembered>()
+const rememberedFor = (tab: string): Remembered => {
+  let r = tabsLast.get(tab)
+  if (!r) {
+    const start = explorerStartDirs.get(tab)
+    explorerStartDirs.delete(tab)
+    r = { ...last, dir: start ?? last.dir }
+    tabsLast.set(tab, r)
+  }
+  return r
 }
 
 /** Cut or copied items, shared by every explorer tab while the app is open. */
@@ -165,10 +182,11 @@ async function recordDeleted(paths: string[]): Promise<void> {
 }
 
 /** The file explorer: browse every folder on the computer (and Google Drive), manage files, preview them and drag them into notes. */
-export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
+export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFocus?: boolean; tab?: string }) {
+  const mine = rememberedFor(tab)
   const [places, setPlaces] = useState<ExplorerPlace[]>([])
   const [pins, setPins] = useState<string[]>(loadPins)
-  const [dir, setDir] = useState<string | null>(last.dir)
+  const [dir, setDir] = useState<string | null>(mine.dir)
   const [entries, setEntries] = useState<ExplorerEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   /** The one the preview shows and the arrow keys move from. */
@@ -179,9 +197,9 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
   const [query, setQuery] = useState('')
   const [deep, setDeep] = useState(false)
   const [results, setResults] = useState<ExplorerEntry[] | null>(null)
-  const [view, setView] = useState(last.view)
-  const [sort, setSort] = useState(last.sort)
-  const [showHidden, setShowHidden] = useState(last.showHidden)
+  const [view, setView] = useState(mine.view)
+  const [sort, setSort] = useState(mine.sort)
+  const [showHidden, setShowHidden] = useState(mine.showHidden)
   const [back, setBack] = useState<string[]>([])
   const [forward, setForward] = useState<string[]>([])
   const [reload, setReload] = useState(0)
@@ -200,6 +218,8 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
   const closeMenu = useCallback(() => setMenu(null), [])
 
   Object.assign(last, { dir, view, sort, showHidden })
+  Object.assign(mine, { dir, view, sort, showHidden })
+  useEffect(() => void (dir && setExplorerTabDir(tab, dir)), [tab, dir])
 
   useEffect(() => {
     window.api
@@ -212,6 +232,22 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
   }, [])
 
   useEffect(() => localStorage.setItem(PINS_KEY, JSON.stringify(pins)), [pins])
+
+  // A file to show from elsewhere ("Open in Orbit" on a zip): open its folder with it picked.
+  useEffect(() => {
+    const show = (path: string | null): void => {
+      if (!path) return
+      useFilesReveal.setState({ path: null })
+      const folder = parentPath(path)
+      if (!folder) return
+      pickAfter.current = { paths: [path] }
+      setQuery('')
+      setDir(folder)
+      setReload((n) => n + 1)
+    }
+    show(useFilesReveal.getState().path)
+    return useFilesReveal.subscribe((st) => show(st.path))
+  }, [])
 
   useEffect(() => {
     if (!dir) return
@@ -318,16 +354,21 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
 
   const open = (entry: ExplorerEntry): void => {
     if (entry.isDir) return go(entry.path)
-    // Videos (anywhere on the computer) play in the video player.
-    if (isVideoFile(entry.name)) return openVideo(entry.path)
+    // Opening a file never kicks off something unexpected.
+    // Videos (anywhere on the computer) go in the video player's Up next, without playing.
+    if (isVideoFile(entry.name)) return queueVideo(entry.path)
     // Notes and files in the notes folder open here, in a tab of their own.
     if (entry.vaultPath && /\.md$/i.test(entry.name)) return openNote(entry.vaultPath, { newTab: true })
     if (entry.vaultPath && fileKind(entry.vaultPath) !== 'other') return openFileTab(entry.vaultPath, { newTab: true })
-    // Comics open in Orbit's comic reader (and go on its shelf).
-    if (isComicFile(entry.name)) return void openComicFile(entry.path)
-    // Zips, RARs and 7z files unpack into a folder next to them, which then opens.
-    if (isArchiveFile(entry.name)) return void extract(entry, { intoFolder: true, go: true }).catch((err) => notify(/password/i.test(String(err)) ? 'This archive has a password: type it in on the right, then Extract.' : err))
-    window.api.explorerOpen(entry.path).catch(notify)
+    // Comics go on Orbit's comic shelf (without opening the comic).
+    if (isComicBookFile(entry.name)) return void shelveComicFile(entry.path)
+    // Zips, RARs and 7z files show what's inside on the right; nothing is unpacked until you press Extract.
+    if (isArchiveFile(entry.name)) {
+      pickOnly(entry.path)
+      return notify('What’s inside is shown on the right. Press Extract there to unpack it.', 'info')
+    }
+    // Anything else asks before opening in another app.
+    window.api.explorerOpen(entry.path, true).catch(notify)
   }
 
   // ---- file actions ----
@@ -529,17 +570,25 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
 
   const onDragStart = (e: DragEvent, entry: ExplorerEntry): void => {
     if (!picked.has(entry.path)) pickOnly(entry.path)
-    const paths = (picked.has(entry.path) ? pickedEntries : [entry]).map((x) => x.path)
+    const list = picked.has(entry.path) ? pickedEntries : [entry]
+    const paths = list.map((x) => x.path)
     // Dragged as real files, so they drop into Discord, a browser or File Explorer / Finder too.
-    // In Orbit, a single file can also be dropped into a note; the notes tree in the sidebar takes any of them.
-    dragFilesOut(e, paths, paths.length === 1 && !entry.isDir ? { kind: 'computer', path: entry.path } : { kind: 'computerMany', paths })
+    // In Orbit, files can also be dropped into a note (folders can't); the notes tree in the sidebar takes any of them.
+    const files = list.filter((x) => !x.isDir).map((x) => x.path)
+    dragFilesOut(e, paths, paths.length === 1 && !entry.isDir ? { kind: 'computer', path: entry.path } : { kind: 'computerMany', paths, files })
   }
 
   const dropProps = (target: string) => ({
     onDragOver: (e: DragEvent) => {
-      if (!e.dataTransfer.types.includes('Files')) return
+      const tree = getTreeDrag().length > 0
+      if (!tree && !e.dataTransfer.types.includes('Files')) return
       e.preventDefault()
       e.stopPropagation()
+      // From the notes tree: copied out of your notes (or moved, with Shift held).
+      if (tree) {
+        e.dataTransfer.dropEffect = e.shiftKey ? 'move' : 'copy'
+        return setDropOn(target)
+      }
       // The computer only lets files dragged out be copied or linked, so the cursor says copy even
       // when moving within the Files tab (the drop below still moves them unless Ctrl / Alt is held).
       e.dataTransfer.dropEffect = 'copy'
@@ -552,6 +601,19 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
       e.preventDefault()
       e.stopPropagation()
       setDropOn(null)
+      const tree = getTreeDrag()
+      if (tree.length) {
+        setTreeDrag([])
+        setDrag(null)
+        return void window.api
+          .getVault()
+          .then((root) => {
+            if (!root) return
+            const sep = root.includes('\\') ? '\\' : '/'
+            pasteInto(tree.map((p) => `${root.replace(/[\\/]+$/, '')}${sep}${p.split('/').join(sep)}`), target, e.shiftKey ? 'move' : 'copy')
+          })
+          .catch(notify)
+      }
       const ours = computerPaths(getDrag())
       setDrag(null)
       if (ours.length) {
@@ -573,6 +635,12 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
       ...(!many
         ? [
             { label: 'Open', icon: entry.isDir ? <FolderOpen size={14} /> : <ExternalLink size={14} />, onClick: () => open(entry) },
+            ...(entry.isDir
+              ? [
+                  { label: 'Open in a new tab', icon: <Plus size={14} />, onClick: () => openExplorerTab(entry.path) },
+                  { label: 'Open beside', icon: <Columns2 size={14} />, onClick: () => openExplorerTab(entry.path, { beside: true }) }
+                ]
+              : []),
             ...(searching ? [{ label: 'Open the folder it’s in', icon: <Folder size={14} />, onClick: () => { const p = parentPath(entry.path); if (p) { pickAfter.current = { paths: [entry.path] }; go(p) } } }] : []),
             'separator' as const
           ]
@@ -614,6 +682,12 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
     { label: 'New text file', icon: <FilePlus size={14} />, onClick: () => create('file') },
     ...(clipped ? [{ label: `Paste ${clipped.paths.length === 1 ? '' : `${clipped.paths.length} items`}`.trim(), icon: <ClipboardPaste size={14} />, onClick: () => paste() }] : []),
     'separator',
+    ...(dir
+      ? [
+          { label: 'Open this folder in a new tab', icon: <Plus size={14} />, onClick: () => openExplorerTab(dir) },
+          { label: 'Open this folder beside', icon: <Columns2 size={14} />, onClick: () => openExplorerTab(dir, { beside: true }) }
+        ]
+      : []),
     { label: 'Refresh', icon: <RefreshCw size={14} />, onClick: refresh },
     ...(dir ? [{ label: pins.includes(dir) ? 'Unpin this folder' : 'Pin this folder to the sidebar', icon: <Pin size={14} />, onClick: () => togglePin(dir) }] : []),
     ...(dir ? [{ label: `Open in ${FILE_MANAGER}`, icon: <FolderSearch size={14} />, onClick: () => window.api.explorerOpen(dir).catch(notify) }] : [])
@@ -621,6 +695,7 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
 
   const pinMenu = (path: string): MenuItem[] => [
     { label: 'Open', icon: <FolderOpen size={14} />, onClick: () => go(path) },
+    { label: 'Open in a new tab', icon: <Plus size={14} />, onClick: () => openExplorerTab(path) },
     { label: 'Unpin', icon: <PinOff size={14} />, onClick: () => togglePin(path) }
   ]
 
@@ -636,6 +711,7 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
       key={key}
       className={`explorer-place ${kind} ${dir === path ? 'active' : ''} ${dropOn === path ? 'drop' : ''}`}
       onClick={() => go(path)}
+      onAuxClick={(e) => e.button === 1 && openExplorerTab(path)}
       onContextMenu={pinned ? (e) => (e.preventDefault(), setMenu({ x: e.clientX, y: e.clientY, entry: null, pin: path })) : undefined}
       title={path}
       {...dropProps(path)}
@@ -673,6 +749,12 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
             </button>
             <button className="icon-btn" disabled={!up} onClick={() => up && go(up)} title="Up a folder (Backspace)">
               <ArrowUp size={15} />
+            </button>
+            <button className="icon-btn" onClick={() => openExplorerTab(dir ?? undefined)} title="Open this folder in a new tab (or middle-click any folder)">
+              <Plus size={15} />
+            </button>
+            <button className="icon-btn" onClick={() => openExplorerTab(dir ?? undefined, { beside: true })} title="Open this folder beside, to drag files between the two">
+              <Columns2 size={15} />
             </button>
             {address !== null ? (
               <input
@@ -800,6 +882,9 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
                 onDragStart={(e) => onDragStart(e, entry)}
                 onClick={(e) => onItemClick(e, entry)}
                 onDoubleClick={() => renaming !== entry.path && open(entry)}
+                // Middle-click a folder: it opens in a new Files tab, like in a browser.
+                onMouseDown={(e) => entry.isDir && e.button === 1 && e.preventDefault()}
+                onAuxClick={(e) => entry.isDir && e.button === 1 && openExplorerTab(entry.path)}
                 onContextMenu={(e) => {
                   e.preventDefault()
                   if (!picked.has(entry.path)) pickOnly(entry.path)

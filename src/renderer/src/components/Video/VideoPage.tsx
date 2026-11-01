@@ -4,6 +4,8 @@ import {
   ArrowLeft,
   AudioLines,
   Captions,
+  ChevronDown,
+  ChevronUp,
   Download,
   Film,
   FolderOpen,
@@ -16,6 +18,7 @@ import {
   Play,
   RotateCcw,
   RotateCw,
+  SkipForward,
   Volume2,
   VolumeX,
   X
@@ -41,7 +44,7 @@ import {
 } from '@shared/videoPlayer'
 import { FILE_MANAGER } from '@shared/platform'
 import { notify } from '../../store/notify'
-import { closeVideo, forgetVideo, openVideo, remember, useVideoPlayer, watchedOf, type SubtitleChoice } from '../../store/videoPlayer'
+import { closeVideo, forgetVideo, moveQueued, openVideo, playNext, remember, unqueueVideo, useVideoPlayer, watchedOf, type SubtitleChoice } from '../../store/videoPlayer'
 
 /**
  * The video player tab: plays any video on the computer (MKV, AVI, WMV… through the video helper,
@@ -102,6 +105,7 @@ function dropVideo(e: DragEvent): string | null {
 
 function VideoList() {
   const history = useVideoPlayer((s) => s.history)
+  const queue = useVideoPlayer((s) => s.queue)
   const ffmpeg = useFfmpeg()
   const [over, setOver] = useState(false)
 
@@ -137,6 +141,30 @@ function VideoList() {
           Drop one here, or open one from Files.
         </p>
         <HelperDownload state={ffmpeg} compact />
+        {queue.length > 0 && (
+          <>
+            <h3>Up next</h3>
+            <ul className="video-history" data-video-queue>
+              {queue.map((p, i) => (
+                <li key={p}>
+                  <button className="video-history-item" onClick={() => openVideo(p)} title={p}>
+                    <Play size={14} />
+                    <span className="video-history-name">{fileName(p)}</span>
+                  </button>
+                  <button className="icon-btn" title="Earlier" disabled={i === 0} onClick={() => moveQueued(p, -1)}>
+                    <ChevronUp size={14} />
+                  </button>
+                  <button className="icon-btn" title="Later" disabled={i === queue.length - 1} onClick={() => moveQueued(p, 1)}>
+                    <ChevronDown size={14} />
+                  </button>
+                  <button className="icon-btn" title="Take out of Up next" onClick={() => unqueueVideo(p)}>
+                    <X size={14} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
         {history.length > 0 && (
           <>
             <h3>Carry on watching</h3>
@@ -193,6 +221,7 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
   const ffmpeg = useFfmpeg()
   const volume = useVideoPlayer((s) => s.volume)
   const muted = useVideoPlayer((s) => s.muted)
+  const upNext = useVideoPlayer((s) => s.queue[0] ?? null)
 
   const [info, setInfo] = useState<VideoInfo | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -662,6 +691,11 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
         </span>
         {live && <span className="video-badge" title={source?.mode === 'remux' ? 'The sound is converted as it plays' : 'Converted as it plays'}>{source?.mode === 'remux' ? 'Sound converted' : 'Converted'}</span>}
         <span className="video-top-gap" />
+        {upNext && (
+          <button className="btn" onClick={() => (save(), playNext())} title={`Up next: ${fileName(upNext)}`} data-video-next>
+            <SkipForward size={13} /> Next
+          </button>
+        )}
         <button className="btn" onClick={() => window.api.explorerReveal(path).catch(notify)} title={`Show in ${FILE_MANAGER}`}>
           <FolderOpen size={13} />
         </button>
@@ -669,6 +703,15 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
           Open another…
         </button>
       </div>
+
+      {ended && upNext && (
+        <div className="video-resumed" data-video-up-next>
+          Up next: {fileName(upNext)}
+          <button className="btn btn-primary" onClick={() => playNext()}>
+            <Play size={13} /> Play
+          </button>
+        </div>
+      )}
 
       {resumed !== null && source && 'src' in source && (
         <div className="video-resumed" data-video-resumed>

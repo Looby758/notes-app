@@ -7,7 +7,7 @@ import { applyText, getOpenText, isNoteTab, noteLockOf, openSpecialTab, AI_TAB }
 import { pickContext, splitFrontmatter, withSummary, withTidiedBody } from '../lib/ai'
 import { errorMessage, noteTitle } from '../lib/paths'
 import { isLockedText } from '../lib/lock/crypto'
-import { calendarContext, emailContext, moneyContext, questionWords } from '../lib/askContext'
+import { calendarContext, moneyContext } from '../lib/askContext'
 import { dayOf } from '../lib/money'
 import { ensureMoney, useMoney } from './money'
 
@@ -153,7 +153,7 @@ export async function askNotes(question: string, opts: AskOptions = {}): Promise
     const searchText = [...earlier.map((t) => t.question), q].join(' ')
     // The offline AI reads less at once, so it gets fewer notes.
     const notes = pickContext(notesForQuestion(searchText), offline ? 16000 : 60000, offline ? 8 : 25).map(({ title, text }) => ({ title, text }))
-    const extra = await gatherContext(searchText)
+    const extra = await gatherContext(searchText, engine)
     const reply = await window.api.aiAsk(
       q,
       notes,
@@ -184,7 +184,7 @@ export async function setAiEngine(use: AiEngine): Promise<void> {
 }
 
 /** Money, calendar and email as text for the AI, for the sources that are switched on. Anything unavailable is skipped. */
-async function gatherContext(question: string): Promise<{ money?: string; calendar?: string; email?: string }> {
+async function gatherContext(question: string, engine?: AiEngine): Promise<{ money?: string; calendar?: string; email?: string }> {
   const { sources } = useAi.getState()
   const today = dayOf(new Date())
   const out: { money?: string; calendar?: string; email?: string } = {}
@@ -209,17 +209,14 @@ async function gatherContext(question: string): Promise<{ money?: string; calend
     )
   }
   if (sources.email) {
+    // The emails that match best, the top few in full, from Gmail or the copy kept on this computer.
     jobs.push(
-      (async () => {
-        const status = await window.api.emailStatus()
-        if (!status.gmail) return
-        const words = questionWords(question).slice(0, 4)
-        const [recent, found] = await Promise.all([
-          window.api.emailList('inbox', '', undefined).catch(() => null),
-          words.length ? window.api.emailList('all', words.join(' OR '), undefined).catch(() => null) : null
-        ])
-        out.email = emailContext([...(found?.emails ?? []), ...(recent?.emails ?? [])]) || undefined
-      })().catch(() => undefined)
+      window.api.aiEmailContext(question, engine).then(
+        (text) => {
+          out.email = text || undefined
+        },
+        () => undefined
+      )
     )
   }
   await Promise.all(jobs)

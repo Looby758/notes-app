@@ -33,13 +33,16 @@ import * as calendars from './calendarSources'
 import { readGoogleSheet } from './googleSheets'
 import * as ai from './ai'
 import * as email from './email'
+import * as emailAsk from './emailAsk'
 import * as spotify from './spotify'
 import * as localMusic from './localMusic'
 import { closeMusicMini, setupMusicMini } from './musicMini'
+import { closePopout, setupPopout } from './popout'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
 import { applySnipShortcut, setupSnip, startSnip } from './snip'
 import { applySongIdShortcut, setupSongId } from './songId'
 import { setupUpdater } from './updater'
+import { setupSettingsHealth } from './settingsHealth'
 import { setupExport } from './exporter'
 import { setupConverter } from './converter'
 import { setupVideoDownloader } from './videoDownload'
@@ -54,6 +57,8 @@ import { setupMonitors, teardownMonitors } from './monitors'
 import { setupMixer, teardownMixer } from './mixer'
 import { setupLive } from './live'
 import { explorerFile, setupExplorer } from './explorer'
+import { openOutside } from './openOutside'
+import { openInOrbit, pathsFromArgv, setupOpenInOrbit } from './openInOrbit'
 import { hold, setupUndoBin } from './undoBin'
 import { setupVideoPlayer, videoResponse } from './videoPlayer'
 import { comicResponse, setupComics, shareProgress as shareComicProgress } from './comics'
@@ -106,8 +111,20 @@ if (process.platform === 'win32') app.setAppUserModelId('com.notesapp.desktop')
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
-  app.on('second-instance', () => showMain())
+  // "Open in Orbit" from File Explorer while Orbit is running starts a second copy, which hands the file over here.
+  app.on('second-instance', (_e, argv) => {
+    showMain()
+    pathsFromArgv(argv).forEach(openInOrbit)
+  })
+  // …or this copy was started by it.
+  pathsFromArgv(process.argv).forEach(openInOrbit)
 }
+
+// Mac: a file opened with Orbit from Finder (Open With → Orbit). Can come before start-up finishes.
+app.on('open-file', (e, path) => {
+  e.preventDefault()
+  openInOrbit(path)
+})
 
 // Clicking the Dock icon (Mac) brings the window back. Set up first thing, so that nothing that
 // goes wrong later in start-up can leave Notes running with no way to see it.
@@ -518,6 +535,7 @@ function createWindow(): BrowserWindow {
     if (win === mainWindow) {
       closeYouTube()
       closeMusicMini()
+      closePopout()
     }
   })
   ipcMain.removeHandler('app:ready-to-close')
@@ -725,7 +743,11 @@ function registerIpc(): void {
   ipcMain.handle('cal:status', () => calendars.status())
   ipcMain.handle('cal:setClient', (_e, id: string, secret: string) => calendars.setClient(id, secret))
   ipcMain.handle('cal:connect', () => calendars.connect())
-  ipcMain.handle('cal:disconnect', () => calendars.disconnect())
+  ipcMain.handle('cal:disconnect', async () => {
+    const result = await calendars.disconnect()
+    emailAsk.clear()
+    return result
+  })
   ipcMain.handle('cal:setEnabled', (_e, id: string, enabled: boolean) => calendars.setCalendarEnabled(id, enabled))
   ipcMain.handle('cal:addFeed', (_e, name: string, url: string) => calendars.addFeed(name, url))
   ipcMain.handle('cal:removeFeed', (_e, id: string) => calendars.removeFeed(id))
@@ -733,12 +755,19 @@ function registerIpc(): void {
   ipcMain.handle('email:status', () => email.status())
   ipcMain.handle('email:connect', () => email.connect())
   ipcMain.handle('email:list', (_e, folder: EmailFolder, query: string, next?: string) => email.list(folder, query, next))
-  ipcMain.handle('email:get', (_e, id: string) => email.get(id))
+  ipcMain.handle('email:get', async (_e, id: string) => {
+    const message = await email.get(id)
+    emailAsk.remember(message)
+    return message
+  })
   ipcMain.handle('email:send', (_e, message: OutgoingEmail) => email.send(message))
   ipcMain.handle('email:markRead', (_e, id: string, read: boolean) => email.markRead(id, read))
   ipcMain.handle('email:star', (_e, id: string, starred: boolean) => email.star(id, starred))
   ipcMain.handle('email:archive', (_e, id: string) => email.archive(id))
-  ipcMain.handle('email:trash', (_e, id: string) => email.trash(id))
+  ipcMain.handle('email:trash', async (_e, id: string) => {
+    await email.trash(id)
+    emailAsk.forget(id)
+  })
   ipcMain.handle('gsheet:read', (_e, rel: string) => readGoogleSheet(currentVault().abs(rel)))
   ipcMain.handle('music:status', () => spotify.status())
   ipcMain.handle('music:setClient', (_e, id: string) => spotify.setClient(id))
@@ -780,6 +809,7 @@ function registerIpc(): void {
   ipcMain.handle('ai:ask', (_e, question: string, notes: AiNote[], history: AiAskTurn[], extra?: AiExtraContext, engine?: AiEngine) =>
     ai.askNotes(question, notes, history, extra, engine)
   )
+  ipcMain.handle('ai:emailContext', (_e, question: string, engine?: AiEngine) => ai.emailContext(question, engine))
   ipcMain.handle('ai:chat', (_e, messages: AiChatMessage[], engine?: AiEngine) => ai.chat(messages, engine))
   ipcMain.handle('ai:setEngine', (_e, use: AiEngine) => ai.setEngine(use))
   ipcMain.handle('ai:sortMoney', (_e, rows: AiSortRow[], categories: { id: string; name: string; income?: boolean }[]) =>
@@ -849,12 +879,12 @@ function registerIpc(): void {
     return Promise.all(result.filePaths.map((p) => currentVault().copyAttachment(folder, p)))
   })
   // Opens an attachment (PDF, document…) in its usual app. Notes and folders stay in the app.
-  ipcMain.handle('fs:openFile', async (_e, path: string) => {
+  // `ask`: a plain click, so Orbit asks before another app opens.
+  ipcMain.handle('fs:openFile', async (e, path: string, ask?: boolean) => {
     const full = currentVault().abs(path)
     if (!statSync(full).isFile()) throw new Error('That is not a file.')
     if (/\.(exe|bat|cmd|com|msi|ps1|vbs|js|lnk|scr|app|command|sh|pkg|workflow|terminal|tool|scpt)$/i.test(full)) throw new Error('For safety, programs and scripts are not opened from notes.')
-    const error = await shell.openPath(full)
-    if (error) throw new Error(error)
+    await openOutside(e.sender, full, !!ask)
   })
 
   // Several at once: one question, then each to the Bin. Returns the ones moved.
@@ -945,6 +975,9 @@ async function offerMoveToApplications(): Promise<boolean> {
 }
 
 app.whenReady().then(async () => {
+  // Ask everything's copy of recent emails, so it can answer without the internet (emailAsk.ts).
+  setTimeout(() => void emailAsk.catchUp(), 60_000)
+  setInterval(() => void emailAsk.catchUp(), 30 * 60_000)
   // Imported themes first: settings that use one are only valid once it's known.
   safely('imported themes', loadImportedThemes)
   if (await offerMoveToApplications()) return
@@ -968,6 +1001,8 @@ app.whenReady().then(async () => {
   registerVaultProtocol()
   registerCodeSandbox()
   registerIpc()
+  setupOpenInOrbit(() => mainWindow, showMain)
+  safely('settings check', setupSettingsHealth)
   // A theme was imported or removed (here, or on another computer): a removed theme that was in
   // use falls back to the default.
   const themesChanged = (): void => {
@@ -985,6 +1020,7 @@ app.whenReady().then(async () => {
   safely('web browser', () => setupBrowser(() => currentPrefs().streamerMode))
   safely('YouTube mini window', () => setupYouTube(currentPrefs))
   safely('Music mini player', () => setupMusicMini(currentPrefs, () => mainWindow))
+  safely('pop-out window', () => setupPopout(currentPrefs))
   safely('export', setupExport)
   safely('converter', setupConverter)
   safely('video downloader', () => setupVideoDownloader(() => vault))

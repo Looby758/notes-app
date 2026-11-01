@@ -4,7 +4,9 @@ import { join } from 'path'
 import Anthropic from '@anthropic-ai/sdk'
 import type { AiAskTurn, AiEngine, AiExtraContext, AiChat, AiChatMessage, AiNote, AiReply, AiSortRow, AiStatus } from '@shared/types'
 import { cleanReply, fitTexts, HARD_NOTE, LOCAL_CONTEXT_CHARS, MEANING_SYSTEM, meaningPrompt, MONEY_SORT_SYSTEM, moneySortPrompt, parseMoneySort } from '@shared/localAi'
+import { parseRelatedWords } from '@shared/emailSearch'
 import { localAiInstalled, localAiState, localComplete, type LocalMessage } from './localAi'
+import * as emailAsk from './emailAsk'
 
 /**
  * The AI helper: summarise a note, tidy a quick capture, answer questions from your notes and read
@@ -197,12 +199,14 @@ export async function askNotes(question: string, notes: AiNote[], history: AiAsk
     history = history.slice(-2)
   }
   const extraMax = offline ? 3500 : 30000
+  // Email gets more room offline than the others, for the full text of the best matches (emailAsk.ts).
+  const max = (key: string): number => (offline && key === 'email' ? 9000 : extraMax)
   const context = notes.length
     ? notes.map((n) => `<note title="${n.title.replace(/"/g, "'")}">\n${n.text}\n</note>`).join('\n\n')
     : '(No notes matched this question.)'
   let others = ''
   for (const key of ['money', 'calendar', 'email'] as const) {
-    const text = typeof extra?.[key] === 'string' ? extra[key]!.slice(0, extraMax) : ''
+    const text = typeof extra?.[key] === 'string' ? extra[key]!.slice(0, max(key)) : ''
     if (text) others += `\n\n<${key}>\n${text}\n</${key}>`
   }
   const messages: Anthropic.Beta.BetaMessageParam[] = []
@@ -218,6 +222,29 @@ const chatSystem = (): string => `You are Claude, chatting with someone inside t
 Be clear and friendly, and match the length of your answer to the question. Use markdown (headings, lists, tables, code blocks) when it makes an answer easier to read.
 You can't see their notes or browse the web here, so if they need something from their notes, suggest the "Ask everything" page.
 Today's date is ${new Date().toISOString().slice(0, 10)}.`
+
+const RELATED_SYSTEM = `Someone is searching their own email inbox to answer a question. List words and short phrases the email they need would probably contain, that aren't already in the question: other words for the same thing, the kind of company or sender that would send it, and words such emails usually use. For example, for "when is my flight?": booking, boarding pass, itinerary, airline, departure, Ryanair, easyJet, British Airways.
+Reply with up to 12, one per line, nothing else.`
+
+/** Words an email answering the question would probably use, so Ask everything can match emails by meaning. Empty if the AI can't be reached. */
+async function relatedWords(question: string, engine: AiEngine): Promise<string[]> {
+  try {
+    const messages = [{ role: 'user' as const, content: question.slice(0, 500) }]
+    const reply =
+      engine === 'offline'
+        ? await localComplete([{ role: 'system', content: RELATED_SYSTEM }, ...messages], { maxTokens: 120, temperature: 0 })
+        : await askClaude(RELATED_SYSTEM, messages, 'low')
+    return parseRelatedWords(reply)
+  } catch {
+    return []
+  }
+}
+
+/** The email part of Ask everything (see emailAsk.ts), for the AI that will answer. */
+export async function emailContext(question: string, engine?: AiEngine): Promise<string> {
+  const use = engineFor(engine)
+  return emailAsk.contextFor(question, await relatedWords(question, use), use)
+}
 
 const offlineChatSystem = (): string => `You are Orbit's offline AI, running privately on this person's own computer inside their notes app. Help with whatever they ask: questions, explanations, writing, ideas, planning, maths, code.
 Be clear and friendly, and keep answers fairly short. Use markdown when it makes an answer easier to read.

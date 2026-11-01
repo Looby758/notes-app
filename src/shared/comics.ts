@@ -106,6 +106,9 @@ export const COMIC_EXTENSIONS = ['cbz', 'cbr', 'zip', 'rar'] as const
 
 export const isComicFile = (name: string): boolean => (COMIC_EXTENSIONS as readonly string[]).includes(name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? '')
 
+/** Files that are clearly comics (.cbz, .cbr), not just any zip or RAR (which might be a comic or not). */
+export const isComicBookFile = (name: string): boolean => /\.(cbz|cbr)$/i.test(name)
+
 const PAGE_IMAGE = /\.(jpe?g|png|gif|webp|bmp|avif|jfif)$/i
 
 /** A picture that's a page, not a Mac leftover ("__MACOSX/…", "._page.jpg") or a hidden file. */

@@ -11,6 +11,7 @@ import { useVault } from '../store/vault'
 import { useEditor } from '../store/editor'
 import { getNoteText, normalizeText } from '../store/noteIndex'
 import { notify } from '../store/notify'
+import { recordUndo } from './undo'
 
 export { dailyDateOf, dailyPath }
 
@@ -64,9 +65,9 @@ export function stepDaily(step: 1 | -1): void {
 
 /**
  * Changes a note's text, through the editor if it's open (so undo works and unsaved typing is
- * kept), else on disk.
+ * kept), else on disk. With `undo`, Ctrl+Z outside the note puts the text back (named by `undo`).
  */
-export async function editNote(path: string, change: (text: string) => string | null): Promise<boolean> {
+export async function editNote(path: string, change: (text: string) => string | null, { undo }: { undo?: string } = {}): Promise<boolean> {
   let current = getOpenText(path)
   if (current === null) {
     current = normalizeText(await window.api.readNote(path))
@@ -75,7 +76,20 @@ export async function editNote(path: string, change: (text: string) => string | 
   const next = change(current)
   if (next === null || next === current) return false
   if (!applyText(path, next)) await window.api.writeNote(path, next)
+  if (undo) {
+    const before = current
+    recordUndo({ label: undo, undo: () => swapText(path, next, before), redo: () => swapText(path, before, next) })
+  }
   return true
+}
+
+/** For Ctrl+Z: puts `to` back, as long as the note still reads `from` (typing since would be lost). */
+async function swapText(path: string, from: string, to: string): Promise<void> {
+  await editNote(path, (text) => {
+    if (text !== from) throw new Error(`“${noteTitle(path)}” has changed since, so that can’t be undone.`)
+    return to
+  })
+  await useVault.getState().refresh([path])
 }
 
 /** Makes sure a day's daily note exists (from your template), without opening it. Returns its path. */
@@ -95,7 +109,7 @@ export async function addEvent(date: Date, title: string, start?: string, end?: 
   const prefs = usePrefs.getState().prefs
   try {
     const path = await ensureDaily(date)
-    await editNote(path, (text) => insertEvent(text, prefs.scheduleHeading, formatEventLine(title, start, end)))
+    await editNote(path, (text) => insertEvent(text, prefs.scheduleHeading, formatEventLine(title, start, end)), { undo: `Added “${title.trim()}” to the calendar` })
     await useVault.getState().refresh([path])
   } catch (err) {
     notify(err)
@@ -111,7 +125,7 @@ export async function toggleCalendarTask(item: DatedItem): Promise<void> {
       const isTask = (l: string | undefined): boolean => !!l && /^\s*[-*+]\s+\[[ xX]\]/.test(l) && l.includes(item.title)
       const line = isTask(lines[item.line]) ? item.line : lines.findIndex(isTask)
       return line === -1 ? null : toggleTaskAt(text, line)
-    })
+    }, { undo: `${item.done ? 'Unticked' : 'Ticked'} “${item.title}”` })
     await useVault.getState().refresh([item.path])
   } catch (err) {
     notify(err)

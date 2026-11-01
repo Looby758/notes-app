@@ -3,6 +3,7 @@ import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, screen,
 import { join } from 'path'
 import { activeThemeId, getTheme } from '@shared/themes'
 import type { Prefs } from '@shared/prefs'
+import { openPopout } from './popout'
 import { acceleratorLabel, IS_MAC, SYSTEM_NAME } from '@shared/platform'
 
 /**
@@ -141,6 +142,7 @@ function updateTrayMenu(): void {
       { label: 'Open Orbit', click: () => hooks.showMain() },
       { label: `Summon bar${shortcut}`, click: openCapture },
       { label: 'Screen snip', click: () => void hooks.snip?.() },
+      { label: 'Pop out an app…', click: openPopout },
       { type: 'separator' },
       { label: 'Quit Orbit', click: () => app.quit() }
     ])

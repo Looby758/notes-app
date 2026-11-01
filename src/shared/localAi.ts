@@ -264,3 +264,54 @@ export const MEANING_SYSTEM = `You explain what a word means in the sentence it'
 Reply in one or two short, plain sentences: what it means here (not every meaning it can have). If it's slang, a name or a word used in an unusual way, say so. No preamble, no quotes around the answer.`
 
 export const meaningPrompt = (word: string, sentence: string): string => `Word: ${word}\nSentence: ${sentence}`
+
+// ---------- writing autocomplete ----------
+
+/** How much of the note before the cursor the offline AI reads to guess what comes next. */
+export const SUGGEST_BEFORE_CHARS = 3000
+
+/** Whether it's worth guessing the rest of this line: you're at its end, writing words (not a link, a / command or a heading mark). */
+export function shouldSuggest(lineBefore: string, lineAfter: string): boolean {
+  if (lineAfter.trim() !== '') return false
+  // Markdown at the start of the line doesn't count as writing.
+  const words = lineBefore.replace(/^\s*(#{1,6}\s+|>\s*|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)/, '')
+  if (words.trim().length < 4 || !/\p{L}{2,}/u.test(words)) return false
+  // Not halfway through a [[link]], a / command, a #tag, an address or a table row.
+  if (/\[\[[^\]]*$/.test(lineBefore) || /(^|\s)\/\S*$/.test(lineBefore) || /(^|\s)#\S*$/.test(lineBefore)) return false
+  if (/https?:\/\/\S*$/.test(lineBefore) || /^\s*\|/.test(lineBefore)) return false
+  // Right after a letter, a number, a space after a word, or the end of a sentence.
+  if (/\s{2,}$/.test(lineBefore)) return false
+  return /[\p{L}\p{N},.;:!?'’")\s]$/u.test(lineBefore)
+}
+
+/** The text the model continues: the note's name, then the writing before the cursor (starting at a whole line). */
+export function suggestPrompt(title: string, before: string): string {
+  let text = before
+  if (text.length > SUGGEST_BEFORE_CHARS) {
+    text = text.slice(-SUGGEST_BEFORE_CHARS)
+    const nl = text.indexOf('\n')
+    if (nl >= 0 && nl < text.length - 1) text = text.slice(nl + 1)
+  }
+  const name = title.trim()
+  return name && !/^\s*#\s/.test(before) ? `# ${name}\n\n${text}` : text
+}
+
+/**
+ * The model's guess, made ready to show in grey: one line, no thinking, no half a word at the end
+ * (when it was cut off), and no doubled space. Empty when there's nothing worth showing.
+ */
+export function cleanSuggestion(raw: string, before: string, cutOff: boolean, max = 90): string {
+  let s = raw.replace(/<think>[\s\S]*?(<\/think>|$)/gi, '').replace(/<\|[^|]*\|>/g, '')
+  s = s.split(/\r?\n/)[0].replace(/\t/g, ' ')
+  if (/\s$/.test(before) || before === '') s = s.replace(/^\s+/, '')
+  if (s.length > max) {
+    s = s.slice(0, max)
+    cutOff = true
+  }
+  if (cutOff) {
+    const space = s.lastIndexOf(' ')
+    if (space > 0) s = s.slice(0, space)
+  }
+  s = s.replace(/\s+$/, '').replace(/ {2,}/g, ' ')
+  return /[\p{L}\p{N}]/u.test(s) ? s : ''
+}

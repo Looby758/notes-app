@@ -3,6 +3,49 @@
 ; An "Optional extras" page with one box, unticked: download ffmpeg, which the Studio needs to go
 ; live on Twitch or YouTube, and the file converter needs for videos. Ticking it leaves a note for Orbit, which downloads ffmpeg the first
 ; time it opens (Settings → Studio can do the same at any time). Silent updates skip the page.
+;
+; It also adds "Open in Orbit" to File Explorer's right-click menu for videos, comics and zips
+; (removed again when Orbit is uninstalled).
+
+; "Open in Orbit" on one kind of file (HKCU\Software\Classes\SystemFileAssociations\.ext\shell).
+!macro OrbitAddVerb EXT
+  WriteRegStr HKCU "Software\Classes\SystemFileAssociations\.${EXT}\shell\OpenInOrbit" "MUIVerb" "Open in Orbit"
+  WriteRegStr HKCU "Software\Classes\SystemFileAssociations\.${EXT}\shell\OpenInOrbit" "Icon" '"$INSTDIR\${APP_EXECUTABLE_FILENAME}",0'
+  WriteRegStr HKCU "Software\Classes\SystemFileAssociations\.${EXT}\shell\OpenInOrbit\command" "" '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "--open-in-orbit=%1"'
+!macroend
+!macro OrbitRemoveVerb EXT
+  DeleteRegKey HKCU "Software\Classes\SystemFileAssociations\.${EXT}\shell\OpenInOrbit"
+!macroend
+
+!macro customUnInstall
+    !insertmacro OrbitRemoveVerb "mp4"
+    !insertmacro OrbitRemoveVerb "m4v"
+    !insertmacro OrbitRemoveVerb "mov"
+    !insertmacro OrbitRemoveVerb "webm"
+    !insertmacro OrbitRemoveVerb "mkv"
+    !insertmacro OrbitRemoveVerb "avi"
+    !insertmacro OrbitRemoveVerb "wmv"
+    !insertmacro OrbitRemoveVerb "asf"
+    !insertmacro OrbitRemoveVerb "flv"
+    !insertmacro OrbitRemoveVerb "f4v"
+    !insertmacro OrbitRemoveVerb "m2ts"
+    !insertmacro OrbitRemoveVerb "mts"
+    !insertmacro OrbitRemoveVerb "mpg"
+    !insertmacro OrbitRemoveVerb "mpeg"
+    !insertmacro OrbitRemoveVerb "vob"
+    !insertmacro OrbitRemoveVerb "3gp"
+    !insertmacro OrbitRemoveVerb "3g2"
+    !insertmacro OrbitRemoveVerb "ogv"
+    !insertmacro OrbitRemoveVerb "divx"
+    !insertmacro OrbitRemoveVerb "rm"
+    !insertmacro OrbitRemoveVerb "rmvb"
+    !insertmacro OrbitRemoveVerb "cbz"
+    !insertmacro OrbitRemoveVerb "cbr"
+    !insertmacro OrbitRemoveVerb "zip"
+    !insertmacro OrbitRemoveVerb "rar"
+    !insertmacro OrbitRemoveVerb "7z"
+!macroend
+
 !ifndef BUILD_UNINSTALLER
   !include nsDialogs.nsh
   !include LogicLib.nsh
@@ -40,6 +83,36 @@
   !macroend
 
   !macro customInstall
+    ; "Open in Orbit" in File Explorer's right-click menu for videos, comics and zips (just for you,
+    ; next to the usual Open; it doesn't change which app opens them on a double-click).
+    !insertmacro OrbitAddVerb "mp4"
+    !insertmacro OrbitAddVerb "m4v"
+    !insertmacro OrbitAddVerb "mov"
+    !insertmacro OrbitAddVerb "webm"
+    !insertmacro OrbitAddVerb "mkv"
+    !insertmacro OrbitAddVerb "avi"
+    !insertmacro OrbitAddVerb "wmv"
+    !insertmacro OrbitAddVerb "asf"
+    !insertmacro OrbitAddVerb "flv"
+    !insertmacro OrbitAddVerb "f4v"
+    !insertmacro OrbitAddVerb "m2ts"
+    !insertmacro OrbitAddVerb "mts"
+    !insertmacro OrbitAddVerb "mpg"
+    !insertmacro OrbitAddVerb "mpeg"
+    !insertmacro OrbitAddVerb "vob"
+    !insertmacro OrbitAddVerb "3gp"
+    !insertmacro OrbitAddVerb "3g2"
+    !insertmacro OrbitAddVerb "ogv"
+    !insertmacro OrbitAddVerb "divx"
+    !insertmacro OrbitAddVerb "rm"
+    !insertmacro OrbitAddVerb "rmvb"
+    !insertmacro OrbitAddVerb "cbz"
+    !insertmacro OrbitAddVerb "cbr"
+    !insertmacro OrbitAddVerb "zip"
+    !insertmacro OrbitAddVerb "rar"
+    !insertmacro OrbitAddVerb "7z"
+    ; Tell File Explorer the menus changed.
+    System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
     ${If} $FfmpegWanted == "1"
       CreateDirectory "$APPDATA\Orbit"
       FileOpen $0 "$APPDATA\Orbit\ffmpeg-wanted" w

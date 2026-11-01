@@ -35,6 +35,8 @@ interface VideoPlayerState {
   current: string | null
   /** Most recently watched first. */
   history: Watched[]
+  /** Up next: videos (full paths) waiting to be played, in order. Clicking a video file adds it here. */
+  queue: string[]
   volume: number
   muted: boolean
 }
@@ -42,17 +44,18 @@ interface VideoPlayerState {
 const KEY = 'orbit.videoPlayer'
 const MAX_HISTORY = 200
 
-function load(): Pick<VideoPlayerState, 'current' | 'history' | 'volume' | 'muted'> {
+function load(): Pick<VideoPlayerState, 'current' | 'history' | 'queue' | 'volume' | 'muted'> {
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<VideoPlayerState>
     return {
       current: typeof raw.current === 'string' ? raw.current : null,
       history: Array.isArray(raw.history) ? raw.history.filter((h) => h && typeof h.path === 'string') : [],
+      queue: Array.isArray(raw.queue) ? raw.queue.filter((p): p is string => typeof p === 'string') : [],
       volume: typeof raw.volume === 'number' ? Math.min(1, Math.max(0, raw.volume)) : 1,
       muted: !!raw.muted
     }
   } catch {
-    return { current: null, history: [], volume: 1, muted: false }
+    return { current: null, history: [], queue: [], volume: 1, muted: false }
   }
 }
 
@@ -60,7 +63,7 @@ export const useVideoPlayer = create<VideoPlayerState>(() => load())
 
 useVideoPlayer.subscribe((s) => {
   try {
-    localStorage.setItem(KEY, JSON.stringify({ current: s.current, history: s.history, volume: s.volume, muted: s.muted }))
+    localStorage.setItem(KEY, JSON.stringify({ current: s.current, history: s.history, queue: s.queue, volume: s.volume, muted: s.muted }))
   } catch {
     // Storage full: it still plays, it just won't remember.
   }
@@ -68,15 +71,51 @@ useVideoPlayer.subscribe((s) => {
 
 const nameOf = (path: string): string => path.slice(Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1)
 
-/** Opens a video (full path) in the player tab. */
+/** Opens a video (full path) in the player tab (taking it out of Up next). */
 export function openVideo(path: string): void {
-  useVideoPlayer.setState({ current: path })
+  useVideoPlayer.setState((s) => ({ current: path, queue: s.queue.filter((p) => p !== path) }))
   openSpecialTab(VIDEO_TAB)
 }
 
 /** Opens a video from the notes folder (its path in there). */
 export function openVaultVideo(path: string): void {
   window.api.videoInVault(path).then(openVideo).catch(notify)
+}
+
+/** Adds a video (full path) to Up next without playing anything or changing tabs. */
+export function queueVideo(path: string): void {
+  const s = useVideoPlayer.getState()
+  if (s.current === path) return notify(`“${nameOf(path)}” is already open in the video player.`, 'info')
+  if (s.queue.includes(path)) return notify(`“${nameOf(path)}” is already in Up next in the video player.`, 'info')
+  useVideoPlayer.setState({ queue: [...s.queue, path] })
+  notify(`Added “${nameOf(path)}” to Up next in the video player.`, 'info')
+}
+
+/** The same for a video in the notes folder (its path in there). */
+export function queueVaultVideo(path: string): void {
+  window.api.videoInVault(path).then(queueVideo).catch(notify)
+}
+
+export const unqueueVideo = (path: string): void => useVideoPlayer.setState((s) => ({ queue: s.queue.filter((p) => p !== path) }))
+
+/** Moves a video in Up next by one place (-1 earlier, 1 later). */
+export function moveQueued(path: string, by: -1 | 1): void {
+  useVideoPlayer.setState((s) => {
+    const i = s.queue.indexOf(path)
+    const j = i + by
+    if (i < 0 || j < 0 || j >= s.queue.length) return {}
+    const queue = [...s.queue]
+    ;[queue[i], queue[j]] = [queue[j], queue[i]]
+    return { queue }
+  })
+}
+
+/** Plays the first video in Up next. Returns false if there isn't one. */
+export function playNext(): boolean {
+  const next = useVideoPlayer.getState().queue[0]
+  if (!next) return false
+  openVideo(next)
+  return true
 }
 
 /** Back to the list of videos. */
