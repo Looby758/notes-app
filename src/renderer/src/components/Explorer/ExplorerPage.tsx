@@ -56,7 +56,7 @@ import {
   type PasteMode
 } from '@shared/explorer'
 import { FILE_MANAGER, TRASH_NAME } from '@shared/platform'
-import { setDrag } from '../../lib/dnd'
+import { computerPaths, dragFilesOut, getDrag, setDrag } from '../../lib/dnd'
 import { recordUndo, undoChanged, useUndoChanges } from '../../lib/undo'
 import { openFileTab, openNote } from '../../lib/editorController'
 import { fileKind } from '../../lib/fileKinds'
@@ -80,8 +80,6 @@ const PLACE_ICONS: Record<ExplorerPlace['kind'], typeof Folder> = {
 /** Big folders are drawn this many at a time (typing in the search box narrows them). */
 const MAX_SHOWN = 2000
 
-/** Explorer items being dragged (to move into a folder, or Ctrl to copy). */
-const DRAG_TYPE = 'application/x-orbit-explorer'
 
 /** Where you were and how you liked it, kept while the app is open. */
 const last: { dir: string | null; view: 'list' | 'grid'; sort: ExplorerSort; showHidden: boolean } = {
@@ -478,22 +476,20 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
 
   const onDragStart = (e: DragEvent, entry: ExplorerEntry): void => {
     if (!picked.has(entry.path)) pickOnly(entry.path)
-    const list = picked.has(entry.path) ? pickedEntries : [entry]
-    e.dataTransfer.effectAllowed = 'copyMove'
-    e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(list.map((x) => x.path)))
-    e.dataTransfer.setData('text/plain', list.map((x) => x.path).join('\n'))
-    // A single file can also be dropped into a note;
-    // The notes tree in the sidebar takes any of them.
-    setDrag(list.length === 1 && !entry.isDir ? { kind: 'computer', path: entry.path } : { kind: 'computerMany', paths: list.map((x) => x.path) })
+    const paths = (picked.has(entry.path) ? pickedEntries : [entry]).map((x) => x.path)
+    // Dragged as real files, so they drop into Discord, a browser or File Explorer / Finder too.
+    // In Orbit, a single file can also be dropped into a note; the notes tree in the sidebar takes any of them.
+    dragFilesOut(e, paths, paths.length === 1 && !entry.isDir ? { kind: 'computer', path: entry.path } : { kind: 'computerMany', paths })
   }
 
   const dropProps = (target: string) => ({
     onDragOver: (e: DragEvent) => {
-      const ours = e.dataTransfer.types.includes(DRAG_TYPE)
-      if (!ours && !e.dataTransfer.types.includes('Files')) return
+      if (!e.dataTransfer.types.includes('Files')) return
       e.preventDefault()
       e.stopPropagation()
-      e.dataTransfer.dropEffect = !ours || e.ctrlKey || e.altKey ? 'copy' : 'move'
+      // The computer only lets files dragged out be copied or linked, so the cursor says copy even
+      // when moving within the Files tab (the drop below still moves them unless Ctrl / Alt is held).
+      e.dataTransfer.dropEffect = 'copy'
       setDropOn(target)
     },
     onDragLeave: (e: DragEvent) => {
@@ -503,10 +499,10 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
       e.preventDefault()
       e.stopPropagation()
       setDropOn(null)
+      const ours = computerPaths(getDrag())
       setDrag(null)
-      const ours = e.dataTransfer.getData(DRAG_TYPE)
-      if (ours) {
-        const paths = (JSON.parse(ours) as string[]).filter((p) => p !== target)
+      if (ours.length) {
+        const paths = ours.filter((p) => p !== target)
         return pasteInto(paths, target, e.ctrlKey || e.altKey ? 'copy' : 'move')
       }
       // Dropped in from File Explorer / Finder: copied here.
@@ -731,7 +727,6 @@ export default function ExplorerPage({ autoFocus }: { autoFocus?: boolean }) {
                 data-path={entry.path}
                 draggable={renaming !== entry.path}
                 onDragStart={(e) => onDragStart(e, entry)}
-                onDragEnd={() => (setDrag(null), setDropOn(null))}
                 onClick={(e) => onItemClick(e, entry)}
                 onDoubleClick={() => renaming !== entry.path && open(entry)}
                 onContextMenu={(e) => {

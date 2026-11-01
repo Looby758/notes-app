@@ -1,4 +1,4 @@
-import { app, ipcMain, shell } from 'electron'
+import { app, ipcMain, nativeImage, shell, type NativeImage } from 'electron'
 import { existsSync, readdirSync } from 'fs'
 import { cp, mkdir, open, readdir, rename, rm, stat, writeFile } from 'fs/promises'
 import { homedir } from 'os'
@@ -17,6 +17,7 @@ import {
   type PasteMode
 } from '@shared/explorer'
 import { IS_MAC } from '@shared/platform'
+import { logError } from './log'
 import { hold } from './undoBin'
 
 /**
@@ -264,7 +265,41 @@ const checkPaths = (paths: unknown): string[] => {
   return paths.map(checkPath)
 }
 
+/** A see-through 1×1 picture: macOS won't start a drag without some icon. */
+const BLANK_ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+
+const DRAG_PICTURE = /\.(png|jpe?g|gif|webp|bmp|ico)$/i
+
+/** What follows the pointer while files are dragged out: the picture itself, or the file's usual icon. */
+async function dragIcon(path: string): Promise<NativeImage> {
+  try {
+    if (DRAG_PICTURE.test(path)) {
+      const picture = nativeImage.createFromPath(path)
+      if (!picture.isEmpty()) {
+        const { width, height } = picture.getSize()
+        return width >= height ? picture.resize({ width: Math.min(width, 64) }) : picture.resize({ height: Math.min(height, 64) })
+      }
+    }
+    const icon = await app.getFileIcon(path, { size: 'normal' })
+    if (!icon.isEmpty()) return icon
+  } catch {
+    // Falls through to the blank one.
+  }
+  return nativeImage.createFromDataURL(BLANK_ICON)
+}
+
 export function setupExplorer(vaultRoot: () => string | null): void {
+  // Dragging files out of the Files tab as real files, so they can be dropped into Discord, a
+  // browser, File Explorer / Finder or any other app (a drag the page starts itself stays inside it).
+  ipcMain.on('explorer:startDrag', async (e, paths: unknown) => {
+    try {
+      const files = checkPaths(paths).filter((p) => existsSync(p))
+      if (!files.length) return
+      e.sender.startDrag({ file: files[0], files, icon: await dragIcon(files[0]) })
+    } catch (err) {
+      logError('dragging files out', err)
+    }
+  })
   ipcMain.handle('explorer:places', () => places(vaultRoot()))
   ipcMain.handle('explorer:list', (_e, dir: string) => list(vaultRoot(), checkPath(dir)))
   ipcMain.handle('explorer:readText', (_e, path: string) => {
