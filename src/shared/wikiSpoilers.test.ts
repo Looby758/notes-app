@@ -5,6 +5,7 @@ import {
   buildTimeline,
   DEFAULT_SPOILERS,
   filterPage,
+  firstAppearanceLinks,
   forbiddenNames,
   mentionsHidden,
   pageAllowed,
@@ -186,5 +187,34 @@ describe('search and the wiki brain', () => {
   it('reads saved settings safely', () => {
     expect(spoilerSettings({ limit: true, parts: 'show', progress: { 'TV Series': 2003, bad: 'x' }, updated: 5 })).toEqual({ limit: true, parts: 'show', progress: { 'TV Series': 2003 }, updated: 5 })
     expect(spoilerSettings(null)).toEqual(DEFAULT_SPOILERS)
+  })
+})
+
+describe('the wiki’s main page (lists of names)', () => {
+  // When characters and places first appear, from their own info boxes.
+  const firstBox = (ep: string): string => box(field('first', 'First Appearance', `<a href="/wiki/${ep}">x</a>`))
+  const withFirsts = buildTimeline(facts, key, {
+    'Rick Grimes (TV Series)': firstAppearanceLinks(firstBox('Days_Gone_Bye_(TV_Series)'), base),
+    'Hilltop Colony': firstAppearanceLinks(firstBox('Beside_the_Dying_Fire'), base)
+  })
+  const c = { timeline: withFirsts, key, base }
+  const page = `<table><tr><td><a href="/wiki/Rick_Grimes_(TV_Series)">Rick Grimes</a></td><td><a href="/wiki/Hilltop_Colony">Hilltop Colony</a></td>
+<td><a href="/wiki/Rick_Grimes_(TV_Series)">Rick</a> <a href="/wiki/Mystery_Person">Mystery</a></td>
+<td><small><b>News: <a href="/wiki/Rick_Grimes_(TV_Series)">Rick Grimes</a> returns in the new spin-off, Rick Lives!</b><div><p>Plain line.</p></div></small></td></tr></table>`
+  const html = filterPage(page, 'The Walking Dead Wiki', [], c, at({ 'TV Series': 2001 }), false).html
+
+  it('knows when characters and places first appear', () => {
+    expect(withFirsts.firsts).toEqual({ 'rick grimes (tv series)': { 'TV Series': 1001 }, 'hilltop colony': { 'TV Series': 2013 } })
+  })
+  it('shows names you’ve reached and hides the rest', () => {
+    expect(html).toContain('Rick Grimes')
+    expect(html).not.toContain('Hilltop')
+  })
+  it('hides a list with a name it can’t place', () => {
+    expect(html).not.toContain('Mystery')
+  })
+  it('never lets one early name make writing safe, even inside a box', () => {
+    expect(html).not.toContain('spin-off')
+    expect(html).not.toContain('News')
   })
 })

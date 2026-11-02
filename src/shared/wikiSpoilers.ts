@@ -54,6 +54,12 @@ export interface WikiTimeline {
   /** A volume's name ("days gone bye") → its page title (lower case), for headings that name it. */
   volumes: Record<string, string>
   series: TimelineSeries[]
+  /**
+   * By the page's title (lower case): when its subject first appears (a character, a place…), from
+   * its info box. A link to that page counts from then: "Alexandria" in a list is shown once you've
+   * reached Alexandria.
+   */
+  firsts?: Record<string, Req>
 }
 
 export interface WikiSpoilerSettings {
@@ -155,7 +161,16 @@ export function timelineFact(title: string, categories: string[], html: string, 
 }
 
 /** The whole timeline, from every page's fact. `key` turns a title (or a redirect to it) into its page's key. */
-export function buildTimeline(facts: TimelineFact[], key: (title: string) => string): WikiTimeline {
+/** The pages a page's info box gives as its first appearance ("First Appearance", "Comic First"…). */
+export function firstAppearanceLinks(html: string, base: string): string[] {
+  const box = infoBox(html)
+  const out: string[] = []
+  // Each field with "first" in its data-source, up to where the next field starts.
+  for (const m of box.matchAll(/<(div|td)\b[^>]*data-source="[^"]*first[^"]*"[^>]*>([\s\S]*?)(?=<(?:div|td|th|h2|h3|section)\b[^>]*data-source=|<\/aside>|$)/gi)) out.push(...linkedTitles(m[2], base))
+  return out
+}
+
+export function buildTimeline(facts: TimelineFact[], key: (title: string) => string, firstLinks: Record<string, string[]> = {}): WikiTimeline {
   const entries: Record<string, TimelineEntry> = {}
   const labels = new Map<string, string>()
   const volumeOf = new Map<string, number>()
@@ -194,7 +209,20 @@ export function buildTimeline(facts: TimelineFact[], key: (title: string) => str
   for (const s of series) s.points.sort((a, b) => a.order - b.order)
   // Shows first, then comics, biggest first.
   series.sort((a, b) => (a.part === b.part ? b.points.length - a.points.length : a.part === 'show' ? -1 : 1))
-  return { entries, volumes, series }
+  // When each character, place… first appears: the earliest thing in its first-appearance field, in the
+  // biggest series it's in (so a link to it needs just that one, not every show it's ever been in).
+  const rank = new Map(series.map((s, i) => [s.name, i]))
+  const firsts: Record<string, Req> = {}
+  for (const [title, links] of Object.entries(firstLinks)) {
+    let best: TimelineEntry | null = null
+    for (const l of links) {
+      const e = entries[key(l)]
+      if (!e) continue
+      if (!best || (rank.get(e.series) ?? 99) < (rank.get(best.series) ?? 99) || (e.series === best.series && e.order < best.order)) best = e
+    }
+    if (best && !entries[key(title)]) firsts[key(title)] = { [best.series]: best.order }
+  }
+  return { entries, volumes, series, firsts }
 }
 
 /** The last episode of a season (or as far as the season could go, when its episodes aren't known). */
@@ -237,7 +265,7 @@ const SAFE_FIELDS = new Set(
     ' '
   )
 )
-const BLOCK = new Set(['p', 'li', 'dt', 'dd', 'blockquote', 'pre', 'figure', 'figcaption', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'tr', 'caption'])
+const BLOCK = new Set(['p', 'li', 'dt', 'dd', 'blockquote', 'pre', 'figure', 'figcaption', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'tr', 'td', 'th', 'caption'])
 const HEADING = /^h([1-6])$/
 /** Fandom's own machine-written "Quick Answers": not the wiki's text, and full of spoilers. */
 const JUNK = /\b(trfc\d*|quick-answers|quick_answers|toc|mw-editsection|navbox|printfooter)\b/
@@ -292,9 +320,37 @@ function walk(html: string, title: string, categories: string[], ctx: SpoilerCon
     const link = wikiLink(href, ctx.base)
     return link?.kind === 'page' ? ctx.timeline.entries[ctx.key(link.title)] : undefined
   }
+  /** How far a link needs you to be: an episode or issue, or a page about something that first appears at some point. */
+  const linkReq = (href: string): Req | null => {
+    const entry = entryFor(href)
+    if (entry) return reqOf(entry)
+    const link = wikiLink(href, ctx.base)
+    return link?.kind === 'page' ? (ctx.timeline.firsts?.[ctx.key(link.title)] ?? null) : null
+  }
+  /**
+   * How far the links in a piece need you to be. In writing, only links to episodes and issues count
+   * (one early name doesn't make a whole paragraph safe). In a piece that's just names (a list of
+   * characters or places), each name counts from its first appearance, and one name Orbit can't place
+   * keeps the whole piece hidden.
+   */
   const linksIn = (el: Element): Req | null => {
+    const links = DomUtils.findAll((n) => n.name === 'a' && !!n.attribs.href, [el])
+    const linkText = links.reduce((n, a) => n + DomUtils.textContent(a).trim().length, 0)
+    const justNames = links.length > 0 && DomUtils.textContent(el).replace(/\s+/g, ' ').trim().length - linkText <= 20
     let req: Req | null = null
-    for (const a of DomUtils.findAll((n) => n.name === 'a' && !!n.attribs.href, [el])) req = merge(req, reqOf(entryFor(a.attribs.href)))
+    for (const a of links) {
+      const entry = entryFor(a.attribs.href)
+      if (entry) {
+        req = merge(req, reqOf(entry))
+        continue
+      }
+      if (!justNames) continue
+      const link = wikiLink(a.attribs.href, ctx.base)
+      if (link?.kind !== 'page') continue
+      const first = linkReq(a.attribs.href)
+      if (!first) return null
+      req = merge(req, first)
+    }
     return req
   }
 
@@ -469,7 +525,7 @@ export function placedChunks(html: string, title: string, categories: string[], 
 }
 
 /** Hidden pieces that leave a note (others, like info box fields and list items, just go). */
-const NOTE_TAGS = new Set(['p', 'blockquote', 'pre', 'dd', 'figure', 'div', 'center'])
+const NOTE_TAGS = new Set(['p', 'blockquote'])
 const HIDDEN_BOTH = 'Hidden: past where you are, or Orbit couldn’t tell when it happens.'
 const HIDDEN_LATER = 'Hidden: this is past where you are.'
 const HIDDEN_UNPLACED = 'Hidden: Orbit couldn’t tell when this happens.'
@@ -507,11 +563,7 @@ export function filterPage(html: string, title: string, categories: string[], ct
   for (const u of w.units) {
     if (visible.has(u)) continue
     const unplaced = unitReq(u) === null
-    // Pieces inside it that are their own (a list inside a list item) are kept or hidden by themselves.
-    for (const child of [...u.el.children]) {
-      if (isElement(child) && (isBlock(child) || DomUtils.findOne(isBlock, child.children, true))) continue
-      DomUtils.removeElement(child)
-    }
+    strip(u.el)
     const left = !!DomUtils.textContent(u.el).trim() || !!DomUtils.findOne((n) => n.name === 'img', u.el.children, true)
     if (left) continue
     if (u.heading === null && !u.inBox && NOTE_TAGS.has(u.el.name) && u.text.trim()) {
@@ -523,6 +575,24 @@ export function filterPage(html: string, title: string, categories: string[], ct
   }
   tidy(w.doc.children)
   return { html: DomUtils.getOuterHTML(w.doc), hiddenLater, hiddenUnplaced }
+}
+
+/**
+ * Takes out a hidden piece's own text and pictures. Pieces inside it that are their own (a list inside
+ * a list item, a paragraph in a box) stay, to be shown or hidden by themselves, but any loose text
+ * around them goes.
+ */
+function strip(el: Element): void {
+  for (const child of [...el.children]) {
+    if (isElement(child)) {
+      if (isBlock(child)) continue
+      if (DomUtils.findOne(isBlock, child.children, true)) {
+        strip(child)
+        continue
+      }
+    }
+    DomUtils.removeElement(child)
+  }
 }
 
 /** Takes away boxes left with nothing in them, and runs of hidden notes become one. */
