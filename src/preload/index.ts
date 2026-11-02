@@ -136,7 +136,7 @@ const api: NotesApi = {
   releaseMessages: () => ipcRenderer.invoke('messages:release'),
   setWebShortcuts: (shortcuts) => ipcRenderer.send('web:shortcuts', shortcuts),
   onWebOpen: (callback) => {
-    const handler = (_e: unknown, url: string): void => callback(url)
+    const handler = (_e: unknown, url: string, privately?: boolean): void => callback(url, privately === true)
     ipcRenderer.on('web:open', handler)
     return () => ipcRenderer.removeListener('web:open', handler)
   },
@@ -145,6 +145,53 @@ const api: NotesApi = {
     ipcRenderer.on('web:shortcut', handler)
     return () => ipcRenderer.removeListener('web:shortcut', handler)
   },
+  webTakePending: () => ipcRenderer.invoke('web:takePending'),
+  webOpenOutside: (url) => ipcRenderer.invoke('web:openOutside', url),
+  webDefaultBrowser: () => ipcRenderer.invoke('web:defaultBrowser'),
+  webMakeDefault: () => ipcRenderer.invoke('web:makeDefault'),
+  onWebKey: (callback) => on('web:key', callback),
+  webBookmarks: () => ipcRenderer.invoke('web:bookmarks'),
+  webFavicons: () => ipcRenderer.invoke('web:favicons'),
+  onWebFavicons: (callback) => on('web:favicons', callback),
+  webSetBookmarks: (list) => ipcRenderer.invoke('web:setBookmarks', list),
+  onWebBookmarks: (callback) => on('web:bookmarks-changed', callback),
+  webHistory: (query, limit) => ipcRenderer.invoke('web:history', query, limit),
+  webHistoryRemove: (url) => ipcRenderer.invoke('web:historyRemove', url),
+  webHistoryClear: () => ipcRenderer.invoke('web:historyClear'),
+  webSuggest: (typed) => ipcRenderer.invoke('web:suggest', typed),
+  webSites: () => ipcRenderer.invoke('web:sites'),
+  webSiteSet: (site, patch) => ipcRenderer.invoke('web:siteSet', site, patch),
+  webSiteForget: (site) => ipcRenderer.invoke('web:siteForget', site),
+  onWebSites: (callback) => on('web:sites-changed', callback),
+  webClearSite: (site) => ipcRenderer.invoke('web:clearSite', site),
+  webDownloads: () => ipcRenderer.invoke('web:downloads'),
+  onWebDownloads: (callback) => on('web:downloads', callback),
+  onWebDownloadStarted: (callback) => on('web:download-started', callback),
+  webDownloadTo: (id, folder, remember) => ipcRenderer.invoke('web:downloadTo', id, folder, remember),
+  webDownloadCancel: (id) => ipcRenderer.invoke('web:downloadCancel', id),
+  webDownloadPause: (id, paused) => ipcRenderer.invoke('web:downloadPause', id, paused),
+  webDownloadForget: (id) => ipcRenderer.invoke('web:downloadForget', id),
+  webDownloadsClear: () => ipcRenderer.invoke('web:downloadsClear'),
+  webDownloadFolder: () => ipcRenderer.invoke('web:downloadFolder'),
+  webSetDownloadFolder: (folder) => ipcRenderer.invoke('web:setDownloadFolder', folder),
+  webAutofill: () => ipcRenderer.invoke('web:autofill'),
+  onWebAutofill: (callback) => on('web:autofill-changed', callback),
+  webSetAutofill: (profile) => ipcRenderer.invoke('web:setAutofill', profile),
+  webZoom: (wcId, by) => ipcRenderer.invoke('web:zoom', wcId, by),
+  onWebZoomed: (callback) => on('web:zoomed', callback),
+  webMuteTab: (wcId, muted) => ipcRenderer.invoke('web:muteTab', wcId, muted),
+  onWebAudio: (callback) => on('web:audio', callback),
+  onWebPermissionAsk: (callback) => on('web:permission-ask', callback),
+  webPermissionAnswer: (id, allow) => ipcRenderer.invoke('web:permissionAnswer', id, allow),
+  onWebFocus: (callback) => on('web:focus', callback),
+  onWebImageSaved: (callback) => {
+    const handler = (_e: unknown, path: string | null, error?: string): void => callback(path, error)
+    ipcRenderer.on('web:image-saved', handler)
+    return () => ipcRenderer.removeListener('web:image-saved', handler)
+  },
+  webOperaFound: () => ipcRenderer.invoke('web:operaFound'),
+  webImportOpera: () => ipcRenderer.invoke('web:importOpera'),
+  webImportCsv: () => ipcRenderer.invoke('web:importCsv'),
   onWebMouseNav: (callback) => {
     const handler = (_e: unknown, contentsId: number, dir: 1 | -1): void => callback(contentsId, dir)
     ipcRenderer.on('web:mouseNav', handler)

@@ -23,7 +23,7 @@ import {
   type HfFile,
 } from '@shared/localAi'
 import type { LocalAiState } from '@shared/types'
-import { gameRunning, onGameRunning } from './games'
+import { gameRunning, onGameRunning, runningGameNames } from './games'
 import { logError } from './log'
 
 /**
@@ -505,7 +505,14 @@ function idleLater(): void {
 
 export class GameRunningError extends Error {
   constructor() {
-    super('A game is running, so the offline AI is switched off to keep your graphics card free for it. It’s back when the game closes.')
+    const names = runningGameNames()
+    const which = names.length ? `${names.join(' and ')} ${names.length > 1 ? 'are' : 'is'} running` : 'A game is running'
+    super(
+      `${which}, so the offline AI is switched off to keep your graphics card free for it. It’s back when the game closes. ` +
+        (names.length
+          ? `Not playing it? Hide it on the Games page and it stops counting, or turn this off in Settings → AI helper.`
+          : 'You can turn this off in Settings → AI helper.')
+    )
   }
 }
 

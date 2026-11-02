@@ -1,0 +1,1112 @@
+/* The web browser tab's extras (the basics are in styles/theme.css under .web-page). */
+
+/* ---------- address bar ---------- */
+.web-address-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  margin: 0 6px;
+  padding-right: 3px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg);
+}
+.web-address-wrap:focus-within {
+  border-color: var(--accent);
+}
+.web-address-wrap .web-address {
+  margin: 0;
+  height: 26px;
+  border: none;
+  background: transparent;
+}
+.web-address-wrap .icon-btn {
+  width: 22px;
+  height: 22px;
+}
+.web-star.on {
+  color: var(--accent);
+}
+.web-star.on svg {
+  fill: currentColor;
+}
+.web-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  height: 20px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.web-chip:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.web-suggest {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  padding: 4px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+.web-suggest button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.web-suggest button:hover,
+.web-suggest button.on {
+  background: var(--bg-hover);
+}
+.web-suggest-title {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.web-suggest-url {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-faint);
+}
+.web-star-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 31;
+  width: 320px;
+  padding: 12px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  animation: pop 120ms var(--ease);
+}
+.web-star-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  color: var(--text-strong);
+  font-weight: 600;
+}
+.web-star-head svg {
+  color: var(--accent);
+  fill: currentColor;
+}
+.web-star-away {
+  position: fixed;
+  inset: 0;
+  z-index: 29;
+}
+.web-bar .web-address-wrap {
+  z-index: 30;
+}
+.web-downloading {
+  animation: web-pulse 1.4s ease-in-out infinite;
+}
+@keyframes web-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+.web-menu kbd {
+  margin-left: auto;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: 11px;
+}
+.web-menu button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.web-menu-zoom {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  font-size: 13px;
+}
+.web-menu-zoom > span {
+  flex: 1;
+}
+.web-menu .web-menu-zoom button {
+  width: auto;
+  padding: 4px 6px;
+}
+.web-menu .web-menu-zoom-pct {
+  min-width: 48px;
+  justify-content: center;
+}
+
+/* ---------- private tabs ---------- */
+.web-page.private .web-bar {
+  background: color-mix(in srgb, #8b5cf6 12%, transparent);
+}
+.web-private-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: color-mix(in srgb, #8b5cf6 28%, transparent);
+  color: var(--text-strong);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ---------- bookmarks bar ---------- */
+.web-bookmarks-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 28px;
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+.web-bookmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  max-width: 180px;
+  height: 22px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.web-bookmark span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.web-bookmark:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.web-bookmark-all {
+  margin-left: auto;
+}
+.web-bookmarks-hint {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.web-folder-menu {
+  position: fixed;
+  top: auto;
+  max-height: 60vh;
+  overflow: auto;
+  z-index: 40;
+}
+.web-folder-empty {
+  display: block;
+  padding: 7px 10px;
+  color: var(--text-faint);
+  font-size: 12.5px;
+}
+
+/* ---------- bars across the top of the page (permissions, save login, DRM) ---------- */
+.web-bar-prompt {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-raised);
+  font-size: 13px;
+  animation: pop 140ms var(--ease);
+}
+.web-bar-prompt > svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.web-bar-prompt-text {
+  flex: 1;
+  min-width: 180px;
+}
+.web-bar-prompt-note {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.web-bar-prompt .text-input {
+  height: 26px;
+}
+.web-bar-prompt-user {
+  width: 180px;
+}
+.web-bar-prompt-pass {
+  width: 120px;
+  cursor: pointer;
+}
+.web-drm > svg {
+  color: #f0b45a;
+}
+.web-unlock {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.web-unlock .text-input {
+  width: 170px;
+  height: 26px;
+}
+.web-unlock-error {
+  width: 100%;
+  color: #f97066;
+  font-size: 12px;
+}
+
+/* ---------- find on page ---------- */
+.web-find {
+  position: absolute;
+  top: 8px;
+  right: 16px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 4px 4px 8px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  animation: pop 120ms var(--ease);
+}
+.web-find .text-input {
+  width: 200px;
+  height: 26px;
+}
+.web-find-count {
+  min-width: 44px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* ---------- the fill-in pop-up ---------- */
+.web-fill {
+  position: absolute;
+  z-index: 25;
+  max-width: 380px;
+  padding: 4px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  animation: pop 120ms var(--ease);
+}
+.web-fill-head {
+  padding: 4px 28px 4px 8px;
+  color: var(--text-faint);
+  font-size: 11.5px;
+}
+.web-fill-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 28px 7px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.web-fill-item:hover {
+  background: var(--bg-hover);
+}
+.web-fill-item > svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.web-fill-item span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.web-fill-item strong {
+  font-weight: 500;
+  font-size: 13px;
+}
+.web-fill-item small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+.web-fill-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+}
+.web-fill-locked {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 28px 6px 8px;
+  font-size: 12.5px;
+}
+.web-fill-locked > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---------- side panels (bookmarks, history, downloads, sites, summary) ---------- */
+.web-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 22;
+  display: flex;
+  flex-direction: column;
+  width: min(380px, 100%);
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.3);
+  animation: web-panel-in 160ms var(--ease);
+}
+@keyframes web-panel-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+.web-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px 8px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-strong);
+}
+.web-panel-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  overflow: auto;
+}
+.web-panel-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-faint);
+}
+.web-panel-search .text-input {
+  flex: 1;
+  height: 28px;
+}
+.web-panel-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.web-panel-empty {
+  margin: 12px 4px;
+  color: var(--text-faint);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.web-panel-foot {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.web-panel-day {
+  margin: 10px 4px 4px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.web-panel-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 6px;
+}
+.web-panel-row:hover {
+  background: var(--bg-hover);
+}
+.web-panel-row .icon-btn {
+  opacity: 0;
+}
+.web-panel-row:hover .icon-btn {
+  opacity: 1;
+}
+.web-panel-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  column-gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.web-panel-main > svg {
+  grid-row: span 3;
+  color: var(--text-muted);
+}
+.web-panel-title,
+.web-panel-sub,
+.web-panel-snippet {
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.web-panel-sub {
+  color: var(--text-faint);
+  font-size: 11.5px;
+}
+.web-panel-snippet {
+  color: var(--text-muted);
+  font-size: 11.5px;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.web-panel-crumbs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.web-panel-roots {
+  display: flex;
+  gap: 4px;
+}
+.web-panel-roots button {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.web-panel-roots button.on {
+  border-color: var(--accent-dim);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.web-panel-path {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.web-panel-path span {
+  display: inline-flex;
+  align-items: center;
+}
+.web-bookmark-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.web-star-pop .web-bookmark-edit {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+.web-bookmark-edit label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.web-bookmark-edit .text-input {
+  height: 28px;
+}
+.web-bookmark-edit-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.web-bookmark-edit-foot .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* downloads */
+.web-downloads {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.web-download {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.web-download.failed,
+.web-download.cancelled {
+  opacity: 0.65;
+}
+.web-download-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.web-download-name strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  font-size: 13px;
+}
+.web-download-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-faint);
+  font-size: 11.5px;
+}
+.web-download-bar {
+  height: 3px;
+  margin-top: 3px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+.web-download-bar div {
+  height: 100%;
+  background: var(--accent);
+  transition: width 200ms var(--ease);
+}
+.web-download-bar div.unknown {
+  animation: web-loading 1.1s var(--ease) infinite;
+}
+.web-download-actions {
+  display: flex;
+  gap: 2px;
+}
+
+/* site settings */
+.web-site {
+  border-radius: 8px;
+}
+.web-site.open {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  margin: 4px 0;
+}
+.web-site .web-panel-main > svg {
+  grid-row: span 2;
+}
+.web-site-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 10px 10px 34px;
+}
+.web-site-perm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.web-site-perm select {
+  width: 96px;
+  height: 26px;
+}
+.web-site-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+}
+.web-site-sound input[type='range'] {
+  width: 110px;
+  accent-color: var(--accent);
+}
+.web-site-sound > span {
+  min-width: 34px;
+  text-align: right;
+}
+.web-small-btn {
+  padding: 2px 8px;
+  font-size: 11.5px;
+}
+.web-site-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.web-site-foot .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* summary */
+.web-summary-of {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.web-summary .ai-result {
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+.web-summary-foot {
+  display: flex;
+  gap: 6px;
+}
+.web-summary-foot .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ---------- picking a folder inside Orbit ---------- */
+.folder-picker {
+  display: flex;
+  height: 300px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg);
+}
+.folder-picker-places {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 150px;
+  flex-shrink: 0;
+  padding: 6px;
+  border-right: 1px solid var(--border);
+  overflow: auto;
+}
+.folder-picker-places button,
+.folder-picker-list > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.folder-picker-places button:hover,
+.folder-picker-list > button:hover {
+  background: var(--bg-hover);
+}
+.folder-picker-places button.on {
+  background: var(--accent-soft);
+}
+.folder-picker-places svg,
+.folder-picker-list svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+.folder-picker-list > button span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.folder-picker-go {
+  opacity: 0.5;
+}
+.folder-picker-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.folder-picker-where {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.folder-picker-where span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+.folder-picker-list {
+  flex: 1;
+  min-height: 0;
+  padding: 4px;
+  overflow: auto;
+}
+.folder-picker-new {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px;
+}
+.folder-picker-new .text-input {
+  flex: 1;
+  height: 26px;
+}
+.folder-picker-empty {
+  margin: 14px 8px;
+  color: var(--text-faint);
+  font-size: 12.5px;
+}
+.folder-picker-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 6px;
+  border-top: 1px solid var(--border);
+}
+.folder-picker-foot .btn-primary {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* the "Save to" question for a new download */
+.download-prompt {
+  position: fixed;
+  top: calc(var(--titlebar-h) + 12px);
+  right: 16px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(560px, calc(100vw - 32px));
+  padding: 12px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5);
+  animation: pop 140ms var(--ease);
+}
+.download-prompt-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.download-prompt-head > svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.download-prompt-head > div {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.download-prompt-head strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-strong);
+}
+.download-prompt-head span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.download-prompt-remember {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* the speaker on a web tab that's playing sound */
+.tab-audio {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-left: -2px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.tab-audio:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.tab-audio.muted {
+  color: var(--text-faint);
+}
+
+/* ---------- Settings → Web browser ---------- */
+.browser-settings {
+  margin-top: 8px;
+}
+.browser-setting-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 0;
+}
+.browser-setting-row.column {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 0;
+}
+.browser-setting-row > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.browser-setting-row strong {
+  color: var(--text);
+  font-weight: 500;
+}
+.browser-setting-row p,
+.browser-setting-note {
+  margin: 3px 0 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.browser-setting-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.browser-setting-buttons .btn,
+.browser-setting-row > .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.browser-autofill {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 0;
+}
+.browser-autofill-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+.browser-autofill-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.browser-autofill-grid label.wide {
+  grid-column: span 2;
+}
+.browser-autofill-grid .text-input {
+  height: 30px;
+}
+.browser-import-report {
+  margin: 0;
+  padding: 8px 8px 8px 26px;
+  border-radius: 8px;
+  background: var(--bg-raised);
+  color: var(--text);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.browser-sites {
+  height: 360px;
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  overflow: hidden;
+}
+.browser-sites .web-panel-body {
+  flex: 1;
+}
+
+/* ---------- site icons, dragging bookmarks, the » menu ---------- */
+.site-icon {
+  flex-shrink: 0;
+  object-fit: contain;
+  border-radius: 2px;
+}
+.web-bookmarks-tail {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.web-bookmark {
+  position: relative;
+}
+.web-bookmark.open,
+.web-bookmark.drop-into,
+.web-folder-menu button.drop-into {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.web-bookmark.drop-before::before,
+.web-bookmark.drop-after::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+.web-bookmark.drop-before::before {
+  left: -2px;
+}
+.web-bookmark.drop-after::after {
+  right: -2px;
+}
+.web-folder-menu {
+  width: 270px;
+}
+.web-folder-menu button {
+  position: relative;
+}
+.web-folder-menu button.drop-before::before,
+.web-folder-menu button.drop-after::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+.web-folder-menu button.drop-before::before {
+  top: -1px;
+}
+.web-folder-menu button.drop-after::after {
+  bottom: -1px;
+}
+.web-folder-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.web-suggest-kind {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.web-panel-row[draggable='true'] {
+  cursor: grab;
+}
+/* The bar never makes the tab wider than its pane (what doesn't fit goes in the » menu). */
+.web-page,
+.web-page .web-bookmarks-bar {
+  min-width: 0;
+}
+.web-page .web-bookmarks-bar {
+  width: 100%;
+  box-sizing: border-box;
+}
+/* (More specific than the app's own .menu, which would make it absolute: then it opens off to the
+   side, behind the page.) */
+.menu.web-folder-menu {
+  position: fixed;
+  top: auto;
+  z-index: 60;
+}

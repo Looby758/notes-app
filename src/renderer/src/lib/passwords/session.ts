@@ -213,6 +213,13 @@ export function saveLogin(login: Login): Promise<void> {
   return update((logins) => (logins.some((l) => l.id === login.id) ? logins.map((l) => (l.id === login.id ? saved : l)) : [...logins, saved]))
 }
 
+/** Adds several logins in one go (importing from another browser). */
+export function addLogins(list: Login[]): Promise<void> {
+  if (!list.length) return Promise.resolve()
+  const now = Date.now()
+  return update((logins) => [...logins, ...list.map((l) => ({ ...l, updated: now }))])
+}
+
 export function deleteLogin(id: string): Promise<void> {
   return update((logins) => logins.map((l) => (l.id === id ? tombstone(id) : l)))
 }

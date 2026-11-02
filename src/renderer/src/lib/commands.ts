@@ -357,6 +357,7 @@ export const commands: Command[] = [
   { id: 'games.open', group: 'Navigation', title: 'Games (play your Steam and other games)', run: () => openSpecialTab(GAMES_TAB) },
   { id: 'web.open', group: 'Web', title: 'Open a web page', shortcut: 'Ctrl+Shift+I', run: () => openWebTab() },
   { id: 'web.beside', group: 'Web', title: 'Open a web page beside this note', run: () => openWebTab('', { beside: true }) },
+  { id: 'web.private', group: 'Web', title: 'Open a private web tab (no history, nothing saved)', run: () => openWebTab('', { privately: true }) },
   {
     id: 'youtube.open',
     group: 'Web',

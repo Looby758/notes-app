@@ -27,6 +27,7 @@ import {
   openNote,
   openSpecialTab,
   openWebTab,
+  activateTab,
   refreshEmbeds,
   refreshLinkDecorations,
   remeasure,
@@ -55,6 +56,8 @@ import { startDictionary } from '../lib/dictionary'
 import { EventDetails } from './Calendar/shared'
 import Resizer from './Resizer'
 import UpdateToast from './UpdateToast'
+import { DownloadPrompt } from './Web/Downloads'
+import { startBrowser, tabsByPage } from '../store/browser'
 import StartupNotices from './Notices/StartupNotices'
 import Screensaver from './Screensaver/Screensaver'
 import Pet from './Motion/Pet'
@@ -264,10 +267,19 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
   useEffect(() => window.api.setWebShortcuts(appShortcuts()), [shortcutPrefs])
   useEffect(() => {
     const offShortcut = window.api.onWebShortcut((shortcut) => commandForShortcut(shortcut)?.run())
-    const offOpen = window.api.onWebOpen((url) => openWebTab(url))
+    const offOpen = window.api.onWebOpen((url, privately) => openWebTab(url, { privately }))
+    // A site's notification was clicked: its tab comes forward.
+    const offFocus = window.api.onWebFocus((wcId) => {
+      const tab = tabsByPage.get(wcId)
+      if (tab) activateTab(tab)
+    })
+    startBrowser()
+    // Links other apps sent while Orbit was starting (Orbit as the default browser).
+    void window.api.webTakePending().then((urls) => urls.forEach((url) => openWebTab(url)))
     return () => {
       offShortcut()
       offOpen()
+      offFocus()
     }
   }, [])
 
@@ -402,6 +414,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <EventDetails />
       <Pet />
       <UpdateToast />
+      <DownloadPrompt />
       <StartupNotices />
       <DeviceDrop />
       <MusicPlayer />

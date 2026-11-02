@@ -4,6 +4,7 @@ import { promisify } from 'util'
 import { IS_MAC } from '@shared/platform'
 import { clampVolume, groupSessions, MAC_APPS, macState, type MixerState, type RawList, type RawMacList } from '@shared/mixer'
 import { logError } from './log'
+import { setSiteSound, siteSounds } from './browser'
 
 /**
  * The volume mixer: a slider for each app making sound (a game, Discord, Spotify...), from Orbit or
@@ -473,25 +474,31 @@ let last: { at: number; state: MixerState } | null = null
 /** The sliders as they are now (looks are shared when Orbit and the phone ask at once). */
 export function mixerState(): Promise<MixerState> {
   if (last && Date.now() - last.at < 250) return Promise.resolve(last.state)
-  looking ??= (async () => {
+  // (Cleared once it's settled, never during: a look that finishes without waiting for anything
+  // would otherwise clear it before it was set, and every later look would get this one's answer.)
+  looking ??= (async (): Promise<MixerState> => {
     try {
-      const state: MixerState =
+      const system: MixerState =
         process.platform === 'win32' ? await windowsState() : IS_MAC ? await macStateNow() : { apps: [], problem: 'The volume mixer works on Windows and on a Mac.' }
+      // Websites playing sound in Orbit's web tabs get a slider each, after the apps.
+      const sites = siteSounds()
+      const state: MixerState = sites.length ? { ...system, apps: [...system.apps, ...sites], problem: system.apps.length ? system.problem : undefined } : system
       last = { at: Date.now(), state }
       return state
     } catch (err) {
       logError('volume mixer', err)
       return { apps: [], problem: 'Couldn’t read the sound settings.' }
-    } finally {
-      looking = null
     }
-  })()
+  })().finally(() => {
+    looking = null
+  })
   return looking
 }
 
 /** Sets an app's volume (0 to 100) and/or mute; false if it didn't take. */
 export async function mixerSet(id: string, volume: number | null, muted: boolean | null): Promise<boolean> {
   last = null
+  if (id.startsWith('site:')) return setSiteSound(id.slice(5), volume === null ? null : clampVolume(volume), muted)
   if (process.platform === 'win32') {
     if (!targets[id]) await mixerState()
     return windowsSet(id, volume, muted)
