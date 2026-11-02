@@ -226,7 +226,7 @@ export default function WordlePage() {
                 key={m.id}
                 className={`sudoku-level ${mode === m.id ? 'active' : ''}`}
                 onClick={() => chooseMode(m.id)}
-                title={m.id === 'walkingDead' ? 'Words from The Walking Dead: characters, places, weapons, episodes and more' : 'Everyday words'}
+                title={m.id === 'walkingDead' ? 'Words from the main Walking Dead TV show: characters, places, groups and more' : 'Everyday words'}
                 data-wordle-mode={m.id}
               >
                 {m.id === 'walkingDead' && <Skull size={13} />} {m.label}

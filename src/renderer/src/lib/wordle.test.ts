@@ -42,7 +42,8 @@ describe('wordle', () => {
 
   it('says what kind of word a Walking Dead answer is', () => {
     expect(walkingDeadKind('daryl')).toBe('a character')
-    expect(walkingDeadKind('KATANA')).toBe('a weapon or gear')
+    expect(walkingDeadKind('KATANA')).toBe('something from the show')
+    expect(walkingDeadKind('guts')).toBeNull()
     expect(walkingDeadKind('house')).toBeNull()
   })
 

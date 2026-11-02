@@ -11,7 +11,7 @@ export type WordleMode = 'classic' | 'walkingDead'
 
 export const WORDLE_MODES: { id: WordleMode; label: string; lengths: number[] }[] = [
   { id: 'classic', label: 'Classic', lengths: [2, 3, 4, 5, 6, 7, 8] },
-  { id: 'walkingDead', label: 'Walking Dead', lengths: [3, 4, 5, 6, 7, 8] }
+  { id: 'walkingDead', label: 'Walking Dead', lengths: [4, 5, 6, 7, 8] }
 ]
 
 export const wordleModeOf = (id: WordleMode): (typeof WORDLE_MODES)[number] => WORDLE_MODES.find((m) => m.id === id) ?? WORDLE_MODES[0]
