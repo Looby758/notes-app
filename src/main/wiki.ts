@@ -77,8 +77,13 @@ const WIKI_SYNC_FILE = 'wiki-progress.json'
 const zip = promisify(gzip)
 const unzip = promisify(gunzip)
 
-/** At least this long between requests to the wiki, and to its picture server. */
-const API_GAP_MS = 500
+/**
+ * Pages come two at a time, each waiting half a second after its last request: twice as quick as
+ * one at a time, and still gentle on the wiki (much more and Fandom may block the download).
+ */
+const PAGES_AT_ONCE = 2
+/** At least this long between requests to the wiki (from either of the two), and to its picture server. */
+const API_GAP_MS = 500 / PAGES_AT_ONCE
 const IMAGE_GAP_MS = 200
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024
 /** Rebuild the search index when this many more pages have arrived since it was made. */
@@ -434,35 +439,49 @@ async function download(w: Loaded, signal: AbortSignal): Promise<void> {
     titleMaps.delete(id)
   }
 
-  // 2. The pages, one at a time.
+  // 2. The pages, two at a time.
   w.meta.status = 'pages'
   w.meta.total = list.pages.length
   await saveMeta(w)
   tellSoon()
   const failed = new Set(list.failed)
   let sinceSave = 0
-  for (const p of list.pages) {
-    if (signal.aborted) throw new Error('stopped')
-    if (w.done.has(p.id) || failed.has(p.id)) continue
-    try {
-      await downloadPage(w, p.id, signal)
-      w.done.add(p.id)
-    } catch (err) {
-      if (signal.aborted) throw err
-      // One page that won't come is skipped, not the whole wiki.
-      if (err instanceof WikiError && /couldn’t reach/i.test(err.message)) throw err
-      logError('wiki', `page ${p.title}: ${err instanceof Error ? err.message : err}`)
-      failed.add(p.id)
-      list.failed = [...failed]
-      w.failed = failed.size
-      await saveList(id, list)
-    }
-    tellSoon()
-    if (++sinceSave >= 50) {
-      sinceSave = 0
-      void sizeOf(id)
+  const todo = list.pages.filter((p) => !w.done.has(p.id) && !failed.has(p.id))
+  let next = 0
+  // A problem that stops the whole download (no internet): the other page stops too.
+  let stop: unknown = null
+  const worker = async (): Promise<void> => {
+    while (next < todo.length && !stop) {
+      if (signal.aborted) throw new Error('stopped')
+      const p = todo[next++]
+      try {
+        await downloadPage(w, p.id, signal)
+        w.done.add(p.id)
+      } catch (err) {
+        if (signal.aborted) throw err
+        if (err instanceof WikiError && /couldn’t reach/i.test(err.message)) {
+          stop = err
+          return
+        }
+        // One page that won't come is skipped, not the whole wiki.
+        logError('wiki', `page ${p.title}: ${err instanceof Error ? err.message : err}`)
+        failed.add(p.id)
+        list.failed = [...failed]
+        w.failed = failed.size
+        await saveList(id, list)
+      }
+      tellSoon()
+      if (++sinceSave >= 50) {
+        sinceSave = 0
+        void sizeOf(id)
+      }
     }
   }
+  const results = await Promise.allSettled(Array.from({ length: PAGES_AT_ONCE }, worker))
+  if (signal.aborted) throw new Error('stopped')
+  if (stop) throw stop
+  const broke = results.find((r) => r.status === 'rejected')
+  if (broke) throw (broke as PromiseRejectedResult).reason
 
   // 3. The timeline, the spoiler check and the search index for the wiki brain.
   w.meta.status = 'indexing'

@@ -180,7 +180,7 @@ function AddWiki() {
             </label>
           ))}
           <p className="screens-note">
-            Pages download one at a time so the wiki isn’t overloaded, so a big wiki can take a few hours. You can keep using Orbit, read pages as they arrive, and pause: it carries on from where it stopped.
+            Pages download two at a time with short pauses, so the wiki isn’t overloaded. A big wiki can take a couple of hours. You can keep using Orbit, read pages as they arrive, and pause: it carries on from where it stopped.
           </p>
           <div className="wiki-add-row">
             <button className="btn btn-primary" onClick={() => void start()} disabled={starting}>
