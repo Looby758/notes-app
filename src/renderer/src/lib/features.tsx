@@ -6,7 +6,7 @@ import {
   AudioLines,
   Clapperboard,
   Cpu,
-  Bomb,
+  Joystick,
   BookOpen,
   CalendarDays,
   CalendarCheck,
@@ -18,7 +18,6 @@ import {
   Globe,
   Globe2,
   Hourglass,
-  Grid3x3,
   HardDrive,
   House,
   KeyRound,
@@ -54,6 +53,7 @@ import {
 } from 'lucide-react'
 import { openGrokTab } from '../components/Grok/GrokPage'
 import { useGrok } from '../store/grok'
+import { openMiniGames } from '../store/miniGames'
 import { useVault } from '../store/vault'
 import { setPrefs, usePrefs } from '../store/prefs'
 import { showSearch, toggleZen, useUI } from '../store/ui'
@@ -83,7 +83,6 @@ import {
   GRAPH_TAB,
   HOME_TAB,
   MESSAGES_TAB,
-  MINESWEEPER_TAB,
   CLOCKS_TAB,
   COUNTDOWNS_TAB,
   SCREENS_TAB,
@@ -92,7 +91,6 @@ import {
   MONEY_TAB,
   PASSWORDS_TAB,
   SETTINGS_TAB,
-  SUDOKU_TAB,
   TERMINAL_TAB,
   openSpecialTab,
   openWebTab
@@ -206,8 +204,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   wiki: { icon: Library, run: () => openSpecialTab(WIKI_TAB) },
   youtube: { icon: MonitorPlay, run: () => void window.api.openYouTube() },
   games: { icon: Gamepad2, run: () => openSpecialTab(GAMES_TAB) },
-  sudoku: { icon: Grid3x3, run: () => openSpecialTab(SUDOKU_TAB) },
-  minesweeper: { icon: Bomb, run: () => openSpecialTab(MINESWEEPER_TAB) },
+  'mini-games': { icon: Joystick, run: () => openMiniGames(null) },
   snip: { icon: Scan, run: () => void startSnip() },
   explorer: { icon: HardDrive, run: () => openSpecialTab(EXPLORER_TAB) },
   convert: { icon: ArrowRightLeft, run: () => openSpecialTab(CONVERT_TAB) },
