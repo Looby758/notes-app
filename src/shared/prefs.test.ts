@@ -18,3 +18,11 @@ describe('motion setting', () => {
     expect(normalizePrefs({ reduceMotion: true, motion: 'subtle' }).motion).toBe('subtle')
   })
 })
+
+describe('features moved into Mini games', () => {
+  it('turns Sudoku and Minesweeper on the bars into one Mini games button', () => {
+    const prefs = normalizePrefs({ dockFeatures: ['home', 'sudoku', 'minesweeper', 'music'], topbarFeatures: ['minesweeper'] })
+    expect(prefs.dockFeatures).toEqual(['home', 'mini-games', 'music'])
+    expect(prefs.topbarFeatures).toEqual(['mini-games'])
+  })
+})

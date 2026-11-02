@@ -396,6 +396,10 @@ export const CAPTURE_SHORTCUTS = CHOICES.captureShortcut
 const cleanIds = (v: unknown): string[] =>
   Array.isArray(v) ? [...new Set(v.filter((id): id is string => typeof id === 'string' && /^[a-z0-9-]{1,40}$/.test(id)))].slice(0, 50) : []
 
+/** Features that were folded into another one: Sudoku and Minesweeper now live in Mini games. */
+const RENAMED_FEATURES: Record<string, string> = { sudoku: 'mini-games', minesweeper: 'mini-games' }
+const renameFeatures = (ids: string[]): string[] => [...new Set(ids.map((id) => RENAMED_FEATURES[id] ?? id))]
+
 const isHex = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)
 /** Font names are used inside CSS, so keep them to characters a font name can contain. */
 const cleanFont = (v: unknown): string =>
@@ -474,7 +478,7 @@ export function normalizePrefs(raw: unknown): Prefs {
   out.worldClocks = cleanClocks(input.worldClocks)
   out.countdowns = cleanCountdowns(input.countdowns)
   for (const k of ['topbarFeatures', 'dockFeatures', 'radialFeatures', 'phoneDeck'] as const) {
-    out[k] = input[k] === undefined ? [...DEFAULT_PREFS[k]] : cleanIds(input[k])
+    out[k] = input[k] === undefined ? [...DEFAULT_PREFS[k]] : renameFeatures(cleanIds(input[k]))
   }
 
   if (input.shortcuts && typeof input.shortcuts === 'object') {
