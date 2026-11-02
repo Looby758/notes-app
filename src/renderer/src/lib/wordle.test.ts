@@ -33,7 +33,7 @@ describe('wordle', () => {
     for (const mode of WORDLE_MODES) {
       for (const len of mode.lengths) {
         const words = answersFor(mode.id, len)
-        expect(words.length, `${mode.id} ${len}`).toBeGreaterThanOrEqual(mode.id === 'classic' && len === 2 ? 20 : 15)
+        expect(words.length, `${mode.id} ${len}`).toBeGreaterThanOrEqual(mode.id === 'walkingDead' ? (len <= 3 ? 2 : 15) : len === 2 ? 20 : 15)
         expect(new Set(words).size).toBe(words.length)
         for (const w of words) expect(w, `${mode.id} ${len}`).toMatch(new RegExp(`^[a-z]{${len}}$`))
       }

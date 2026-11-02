@@ -3,7 +3,8 @@
  * characters, no spin-offs (Fear, World Beyond, Dead City, Daryl Dixon, The Ones Who Live), and no
  * behind-the-scenes names: just people, places and things a viewer of the show would know.
  * Grouped by kind so the game can say what the word was ("DARYL: a character") once a round is over.
- * Only 4 to 8 letters: there are too few shorter ones to make a game of.
+ * Characters only, never the actors who play them. 2 to 8 letters, like Classic; the short lengths
+ * have only a few words, so they come round again often.
  */
 
 export type WalkingDeadKind = 'character' | 'place' | 'thing' | 'walker'
@@ -21,7 +22,7 @@ export const WALKING_DEAD_KINDS: Record<WalkingDeadKind, string> = {
 const WORDS: Record<WalkingDeadKind, string> = {
   // Season by season, roughly in the order they turn up, then family names.
   character: `
-    rick carl lori shane glenn morgan duane jenny merle andrea amy dale jim jacqui morales jenner
+    rick carl lori shane glenn morgan duane jenny merle andrea amy dale jim jacqui morales jenner ed
     daryl carol sophia hershel maggie beth otis patricia jimmy tdog
     michonne axel oscar tomas governor philip blake penny milton martinez tyreese sasha karen
     lizzie mika judith patrick zach bob eugene rosita abraham tara joe len
@@ -31,7 +32,7 @@ const WORDS: Record<WalkingDeadKind, string> = {
     jerry jadis anne cyndie natania arat laura paula
     siddiq alden carson harlan tanya frankie gavin jared regina
     alpha beta lydia henry magna yumiko luke connie kelly gamma earl tammy gage ozzy alek kal dante
-    pamela lance hornsby mercer max maxine princess juanita elijah leah annie
+    pamela lance hornsby mercer max maxine princess juanita elijah leah annie rj
     grimes greene rhee peletier dixon monroe porter ford espinosa williams chambler
   `,
   place: `
@@ -51,7 +52,7 @@ export const WALKING_DEAD_KIND_OF: Record<string, WalkingDeadKind> = {}
 
 for (const kind of Object.keys(WORDS) as WalkingDeadKind[]) {
   for (const word of WORDS[kind].split(/\s+/)) {
-    if (!/^[a-z]{4,8}$/.test(word) || WALKING_DEAD_KIND_OF[word]) continue
+    if (!/^[a-z]{2,8}$/.test(word) || WALKING_DEAD_KIND_OF[word]) continue
     WALKING_DEAD_KIND_OF[word] = kind
     ;(WALKING_DEAD_ANSWERS[word.length] ??= []).push(word)
   }
