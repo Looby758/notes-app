@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react'
 import { ArrowLeft, ArrowRight, BookOpen, Brain, Download, House, Library, Pause, Play, Search, Shield, ShieldCheck, Trash2, X } from 'lucide-react'
-import { bytesText, DEFAULT_PICTURES, pageUrl, type WikiAnswer, type WikiCheck, type WikiHit, type WikiInfo, type WikiPageView, type WikiPictureChoice, type WikiSpoilerView } from '@shared/wiki'
+import { bytesText, DEFAULT_PICTURES, pageUrl, timeLeftText, type WikiAnswer, type WikiCheck, type WikiHit, type WikiInfo, type WikiPageView, type WikiPictureChoice, type WikiSpoilerView } from '@shared/wiki'
 import type { WikiPartsChoice, WikiSpoilerSettings } from '@shared/wikiSpoilers'
 import { goWiki, useWiki, wikiBack, wikiForward, type WikiPlace } from '../../store/wiki'
 import { notify } from '../../store/notify'
@@ -36,7 +36,8 @@ function statusText(w: WikiInfo): string {
   if (w.status === 'done') return `Ready · ${n(w.done)} pages${w.failed ? ` (${n(w.failed)} wouldn’t download)` : ''} · ${bytesText(w.bytes)}`
   if (w.status === 'listing') return w.running ? 'Getting the list of pages…' : 'Paused while getting the list of pages'
   if (w.status === 'indexing') return w.running ? 'Making it searchable…' : 'Paused'
-  return `${w.running ? 'Downloading' : 'Paused'}: ${n(w.done)} of ${n(w.total)} pages · ${bytesText(w.bytes)}`
+  const left = w.running ? (w.secondsLeft !== undefined ? ` · ${timeLeftText(w.secondsLeft)}` : ' · working out how long…') : ''
+  return `${w.running ? 'Downloading' : 'Paused'}: ${n(w.done)} of ${n(w.total)} pages · ${bytesText(w.bytes)}${left}`
 }
 
 function Shelf({ wikis }: { wikis: WikiInfo[] }) {

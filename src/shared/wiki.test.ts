@@ -3,6 +3,8 @@ import {
   chunkSections,
   citedNumbers,
   decodeEntities,
+  estimateSecondsLeft,
+  timeLeftText,
   findImages,
   htmlToSections,
   imageExtension,
@@ -129,5 +131,28 @@ describe('the wiki brain', () => {
   it('reads which extracts an answer used', () => {
     expect(citedNumbers('He dies [2]. He was a delivery boy [1, 2] [9].', 3)).toEqual([2, 1])
     expect(citedNumbers('No idea.', 3)).toEqual([])
+  })
+})
+
+describe('time left', () => {
+  it('waits until there’s enough to go on', () => {
+    expect(estimateSecondsLeft([1000, 2000], 3000, 100)).toBeNull()
+    expect(estimateSecondsLeft(Array.from({ length: 20 }, (_, i) => i * 100), 2000, 100)).toBeNull()
+  })
+  it('guesses from the recent speed', () => {
+    // 4 pages a second for the last minute; 15,000 pages left is about an hour.
+    const times = Array.from({ length: 241 }, (_, i) => 1_000_000 + i * 250)
+    expect(Math.round(estimateSecondsLeft(times, 1_060_000, 15_000)!)).toBe(3750)
+    expect(estimateSecondsLeft(times, 1_060_000, 0)).toBe(0)
+  })
+  it('ignores speed from long ago', () => {
+    const old = Array.from({ length: 50 }, (_, i) => i * 100)
+    expect(estimateSecondsLeft(old, 10 * 60_000, 100)).toBeNull()
+  })
+  it('says it plainly', () => {
+    expect(timeLeftText(30)).toBe('less than a minute left')
+    expect(timeLeftText(5 * 60 + 10)).toBe('about 5 min left')
+    expect(timeLeftText(3750)).toBe('about 1 hr 5 min left')
+    expect(timeLeftText(2 * 3600 + 60)).toBe('about 2 hr left')
   })
 })

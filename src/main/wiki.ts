@@ -13,6 +13,7 @@ import { logError } from './log'
 import { cleanReply, LOCAL_CONTEXT_CHARS } from '@shared/localAi'
 import {
   citedNumbers,
+  estimateSecondsLeft,
   findImages,
   htmlToSections,
   imageExtension,
@@ -109,6 +110,8 @@ interface Loaded {
   done: Set<number>
   failed: number
   bytes: number
+  /** When recent pages finished (ms), for the time-left guess. */
+  recent: number[]
 }
 
 const root = (): string => join(app.getPath('userData'), 'wikis')
@@ -141,7 +144,7 @@ function loadAll(): void {
       if (meta.status === 'listing' || meta.status === 'pages' || meta.status === 'indexing') meta.status = 'paused'
       const pages = existsSync(join(dirOf(id), 'pages')) ? readdirSync(join(dirOf(id), 'pages')) : []
       const done = new Set(pages.filter((f) => f.endsWith('.json.gz')).map((f) => Number(f.slice(0, -8))))
-      wikis.set(id, { meta, done, failed: 0, bytes: 0 })
+      wikis.set(id, { meta, done, failed: 0, bytes: 0, recent: [] })
       void sizeOf(id)
       void listOf(id).then((l) => {
         const w = wikis.get(id)
@@ -188,7 +191,9 @@ const saveList = (id: string, l: PageList): Promise<void> => writeJson(join(dirO
 
 function info(w: Loaded): WikiInfo {
   const { address: _address, ...meta } = w.meta
-  return { ...meta, running: jobs.has(w.meta.id), done: w.done.size, failed: w.failed, bytes: w.bytes }
+  const running = jobs.has(w.meta.id)
+  const left = running && w.meta.status === 'pages' ? estimateSecondsLeft(w.recent, Date.now(), w.meta.total - w.done.size - w.failed) : null
+  return { ...meta, running, done: w.done.size, failed: w.failed, bytes: w.bytes, ...(left !== null ? { secondsLeft: left } : {}) }
 }
 
 export function wikiList(): WikiInfo[] {
@@ -337,6 +342,7 @@ export async function addWiki(input: string, pictures: WikiPictureChoice): Promi
     w = {
       meta: { id: address.id, address, name: site.name, base: address.base, mainPage: site.mainPage, licence: site.licence, pictures: pictureChoice(pictures), status: 'listing', total: site.articles, added: Date.now() },
       done: new Set(),
+      recent: [],
       failed: 0,
       bytes: 0
     }
@@ -387,6 +393,8 @@ function startJob(id: string): void {
   jobs.set(id, abort)
   const w = wikis.get(id)!
   delete w.meta.error
+  // The guess starts again: speed before a pause says little about speed now.
+  w.recent = []
   tellSoon()
   void download(w, abort.signal)
     .catch(async (err) => {
@@ -457,6 +465,8 @@ async function download(w: Loaded, signal: AbortSignal): Promise<void> {
       try {
         await downloadPage(w, p.id, signal)
         w.done.add(p.id)
+        w.recent.push(Date.now())
+        if (w.recent.length > 400) w.recent.splice(0, w.recent.length - 400)
       } catch (err) {
         if (signal.aborted) throw err
         if (err instanceof WikiError && /couldn’t reach/i.test(err.message)) {

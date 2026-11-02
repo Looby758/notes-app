@@ -55,6 +55,8 @@ export interface WikiInfo {
   finished?: number
   /** The spoiler limit and how far you are (shared with your other computers). */
   spoilers?: WikiSpoilerSettings
+  /** While pages are downloading: about how many seconds are left (once there's enough to go on). */
+  secondsLeft?: number
 }
 
 /** What the spoiler settings show for a wiki. */
@@ -465,6 +467,33 @@ export function citedNumbers(reply: string, count: number): number[] {
     }
   }
   return out
+}
+
+/**
+ * About how long the rest of a download will take, from how fast the last few minutes of pages
+ * came (so it follows the wiki getting quicker or slower). Null until there's enough to go on.
+ * `times` are when pages finished (ms), oldest first.
+ */
+export function estimateSecondsLeft(times: number[], now: number, left: number): number | null {
+  if (left <= 0) return 0
+  const recent = times.filter((t) => now - t <= 3 * 60_000)
+  if (recent.length < 10) return null
+  const span = Math.max(now, recent[recent.length - 1]) - recent[0]
+  if (span < 10_000) return null
+  const perSecond = (recent.length - 1) / (span / 1000)
+  return perSecond > 0 ? left / perSecond : null
+}
+
+/** "about 5 min left", "about 1 hr 20 min left". */
+export function timeLeftText(seconds: number): string {
+  if (seconds < 60) return 'less than a minute left'
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60) return `about ${minutes} min left`
+  // Over an hour, to the nearest 5 minutes: it's a guess.
+  const rounded = Math.round(minutes / 5) * 5
+  const h = Math.floor(rounded / 60)
+  const m = rounded % 60
+  return `about ${h} hr${m ? ` ${m} min` : ''} left`
 }
 
 /** A size for the wiki list ("340 MB"). */
