@@ -36,7 +36,9 @@ import * as spotify from './spotify'
 import * as localMusic from './localMusic'
 import { closeMusicMini, setupMusicMini } from './musicMini'
 import { closePopout, setupPopout } from './popout'
+import { closeDiscordPopout, setupDiscordPopout } from './discordPopout'
 import { closeVideoWindow, setupVideoWindow } from './videoWindow'
+import { closeWebWindow, setupWebWindow } from './webWindow'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
 import { applySnipShortcut, setupSnip, startSnip } from './snip'
 import { applySongIdShortcut, setupSongId } from './songId'
@@ -536,7 +538,9 @@ function createWindow(): BrowserWindow {
       closeYouTube()
       closeMusicMini()
       closePopout()
+      closeDiscordPopout()
       closeVideoWindow()
+      closeWebWindow()
     }
   })
   ipcMain.removeHandler('app:ready-to-close')
@@ -1025,7 +1029,7 @@ app.whenReady().then(async () => {
       syncOrbitSoon()
     })
   )
-  safely('web browser', () => setupBrowser(() => currentPrefs().streamerMode))
+  safely('web browser', () => setupBrowser(() => currentPrefs().streamerMode, () => currentPrefs().googleSignInAsFirefox))
   safely('YouTube mini window', () => setupYouTube(currentPrefs))
   safely('Music mini player', () => setupMusicMini(currentPrefs, () => mainWindow))
   safely('pop-out window', () => setupPopout(currentPrefs))
@@ -1036,11 +1040,13 @@ app.whenReady().then(async () => {
   safely('offline AI', setupLocalAi)
   safely('soundboard', setupSoundboard)
   safely('Discord voice', setupDiscord)
+  safely('Discord voice pop-out', () => setupDiscordPopout(currentPrefs))
   safely('live streaming', setupLive)
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
   safely('undo', () => setupUndoBin(() => vault?.root ?? null))
   safely('video player', () => setupVideoPlayer(() => vault?.root ?? null))
   safely('video window', () => setupVideoWindow(() => mainWindow))
+  safely('web window', () => setupWebWindow(() => mainWindow))
   safely('comic reader', () => setupComics(() => vault))
   safely('wikis', () => setupWiki(() => vault))
   // Hand edits to settings.json apply straight away.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FULL, composeCrop, cropFromDrag, cropStyle, fitWindow, isFull, nextOpacity, shownAspect, MIN_SIDE } from './popout'
+import { FULL, composeCrop, cropFromDrag, cropStyle, discordSource, fitWindow, isFull, nextOpacity, shownAspect, MIN_SIDE } from './popout'
 
 describe('cropFromDrag', () => {
   it('works whichever way you drag', () => {
@@ -71,5 +71,14 @@ describe('nextOpacity', () => {
     expect(nextOpacity(1)).toBe(0.85)
     expect(nextOpacity(0.5)).toBe(1)
     expect(nextOpacity(0.33)).toBe(1)
+  })
+})
+
+describe('discordSource', () => {
+  it('prefers a stream popped out of Discord over Discord itself', () => {
+    const s = (name: string, kind: 'screen' | 'window' = 'window') => ({ name, kind })
+    expect(discordSource([s('Notepad'), s('#general | Friends - Discord'), s('Sam’s screen — Discord stream')])?.name).toBe('Sam’s screen — Discord stream')
+    expect(discordSource([s('Notepad'), s('Discord')])?.name).toBe('Discord')
+    expect(discordSource([s('Discord', 'screen'), s('Notepad')])).toBeNull()
   })
 })

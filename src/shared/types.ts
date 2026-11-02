@@ -12,7 +12,7 @@ import type { LocalLibrary } from './localMusic'
 import type { MixerState } from './mixer'
 import type { MonitorAction, MonitorSaved, MonitorSetting, MonitorsStatus, MonitorTarget } from './monitors'
 import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
-import type { DiscordStatus } from './discord'
+import type { CallRecord, DiscordStatus, SavedPlace } from './discord'
 import type { WifiNetwork } from './wifi'
 import type { MusicAction, MusicDevice, MusicItem, MusicQueue, MusicSearchResults, MusicState, MusicStatus } from './spotify'
 import type { FoundSong, SongIdStatus } from './songId'
@@ -50,8 +50,12 @@ export interface Settings {
   /** The pop-out window (any app, floating on top): where it was left, and how see-through it was. */
   popoutWindow?: WindowBounds
   popoutOpacity?: number
+  /** The Discord voice pop-out: where it was left, and on which screen (see restorePlace in shared/discord.ts). */
+  discordPopoutWindow?: SavedPlace
   /** The video player's own window ("Pop out"): where it was left. */
   videoWindow?: WindowBounds
+  /** A web tab's page in its own window ("Pop out into its own window"): where it was left. */
+  webWindow?: WindowBounds
   /** The paired phone's link (its token, and the port it was on), so the phone reconnects by itself. */
   phoneToken?: string
   phonePort?: number
@@ -525,7 +529,8 @@ export interface NotesApi {
   /** Tells the window the replay buffer is (or isn't) running, so it keeps going in the background. */
   replayRunning(on: boolean): Promise<void>
   /** Joins the buffer's pieces into one video in the recordings folder; resolves to its path. */
-  replaySave(folder: string | null, parts: Uint8Array[], ext: 'mp4' | 'webm', seconds: number): Promise<string>
+  /** `kind` 'call': the Discord voice pop-out's call-audio clip (named "Call clip …"). */
+  replaySave(folder: string | null, parts: Uint8Array[], ext: 'mp4' | 'webm', seconds: number, kind?: 'replay' | 'call'): Promise<string>
   /** Main window: the "save replay" shortcut was pressed. */
   onReplaySave(callback: () => void): () => void
   /** Main window: open this clip in the clip editor (a click on the "Replay saved" notification). */
@@ -617,6 +622,8 @@ export interface NotesApi {
   onWebOpen(callback: (url: string) => void): () => void
   /** One of the app's shortcuts was pressed while a web page had focus. */
   onWebShortcut(callback: (shortcut: string) => void): () => void
+  /** The mouse's back (-1) or forward (1) button was pressed in a web page (by its web contents id). */
+  onWebMouseNav(callback: (contentsId: number, dir: 1 | -1) => void): () => void
 
   // The YouTube mini window
   /**
@@ -636,6 +643,11 @@ export interface NotesApi {
   closeYouTube(): Promise<void>
   /** In the mini window: play this page (opened from the notes window). */
   onYouTubeLoad(callback: (url: string, seconds: number) => void): () => void
+  /**
+   * Opens a web page in a window of its own, which can go full screen on another screen while Orbit
+   * carries on; its video starts `seconds` in.
+   */
+  popOutWebPage(url: string, seconds?: number): Promise<void>
 
   // Updates
   updateStatus(): Promise<UpdateStatus>
@@ -779,6 +791,37 @@ export interface NotesApi {
   discordSet(which: 'mute' | 'deaf', value?: boolean): Promise<DiscordStatus>
   discordOpenPortal(): Promise<void>
   onDiscordChanged(callback: (status: DiscordStatus) => void): () => void
+  /** How loud you hear one person (0 to 200), or muting them just for you. */
+  discordUserVoice(userId: string, patch: { volume?: number; mute?: boolean }): Promise<DiscordStatus>
+  /** Leaves the voice channel. */
+  discordLeave(): Promise<void>
+  /** The pop-out's push-to-talk button: pressed (true) and let go (false). */
+  discordPushToTalk(down: boolean): Promise<DiscordStatus>
+  /** Opens the voice channel in the Discord app (to type in its chat). */
+  discordOpenChannel(): Promise<void>
+  /** Signs in again so Discord grants the newer permissions (the chat). */
+  discordReauthorize(): Promise<DiscordStatus>
+  /** The call history (kept only on this computer), newest first. */
+  discordCalls(): Promise<CallRecord[]>
+  discordRemoveCall(id: string): Promise<CallRecord[]>
+  discordClearCalls(): Promise<CallRecord[]>
+  onDiscordCalls(callback: (calls: CallRecord[]) => void): () => void
+  /** The Discord voice pop-out (its own window, for a second screen): opens it or brings it back. */
+  openDiscordPopout(): Promise<void>
+  closeDiscordPopout(): Promise<void>
+  minimizeDiscordPopout(): Promise<void>
+  /** Whether the Discord voice pop-out is open (for its button). */
+  discordPopoutOpen(): Promise<boolean>
+  onDiscordPopoutOpen(callback: (open: boolean) => void): () => void
+  /** The pop-out's "Watch" button: the floating pop-out window, showing Discord's window. */
+  watchDiscordStream(): Promise<void>
+  /** The corner note ("Pop out the call?"): its answer, and the pointer being over it (it waits while it is). */
+  discordToastAnswer(popOut: boolean): Promise<void>
+  discordToastHover(over: boolean): Promise<void>
+  /** Plays a soundboard clip, or stops them all, in the main window (the pop-out's soundboard). */
+  soundboardTrigger(action: SoundboardAction): Promise<void>
+  /** Opens one of Orbit's known links: Roblox's download page. */
+  openRobloxDownload(): Promise<void>
 
   // Screen snip (main/snip.ts)
   /** Takes a picture of the screen under the pointer and opens the snip window over it. */
@@ -868,6 +911,9 @@ export interface NotesApi {
   /** Pop-out window's own page: the apps and screens it can show. */
   popoutSources(): Promise<StudioCaptureSource[]>
   popoutState(): Promise<{ opacity: number }>
+  /** Pop-out window's own page: what it was opened to show ('discord': Discord's window, from the voice pop-out), once. */
+  popoutHint(): Promise<string | null>
+  onPopoutHint(callback: (hint: string) => void): () => void
   /** Pop-out window's own page: take the shape of the picture (width ÷ height). */
   fitPopout(aspect: number): Promise<void>
   /** Pop-out window's own page: make room to pick an app. */

@@ -9,7 +9,7 @@ import { usePrefs } from '../../store/prefs'
 import { notify } from '../../store/notify'
 import { useMotion } from '../../lib/motion'
 
-const SOURCE_NAMES: Record<GameSource, string> = { steam: 'Steam', epic: 'Epic Games', app: IS_MAC ? 'Mac app' : 'App', added: 'Added by you' }
+const SOURCE_NAMES: Record<GameSource, string> = { steam: 'Steam', epic: 'Epic Games', roblox: 'Roblox', app: IS_MAC ? 'Mac app' : 'App', added: 'Added by you' }
 
 const SORTS: { value: GameSort; label: string }[] = [
   { value: 'recent', label: 'Recently played' },

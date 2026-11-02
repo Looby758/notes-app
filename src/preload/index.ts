@@ -46,7 +46,7 @@ const api: NotesApi = {
   replaySaveNow: () => ipcRenderer.invoke('replay:saveNow'),
   replayScreen: () => ipcRenderer.invoke('replay:screen'),
   replayRunning: (on) => ipcRenderer.invoke('replay:running', on),
-  replaySave: (folder, parts, ext, seconds) => ipcRenderer.invoke('replay:save', folder, parts, ext, seconds),
+  replaySave: (folder, parts, ext, seconds, kind) => ipcRenderer.invoke('replay:save', folder, parts, ext, seconds, kind),
   onReplaySave: (callback) => {
     const handler = (): void => callback()
     ipcRenderer.on('replay:save', handler)
@@ -145,7 +145,13 @@ const api: NotesApi = {
     ipcRenderer.on('web:shortcut', handler)
     return () => ipcRenderer.removeListener('web:shortcut', handler)
   },
+  onWebMouseNav: (callback) => {
+    const handler = (_e: unknown, contentsId: number, dir: 1 | -1): void => callback(contentsId, dir)
+    ipcRenderer.on('web:mouseNav', handler)
+    return () => ipcRenderer.removeListener('web:mouseNav', handler)
+  },
   openYouTube: (url, seconds) => ipcRenderer.invoke('youtube:open', url, seconds),
+  popOutWebPage: (url, seconds) => ipcRenderer.invoke('webWindow:open', url, seconds),
   youTubeState: () => ipcRenderer.invoke('youtube:state'),
   rememberYouTube: (url) => ipcRenderer.invoke('youtube:remember', url),
   pinYouTube: (on) => ipcRenderer.invoke('youtube:pin', on),
@@ -335,6 +341,33 @@ const api: NotesApi = {
   discordForget: () => ipcRenderer.invoke('discord:forget'),
   discordSet: (which, value) => ipcRenderer.invoke('discord:set', which, value),
   discordOpenPortal: () => ipcRenderer.invoke('discord:open-portal'),
+  discordUserVoice: (userId, patch) => ipcRenderer.invoke('discord:user-voice', userId, patch),
+  discordLeave: () => ipcRenderer.invoke('discord:leave'),
+  discordPushToTalk: (down) => ipcRenderer.invoke('discord:push-to-talk', down),
+  discordOpenChannel: () => ipcRenderer.invoke('discord:open-channel'),
+  discordReauthorize: () => ipcRenderer.invoke('discord:reauthorize'),
+  discordCalls: () => ipcRenderer.invoke('discord:calls'),
+  discordRemoveCall: (id) => ipcRenderer.invoke('discord:remove-call', id),
+  discordClearCalls: () => ipcRenderer.invoke('discord:clear-calls'),
+  onDiscordCalls: (callback) => {
+    const handler = (_e: Electron.IpcRendererEvent, calls: Parameters<typeof callback>[0]): void => callback(calls)
+    ipcRenderer.on('discord:calls-changed', handler)
+    return () => ipcRenderer.removeListener('discord:calls-changed', handler)
+  },
+  openDiscordPopout: () => ipcRenderer.invoke('discord-popout:open'),
+  closeDiscordPopout: () => ipcRenderer.invoke('discord-popout:close'),
+  minimizeDiscordPopout: () => ipcRenderer.invoke('discord-popout:minimize'),
+  discordPopoutOpen: () => ipcRenderer.invoke('discord-popout:is-open'),
+  onDiscordPopoutOpen: (callback) => {
+    const handler = (_e: Electron.IpcRendererEvent, open: boolean): void => callback(open)
+    ipcRenderer.on('discord-popout:open-changed', handler)
+    return () => ipcRenderer.removeListener('discord-popout:open-changed', handler)
+  },
+  watchDiscordStream: () => ipcRenderer.invoke('discord-popout:watch'),
+  discordToastAnswer: (popOut) => ipcRenderer.invoke('discord-toast:answer', popOut),
+  discordToastHover: (over) => ipcRenderer.invoke('discord-toast:hover', over),
+  soundboardTrigger: (action) => ipcRenderer.invoke('soundboard:trigger', action),
+  openRobloxDownload: () => ipcRenderer.invoke('discord-popout:roblox-download'),
   onDiscordChanged: (callback) => {
     const handler = (_e: unknown, status: Parameters<typeof callback>[0]): void => callback(status)
     ipcRenderer.on('discord:changed', handler)
@@ -424,6 +457,12 @@ const api: NotesApi = {
   openPopout: () => ipcRenderer.invoke('popout:open'),
   popoutSources: () => ipcRenderer.invoke('popout:sources'),
   popoutState: () => ipcRenderer.invoke('popout:state'),
+  popoutHint: () => ipcRenderer.invoke('popout:hint'),
+  onPopoutHint: (callback) => {
+    const handler = (_e: Electron.IpcRendererEvent, hint: string): void => callback(hint)
+    ipcRenderer.on('popout:hint', handler)
+    return () => ipcRenderer.removeListener('popout:hint', handler)
+  },
   fitPopout: (aspect) => ipcRenderer.invoke('popout:fit', aspect),
   popoutPicker: () => ipcRenderer.invoke('popout:picker'),
   setPopoutOpacity: (opacity) => ipcRenderer.invoke('popout:opacity', opacity),

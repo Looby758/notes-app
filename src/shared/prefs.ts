@@ -49,6 +49,14 @@ export interface Prefs {
   /** A little animated pet in the bottom corner that cheers when you finish things and naps when you're away. */
   pet: boolean
 
+  /**
+   * Google's sign-in pages (in web tabs, Messages and Grok) are told the browser is Firefox. Off (the
+   * default) they see plain Chromium, which Google accepts; telling them Firefox sends "Sign in with
+   * Google" back to "Choose an account" each time. On is a fallback in case Google ever refuses the
+   * app with "This browser or app may not be secure".
+   */
+  googleSignInAsFirefox: boolean
+
   // Streamer mode
   /** Blur private things (your town, email, money, passwords, messages, events) until you click them, for sharing your screen. */
   streamerMode: boolean
@@ -182,6 +190,8 @@ export interface Prefs {
   /** Record what you hear (Windows) and your microphone in replays. */
   replaySound: boolean
   replayMic: boolean
+  /** Joining a Discord voice call shows a small note in the corner offering the voice pop-out (it goes away by itself). */
+  discordPopoutPrompt: boolean
   /** Closing the window keeps Notes running in the tray (so quick capture still works). */
   closeToTray: boolean
   launchAtStartup: boolean
@@ -235,6 +245,7 @@ export const DEFAULT_PREFS: Prefs = {
   screensaver: true,
   screensaverMinutes: 5,
   pet: true,
+  googleSignInAsFirefox: false,
 
   streamerMode: false,
   streamerHideNotes: true,
@@ -312,6 +323,7 @@ export const DEFAULT_PREFS: Prefs = {
   replayQuality: '1080p60',
   replaySound: true,
   replayMic: false,
+  discordPopoutPrompt: true,
   closeToTray: true,
   launchAtStartup: false,
 

@@ -70,6 +70,7 @@ import { showAndFindSong } from '../store/songId'
 import { sendToPhone } from '../store/phone'
 import { toggleDiscord } from '../store/discord'
 import { openRadial } from '../components/Nav/RadialMenu'
+import { openGrokTab, toggleGrokFloat } from '../components/Grok/GrokPage'
 import { startSnip } from './snip'
 import { changeNotesPassword, lockAllNow, lockFolder, lockNote, lockNoteOwn, removeLock } from './lock/actions'
 
@@ -234,6 +235,8 @@ export const commands: Command[] = [
       openSpecialTab(MESSAGES_TAB)
     }
   },
+  { id: 'grok.open', group: 'Navigation', title: 'Open Grok in a tab', run: () => openGrokTab() },
+  { id: 'grok.float', group: 'Navigation', title: 'Grok: float over your notes (pop out inside Orbit), or put it away', run: () => toggleGrokFloat() },
   { id: 'email.open', group: 'Navigation', title: 'Open email', shortcut: 'Ctrl+Shift+A', run: () => openSpecialTab(EMAIL_TAB) },
   { id: 'calendar.panel', group: 'Calendar', title: 'Show calendar in the side panel', run: () => showRightView('calendar') },
   { id: 'phone.pair', group: 'Phone', title: 'Phone: connect your phone (send, clipboard, remote, touchpad, talk, scan)', run: () => sendToPhone({ kind: 'pair' }) },
@@ -330,6 +333,7 @@ export const commands: Command[] = [
   { id: 'wiki.open', group: 'Navigation', title: 'Wikis (downloaded Fandom wikis, read offline)', run: () => openSpecialTab(WIKI_TAB) },
   { id: 'sudoku.open', group: 'Navigation', title: 'Play sudoku (take a quick break)', run: () => openSpecialTab(SUDOKU_TAB) },
   { id: 'discord.open', group: 'Navigation', title: 'Discord voice (who’s in voice, mute, deafen)', run: () => openSpecialTab(DISCORD_TAB) },
+  { id: 'discord.popout', group: 'Discord', title: 'Discord: pop out the voice call (its own window)', run: () => void window.api.openDiscordPopout() },
   { id: 'discord.mute', group: 'Discord', title: 'Discord: mute / unmute', run: () => void toggleDiscord('mute') },
   { id: 'discord.deafen', group: 'Discord', title: 'Discord: deafen / undeafen', run: () => void toggleDiscord('deaf') },
   { id: 'soundboard.open', group: 'Navigation', title: 'Open the soundboard and voice changer', run: () => openSpecialTab(SOUNDBOARD_TAB) },

@@ -692,6 +692,18 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'weather forecast rain outdoor outside event calendar'
   },
 
+  // ---------- Web pages ----------
+  {
+    key: 'googleSignInAsFirefox',
+    section: 'navigation',
+    group: 'Web pages',
+    type: 'toggle',
+    label: 'Sign in with Google as Firefox',
+    description:
+      'Leave this off unless Google refuses to sign you in with “This browser or app may not be secure” (in Grok, a web tab or Messages). On, Google’s sign-in pages are told this is Firefox, but that can send “Sign in with Google” back to “Choose an account” each time.',
+    keywords: 'google sign in login log in account chooser loop grok firefox browser not secure web tab'
+  },
+
   // ---------- Finding features ----------
   {
     key: 'showDock',
@@ -797,6 +809,15 @@ export const SETTINGS: SettingDef[] = [
     type: 'toggle',
     label: 'Record your microphone',
     keywords: 'replay mic voice commentary'
+  },
+  {
+    key: 'discordPopoutPrompt',
+    section: 'studio',
+    group: 'Discord voice',
+    type: 'toggle',
+    label: 'Offer the voice pop-out when you join a call',
+    description: 'A small note in the corner when you join a Discord voice call. Ignore it and it goes away by itself after a few seconds; nothing pops out unless you click it.',
+    keywords: 'discord voice call pop out popout second monitor screen notification join vc'
   },
   {
     key: 'snipShortcut',

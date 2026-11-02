@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { LAUNCH_ANIMATION_MS, type Game, type GameSource, type LaunchArt } from '@shared/games'
 
-const STARTING_WITH: Record<GameSource, string> = { steam: 'Starting with Steam', epic: 'Starting with Epic Games', app: 'Starting', added: 'Starting' }
+const STARTING_WITH: Record<GameSource, string> = { steam: 'Starting with Steam', epic: 'Starting with Epic Games', roblox: 'Starting Roblox', app: 'Starting', added: 'Starting' }
 
 /** How long fading out takes (ms); matches .launch-anim.closing in theme.css. */
 const FADE_MS = 400

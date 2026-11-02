@@ -1,5 +1,5 @@
 import { join } from 'path'
-import { app, clipboard, ipcMain, Menu, powerMonitor, session, shell, webContents, type MenuItemConstructorOptions, type WebContents } from 'electron'
+import { app, BrowserWindow, clipboard, ipcMain, Menu, powerMonitor, session, shell, webContents, type MenuItemConstructorOptions, type WebContents } from 'electron'
 import { firefoxUserAgent, isGoogleSignIn, isWebUrl, plainUserAgent, searchUrl, WEB_PARTITION } from '@shared/web'
 import { isMessagesUrl, MESSAGES_PARTITION } from '@shared/messages'
 import { shortcutFromEvent } from '@shared/shortcuts'
@@ -27,11 +27,16 @@ let appShortcuts = new Set<string>()
 /** What Google's sign-in pages are told the browser is (see isGoogleSignIn). */
 const SIGN_IN_AGENT = firefoxUserAgent(process.platform)
 
+/** Whether Google's sign-in pages are told "Firefox" (the "Sign in with Google as Firefox" setting). */
+let asFirefox: () => boolean = () => false
+const firefoxFor = (url: string): boolean => isGoogleSignIn(url) && asFirefox()
+
 /**
  * `quiet`: streamer mode is on, so WhatsApp and Discord may not pop up notifications (they'd show
  * who wrote and what, on top of whatever you're sharing).
  */
-export function setupBrowser(quiet: () => boolean = () => false): void {
+export function setupBrowser(quiet: () => boolean = () => false, googleAsFirefox: () => boolean = () => false): void {
+  asFirefox = googleAsFirefox
   app.on('web-contents-created', (_e, contents) => {
     // However a web page tab is asked for, it gets the same walled-off setup.
     contents.on('will-attach-webview', (event, prefs, params) => {
@@ -60,8 +65,10 @@ export function setupBrowser(quiet: () => boolean = () => false): void {
   web.setUserAgent(plainUserAgent(web.getUserAgent()))
   web.setPermissionRequestHandler((_wc, permission, callback) => callback(WEB_PERMISSIONS.has(permission)))
   web.setPermissionCheckHandler((_wc, permission) => WEB_PERMISSIONS.has(permission))
-  // Google's sign-in pages hear "Firefox", without the Chrome-only hints that would give it away.
-  web.webRequest.onBeforeSendHeaders({ urls: ['https://accounts.google.com/*'] }, (details, callback) => {
+  // With "Sign in with Google as Firefox" on, Google's sign-in pages (every one the sign-in passes
+  // through, see isGoogleSignIn) hear "Firefox", without the Chrome-only hints that would give it away.
+  web.webRequest.onBeforeSendHeaders({ urls: ['https://*/*'] }, (details, callback) => {
+    if (!firefoxFor(details.url)) return callback({})
     const headers = Object.fromEntries(Object.entries(details.requestHeaders).filter(([name]) => !/^sec-ch-ua/i.test(name)))
     callback({ requestHeaders: { ...headers, 'User-Agent': SIGN_IN_AGENT } })
   })
@@ -93,13 +100,24 @@ export function setupBrowser(quiet: () => boolean = () => false): void {
     await web.clearCache()
     await web.clearAuthCache()
   })
+  // The mouse's back or forward button in a web page (src/preload/web.ts): the app window it's in decides
+  // whether the page or the app goes back.
+  ipcMain.on('web:mouseNav', (e, dir: unknown) => {
+    const page = e.sender
+    if ((dir !== 1 && dir !== -1) || page.getType() !== 'webview') return
+    const host = page.hostWebContents
+    if (host && !host.isDestroyed()) host.send('web:mouseNav', page.id, dir)
+  })
+  ipcMain.on('web:googleAsFirefox', (e) => {
+    e.returnValue = asFirefox()
+  })
   ipcMain.on('web:shortcuts', (_e, list: unknown) => {
     appShortcuts = new Set(Array.isArray(list) ? list.filter((s): s is string => typeof s === 'string') : [])
   })
 }
 
 /** Each web page gets the ad blocker's CSS; YouTube (in a web tab or the mini window) its script too. */
-function blockAds(page: WebContents): void {
+export function blockAds(page: WebContents): void {
   page.on('dom-ready', () => {
     if (page.session !== session.fromPartition(WEB_PARTITION)) return
     page.insertCSS(PAGE_AD_CSS).catch(() => undefined)
@@ -134,9 +152,10 @@ export function saveMessages(): void {
 
 /**
  * What a web page may do: stay on the web, and open new windows as new web tabs. `host` is the
- * app window it belongs to.
+ * app window it belongs to. With `appShortcuts: false` the app's shortcuts stay with the page (for a
+ * page in a window of its own, where Ctrl+W shouldn't close a tab in the notes window).
  */
-export function guardPage(page: WebContents, host: () => WebContents | null): void {
+export function guardPage(page: WebContents, host: () => WebContents | null, { appShortcuts: passShortcuts = true } = {}): void {
   const openInTab = (url: string): void => {
     if (isWebUrl(url)) host()?.send('web:open', url)
   }
@@ -154,6 +173,14 @@ export function guardPage(page: WebContents, host: () => WebContents | null): vo
           height: 720,
           autoHideMenuBar: true,
           webPreferences: { partition: inHub() ? MESSAGES_PARTITION : WEB_PARTITION, sandbox: true, contextIsolation: true, nodeIntegration: false }
+        },
+        // The pop-up is made here so it has the right browser name before its first page loads: a
+        // Google sign-in pop-up that opened as "Chrome" and then became "Firefox" sends you back to
+        // "Choose an account" each time you pick one.
+        createWindow: (options) => {
+          const popup = new BrowserWindow(options)
+          if (firefoxFor(url)) popup.webContents.setUserAgent(SIGN_IN_AGENT)
+          return popup.webContents
         }
       }
     }
@@ -165,7 +192,7 @@ export function guardPage(page: WebContents, host: () => WebContents | null): vo
 
   // Google's sign-in pages see "Firefox" from the page's side too (the request side is in setupBrowser).
   const browserName = (url: string): void => {
-    const agent = isGoogleSignIn(url) ? SIGN_IN_AGENT : page.session.getUserAgent()
+    const agent = firefoxFor(url) ? SIGN_IN_AGENT : page.session.getUserAgent()
     if (page.getUserAgent() !== agent) page.setUserAgent(agent)
   }
   page.on('did-start-navigation', (details) => {
@@ -196,7 +223,7 @@ export function guardPage(page: WebContents, host: () => WebContents | null): vo
 
   // The app's shortcuts (Ctrl+W, Ctrl+P…) work while a page has focus; everything else goes to the page.
   page.on('before-input-event', (e, input) => {
-    if (input.type !== 'keyDown' || !appShortcuts.size) return
+    if (!passShortcuts || input.type !== 'keyDown' || !appShortcuts.size) return
     const pressed = shortcutFromEvent({
       key: input.key,
       code: input.code,
