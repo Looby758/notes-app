@@ -288,6 +288,31 @@ export function sortGames(games: Game[], by: GameSort): Game[] {
   })
 }
 
+/**
+ * Programs that sit in a game's folder but run in the background without the game: crash
+ * handlers (Roblox's stays running after Roblox closes), anti-cheat, launchers, updaters and
+ * helpers. Running on their own, they don't mean a game is being played.
+ */
+const BACKGROUND_PROGRAM = new RegExp(
+  [
+    'crash ?handler', 'crash_?handler', 'crashpad', 'crash ?report', 'crash_?reporter', 'crashsender', 'bugreport',
+    'launcher$', 'updater$', 'update ?agent', '^update$', 'helper$', 'web ?helper', 'service$', 'services$', 'tray$', 'overlay',
+    'bootstrapper', 'installer', '^setup', 'uninst', 'anti ?cheat', 'easyanticheat', 'battleye', '^beservice', '^vgc$', '^vgtray$',
+    'redist', 'dxsetup', 'cefprocess', 'cefsharp', 'socialclub', 'watchdog'
+  ].join('|'),
+  'i'
+)
+
+export function isBackgroundProgram(programPath: string): boolean {
+  const name = programPath.replace(/\\/g, '/').split('/').pop() ?? ''
+  return BACKGROUND_PROGRAM.test(name.replace(/\.(exe|app)$/i, ''))
+}
+
+/** Things in game libraries that aren't games and often run all the time (Wallpaper Engine, Steam's own tools). */
+export function isNotAGame(name: string): boolean {
+  return /^(wallpaper engine|steamworks common redistributables|steam linux runtime|proton\b|steamvr$)/i.test(name.trim())
+}
+
 /** Whether a running program (its full path) belongs to a game installed at `gamePath`. */
 export function isInside(programPath: string, gamePath: string, caseInsensitive: boolean): boolean {
   const norm = (p: string): string => {

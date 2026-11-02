@@ -255,11 +255,17 @@ describe('importing', () => {
       roots: {
         bookmark_bar: { type: 'folder', children: [{ type: 'url', name: 'BBC', url: 'https://bbc.co.uk' }, { type: 'folder', name: 'Games', children: [{ type: 'url', name: 'Steam', url: 'https://store.steampowered.com' }] }] },
         other: { type: 'folder', children: [{ type: 'url', name: 'Bad', url: 'javascript:void 0' }] },
-        custom_root: { trash: { type: 'folder', children: [{ type: 'url', name: 'Old', url: 'https://old.com' }] }, unsorted: { type: 'folder', name: 'Unsorted', children: [{ type: 'url', name: 'U', url: 'https://u.com' }] } }
+        custom_root: {
+          trash: { type: 'folder', children: [{ type: 'url', name: 'Old', url: 'https://old.com' }] },
+          unsorted: { type: 'folder', name: 'Unsorted', children: [{ type: 'url', name: 'U', url: 'https://u.com' }] },
+          speedDial: { type: 'folder', name: 'Speed Dials', children: [{ type: 'url', name: 'YouTube', url: 'https://youtube.com' }] }
+        }
       }
     })
     const { bar, other } = parseChromiumBookmarks(json)
-    expect(bar.map((b) => b.title)).toEqual(['BBC', 'Games'])
+    // Opera's Speed Dial tiles come along as a folder on the bar; its trash doesn't.
+    expect(bar.map((b) => b.title)).toEqual(['BBC', 'Games', 'Speed Dial'])
+    expect(bar[2].children).toEqual([{ title: 'YouTube', url: 'https://youtube.com' }])
     expect(bar[1].children?.[0].url).toBe('https://store.steampowered.com')
     expect(other).toEqual([{ title: 'Unsorted', children: [{ title: 'U', url: 'https://u.com' }] }])
     expect(parseChromiumBookmarks('not json')).toEqual({ bar: [], other: [] })

@@ -6,8 +6,9 @@ import { blankLogin, type Login } from '../../lib/passwords/entries'
 import { answerPermission, setSite, type PermissionAsk } from '../../store/browser'
 import { openSpecialTab, PASSWORDS_TAB } from '../../lib/editorController'
 import { notify } from '../../store/notify'
+import { errorMessage } from '../../lib/paths'
 
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err))
+const errorText = errorMessage
 
 /** Your master password, typed into a bar or pop-up to unlock Passwords there and then. */
 function Unlock({ onUnlocked, compact }: { onUnlocked: () => void; compact?: boolean }) {

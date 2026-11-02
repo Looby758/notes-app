@@ -658,7 +658,11 @@ export interface ImportedBookmark {
   children?: ImportedBookmark[]
 }
 
-/** Chromium's "Bookmarks" file → the bookmarks bar and the rest (the trash and speed dials left out). */
+/**
+ * Chromium's "Bookmarks" file → the bookmarks bar and the rest. Opera's Speed Dial (the start page's
+ * tiles, where most Opera GX users keep their sites) comes along as a "Speed Dial" folder on the
+ * bar; Opera's trash is left out.
+ */
 export function parseChromiumBookmarks(json: string): { bar: ImportedBookmark[]; other: ImportedBookmark[] } {
   let data: unknown
   try {
@@ -667,13 +671,13 @@ export function parseChromiumBookmarks(json: string): { bar: ImportedBookmark[];
     return { bar: [], other: [] }
   }
   const roots = (data as { roots?: Record<string, unknown> })?.roots ?? {}
+  const isTrash = (name: string): boolean => /^trash$/i.test(name.trim())
   const convert = (node: unknown): ImportedBookmark | null => {
     if (!node || typeof node !== 'object') return null
     const n = node as { type?: string; name?: string; url?: string; children?: unknown[] }
     if (n.type === 'url') return hostOf(n.url ?? '') ? { title: n.name ?? '', url: n.url } : null
     if (n.type === 'folder' || Array.isArray(n.children)) {
-      // Opera's own folders that aren't really yours.
-      if (/^(trash|speed ?dials?|speeddial)$/i.test(n.name ?? '')) return null
+      if (isTrash(n.name ?? '')) return null
       return { title: n.name ?? '', children: (n.children ?? []).map(convert).filter((c): c is ImportedBookmark => !!c) }
     }
     return null
@@ -681,13 +685,15 @@ export function parseChromiumBookmarks(json: string): { bar: ImportedBookmark[];
   const childrenOfRoot = (key: string): ImportedBookmark[] => convert(roots[key])?.children ?? []
   const bar = childrenOfRoot('bookmark_bar')
   const other = [...childrenOfRoot('other'), ...childrenOfRoot('synced')]
-  // Opera keeps "Unsorted bookmarks" and its own folders under custom_root.
+  // Opera keeps its Speed Dial, "Unsorted bookmarks" and its own folders under custom_root.
   const custom = roots.custom_root
   if (custom && typeof custom === 'object') {
     for (const [key, node] of Object.entries(custom as Record<string, unknown>)) {
-      if (/trash|speedDial/i.test(key)) continue
+      if (/trash/i.test(key)) continue
       const c = convert(node)
-      if (c?.children?.length) other.push({ title: c.title || (key === 'unsorted' ? 'Unsorted bookmarks' : key), children: c.children })
+      if (!c?.children?.length) continue
+      if (/speed ?dial/i.test(key)) bar.push({ title: 'Speed Dial', children: c.children })
+      else other.push({ title: c.title || (key === 'unsorted' ? 'Unsorted bookmarks' : key), children: c.children })
     }
   }
   return { bar, other }

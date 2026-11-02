@@ -8,7 +8,9 @@ import {
   addPlay,
   epicGameFromManifest,
   epicLaunchUrl,
+  isBackgroundProgram,
   isInside,
+  isNotAGame,
   macGameFromPlist,
   newestRobloxVersion,
   ROBLOX_ICON,
@@ -403,8 +405,21 @@ let lastTick = 0
 
 const runningListeners = new Set<(playing: boolean) => void>()
 
-/** Whether a game is running right now (checked once a minute). */
-export const gameRunning = (): boolean => running.size > 0
+/**
+ * The games that count as being played right now (checked once a minute): ones you've hidden on
+ * the Games page don't, so hiding something that isn't really a game stops it switching the
+ * offline AI off.
+ */
+function playingNow(): Found[] {
+  const hidden = new Set(loadStore().hidden)
+  return found.filter((g) => running.has(g.id) && !hidden.has(g.id))
+}
+
+/** Whether a game is running right now. */
+export const gameRunning = (): boolean => playingNow().length > 0
+
+/** The names of the games running now (to say which one switched the offline AI off). */
+export const runningGameNames = (): string[] => playingNow().map((g) => g.name)
 
 /** Calls back when a game starts (true) or the last one closes (false). */
 export function onGameRunning(listener: (playing: boolean) => void): () => void {
@@ -425,13 +440,17 @@ async function tick(): Promise<void> {
   const seconds = lastTick ? Math.round(Math.min(now - lastTick, 2 * TICK) / 1000) : 0
   lastTick = now
   const caseInsensitive = IS_MAC || IS_WIN
-  const playing = new Set(found.filter((g) => programs.some((p) => isInside(p, g.path, caseInsensitive))).map((g) => g.id))
+  // A game counts as playing when one of its own programs is running (not just a background
+  // helper from its folder), and it's really a game.
+  const playing = new Set(
+    found.filter((g) => !isNotAGame(g.name) && programs.some((p) => !isBackgroundProgram(p) && isInside(p, g.path, caseInsensitive))).map((g) => g.id)
+  )
   const s = loadStore()
   for (const id of playing) s.play[id] = addPlay(s.play[id], running.has(id) ? seconds : 0, new Date(now))
   const changed = playing.size !== running.size || [...playing].some((id) => !running.has(id))
-  const wasPlaying = running.size > 0
+  const wasPlaying = gameRunning()
   running = playing
-  if (wasPlaying !== playing.size > 0) for (const l of runningListeners) l(playing.size > 0)
+  if (wasPlaying !== gameRunning()) for (const l of runningListeners) l(gameRunning())
   if (playing.size) saveStore()
   if (changed || playing.size) broadcast()
 }
@@ -520,6 +539,10 @@ export function setupGames(): void {
   })
 
   ipcMain.handle('games:setHidden', (_e, id: string, hide: boolean) => {
+    const wasPlaying = gameRunning()
+    queueMicrotask(() => {
+      if (wasPlaying !== gameRunning()) for (const l of runningListeners) l(gameRunning())
+    })
     const s = loadStore()
     s.hidden = s.hidden.filter((h) => h !== id)
     if (hide) s.hidden.push(id)

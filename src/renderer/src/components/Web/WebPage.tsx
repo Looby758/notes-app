@@ -54,7 +54,7 @@ import {
 import { youTubeVideoId, youTubeWatchUrl } from '@shared/youtube'
 import { FIND_VIDEO } from '@shared/video'
 import { loadInWebTab, setWebPage, useWeb, webviews } from '../../store/web'
-import { addBookmark, setSite, tabsByPage, useBrowser } from '../../store/browser'
+import { addBookmark, setSite, tabsByPage, updateBookmark, useBrowser } from '../../store/browser'
 import { notify } from '../../store/notify'
 import { sendToPhone } from '../../store/phone'
 import { setPrefs, usePrefs } from '../../store/prefs'
@@ -65,6 +65,7 @@ import { usePasswords } from '../../lib/passwords/session'
 import { loginMatchesPage } from '@shared/browser'
 import { isPrivateWebTab, openSpecialTab, openWebTab, SETTINGS_TAB } from '../../lib/editorController'
 import { freePath } from '../../lib/email'
+import { errorMessage } from '../../lib/paths'
 import { CLICK_MOD, showKeys } from '@shared/platform'
 import { openAiSettings } from '../Ai/AiSettings'
 import ContextMenu, { type MenuItem } from '../ContextMenu'
@@ -202,9 +203,13 @@ export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidde
   /** The page's title now (the saved one can still be the last page's for a moment after moving on). */
   const titleNow = (): string => {
     try {
-      return ready()?.getTitle() || pageTitle
+      const el = ready()
+      const title = el?.getTitle() ?? ''
+      // While a page loads, its "title" is just its address: no title yet (it's filled in when it arrives).
+      if (!title || title === el?.getURL() || displayUrl(el?.getURL() ?? '') === title || /^https?:\/\//i.test(title)) return ''
+      return title
     } catch {
-      return pageTitle
+      return ''
     }
   }
 
@@ -241,7 +246,14 @@ export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidde
       setFailure(null)
       updateNav()
     }
-    const onTitle = (e: Event): void => setWebPage(tab, { title: (e as Event & { title: string }).title })
+    const onTitle = (e: Event): void => {
+      const title = (e as Event & { title: string }).title
+      setWebPage(tab, { title })
+      // A bookmark made before the page had its title gets it now (one you've renamed is left alone).
+      const here = el.getURL()
+      const mark = bookmarkFor(useBrowser.getState().bookmarks, here)
+      if (mark && title && (mark.title === here || mark.title === displayUrl(here) || mark.title === hostOf(here))) updateBookmark(mark.id, { title })
+    }
     const onStart = (): void => setLoading(true)
     const onStop = (): void => {
       setLoading(false)
@@ -396,7 +408,7 @@ export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidde
       const result = await window.api.aiSummarise(at.title, `Web page: ${url}\n\n${text}`)
       setSummary((s) => (s?.url === at.url ? { state: 'done', text: result, ...at } : s))
     } catch (err) {
-      setSummary((s) => (s?.url === at.url ? { state: 'error', text: err instanceof Error ? err.message : String(err), ...at } : s))
+      setSummary((s) => (s?.url === at.url ? { state: 'error', text: errorMessage(err), ...at } : s))
     }
   }
 

@@ -48,7 +48,10 @@ function profileFolders(): string[] {
 }
 
 export function findOperaProfile(): { profile: string; root: string } | null {
-  for (const folder of profileFolders()) {
+  // The folder with the bookmarks first, then one with anything Opera keeps.
+  const candidates = profileFolders()
+  const withBookmarks = candidates.find((f) => existsSync(join(f, 'Bookmarks')))
+  for (const folder of withBookmarks ? [withBookmarks] : candidates) {
     if (existsSync(join(folder, 'Bookmarks')) || existsSync(join(folder, 'History')) || existsSync(join(folder, 'Login Data'))) {
       // Local State (with the passwords' key) is in the folder above a "Default" profile.
       const root = folder.endsWith('Default') ? join(folder, '..') : folder
@@ -132,6 +135,8 @@ export function addImportedBookmarks(imported: { bar: ImportedBookmark[]; other:
     result = next
   }
   setBookmarks(result)
+  // The bookmarks bar and the Bookmarks panel show them straight away.
+  for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send('web:bookmarks-changed', getBookmarks())
   return added
 }
 
