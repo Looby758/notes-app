@@ -49,8 +49,7 @@ export const THEME_PAGES: Record<string, string> = {
   messages: 'Messages',
   ai: 'Ask AI',
   chat: 'AI chat',
-  sudoku: 'Sudoku',
-  minesweeper: 'Minesweeper',
+  minigames: 'Mini games',
   clocks: 'World clocks',
   countdowns: 'Countdowns',
   screens: 'Screens',
@@ -154,8 +153,10 @@ export function readThemeManifest(raw: unknown, hasFile: (path: string) => boole
 
   const pictures: Record<string, PagePicture> = {}
   if (isObject(raw.pictures)) {
-    for (const [page, value] of Object.entries(raw.pictures)) {
-      if (!(page in THEME_PAGES)) continue
+    for (const [named, value] of Object.entries(raw.pictures)) {
+      // Sudoku and Minesweeper were parts of their own before Mini games held them both.
+      const page = named === 'sudoku' || named === 'minesweeper' ? 'minigames' : named
+      if (!(page in THEME_PAGES) || (page !== named && pictures[page])) continue
       const entry = typeof value === 'string' ? { file: value } : value
       if (!isObject(entry)) continue
       const picture = file(entry.file, PICTURE_TYPES)

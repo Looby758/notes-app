@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ArrowRightLeft, AudioLines, Bot, Headphones, Bomb, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Hourglass, Grid3x3, HardDrive, House, KeyRound, Layers, LibraryBig, Mail, MessageSquare, MessagesSquare, Monitor, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Scissors, Settings, SlidersVertical, Sparkles, SquareTerminal, Star, StarOff, X, CloudDownload } from 'lucide-react'
+import { ArrowRightLeft, AudioLines, Bot, Headphones, Joystick, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Hourglass, HardDrive, House, KeyRound, Layers, LibraryBig, Mail, MessageSquare, MessagesSquare, Monitor, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Scissors, Settings, SlidersVertical, Sparkles, SquareTerminal, Star, StarOff, X, CloudDownload } from 'lucide-react'
 import Private from '../Streamer/Private'
 import { useHideNames } from '../../store/streamer'
 import { useEditor } from '../../store/editor'
@@ -22,9 +22,8 @@ import {
   MONEY_TAB,
   CONVERT_TAB,
   isExplorerTab,
-  SUDOKU_TAB,
   COMICS_TAB,
-  MINESWEEPER_TAB,
+  MINIGAMES_TAB,
   CLOCKS_TAB,
   COUNTDOWNS_TAB,
   SCREENS_TAB,
@@ -94,9 +93,8 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === HOME_TAB) return 'Home'
   if (id === MONEY_TAB) return 'Money'
   if (id === CONVERT_TAB) return 'Convert files'
-  if (id === SUDOKU_TAB) return 'Sudoku'
   if (id === COMICS_TAB) return 'Comics'
-  if (id === MINESWEEPER_TAB) return 'Minesweeper'
+  if (id === MINIGAMES_TAB) return 'Mini games'
   if (id === CLOCKS_TAB) return 'World clocks'
   if (id === COUNTDOWNS_TAB) return 'Countdowns'
   if (id === SCREENS_TAB) return 'Screens'
@@ -315,9 +313,8 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === HOME_TAB && <House size={13} className="tab-icon" />}
               {id === MONEY_TAB && <PoundSterling size={13} className="tab-icon" />}
               {id === CONVERT_TAB && <ArrowRightLeft size={13} className="tab-icon" />}
-              {id === SUDOKU_TAB && <Grid3x3 size={13} className="tab-icon" />}
               {id === COMICS_TAB && <LibraryBig size={13} className="tab-icon" />}
-              {id === MINESWEEPER_TAB && <Bomb size={13} className="tab-icon" />}
+              {id === MINIGAMES_TAB && <Joystick size={13} className="tab-icon" />}
               {id === CLOCKS_TAB && <Globe2 size={13} className="tab-icon" />}
               {id === COUNTDOWNS_TAB && <Hourglass size={13} className="tab-icon" />}
               {id === SCREENS_TAB && <Monitor size={13} className="tab-icon" />}

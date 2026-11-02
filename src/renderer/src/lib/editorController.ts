@@ -68,9 +68,12 @@ export const EMAIL_TAB = 'email:'
 export const HOME_TAB = 'home:'
 export const MONEY_TAB = 'money:'
 export const CONVERT_TAB = 'convert:'
-export const SUDOKU_TAB = 'sudoku:'
 export const COMICS_TAB = 'comics:'
-export const MINESWEEPER_TAB = 'minesweeper:'
+/** Sudoku, Minesweeper, Nonograms and Jigsaw (components/MiniGames); which one is showing is in store/miniGames. */
+export const MINIGAMES_TAB = 'minigames:'
+/** Sudoku and Minesweeper had tabs of their own before Mini games; a saved tab of theirs opens Mini games. */
+const OLD_GAME_TABS = new Set(['sudoku:', 'minesweeper:'])
+const renameOldTab = (t: string): string => (OLD_GAME_TABS.has(t) ? MINIGAMES_TAB : t)
 /** Clocks for places around the world (components/Clocks). */
 export const CLOCKS_TAB = 'clocks:'
 /** Big countdown cards (components/Countdowns). */
@@ -426,9 +429,9 @@ function restore(): { layout: LayoutNode; panes: Record<string, PaneState>; acti
       const panes: Record<string, PaneState> = {}
       for (const [id, p] of Object.entries(saved.panes as Record<string, PaneState>)) {
         if (Array.isArray(p?.tabs)) {
-          const tabs = p.tabs.filter((t) => typeof t === 'string')
-          const pinned = Array.isArray(p.pinned) ? p.pinned.filter((t) => tabs.includes(t)) : []
-          panes[id] = { tabs, active: p.active ?? null, pinned }
+          const tabs = [...new Set(p.tabs.filter((t) => typeof t === 'string').map(renameOldTab))]
+          const pinned = Array.isArray(p.pinned) ? [...new Set(p.pinned.map(renameOldTab))].filter((t) => tabs.includes(t)) : []
+          panes[id] = { tabs, active: typeof p.active === 'string' ? renameOldTab(p.active) : null, pinned }
         }
       }
       const ids = new Set(Object.keys(panes))

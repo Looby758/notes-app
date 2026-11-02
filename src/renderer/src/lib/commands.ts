@@ -18,9 +18,7 @@ import {
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
-  SUDOKU_TAB,
   COMICS_TAB,
-  MINESWEEPER_TAB,
   CLOCKS_TAB,
   COUNTDOWNS_TAB,
   SCREENS_TAB,
@@ -71,6 +69,7 @@ import { toggleDiscord } from '../store/discord'
 import { openRadial } from '../components/Nav/RadialMenu'
 import { openGrokTab, toggleGrokFloat } from '../components/Grok/GrokPage'
 import { startSnip } from './snip'
+import { openMiniGames } from '../store/miniGames'
 import { changeNotesPassword, lockAllNow, lockFolder, lockNote, lockNoteOwn, removeLock } from './lock/actions'
 
 export interface Command {
@@ -329,7 +328,10 @@ export const commands: Command[] = [
   { id: 'explorer.open', group: 'Navigation', title: 'Browse files on this computer (and Google Drive)', run: () => openSpecialTab(EXPLORER_TAB) },
   { id: 'explorer.newTab', group: 'Navigation', title: 'New Files tab (another folder, to drag files between)', run: () => openExplorerTab() },
   { id: 'comics.open', group: 'Navigation', title: 'Read comics (your comic book shelf)', run: () => openSpecialTab(COMICS_TAB) },
-  { id: 'sudoku.open', group: 'Navigation', title: 'Play sudoku (take a quick break)', run: () => openSpecialTab(SUDOKU_TAB) },
+  { id: 'minigames.open', group: 'Navigation', title: 'Mini games (Sudoku, Minesweeper, Nonograms, Jigsaw)', run: () => openMiniGames(null) },
+  { id: 'sudoku.open', group: 'Navigation', title: 'Play sudoku (take a quick break)', run: () => openMiniGames('sudoku') },
+  { id: 'nonogram.open', group: 'Navigation', title: 'Play nonograms (picture logic puzzles)', run: () => openMiniGames('nonogram') },
+  { id: 'jigsaw.open', group: 'Navigation', title: 'Make a jigsaw from a photo', run: () => openMiniGames('jigsaw') },
   { id: 'discord.open', group: 'Navigation', title: 'Discord voice (who’s in voice, mute, deafen)', run: () => openSpecialTab(DISCORD_TAB) },
   { id: 'discord.popout', group: 'Discord', title: 'Discord: pop out the voice call (its own window)', run: () => void window.api.openDiscordPopout() },
   { id: 'discord.mute', group: 'Discord', title: 'Discord: mute / unmute', run: () => void toggleDiscord('mute') },
@@ -341,7 +343,7 @@ export const commands: Command[] = [
   { id: 'replay.save', group: 'Navigation', title: 'Save the last 30 seconds (instant replay)', run: () => void import('./replay').then((m) => m.saveReplay()) },
   { id: 'replay.toggle', group: 'Navigation', title: 'Turn instant replay on or off', run: () => setPrefs({ replayOn: !usePrefs.getState().prefs.replayOn }) },
   { id: 'studio.record', group: 'Navigation', title: 'Start or stop recording (Studio)', run: () => void import('./studio').then((m) => m.toggleRecording()) },
-  { id: 'minesweeper.open', group: 'Navigation', title: 'Play minesweeper (take a quick break)', run: () => openSpecialTab(MINESWEEPER_TAB) },
+  { id: 'minesweeper.open', group: 'Navigation', title: 'Play minesweeper (take a quick break)', run: () => openMiniGames('minesweeper') },
   { id: 'video.open', group: 'Navigation', title: 'Video player (play any video, MKV, AVI…)', run: () => openSpecialTab(VIDEO_TAB) },
   { id: 'mixer.open', group: 'Navigation', title: 'Volume mixer (a volume for each app)', run: () => openSpecialTab(MIXER_TAB) },
   { id: 'screens.open', group: 'Navigation', title: 'Screens (monitor brightness, contrast and input)', run: () => openSpecialTab(SCREENS_TAB) },

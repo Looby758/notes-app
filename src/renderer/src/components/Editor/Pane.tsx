@@ -25,9 +25,8 @@ import {
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
-  SUDOKU_TAB,
   COMICS_TAB,
-  MINESWEEPER_TAB,
+  MINIGAMES_TAB,
   CLOCKS_TAB,
   COUNTDOWNS_TAB,
   SCREENS_TAB,
@@ -69,7 +68,7 @@ import HomePage from '../Home/HomePage'
 import MoneyPage from '../Money/MoneyPage'
 import ConvertPage from '../Convert/ConvertPage'
 import VideoDownloaderPage from '../Downloader/VideoDownloaderPage'
-import SudokuPage from '../Sudoku/SudokuPage'
+import MiniGamesPage from '../MiniGames/MiniGamesPage'
 import ComicsPage from '../Comics/ComicsPage'
 import WorldClocksPage from '../Clocks/WorldClocksPage'
 import CountdownsPage from '../Countdowns/CountdownsPage'
@@ -79,7 +78,6 @@ import StudioPage from '../Studio/StudioPage'
 import ClipsPage from '../Clips/ClipsPage'
 import SoundboardPage from '../Soundboard/SoundboardPage'
 import DiscordVoicePage from '../Discord/DiscordVoicePage'
-import MinesweeperPage from '../Minesweeper/MinesweeperPage'
 import GamesPage from '../Games/GamesPage'
 import VideoPage from '../Video/VideoPage'
 import ExplorerPage from '../Explorer/ExplorerPage'
@@ -208,9 +206,8 @@ export default function Pane({ pane }: { pane: string }) {
         {(active === HOME_TAB || !active) && <HomePage />}
         {active === MONEY_TAB && <MoneyPage />}
         {active === CONVERT_TAB && <ConvertPage />}
-        {active === SUDOKU_TAB && <SudokuPage />}
         {active === COMICS_TAB && <ComicsPage />}
-        {active === MINESWEEPER_TAB && <MinesweeperPage />}
+        {active === MINIGAMES_TAB && <MiniGamesPage />}
         {active === CLOCKS_TAB && <WorldClocksPage />}
         {active === COUNTDOWNS_TAB && <CountdownsPage />}
         {active === SCREENS_TAB && <ScreensPage />}
