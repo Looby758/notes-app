@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { CalendarDays, Clapperboard, Compass, FileJson, MonitorSmartphone, Music, FolderCog, Info, Keyboard, Palette, PenLine, RefreshCw, RotateCcw, ScrollText, Search, ShieldCheck, Sparkles, X, Zap } from 'lucide-react'
+import { CalendarDays, Clapperboard, Compass, FileJson, MonitorSmartphone, Music, FolderCog, Info, Keyboard, Palette, PenLine, RefreshCw, RotateCcw, ScrollText, Search, ShieldCheck, Sparkles, X, Zap, Globe } from 'lucide-react'
 import { checkForUpdates, useUpdates, watchUpdates } from '../../store/updates'
 import { checkSettingsNow, showWhatsNew } from '../../store/notices'
 import { DEFAULT_PREFS } from '@shared/prefs'
 import type { CaptureStatus } from '@shared/types'
 import { resetPrefs, usePrefs } from '../../store/prefs'
+import BrowserSettings from '../Web/BrowserSettings'
 import { matchesSearch, SECTIONS, SETTINGS, type SectionId, type SettingDef } from '../../lib/settingsSchema'
 import { SettingControl } from './Controls'
 import ShortcutsEditor, { matchingCommands } from './ShortcutsEditor'
@@ -29,6 +30,7 @@ const ICONS: Record<SectionId, typeof Palette> = {
   files: FolderCog,
   calendar: CalendarDays,
   capture: Zap,
+  browser: Globe,
   ai: Sparkles,
   music: Music,
   studio: Clapperboard,
@@ -345,6 +347,7 @@ export default function SettingsPage() {
                   {section === 'music' && <SongIdSettings />}
                   {section === 'studio' && <StudioSettings />}
                   {section === 'computers' && <ShareSettings />}
+                  {section === 'browser' && <BrowserSettings />}
                 </>
               )}
             </>

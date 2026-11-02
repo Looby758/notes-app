@@ -1,9 +1,9 @@
 /**
  * The ad blocker for the web tabs and the YouTube mini window. Three parts:
- *  - requests to ad and tracking servers (and YouTube's own ad addresses) are refused outright;
+ *  - requests to ad and tracking servers are refused outright (except from YouTube's pages, see isAdRequest);
  *  - every page gets CSS that hides the usual ad boxes (and the gaps they'd leave);
- *  - YouTube pages also get a little script that takes the ads out of what the player is told to
- *    play, skips any that still start, and CSS that hides the ad boxes in the feed and beside videos.
+ *  - YouTube pages also get a little script that mutes and speeds through ads and presses Skip,
+ *    and CSS that hides the ad boxes in the feed and beside videos.
  */
 
 /** Ad and tracking servers: nothing from these (or their subdomains) is ever loaded, on any page. */
@@ -33,19 +33,29 @@ function isAdHost(hostname: string): boolean {
   return false
 }
 
-/** YouTube's own addresses that only serve or count ads. */
-const YOUTUBE_AD_PATHS = /^\/(pagead\/|api\/stats\/ads|get_midroll_|ptracking|pcs\/activeview)/i
+/** YouTube's pages (the site, YouTube Music, the embedded player). */
+const isYouTubePage = (url: string): boolean => {
+  try {
+    return /(^|\.)(youtube\.com|youtube-nocookie\.com)$/i.test(new URL(url).hostname)
+  } catch {
+    return false
+  }
+}
 
 /**
  * Whether a page's request is for an ad or tracker, so it's refused. A page you open yourself
  * (`mainFrame`, such as clicking an ad) still loads, so a link never just goes blank.
+ *
+ * Nothing YouTube's pages ask for is refused (`pageUrl` is the page asking). YouTube notices when
+ * its ad requests fail, or when the ads have been taken out of what its player is told, and then
+ * holds the video on "loading" for about as long as the ad would have run. Its ads are dealt with
+ * in the player instead (YOUTUBE_AD_SCRIPT).
  */
-export function isAdRequest(url: string, resourceType = ''): boolean {
+export function isAdRequest(url: string, resourceType = '', pageUrl = ''): boolean {
   if (resourceType === 'mainFrame') return false
+  if (pageUrl && isYouTubePage(pageUrl)) return false
   try {
-    const { hostname, pathname } = new URL(url)
-    if (isAdHost(hostname)) return true
-    return /(^|\.)youtube\.com$/i.test(hostname) && YOUTUBE_AD_PATHS.test(pathname)
+    return isAdHost(new URL(url).hostname)
   } catch {
     return false
   }
@@ -69,31 +79,31 @@ ytd-rich-item-renderer:has(ytd-ad-slot-renderer), ytd-rich-section-renderer:has(
 `
 
 /**
- * Runs in YouTube's page. Takes the ad breaks out of every player response YouTube reads (so most
- * ads never start), and if one starts anyway, jumps to its end and presses Skip. Safe to run twice.
+ * Runs in YouTube's page. Leaves what YouTube sends alone (changing it is what makes YouTube hold
+ * videos on "loading"); when an ad starts, it's muted and run through at top speed, and Skip is
+ * pressed as soon as there is one. The sound and speed you had come back when the video returns.
+ * Safe to run twice.
  */
 export const YOUTUBE_AD_SCRIPT = `(() => {
   if (window.__notesAdBlock) return
   window.__notesAdBlock = true
-  const AD_KEYS = ['adPlacements', 'adSlots', 'playerAds', 'adBreakHeartbeatParams']
-  const strip = (data) => {
-    if (data && typeof data === 'object') {
-      for (const key of AD_KEYS) if (key in data) delete data[key]
-      if (data.playerResponse) strip(data.playerResponse)
+  let saved = null
+  const check = () => {
+    const player = document.querySelector('.html5-video-player')
+    const video = player && player.querySelector('video')
+    if (!video) return
+    const ad = player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting')
+    if (ad) {
+      if (!saved) saved = { muted: video.muted, rate: video.playbackRate }
+      if (!video.muted) video.muted = true
+      if (video.playbackRate !== 16) video.playbackRate = 16
+      for (const button of document.querySelectorAll('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button, button[id^="skip-button"]')) button.click()
+    } else if (saved) {
+      video.muted = saved.muted
+      video.playbackRate = saved.rate
+      saved = null
     }
-    return data
   }
-  const parse = JSON.parse
-  JSON.parse = function (...args) { return strip(parse.apply(this, args)) }
-  const json = Response.prototype.json
-  Response.prototype.json = function () { return json.call(this).then(strip) }
-  strip(window.ytInitialPlayerResponse)
-
-  setInterval(() => {
-    const player = document.querySelector('.html5-video-player.ad-showing')
-    if (!player) return
-    const video = player.querySelector('video')
-    if (video && Number.isFinite(video.duration) && video.currentTime < video.duration) video.currentTime = video.duration
-    for (const button of document.querySelectorAll('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button')) button.click()
-  }, 300)
+  setInterval(check, 250)
+  new MutationObserver(check).observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ['class'] })
 })()`

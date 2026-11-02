@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ArrowRightLeft, AudioLines, Bot, Headphones, Joystick, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Hourglass, HardDrive, House, KeyRound, Layers, LibraryBig, Library, Mail, MessageSquare, MessagesSquare, Monitor, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Scissors, Settings, SlidersVertical, Sparkles, SquareTerminal, Star, StarOff, X, CloudDownload } from 'lucide-react'
+import { ArrowRightLeft, AudioLines, Bot, Headphones, Joystick, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Hourglass, HardDrive, House, KeyRound, Layers, LibraryBig, Library, Mail, MessageSquare, MessagesSquare, Monitor, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Scissors, Settings, SlidersVertical, Sparkles, SquareTerminal, Star, StarOff, X, CloudDownload, VenetianMask, Volume2, VolumeX } from 'lucide-react'
 import Private from '../Streamer/Private'
 import { useHideNames } from '../../store/streamer'
 import { useEditor } from '../../store/editor'
@@ -46,6 +46,7 @@ import {
   isFileTab,
   isNoteTab,
   isWebTab,
+  isPrivateWebTab,
   moveTab,
   newTab,
   openNote,
@@ -62,6 +63,8 @@ import ContextMenu, { type MenuItem } from '../ContextMenu'
 import FileIcon from '../FileIcon'
 import { UnreadBadge } from '../Messages/MessagesPage'
 import { useWeb, type WebPage } from '../../store/web'
+import { tabsByPage, useBrowser } from '../../store/browser'
+import SiteIcon from '../Web/SiteIcon'
 import { displayUrl } from '@shared/web'
 import { FILE_MANAGER, showKeys } from '@shared/platform'
 import { animateOut } from '../../lib/motion'
@@ -79,7 +82,7 @@ function closeWithAnimation(el: HTMLElement | null, id: string, pane: string, un
 
 function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (isBlankTab(id)) return 'New tab'
-  if (isWebTab(id)) return web[id]?.title || (web[id]?.url ? displayUrl(web[id].url) : 'New web tab')
+  if (isWebTab(id)) return web[id]?.title || (web[id]?.url ? displayUrl(web[id].url) : isPrivateWebTab(id) ? 'Private tab' : 'New web tab')
   if (id === SETTINGS_TAB) return 'Settings'
   if (id === CALENDAR_TAB) return 'Calendar'
   if (id === GRAPH_TAB) return 'Graph'
@@ -311,7 +314,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === TERMINAL_TAB && <SquareTerminal size={13} className="tab-icon" />}
               {id === PASSWORDS_TAB && <KeyRound size={13} className="tab-icon" />}
               {id === EMAIL_TAB && <Mail size={13} className="tab-icon" />}
-              {isWebTab(id) && <Globe size={13} className="tab-icon" />}
+              {isWebTab(id) && (isPrivateWebTab(id) ? <VenetianMask size={13} className="tab-icon" /> : web[id]?.url ? <SiteIcon url={web[id].url} size={13} className="tab-icon" /> : <Globe size={13} className="tab-icon" />)}
               {id === HOME_TAB && <House size={13} className="tab-icon" />}
               {id === MONEY_TAB && <PoundSterling size={13} className="tab-icon" />}
               {id === CONVERT_TAB && <ArrowRightLeft size={13} className="tab-icon" />}
@@ -338,6 +341,7 @@ export default function TabBar({ pane }: { pane: string }) {
                 <Private when={hideNames && (isNoteTab(id) || isFileTab(id))}>{tabTitle(id, web)}</Private>
               </span>
               {id === MESSAGES_TAB && <UnreadBadge />}
+              {isWebTab(id) && <TabAudio tab={id} />}
               {isTabPinned ? (
                 // Pinned tabs show a pin instead of ✕; clicking it unpins.
                 <button
@@ -398,5 +402,21 @@ export default function TabBar({ pane }: { pane: string }) {
       </div>
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems(menu.id)} onClose={closeMenu} />}
     </div>
+  )
+}
+
+/** A speaker on a web tab that's playing sound (or muted); clicking it mutes or unmutes the tab. */
+function TabAudio({ tab }: { tab: string }) {
+  const audio = useBrowser((s) => s.audio[tab])
+  if (!audio || (!audio.audible && !audio.muted)) return null
+  const toggle = (e: React.MouseEvent): void => {
+    e.stopPropagation()
+    const wcId = [...tabsByPage].find(([, t]) => t === tab)?.[0]
+    if (wcId !== undefined) void window.api.webMuteTab(wcId, !audio.muted)
+  }
+  return (
+    <button className={`tab-audio ${audio.muted ? 'muted' : ''}`} title={audio.muted ? 'Unmute this tab' : 'Mute this tab'} onClick={toggle} onMouseDown={(e) => e.stopPropagation()} data-tab-audio>
+      {audio.muted ? <VolumeX size={12} /> : <Volume2 size={12} />}
+    </button>
   )
 }

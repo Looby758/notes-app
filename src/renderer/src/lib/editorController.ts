@@ -116,7 +116,10 @@ export const fileOfTab = (id: string): string => id.slice(FILE_TAB.length)
 /** A web page in a tab: "web:1712345abc" (its address and title are in store/web). Open as many as you like. */
 export const WEB_TAB = 'web:'
 export const isWebTab = (id: string | null): id is string => !!id && id.startsWith(WEB_TAB)
-const webId = (): string => `${WEB_TAB}${Date.now()}${Math.random().toString(36).slice(2, 5)}`
+/** A private web tab ("web:private-…"): its own storage in memory only, no history, never restored. */
+export const PRIVATE_WEB_TAB = `${WEB_TAB}private-`
+export const isPrivateWebTab = (id: string | null): id is string => !!id && id.startsWith(PRIVATE_WEB_TAB)
+const webId = (privately = false): string => `${privately ? PRIVATE_WEB_TAB : WEB_TAB}${Date.now()}${Math.random().toString(36).slice(2, 5)}`
 const blankId = (): string => `blank:${Date.now()}${Math.random().toString(36).slice(2, 5)}`
 
 // ---------- state ----------
@@ -429,11 +432,16 @@ function restore(): { layout: LayoutNode; panes: Record<string, PaneState>; acti
     const saved = JSON.parse(localStorage.getItem(`layout:${vaultKey}`) ?? 'null')
     if (saved && typeof saved.panes === 'object') {
       const panes: Record<string, PaneState> = {}
+      // Private web tabs never come back; other web tabs only with "Reopen web tabs" on.
+      const keepWeb = usePrefs.getState().prefs.webRestoreTabs
+      const keep = (t: unknown): t is string => typeof t === 'string' && !isPrivateWebTab(t) && (keepWeb || !isWebTab(t))
       for (const [id, p] of Object.entries(saved.panes as Record<string, PaneState>)) {
         if (Array.isArray(p?.tabs)) {
-          const tabs = [...new Set(p.tabs.filter((t) => typeof t === 'string').map(renameOldTab))]
+          for (const t of p.tabs) if (isWebTab(t) && !keep(t)) forgetWebPage(t)
+          const tabs = [...new Set(p.tabs.filter(keep).map(renameOldTab))]
           const pinned = Array.isArray(p.pinned) ? [...new Set(p.pinned.map(renameOldTab))].filter((t) => tabs.includes(t)) : []
-          panes[id] = { tabs, active: typeof p.active === 'string' ? renameOldTab(p.active) : null, pinned }
+          const active = typeof p.active === 'string' ? renameOldTab(p.active) : null
+          panes[id] = { tabs, active: active && tabs.includes(active) ? active : (tabs[0] ?? null), pinned }
         }
       }
       const ids = new Set(Object.keys(panes))
@@ -866,7 +874,13 @@ export function openExplorerTab(dir?: string, { beside = false }: { beside?: boo
  * in view: the page goes in the pane next to this one (into its web tab, if it's showing one), or
  * a new pane on the right.
  */
-export function openWebTab(url = '', { beside = false }: { beside?: boolean } = {}): void {
+export function openWebTab(url = '', { beside = false, privately = false }: { beside?: boolean; privately?: boolean } = {}): void {
+  if (privately) {
+    const id = webId(true)
+    setWebPage(id, { url, title: '' })
+    addTab(activePane(), id)
+    return
+  }
   const here = activePane()
   // With nothing open there's no note to keep in view: the page just goes here.
   const current = paneState(here).active

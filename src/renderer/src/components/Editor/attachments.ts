@@ -1,3 +1,5 @@
+import { addTitle } from './smartPaste'
+import { linkText } from '@shared/paste'
 import { EditorView } from '@codemirror/view'
 import { notePath } from './facets'
 import { usePrefs } from '../../store/prefs'
@@ -112,6 +114,36 @@ export async function pickAndAttach(view: EditorView, imagesOnly: boolean): Prom
   }
 }
 
+/**
+ * A link dragged in from a web tab (or another browser) becomes a proper markdown link, named after
+ * the link's own text or, failing that, the page's title once it's been looked up.
+ */
+function dropLink(e: DragEvent, view: EditorView): boolean {
+  const data = e.dataTransfer
+  if (!data || view.state.readOnly) return false
+  const url = (data.getData('text/uri-list') || '')
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .find((l) => l && !l.startsWith('#'))
+  if (!url || !/^https?:\/\//i.test(url)) return false
+  e.preventDefault()
+  const pos = view.posAtCoords({ x: e.clientX, y: e.clientY }) ?? view.state.selection.main.head
+  // The link's text, from the page's own copy of the link (when it isn't just the address again).
+  let text = ''
+  const html = data.getData('text/html')
+  if (html) {
+    const a = new DOMParser().parseFromString(html, 'text/html').querySelector('a')
+    text = (a?.textContent ?? '').replace(/\s+/g, ' ').trim()
+  }
+  if (!text) text = data.getData('text/plain').trim()
+  const named = text && text !== url && !/^https?:\/\//i.test(text) && text.length <= 200
+  const insert = named ? `[${linkText(text)}](${url})` : url
+  view.dispatch({ changes: { from: pos, insert }, selection: { anchor: pos + insert.length }, userEvent: 'input.drop' })
+  view.focus()
+  if (!named) void addTitle(view, pos, url)
+  return true
+}
+
 /** Paste a screenshot or drop files from File Explorer straight into a note. */
 export const attachmentHandlers = EditorView.domEventHandlers({
   paste(e, view) {
@@ -148,7 +180,7 @@ export const attachmentHandlers = EditorView.domEventHandlers({
     }
     if (drag) return true
     const dropped = [...(e.dataTransfer?.files ?? [])]
-    if (dropped.length === 0) return false
+    if (dropped.length === 0) return dropLink(e, view)
     e.preventDefault()
     const pos = view.posAtCoords({ x: e.clientX, y: e.clientY }) ?? view.state.selection.main.head
     attachFiles(view, dropped, pos)

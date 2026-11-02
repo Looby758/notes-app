@@ -91,6 +91,11 @@ mac:
       role: Viewer
       rank: Alternate
       ext: [zip, rar, 7z]
+  # Web links, so Orbit can be the default browser (Settings → Web browser → Make default).
+  protocols:
+    - name: Web page
+      role: Viewer
+      schemes: [http, https]
   # Used by the zip; the dmg (the one to download) gets the simpler name below.
   artifactName: Orbit-${version}-${arch}-mac.${ext}
 dmg:

@@ -25,6 +25,7 @@ import {
   steamPlaytimes,
   type Game
 } from './games'
+import { isBackgroundProgram, isNotAGame } from './games'
 
 describe('parseVdf', () => {
   it('reads nested sections, escapes and comments', () => {
@@ -255,5 +256,29 @@ describe('the voice pop-out’s game strip', () => {
     const list = stripGames([game('a', 'Alpha', 5), game('b', 'Beta', 50), game(ROBLOX_ID, 'Roblox', null, { source: 'roblox' }), game('h', 'Hidden', 99, { hidden: true })])
     expect(list.map((g) => g.id)).toEqual([ROBLOX_ID, 'b', 'a'])
     expect(stripGames([game('a', 'A', 1), game('b', 'B', 2)], 1).map((g) => g.id)).toEqual(['b'])
+  })
+})
+
+describe('what counts as playing', () => {
+  it('ignores background programs in a game’s folder', () => {
+    expect(isBackgroundProgram('C:\\Users\\Sam\\AppData\\Local\\Roblox\\Versions\\version-1\\RobloxCrashHandler.exe')).toBe(true)
+    expect(isBackgroundProgram('C:/Games/Fortnite/EasyAntiCheat/EasyAntiCheat_EOS.exe')).toBe(true)
+    expect(isBackgroundProgram('C:/Program Files/Riot Vanguard/vgc.exe')).toBe(true)
+    expect(isBackgroundProgram('C:/Games/Game/UnityCrashHandler64.exe')).toBe(true)
+    expect(isBackgroundProgram('C:/Games/Game/Launcher.exe')).toBe(true)
+    expect(isBackgroundProgram('/Applications/Game.app/Contents/Frameworks/Game Helper.app')).toBe(true)
+  })
+
+  it('still counts the games themselves', () => {
+    expect(isBackgroundProgram('C:\\Users\\Sam\\AppData\\Local\\Roblox\\Versions\\version-1\\RobloxPlayerBeta.exe')).toBe(false)
+    expect(isBackgroundProgram('C:/Games/Crash Bandicoot/CrashBandicootNSaneTrilogy.exe')).toBe(false)
+    expect(isBackgroundProgram('C:/Games/Minecraft/javaw.exe')).toBe(false)
+    expect(isBackgroundProgram('C:/Games/Overwatch/Overwatch.exe')).toBe(false)
+  })
+
+  it('knows things in game libraries that aren’t games', () => {
+    expect(isNotAGame('Wallpaper Engine')).toBe(true)
+    expect(isNotAGame('Steamworks Common Redistributables')).toBe(true)
+    expect(isNotAGame('Rocket League')).toBe(false)
   })
 })

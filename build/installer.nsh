@@ -5,7 +5,8 @@
 ; time it opens (Settings → Studio can do the same at any time). Silent updates skip the page.
 ;
 ; It also adds "Open in Orbit" to File Explorer's right-click menu for videos, comics and zips
-; (removed again when Orbit is uninstalled).
+; (removed again when Orbit is uninstalled). Uninstalling also removes Orbit's web browser
+; registration, which Orbit adds itself when you make it the default browser (main/defaultBrowser.ts).
 
 ; "Open in Orbit" on one kind of file (HKCU\Software\Classes\SystemFileAssociations\.ext\shell).
 !macro OrbitAddVerb EXT
@@ -18,6 +19,10 @@
 !macroend
 
 !macro customUnInstall
+    ; Orbit as a web browser (only there if you chose "Make default" in Settings → Web browser).
+    DeleteRegKey HKCU "Software\Classes\OrbitURL"
+    DeleteRegKey HKCU "Software\Clients\StartMenuInternet\Orbit"
+    DeleteRegValue HKCU "Software\RegisteredApplications" "Orbit"
     !insertmacro OrbitRemoveVerb "mp4"
     !insertmacro OrbitRemoveVerb "m4v"
     !insertmacro OrbitRemoveVerb "mov"

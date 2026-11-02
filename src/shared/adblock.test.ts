@@ -6,9 +6,15 @@ describe('isAdRequest', () => {
     expect(isAdRequest('https://googleads.g.doubleclick.net/pagead/id')).toBe(true)
     expect(isAdRequest('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js')).toBe(true)
     expect(isAdRequest('https://www.googleadservices.com/pagead/conversion/')).toBe(true)
-    expect(isAdRequest('https://www.youtube.com/pagead/adview?ai=x')).toBe(true)
-    expect(isAdRequest('https://www.youtube.com/api/stats/ads?ver=2')).toBe(true)
-    expect(isAdRequest('https://www.youtube.com/get_midroll_info?ei=x')).toBe(true)
+  })
+
+  it('leaves YouTube’s pages alone (blocking makes YouTube hold videos on “loading”)', () => {
+    const watch = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+    expect(isAdRequest('https://www.youtube.com/pagead/adview?ai=x', 'xhr', watch)).toBe(false)
+    expect(isAdRequest('https://imasdk.googleapis.com/js/sdkloader/ima3.js', 'script', watch)).toBe(false)
+    expect(isAdRequest('https://googleads.g.doubleclick.net/pagead/id', 'xhr', 'https://www.youtube-nocookie.com/embed/x')).toBe(false)
+    // …while other sites' ad requests are still refused.
+    expect(isAdRequest('https://googleads.g.doubleclick.net/pagead/id', 'xhr', 'https://www.bbc.co.uk/news')).toBe(true)
   })
 
   it('refuses ad networks and trackers on any site', () => {

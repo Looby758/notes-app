@@ -4,7 +4,8 @@
  * use, with no Electron in them, so they can be tested.
  */
 
-export type MixerKind = 'master' | 'app' | 'system'
+/** 'site': a website playing sound in one of Orbit's web tabs (main/browser.ts). */
+export type MixerKind = 'master' | 'app' | 'system' | 'site'
 
 export interface MixerApp {
   /** 'master', 'system', or the app ('win:discord.exe', 'mac:spotify'). */

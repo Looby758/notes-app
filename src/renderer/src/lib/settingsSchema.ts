@@ -15,6 +15,7 @@ export type SectionId =
   | 'files'
   | 'calendar'
   | 'capture'
+  | 'browser'
   | 'ai'
   | 'music'
   | 'studio'
@@ -461,6 +462,71 @@ export const SETTINGS: SettingDef[] = [
     label: 'Open web links in a web tab beside the note',
     description: 'Off: web links open in your usual browser instead. Either way, a web tab’s ↗ button opens its page in your browser.',
     keywords: 'web browser link url website internet split external chrome safari edge'
+  },
+  // ---------- Web browser ----------
+  {
+    key: 'webRestoreTabs',
+    section: 'browser',
+    group: 'Tabs',
+    type: 'toggle',
+    label: 'Reopen web tabs when Orbit starts',
+    description: 'The pages you had open come back where you left them. Private tabs never do.',
+    keywords: 'session restore reopen tabs pages last time startup browser'
+  },
+  {
+    key: 'webBookmarksBar',
+    section: 'browser',
+    group: 'Tabs',
+    type: 'toggle',
+    label: 'Show the bookmarks bar',
+    description: `Under the address bar. Bookmark a page with ☆ or ${showKeys('Ctrl+D')}; all your bookmarks are in ⋯ → Bookmarks.`,
+    keywords: 'bookmarks favourites favorites bar toolbar'
+  },
+  {
+    key: 'webAskDownloadFolder',
+    section: 'browser',
+    group: 'Downloads',
+    type: 'toggle',
+    label: 'Ask which folder each download goes in',
+    description: 'You pick the folder inside Orbit while it downloads. Off: downloads go straight to the downloads folder below.',
+    keywords: 'download save folder ask where'
+  },
+  {
+    key: 'webOfferPasswords',
+    section: 'browser',
+    group: 'Passwords and forms',
+    type: 'toggle',
+    label: 'Offer to save logins in Passwords',
+    description: 'When you sign in to a site, Orbit offers to keep the login in Passwords (locked with your master password), and next time offers to fill it in. Never in private tabs.',
+    keywords: 'password save remember login sign in fill autofill vault'
+  },
+  {
+    key: 'webAutofill',
+    section: 'browser',
+    group: 'Passwords and forms',
+    type: 'toggle',
+    label: 'Offer to fill in your name, email and address',
+    description: 'A small pop-up under the field offers to fill the form in with your details below. Nothing is filled in unless you pick it.',
+    keywords: 'autofill form address name email phone postcode fill'
+  },
+  {
+    key: 'webOfferTranslate',
+    section: 'browser',
+    group: 'Pages',
+    type: 'toggle',
+    label: 'Offer to translate pages in another language',
+    description: 'A Translate button shows in the address bar (Google Translate). You can always translate from ⋯ → Translate page.',
+    keywords: 'translate language foreign google'
+  },
+  {
+    key: 'webClipFolder',
+    section: 'browser',
+    group: 'Pages',
+    type: 'folder',
+    placeholder: 'Inbox',
+    label: 'Save to Inbox puts pages in',
+    description: `The note button in the address bar saves the part of the page you’ve highlighted (or the whole page) as a note with its link, here. Also ${showKeys('Ctrl+Shift+S')} or right-click → Save to Inbox.`,
+    keywords: 'clip clipper save page inbox note web highlight'
   },
   {
     key: 'homeOnStart',
@@ -926,6 +992,7 @@ export const SECTIONS: { id: SectionId; label: string }[] = [
   { id: 'files', label: 'Files' },
   { id: 'calendar', label: 'Calendar' },
   { id: 'capture', label: 'Summon bar & snip' },
+  { id: 'browser', label: 'Web browser' },
   { id: 'ai', label: 'AI helper' },
   { id: 'music', label: 'Music' },
   { id: 'studio', label: 'Studio' },
