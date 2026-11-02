@@ -2,9 +2,9 @@ import { create } from 'zustand'
 import { MINIGAMES_TAB, openSpecialTab } from '../lib/editorController'
 
 /** The games in the Mini games tab (components/MiniGames). */
-export type MiniGameId = 'sudoku' | 'minesweeper' | 'nonogram' | 'jigsaw'
+export type MiniGameId = 'sudoku' | 'minesweeper' | 'nonogram' | 'jigsaw' | 'wordle'
 
-export const MINI_GAME_IDS: MiniGameId[] = ['sudoku', 'minesweeper', 'nonogram', 'jigsaw']
+export const MINI_GAME_IDS: MiniGameId[] = ['sudoku', 'minesweeper', 'nonogram', 'jigsaw', 'wordle']
 
 const isGame = (v: unknown): v is MiniGameId => typeof v === 'string' && (MINI_GAME_IDS as string[]).includes(v)
 
