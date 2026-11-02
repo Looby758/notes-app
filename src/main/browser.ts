@@ -117,7 +117,7 @@ export function setupBrowser(quiet: () => boolean = () => false, googleAsFirefox
 }
 
 /** Each web page gets the ad blocker's CSS; YouTube (in a web tab or the mini window) its script too. */
-function blockAds(page: WebContents): void {
+export function blockAds(page: WebContents): void {
   page.on('dom-ready', () => {
     if (page.session !== session.fromPartition(WEB_PARTITION)) return
     page.insertCSS(PAGE_AD_CSS).catch(() => undefined)
@@ -152,9 +152,10 @@ export function saveMessages(): void {
 
 /**
  * What a web page may do: stay on the web, and open new windows as new web tabs. `host` is the
- * app window it belongs to.
+ * app window it belongs to. With `appShortcuts: false` the app's shortcuts stay with the page (for a
+ * page in a window of its own, where Ctrl+W shouldn't close a tab in the notes window).
  */
-export function guardPage(page: WebContents, host: () => WebContents | null): void {
+export function guardPage(page: WebContents, host: () => WebContents | null, { appShortcuts: passShortcuts = true } = {}): void {
   const openInTab = (url: string): void => {
     if (isWebUrl(url)) host()?.send('web:open', url)
   }
@@ -222,7 +223,7 @@ export function guardPage(page: WebContents, host: () => WebContents | null): vo
 
   // The app's shortcuts (Ctrl+W, Ctrl+P…) work while a page has focus; everything else goes to the page.
   page.on('before-input-event', (e, input) => {
-    if (input.type !== 'keyDown' || !appShortcuts.size) return
+    if (!passShortcuts || input.type !== 'keyDown' || !appShortcuts.size) return
     const pressed = shortcutFromEvent({
       key: input.key,
       code: input.code,

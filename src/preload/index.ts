@@ -151,6 +151,7 @@ const api: NotesApi = {
     return () => ipcRenderer.removeListener('web:mouseNav', handler)
   },
   openYouTube: (url, seconds) => ipcRenderer.invoke('youtube:open', url, seconds),
+  popOutWebPage: (url, seconds) => ipcRenderer.invoke('webWindow:open', url, seconds),
   youTubeState: () => ipcRenderer.invoke('youtube:state'),
   rememberYouTube: (url) => ipcRenderer.invoke('youtube:remember', url),
   pinYouTube: (on) => ipcRenderer.invoke('youtube:pin', on),

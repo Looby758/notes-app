@@ -52,6 +52,8 @@ export interface Settings {
   discordPopoutWindow?: SavedPlace
   /** The video player's own window ("Pop out"): where it was left. */
   videoWindow?: WindowBounds
+  /** A web tab's page in its own window ("Pop out into its own window"): where it was left. */
+  webWindow?: WindowBounds
   /** The paired phone's link (its token, and the port it was on), so the phone reconnects by itself. */
   phoneToken?: string
   phonePort?: number
@@ -639,6 +641,11 @@ export interface NotesApi {
   closeYouTube(): Promise<void>
   /** In the mini window: play this page (opened from the notes window). */
   onYouTubeLoad(callback: (url: string, seconds: number) => void): () => void
+  /**
+   * Opens a web page in a window of its own, which can go full screen on another screen while Orbit
+   * carries on; its video starts `seconds` in.
+   */
+  popOutWebPage(url: string, seconds?: number): Promise<void>
 
   // Updates
   updateStatus(): Promise<UpdateStatus>
