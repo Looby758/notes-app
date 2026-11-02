@@ -38,6 +38,7 @@ import { closeMusicMini, setupMusicMini } from './musicMini'
 import { closePopout, setupPopout } from './popout'
 import { closeDiscordPopout, setupDiscordPopout } from './discordPopout'
 import { closeVideoWindow, setupVideoWindow } from './videoWindow'
+import { closeWebWindow, setupWebWindow } from './webWindow'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
 import { applySnipShortcut, setupSnip, startSnip } from './snip'
 import { applySongIdShortcut, setupSongId } from './songId'
@@ -535,6 +536,7 @@ function createWindow(): BrowserWindow {
       closePopout()
       closeDiscordPopout()
       closeVideoWindow()
+      closeWebWindow()
     }
   })
   ipcMain.removeHandler('app:ready-to-close')
@@ -1040,6 +1042,7 @@ app.whenReady().then(async () => {
   safely('undo', () => setupUndoBin(() => vault?.root ?? null))
   safely('video player', () => setupVideoPlayer(() => vault?.root ?? null))
   safely('video window', () => setupVideoWindow(() => mainWindow))
+  safely('web window', () => setupWebWindow(() => mainWindow))
   safely('comic reader', () => setupComics(() => vault))
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))
