@@ -6,7 +6,6 @@ import { shortcutFromEvent } from '@shared/shortcuts'
 import { isAdRequest, PAGE_AD_CSS, YOUTUBE_AD_CSS, YOUTUBE_AD_SCRIPT } from '@shared/adblock'
 import { isYouTubeUrl } from '@shared/youtube'
 import { logError } from './log'
-import { traceSignIn, watchSignIn } from './signInTrace'
 
 /**
  * The web browser tab. Each one is a <webview>: a web page running in its own locked-down process,
@@ -29,14 +28,14 @@ let appShortcuts = new Set<string>()
 const SIGN_IN_AGENT = firefoxUserAgent(process.platform)
 
 /** Whether Google's sign-in pages are told "Firefox" (the "Sign in with Google as Firefox" setting). */
-let asFirefox: () => boolean = () => true
+let asFirefox: () => boolean = () => false
 const firefoxFor = (url: string): boolean => isGoogleSignIn(url) && asFirefox()
 
 /**
  * `quiet`: streamer mode is on, so WhatsApp and Discord may not pop up notifications (they'd show
  * who wrote and what, on top of whatever you're sharing).
  */
-export function setupBrowser(quiet: () => boolean = () => false, googleAsFirefox: () => boolean = () => true): void {
+export function setupBrowser(quiet: () => boolean = () => false, googleAsFirefox: () => boolean = () => false): void {
   asFirefox = googleAsFirefox
   app.on('web-contents-created', (_e, contents) => {
     // However a web page tab is asked for, it gets the same walled-off setup.
@@ -66,8 +65,8 @@ export function setupBrowser(quiet: () => boolean = () => false, googleAsFirefox
   web.setUserAgent(plainUserAgent(web.getUserAgent()))
   web.setPermissionRequestHandler((_wc, permission, callback) => callback(WEB_PERMISSIONS.has(permission)))
   web.setPermissionCheckHandler((_wc, permission) => WEB_PERMISSIONS.has(permission))
-  // Google's sign-in pages (every one the sign-in passes through, see isGoogleSignIn) hear
-  // "Firefox", without the Chrome-only hints that would give it away.
+  // With "Sign in with Google as Firefox" on, Google's sign-in pages (every one the sign-in passes
+  // through, see isGoogleSignIn) hear "Firefox", without the Chrome-only hints that would give it away.
   web.webRequest.onBeforeSendHeaders({ urls: ['https://*/*'] }, (details, callback) => {
     if (!firefoxFor(details.url)) return callback({})
     const headers = Object.fromEntries(Object.entries(details.requestHeaders).filter(([name]) => !/^sec-ch-ua/i.test(name)))
@@ -180,7 +179,6 @@ export function guardPage(page: WebContents, host: () => WebContents | null): vo
         createWindow: (options) => {
           const popup = new BrowserWindow(options)
           if (firefoxFor(url)) popup.webContents.setUserAgent(SIGN_IN_AGENT)
-          traceSignIn(page, `opens pop-up ${popup.webContents.id} for`, url)
           return popup.webContents
         }
       }
@@ -189,7 +187,6 @@ export function guardPage(page: WebContents, host: () => WebContents | null): vo
     else if (/^mailto:/i.test(url)) void shell.openExternal(url)
     return { action: 'deny' }
   })
-  watchSignIn(page)
   page.on('did-create-window', (popup) => guardPage(popup.webContents, host))
 
   // Google's sign-in pages see "Firefox" from the page's side too (the request side is in setupBrowser).

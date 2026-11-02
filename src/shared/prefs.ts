@@ -50,8 +50,10 @@ export interface Prefs {
   pet: boolean
 
   /**
-   * Google's sign-in pages (in web tabs, Messages and Grok) are told the browser is Firefox, which
-   * gets past Google's "This browser or app may not be secure". Off: they see plain Chromium.
+   * Google's sign-in pages (in web tabs, Messages and Grok) are told the browser is Firefox. Off (the
+   * default) they see plain Chromium, which Google accepts; telling them Firefox sends "Sign in with
+   * Google" back to "Choose an account" each time. On is a fallback in case Google ever refuses the
+   * app with "This browser or app may not be secure".
    */
   googleSignInAsFirefox: boolean
 
@@ -243,7 +245,7 @@ export const DEFAULT_PREFS: Prefs = {
   screensaver: true,
   screensaverMinutes: 5,
   pet: true,
-  googleSignInAsFirefox: true,
+  googleSignInAsFirefox: false,
 
   streamerMode: false,
   streamerHideNotes: true,

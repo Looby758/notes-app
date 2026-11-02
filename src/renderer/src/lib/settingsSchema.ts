@@ -700,7 +700,7 @@ export const SETTINGS: SettingDef[] = [
     type: 'toggle',
     label: 'Sign in with Google as Firefox',
     description:
-      'Google turns away sign-ins from browsers inside apps, so its sign-in pages are told this is Firefox. If “Sign in with Google” keeps going back to “Choose an account” (in Grok, a web tab or Messages), try turning this off. Each sign-in is noted in the log file (Settings → About) to help find the problem.',
+      'Leave this off unless Google refuses to sign you in with “This browser or app may not be secure” (in Grok, a web tab or Messages). On, Google’s sign-in pages are told this is Firefox, but that can send “Sign in with Google” back to “Choose an account” each time.',
     keywords: 'google sign in login log in account chooser loop grok firefox browser not secure web tab'
   },
 

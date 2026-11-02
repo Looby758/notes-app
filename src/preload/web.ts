@@ -8,9 +8,9 @@ import { firefoxOnGoogleSignIn, firefoxUserAgent, isGoogleSignIn } from '@shared
  * (see quietPasskeys), and passes the mouse's back and forward buttons on to the app.
  */
 contextBridge.executeInMainWorld({ func: quietPasskeys })
-// Google's sign-in pages see the same Firefox the request said (see firefoxOnGoogleSignIn), unless
-// "Sign in with Google as Firefox" is off. Only Google's sign-in pages ask.
-if (isGoogleSignIn(location.href) && ipcRenderer.sendSync('web:googleAsFirefox') !== false) {
+// With "Sign in with Google as Firefox" on, Google's sign-in pages see the same Firefox the request
+// said (see firefoxOnGoogleSignIn). Only Google's sign-in pages ask.
+if (isGoogleSignIn(location.href) && ipcRenderer.sendSync('web:googleAsFirefox') === true) {
   contextBridge.executeInMainWorld({ func: firefoxOnGoogleSignIn, args: [firefoxUserAgent(process.platform)] })
 }
 
