@@ -105,6 +105,19 @@ export function firefoxOnGoogleSignIn(agent: string): void {
   define('userAgentData', undefined)
 }
 
+/**
+ * Google's "Couldn't sign you in: This browser or app may not be secure" page, which it shows
+ * after you type your email when it decides the browser is one built into an app.
+ */
+export function isGoogleRejection(url: string): boolean {
+  if (!isGoogleSignIn(url)) return false
+  try {
+    return /\/signin\/(.*\/)?(rejected|deniedsigninrejected)\b/i.test(new URL(url).pathname)
+  } catch {
+    return false
+  }
+}
+
 /** Firefox's browser name on this kind of computer. */
 export function firefoxUserAgent(platform: string): string {
   const system =

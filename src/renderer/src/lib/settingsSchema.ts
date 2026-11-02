@@ -766,7 +766,7 @@ export const SETTINGS: SettingDef[] = [
     type: 'toggle',
     label: 'Sign in with Google as Firefox',
     description:
-      'Leave this off unless Google refuses to sign you in with “This browser or app may not be secure” (in Grok, a web tab or Messages). On, Google’s sign-in pages are told this is Firefox, but that can send “Sign in with Google” back to “Choose an account” each time.',
+      'Leave this off: when Google refuses to sign you in (“This browser or app may not be secure”), Orbit already tries that sign-in again as Firefox by itself. On, Google’s sign-in pages are always told this is Firefox, which can send “Sign in with Google” (in Grok) back to “Choose an account” each time.',
     keywords: 'google sign in login log in account chooser loop grok firefox browser not secure web tab'
   },
 

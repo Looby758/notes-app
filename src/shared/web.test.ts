@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { displayUrl, firefoxOnGoogleSignIn, firefoxUserAgent, isGoogleSignIn, isWebUrl, plainUserAgent, toWebUrl } from './web'
+import { isGoogleRejection } from './web'
 
 describe('toWebUrl', () => {
   it('opens addresses', () => {
@@ -104,5 +105,19 @@ describe('firefoxOnGoogleSignIn', () => {
   it('leaves every other page alone', () => {
     expect(run('https://grok.com/').userAgent).toBe('Chrome')
     expect(run('https://www.google.com/search?q=x').userAgent).toBe('Chrome')
+  })
+})
+
+describe('isGoogleRejection', () => {
+  it('spots Google’s “This browser or app may not be secure” page', () => {
+    expect(isGoogleRejection('https://accounts.google.com/v3/signin/rejected?rrk=46&hl=en-GB')).toBe(true)
+    expect(isGoogleRejection('https://accounts.google.com/signin/rejected?rrk=46')).toBe(true)
+    expect(isGoogleRejection('https://accounts.google.com/signin/v2/deniedsigninrejected?flowName=GlifWebSignIn')).toBe(true)
+  })
+
+  it('leaves the rest of sign-in alone', () => {
+    expect(isGoogleRejection('https://accounts.google.com/v3/signin/identifier?continue=x')).toBe(false)
+    expect(isGoogleRejection('https://accounts.google.com/o/oauth2/v2/auth?client_id=x')).toBe(false)
+    expect(isGoogleRejection('https://example.com/signin/rejected')).toBe(false)
   })
 })

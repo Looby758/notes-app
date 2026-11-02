@@ -16,7 +16,7 @@ import {
   type Session,
   type WebContents
 } from 'electron'
-import { firefoxUserAgent, isGoogleSignIn, isWebUrl, plainUserAgent, searchUrl, WEB_PARTITION } from '@shared/web'
+import { firefoxUserAgent, isGoogleRejection, isGoogleSignIn, isWebUrl, plainUserAgent, searchUrl, WEB_PARTITION } from '@shared/web'
 import { isMessagesUrl, MESSAGES_PARTITION } from '@shared/messages'
 import { shortcutFromEvent } from '@shared/shortcuts'
 import { isAdRequest, PAGE_AD_CSS, YOUTUBE_AD_CSS, YOUTUBE_AD_SCRIPT } from '@shared/adblock'
@@ -91,7 +91,18 @@ const SIGN_IN_AGENT = firefoxUserAgent(process.platform)
 
 /** Whether Google's sign-in pages are told "Firefox" (the "Sign in with Google as Firefox" setting). */
 let asFirefox: () => boolean = () => false
-const firefoxFor = (url: string): boolean => isGoogleSignIn(url) && asFirefox()
+
+/**
+ * A sign-in Google refused ("This browser or app may not be secure") is tried again as Firefox,
+ * which Google accepts. That lasts for that one sign-in: until its page leaves Google's sign-in
+ * pages (signed in), closes, or 15 minutes pass. Only a fresh sign-in needs it: once you're signed
+ * in, picking your account ("Choose an account", as Grok's "Sign in with Google" does) works as
+ * plain Chromium, and as Firefox it can loop back to "Choose an account".
+ */
+let retryAsFirefox: { page: number; until: number } | null = null
+const retrying = (): boolean => !!retryAsFirefox && Date.now() < retryAsFirefox.until
+const firefoxNow = (): boolean => asFirefox() || retrying()
+const firefoxFor = (url: string): boolean => isGoogleSignIn(url) && firefoxNow()
 
 export interface BrowserDeps {
   /** Streamer mode is on: sites (and WhatsApp and Discord) don't pop up notifications. */
@@ -610,7 +621,7 @@ export function setupBrowser(options: BrowserDeps): void {
     if (host && !host.isDestroyed()) host.send('web:mouseNav', page.id, dir)
   })
   ipcMain.on('web:googleAsFirefox', (e) => {
-    e.returnValue = asFirefox()
+    e.returnValue = firefoxNow()
   })
   ipcMain.on('web:shortcuts', (_e, list: unknown) => {
     appShortcuts = new Set(Array.isArray(list) ? list.filter((s): s is string => typeof s === 'string') : [])
@@ -835,6 +846,34 @@ export function guardPage(page: WebContents, host: () => WebContents | null, { a
   }
   page.on('did-start-navigation', (details) => {
     if (details.isMainFrame && !details.isSameDocument) browserName(details.url)
+  })
+
+  // Google refusing the sign-in: start it again as Firefox (see retryAsFirefox). Where this page's
+  // sign-in began is kept, to go back to.
+  let signInStart: string | null = null
+  let triedAsFirefox = false
+  const watchSignIn = (url: string): void => {
+    if (!isGoogleSignIn(url)) {
+      // Back on the site: signed in (or gone elsewhere), so the next sign-in starts fresh.
+      if (retryAsFirefox?.page === page.id) retryAsFirefox = null
+      signInStart = null
+      triedAsFirefox = false
+      return
+    }
+    if (isGoogleRejection(url)) {
+      if (triedAsFirefox || asFirefox() || !signInStart) return
+      triedAsFirefox = true
+      retryAsFirefox = { page: page.id, until: Date.now() + 15 * 60_000 }
+      page.setUserAgent(SIGN_IN_AGENT)
+      void page.loadURL(signInStart).catch((err) => logError('Google sign-in as Firefox', err))
+      return
+    }
+    signInStart ??= url
+  }
+  page.on('did-navigate', (_e, url) => watchSignIn(url))
+  page.on('did-navigate-in-page', (_e, url, isMainFrame) => isMainFrame && watchSignIn(url))
+  page.once('destroyed', () => {
+    if (retryAsFirefox?.page === page.id) retryAsFirefox = null
   })
 
   // Only web pages: an email link goes to your email app, and anything else (files, other apps) is refused.
