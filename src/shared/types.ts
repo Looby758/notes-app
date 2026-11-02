@@ -618,6 +618,8 @@ export interface NotesApi {
   onWebOpen(callback: (url: string) => void): () => void
   /** One of the app's shortcuts was pressed while a web page had focus. */
   onWebShortcut(callback: (shortcut: string) => void): () => void
+  /** The mouse's back (-1) or forward (1) button was pressed in a web page (by its web contents id). */
+  onWebMouseNav(callback: (contentsId: number, dir: 1 | -1) => void): () => void
 
   // The YouTube mini window
   /**

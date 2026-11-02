@@ -6,6 +6,7 @@ import { WEB_PARTITION } from '@shared/web'
 import { closeTab, GROK_TAB, openSpecialTab } from '../../lib/editorController'
 import { paneWithTab } from '../../store/editor'
 import { setGrokFloating, setGrokRect, setGrokUrl, useGrok } from '../../store/grok'
+import { webviews } from '../../store/web'
 
 /**
  * Grok inside Orbit: grok.com in a walled-off web page (main/browser.ts sets it up, with the web
@@ -34,8 +35,15 @@ export function toggleGrokFloat(): void {
 /** The page the view is on, so the bar's buttons can reach it. */
 type View = { current: WebviewTag | null }
 
-/** grok.com itself, starting on the chat you were last in. */
-function GrokView({ view, focus }: { view: View; focus: boolean }) {
+/** The floating panel's name among the web pages (lib/appNavigation, Clear browsing data). */
+const FLOAT_KEY = 'grok:float'
+
+/**
+ * grok.com itself, starting on the chat you were last in. It's listed with the web tabs' pages
+ * (under `navKey`), so the mouse's back and forward buttons step through Grok's chats first, and
+ * clearing browsing data reloads it too (it keeps its sign-in in the same storage).
+ */
+function GrokView({ view, focus, navKey }: { view: View; focus: boolean; navKey: string }) {
   // Where it starts; after that the page navigates itself (the store follows along).
   const [src] = useState(() => useGrok.getState().url || GROK_URL)
   const viewEl = useRef<HTMLWebViewElement>(null)
@@ -45,6 +53,7 @@ function GrokView({ view, focus }: { view: View; focus: boolean }) {
     const el = viewEl.current as unknown as WebviewTag | null
     view.current = el
     if (!el) return
+    webviews.set(navKey, el)
     const onNavigate = (e: Event): void => {
       const { url, isMainFrame } = e as Event & { url: string; isMainFrame?: boolean }
       if (isMainFrame === false) return
@@ -61,11 +70,12 @@ function GrokView({ view, focus }: { view: View; focus: boolean }) {
     el.addEventListener('did-fail-load', onFail)
     return () => {
       if (view.current === el) view.current = null
+      if (webviews.get(navKey) === el) webviews.delete(navKey)
       el.removeEventListener('did-navigate', onNavigate)
       el.removeEventListener('did-navigate-in-page', onNavigate)
       el.removeEventListener('did-fail-load', onFail)
     }
-  }, [])
+  }, [navKey])
 
   useEffect(() => {
     if (focus) (viewEl.current as unknown as WebviewTag | null)?.focus()
@@ -114,7 +124,7 @@ function PageButtons({ view }: { view: View }) {
 export default function GrokPage({ hidden, autoFocus }: { hidden: boolean; autoFocus: boolean }) {
   const view = useRef<WebviewTag | null>(null)
   return (
-    <div className={`web-page grok-page ${hidden ? 'hidden' : ''}`}>
+    <div className={`web-page grok-page ${hidden ? 'hidden' : ''}`} data-web-tab={GROK_TAB}>
       <div className="grok-bar">
         <span className="grok-title">
           <Bot size={15} /> Grok
@@ -125,7 +135,7 @@ export default function GrokPage({ hidden, autoFocus }: { hidden: boolean; autoF
           <PictureInPicture2 size={14} />
         </button>
       </div>
-      <GrokView view={view} focus={!hidden && autoFocus} />
+      <GrokView view={view} focus={!hidden && autoFocus} navKey={GROK_TAB} />
     </div>
   )
 }
@@ -178,7 +188,7 @@ export function GrokFloat() {
   }
 
   return (
-    <div className="grok-float" style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }} data-grok-float>
+    <div className="grok-float" style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }} data-grok-float data-web-tab={FLOAT_KEY}>
       <div
         className="grok-bar grok-float-bar"
         onPointerDown={(e) => {
@@ -202,7 +212,7 @@ export function GrokFloat() {
           <X size={15} />
         </button>
       </div>
-      <GrokView view={view} focus={false} />
+      <GrokView view={view} focus={false} navKey={FLOAT_KEY} />
       <div
         className="grok-float-grip"
         title="Drag to resize"

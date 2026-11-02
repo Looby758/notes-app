@@ -33,6 +33,7 @@ import {
   SETTINGS_TAB,
   setZenEditor
 } from '../lib/editorController'
+import { startNavHistory, watchMouseNavigation } from '../lib/appNavigation'
 import { openLink, openWikiLink } from '../lib/openLink'
 import { openFromComputer } from '../lib/openFromComputer'
 import { watchUndoKeys } from '../lib/undo'
@@ -122,6 +123,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
   useEffect(() => {
     useVault.getState().open(vault)
     initEditor(vault)
+    const stopHistory = startNavHistory()
     void startReminders()
     // (The test notification from Settings has no note to open.)
     const offReminder = window.api.onReminderOpen((path, line) => path && openNote(path, { line }))
@@ -160,6 +162,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       }
     })
     return () => {
+      stopHistory()
       offChanged()
       offIndex()
       offReminder()
@@ -233,6 +236,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
 
   // Ctrl+Z / Ctrl+Shift+Z for everything that isn't typing (moved files, playlists, settings…).
   useEffect(() => watchUndoKeys(IS_MAC), [])
+
+  // The mouse's back and forward buttons: back a web page, or back to the last note or page.
+  useEffect(() => watchMouseNavigation(), [])
 
   // Every keyboard shortcut comes from the command list, so Ctrl+K shows exactly what works.
   useEffect(() => {

@@ -95,6 +95,14 @@ export function setupBrowser(quiet: () => boolean = () => false): void {
     await web.clearCache()
     await web.clearAuthCache()
   })
+  // The mouse's back or forward button in a web page (src/preload/web.ts): the app window it's in decides
+  // whether the page or the app goes back.
+  ipcMain.on('web:mouseNav', (e, dir: unknown) => {
+    const page = e.sender
+    if ((dir !== 1 && dir !== -1) || page.getType() !== 'webview') return
+    const host = page.hostWebContents
+    if (host && !host.isDestroyed()) host.send('web:mouseNav', page.id, dir)
+  })
   ipcMain.on('web:shortcuts', (_e, list: unknown) => {
     appShortcuts = new Set(Array.isArray(list) ? list.filter((s): s is string => typeof s === 'string') : [])
   })
