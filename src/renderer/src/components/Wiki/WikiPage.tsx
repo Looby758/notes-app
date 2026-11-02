@@ -614,6 +614,7 @@ function BrainPanel({ wiki, wikis }: { wiki: WikiInfo; wikis: WikiInfo[] }) {
 
 function SpoilerPanel({ wiki }: { wiki: WikiInfo }) {
   const [view, setView] = useState<WikiSpoilerView | null>(null)
+  const [moreOpen, setMoreOpen] = useState(false)
   const version = wiki.spoilers?.updated ?? 0
   const status = wiki.status
 
@@ -634,7 +635,12 @@ function SpoilerPanel({ wiki }: { wiki: WikiInfo }) {
   }
   const hasShow = view.series.some((x) => x.part === 'show')
   const hasComics = view.series.some((x) => x.part === 'comics')
-  const shown = view.series.filter((x) => s.parts === 'both' || x.part === (s.parts === 'show' ? 'show' : 'comics'))
+  const inParts = view.series.filter((x) => s.parts === 'both' || x.part === (s.parts === 'show' ? 'show' : 'comics'))
+  // The main show and the comics are always listed. Other series (spin-offs) can give things away by
+  // their names alone ("Daryl Dixon" means he lives), so they stay hidden until you ask, unless you've set one.
+  const main = new Set([view.series.find((x) => x.part === 'show')?.name, view.series.find((x) => x.part === 'comics')?.name])
+  const shown = inParts.filter((x) => main.has(x.name) || moreOpen || (s.progress[x.name] ?? 0) > 0)
+  const more = inParts.length - shown.length
 
   return (
     <aside className="wiki-brain wiki-spoilers">
@@ -680,6 +686,16 @@ function SpoilerPanel({ wiki }: { wiki: WikiInfo }) {
               </select>
             </div>
           ))}
+          {more > 0 && (
+            <div className="wiki-problem">
+              <p>
+                This wiki has {more} more series (like spin-off shows). Their names alone can give things away, like who survives, so they’re hidden. Until you set one, anything from it stays hidden.
+              </p>
+              <button className="btn" onClick={() => setMoreOpen(true)}>
+                Show their names
+              </button>
+            </div>
+          )}
           <p className="screens-note">
             Each paragraph is checked against the episodes and issues the wiki links it to. Where the wiki doesn’t say which episode something happens in, it may only be accurate to the season, and parts Orbit can’t place at all are hidden (each page lets you show them).
             {!view.finished && ' While the wiki is still downloading, some episodes aren’t known yet, so more stays hidden.'}

@@ -43,6 +43,7 @@ import {
   allowed,
   buildTimeline,
   filterPage,
+  firstAppearanceLinks,
   forbiddenNames,
   mentionsHidden,
   pageAllowed,
@@ -720,7 +721,7 @@ const SEARCH_OPTIONS = {
 }
 
 /** Saved indexes from an older Orbit are made again. */
-const INDEX_VERSION = 2
+const INDEX_VERSION = 3
 
 interface Index {
   search: MiniSearch<ChunkDoc>
@@ -749,15 +750,20 @@ async function buildIndex(id: string, signal?: AbortSignal): Promise<Index> {
 
   // 1. The timeline.
   const facts: TimelineFact[] = []
+  const firstLinks: Record<string, string[]> = {}
   let n = 0
   for (const pageId of pageIds) {
     if (signal?.aborted) throw new Error('stopped')
     const p = await readPage(id, pageId)
     const f = p && timelineFact(p.title, p.categories, p.html, w.meta.base)
     if (f) facts.push(f)
+    else if (p) {
+      const first = firstAppearanceLinks(p.html, w.meta.base)
+      if (first.length) firstLinks[p.title] = first
+    }
     if (++n % 50 === 0) await yieldNow()
   }
-  const timeline = buildTimeline(facts, key)
+  const timeline = buildTimeline(facts, key, firstLinks)
   const ctx = { timeline, key, base: w.meta.base }
 
   // 2. Every page, placed and indexed.
