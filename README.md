@@ -269,7 +269,7 @@ Web tabs (Ctrl+Shift+I) are a full browser beside your notes. Everything below i
 - **Private tabs** (⋯ → *New private tab*, or Ctrl+Shift+N in a page): no history, no offers to save logins, and their sign-ins and cookies are forgotten when Orbit closes. They never reopen.
 - **Site permissions**: a site that wants notifications, the microphone, the camera, your location or the clipboard asks first with an *Allow / Block* bar. Change your answers (and each site's zoom and sound) in ⋯ → *Site settings* or Settings → Web browser, where *Clear site data* signs you out of just that site.
 - **Notifications** from sites you've allowed (Discord, X…) show as Orbit's own; clicking one brings its tab forward. They're held back in streamer mode.
-- **Right-click** a link for *Open link in new tab / private tab* and *Copy link*, a picture for *Save image to attachments*, or selected text for *Search Google*.
+- **Right-click** a link for *Open link in new tab / private tab* and *Copy link*; a picture (Google Images too) for *Save image as…* (you pick the folder inside Orbit), *Save image to attachments* or *Copy image*; or selected text for *Search Google*.
 - **Drag a link** from a web page into a note and it becomes a proper link, named after the link's text or the page's title.
 - **Web tabs reopen** where you left them when Orbit starts (turn it off in Settings → Web browser).
 - **Default browser**: Settings → Web browser → *Make default*. On Windows, Orbit registers itself as a browser and opens Windows' Default apps page, where you pick Orbit for web links (Windows doesn't let apps choose this themselves); macOS asks you to confirm. Links from Discord and other apps then open in a web tab, and *Open in your other browser* uses Edge (or Safari).

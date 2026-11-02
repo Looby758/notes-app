@@ -38,6 +38,7 @@ import { closeMusicMini, setupMusicMini } from './musicMini'
 import { closePopout, setupPopout } from './popout'
 import { closeDiscordPopout, setupDiscordPopout } from './discordPopout'
 import { closeVideoWindow, setupVideoWindow } from './videoWindow'
+import { closeWebWindow, setupWebWindow } from './webWindow'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
 import { applySnipShortcut, setupSnip, startSnip } from './snip'
 import { applySongIdShortcut, setupSongId } from './songId'
@@ -63,6 +64,7 @@ import { hold, setupUndoBin } from './undoBin'
 import { setupVideoPlayer, videoResponse } from './videoPlayer'
 import { releaseFiles, serveFile } from './fileLocks'
 import { comicResponse, setupComics, shareProgress as shareComicProgress } from './comics'
+import { setupWiki, shareWikiProgress, wikiImageResponse } from './wiki'
 import { IS_MAC, TRASH_NAME } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
@@ -354,6 +356,7 @@ function openVault(path: string | null): void {
   vault = path ? new Vault(path) : null
   if (!path) return
   void shareComicProgress()
+  void shareWikiProgress()
   syncOrbitSoon()
   startWatching(path, (paths) => {
     for (const win of BrowserWindow.getAllWindows()) win.webContents.send('vault:changed', paths)
@@ -398,6 +401,8 @@ function registerVaultProtocol(): void {
       if (url.host === 'video' || url.host === 'videostream') return await videoResponse(url, request)
       // Comic pages (vault://comic/<id>/<page>) and covers (vault://comiccover/<id>), from the comic shelf.
       if (url.host === 'comic' || url.host === 'comiccover') return await comicResponse(url)
+      // Pictures from downloaded wikis (vault://wiki/<wiki>/<file>).
+      if (url.host === 'wiki') return await wikiImageResponse(url)
       // Soundboard clips (vault://sound/<file>), from Orbit's own soundboard folder.
       if (url.host === 'sound') {
         const full = soundFile(decodeURIComponent(url.pathname.slice(1)))
@@ -543,6 +548,7 @@ function createWindow(): BrowserWindow {
       closePopout()
       closeDiscordPopout()
       closeVideoWindow()
+      closeWebWindow()
     }
   })
   ipcMain.removeHandler('app:ready-to-close')
@@ -1037,7 +1043,8 @@ app.whenReady().then(async () => {
       quiet: () => currentPrefs().streamerMode,
       prefs: currentPrefs,
       saveImage: (name, data) => currentVault().saveAttachment(currentPrefs().attachmentFolder, name, data),
-      showMain
+      showMain,
+      googleAsFirefox: () => currentPrefs().googleSignInAsFirefox
     })
   )
   safely('Opera GX import', setupOperaImport)
@@ -1057,7 +1064,9 @@ app.whenReady().then(async () => {
   safely('undo', () => setupUndoBin(() => vault?.root ?? null))
   safely('video player', () => setupVideoPlayer(() => vault?.root ?? null))
   safely('video window', () => setupVideoWindow(() => mainWindow))
+  safely('web window', () => setupWebWindow(() => mainWindow))
   safely('comic reader', () => setupComics(() => vault))
+  safely('wikis', () => setupWiki(() => vault))
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))
   safely('Orbit sync', () => setupOrbitSync({ root: () => vault?.root ?? null, enabled: () => currentPrefs().syncOrbit, window: () => mainWindow, parts: orbitParts(themesChanged) }))

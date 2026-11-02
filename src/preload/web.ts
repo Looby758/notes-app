@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { quietPasskeys } from '@shared/passkeys'
+import { firefoxOnGoogleSignIn, firefoxUserAgent, isGoogleSignIn } from '@shared/web'
 import { classifyField, profileValue, type AutofillProfile, type FieldKind } from '@shared/browser'
 
 /**
@@ -13,9 +14,29 @@ import { classifyField, profileValue, type AutofillProfile, type FieldKind } fro
  *   Orbit can offer to save it in Passwords;
  * - turns the page's sound down to the site's volume (Orbit's volume mixer);
  * - passes notifications from sites you've allowed to Orbit, which shows them as its own.
+ *
+ * In every page it also passes the mouse's back and forward buttons on to the app, and with "Sign in
+ * with Google as Firefox" on, Google's sign-in pages see Firefox.
  */
 
 contextBridge.executeInMainWorld({ func: quietPasskeys })
+// With "Sign in with Google as Firefox" on, Google's sign-in pages see the same Firefox the request
+// said (see firefoxOnGoogleSignIn). Only Google's sign-in pages ask.
+if (isGoogleSignIn(location.href) && ipcRenderer.sendSync('web:googleAsFirefox') === true) {
+  contextBridge.executeInMainWorld({ func: firefoxOnGoogleSignIn, args: [firefoxUserAgent(process.platform)] })
+}
+
+// The mouse's side buttons (3 = back, 4 = forward): the app steps the page back or forward, or
+// moves around the app once the page can't (main/browser.ts passes them on).
+window.addEventListener(
+  'mouseup',
+  (e) => {
+    if (e.button !== 3 && e.button !== 4) return
+    e.preventDefault()
+    ipcRenderer.send('web:mouseNav', e.button === 3 ? -1 : 1)
+  },
+  true
+)
 
 const kind = ((): string => {
   try {

@@ -48,6 +48,7 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'control-mac', name: 'Control the Mac', blurb: 'See and use your MacBook from the PC in a window', group: 'Connect', keywords: 'remote desktop mac macbook screen vnc' },
   { id: 'webcam', name: 'Phone webcam', blurb: 'Your phone’s camera as the PC’s webcam', group: 'Connect', keywords: 'camera video call discord zoom teams iphone obs' },
   { id: 'web', name: 'Web browser', blurb: 'A web page beside your notes', group: 'Connect', command: 'web.open', keywords: 'internet browse google' },
+  { id: 'grok', name: 'Grok', blurb: 'Grok as a tab, or floating over your notes', group: 'Connect', command: 'grok.open', keywords: 'grok bot xai x ai chatbot assistant elon pop out popout float' },
   { id: 'chat', name: 'AI chat', blurb: 'Chat with Claude about anything', group: 'Connect', command: 'ai.chat', keywords: 'claude ai assistant' },
   { id: 'ask', name: 'Ask everything', blurb: 'AI that knows your notes, email, calendar and money', group: 'Connect', command: 'ai.ask', keywords: 'ai question claude' },
 
@@ -55,6 +56,7 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'songid', name: 'What’s this song?', blurb: 'Find the song in a video, game or stream', group: 'Media', command: 'music.whatsThisSong', keywords: 'identify recognise recognize shazam music playlist' },
   { id: 'video', name: 'Video player', blurb: 'Plays any video, with subtitles and speed', group: 'Media', command: 'video.open', keywords: 'mkv avi wmv mp4 movie film watch subtitles player vlc' },
   { id: 'comics', name: 'Comics', blurb: 'Read .cbz and .cbr comic books', group: 'Media', command: 'comics.open', keywords: 'comic book cbr cbz manga graphic novel read zen' },
+  { id: 'wiki', name: 'Wikis', blurb: 'Fandom wikis offline, with an AI that answers from them', group: 'Media', command: 'wiki.open', keywords: 'wiki fandom offline lore characters walking dead skyblock game show read ask' },
   { id: 'soundboard', name: 'Soundboard', blurb: 'Sounds with hotkeys and a voice changer, into Discord', group: 'Media', command: 'soundboard.open', keywords: 'sound effects meme mic discord voice changer robot deep chipmunk hotkey' },
   { id: 'youtube', name: 'YouTube', blurb: 'A mini window that floats on top', group: 'Media', command: 'youtube.open', keywords: 'video' },
 

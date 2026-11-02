@@ -88,6 +88,10 @@ let appShortcuts = new Set<string>()
 /** What Google's sign-in pages are told the browser is (see isGoogleSignIn). */
 const SIGN_IN_AGENT = firefoxUserAgent(process.platform)
 
+/** Whether Google's sign-in pages are told "Firefox" (the "Sign in with Google as Firefox" setting). */
+let asFirefox: () => boolean = () => false
+const firefoxFor = (url: string): boolean => isGoogleSignIn(url) && asFirefox()
+
 export interface BrowserDeps {
   /** Streamer mode is on: sites (and WhatsApp and Discord) don't pop up notifications. */
   quiet: () => boolean
@@ -95,6 +99,8 @@ export interface BrowserDeps {
   /** Saves a picture into the notes folder's attachments; returns its path there. */
   saveImage: (name: string, data: Uint8Array) => Promise<string>
   showMain: () => void
+  /** The "Sign in with Google as Firefox" setting. */
+  googleAsFirefox?: () => boolean
 }
 
 let deps: BrowserDeps = { quiet: () => false, prefs: () => ({}) as Prefs, saveImage: () => Promise.reject(new Error('No notes folder is open.')), showMain: () => undefined }
@@ -495,8 +501,10 @@ function setupWebSession(ses: Session, isPrivate: boolean, preload: { type: 'fra
   ses.setUserAgent(plainUserAgent(ses.getUserAgent()))
   ses.setPermissionRequestHandler((wc, permission, callback, details) => permissionRequest(wc, permission, details as { requestingUrl?: string; mediaTypes?: string[] }, callback))
   ses.setPermissionCheckHandler((wc, permission, origin, details) => permissionCheck(wc, permission, origin, details as { mediaType?: string }))
-  // Google's sign-in pages hear "Firefox", without the Chrome-only hints that would give it away.
-  ses.webRequest.onBeforeSendHeaders({ urls: ['https://accounts.google.com/*'] }, (details, callback) => {
+  // With "Sign in with Google as Firefox" on, Google's sign-in pages (every one the sign-in passes
+  // through, see isGoogleSignIn) hear "Firefox", without the Chrome-only hints that would give it away.
+  ses.webRequest.onBeforeSendHeaders({ urls: ['https://*/*'] }, (details, callback) => {
+    if (!firefoxFor(details.url)) return callback({})
     const headers = Object.fromEntries(Object.entries(details.requestHeaders).filter(([name]) => !/^sec-ch-ua/i.test(name)))
     callback({ requestHeaders: { ...headers, 'User-Agent': SIGN_IN_AGENT } })
   })
@@ -517,6 +525,7 @@ function setupWebSession(ses: Session, isPrivate: boolean, preload: { type: 'fra
 
 export function setupBrowser(options: BrowserDeps): void {
   deps = options
+  asFirefox = options.googleAsFirefox ?? (() => false)
   downloads = loadDownloads()
 
   app.on('web-contents-created', (_e, contents) => {
@@ -589,6 +598,17 @@ export function setupBrowser(options: BrowserDeps): void {
     await web.clearCache()
     await web.clearAuthCache()
     setHistory([])
+  })
+  // The mouse's back or forward button in a web page (src/preload/web.ts): the app window it's in decides
+  // whether the page or the app goes back.
+  ipcMain.on('web:mouseNav', (e, dir: unknown) => {
+    const page = e.sender
+    if ((dir !== 1 && dir !== -1) || page.getType() !== 'webview') return
+    const host = page.hostWebContents
+    if (host && !host.isDestroyed()) host.send('web:mouseNav', page.id, dir)
+  })
+  ipcMain.on('web:googleAsFirefox', (e) => {
+    e.returnValue = asFirefox()
   })
   ipcMain.on('web:shortcuts', (_e, list: unknown) => {
     appShortcuts = new Set(Array.isArray(list) ? list.filter((s): s is string => typeof s === 'string') : [])
@@ -668,7 +688,7 @@ export function setupBrowser(options: BrowserDeps): void {
 }
 
 /** Each web page gets the ad blocker's CSS; YouTube (in a web tab or the mini window) its script too. */
-function blockAds(page: WebContents): void {
+export function blockAds(page: WebContents): void {
   page.on('dom-ready', () => {
     if (page.session !== webSession() && page.session !== privateSession()) return
     page.insertCSS(PAGE_AD_CSS).catch(() => undefined)
@@ -719,11 +739,14 @@ async function saveImage(page: WebContents, src: string): Promise<void> {
       data = Buffer.from(await res.arrayBuffer())
     }
     const ext = /png/.test(type) ? 'png' : /gif/.test(type) ? 'gif' : /webp/.test(type) ? 'webp' : /svg/.test(type) ? 'svg' : /avif/.test(type) ? 'avif' : 'jpg'
+    // A web picture keeps its file name; an inline "data:" one (Google Images' thumbnails) is just "image".
     let name = 'image'
-    try {
-      name = decodeURIComponent(new URL(src).pathname.split('/').pop() || 'image')
-    } catch {
-      // a data: picture
+    if (!/^data:/i.test(src)) {
+      try {
+        name = decodeURIComponent(new URL(src).pathname.split('/').pop() || 'image')
+      } catch {
+        // not a usable address: "image" it is
+      }
     }
     name = safeDownloadName(name.replace(/\.[a-z0-9]{2,5}$/i, '')) || 'image'
     const saved = await deps.saveImage(`${name}.${ext}`, data)
@@ -760,9 +783,10 @@ function browserKey(input: Electron.Input): string | null {
 
 /**
  * What a web page may do: stay on the web, and open new windows as new web tabs. `host` is the
- * app window it belongs to.
+ * app window it belongs to. With `appShortcuts: false` the app's shortcuts stay with the page (for a
+ * page in a window of its own, where Ctrl+W shouldn't close a tab in the notes window).
  */
-export function guardPage(page: WebContents, host: () => WebContents | null): void {
+export function guardPage(page: WebContents, host: () => WebContents | null, { appShortcuts: passShortcuts = true } = {}): void {
   const openInTab = (url: string, privately = false): void => {
     if (isWebUrl(url)) host()?.send('web:open', url, privately || kindOf(page) === 'private')
   }
@@ -781,6 +805,14 @@ export function guardPage(page: WebContents, host: () => WebContents | null): vo
           height: 720,
           autoHideMenuBar: true,
           webPreferences: { partition: partition(), sandbox: true, contextIsolation: true, nodeIntegration: false }
+        },
+        // The pop-up is made here so it has the right browser name before its first page loads: a
+        // Google sign-in pop-up that opened as "Chrome" and then became "Firefox" sends you back to
+        // "Choose an account" each time you pick one.
+        createWindow: (options) => {
+          const popup = new BrowserWindow(options)
+          if (firefoxFor(url)) popup.webContents.setUserAgent(SIGN_IN_AGENT)
+          return popup.webContents
         }
       }
     }
@@ -792,7 +824,7 @@ export function guardPage(page: WebContents, host: () => WebContents | null): vo
 
   // Google's sign-in pages see "Firefox" from the page's side too (the request side is in setupWebSession).
   const browserName = (url: string): void => {
-    const agent = isGoogleSignIn(url) ? SIGN_IN_AGENT : page.session.getUserAgent()
+    const agent = firefoxFor(url) ? SIGN_IN_AGENT : page.session.getUserAgent()
     if (page.getUserAgent() !== agent) page.setUserAgent(agent)
   }
   page.on('did-start-navigation', (details) => {
@@ -839,7 +871,7 @@ export function guardPage(page: WebContents, host: () => WebContents | null): vo
       }
       if (input.key === 'Escape') host()?.send('web:key', { wcId: page.id, key: 'escape' })
     }
-    if (!appShortcuts.size) return
+    if (!passShortcuts || !appShortcuts.size) return
     const pressed = shortcutFromEvent({
       key: input.key,
       code: input.code,
@@ -883,11 +915,15 @@ export function guardPage(page: WebContents, host: () => WebContents | null): vo
         { type: 'separator' }
       )
     }
+    // Pictures, including Google Images' thumbnails, which are often inline "data:" pictures.
     if (params.mediaType === 'image' && (isWebUrl(params.srcURL) || /^data:image\//i.test(params.srcURL))) {
       items.push(
+        ...(isWebUrl(params.srcURL) ? [{ label: 'Open image in new tab', click: () => openInTab(params.srcURL) }] : []),
+        // Goes through Orbit's downloads, so you pick the folder inside Orbit.
+        ...(web ? [{ label: 'Save image as…', click: () => page.downloadURL(params.srcURL) }] : []),
         ...(web ? [{ label: 'Save image to attachments', click: () => void saveImage(page, params.srcURL) }] : []),
         { label: 'Copy image', click: () => page.copyImageAt(params.x, params.y) },
-        ...(isWebUrl(params.srcURL) ? [{ label: 'Open image in new tab', click: () => openInTab(params.srcURL) }, { label: 'Copy image address', click: () => clipboard.writeText(params.srcURL) }] : []),
+        ...(isWebUrl(params.srcURL) ? [{ label: 'Copy image address', click: () => clipboard.writeText(params.srcURL) }] : []),
         { type: 'separator' }
       )
     }

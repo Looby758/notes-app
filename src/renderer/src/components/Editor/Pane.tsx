@@ -27,6 +27,7 @@ import {
   CONVERT_TAB,
   SUDOKU_TAB,
   COMICS_TAB,
+  WIKI_TAB,
   MINESWEEPER_TAB,
   CLOCKS_TAB,
   COUNTDOWNS_TAB,
@@ -38,6 +39,7 @@ import {
   SOUNDBOARD_TAB,
   DISCORD_TAB,
   MESSAGES_TAB,
+  GROK_TAB,
   GAMES_TAB,
   VIDEO_TAB,
   isExplorerTab,
@@ -63,12 +65,14 @@ import TerminalPage from '../Terminal/TerminalPage'
 import PasswordsPage from '../Passwords/PasswordsPage'
 import EmailPage from '../Email/EmailPage'
 import MessagesPage from '../Messages/MessagesPage'
+import GrokPage from '../Grok/GrokPage'
 import HomePage from '../Home/HomePage'
 import MoneyPage from '../Money/MoneyPage'
 import ConvertPage from '../Convert/ConvertPage'
 import VideoDownloaderPage from '../Downloader/VideoDownloaderPage'
 import SudokuPage from '../Sudoku/SudokuPage'
 import ComicsPage from '../Comics/ComicsPage'
+import WikiPage from '../Wiki/WikiPage'
 import WorldClocksPage from '../Clocks/WorldClocksPage'
 import CountdownsPage from '../Countdowns/CountdownsPage'
 import ScreensPage from '../Screens/ScreensPage'
@@ -190,6 +194,8 @@ export default function Pane({ pane }: { pane: string }) {
         {tabs?.filter(isWebTab).map((t) => <WebPage key={t} tab={t} hidden={t !== active} autoFocus={isActivePane} />)}
         {/* So do WhatsApp and Discord, so their unread counts keep coming in. */}
         {tabs?.includes(MESSAGES_TAB) && <MessagesPage hidden={active !== MESSAGES_TAB} autoFocus={isActivePane} />}
+        {/* And Grok, so a chat isn't lost by looking at a note. */}
+        {tabs?.includes(GROK_TAB) && <GrokPage hidden={active !== GROK_TAB} autoFocus={isActivePane} />}
         {active === SETTINGS_TAB && <SettingsPage />}
         {active === CALENDAR_TAB && <CalendarPage />}
         {active === GRAPH_TAB && <GraphPage />}
@@ -206,6 +212,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === CONVERT_TAB && <ConvertPage />}
         {active === SUDOKU_TAB && <SudokuPage />}
         {active === COMICS_TAB && <ComicsPage />}
+        {active === WIKI_TAB && <WikiPage />}
         {active === MINESWEEPER_TAB && <MinesweeperPage />}
         {active === CLOCKS_TAB && <WorldClocksPage />}
         {active === COUNTDOWNS_TAB && <CountdownsPage />}

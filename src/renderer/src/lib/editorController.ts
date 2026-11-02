@@ -70,6 +70,8 @@ export const MONEY_TAB = 'money:'
 export const CONVERT_TAB = 'convert:'
 export const SUDOKU_TAB = 'sudoku:'
 export const COMICS_TAB = 'comics:'
+/** Downloaded wikis, read offline (components/Wiki). */
+export const WIKI_TAB = 'wiki:'
 export const MINESWEEPER_TAB = 'minesweeper:'
 /** Clocks for places around the world (components/Clocks). */
 export const CLOCKS_TAB = 'clocks:'
@@ -91,6 +93,8 @@ export const SOUNDBOARD_TAB = 'soundboard:'
 export const DISCORD_TAB = 'discord-voice:'
 /** WhatsApp and Discord in one tab (components/Messages). */
 export const MESSAGES_TAB = 'messages:'
+/** Grok, xAI's chat bot (components/Grok); it can float over your notes instead (store/grok). */
+export const GROK_TAB = 'grok:'
 export const GAMES_TAB = 'games:'
 /** The video player (components/Video); which video it shows is in store/videoPlayer. */
 export const VIDEO_TAB = 'video:'

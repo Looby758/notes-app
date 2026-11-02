@@ -52,7 +52,7 @@
 }
 /* Every page a tab can show (Calendar, Email, Settings…), and the note editor when you switch note.
    Web pages and Messages hold live web views, so they just appear. */
-.pane-body > :not(.editor-host, .web-page, .messages-page, .drop-zone, .conflict-banner),
+.pane-body > :not(.editor-host, .web-page, .messages-page, .grok-page, .drop-zone, .conflict-banner),
 .editor-host.page-enter {
   animation: m-page-in calc(260ms * var(--m-time)) var(--m-ease-out) backwards;
 }

@@ -24,6 +24,7 @@ import {
   KeyRound,
   Layers,
   LibraryBig,
+  Library,
   Mail,
   MessageSquare,
   MessagesSquare,
@@ -48,8 +49,11 @@ import {
   CloudDownload,
   History,
   Scissors,
+  Bot,
   type LucideIcon
 } from 'lucide-react'
+import { openGrokTab } from '../components/Grok/GrokPage'
+import { useGrok } from '../store/grok'
 import { useVault } from '../store/vault'
 import { setPrefs, usePrefs } from '../store/prefs'
 import { showSearch, toggleZen, useUI } from '../store/ui'
@@ -65,6 +69,7 @@ import {
   CALENDAR_TAB,
   CHAT_TAB,
   COMICS_TAB,
+  WIKI_TAB,
   CONVERT_TAB,
   STUDIO_TAB,
   CLIPS_TAB,
@@ -192,11 +197,13 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   webcam: { icon: Webcam, run: () => sendToPhone({ kind: 'webcam' }), useActive: () => usePhone((s) => !!s.cam?.on) },
   web: { icon: Globe, run: () => openWebTab('', { beside: true }) },
   chat: { icon: MessageSquare, run: () => openSpecialTab(CHAT_TAB) },
+  grok: { icon: Bot, run: openGrokTab, useActive: () => useGrok((s) => s.floating) },
   ask: { icon: Sparkles, run: () => openAsk() },
   music: { icon: Music, run: toggleMusic, useActive: () => useMusic((s) => s.open) },
   songid: { icon: Ear, run: showAndFindSong, useActive: () => useSongId((s) => s.phase === 'listening' || s.phase === 'thinking') },
   video: { icon: Film, run: () => openSpecialTab(VIDEO_TAB) },
   comics: { icon: LibraryBig, run: () => openSpecialTab(COMICS_TAB) },
+  wiki: { icon: Library, run: () => openSpecialTab(WIKI_TAB) },
   youtube: { icon: MonitorPlay, run: () => void window.api.openYouTube() },
   games: { icon: Gamepad2, run: () => openSpecialTab(GAMES_TAB) },
   sudoku: { icon: Grid3x3, run: () => openSpecialTab(SUDOKU_TAB) },

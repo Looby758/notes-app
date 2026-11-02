@@ -2,6 +2,7 @@ import './web.css'
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import type { WebviewTag } from 'electron'
 import {
+  AppWindow,
   ArrowDown,
   ArrowLeft,
   ArrowRight,
@@ -357,13 +358,16 @@ export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidde
   // The video on the page (any website, not just YouTube) carries on in the mini window from where
   // it's got to, and stops here.
   const videoId = youTubeVideoId(url)
-  const popOut = async (): Promise<void> => {
-    let found: { seconds?: number; url?: string } | null = null
+  const findVideo = async (): Promise<{ seconds?: number; url?: string } | null> => {
     try {
-      found = (await ready()?.executeJavaScript(FIND_VIDEO)) ?? null
+      return (await ready()?.executeJavaScript(FIND_VIDEO)) ?? null
     } catch {
       // The page isn't ready: a YouTube video starts from the beginning.
+      return null
     }
+  }
+  const popOut = async (): Promise<void> => {
+    const found = await findVideo()
     const seconds = Number(found?.seconds) || 0
     if (videoId) void window.api.openYouTube(youTubeWatchUrl(videoId, seconds))
     else if (found?.url) void window.api.openYouTube(found.url)
@@ -492,6 +496,15 @@ export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidde
     setBarMenu({ x: e.clientX, y: e.clientY, items })
   }
 
+  // The whole page in an ordinary window of its own, which can go full screen on another screen
+  // while you use Orbit. Its video stops here and carries on there from where it had got to.
+  const popOutWindow = async (): Promise<void> => {
+    const found = await findVideo()
+    const seconds = Number(found?.seconds) || 0
+    const next = videoId ? youTubeWatchUrl(videoId, seconds) : url
+    await window.api.popOutWebPage(next, videoId ? 0 : seconds).catch(notify)
+  }
+
   return (
     <div className={`web-page ${hidden ? 'hidden' : ''} ${isPrivate ? 'private' : ''}`} data-web-tab={tab} onKeyDown={onKeyDown}>
       <form className="web-bar" onSubmit={go}>
@@ -601,6 +614,17 @@ export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidde
         {/^https?:/i.test(url) && (
           <button type="button" className="icon-btn" title="Pop the video out into the mini window (floats over everything)" onClick={() => void popOut()}>
             <MonitorPlay size={14} />
+          </button>
+        )}
+        {/^https?:/i.test(url) && !isPrivate && (
+          <button
+            type="button"
+            className="icon-btn"
+            title="Pop out into its own window (put it on another screen and make it full screen while you use Orbit)"
+            onClick={() => void popOutWindow()}
+            data-web-pop-out-window
+          >
+            <AppWindow size={14} />
           </button>
         )}
         <button type="button" className="icon-btn" title="Send to phone (scan a QR code)" disabled={!url} onClick={() => sendToPhone({ kind: 'link', url, title: pageTitle })}>
