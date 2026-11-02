@@ -57,13 +57,52 @@ export function plainUserAgent(agent: string): string {
  * Google turns away sign-ins from browsers built into other apps ("This browser or app may not be
  * secure" / "unsupported browser"), judging by the browser's name. Its sign-in pages are told the
  * browser is Firefox, which Google accepts.
+ *
+ * That's every page the sign-in passes through, not just accounts.google.com: once you pick an
+ * account, Google sets the sign-in on its other addresses too (accounts.youtube.com,
+ * google.com/accounts/…, accounts.google.co.uk…). If any of them hears a different browser, Google
+ * drops the sign-in and shows "Choose an account" again.
  */
 export function isGoogleSignIn(url: string): boolean {
   try {
-    return new URL(url).hostname === 'accounts.google.com'
+    const { protocol, hostname, pathname } = new URL(url)
+    if (protocol !== 'https:') return false
+    if (/^accounts\.google\.(com|co\.[a-z]{2}|com\.[a-z]{2}|[a-z]{2})$/.test(hostname)) return true
+    if (hostname === 'accounts.youtube.com') return true
+    return /^(www\.)?google\.(com|co\.[a-z]{2}|com\.[a-z]{2}|[a-z]{2})$/.test(hostname) && pathname.startsWith('/accounts/')
   } catch {
     return false
   }
+}
+
+/**
+ * Runs in each web page before the site's own code (src/preload/web.ts). On a Google sign-in page
+ * the page itself sees the same Firefox as the request said (`agent`), however the page was opened:
+ * a sign-in pop-up's first page, or Google's sign-in button inside another site. Chrome-only details
+ * that would contradict it are hidden. Every other page is left alone.
+ */
+export function firefoxOnGoogleSignIn(agent: string): void {
+  // Self-contained: it's copied into the page, so it can't use anything from this file.
+  const google = (): boolean => {
+    const { protocol, hostname, pathname } = location
+    if (protocol !== 'https:') return false
+    const tld = '(com|co\\.[a-z]{2}|com\\.[a-z]{2}|[a-z]{2})'
+    if (new RegExp(`^accounts\\.google\\.${tld}$`).test(hostname) || hostname === 'accounts.youtube.com') return true
+    return new RegExp(`^(www\\.)?google\\.${tld}$`).test(hostname) && pathname.startsWith('/accounts/')
+  }
+  if (!google()) return
+  const define = (name: string, value: unknown): void => {
+    try {
+      Object.defineProperty(Navigator.prototype, name, { get: () => value, configurable: true })
+    } catch {
+      // Already locked down: leave it.
+    }
+  }
+  define('userAgent', agent)
+  define('appVersion', agent.replace(/^Mozilla\//, ''))
+  define('vendor', '')
+  // Firefox has no userAgentData (Chrome's "which browser am I" details).
+  define('userAgentData', undefined)
 }
 
 /** Firefox's browser name on this kind of computer. */

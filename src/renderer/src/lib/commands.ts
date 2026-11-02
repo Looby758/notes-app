@@ -69,6 +69,7 @@ import { showAndFindSong } from '../store/songId'
 import { sendToPhone } from '../store/phone'
 import { toggleDiscord } from '../store/discord'
 import { openRadial } from '../components/Nav/RadialMenu'
+import { openGrokTab, toggleGrokFloat } from '../components/Grok/GrokPage'
 import { startSnip } from './snip'
 import { changeNotesPassword, lockAllNow, lockFolder, lockNote, lockNoteOwn, removeLock } from './lock/actions'
 
@@ -233,6 +234,8 @@ export const commands: Command[] = [
       openSpecialTab(MESSAGES_TAB)
     }
   },
+  { id: 'grok.open', group: 'Navigation', title: 'Open Grok in a tab', run: () => openGrokTab() },
+  { id: 'grok.float', group: 'Navigation', title: 'Grok: float over your notes (pop out inside Orbit), or put it away', run: () => toggleGrokFloat() },
   { id: 'email.open', group: 'Navigation', title: 'Open email', shortcut: 'Ctrl+Shift+A', run: () => openSpecialTab(EMAIL_TAB) },
   { id: 'calendar.panel', group: 'Calendar', title: 'Show calendar in the side panel', run: () => showRightView('calendar') },
   { id: 'phone.pair', group: 'Phone', title: 'Phone: connect your phone (send, clipboard, remote, touchpad, talk, scan)', run: () => sendToPhone({ kind: 'pair' }) },
