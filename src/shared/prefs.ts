@@ -49,6 +49,12 @@ export interface Prefs {
   /** A little animated pet in the bottom corner that cheers when you finish things and naps when you're away. */
   pet: boolean
 
+  /**
+   * Google's sign-in pages (in web tabs, Messages and Grok) are told the browser is Firefox, which
+   * gets past Google's "This browser or app may not be secure". Off: they see plain Chromium.
+   */
+  googleSignInAsFirefox: boolean
+
   // Streamer mode
   /** Blur private things (your town, email, money, passwords, messages, events) until you click them, for sharing your screen. */
   streamerMode: boolean
@@ -237,6 +243,7 @@ export const DEFAULT_PREFS: Prefs = {
   screensaver: true,
   screensaverMinutes: 5,
   pet: true,
+  googleSignInAsFirefox: true,
 
   streamerMode: false,
   streamerHideNotes: true,

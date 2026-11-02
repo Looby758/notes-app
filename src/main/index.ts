@@ -1023,7 +1023,7 @@ app.whenReady().then(async () => {
       syncOrbitSoon()
     })
   )
-  safely('web browser', () => setupBrowser(() => currentPrefs().streamerMode))
+  safely('web browser', () => setupBrowser(() => currentPrefs().streamerMode, () => currentPrefs().googleSignInAsFirefox))
   safely('YouTube mini window', () => setupYouTube(currentPrefs))
   safely('Music mini player', () => setupMusicMini(currentPrefs, () => mainWindow))
   safely('pop-out window', () => setupPopout(currentPrefs))

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { displayUrl, firefoxOnGoogleSignIn, firefoxUserAgent, isGoogleSignIn, isWebUrl, plainUserAgent, toWebUrl } from './web'
+import { displayUrl, firefoxOnGoogleSignIn, firefoxUserAgent, isGoogleSignIn, traceUrl, isWebUrl, plainUserAgent, toWebUrl } from './web'
 
 describe('toWebUrl', () => {
   it('opens addresses', () => {
@@ -104,5 +104,17 @@ describe('firefoxOnGoogleSignIn', () => {
   it('leaves every other page alone', () => {
     expect(run('https://grok.com/').userAgent).toBe('Chrome')
     expect(run('https://www.google.com/search?q=x').userAgent).toBe('Chrome')
+  })
+})
+
+describe('traceUrl', () => {
+  it('keeps the site and page, never the codes after ? or #', () => {
+    expect(traceUrl('https://accounts.x.ai/callback?code=secret&state=abc#token=x')).toBe('accounts.x.ai/callback')
+    expect(traceUrl('https://accounts.google.com/v3/signin/accountchooser?continue=https://grok.com')).toBe('accounts.google.com/v3/signin/accountchooser')
+  })
+  it('cuts long paths short and copes with odd addresses', () => {
+    expect(traceUrl(`https://grok.com/${'a'.repeat(100)}`)).toHaveLength('grok.com/'.length + 60)
+    expect(traceUrl('about:blank')).toBe('about')
+    expect(traceUrl('nonsense')).toBe('(not an address)')
   })
 })

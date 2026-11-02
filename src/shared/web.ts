@@ -111,3 +111,18 @@ export function firefoxUserAgent(platform: string): string {
     platform === 'darwin' ? 'Macintosh; Intel Mac OS X 10.15' : platform === 'win32' ? 'Windows NT 10.0; Win64; x64' : 'X11; Linux x86_64'
   return `Mozilla/5.0 (${system}; rv:140.0) Gecko/20100101 Firefox/140.0`
 }
+
+/**
+ * An address as the sign-in log writes it: the site and the page, without the "?…" and "#…" parts,
+ * which is where sign-in codes and tokens travel. Long paths are cut short.
+ */
+export function traceUrl(url: string): string {
+  try {
+    const { protocol, host, pathname } = new URL(url)
+    if (protocol !== 'https:' && protocol !== 'http:') return protocol.replace(/:$/, '')
+    const path = pathname.length > 60 ? `${pathname.slice(0, 60)}…` : pathname
+    return `${host}${path}`
+  } catch {
+    return '(not an address)'
+  }
+}
