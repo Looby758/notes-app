@@ -12,6 +12,19 @@ export interface ReleaseNotes {
 /** Newest first. Add an entry with each release. */
 export const RELEASE_NOTES: readonly ReleaseNotes[] = [
   {
+    version: '1.11.0',
+    items: [
+      'Mini games tab: Nonograms and Jigsaw, with Sudoku and Minesweeper in the same place.',
+      'Wikis: download Fandom wikis to read offline, switch between Show and Comics, and ask the wiki brain.',
+      'Grok as a tab or a panel floating inside Orbit.',
+      'Pop a web tab out into its own window that can go full screen.',
+      'Discord voice pop-out: a call window for a second screen.',
+      'Mouse back and forward buttons work in web tabs and around the app.',
+      'Edit .txt, .json and other text files in Orbit.',
+      'Fixes for the Windows volume mixer and for Google sign-in looping back to “Choose an account”.'
+    ]
+  },
+  {
     version: '1.10.2',
     items: [
       'A “What’s new” pop-up like this one after each update, on every computer. Open it again any time from Settings → About.',
