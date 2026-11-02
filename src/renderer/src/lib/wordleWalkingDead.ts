@@ -1,11 +1,12 @@
 /**
- * Walking Dead mode for Wordle: answers from The Walking Dead and its spin-offs (Fear the Walking
- * Dead, World Beyond, Dead City, Daryl Dixon, The Ones Who Live, Telltale's game). Grouped by kind
- * so the game can say what the word was ("DARYL: a character") once a round is over.
+ * Walking Dead mode for Wordle: answers from the main TV show only (all 11 seasons). No comics-only
+ * characters, no spin-offs (Fear, World Beyond, Dead City, Daryl Dixon, The Ones Who Live), and no
+ * behind-the-scenes names: just people, places and things a viewer of the show would know.
+ * Grouped by kind so the game can say what the word was ("DARYL: a character") once a round is over.
  * Only 3 to 8 letters: there are too few two-letter ones to make a game of.
  */
 
-export type WalkingDeadKind = 'character' | 'place' | 'weapon' | 'dead' | 'survival' | 'episode' | 'show'
+export type WalkingDeadKind = 'character' | 'place' | 'weapon' | 'dead' | 'survival' | 'episode'
 
 export const WALKING_DEAD_KINDS: Record<WalkingDeadKind, string> = {
   character: 'a character',
@@ -13,37 +14,29 @@ export const WALKING_DEAD_KINDS: Record<WalkingDeadKind, string> = {
   weapon: 'a weapon or gear',
   dead: 'about the dead',
   survival: 'surviving the apocalypse',
-  episode: 'an episode title',
-  show: 'about the show'
+  episode: 'an episode title'
 }
 
 // A word listed under two kinds counts as the first one.
 const WORDS: Record<WalkingDeadKind, string> = {
+  // Season by season, roughly in the order they turn up.
   character: `
-    rick carl lori shane glenn maggie daryl merle carol sophia andrea amy dale jim jacqui morales
-    jenner ed hershel beth otis patricia jimmy tdog theodore douglas axel oscar tomas lizzie mika
-    judith michonne andre philip blake penny milton martinez caesar shumpert allen donna ben
-    governor tyreese sasha bob karen zach patrick eugene rosita abraham abe tara gareth mary dawn
-    noah aaron eric deanna reg monroe aiden nicholas pete jessie ron sam spencer olivia enid denise
-    heath tobin francine holly jesus paul rovia gregory negan lucille annie simon dwight sherry
-    regina gavin jared arat laura frankie tanya amber ezekiel shiva richard benjamin jerry diane kal
-    jadis anne cyndie natania siddiq alden alpha beta gamma lydia henry magna yumiko luke connie
-    kelly dante margo ozzy alek pamela lance hornsby mercer max maxine princess juanita elijah leah
-    gage earl tammy rose morgan duane jenny grimes greene rhee peletier dixon carson gorman owen
-    joe len
-    madison travis liza nick alicia chris ofelia daniel griselda strand victor celia salazar clark
-    manawa otto troy jake naomi john dorie althea june wendell charlie sarah luciana virginia dakota
-    teddy grace logan wes
-    iris hope elton silas felix huck jennifer percy leo kublek
-    perlie croat ginny tommaso isabelle laurent sylvie quinn genet codron losang
-    thorne okafor beale nat
-    lee kenny duck omid christa molly sarita violet louis marlon tenn javier
+    rick carl lori shane glenn morgan duane jenny merle andrea amy dale jim jacqui morales jenner ed
+    daryl carol sophia hershel maggie beth otis patricia jimmy tdog
+    michonne axel oscar tomas governor philip blake penny milton martinez tyreese sasha karen
+    lizzie mika judith patrick zach bob eugene rosita abraham tara joe len
+    gareth mary noah dawn gorman
+    aaron eric deanna reg aiden spencer jessie ron sam pete olivia enid denise nicholas owen heath
+    tobin jesus paul gregory negan lucille simon dwight sherry amber ezekiel shiva richard benjamin
+    jerry jadis anne cyndie natania arat laura
+    siddiq alden carson tanya frankie gavin jared regina
+    alpha beta lydia henry magna yumiko luke connie kelly gamma earl tammy gage ozzy alek kal dante
+    pamela lance hornsby mercer max maxine princess juanita elijah leah annie
+    grimes greene rhee peletier dixon
   `,
   place: `
     atlanta georgia virginia prison farm barn quarry camp terminus woodbury hilltop kingdom grady
-    hospital church cdc senoia highway bridge tower walls gate fence colony paris france spain
-    campus omaha nebraska ericson saviors whispers claimers wolves hunters militia crm
-    republic civic
+    hospital church cdc highway bridge tower walls gate fence saviors claimers wolves hunters
   `,
   weapon: `
     katana crossbow bolt bolts arrow arrows axe machete python colt revolver rifle shotgun pistol
@@ -56,8 +49,8 @@ const WORDS: Record<WalkingDeadKind, string> = {
     walker walkers biter biters roamer roamers lurker lurkers zombie zombies undead dead corpse
     herd horde hordes rotten decay decayed guts blood bloody brain brains skull bite bitten fever
     turn turned turning infected infested infect virus cure outbreak plague rot stench smell groan
-    moan growl headshot headless dying death die grave graves bones flesh hungry hunger
-    swarm winslow teeth jaw pit pikes heads border skeleton carcass maggot putrid shuffle
+    moan growl headshot headless dying death die grave graves bones flesh hungry hunger swarm
+    winslow teeth jaw pit pikes heads border skeleton carcass maggot putrid shuffle
   `,
   survival: `
     survive survivor survival scavenge supply supplies run food water shelter fire campfire tent
@@ -73,10 +66,9 @@ const WORDS: Record<WalkingDeadKind, string> = {
     guts vatos wildfire secrets nebraska seed sick hounded home prey after inmates claimed still
     alone grove slabtown consumed crossed coda them remember forget spend try conquer now east
     service swear mercy damned monsters honor worth wrath bridge obliged omega bounty scars storm
-    ghosts bonds squeeze stalker tower splinter diverged acheron hunted lockdown faith variant
-    family key
-  `,
-  show: `amc kirkman adlard gimple darabont image comic comics fear spinoff finale telltale deadcity`
+    ghosts bonds squeeze stalker tower splinter diverged acheron hunted lockdown warlords faith
+    variant family key
+  `
 }
 
 /** Every answer by length, and what kind of word each one is (the first kind it's listed under). */
