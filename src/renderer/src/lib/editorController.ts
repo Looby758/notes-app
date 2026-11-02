@@ -69,6 +69,8 @@ export const HOME_TAB = 'home:'
 export const MONEY_TAB = 'money:'
 export const CONVERT_TAB = 'convert:'
 export const COMICS_TAB = 'comics:'
+/** Downloaded wikis, read offline (components/Wiki). */
+export const WIKI_TAB = 'wiki:'
 /** Sudoku, Minesweeper, Nonograms and Jigsaw (components/MiniGames); which one is showing is in store/miniGames. */
 export const MINIGAMES_TAB = 'minigames:'
 /** Sudoku and Minesweeper had tabs of their own before Mini games; a saved tab of theirs opens Mini games. */

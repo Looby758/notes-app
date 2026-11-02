@@ -151,6 +151,7 @@ const api: NotesApi = {
     return () => ipcRenderer.removeListener('web:mouseNav', handler)
   },
   openYouTube: (url, seconds) => ipcRenderer.invoke('youtube:open', url, seconds),
+  popOutWebPage: (url, seconds) => ipcRenderer.invoke('webWindow:open', url, seconds),
   youTubeState: () => ipcRenderer.invoke('youtube:state'),
   rememberYouTube: (url) => ipcRenderer.invoke('youtube:remember', url),
   pinYouTube: (on) => ipcRenderer.invoke('youtube:pin', on),
@@ -221,6 +222,23 @@ const api: NotesApi = {
     const handler = (_e: unknown, p: Parameters<typeof callback>[0]): void => callback(p)
     ipcRenderer.on('comics:preparing', handler)
     return () => ipcRenderer.removeListener('comics:preparing', handler)
+  },
+  wikiList: () => ipcRenderer.invoke('wiki:list'),
+  wikiCheck: (address) => ipcRenderer.invoke('wiki:check', address),
+  wikiAdd: (address, pictures) => ipcRenderer.invoke('wiki:add', address, pictures),
+  wikiPause: (id) => ipcRenderer.invoke('wiki:pause', id),
+  wikiResume: (id) => ipcRenderer.invoke('wiki:resume', id),
+  wikiRemove: (id) => ipcRenderer.invoke('wiki:remove', id),
+  wikiTitles: (id) => ipcRenderer.invoke('wiki:titles', id),
+  wikiPage: (id, title, showUnplaced) => ipcRenderer.invoke('wiki:page', id, title, showUnplaced),
+  wikiSpoilers: (id) => ipcRenderer.invoke('wiki:spoilers', id),
+  wikiSetSpoilers: (id, patch) => ipcRenderer.invoke('wiki:setSpoilers', id, patch),
+  wikiSearch: (id, query) => ipcRenderer.invoke('wiki:search', id, query),
+  wikiAsk: (question, ids) => ipcRenderer.invoke('wiki:ask', question, ids),
+  onWikiChanged: (callback) => {
+    const handler = (_e: unknown, wikis: Parameters<typeof callback>[0]): void => callback(wikis)
+    ipcRenderer.on('wiki:changed', handler)
+    return () => ipcRenderer.removeListener('wiki:changed', handler)
   },
   pathForFile: (file) => {
     try {

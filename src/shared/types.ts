@@ -1,6 +1,8 @@
 import type { ExplorerEntry, ExplorerPlace, PasteMode } from './explorer'
 import type { ArchiveEntry } from './archive'
 import type { ComicOpened, ComicPreparing, ComicSettings, ComicShelf } from './comics'
+import type { WikiAnswer, WikiCheck, WikiHit, WikiInfo, WikiPageView, WikiPictureChoice, WikiSpoilerView } from './wiki'
+import type { WikiSpoilerSettings } from './wikiSpoilers'
 import type { Prefs } from './prefs'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
@@ -52,6 +54,8 @@ export interface Settings {
   discordPopoutWindow?: SavedPlace
   /** The video player's own window ("Pop out"): where it was left. */
   videoWindow?: WindowBounds
+  /** A web tab's page in its own window ("Pop out into its own window"): where it was left. */
+  webWindow?: WindowBounds
   /** The paired phone's link (its token, and the port it was on), so the phone reconnects by itself. */
   phoneToken?: string
   phonePort?: number
@@ -639,6 +643,11 @@ export interface NotesApi {
   closeYouTube(): Promise<void>
   /** In the mini window: play this page (opened from the notes window). */
   onYouTubeLoad(callback: (url: string, seconds: number) => void): () => void
+  /**
+   * Opens a web page in a window of its own, which can go full screen on another screen while Orbit
+   * carries on; its video starts `seconds` in.
+   */
+  popOutWebPage(url: string, seconds?: number): Promise<void>
 
   // Updates
   updateStatus(): Promise<UpdateStatus>
@@ -1195,6 +1204,27 @@ export interface NotesApi {
   comicsReadText(png: Uint8Array): Promise<string>
   onComicsChanged(callback: () => void): () => void
   onComicsPreparing(callback: (p: ComicPreparing) => void): () => void
+  // Wikis (downloaded Fandom wikis, read offline)
+  wikiList(): Promise<WikiInfo[]>
+  /** Looks a wiki up before downloading it: its name, size and licence. */
+  wikiCheck(address: string): Promise<WikiCheck>
+  /** Starts downloading a wiki (or carries on with one already there). */
+  wikiAdd(address: string, pictures: WikiPictureChoice): Promise<WikiInfo>
+  wikiPause(id: string): Promise<WikiInfo>
+  wikiResume(id: string): Promise<WikiInfo>
+  /** Deletes a downloaded wiki from this computer. */
+  wikiRemove(id: string): Promise<WikiInfo[]>
+  /** Titles of the downloaded pages. */
+  wikiTitles(id: string): Promise<string[]>
+  /** A downloaded page (null when it isn't downloaded), with anything past where you are taken out. */
+  wikiPage(id: string, title: string, showUnplaced?: boolean): Promise<WikiPageView | null>
+  /** The spoiler limit, the Show / Comics switch and how far you are, with the shows and comics found in the wiki. */
+  wikiSpoilers(id: string): Promise<WikiSpoilerView>
+  wikiSetSpoilers(id: string, patch: Partial<WikiSpoilerSettings>): Promise<WikiInfo>
+  wikiSearch(id: string, query: string): Promise<WikiHit[]>
+  /** The wiki brain: the offline AI answers from these wikis only (all of them when empty). */
+  wikiAsk(question: string, ids: string[]): Promise<WikiAnswer>
+  onWikiChanged(callback: (wikis: WikiInfo[]) => void): () => void
   /** Copies files/folders from the computer into a notes folder ('' is the top); ones already in the notes folder are moved. Returns their notes-folder paths. */
   explorerToVault(paths: string[], folder: string): Promise<string[]>
   /** Starts dragging files out as real files (into Discord, a browser, File Explorer / Finder, or back into Orbit). Call it from dragstart, after preventDefault. */

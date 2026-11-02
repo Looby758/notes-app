@@ -26,6 +26,7 @@ import {
   MONEY_TAB,
   CONVERT_TAB,
   COMICS_TAB,
+  WIKI_TAB,
   MINIGAMES_TAB,
   CLOCKS_TAB,
   COUNTDOWNS_TAB,
@@ -70,6 +71,7 @@ import ConvertPage from '../Convert/ConvertPage'
 import VideoDownloaderPage from '../Downloader/VideoDownloaderPage'
 import MiniGamesPage from '../MiniGames/MiniGamesPage'
 import ComicsPage from '../Comics/ComicsPage'
+import WikiPage from '../Wiki/WikiPage'
 import WorldClocksPage from '../Clocks/WorldClocksPage'
 import CountdownsPage from '../Countdowns/CountdownsPage'
 import ScreensPage from '../Screens/ScreensPage'
@@ -207,6 +209,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === MONEY_TAB && <MoneyPage />}
         {active === CONVERT_TAB && <ConvertPage />}
         {active === COMICS_TAB && <ComicsPage />}
+        {active === WIKI_TAB && <WikiPage />}
         {active === MINIGAMES_TAB && <MiniGamesPage />}
         {active === CLOCKS_TAB && <WorldClocksPage />}
         {active === COUNTDOWNS_TAB && <CountdownsPage />}
