@@ -65,8 +65,9 @@ export async function extractArchive(path: string, dest: string, opts: ExtractOp
   const zip = await ZipArchive.open(path)
   try {
     const files = zip.entries.filter((e) => !e.isDir && (!opts.only || opts.only(e.name)))
-    // A password, or a rarer way of squashing: 7-Zip does those.
-    if (files.some((e) => e.encrypted || !ZIP_METHODS_READ.has(zip.methodOf(e.name)))) return extractWithSevenZip(path, dest, zip.entries, opts)
+    // A password, or a rarer way of squashing: 7-Zip does those. (Awaited here so a failure is caught
+    // while the zip is still open, not left unhandled while "finally" closes it.)
+    if (files.some((e) => e.encrypted || !ZIP_METHODS_READ.has(zip.methodOf(e.name)))) return await extractWithSevenZip(path, dest, zip.entries, opts)
     const done: string[] = []
     for (const entry of files) {
       if (opts.cancelled?.()) break
