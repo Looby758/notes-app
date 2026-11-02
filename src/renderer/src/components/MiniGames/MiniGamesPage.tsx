@@ -1,17 +1,19 @@
 import type { ComponentType } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Bomb, ChevronLeft, Grid2x2Check, Grid3x3, Joystick, Puzzle } from 'lucide-react'
+import { Bomb, ChevronLeft, Grid2x2Check, Grid3x3, Joystick, Puzzle, SpellCheck2 } from 'lucide-react'
 import SudokuPage from '../Sudoku/SudokuPage'
 import MinesweeperPage from '../Minesweeper/MinesweeperPage'
 import NonogramPage from './NonogramPage'
 import JigsawPage from './JigsawPage'
+import WordlePage from './WordlePage'
 import { playMiniGame, useMiniGames, type MiniGameId } from '../../store/miniGames'
 
 export const MINI_GAMES: { id: MiniGameId; name: string; blurb: string; icon: LucideIcon }[] = [
   { id: 'sudoku', name: 'Sudoku', blurb: 'Fill the grid so every row, column and box has 1 to 9 once', icon: Grid3x3 },
   { id: 'minesweeper', name: 'Minesweeper', blurb: 'Open every square that isn’t a mine', icon: Bomb },
   { id: 'nonogram', name: 'Nonograms', blurb: 'Use the number clues to reveal a hidden picture', icon: Grid2x2Check },
-  { id: 'jigsaw', name: 'Jigsaw', blurb: 'Turn one of your photos into a jigsaw puzzle', icon: Puzzle }
+  { id: 'jigsaw', name: 'Jigsaw', blurb: 'Turn one of your photos into a jigsaw puzzle', icon: Puzzle },
+  { id: 'wordle', name: 'Wordle', blurb: 'Guess the hidden word, 2 to 8 letters, or play Walking Dead mode', icon: SpellCheck2 }
 ]
 
 export const miniGameName = (id: MiniGameId | null): string => MINI_GAMES.find((g) => g.id === id)?.name ?? 'Mini games'
@@ -20,7 +22,8 @@ const PAGES: Record<MiniGameId, ComponentType> = {
   sudoku: SudokuPage,
   minesweeper: MinesweeperPage,
   nonogram: NonogramPage,
-  jigsaw: JigsawPage
+  jigsaw: JigsawPage,
+  wordle: WordlePage
 }
 
 /** Mini games: pick a game for a quick break, and get back to the list from inside it. */
