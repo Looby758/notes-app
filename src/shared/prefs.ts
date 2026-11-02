@@ -86,6 +86,22 @@ export interface Prefs {
   openInNewTab: boolean
   /** Web links in notes open in a web tab beside the note, instead of your usual browser. */
   openLinksInApp: boolean
+
+  // Web browser
+  /** Web tabs that were open come back, on the same pages, when Orbit starts. */
+  webRestoreTabs: boolean
+  /** Each download asks which folder it goes in (inside Orbit); off: straight to the downloads folder. */
+  webAskDownloadFolder: boolean
+  /** Offer to save logins in Passwords when you sign in to a site, and to fill them in next time. */
+  webOfferPasswords: boolean
+  /** Offer to fill in your name, email and address on forms (a pop-up; never by itself). */
+  webAutofill: boolean
+  /** The bookmarks bar under the address bar. */
+  webBookmarksBar: boolean
+  /** Offer to translate pages in another language. */
+  webOfferTranslate: boolean
+  /** The folder "Save to Inbox" puts clipped pages in. */
+  webClipFolder: string
   /** Notes starts on the Home page (today, reminders, recent notes). */
   homeOnStart: boolean
   /** The Home page's boxes in the order you dragged them into (ids; boxes not listed keep their usual place). */
@@ -261,6 +277,13 @@ export const DEFAULT_PREFS: Prefs = {
   showWordCount: true,
   openInNewTab: false,
   openLinksInApp: true,
+  webRestoreTabs: true,
+  webAskDownloadFolder: true,
+  webOfferPasswords: true,
+  webAutofill: true,
+  webBookmarksBar: true,
+  webOfferTranslate: true,
+  webClipFolder: 'Inbox',
   homeOnStart: true,
   homeOrder: [],
   homeHidden: [],
@@ -442,6 +465,7 @@ export function normalizePrefs(raw: unknown): Prefs {
   out.tabSize = Math.round(out.tabSize)
   for (const k of ['focusMinutes', 'breakMinutes', 'longBreakMinutes', 'focusRounds', 'autoLockMinutes', 'replaySeconds'] as const) out[k] = Math.round(out[k])
   out.attachmentFolder = cleanFolder(input.attachmentFolder ?? DEFAULT_PREFS.attachmentFolder, DEFAULT_PREFS.attachmentFolder)
+  out.webClipFolder = cleanFolder(input.webClipFolder ?? DEFAULT_PREFS.webClipFolder, DEFAULT_PREFS.webClipFolder)
   out.templatesFolder = cleanFolder(input.templatesFolder ?? DEFAULT_PREFS.templatesFolder, DEFAULT_PREFS.templatesFolder)
   out.dailyFolder = cleanFolder(input.dailyFolder ?? DEFAULT_PREFS.dailyFolder, DEFAULT_PREFS.dailyFolder)
   out.dailyTemplate = cleanFolder(input.dailyTemplate ?? '', '')

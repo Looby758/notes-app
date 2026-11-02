@@ -77,6 +77,8 @@ import { setupWebTitle } from './webTitle'
 import { setupPlaces } from './places'
 import { setupWeather } from './weather'
 import { releaseMessages, saveMessages, setupBrowser } from './browser'
+import { openInOtherBrowser, openLinksFromArgv, setupDefaultBrowser } from './defaultBrowser'
+import { setupOperaImport } from './operaImport'
 import { closeYouTube, setupYouTube } from './youtube'
 import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
@@ -116,10 +118,16 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', (_e, argv) => {
     showMain()
     pathsFromArgv(argv).forEach(openInOrbit)
+    // A link clicked in another app while Orbit is the default browser.
+    openLinksFromArgv(argv)
   })
   // …or this copy was started by it.
   pathsFromArgv(process.argv).forEach(openInOrbit)
+  openLinksFromArgv(process.argv)
 }
+
+// Orbit as the default browser: links from other apps open in a web tab (see defaultBrowser.ts).
+setupDefaultBrowser(() => mainWindow, showMain)
 
 // Mac: a file opened with Orbit from Finder (Open With → Orbit). Can come before start-up finishes.
 app.on('open-file', (e, path) => {
@@ -598,8 +606,9 @@ function createWindow(): BrowserWindow {
   }
 
   // Links to the web open in the default browser, never inside the app.
+  // (When Orbit is the default browser itself, that's your other browser: see openInOtherBrowser.)
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^(https?|mailto):/i.test(url)) shell.openExternal(url)
+    if (/^(https?|mailto):/i.test(url)) void openInOtherBrowser(url)
     return { action: 'deny' }
   })
   // A file let go where nothing takes it (like one dragged out of the Files tab and dropped on the
@@ -1023,7 +1032,15 @@ app.whenReady().then(async () => {
       syncOrbitSoon()
     })
   )
-  safely('web browser', () => setupBrowser(() => currentPrefs().streamerMode))
+  safely('web browser', () =>
+    setupBrowser({
+      quiet: () => currentPrefs().streamerMode,
+      prefs: currentPrefs,
+      saveImage: (name, data) => currentVault().saveAttachment(currentPrefs().attachmentFolder, name, data),
+      showMain
+    })
+  )
+  safely('Opera GX import', setupOperaImport)
   safely('YouTube mini window', () => setupYouTube(currentPrefs))
   safely('Music mini player', () => setupMusicMini(currentPrefs, () => mainWindow))
   safely('pop-out window', () => setupPopout(currentPrefs))

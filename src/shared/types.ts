@@ -2,6 +2,7 @@ import type { ExplorerEntry, ExplorerPlace, PasteMode } from './explorer'
 import type { ArchiveEntry } from './archive'
 import type { ComicOpened, ComicPreparing, ComicSettings, ComicShelf } from './comics'
 import type { Prefs } from './prefs'
+import type { AutofillProfile, Bookmark, HistoryHit, ImportedLogin, SitePermission, SiteSettings, WebDownload } from './browser'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
 import type { Place } from './places'
@@ -614,10 +615,67 @@ export interface NotesApi {
   releaseMessages(): Promise<void>
   /** The app's shortcuts, so they still work while a web page has focus. */
   setWebShortcuts(shortcuts: string[]): void
-  /** A web page opened a link in a new window: open it in a new web tab. */
-  onWebOpen(callback: (url: string) => void): () => void
+  /** A web page opened a link in a new window (or another app sent one): open it in a new web tab (private: from a private tab). */
+  onWebOpen(callback: (url: string, privately?: boolean) => void): () => void
   /** One of the app's shortcuts was pressed while a web page had focus. */
   onWebShortcut(callback: (shortcut: string) => void): () => void
+  /** Links other apps sent before the window was ready (Orbit as the default browser). */
+  webTakePending(): Promise<string[]>
+  /** Opens a link in your other browser (Edge or Safari when Orbit is the default browser itself). */
+  webOpenOutside(url: string): Promise<void>
+  webDefaultBrowser(): Promise<DefaultBrowserState>
+  /** Registers Orbit as a browser and opens the system's page to choose it (Windows), or asks macOS. */
+  webMakeDefault(): Promise<DefaultBrowserState>
+  /** A browser key (find, bookmark, zoom…) pressed in a web page, for the tab it's in. */
+  onWebKey(callback: (e: { wcId: number; key: string }) => void): () => void
+  webBookmarks(): Promise<Bookmark[]>
+  /** Saves the whole bookmarks list (worked out with @shared/browser). */
+  webSetBookmarks(list: Bookmark[]): Promise<Bookmark[]>
+  onWebBookmarks(callback: (list: Bookmark[]) => void): () => void
+  webHistory(query: string, limit?: number): Promise<HistoryHit[]>
+  webHistoryRemove(url: string): Promise<void>
+  webHistoryClear(): Promise<void>
+  webSuggest(typed: string): Promise<{ url: string; title: string; kind: 'bookmark' | 'history' }[]>
+  webSites(): Promise<Record<string, SiteSettings>>
+  webSiteSet(site: string, patch: Partial<SiteSettings>): Promise<Record<string, SiteSettings>>
+  webSiteForget(site: string): Promise<Record<string, SiteSettings>>
+  onWebSites(callback: (sites: Record<string, SiteSettings>) => void): () => void
+  /** Signs you out of one site and forgets what it stored (cookies, storage). */
+  webClearSite(site: string): Promise<void>
+  webDownloads(): Promise<WebDownload[]>
+  onWebDownloads(callback: (list: WebDownload[]) => void): () => void
+  onWebDownloadStarted(callback: (e: { id: string; wcId: number | null }) => void): () => void
+  /** Where a download goes (`remember`: and the next ones too). */
+  webDownloadTo(id: string, folder: string, remember: boolean): Promise<void>
+  webDownloadCancel(id: string): Promise<void>
+  webDownloadPause(id: string, paused: boolean): Promise<void>
+  /** Takes a download off the list (the file stays). */
+  webDownloadForget(id: string): Promise<void>
+  webDownloadsClear(): Promise<void>
+  webDownloadFolder(): Promise<{ folder: string; chosen: boolean }>
+  /** '' for the computer's Downloads folder. */
+  webSetDownloadFolder(folder: string): Promise<void>
+  webAutofill(): Promise<AutofillProfile>
+  onWebAutofill(callback: (profile: AutofillProfile) => void): () => void
+  /** `saved`: false when this computer can't encrypt them, so they're only kept until Orbit closes. */
+  webSetAutofill(profile: AutofillProfile): Promise<{ profile: AutofillProfile; saved: boolean }>
+  /** Zooms a web tab's page in (1), out (-1) or back to 100% (0); its site remembers it. */
+  webZoom(wcId: number, by: number): Promise<void>
+  onWebZoomed(callback: (e: { wcId: number; zoom: number }) => void): () => void
+  webMuteTab(wcId: number, muted: boolean): Promise<void>
+  onWebAudio(callback: (e: { wcId: number; audible: boolean; muted: boolean; site: string }) => void): () => void
+  onWebPermissionAsk(callback: (e: { id: string; wcId: number; site: string; permissions: SitePermission[] }) => void): () => void
+  webPermissionAnswer(id: string, allow: boolean): Promise<void>
+  /** A notification from a site was clicked: show its tab. */
+  onWebFocus(callback: (wcId: number) => void): () => void
+  /** A picture from a page was saved into the attachments (its path), or couldn't be (null and why). */
+  onWebImageSaved(callback: (path: string | null, error?: string) => void): () => void
+  /** Whether Opera GX's profile is on this computer. */
+  webOperaFound(): Promise<boolean>
+  /** Brings in Opera GX's bookmarks and history; returns its saved logins for Passwords. */
+  webImportOpera(): Promise<OperaImportResult>
+  /** Logins from a passwords CSV (asks which file); null if you didn't pick one. */
+  webImportCsv(): Promise<ImportedLogin[] | null>
 
   // The YouTube mini window
   /**
@@ -1267,6 +1325,24 @@ export type GoogleSheetResult =
       fix?: 'setup' | 'connect' | 'enable-api' | 'retry'
     }
 /** The kinds of file Notes can save (exports and converted files). */
+/** Whether Orbit is (or can be) the default browser. */
+export interface DefaultBrowserState {
+  supported: boolean
+  isDefault: boolean
+}
+
+/** What the Opera GX import brought in. */
+export interface OperaImportResult {
+  /** Where Opera GX's profile was found ('' if it wasn't). */
+  profile: string
+  bookmarks: number
+  history: number
+  logins: ImportedLogin[]
+  /** Saved logins whose passwords couldn't be read. */
+  lockedLogins: number
+  problems: string[]
+}
+
 export type SaveFormat = 'pdf' | 'docx' | 'html' | 'md' | 'txt' | 'jpg' | 'png' | 'webp' | 'mp3' | 'wav' | 'mp4' | 'mov' | 'webm' | 'gif'
 
 /** A converted video waiting in a temporary file (videos are too big to pass around in memory). */

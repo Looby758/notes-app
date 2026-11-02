@@ -31,7 +31,9 @@ export const useWeb = create<WebState>(() => ({ pages: load() }))
 
 useWeb.subscribe((s) => {
   try {
-    localStorage.setItem(KEY, JSON.stringify(s.pages))
+    // A private tab's pages are never written down.
+    const kept = Object.fromEntries(Object.entries(s.pages).filter(([id]) => !id.startsWith('web:private-')))
+    localStorage.setItem(KEY, JSON.stringify(kept))
   } catch {
     // not fatal: web tabs just open empty next time
   }

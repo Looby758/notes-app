@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AppWindow, Bell, RefreshCw, SlidersVertical, Speaker, Volume1, Volume2, VolumeX } from 'lucide-react'
+import { AppWindow, Bell, Globe, RefreshCw, SlidersVertical, Speaker, Volume1, Volume2, VolumeX } from 'lucide-react'
 import { notify } from '../../store/notify'
 import { addHomeCard } from '../../lib/home'
 import { MIXER_TAB, openSpecialTab } from '../../lib/editorController'
@@ -36,7 +36,7 @@ function useMixer(every = EVERY): [MixerState | null, () => Promise<void>] {
 
 function AppIcon({ app }: { app: MixerApp }) {
   if (app.icon) return <img className="mixer-icon" src={app.icon} alt="" />
-  const Icon = app.kind === 'master' ? Speaker : app.kind === 'system' ? Bell : AppWindow
+  const Icon = app.kind === 'master' ? Speaker : app.kind === 'system' ? Bell : app.kind === 'site' ? Globe : AppWindow
   return (
     <span className="mixer-icon">
       <Icon size={16} />

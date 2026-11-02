@@ -20,7 +20,7 @@ const inCode = (view: EditorView, pos: number): boolean => {
 }
 
 /** Swaps a pasted address for [title](address) once the title arrives (if it's still there). */
-async function addTitle(view: EditorView, from: number, url: string): Promise<void> {
+export async function addTitle(view: EditorView, from: number, url: string): Promise<void> {
   const title = await window.api.webTitle(url).catch(() => null)
   if (!title || !view.dom.isConnected) return
   const doc = view.state.doc.toString()
