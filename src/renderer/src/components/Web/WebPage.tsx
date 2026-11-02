@@ -1,5 +1,5 @@
 import './web.css'
-import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { WebviewTag } from 'electron'
 import {
   AppWindow,
@@ -8,14 +8,12 @@ import {
   ArrowRight,
   ArrowUp,
   Bookmark as BookmarkIcon,
-  ChevronDown,
   Clock,
   Copy,
   Download,
   Eraser,
   ExternalLink,
   FilePlus2,
-  Folder,
   Globe,
   Languages,
   Loader2,
@@ -38,7 +36,6 @@ import {
 import { displayUrl, toWebUrl, WEB_PARTITION } from '@shared/web'
 import {
   bookmarkFor,
-  childrenOf,
   clipName,
   clipToNote,
   drmService,
@@ -48,8 +45,7 @@ import {
   isTranslated,
   PRIVATE_PARTITION,
   siteOf,
-  translateUrl,
-  type Bookmark
+  translateUrl
 } from '@shared/browser'
 import { youTubeVideoId, youTubeWatchUrl } from '@shared/youtube'
 import { FIND_VIDEO } from '@shared/video'
@@ -68,7 +64,8 @@ import { freePath } from '../../lib/email'
 import { errorMessage } from '../../lib/paths'
 import { CLICK_MOD, showKeys } from '@shared/platform'
 import { openAiSettings } from '../Ai/AiSettings'
-import ContextMenu, { type MenuItem } from '../ContextMenu'
+import BookmarksBar from './BookmarksBar'
+import SiteIcon from './SiteIcon'
 import { BookmarksPanel, EditBookmark, HistoryPanel, SitesPanel } from './WebPanels'
 import { DownloadsList } from './Downloads'
 import { FillPopup, loginOffer, PermissionBar, SaveLoginBar, type FieldFocus, type LoginOffer } from './WebPrompts'
@@ -179,8 +176,6 @@ export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidde
   const [field, setField] = useState<FieldFocus | null>(null)
   const overFill = useRef(false)
   const blurTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const [barMenu, setBarMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null)
-  const [folderMenu, setFolderMenu] = useState<{ id: string; x: number; y: number } | null>(null)
 
   useEffect(() => {
     if (!src && url) setSrc(url)
@@ -491,22 +486,8 @@ export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidde
   const drm = drmService(url)
   const offerTranslate = prefs.webOfferTranslate && !!url && isForeign(pageLang, navigator.language) && !isTranslated(url)
   const busyDownloads = downloads.filter((d) => d.state === 'downloading' || d.state === 'paused').length
-  const barItems = useMemo(() => childrenOf(bookmarks, 'bar'), [bookmarks])
   const muted = !!audio?.muted
 
-  const bookmarkMenu = (e: ReactMouseEvent, b: Bookmark): void => {
-    e.preventDefault()
-    const items: MenuItem[] = b.url
-      ? [
-          { label: 'Open in new tab', onClick: () => openWebTab(b.url!, { privately: isPrivate }) },
-          ...(isPrivate ? [] : [{ label: 'Open in private tab', onClick: () => openWebTab(b.url!, { privately: true }) }]),
-          { label: 'Copy link', icon: <Copy size={14} />, onClick: () => void navigator.clipboard.writeText(b.url!) },
-          'separator'
-        ]
-      : []
-    items.push({ label: 'Edit in Bookmarks…', onClick: () => setPanel('bookmarks') })
-    setBarMenu({ x: e.clientX, y: e.clientY, items })
-  }
 
   // The whole page in an ordinary window of its own, which can go full screen on another screen
   // while you use Orbit. Its video stops here and carries on there from where it had got to.
@@ -586,7 +567,8 @@ export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidde
             <div className="web-suggest" onMouseDown={(e) => e.preventDefault()}>
               {suggested.map((s, i) => (
                 <button type="button" key={s.url} className={i === pick ? 'on' : ''} onClick={() => goTo(s.url)}>
-                  {s.kind === 'bookmark' ? <Star size={13} /> : <Clock size={13} />}
+                  <SiteIcon url={s.url} size={14} />
+                  {s.kind === 'bookmark' ? <Star size={11} className="web-suggest-kind" /> : null}
                   <span className="web-suggest-title">{s.title || displayUrl(s.url)}</span>
                   <span className="web-suggest-url">{displayUrl(s.url)}</span>
                 </button>
@@ -706,45 +688,7 @@ export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidde
         {loading && <div className="web-progress" />}
       </form>
 
-      {prefs.webBookmarksBar && (
-        <div className="web-bookmarks-bar" data-bookmarks-bar>
-          {barItems.length === 0 && <span className="web-bookmarks-hint">Bookmarks you add (☆ or {showKeys('Ctrl+D')}) show here.</span>}
-          {barItems.map((b) =>
-            b.kind === 'folder' ? (
-              <button key={b.id} className="web-bookmark" onClick={(e) => setFolderMenu({ id: b.id, x: e.currentTarget.getBoundingClientRect().left, y: e.currentTarget.getBoundingClientRect().bottom + 2 })} onContextMenu={(e) => bookmarkMenu(e, b)}>
-                <Folder size={13} /> <span>{b.title || 'Folder'}</span> <ChevronDown size={11} />
-              </button>
-            ) : (
-              <button
-                key={b.id}
-                className="web-bookmark"
-                title={b.url}
-                onClick={(e) => openLink(b.url!, e.ctrlKey || e.metaKey)}
-                onAuxClick={(e) => e.button === 1 && openLink(b.url!, true)}
-                onContextMenu={(e) => bookmarkMenu(e, b)}
-              >
-                <Globe size={12} /> <span>{b.title || hostOf(b.url!)}</span>
-              </button>
-            )
-          )}
-          <button className="web-bookmark web-bookmark-all" title="All bookmarks" onClick={() => setPanel('bookmarks')}>
-            <BookmarkIcon size={12} /> All bookmarks
-          </button>
-        </div>
-      )}
-      {folderMenu && (
-        <BookmarkFolderMenu
-          folder={folderMenu.id}
-          x={folderMenu.x}
-          y={folderMenu.y}
-          onOpen={(target, newTab) => {
-            setFolderMenu(null)
-            openLink(target, newTab)
-          }}
-          onClose={() => setFolderMenu(null)}
-        />
-      )}
-      {barMenu && <ContextMenu x={barMenu.x} y={barMenu.y} items={barMenu.items} onClose={() => setBarMenu(null)} />}
+      {prefs.webBookmarksBar && <BookmarksBar isPrivate={isPrivate} onOpen={openLink} onManage={() => setPanel('bookmarks')} />}
 
       {asks.map((a) => (
         <PermissionBar key={a.id} ask={a} />
@@ -908,42 +852,6 @@ export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidde
         )}
       </div>
       {starOpen && <div className="web-star-away" onMouseDown={() => setStarOpen(false)} />}
-    </div>
-  )
-}
-
-/** A folder on the bookmarks bar, opened as a list (its folders open in place, with a way back). */
-function BookmarkFolderMenu({ folder, x, y, onOpen, onClose }: { folder: string; x: number; y: number; onOpen: (url: string, newTab: boolean) => void; onClose: () => void }) {
-  const all = useBrowser((s) => s.bookmarks)
-  const [path, setPath] = useState<string[]>([folder])
-  const here = path[path.length - 1]
-  const items = childrenOf(all, here)
-  useEffect(() => {
-    const away = (e: MouseEvent): void => {
-      if (!(e.target as Element).closest?.('.web-folder-menu')) onClose()
-    }
-    window.addEventListener('mousedown', away)
-    return () => window.removeEventListener('mousedown', away)
-  }, [onClose])
-  return (
-    <div className="menu web-folder-menu" style={{ left: x, top: y }}>
-      {path.length > 1 && (
-        <button type="button" onClick={() => setPath(path.slice(0, -1))}>
-          <ArrowLeft size={14} /> Back
-        </button>
-      )}
-      {items.length === 0 && <span className="web-folder-empty">Empty folder</span>}
-      {items.map((b) =>
-        b.kind === 'folder' ? (
-          <button type="button" key={b.id} onClick={() => setPath([...path, b.id])}>
-            <Folder size={14} /> {b.title || 'Folder'}
-          </button>
-        ) : (
-          <button type="button" key={b.id} title={b.url} onClick={(e) => onOpen(b.url!, e.ctrlKey || e.metaKey)} onAuxClick={(e) => e.button === 1 && onOpen(b.url!, true)}>
-            <Globe size={14} /> {b.title || hostOf(b.url!)}
-          </button>
-        )
-      )}
     </div>
   )
 }

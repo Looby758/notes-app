@@ -132,6 +132,46 @@ export function moveBookmark(all: Bookmark[], id: string, parent: string, index?
   return [...rest.slice(0, at), moved, ...rest.slice(at)]
 }
 
+/**
+ * Takes a folder apart: what was in it goes where the folder was (in the same place, in order),
+ * and the folder goes.
+ */
+export function unwrapFolder(all: Bookmark[], folderId: string): Bookmark[] {
+  const folder = all.find((b) => b.id === folderId && b.kind === 'folder')
+  if (!folder) return all
+  const inside = all.filter((b) => b.parent === folderId).map((b) => ({ ...b, parent: folder.parent }))
+  const out: Bookmark[] = []
+  for (const b of all) {
+    if (b.id === folderId) out.push(...inside)
+    else if (b.parent !== folderId) out.push(b)
+  }
+  return out
+}
+
+/**
+ * The folders Orbit's own Opera GX import used to wrap bookmarks in ("Imported from Opera GX", and
+ * a "Speed Dial" folder inside it), taken apart so their bookmarks sit on the bar themselves.
+ * A bookmark that's now there twice keeps its first place.
+ */
+export function unwrapImportFolders(all: Bookmark[]): Bookmark[] {
+  let list = all
+  for (;;) {
+    const wrapper = list.find((b) => b.kind === 'folder' && /^Imported from Opera GX$/.test(b.title))
+    if (!wrapper) break
+    const dials = list.filter((b) => b.kind === 'folder' && b.parent === wrapper.id && b.title === 'Speed Dial')
+    for (const d of dials) list = unwrapFolder(list, d.id)
+    list = unwrapFolder(list, wrapper.id)
+  }
+  const seen = new Set<string>()
+  return list.filter((b) => {
+    if (b.kind !== 'link' || !b.url) return true
+    const key = b.url.replace(/#.*$/, '').replace(/\/$/, '').toLowerCase()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
 /** Bookmarks matching a search (title or address), links only. */
 export function searchBookmarks(all: Bookmark[], query: string): Bookmark[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean)
@@ -660,8 +700,7 @@ export interface ImportedBookmark {
 
 /**
  * Chromium's "Bookmarks" file → the bookmarks bar and the rest. Opera's Speed Dial (the start page's
- * tiles, where most Opera GX users keep their sites) comes along as a "Speed Dial" folder on the
- * bar; Opera's trash is left out.
+ * tiles, where most Opera GX users keep their sites) goes on the bar too; Opera's trash is left out.
  */
 export function parseChromiumBookmarks(json: string): { bar: ImportedBookmark[]; other: ImportedBookmark[] } {
   let data: unknown
@@ -692,7 +731,7 @@ export function parseChromiumBookmarks(json: string): { bar: ImportedBookmark[];
       if (/trash/i.test(key)) continue
       const c = convert(node)
       if (!c?.children?.length) continue
-      if (/speed ?dial/i.test(key)) bar.push({ title: 'Speed Dial', children: c.children })
+      if (/speed ?dial/i.test(key)) bar.push(...c.children)
       else other.push({ title: c.title || (key === 'unsorted' ? 'Unsorted bookmarks' : key), children: c.children })
     }
   }
@@ -754,4 +793,45 @@ export function loginsFromCsv(text: string): ImportedLogin[] {
   return rows
     .map((r) => ({ url: (r[url] ?? '').trim(), username: user === -1 ? '' : (r[user] ?? '').trim(), password: r[pass] ?? '' }))
     .filter((l) => l.password && hostOf(/^[a-z]+:/i.test(l.url) ? l.url : `https://${l.url}`))
+}
+
+// ---------------------------------------------------------------------------------------------
+// Site icons (favicons)
+
+/** Site icons are kept by host ("www.youtube.com"). */
+export const iconKey = (url: string): string => hostOf(url)
+
+/** A site's icon from the ones Orbit has: its own host, then with or without "www.", then the site it's part of. */
+export function iconFor(icons: Record<string, string>, url: string): string | undefined {
+  const host = hostOf(url)
+  if (!host) return undefined
+  const bare = host.replace(/^www\./, '')
+  const tries = [host, bare, `www.${bare}`]
+  const parts = bare.split('.')
+  for (let i = 1; i < parts.length - 1; i++) tries.push(parts.slice(i).join('.'), `www.${parts.slice(i).join('.')}`)
+  for (const t of tries) if (icons[t]) return icons[t]
+  return undefined
+}
+
+/** The icon a page's HTML points to (<link rel="icon">), as a full address; null if it names none. */
+export function iconLinkFromHtml(html: string, baseUrl: string): string | null {
+  const links = html.match(/<link\b[^>]*>/gi) ?? []
+  let best: { href: string; score: number } | null = null
+  for (const tag of links) {
+    const rel = /\brel\s*=\s*["']?([^"'>]+)/i.exec(tag)?.[1].toLowerCase() ?? ''
+    if (!/\bicon\b/.test(rel) || /mask-icon/.test(rel)) continue
+    const href = /\bhref\s*=\s*["']?([^"'\s>]+)/i.exec(tag)?.[1]
+    if (!href) continue
+    const size = Number(/\bsizes\s*=\s*["']?(\d+)/i.exec(tag)?.[1] ?? 0)
+    // Something around 32px looks best on the bar; anything beats nothing.
+    const score = size ? 100 - Math.abs(size - 32) : rel.includes('apple-touch') ? 20 : 50
+    if (!best || score > best.score) best = { href, score }
+  }
+  if (!best) return null
+  try {
+    const full = new URL(best.href.replace(/&amp;/g, '&'), baseUrl).href
+    return /^(https?:|data:image\/)/i.test(full) ? full : null
+  } catch {
+    return null
+  }
 }

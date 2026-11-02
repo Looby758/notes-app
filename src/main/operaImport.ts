@@ -12,7 +12,6 @@ import {
   hostOf,
   loginsFromCsv,
   parseChromiumBookmarks,
-  type Bookmark,
   type HistoryEntry,
   type ImportedBookmark,
   type ImportedLogin
@@ -20,6 +19,7 @@ import {
 import type { OperaImportResult } from '@shared/types'
 import { getBookmarks, getHistory, setBookmarks, setHistory } from './browserData'
 import { logError } from './log'
+import { findMissingFavicons, rememberFavicon } from './favicons'
 
 /**
  * A one-time move from Opera GX: its bookmarks and history come into Orbit's browser, and its saved
@@ -97,7 +97,7 @@ function rows(db: Database, query: string): Record<string, unknown>[] {
 const newId = (): string => `b${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
 
 /** Adds Opera's bookmarks (each address once); returns how many links were added. */
-export function addImportedBookmarks(imported: { bar: ImportedBookmark[]; other: ImportedBookmark[] }, from = 'Opera GX'): number {
+export function addImportedBookmarks(imported: { bar: ImportedBookmark[]; other: ImportedBookmark[] }): number {
   const all = [...getBookmarks()]
   const have = new Set(all.filter((b) => b.url).map((b) => b.url!.replace(/\/$/, '')))
   let added = 0
@@ -115,16 +115,9 @@ export function addImportedBookmarks(imported: { bar: ImportedBookmark[]; other:
       }
     }
   }
-  const intoFolder = (items: ImportedBookmark[], root: 'bar' | 'other'): void => {
-    if (!items.length) return
-    // An empty bookmarks bar just gets Opera's; otherwise they go in a folder of their own.
-    if (root === 'bar' && !all.some((b) => b.parent === 'bar')) return addTree(items, 'bar')
-    const id = newId()
-    all.push({ id, kind: 'folder', title: `Imported from ${from}`, parent: root, created: now } satisfies Bookmark)
-    addTree(items, id)
-  }
-  intoFolder(imported.bar, 'bar')
-  intoFolder(imported.other, 'other')
+  // Straight onto the bar and into Other bookmarks, after what's there (Opera's own folders stay folders).
+  addTree(imported.bar, 'bar')
+  addTree(imported.other, 'other')
   // Folders that ended up empty (everything in them was already bookmarked) aren't kept.
   let changed = true
   let result = all
@@ -138,6 +131,21 @@ export function addImportedBookmarks(imported: { bar: ImportedBookmark[]; other:
   // The bookmarks bar and the Bookmarks panel show them straight away.
   for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send('web:bookmarks-changed', getBookmarks())
   return added
+}
+
+/** Opera's own icons for these pages (from its "Favicons" database), the one nearest 32px per site. */
+function importIcons(db: Database, urls: Set<string>): number {
+  const hosts = new Set([...urls].map((u) => hostOf(u)).filter(Boolean))
+  const best = new Map<string, { width: number; data: Uint8Array }>()
+  for (const r of rows(db, 'SELECT m.page_url AS page, b.image_data AS data, b.width AS width FROM icon_mapping m JOIN favicon_bitmaps b ON b.icon_id = m.icon_id')) {
+    const host = hostOf(String(r.page ?? ''))
+    if (!hosts.has(host) || !(r.data instanceof Uint8Array) || !r.data.length) continue
+    const width = Number(r.width) || 16
+    const have = best.get(host)
+    if (!have || Math.abs(width - 32) < Math.abs(have.width - 32)) best.set(host, { width, data: r.data })
+  }
+  for (const [host, { data }] of best) rememberFavicon(host, `data:image/png;base64,${Buffer.from(data).toString('base64')}`)
+  return best.size
 }
 
 function importHistory(db: Database): number {
@@ -257,6 +265,19 @@ export async function importFromOpera(): Promise<OperaImportResult> {
   await step('Bookmarks', async () => {
     const file = join(profile, 'Bookmarks')
     if (existsSync(file)) result.bookmarks = addImportedBookmarks(parseChromiumBookmarks(await fs.readFile(file, 'utf8')))
+  })
+  await step('Site icons', async () => {
+    const urls = new Set(getBookmarks().flatMap((b) => (b.url ? [b.url] : [])))
+    if (existsSync(join(profile, 'Favicons'))) {
+      const db = await openDatabase(join(profile, 'Favicons'))
+      try {
+        importIcons(db, urls)
+      } finally {
+        db.close()
+      }
+    }
+    // Any still without one are looked up in the background.
+    void findMissingFavicons([...urls])
   })
   await step('History', async () => {
     if (!existsSync(join(profile, 'History'))) return

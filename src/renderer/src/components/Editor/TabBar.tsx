@@ -64,6 +64,7 @@ import FileIcon from '../FileIcon'
 import { UnreadBadge } from '../Messages/MessagesPage'
 import { useWeb, type WebPage } from '../../store/web'
 import { tabsByPage, useBrowser } from '../../store/browser'
+import SiteIcon from '../Web/SiteIcon'
 import { displayUrl } from '@shared/web'
 import { FILE_MANAGER, showKeys } from '@shared/platform'
 import { animateOut } from '../../lib/motion'
@@ -313,7 +314,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === TERMINAL_TAB && <SquareTerminal size={13} className="tab-icon" />}
               {id === PASSWORDS_TAB && <KeyRound size={13} className="tab-icon" />}
               {id === EMAIL_TAB && <Mail size={13} className="tab-icon" />}
-              {isWebTab(id) && (isPrivateWebTab(id) ? <VenetianMask size={13} className="tab-icon" /> : <Globe size={13} className="tab-icon" />)}
+              {isWebTab(id) && (isPrivateWebTab(id) ? <VenetianMask size={13} className="tab-icon" /> : web[id]?.url ? <SiteIcon url={web[id].url} size={13} className="tab-icon" /> : <Globe size={13} className="tab-icon" />)}
               {id === HOME_TAB && <House size={13} className="tab-icon" />}
               {id === MONEY_TAB && <PoundSterling size={13} className="tab-icon" />}
               {id === CONVERT_TAB && <ArrowRightLeft size={13} className="tab-icon" />}

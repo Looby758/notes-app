@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Bookmark as BookmarkIcon, Check, ChevronRight, Eraser, Folder, FolderPlus, Globe, Pencil, Search, Trash2, Volume2, VolumeX, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronRight, Eraser, Folder, FolderPlus, Globe, Pencil, Search, Trash2, Volume2, VolumeX, X } from 'lucide-react'
 import {
   childrenOf,
   folderChoices,
@@ -16,6 +16,8 @@ import {
 } from '@shared/browser'
 import { addFolder, placeBookmark, removeBookmark, setSite, updateBookmark, useBrowser } from '../../store/browser'
 import { notify } from '../../store/notify'
+import SiteIcon from './SiteIcon'
+import { dragBookmark } from './BookmarksBar'
 
 // ---------- bookmarks ----------
 
@@ -76,14 +78,14 @@ export function BookmarksPanel({ onOpen }: { onOpen: (url: string, newTab: boole
           editing === b.id ? (
             <EditBookmark key={b.id} bookmark={b} done={() => setEditing(null)} />
           ) : (
-            <div key={b.id} className="web-panel-row" data-bookmark={b.id}>
+            <div key={b.id} className="web-panel-row" data-bookmark={b.id} draggable onDragStart={(e) => dragBookmark(e, b)}>
               <button
                 className="web-panel-main"
                 title={b.url ?? b.title}
                 onClick={(e) => (b.kind === 'folder' ? setFolder(b.id) : onOpen(b.url!, e.ctrlKey || e.metaKey))}
                 onAuxClick={(e) => e.button === 1 && b.url && onOpen(b.url, true)}
               >
-                {b.kind === 'folder' ? <Folder size={14} /> : <BookmarkIcon size={14} />}
+                {b.kind === 'folder' ? <Folder size={14} /> : <SiteIcon url={b.url!} size={14} />}
                 <span className="web-panel-title">{b.title || (b.url ? hostOf(b.url) : 'Folder')}</span>
                 {b.url && <span className="web-panel-sub">{hostOf(b.url)}</span>}
               </button>
@@ -218,7 +220,7 @@ export function HistoryPanel({ onOpen }: { onOpen: (url: string, newTab: boolean
               {heading && <div className="web-panel-day">{heading}</div>}
               <div className="web-panel-row" data-history={h.url}>
                 <button className="web-panel-main" title={h.url} onClick={(e) => onOpen(h.url, e.ctrlKey || e.metaKey)} onAuxClick={(e) => e.button === 1 && onOpen(h.url, true)}>
-                  <Globe size={14} />
+                  <SiteIcon url={h.url} size={14} />
                   <span className="web-panel-title">{h.title || hostOf(h.url)}</span>
                   <span className="web-panel-sub">
                     {new Date(h.visited).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })} · {hostOf(h.url)}

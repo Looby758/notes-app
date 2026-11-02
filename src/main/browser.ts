@@ -61,6 +61,7 @@ import {
   siteSettings
 } from './browserData'
 import { openInOtherBrowser } from './defaultBrowser'
+import { findMissingFavicons, getFavicons, watchFavicons } from './favicons'
 import { logError } from './log'
 
 /**
@@ -551,6 +552,7 @@ export function setupBrowser(options: BrowserDeps): void {
         const kind = kindOf(contents)
         if (kind !== 'web' && kind !== 'private') return
         keepHistory(contents)
+        if (kind === 'web') watchFavicons(contents)
         contents.on('did-navigate', () => applySite(contents))
         contents.on('dom-ready', () => applySite(contents))
         contents.on('audio-state-changed', () => tellAudio(contents))
@@ -616,9 +618,13 @@ export function setupBrowser(options: BrowserDeps): void {
 
   // Bookmarks: the window works out the changes (with @shared/browser) and sends the whole list back.
   ipcMain.handle('web:bookmarks', () => getBookmarks())
+  ipcMain.handle('web:favicons', () => getFavicons())
+  // Icons for bookmarks that don't have one yet, once Orbit has settled after starting.
+  setTimeout(() => void findMissingFavicons(getBookmarks().flatMap((b) => (b.url ? [b.url] : []))), 15_000).unref?.()
   ipcMain.handle('web:setBookmarks', (_e, list: Bookmark[]) => {
     setBookmarks(list)
     broadcast('web:bookmarks-changed', getBookmarks())
+    void findMissingFavicons(getBookmarks().flatMap((b) => (b.url ? [b.url] : [])))
     return getBookmarks()
   })
 

@@ -27,6 +27,8 @@ export interface PermissionAsk {
 
 interface BrowserState {
   bookmarks: Bookmark[]
+  /** Site icons by host (data: pictures). */
+  favicons: Record<string, string>
   downloads: WebDownload[]
   sites: Record<string, SiteSettings>
   profile: AutofillProfile
@@ -41,6 +43,7 @@ interface BrowserState {
 
 export const useBrowser = create<BrowserState>(() => ({
   bookmarks: [],
+  favicons: {},
   downloads: [],
   sites: {},
   profile: { ...EMPTY_PROFILE },
@@ -64,6 +67,8 @@ export function startBrowser(): void {
   void window.api.webSites().then((sites) => useBrowser.setState({ sites }))
   void window.api.webAutofill().then((profile) => useBrowser.setState({ profile })).catch(() => undefined)
   window.api.onWebBookmarks((bookmarks) => useBrowser.setState({ bookmarks }))
+  void window.api.webFavicons().then((favicons) => useBrowser.setState((s) => ({ favicons: { ...favicons, ...s.favicons } })))
+  window.api.onWebFavicons((icons) => useBrowser.setState((s) => ({ favicons: { ...s.favicons, ...icons } })))
   window.api.onWebDownloads((downloads) => useBrowser.setState({ downloads }))
   window.api.onWebSites((sites) => useBrowser.setState({ sites }))
   window.api.onWebAutofill((profile) => useBrowser.setState({ profile }))

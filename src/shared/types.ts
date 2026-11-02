@@ -633,6 +633,10 @@ export interface NotesApi {
   /** A browser key (find, bookmark, zoom…) pressed in a web page, for the tab it's in. */
   onWebKey(callback: (e: { wcId: number; key: string }) => void): () => void
   webBookmarks(): Promise<Bookmark[]>
+  /** Site icons by host (data: pictures). */
+  webFavicons(): Promise<Record<string, string>>
+  /** New or changed site icons (by host). */
+  onWebFavicons(callback: (icons: Record<string, string>) => void): () => void
   /** Saves the whole bookmarks list (worked out with @shared/browser). */
   webSetBookmarks(list: Bookmark[]): Promise<Bookmark[]>
   onWebBookmarks(callback: (list: Bookmark[]) => void): () => void

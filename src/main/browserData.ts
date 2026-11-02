@@ -13,7 +13,8 @@ import {
   type Bookmark,
   type HistoryEntry,
   type SiteSettings,
-  type WebDownload
+  type WebDownload,
+  unwrapImportFolders
 } from '@shared/browser'
 import { logError } from './log'
 
@@ -79,7 +80,15 @@ export async function flushBrowserData(): Promise<void> {
 let bookmarks: Bookmark[] | null = null
 
 export function getBookmarks(): Bookmark[] {
-  bookmarks ??= cleanBookmarks(readJson('bookmarks.json'))
+  if (!bookmarks) {
+    bookmarks = cleanBookmarks(readJson('bookmarks.json'))
+    // Once: the Opera GX import used to put its bookmarks in a folder; they go on the bar themselves.
+    if (!getMisc().unwrappedImport) {
+      const unwrapped = unwrapImportFolders(bookmarks)
+      if (unwrapped.length !== bookmarks.length || unwrapped.some((b, i) => b !== bookmarks![i])) setBookmarks(unwrapped)
+      setMisc({ unwrappedImport: true })
+    }
+  }
   return bookmarks
 }
 
@@ -152,6 +161,8 @@ export function forgetSite(site: string): void {
 export interface BrowserMisc {
   /** The folder downloads go to unless you pick another ('' for the computer's Downloads folder). */
   downloadFolder: string
+  /** The old "Imported from Opera GX" folders have been taken apart (see getBookmarks). */
+  unwrappedImport?: boolean
 }
 
 let misc: BrowserMisc | null = null
@@ -159,7 +170,7 @@ let misc: BrowserMisc | null = null
 export function getMisc(): BrowserMisc {
   if (!misc) {
     const raw = (readJson('browser.json') ?? {}) as Partial<BrowserMisc>
-    misc = { downloadFolder: typeof raw.downloadFolder === 'string' ? raw.downloadFolder : '' }
+    misc = { downloadFolder: typeof raw.downloadFolder === 'string' ? raw.downloadFolder : '', unwrappedImport: raw.unwrappedImport === true }
   }
   return misc
 }

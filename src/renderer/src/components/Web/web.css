@@ -189,6 +189,7 @@
 
 /* ---------- bookmarks bar ---------- */
 .web-bookmarks-bar {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 2px;
@@ -1017,4 +1018,95 @@
 }
 .browser-sites .web-panel-body {
   flex: 1;
+}
+
+/* ---------- site icons, dragging bookmarks, the » menu ---------- */
+.site-icon {
+  flex-shrink: 0;
+  object-fit: contain;
+  border-radius: 2px;
+}
+.web-bookmarks-tail {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.web-bookmark {
+  position: relative;
+}
+.web-bookmark.open,
+.web-bookmark.drop-into,
+.web-folder-menu button.drop-into {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.web-bookmark.drop-before::before,
+.web-bookmark.drop-after::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+.web-bookmark.drop-before::before {
+  left: -2px;
+}
+.web-bookmark.drop-after::after {
+  right: -2px;
+}
+.web-folder-menu {
+  width: 270px;
+}
+.web-folder-menu button {
+  position: relative;
+}
+.web-folder-menu button.drop-before::before,
+.web-folder-menu button.drop-after::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+.web-folder-menu button.drop-before::before {
+  top: -1px;
+}
+.web-folder-menu button.drop-after::after {
+  bottom: -1px;
+}
+.web-folder-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.web-suggest-kind {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.web-panel-row[draggable='true'] {
+  cursor: grab;
+}
+/* The bar never makes the tab wider than its pane (what doesn't fit goes in the » menu). */
+.web-page,
+.web-page .web-bookmarks-bar {
+  min-width: 0;
+}
+.web-page .web-bookmarks-bar {
+  width: 100%;
+  box-sizing: border-box;
+}
+/* (More specific than the app's own .menu, which would make it absolute: then it opens off to the
+   side, behind the page.) */
+.menu.web-folder-menu {
+  position: fixed;
+  top: auto;
+  z-index: 60;
 }

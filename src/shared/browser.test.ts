@@ -29,6 +29,10 @@ import {
   translateUrl,
   updateVisit,
   urlsFromArgv,
+  iconFor,
+  iconLinkFromHtml,
+  unwrapFolder,
+  unwrapImportFolders,
   EMPTY_PROFILE,
   type Bookmark,
   type HistoryEntry
@@ -82,6 +86,21 @@ describe('bookmarks', () => {
   it('lists folders with their paths', () => {
     const all = [bm('Recipes', 'bar', 'folder'), bm('Cakes', 'Recipes', 'folder')]
     expect(folderChoices(all).map((f) => f.label)).toEqual(['Bookmarks bar', 'Bookmarks bar / Recipes', 'Bookmarks bar / Recipes / Cakes', 'Other bookmarks'])
+  })
+
+  it('takes a folder apart, its bookmarks taking its place', () => {
+    const all = [bm('a', 'bar'), bm('f', 'bar', 'folder'), bm('x', 'f'), bm('y', 'f'), bm('b', 'bar')]
+    expect(unwrapFolder(all, 'f').filter((b) => b.parent === 'bar').map((b) => b.id)).toEqual(['a', 'x', 'y', 'b'])
+  })
+
+  it('undoes the old import folders, without doubling up', () => {
+    const wrap: Bookmark = { ...bm('w', 'bar', 'folder'), title: 'Imported from Opera GX' }
+    const dial: Bookmark = { ...bm('d', 'w', 'folder'), title: 'Speed Dial' }
+    const mine: Bookmark = { ...bm('m', 'bar', 'folder'), title: 'Games' }
+    const all = [bm('a', 'bar'), wrap, bm('b', 'w'), dial, bm('c', 'd'), bm('dup', 'd', 'link', 'https://a.com'), mine, bm('g', 'm')]
+    const out = unwrapImportFolders(all)
+    expect(out.filter((b) => b.parent === 'bar').map((b) => b.id)).toEqual(['a', 'b', 'c', 'm'])
+    expect(out.find((b) => b.id === 'g')?.parent).toBe('m')
   })
 
   it('repairs a broken saved list', () => {
@@ -263,9 +282,8 @@ describe('importing', () => {
       }
     })
     const { bar, other } = parseChromiumBookmarks(json)
-    // Opera's Speed Dial tiles come along as a folder on the bar; its trash doesn't.
-    expect(bar.map((b) => b.title)).toEqual(['BBC', 'Games', 'Speed Dial'])
-    expect(bar[2].children).toEqual([{ title: 'YouTube', url: 'https://youtube.com' }])
+    // Opera's Speed Dial tiles go straight on the bar; its trash doesn't come.
+    expect(bar.map((b) => b.title)).toEqual(['BBC', 'Games', 'YouTube'])
     expect(bar[1].children?.[0].url).toBe('https://store.steampowered.com')
     expect(other).toEqual([{ title: 'Unsorted', children: [{ title: 'U', url: 'https://u.com' }] }])
     expect(parseChromiumBookmarks('not json')).toEqual({ bar: [], other: [] })
@@ -279,5 +297,23 @@ describe('importing', () => {
     expect(parseCsv('a,"b,c","d ""e"""\n1,2,3\n')).toEqual([['a', 'b,c', 'd "e"'], ['1', '2', '3']])
     const logins = loginsFromCsv('name,url,username,password,note\r\nSite,https://site.com/login,sam,"pa,ss",\r\nEmpty,https://x.com,sam,,\r\n')
     expect(logins).toEqual([{ url: 'https://site.com/login', username: 'sam', password: 'pa,ss' }])
+  })
+})
+
+describe('site icons', () => {
+  it('finds a site’s icon by its host, with or without www, or the site it’s part of', () => {
+    const icons = { 'www.youtube.com': 'yt', 'google.com': 'g' }
+    expect(iconFor(icons, 'https://youtube.com/watch?v=1')).toBe('yt')
+    expect(iconFor(icons, 'https://www.youtube.com/')).toBe('yt')
+    expect(iconFor(icons, 'https://mail.google.com/mail')).toBe('g')
+    expect(iconFor(icons, 'https://example.com')).toBeUndefined()
+  })
+
+  it('reads the icon a page points to', () => {
+    expect(iconLinkFromHtml('<link rel="shortcut icon" href="/favicon.ico">', 'https://a.com/x/y')).toBe('https://a.com/favicon.ico')
+    expect(iconLinkFromHtml('<link rel="icon" sizes="16x16" href="s.png"><link rel="icon" sizes="32x32" href="m.png"><link rel="icon" sizes="192x192" href="l.png">', 'https://a.com/')).toBe('https://a.com/m.png')
+    expect(iconLinkFromHtml('<link rel="mask-icon" href="/m.svg"><link rel="stylesheet" href="/s.css">', 'https://a.com/')).toBeNull()
+    expect(iconLinkFromHtml('<link rel=icon href=//cdn.a.com/i.png>', 'https://a.com/')).toBe('https://cdn.a.com/i.png')
+    expect(iconLinkFromHtml('<link rel="icon" href="javascript:alert(1)">', 'https://a.com/')).toBeNull()
   })
 })
