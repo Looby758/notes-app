@@ -16,7 +16,7 @@ import {
   type Session,
   type WebContents
 } from 'electron'
-import { firefoxUserAgent, isGoogleRejection, isGoogleSignIn, isWebUrl, plainUserAgent, searchUrl, WEB_PARTITION } from '@shared/web'
+import { chromeHints, firefoxUserAgent, isGoogleRejection, isGoogleSignIn, isWebUrl, plainUserAgent, searchUrl, WEB_PARTITION } from '@shared/web'
 import { isMessagesUrl, MESSAGES_PARTITION } from '@shared/messages'
 import { shortcutFromEvent } from '@shared/shortcuts'
 import { isAdRequest, PAGE_AD_CSS, YOUTUBE_AD_CSS, YOUTUBE_AD_SCRIPT } from '@shared/adblock'
@@ -513,10 +513,12 @@ function setupWebSession(ses: Session, isPrivate: boolean, preload: { type: 'fra
   ses.setUserAgent(plainUserAgent(ses.getUserAgent()))
   ses.setPermissionRequestHandler((wc, permission, callback, details) => permissionRequest(wc, permission, details as { requestingUrl?: string; mediaTypes?: string[] }, callback))
   ses.setPermissionCheckHandler((wc, permission, origin, details) => permissionCheck(wc, permission, origin, details as { mediaType?: string }))
+  // Secure requests carry the "client hints" Google Chrome sends (which browser, version, on what):
+  // without them Google's sign-in says "This browser or app may not be secure" (see chromeHints).
   // With "Sign in with Google as Firefox" on, Google's sign-in pages (every one the sign-in passes
-  // through, see isGoogleSignIn) hear "Firefox", without the Chrome-only hints that would give it away.
+  // through, see isGoogleSignIn) hear "Firefox" instead, without the Chrome-only hints.
   ses.webRequest.onBeforeSendHeaders({ urls: ['https://*/*'] }, (details, callback) => {
-    if (!firefoxFor(details.url)) return callback({})
+    if (!firefoxFor(details.url)) return callback({ requestHeaders: chromeHints(details.requestHeaders, process.versions.chrome, process.platform) })
     const headers = Object.fromEntries(Object.entries(details.requestHeaders).filter(([name]) => !/^sec-ch-ua/i.test(name)))
     callback({ requestHeaders: { ...headers, 'User-Agent': SIGN_IN_AGENT } })
   })
@@ -537,6 +539,9 @@ function setupWebSession(ses: Session, isPrivate: boolean, preload: { type: 'fra
 
 export function setupBrowser(options: BrowserDeps): void {
   deps = options
+  // Anything that doesn't get a browser name of its own (a pop-up, a window opened from a page) gets
+  // the plain one, never Electron's: no "Electron/36" or "Orbit/1.11" for a site to see.
+  app.userAgentFallback = plainUserAgent(app.userAgentFallback)
   asFirefox = options.googleAsFirefox ?? (() => false)
   downloads = loadDownloads()
 
@@ -828,7 +833,9 @@ export function guardPage(page: WebContents, host: () => WebContents | null, { a
         // "Choose an account" each time you pick one.
         createWindow: (options) => {
           const popup = new BrowserWindow(options)
-          if (firefoxFor(url)) popup.webContents.setUserAgent(SIGN_IN_AGENT)
+          // A new window starts with Electron's own browser name ("… Electron/36…"), which Google
+          // refuses: it gets the web tabs' plain one (or Firefox's) before its first page loads.
+          popup.webContents.setUserAgent(firefoxFor(url) ? SIGN_IN_AGENT : popup.webContents.session.getUserAgent())
           return popup.webContents
         }
       }
