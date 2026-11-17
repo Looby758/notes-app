@@ -259,6 +259,9 @@ function Reader({ wiki, wikis, place }: { wiki: WikiInfo; wikis: WikiInfo[]; pla
         </button>
       </div>
       {wiki.status !== 'done' && <div className="wiki-notice">{statusText(wiki)}. Pages that haven’t arrived yet can’t be opened.</div>}
+      {wiki.status === 'done' && wiki.checking !== undefined && (
+        <div className="wiki-notice">Orbit is checking this wiki for spoilers ({wiki.checking}% done). This happens once after a download or an update, and takes a few minutes for a big wiki.</div>
+      )}
       <div className="wiki-body">
         {place.search ? <SearchResults key={version} wiki={wiki} query={place.search} /> : <Article key={`${wiki.id}/${title}/${version}`} wiki={wiki} title={title} fragment={place.fragment} />}
         {side === 'brain' && <BrainPanel wiki={wiki} wikis={wikis} />}
@@ -363,6 +366,8 @@ function Article({ wiki, title, fragment }: { wiki: WikiInfo; title: string; fra
   const onClick = useLinkClicks(wiki.id)
   // A page that hadn't arrived yet is looked for again as more pages arrive.
   const waiting = page === null && wiki.status !== 'done' ? wiki.done : -1
+  // …and when the spoiler check finishes.
+  const checked = wiki.checking === undefined
 
   useEffect(() => {
     let live = true
@@ -376,7 +381,7 @@ function Article({ wiki, title, fragment }: { wiki: WikiInfo; title: string; fra
     return () => {
       live = false
     }
-  }, [wiki.id, title, waiting, showUnplaced])
+  }, [wiki.id, title, waiting, showUnplaced, checked])
 
   const html = useMemo(() => (page ? cleanWikiHtml(page.html, page, wiki.base) : ''), [page, wiki.base])
 
@@ -396,7 +401,10 @@ function Article({ wiki, title, fragment }: { wiki: WikiInfo; title: string; fra
           <p>
             {page.blocked === 'later' && 'This page is about something you haven’t reached yet, so it’s hidden. Change how far you are in Spoilers to see it.'}
             {page.blocked === 'part' && 'This page is about a part of the story you’ve switched off (in Spoilers).'}
-            {page.blocked === 'unchecked' && 'Orbit hasn’t checked this page for spoilers yet. It will after more of the wiki has downloaded.'}
+            {page.blocked === 'unchecked' &&
+              (wiki.checking !== undefined
+                ? `Orbit is checking this wiki for spoilers (${wiki.checking}% done). This page shows when it’s finished.`
+                : 'Orbit hasn’t checked this page for spoilers yet. It will after more of the wiki has downloaded.')}
             {page.blocked === 'unplaced' && 'Orbit couldn’t tell when anything on this page happens, so it might spoil something.'}
           </p>
           {page.blocked === 'unplaced' && (
@@ -624,9 +632,17 @@ function SpoilerPanel({ wiki }: { wiki: WikiInfo }) {
     return () => {
       live = false
     }
-  }, [wiki.id, version, status])
+  }, [wiki.id, version, status, wiki.checking === undefined])
 
-  if (!view) return <aside className="wiki-brain" />
+  if (!view)
+    return (
+      <aside className="wiki-brain wiki-spoilers">
+        <h3>
+          <Shield size={15} /> Spoilers
+        </h3>
+        <p className="screens-note">Loading…</p>
+      </aside>
+    )
   const s = view.settings
   const set = (patch: Partial<WikiSpoilerSettings>): void => {
     // Shown straight away; the saved setting follows.
@@ -669,7 +685,13 @@ function SpoilerPanel({ wiki }: { wiki: WikiInfo }) {
       </label>
       {s.limit && (
         <>
-          {!view.ready && <p className="screens-note">Orbit works out the wiki’s episodes once some pages have downloaded. Until then, pages stay hidden.</p>}
+          {!view.ready && (
+            <p className="screens-note">
+              {wiki.checking !== undefined
+                ? `Orbit is checking this wiki for spoilers (${wiki.checking}% done). The list of episodes appears here when it’s finished, in a few minutes. Until then, pages stay hidden.`
+                : 'Orbit works out the wiki’s episodes once some pages have downloaded. Until then, pages stay hidden.'}
+            </p>
+          )}
           {view.ready && shown.length === 0 && <p className="screens-note">Orbit couldn’t find a list of episodes or issues in this wiki, so it can’t tell what’s a spoiler. Everything it can’t place stays hidden.</p>}
           {shown.map((series) => (
             <div key={series.name} className="wiki-spoiler-group">

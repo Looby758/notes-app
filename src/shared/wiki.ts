@@ -57,6 +57,8 @@ export interface WikiInfo {
   spoilers?: WikiSpoilerSettings
   /** While pages are downloading: about how many seconds are left (once there's enough to go on). */
   secondsLeft?: number
+  /** While Orbit checks the downloaded pages for spoilers (after an update or a download): how far it's got, 0–99. */
+  checking?: number
 }
 
 /** What the spoiler settings show for a wiki. */

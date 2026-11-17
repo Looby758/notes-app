@@ -1,9 +1,10 @@
 import { app, BrowserWindow, ipcMain, net } from 'electron'
 import { createHash } from 'crypto'
-import { existsSync, readdirSync, readFileSync } from 'fs'
+import { createReadStream, createWriteStream, existsSync, readdirSync, readFileSync } from 'fs'
+import { createInterface } from 'readline'
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'fs/promises'
 import { join } from 'path'
-import { gunzip, gzip } from 'zlib'
+import { createGunzip, createGzip, gunzip, gzip } from 'zlib'
 import { promisify } from 'util'
 import MiniSearch from 'minisearch'
 import { localComplete } from './localAi'
@@ -194,7 +195,15 @@ function info(w: Loaded): WikiInfo {
   const { address: _address, ...meta } = w.meta
   const running = jobs.has(w.meta.id)
   const left = running && w.meta.status === 'pages' ? estimateSecondsLeft(w.recent, Date.now(), w.meta.total - w.done.size - w.failed) : null
-  return { ...meta, running, done: w.done.size, failed: w.failed, bytes: w.bytes, ...(left !== null ? { secondsLeft: left } : {}) }
+  return {
+    ...meta,
+    running,
+    done: w.done.size,
+    failed: w.failed,
+    bytes: w.bytes,
+    ...(left !== null ? { secondsLeft: left } : {}),
+    ...(checking.has(w.meta.id) ? { checking: checking.get(w.meta.id) } : {})
+  }
 }
 
 export function wikiList(): WikiInfo[] {
@@ -597,7 +606,7 @@ export async function wikiTitles(id: string): Promise<string[]> {
   const w = wiki(id)
   const l = await listOf(w.meta.id)
   const s = settingsOf(w)
-  const index = s.limit || s.parts !== 'both' ? await indexOf(w.meta.id) : null
+  const index = s.limit || s.parts !== 'both' ? await indexOf(w.meta.id, false) : null
   return l.pages.filter((p) => w.done.has(p.id) && pageState(w, index, p.id) === 'ok').map((p) => p.title)
 }
 
@@ -611,7 +620,7 @@ export async function wikiPage(id: string, title: string, showUnplaced = false):
   const view: WikiPageView = { wikiId: w.meta.id, title: p.title, displayTitle: p.displayTitle, html: p.html, images: p.images, categories: p.categories, url: pageUrl(w.meta.base, p.title) }
   const s = settingsOf(w)
   if (!s.limit && s.parts === 'both') return view
-  const index = await indexOf(w.meta.id)
+  const index = await indexOf(w.meta.id, false)
   const state = pageState(w, index, pageId)
   if (state !== 'ok' && !(state === 'unplaced' && showUnplaced)) return { ...view, html: '', images: {}, blocked: state }
   if (!s.limit || !index) return view
@@ -638,7 +647,7 @@ const MIN_SERIES_POINTS = 6
 
 export async function wikiSpoilers(id: string): Promise<WikiSpoilerView> {
   const w = wiki(id)
-  const index = await indexOf(w.meta.id).catch(() => null)
+  const index = await indexOf(w.meta.id, false).catch(() => null)
   const series = (index?.timeline.series ?? []).filter((s) => s.points.length >= MIN_SERIES_POINTS)
   return { settings: settingsOf(w), series, ready: !!index, finished: w.meta.status === 'done' }
 }
@@ -733,6 +742,8 @@ interface Index {
 }
 
 const indexes = new Map<string, Index>()
+/** Wikis whose spoiler check is running, and how far it's got (0–99). */
+const checking = new Map<string, number>()
 const building = new Map<string, Promise<Index>>()
 let dropTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -743,10 +754,28 @@ const chunkFile = (id: string, pageId: number): string => join(dirOf(id), 'chunk
  * and makes the search index from those parts (a little at a time, so Orbit stays quick).
  */
 async function buildIndex(id: string, signal?: AbortSignal): Promise<Index> {
+  try {
+    return await checkAndIndex(id, signal)
+  } finally {
+    checking.delete(id)
+    tellSoon()
+  }
+}
+
+async function checkAndIndex(id: string, signal?: AbortSignal): Promise<Index> {
   const w = wiki(id)
   const pageIds = [...w.done]
   const key = await keyFor(id)
   const yieldNow = (): Promise<void> => new Promise((r) => setImmediate(r))
+
+  // How far the check has got, for the Wiki tab (both passes count).
+  const total = pageIds.length * 2
+  const progress = (): void => {
+    checking.set(id, Math.min(99, Math.floor((n / Math.max(1, total)) * 100)))
+    if (n % 100 === 0) tellSoon()
+  }
+  checking.set(id, 0)
+  tellSoon()
 
   // 1. The timeline.
   const facts: TimelineFact[] = []
@@ -761,7 +790,9 @@ async function buildIndex(id: string, signal?: AbortSignal): Promise<Index> {
       const first = firstAppearanceLinks(p.html, w.meta.base)
       if (first.length) firstLinks[p.title] = first
     }
-    if (++n % 50 === 0) await yieldNow()
+    n++
+    progress()
+    if (n % 50 === 0) await yieldNow()
   }
   const timeline = buildTimeline(facts, key, firstLinks)
   const ctx = { timeline, key, base: w.meta.base }
@@ -774,6 +805,8 @@ async function buildIndex(id: string, signal?: AbortSignal): Promise<Index> {
     if (signal?.aborted) throw new Error('stopped')
     const p = await readPage(id, pageId)
     if (!p) continue
+    n++
+    progress()
     let placed: ReturnType<typeof placedChunks>
     try {
       placed = placedChunks(p.html, p.title, p.categories, ctx)
@@ -784,47 +817,87 @@ async function buildIndex(id: string, signal?: AbortSignal): Promise<Index> {
     pageFacts[pageId] = placed.facts
     await writeFile(chunkFile(id, pageId), await zip(JSON.stringify(placed.chunks)))
     search.addAll(placed.chunks.map((c, i) => ({ id: `${pageId}:${i}`, title: p.title, section: c.section, text: c.text, req: JSON.stringify(c.req), part: placed.facts.part })))
-    if (++n % 20 === 0) await yieldNow()
+    if (n % 20 === 0) await yieldNow()
   }
   const index: Index = { search, pages: w.done.size, used: Date.now(), timeline, facts: pageFacts }
-  const file = join(dirOf(id), 'search.json.gz')
-  await writeFile(`${file}.tmp`, await zip(JSON.stringify({ version: INDEX_VERSION, pages: index.pages, timeline, facts: pageFacts, index: search })))
-  await rename(`${file}.tmp`, file)
+  await saveIndex(id, index)
   indexes.set(id, index)
   tellSoon()
   return index
 }
 
-/** The wiki's search index: in memory, else from its file, else made now (or again, when lots more pages have come since). */
-async function indexOf(id: string): Promise<Index | null> {
+/**
+ * Saves the index a line at a time: a big wiki's index is too large to turn into one piece of text
+ * (it would fail, and the whole check would run again every time).
+ */
+async function saveIndex(id: string, index: Index): Promise<void> {
+  const file = join(dirOf(id), 'search.lines.gz')
+  const { index: terms, ...rest } = index.search.toJSON() as unknown as { index: unknown[] } & Record<string, unknown>
+  const out = createGzip()
+  const done = new Promise<void>((resolve, reject) => {
+    const sink = createWriteStream(`${file}.tmp`)
+    sink.on('finish', resolve).on('error', reject)
+    out.on('error', reject).pipe(sink)
+  })
+  const write = (line: string): Promise<void> => (out.write(line + '\n') ? Promise.resolve() : new Promise((r) => out.once('drain', () => r())))
+  await write(JSON.stringify({ version: INDEX_VERSION, pages: index.pages, timeline: index.timeline, facts: index.facts, search: rest }))
+  for (const term of terms) await write(JSON.stringify(term))
+  out.end()
+  await done
+  await rename(`${file}.tmp`, file)
+  await rm(join(dirOf(id), 'search.json.gz'), { force: true })
+}
+
+async function loadIndex(id: string): Promise<Index | null> {
+  const file = join(dirOf(id), 'search.lines.gz')
+  if (!existsSync(file)) return null
+  // A read problem ends the reading (instead of leaving it waiting for lines that never come).
+  const raw = createReadStream(file)
+  const unzipped = createGunzip()
+  raw.on('error', (err) => unzipped.destroy(err))
+  const lines = createInterface({ input: raw.pipe(unzipped), crlfDelay: Infinity })
+  let head: { version?: number; pages: number; timeline: WikiTimeline; facts: Record<number, PageFacts>; search: Record<string, unknown> } | null = null
+  const terms: unknown[] = []
+  for await (const line of lines) {
+    if (!line) continue
+    if (!head) {
+      head = JSON.parse(line)
+      if (head?.version !== INDEX_VERSION) {
+        lines.close()
+        return null
+      }
+    } else terms.push(JSON.parse(line))
+  }
+  if (!head) return null
+  const search = MiniSearch.loadJS<ChunkDoc>({ ...head.search, index: terms } as never, SEARCH_OPTIONS)
+  return { search, pages: head.pages, used: Date.now(), timeline: head.timeline, facts: head.facts }
+}
+
+/**
+ * The wiki's search index and spoiler check: in memory, else from its file, else made now (or again,
+ * when lots more pages have come since). With `wait` false, gives null while it's still being made
+ * the first time (the Wiki tab shows how far the check has got).
+ */
+async function indexOf(id: string, wait = true): Promise<Index | null> {
   const w = wiki(id)
   if (!w.done.size) return null
   let index = indexes.get(id) ?? null
-  if (!index) {
-    try {
-      const saved = JSON.parse((await unzip(await readFile(join(dirOf(id), 'search.json.gz')))).toString('utf8')) as {
-        version?: number
-        pages: number
-        timeline: WikiTimeline
-        facts: Record<number, PageFacts>
-        index: unknown
-      }
-      if (saved.version === INDEX_VERSION) {
-        index = { search: MiniSearch.loadJS<ChunkDoc>(saved.index as never, SEARCH_OPTIONS), pages: saved.pages, used: Date.now(), timeline: saved.timeline, facts: saved.facts }
-        indexes.set(id, index)
-      }
-    } catch {
-      index = null
-    }
+  if (!index && !building.has(id)) {
+    index = await loadIndex(id).catch(() => null)
+    if (index) indexes.set(id, index)
   }
   if (!index || w.done.size - index.pages >= REINDEX_AFTER || (w.meta.status === 'done' && index.pages !== w.done.size)) {
     let job = building.get(id)
     if (!job) {
       job = buildIndex(id).finally(() => building.delete(id))
+      job.catch((err) => logError('wiki', err))
       building.set(id, job)
     }
     // A slightly old index is fine while a new one is made.
-    if (!index) index = await job
+    if (!index) {
+      if (!wait) return null
+      index = await job
+    }
   }
   index.used = Date.now()
   // Indexes are big: let go of them after a while unused.
@@ -832,6 +905,13 @@ async function indexOf(id: string): Promise<Index | null> {
   dropTimer = setTimeout(() => {
     for (const [k, v] of indexes) if (Date.now() - v.used > 10 * 60_000) indexes.delete(k)
   }, 11 * 60_000)
+  return index
+}
+
+/** While the spoiler check runs, searching and asking say so instead of waiting minutes. */
+async function readyIndex(w: Loaded): Promise<Index | null> {
+  const index = await indexOf(w.meta.id, false)
+  if (!index && checking.has(w.meta.id)) throw new Error(`Orbit is checking ${w.meta.name} for spoilers (${checking.get(w.meta.id)}% done). Try again when it’s finished.`)
   return index
 }
 
@@ -861,7 +941,7 @@ function canSee(w: Loaded, index: Index): (r: { id: string; req?: string; part?:
 /** Pages whose text matches, best first (one result per page). */
 export async function wikiSearch(id: string, query: string): Promise<WikiHit[]> {
   const w = wiki(id)
-  const index = await indexOf(w.meta.id)
+  const index = await readyIndex(w)
   if (!index || !query.trim()) return []
   const best = new Map<string, { id: string; score: number }>()
   for (const r of index.search.search(query.slice(0, 300), { filter: canSee(w, index) as never })) {
@@ -907,7 +987,7 @@ export async function wikiAsk(question: string, ids: string[]): Promise<WikiAnsw
   const forbidden: string[] = []
   let limited = false
   for (const w of chosen) {
-    const index = await indexOf(w.meta.id)
+    const index = await readyIndex(w)
     if (!index) continue
     if (settingsOf(w).limit) {
       limited = true
