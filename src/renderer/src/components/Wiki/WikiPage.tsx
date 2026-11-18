@@ -272,7 +272,7 @@ function Reader({ wiki, wikis, place }: { wiki: WikiInfo; wikis: WikiInfo[]; pla
 }
 
 function TitleSearch({ wiki }: { wiki: WikiInfo }) {
-  const [titles, setTitles] = useState<string[]>([])
+  const [titles, setTitles] = useState<{ title: string; shown: string; known: string[] }[]>([])
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [at, setAt] = useState(0)
@@ -284,15 +284,19 @@ function TitleSearch({ wiki }: { wiki: WikiInfo }) {
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return []
-    const starts: string[] = []
-    const inside: string[] = []
+    // Matched and shown by the name you know (with the spoiler limit), opened by the page's title.
+    // Other names you'd know a page by count too: "Jesus" finds Paul Rovia.
+    type Entry = { title: string; shown: string; known: string[] }
+    const starts: Entry[] = []
+    const inside: Entry[] = []
     for (const t of titles) {
-      const l = t.toLowerCase()
-      if (l.startsWith(q)) starts.push(t)
-      else if (l.includes(q)) inside.push(t)
+      const names = [t.shown, ...t.known].map((n) => n.toLowerCase())
+      if (names.some((n) => n.startsWith(q))) starts.push(t)
+      else if (names.some((n) => n.includes(q))) inside.push(t)
       if (starts.length >= 10) break
     }
-    return [...starts.sort((a, b) => a.length - b.length), ...inside.sort((a, b) => a.length - b.length)].slice(0, 10)
+    const byLength = (a: Entry, b: Entry): number => a.shown.length - b.shown.length
+    return [...starts.sort(byLength), ...inside.sort(byLength)].slice(0, 10)
   }, [titles, query])
 
   const go = (title: string | null): void => {
@@ -324,7 +328,7 @@ function TitleSearch({ wiki }: { wiki: WikiInfo }) {
           } else if (e.key === 'ArrowUp') {
             e.preventDefault()
             setAt((a) => Math.max(a - 1, 0))
-          } else if (e.key === 'Enter') go(matches[at] ?? null)
+          } else if (e.key === 'Enter') go(matches[at]?.title ?? null)
           else if (e.key === 'Escape') {
             setQuery('')
             ;(e.target as HTMLInputElement).blur()
@@ -334,8 +338,8 @@ function TitleSearch({ wiki }: { wiki: WikiInfo }) {
       {open && query.trim() && (
         <div className="wiki-search-list">
           {matches.map((t, i) => (
-            <button key={t} className={i === at ? 'on' : ''} onMouseDown={(e) => e.preventDefault()} onClick={() => go(t)}>
-              {t}
+            <button key={t.title} className={i === at ? 'on' : ''} onMouseDown={(e) => e.preventDefault()} onClick={() => go(t.title)}>
+              {t.shown}
             </button>
           ))}
           <button className={at === matches.length ? 'on' : ''} onMouseDown={(e) => e.preventDefault()} onClick={() => go(null)}>
@@ -482,7 +486,7 @@ function SearchResults({ wiki, query }: { wiki: WikiInfo; query: string }) {
         {hits?.length === 0 && <p className="screens-note">Nothing in the downloaded pages matches that.</p>}
         {hits?.map((h) => (
           <button key={h.title} className="wiki-hit" onClick={() => goWiki({ wikiId: wiki.id, title: h.title })}>
-            <strong>{h.title}</strong>
+            <strong>{h.shown}</strong>
             {h.section && <span className="wiki-faint"> · {h.section}</span>}
             <span className="wiki-hit-text">{h.snippet}</span>
           </button>
@@ -605,7 +609,7 @@ function BrainPanel({ wiki, wikis }: { wiki: WikiInfo; wikis: WikiInfo[] }) {
             {answer.a.sources.map((s) => (
               <li key={s.n}>
                 <button onClick={() => openSource(s.n)}>
-                  <span className="wiki-cite">{s.n}</span> {s.title}
+                  <span className="wiki-cite">{s.n}</span> {s.shown}
                   {s.section && <span className="wiki-faint"> · {s.section}</span>}
                   {scope === 'all' && <span className="wiki-faint"> ({s.wikiName})</span>}
                 </button>

@@ -1277,7 +1277,7 @@ export interface NotesApi {
   /** Deletes a downloaded wiki from this computer. */
   wikiRemove(id: string): Promise<WikiInfo[]>
   /** Titles of the downloaded pages. */
-  wikiTitles(id: string): Promise<string[]>
+  wikiTitles(id: string): Promise<{ title: string; shown: string; known: string[] }[]>
   /** A downloaded page (null when it isn't downloaded), with anything past where you are taken out. */
   wikiPage(id: string, title: string, showUnplaced?: boolean): Promise<WikiPageView | null>
   /** The spoiler limit, the Show / Comics switch and how far you are, with the shows and comics found in the wiki. */

@@ -104,7 +104,10 @@ export interface WikiPageView {
 export interface WikiHit {
   wikiId: string
   wikiName: string
+  /** The page's title (to open it). */
   title: string
+  /** The name to show for it (with the spoiler limit, a name you know rather than a later one). */
+  shown: string
   section: string
   snippet: string
 }
@@ -113,7 +116,10 @@ export interface WikiSource {
   n: number
   wikiId: string
   wikiName: string
+  /** The page's title (to open it). */
   title: string
+  /** The name to show for it. */
+  shown: string
   section: string
 }
 

@@ -281,6 +281,8 @@ interface Unit {
   safe: boolean
   inBox: boolean
   firstField: boolean
+  /** Just a list of names (a link, or a few, and little else). */
+  justNames: boolean
 }
 
 const cls = (el: Element): string => el.attribs?.class ?? ''
@@ -290,6 +292,12 @@ function isBlock(el: Element): boolean {
   if (BLOCK.has(el.name)) return true
   const c = cls(el)
   return /\bpi-data\b|\bpi-image\b|\bpi-header\b|\bpi-title\b|\bpi-horizontal-group-item\b|\bpi-caption\b|\bwikia-gallery-item\b|\bgallerybox\b/.test(c)
+}
+
+/** Whether a piece is just names: some links and hardly any other words. */
+function namesOnly(el: Element, links = DomUtils.findAll((n) => n.name === 'a' && !!n.attribs.href, [el])): boolean {
+  const linkText = links.reduce((n, a) => n + DomUtils.textContent(a).trim().length, 0)
+  return links.length > 0 && DomUtils.textContent(el).replace(/\s+/g, ' ').trim().length - linkText <= 20
 }
 
 interface Walked {
@@ -335,8 +343,7 @@ function walk(html: string, title: string, categories: string[], ctx: SpoilerCon
    */
   const linksIn = (el: Element): Req | null => {
     const links = DomUtils.findAll((n) => n.name === 'a' && !!n.attribs.href, [el])
-    const linkText = links.reduce((n, a) => n + DomUtils.textContent(a).trim().length, 0)
-    const justNames = links.length > 0 && DomUtils.textContent(el).replace(/\s+/g, ' ').trim().length - linkText <= 20
+    const justNames = namesOnly(el, links)
     let req: Req | null = null
     for (const a of links) {
       const entry = entryFor(a.attribs.href)
@@ -390,7 +397,8 @@ function walk(html: string, title: string, categories: string[], ctx: SpoilerCon
       links: linksIn(el),
       safe,
       inBox: box,
-      firstField
+      firstField,
+      justNames: namesOnly(el)
     }
     unitOf.set(el, unit)
     units.push(unit)
@@ -496,8 +504,20 @@ export interface PlacedChunk {
 }
 
 /** A page's text in pieces of at most `max` characters, each placed on the timeline (for searching and the wiki brain). */
-export function placedChunks(html: string, title: string, categories: string[], ctx: SpoilerContext, max = 1200): { facts: PageFacts; chunks: PlacedChunk[] } {
+export function placedChunks(html: string, title: string, categories: string[], ctx: SpoilerContext, max = 1200): { facts: PageFacts; chunks: PlacedChunk[]; aliases: PlacedAlias[] } {
   const w = walk(html, title, categories, ctx)
+  // The names this page's writing uses for other pages, each placed where it's used.
+  const aliases: PlacedAlias[] = []
+  for (const u of w.units) {
+    if (u.heading !== null || u.inBox || u.justNames) continue
+    const req = unitReq(u)
+    if (!req || req === 'safe') continue
+    for (const a of DomUtils.findAll((n) => n.name === 'a' && !!n.attribs.href, [u.el])) {
+      const link = wikiLink(a.attribs.href, ctx.base)
+      const text = DomUtils.textContent(a).replace(/\s+/g, ' ').trim()
+      if (link?.kind === 'page' && looksLikeName(text)) aliases.push({ key: ctx.key(link.title), text, req })
+    }
+  }
   const chunks: PlacedChunk[] = []
   let cur: PlacedChunk | null = null
   const reqKey = (r: UnitReq): string => (r === 'safe' ? 'safe' : r ? JSON.stringify(Object.entries(r).sort()) : 'none')
@@ -521,7 +541,7 @@ export function placedChunks(html: string, title: string, categories: string[], 
       if (!c.req || c.req === 'safe') continue
       for (const [series, order] of Object.entries(c.req)) first = { ...(first ?? {}), [series]: Math.min(first?.[series] ?? Infinity, order) }
     }
-  return { facts: { part: w.part, self: w.self, first }, chunks }
+  return { facts: { part: w.part, self: w.self, first }, chunks, aliases }
 }
 
 /** Hidden pieces that leave a note (others, like info box fields and list items, just go). */
@@ -535,7 +555,15 @@ const HIDDEN_UNPLACED = 'Hidden: Orbit couldn’t tell when this happens.'
  * `showUnplaced`). Hidden paragraphs leave a short note; hidden info box fields and list items
  * just go. Headings with nothing left under them go too.
  */
-export function filterPage(html: string, title: string, categories: string[], ctx: SpoilerContext, s: WikiSpoilerSettings, showUnplaced: boolean): { html: string; hiddenLater: number; hiddenUnplaced: number } {
+export function filterPage(
+  html: string,
+  title: string,
+  categories: string[],
+  ctx: SpoilerContext,
+  s: WikiSpoilerSettings,
+  showUnplaced: boolean,
+  renames?: Map<string, string>
+): { html: string; hiddenLater: number; hiddenUnplaced: number } {
   const w = walk(html, title, categories, ctx)
   let hiddenLater = 0
   let hiddenUnplaced = 0
@@ -574,7 +602,100 @@ export function filterPage(html: string, title: string, categories: string[], ct
     } else DomUtils.removeElement(u.el)
   }
   tidy(w.doc.children)
+  if (renames?.size) renameText(w.doc.children, renames)
   return { html: DomUtils.getOuterHTML(w.doc), hiddenLater, hiddenUnplaced }
+}
+
+// ---------- names that change (Michonne Hawthorne → Michonne Grimes) ----------
+
+/** A name one page's writing uses for another page, and where in the story it's used. */
+export interface PlacedAlias {
+  /** The named page's key. */
+  key: string
+  text: string
+  req: Req
+}
+
+/** Short, capitalised, like a name ("Michonne", "The Governor"), not a phrase ("his wife"). */
+export function looksLikeName(text: string): boolean {
+  return text.length >= 2 && text.length <= 40 && /^[\p{Lu}0-9]/u.test(text) && text.split(' ').length <= 4 && !/[.!?:;]$/.test(text)
+}
+
+/** Every name used for a page: the text, how far you need to be to have seen it, and how often. */
+export type AliasTable = Record<string, [text: string, req: string, count: number][]>
+
+/** Adds a page's names to the table (each name and place once, with a count). */
+export function addAliases(table: AliasTable, aliases: PlacedAlias[]): void {
+  for (const a of aliases) {
+    const req = JSON.stringify(a.req)
+    const list = (table[a.key] ??= [])
+    const hit = list.find(([t, r]) => t === a.text && r === req)
+    if (hit) hit[2]++
+    else if (list.length < 40) list.push([a.text, req, 1])
+  }
+}
+
+const baseTitle = (t: string): string => t.replace(/\s*\([^)]*\)\s*$/, '').trim()
+
+/**
+ * The name to show for a page at your point in the story. The wiki names pages by the latest name
+ * ("Michonne Grimes", "Paul Rovia"); when you haven't seen that name used yet, it's the name you've
+ * seen used most ("Michonne", "Jesus"). The page's "(TV Universe)" stays. Null: the title is fine.
+ */
+export function shownName(title: string, key: string, table: AliasTable, s: WikiSpoilerSettings): string | null {
+  if (!s.limit) return null
+  const list = table[key]
+  if (!list?.length) return null
+  const base = baseTitle(title)
+  const counts = new Map<string, number>()
+  for (const [text, req, count] of list) if (allowed(JSON.parse(req) as Req, s)) counts.set(text, (counts.get(text) ?? 0) + count)
+  if (!counts.size) return null
+  // Seen a couple of times already: the title is fine.
+  const sameAsTitle = [...counts].filter(([t]) => t.toLowerCase() === base.toLowerCase()).reduce((n, [, c]) => n + c, 0)
+  if (sameAsTitle >= 2) return null
+  const best = [...counts].filter(([t]) => t.toLowerCase() !== base.toLowerCase()).sort((a, b) => b[1] - a[1])[0]?.[0]
+  if (!best) return null
+  return title.replace(base, best)
+}
+
+/** The names you've seen used for a page by your point in the story, most used first ("Jesus" for Paul Rovia). */
+export function knownNames(key: string, table: AliasTable, s: WikiSpoilerSettings, max = 5): string[] {
+  const counts = new Map<string, number>()
+  for (const [text, req, count] of table[key] ?? []) if (allowed(JSON.parse(req) as Req, s)) counts.set(text, (counts.get(text) ?? 0) + count)
+  return [...counts].sort((a, b) => b[1] - a[1]).slice(0, max).map(([t]) => t)
+}
+
+/** Later names to swap for the ones you know, everywhere a page is shown ("Michonne Grimes" → "Michonne"). */
+export function renamesFor(titles: { title: string; key: string }[], table: AliasTable, s: WikiSpoilerSettings): Map<string, string> {
+  const out = new Map<string, string>()
+  const clash = new Set<string>()
+  for (const { title, key } of titles) {
+    const shown = shownName(title, key, table, s)
+    if (!shown) continue
+    const from = baseTitle(title)
+    const to = baseTitle(shown)
+    if (from.length < 3 || from === to) continue
+    if (out.has(from) && out.get(from) !== to) clash.add(from)
+    out.set(from, to)
+  }
+  // Two pages with the same later name but different earlier ones: leave it alone.
+  for (const c of clash) out.delete(c)
+  return out
+}
+
+/** Swaps later names in text (whole words, same capitals). */
+export function renameIn(text: string, renames: Map<string, string>): string {
+  if (!renames.size) return text
+  const names = [...renames.keys()].sort((a, b) => b.length - a.length).map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const re = new RegExp(`(^|[^\\p{L}\\p{N}])(${names.join('|')})(?=$|[^\\p{L}\\p{N}])`, 'gu')
+  return text.replace(re, (_, before: string, name: string) => before + (renames.get(name) ?? name))
+}
+
+function renameText(nodes: AnyNode[], renames: Map<string, string>): void {
+  for (const n of nodes) {
+    if (n.type === 'text') n.data = renameIn(n.data, renames)
+    else if (isElement(n)) renameText(n.children, renames)
+  }
 }
 
 /**

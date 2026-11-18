@@ -43,15 +43,21 @@ import {
 import {
   allowed,
   buildTimeline,
+  addAliases,
   filterPage,
   firstAppearanceLinks,
   forbiddenNames,
   mentionsHidden,
   pageAllowed,
+  renameIn,
+  renamesFor,
+  shownName,
+  knownNames,
   partShown,
   placedChunks,
   spoilerSettings,
   timelineFact,
+  type AliasTable,
   type PageFacts,
   type PlacedChunk,
   type TimelineFact,
@@ -601,13 +607,46 @@ function pageState(w: Loaded, index: Index | null, pageId: number): 'ok' | 'part
   return pageAllowed(facts, s)
 }
 
-/** The titles of the downloaded pages you can see, for the reader's search box. */
-export async function wikiTitles(id: string): Promise<string[]> {
+interface Names {
+  /** Later names to swap in text: "Michonne Grimes" → "Michonne". */
+  renames: Map<string, string>
+  /** A page's title → the title to show. */
+  shown: (title: string) => string
+  /** A page's title → other names you'd know it by, for the search box. */
+  known: (title: string) => string[]
+}
+
+const namesCache = new Map<string, { index: Index; updated: number; names: Names }>()
+
+/** The names to show at your point in the story, for characters whose names change. */
+async function namesOf(w: Loaded, index: Index | null): Promise<Names> {
+  const s = settingsOf(w)
+  const none: Names = { renames: new Map(), shown: (t) => t, known: () => [] }
+  if (!s.limit || !index) return none
+  const cached = namesCache.get(w.meta.id)
+  if (cached && cached.index === index && cached.updated === s.updated) return cached.names
+  const key = await keyFor(w.meta.id)
+  const l = await listOf(w.meta.id)
+  const titles = l.pages.filter((p) => w.done.has(p.id)).map((p) => ({ title: p.title, key: key(p.title) }))
+  const renames = renamesFor(titles, index.aliases, s)
+  const byTitle = new Map<string, string>()
+  for (const t of titles) {
+    const shown = shownName(t.title, t.key, index.aliases, s)
+    if (shown) byTitle.set(t.title, shown)
+  }
+  const names: Names = { renames, shown: (t) => byTitle.get(t) ?? renameIn(t, renames), known: (t) => knownNames(key(t), index.aliases, s) }
+  namesCache.set(w.meta.id, { index, updated: s.updated, names })
+  return names
+}
+
+/** The downloaded pages you can see, for the reader's search box: each page's title, and the name to show for it. */
+export async function wikiTitles(id: string): Promise<{ title: string; shown: string; known: string[] }[]> {
   const w = wiki(id)
   const l = await listOf(w.meta.id)
   const s = settingsOf(w)
   const index = s.limit || s.parts !== 'both' ? await indexOf(w.meta.id, false) : null
-  return l.pages.filter((p) => w.done.has(p.id) && pageState(w, index, p.id) === 'ok').map((p) => p.title)
+  const names = await namesOf(w, index)
+  return l.pages.filter((p) => w.done.has(p.id) && pageState(w, index, p.id) === 'ok').map((p) => ({ title: p.title, shown: names.shown(p.title), known: names.known(p.title) }))
 }
 
 /** A downloaded page by its title (or a redirect to it), with anything past where you are taken out. Null when it isn't downloaded. */
@@ -624,8 +663,9 @@ export async function wikiPage(id: string, title: string, showUnplaced = false):
   const state = pageState(w, index, pageId)
   if (state !== 'ok' && !(state === 'unplaced' && showUnplaced)) return { ...view, html: '', images: {}, blocked: state }
   if (!s.limit || !index) return view
-  const filtered = filterPage(p.html, p.title, p.categories, { timeline: index.timeline, key: await keyFor(w.meta.id), base: w.meta.base }, s, showUnplaced)
-  return { ...view, html: filtered.html, hiddenLater: filtered.hiddenLater, hiddenUnplaced: filtered.hiddenUnplaced }
+  const names = await namesOf(w, index)
+  const filtered = filterPage(p.html, p.title, p.categories, { timeline: index.timeline, key: await keyFor(w.meta.id), base: w.meta.base }, s, showUnplaced, names.renames)
+  return { ...view, displayTitle: names.shown(p.title), html: filtered.html, hiddenLater: filtered.hiddenLater, hiddenUnplaced: filtered.hiddenUnplaced }
 }
 
 /** vault://wiki/<id>/<picture>: a downloaded picture. */
@@ -730,7 +770,7 @@ const SEARCH_OPTIONS = {
 }
 
 /** Saved indexes from an older Orbit are made again. */
-const INDEX_VERSION = 3
+const INDEX_VERSION = 4
 
 interface Index {
   search: MiniSearch<ChunkDoc>
@@ -739,6 +779,8 @@ interface Index {
   timeline: WikiTimeline
   /** By page id: which part it's about and when it first appears. */
   facts: Record<number, PageFacts>
+  /** The names the wiki's writing uses for each page, and where (for characters whose names change). */
+  aliases: AliasTable
 }
 
 const indexes = new Map<string, Index>()
@@ -801,6 +843,7 @@ async function checkAndIndex(id: string, signal?: AbortSignal): Promise<Index> {
   await mkdir(join(dirOf(id), 'chunks'), { recursive: true })
   const search = new MiniSearch<ChunkDoc>(SEARCH_OPTIONS)
   const pageFacts: Record<number, PageFacts> = {}
+  const aliases: AliasTable = {}
   for (const pageId of pageIds) {
     if (signal?.aborted) throw new Error('stopped')
     const p = await readPage(id, pageId)
@@ -815,11 +858,12 @@ async function checkAndIndex(id: string, signal?: AbortSignal): Promise<Index> {
       continue
     }
     pageFacts[pageId] = placed.facts
+    addAliases(aliases, placed.aliases)
     await writeFile(chunkFile(id, pageId), await zip(JSON.stringify(placed.chunks)))
     search.addAll(placed.chunks.map((c, i) => ({ id: `${pageId}:${i}`, title: p.title, section: c.section, text: c.text, req: JSON.stringify(c.req), part: placed.facts.part })))
     if (n % 20 === 0) await yieldNow()
   }
-  const index: Index = { search, pages: w.done.size, used: Date.now(), timeline, facts: pageFacts }
+  const index: Index = { search, pages: w.done.size, used: Date.now(), timeline, facts: pageFacts, aliases }
   await saveIndex(id, index)
   indexes.set(id, index)
   tellSoon()
@@ -840,7 +884,7 @@ async function saveIndex(id: string, index: Index): Promise<void> {
     out.on('error', reject).pipe(sink)
   })
   const write = (line: string): Promise<void> => (out.write(line + '\n') ? Promise.resolve() : new Promise((r) => out.once('drain', () => r())))
-  await write(JSON.stringify({ version: INDEX_VERSION, pages: index.pages, timeline: index.timeline, facts: index.facts, search: rest }))
+  await write(JSON.stringify({ version: INDEX_VERSION, pages: index.pages, timeline: index.timeline, facts: index.facts, aliases: index.aliases, search: rest }))
   for (const term of terms) await write(JSON.stringify(term))
   out.end()
   await done
@@ -856,7 +900,7 @@ async function loadIndex(id: string): Promise<Index | null> {
   const unzipped = createGunzip()
   raw.on('error', (err) => unzipped.destroy(err))
   const lines = createInterface({ input: raw.pipe(unzipped), crlfDelay: Infinity })
-  let head: { version?: number; pages: number; timeline: WikiTimeline; facts: Record<number, PageFacts>; search: Record<string, unknown> } | null = null
+  let head: { version?: number; pages: number; timeline: WikiTimeline; facts: Record<number, PageFacts>; aliases: AliasTable; search: Record<string, unknown> } | null = null
   const terms: unknown[] = []
   for await (const line of lines) {
     if (!line) continue
@@ -870,7 +914,7 @@ async function loadIndex(id: string): Promise<Index | null> {
   }
   if (!head) return null
   const search = MiniSearch.loadJS<ChunkDoc>({ ...head.search, index: terms } as never, SEARCH_OPTIONS)
-  return { search, pages: head.pages, used: Date.now(), timeline: head.timeline, facts: head.facts }
+  return { search, pages: head.pages, used: Date.now(), timeline: head.timeline, facts: head.facts, aliases: head.aliases ?? {} }
 }
 
 /**
@@ -949,10 +993,19 @@ export async function wikiSearch(id: string, query: string): Promise<WikiHit[]> 
     if (!best.has(page)) best.set(page, { id: String(r.id), score: r.score })
     if (best.size >= 30) break
   }
+  const names = await namesOf(w, index)
   const out: WikiHit[] = []
   for (const { id: docId } of best.values()) {
     const c = await chunkText(w.meta.id, docId)
-    if (c) out.push({ wikiId: w.meta.id, wikiName: w.meta.name, title: c.title, section: c.section, snippet: c.text.replace(/\s+/g, ' ').slice(0, 220) })
+    if (c)
+      out.push({
+        wikiId: w.meta.id,
+        wikiName: w.meta.name,
+        title: c.title,
+        shown: names.shown(c.title),
+        section: renameIn(c.section, names.renames),
+        snippet: renameIn(c.text.replace(/\s+/g, ' ').slice(0, 220), names.renames)
+      })
   }
   return out
 }
@@ -985,13 +1038,18 @@ export async function wikiAsk(question: string, ids: string[]): Promise<WikiAnsw
   const chosen = (ids.length ? ids : [...wikis.keys()]).map((i) => wiki(i))
   const hits: { w: Loaded; docId: string; score: number }[] = []
   const forbidden: string[] = []
+  const namesByWiki = new Map<string, Names>()
   let limited = false
   for (const w of chosen) {
     const index = await readyIndex(w)
     if (!index) continue
+    const names = await namesOf(w, index)
+    namesByWiki.set(w.meta.id, names)
     if (settingsOf(w).limit) {
       limited = true
       forbidden.push(...(await hiddenNames(w, index)))
+      // Later names ("Michonne Grimes") mustn't come up either.
+      forbidden.push(...names.renames.keys())
     }
     const results = index.search.search(q, { filter: canSee(w, index) as never }).slice(0, 14)
     const top = results[0]?.score || 1
@@ -1001,7 +1059,7 @@ export async function wikiAsk(question: string, ids: string[]): Promise<WikiAnsw
   if (!hits.length) throw new Error(chosen.some((w) => w.done.size) ? 'Nothing you can see in the downloaded wiki matches that. Try other words, like a name.' : 'Download a wiki first (or wait for some of its pages to arrive).')
   hits.sort((a, b) => b.score - a.score)
 
-  const extracts: (WikiExtract & { wikiId: string })[] = []
+  const extracts: (WikiExtract & { wikiId: string; page: string })[] = []
   const perPage = new Map<string, number>()
   let used = 0
   const budget = LOCAL_CONTEXT_CHARS * 0.55
@@ -1014,7 +1072,9 @@ export async function wikiAsk(question: string, ids: string[]): Promise<WikiAnsw
       if (extracts.length) break
       c.text = c.text.slice(0, budget)
     }
-    extracts.push({ wikiId: h.w.meta.id, wikiName: h.w.meta.name, ...c })
+    // The AI reads the names you know, not later ones.
+    const names = namesByWiki.get(h.w.meta.id)!
+    extracts.push({ wikiId: h.w.meta.id, wikiName: h.w.meta.name, title: names.shown(c.title), section: renameIn(c.section, names.renames), text: renameIn(c.text, names.renames), page: c.title })
     perPage.set(pageKey, (perPage.get(pageKey) ?? 0) + 1)
     used += c.text.length
     if (extracts.length >= 12) break
@@ -1035,7 +1095,7 @@ export async function wikiAsk(question: string, ids: string[]): Promise<WikiAnsw
   const cited = citedNumbers(text, extracts.length)
   const source = (n: number): WikiSource => {
     const e = extracts[n - 1]
-    return { n, wikiId: e.wikiId, wikiName: e.wikiName, title: e.title, section: e.section }
+    return { n, wikiId: e.wikiId, wikiName: e.wikiName, title: e.page, shown: e.title, section: e.section }
   }
   return { text, cited: cited.length > 0, sources: cited.length ? cited.map(source) : extracts.map((_, i) => source(i + 1)) }
 }

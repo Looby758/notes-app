@@ -4,7 +4,13 @@ import {
   allowed,
   buildTimeline,
   DEFAULT_SPOILERS,
+  addAliases,
   filterPage,
+  knownNames,
+  renameIn,
+  renamesFor,
+  shownName,
+  type AliasTable,
   firstAppearanceLinks,
   forbiddenNames,
   mentionsHidden,
@@ -216,5 +222,41 @@ describe('the wiki’s main page (lists of names)', () => {
   it('never lets one early name make writing safe, even inside a box', () => {
     expect(html).not.toContain('spin-off')
     expect(html).not.toContain('News')
+  })
+})
+
+describe('characters whose names change', () => {
+  // Episode write-ups call her "Michonne"; from Season 2 Episode 13 on, one calls her "Michonne Grimes".
+  const table: AliasTable = {}
+  const early = placedChunks(episode(2, 1) + '<p><a href="/wiki/Michonne_Grimes_(TV_Universe)">Michonne</a> arrives at the edge of the woods, dragging two chained walkers behind her.</p>', 'What Lies Ahead', TV, ctx)
+  const late = placedChunks(episode(2, 13) + '<p><a href="/wiki/Michonne_Grimes_(TV_Universe)">Michonne Grimes</a> saves Andrea in the woods, and later <a href="/wiki/Michonne_Grimes_(TV_Universe)">Michonne Grimes</a> leads her away from the farm.</p>', 'Beside the Dying Fire', TV, ctx)
+  // A list of names doesn't count: it's placed by when she first appears, not by when the name is used.
+  const list = placedChunks('<ul><li><a href="/wiki/Michonne_Grimes_(TV_Universe)">Michonne Grimes</a></li></ul>', 'The Walking Dead Wiki', [], ctx)
+  addAliases(table, [...early.aliases, ...late.aliases, ...list.aliases])
+  const key = 'michonne grimes (tv universe)'
+  const title = 'Michonne Grimes (TV Universe)'
+
+  it('collects names from writing only, each where it’s used', () => {
+    expect(table[key]).toEqual([
+      ['Michonne', '{"TV Series":2001}', 1],
+      ['Michonne Grimes', '{"TV Series":2013}', 2]
+    ])
+  })
+  it('shows the name you know until the later one is used', () => {
+    expect(shownName(title, key, table, at({ 'TV Series': 2001 }))).toBe('Michonne (TV Universe)')
+    expect(shownName(title, key, table, at({ 'TV Series': 2013 }))).toBeNull()
+    expect(shownName(title, key, table, DEFAULT_SPOILERS)).toBeNull()
+    expect(shownName(title, key, table, at({}))).toBeNull()
+  })
+  it('swaps the later name in any text, as whole words only', () => {
+    const renames = renamesFor([{ title, key }], table, at({ 'TV Series': 2001 }))
+    expect([...renames]).toEqual([['Michonne Grimes', 'Michonne']])
+    expect(renameIn('Rick and Michonne Grimes. Michonne Grimesville.', renames)).toBe('Rick and Michonne. Michonne Grimesville.')
+    const html = filterPage('<p>In <a href="/wiki/Guts">Guts</a>, Michonne Grimes waves at the group from across the road.</p>', 'Guts', TV, ctx, at({ 'TV Series': 2001 }), false, renames).html
+    expect(html).toContain('Michonne waves at the group')
+  })
+  it('finds a page by the names you know', () => {
+    expect(knownNames(key, table, at({ 'TV Series': 2001 }))).toEqual(['Michonne'])
+    expect(knownNames(key, table, at({ 'TV Series': 2013 }))).toEqual(['Michonne Grimes', 'Michonne'])
   })
 })
