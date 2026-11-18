@@ -635,6 +635,9 @@ export function addAliases(table: AliasTable, aliases: PlacedAlias[]): void {
   }
 }
 
+/** How much of the naming the title needs before it's shown (Glenn is "Glenn Rhee" in about 40% of early mentions). */
+const TITLE_SHARE = 0.25
+
 const baseTitle = (t: string): string => t.replace(/\s*\([^)]*\)\s*$/, '').trim()
 
 /**
@@ -650,9 +653,11 @@ export function shownName(title: string, key: string, table: AliasTable, s: Wiki
   const counts = new Map<string, number>()
   for (const [text, req, count] of list) if (allowed(JSON.parse(req) as Req, s)) counts.set(text, (counts.get(text) ?? 0) + count)
   if (!counts.size) return null
-  // Seen a couple of times already: the title is fine.
+  // The title is fine once it's a fair share of how the page is named by your point. A few uses
+  // aren't enough: the wiki's writers often use the latest name even about early episodes.
   const sameAsTitle = [...counts].filter(([t]) => t.toLowerCase() === base.toLowerCase()).reduce((n, [, c]) => n + c, 0)
-  if (sameAsTitle >= 2) return null
+  const all = [...counts.values()].reduce((n, c) => n + c, 0)
+  if (sameAsTitle >= 2 && sameAsTitle >= all * TITLE_SHARE) return null
   const best = [...counts].filter(([t]) => t.toLowerCase() !== base.toLowerCase()).sort((a, b) => b[1] - a[1])[0]?.[0]
   if (!best) return null
   return title.replace(base, best)

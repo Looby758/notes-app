@@ -255,6 +255,14 @@ describe('characters whose names change', () => {
     const html = filterPage('<p>In <a href="/wiki/Guts">Guts</a>, Michonne Grimes waves at the group from across the road.</p>', 'Guts', TV, ctx, at({ 'TV Series': 2001 }), false, renames).html
     expect(html).toContain('Michonne waves at the group')
   })
+  it('isn’t fooled by a few early uses of the later name', () => {
+    // Other pages' early write-ups mostly say "Michonne", but a few say "Michonne Grimes".
+    const t: AliasTable = { [key]: [['Michonne', '{"TV Series":2001}', 40], ['Michonne Grimes', '{"TV Series":2001}', 3]] }
+    expect(shownName(title, key, t, at({ 'TV Series': 3001 }))).toBe('Michonne (TV Universe)')
+    // Glenn is "Glenn Rhee" in a good share of mentions: his name stays.
+    const g: AliasTable = { 'glenn rhee (tv series)': [['Glenn', '{"TV Series":1002}', 6], ['Glenn Rhee', '{"TV Series":1001}', 4]] }
+    expect(shownName('Glenn Rhee (TV Series)', 'glenn rhee (tv series)', g, at({ 'TV Series': 3001 }))).toBeNull()
+  })
   it('finds a page by the names you know', () => {
     expect(knownNames(key, table, at({ 'TV Series': 2001 }))).toEqual(['Michonne'])
     expect(knownNames(key, table, at({ 'TV Series': 2013 }))).toEqual(['Michonne Grimes', 'Michonne'])
