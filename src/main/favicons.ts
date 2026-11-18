@@ -2,7 +2,7 @@ import { app, BrowserWindow, session, type Session, type WebContents } from 'ele
 import { promises as fs, readFileSync } from 'fs'
 import { join } from 'path'
 import { hostOf, iconLinkFromHtml } from '@shared/browser'
-import { WEB_PARTITION } from '@shared/web'
+import { isGoogleSignIn, WEB_PARTITION } from '@shared/web'
 import { logError } from './log'
 
 /**
@@ -95,6 +95,9 @@ async function fetchIcon(ses: Session, url: string): Promise<string | null> {
 /** A web tab's page told us its icon: keep it for its host. */
 export function watchFavicons(page: WebContents): void {
   page.on('page-favicon-updated', (_e, favicons) => {
+    // Google's sign-in pages are left alone: a request from Orbit itself (as Chrome) in the middle of
+    // a sign-in told "Firefox" would look odd to Google.
+    if (isGoogleSignIn(page.getURL())) return
     const host = hostOf(page.getURL())
     const first = favicons.find((f) => /^(https?:|data:image\/)/i.test(f))
     if (!host || !first) return
@@ -135,6 +138,7 @@ export async function findMissingFavicons(urls: string[]): Promise<void> {
   const now = Date.now()
   const byHost = new Map<string, string>()
   for (const url of urls) {
+    if (isGoogleSignIn(url)) continue
     const host = hostOf(url)
     if (!host || s.icons[host] || lookingUp.has(host) || now - (s.missing[host] ?? 0) < RETRY_MS) continue
     if (!byHost.has(host)) byHost.set(host, url)
