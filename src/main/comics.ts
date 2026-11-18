@@ -332,10 +332,12 @@ async function buildIndex(b: ComicBook): Promise<PageIndex> {
     const fileFor = (n: string): string => `${String(order.get(n) ?? 0).padStart(5, '0')}${extname(n).toLowerCase()}`
     const out = join(dir, 'pages')
     await rm(out, { recursive: true, force: true })
+    // Show "0 of N" straight away, so a slow start looks like progress and not a stuck screen.
+    sendPreparing(b.id, 0, names.length)
     await extractRar(b.path, out, {
       only: (n) => order.has(n),
       rename: fileFor,
-      onFile: (_n, done, total) => done % 5 === 0 && sendPreparing(b.id, done, total)
+      onFile: (_n, done, total) => (done <= 5 || done % 5 === 0) && sendPreparing(b.id, done, total)
     })
     files = names.map(fileFor)
     bytes = 0

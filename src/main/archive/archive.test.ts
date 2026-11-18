@@ -5,6 +5,12 @@ import JSZip from 'jszip'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { archiveKind, extractArchive, listArchive, ZipArchive } from './index'
 import { storedRar, tinyPng } from './testArchives'
+import { createRequire } from 'module'
+import { setRarRunner } from './rar'
+import { runRar, type Unrar } from './rarRun'
+
+/** Tests run unrar in the same thread. */
+setRarRunner((job, onProgress, cancelled) => runRar(createRequire(__filename)('node-unrar-js') as Unrar, job, onProgress, cancelled) as never)
 
 const fixture = (name: string): string => join(__dirname, 'fixtures', name)
 

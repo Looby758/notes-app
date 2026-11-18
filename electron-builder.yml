@@ -23,6 +23,7 @@ npmRebuild: false
 # the offline handwriting reader's worker thread and the packages it loads, and 7-Zip's.
 asarUnpack:
   - node_modules/node-pty/**
+  - node_modules/node-unrar-js/**
   - node_modules/tesseract.js/**
   - node_modules/tesseract.js-core/**
   - node_modules/@tesseract.js-data/**
