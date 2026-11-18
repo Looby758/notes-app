@@ -259,6 +259,7 @@ function Reader({ wiki, wikis, place }: { wiki: WikiInfo; wikis: WikiInfo[]; pla
         </button>
       </div>
       {wiki.status !== 'done' && <div className="wiki-notice">{statusText(wiki)}. Pages that haven’t arrived yet can’t be opened.</div>}
+      {wiki.checkProblem && <div className="wiki-notice">Orbit couldn’t finish checking this wiki for spoilers. It tries again in a few minutes.</div>}
       {wiki.status === 'done' && wiki.checking !== undefined && (
         <div className="wiki-notice">Orbit is checking this wiki for spoilers ({wiki.checking}% done). This happens once after a download or an update, and takes a few minutes for a big wiki.</div>
       )}

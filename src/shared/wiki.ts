@@ -59,6 +59,8 @@ export interface WikiInfo {
   secondsLeft?: number
   /** While Orbit checks the downloaded pages for spoilers (after an update or a download): how far it's got, 0–99. */
   checking?: number
+  /** The spoiler check went wrong (it's tried again after a few minutes). */
+  checkProblem?: boolean
 }
 
 /** What the spoiler settings show for a wiki. */

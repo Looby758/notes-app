@@ -2,6 +2,8 @@ import { app, BrowserWindow, ipcMain, net } from 'electron'
 import { createHash } from 'crypto'
 import { createReadStream, createWriteStream, existsSync, readdirSync, readFileSync } from 'fs'
 import { createInterface } from 'readline'
+import { Readable } from 'stream'
+import { pipeline } from 'stream/promises'
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { createGunzip, createGzip, gunzip, gzip } from 'zlib'
@@ -208,7 +210,8 @@ function info(w: Loaded): WikiInfo {
     failed: w.failed,
     bytes: w.bytes,
     ...(left !== null ? { secondsLeft: left } : {}),
-    ...(checking.has(w.meta.id) ? { checking: checking.get(w.meta.id) } : {})
+    ...(checking.has(w.meta.id) ? { checking: checking.get(w.meta.id) } : {}),
+    ...(checkFailed.has(w.meta.id) && !checking.has(w.meta.id) ? { checkProblem: true } : {})
   }
 }
 
@@ -786,6 +789,9 @@ interface Index {
 const indexes = new Map<string, Index>()
 /** Wikis whose spoiler check is running, and how far it's got (0–99). */
 const checking = new Map<string, number>()
+/** When a wiki's spoiler check last went wrong (it's tried again after a while). */
+const checkFailed = new Map<string, number>()
+const RETRY_CHECK_MS = 10 * 60_000
 const building = new Map<string, Promise<Index>>()
 let dropTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -864,8 +870,9 @@ async function checkAndIndex(id: string, signal?: AbortSignal): Promise<Index> {
     if (n % 20 === 0) await yieldNow()
   }
   const index: Index = { search, pages: w.done.size, used: Date.now(), timeline, facts: pageFacts, aliases }
-  await saveIndex(id, index)
+  // Used straight away; saving it only spares checking again next time Orbit starts.
   indexes.set(id, index)
+  await saveIndex(id, index).catch((err) => logError('wiki', `saving the spoiler check: ${err instanceof Error ? err.message : err}`))
   tellSoon()
   return index
 }
@@ -877,19 +884,29 @@ async function checkAndIndex(id: string, signal?: AbortSignal): Promise<Index> {
 async function saveIndex(id: string, index: Index): Promise<void> {
   const file = join(dirOf(id), 'search.lines.gz')
   const { index: terms, ...rest } = index.search.toJSON() as unknown as { index: unknown[] } & Record<string, unknown>
-  const out = createGzip()
-  const done = new Promise<void>((resolve, reject) => {
-    const sink = createWriteStream(`${file}.tmp`)
-    sink.on('finish', resolve).on('error', reject)
-    out.on('error', reject).pipe(sink)
-  })
-  const write = (line: string): Promise<void> => (out.write(line + '\n') ? Promise.resolve() : new Promise((r) => out.once('drain', () => r())))
-  await write(JSON.stringify({ version: INDEX_VERSION, pages: index.pages, timeline: index.timeline, facts: index.facts, aliases: index.aliases, search: rest }))
-  for (const term of terms) await write(JSON.stringify(term))
-  out.end()
-  await done
-  await rename(`${file}.tmp`, file)
+  // One line at a time through gzip into the file; any problem on the way stops it and is reported.
+  const head = JSON.stringify({ version: INDEX_VERSION, pages: index.pages, timeline: index.timeline, facts: index.facts, aliases: index.aliases, search: rest })
+  async function* lines(): AsyncGenerator<string> {
+    yield head + '\n'
+    for (const term of terms) yield JSON.stringify(term) + '\n'
+  }
+  await pipeline(Readable.from(lines()), createGzip(), createWriteStream(`${file}.tmp`))
+  await replaceFile(`${file}.tmp`, file)
   await rm(join(dirOf(id), 'search.json.gz'), { force: true })
+}
+
+/** Puts a new file in place of an old one, trying again for a moment if something (an antivirus scan) has the old one open. */
+async function replaceFile(from: string, to: string): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await rename(from, to)
+      return
+    } catch (err) {
+      if (attempt >= 5) throw err
+      await new Promise((r) => setTimeout(r, 300 * (attempt + 1)))
+      await rm(to, { force: true }).catch(() => undefined)
+    }
+  }
 }
 
 async function loadIndex(id: string): Promise<Index | null> {
@@ -902,15 +919,21 @@ async function loadIndex(id: string): Promise<Index | null> {
   const lines = createInterface({ input: raw.pipe(unzipped), crlfDelay: Infinity })
   let head: { version?: number; pages: number; timeline: WikiTimeline; facts: Record<number, PageFacts>; aliases: AliasTable; search: Record<string, unknown> } | null = null
   const terms: unknown[] = []
-  for await (const line of lines) {
-    if (!line) continue
-    if (!head) {
-      head = JSON.parse(line)
-      if (head?.version !== INDEX_VERSION) {
-        lines.close()
-        return null
-      }
-    } else terms.push(JSON.parse(line))
+  try {
+    for await (const line of lines) {
+      if (!line) continue
+      if (!head) {
+        head = JSON.parse(line)
+        // Saved by an older Orbit: it's made again.
+        if (head?.version !== INDEX_VERSION) return null
+      } else terms.push(JSON.parse(line))
+    }
+  } finally {
+    // Always let go of the file. Windows won't let a file that's still open be replaced, so a
+    // forgotten one stopped the new check from being saved (and the check ran again and again).
+    lines.close()
+    unzipped.destroy()
+    raw.destroy()
   }
   if (!head) return null
   const search = MiniSearch.loadJS<ChunkDoc>({ ...head.search, index: terms } as never, SEARCH_OPTIONS)
@@ -932,14 +955,25 @@ async function indexOf(id: string, wait = true): Promise<Index | null> {
   }
   if (!index || w.done.size - index.pages >= REINDEX_AFTER || (w.meta.status === 'done' && index.pages !== w.done.size)) {
     let job = building.get(id)
-    if (!job) {
+    const failed = checkFailed.get(id)
+    if (!job && failed && Date.now() - failed < RETRY_CHECK_MS) {
+      // It went wrong a moment ago: try again later, not over and over.
+      if (!index) return null
+    } else if (!job) {
       job = buildIndex(id).finally(() => building.delete(id))
-      job.catch((err) => logError('wiki', err))
+      job.then(
+        () => checkFailed.delete(id),
+        (err) => {
+          logError('wiki', err)
+          checkFailed.set(id, Date.now())
+          tellSoon()
+        }
+      )
       building.set(id, job)
     }
     // A slightly old index is fine while a new one is made.
     if (!index) {
-      if (!wait) return null
+      if (!wait || !job) return null
       index = await job
     }
   }
@@ -955,6 +989,7 @@ async function indexOf(id: string, wait = true): Promise<Index | null> {
 /** While the spoiler check runs, searching and asking say so instead of waiting minutes. */
 async function readyIndex(w: Loaded): Promise<Index | null> {
   const index = await indexOf(w.meta.id, false)
+  if (!index && checkFailed.has(w.meta.id) && !checking.has(w.meta.id)) throw new Error(`Orbit couldn’t finish checking ${w.meta.name} for spoilers. It tries again in a few minutes.`)
   if (!index && checking.has(w.meta.id)) throw new Error(`Orbit is checking ${w.meta.name} for spoilers (${checking.get(w.meta.id)}% done). Try again when it’s finished.`)
   return index
 }
