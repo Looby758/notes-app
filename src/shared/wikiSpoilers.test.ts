@@ -4,7 +4,14 @@ import {
   allowed,
   buildTimeline,
   DEFAULT_SPOILERS,
+  addAliases,
   filterPage,
+  knownNames,
+  renameIn,
+  renamesFor,
+  shownName,
+  type AliasTable,
+  firstAppearanceLinks,
   forbiddenNames,
   mentionsHidden,
   pageAllowed,
@@ -186,5 +193,78 @@ describe('search and the wiki brain', () => {
   it('reads saved settings safely', () => {
     expect(spoilerSettings({ limit: true, parts: 'show', progress: { 'TV Series': 2003, bad: 'x' }, updated: 5 })).toEqual({ limit: true, parts: 'show', progress: { 'TV Series': 2003 }, updated: 5 })
     expect(spoilerSettings(null)).toEqual(DEFAULT_SPOILERS)
+  })
+})
+
+describe('the wiki’s main page (lists of names)', () => {
+  // When characters and places first appear, from their own info boxes.
+  const firstBox = (ep: string): string => box(field('first', 'First Appearance', `<a href="/wiki/${ep}">x</a>`))
+  const withFirsts = buildTimeline(facts, key, {
+    'Rick Grimes (TV Series)': firstAppearanceLinks(firstBox('Days_Gone_Bye_(TV_Series)'), base),
+    'Hilltop Colony': firstAppearanceLinks(firstBox('Beside_the_Dying_Fire'), base)
+  })
+  const c = { timeline: withFirsts, key, base }
+  const page = `<table><tr><td><a href="/wiki/Rick_Grimes_(TV_Series)">Rick Grimes</a></td><td><a href="/wiki/Hilltop_Colony">Hilltop Colony</a></td>
+<td><a href="/wiki/Rick_Grimes_(TV_Series)">Rick</a> <a href="/wiki/Mystery_Person">Mystery</a></td>
+<td><small><b>News: <a href="/wiki/Rick_Grimes_(TV_Series)">Rick Grimes</a> returns in the new spin-off, Rick Lives!</b><div><p>Plain line.</p></div></small></td></tr></table>`
+  const html = filterPage(page, 'The Walking Dead Wiki', [], c, at({ 'TV Series': 2001 }), false).html
+
+  it('knows when characters and places first appear', () => {
+    expect(withFirsts.firsts).toEqual({ 'rick grimes (tv series)': { 'TV Series': 1001 }, 'hilltop colony': { 'TV Series': 2013 } })
+  })
+  it('shows names you’ve reached and hides the rest', () => {
+    expect(html).toContain('Rick Grimes')
+    expect(html).not.toContain('Hilltop')
+  })
+  it('hides a list with a name it can’t place', () => {
+    expect(html).not.toContain('Mystery')
+  })
+  it('never lets one early name make writing safe, even inside a box', () => {
+    expect(html).not.toContain('spin-off')
+    expect(html).not.toContain('News')
+  })
+})
+
+describe('characters whose names change', () => {
+  // Episode write-ups call her "Michonne"; from Season 2 Episode 13 on, one calls her "Michonne Grimes".
+  const table: AliasTable = {}
+  const early = placedChunks(episode(2, 1) + '<p><a href="/wiki/Michonne_Grimes_(TV_Universe)">Michonne</a> arrives at the edge of the woods, dragging two chained walkers behind her.</p>', 'What Lies Ahead', TV, ctx)
+  const late = placedChunks(episode(2, 13) + '<p><a href="/wiki/Michonne_Grimes_(TV_Universe)">Michonne Grimes</a> saves Andrea in the woods, and later <a href="/wiki/Michonne_Grimes_(TV_Universe)">Michonne Grimes</a> leads her away from the farm.</p>', 'Beside the Dying Fire', TV, ctx)
+  // A list of names doesn't count: it's placed by when she first appears, not by when the name is used.
+  const list = placedChunks('<ul><li><a href="/wiki/Michonne_Grimes_(TV_Universe)">Michonne Grimes</a></li></ul>', 'The Walking Dead Wiki', [], ctx)
+  addAliases(table, [...early.aliases, ...late.aliases, ...list.aliases])
+  const key = 'michonne grimes (tv universe)'
+  const title = 'Michonne Grimes (TV Universe)'
+
+  it('collects names from writing only, each where it’s used', () => {
+    expect(table[key]).toEqual([
+      ['Michonne', '{"TV Series":2001}', 1],
+      ['Michonne Grimes', '{"TV Series":2013}', 2]
+    ])
+  })
+  it('shows the name you know until the later one is used', () => {
+    expect(shownName(title, key, table, at({ 'TV Series': 2001 }))).toBe('Michonne (TV Universe)')
+    expect(shownName(title, key, table, at({ 'TV Series': 2013 }))).toBeNull()
+    expect(shownName(title, key, table, DEFAULT_SPOILERS)).toBeNull()
+    expect(shownName(title, key, table, at({}))).toBeNull()
+  })
+  it('swaps the later name in any text, as whole words only', () => {
+    const renames = renamesFor([{ title, key }], table, at({ 'TV Series': 2001 }))
+    expect([...renames]).toEqual([['Michonne Grimes', 'Michonne']])
+    expect(renameIn('Rick and Michonne Grimes. Michonne Grimesville.', renames)).toBe('Rick and Michonne. Michonne Grimesville.')
+    const html = filterPage('<p>In <a href="/wiki/Guts">Guts</a>, Michonne Grimes waves at the group from across the road.</p>', 'Guts', TV, ctx, at({ 'TV Series': 2001 }), false, renames).html
+    expect(html).toContain('Michonne waves at the group')
+  })
+  it('isn’t fooled by a few early uses of the later name', () => {
+    // Other pages' early write-ups mostly say "Michonne", but a few say "Michonne Grimes".
+    const t: AliasTable = { [key]: [['Michonne', '{"TV Series":2001}', 40], ['Michonne Grimes', '{"TV Series":2001}', 3]] }
+    expect(shownName(title, key, t, at({ 'TV Series': 3001 }))).toBe('Michonne (TV Universe)')
+    // Glenn is "Glenn Rhee" in a good share of mentions: his name stays.
+    const g: AliasTable = { 'glenn rhee (tv series)': [['Glenn', '{"TV Series":1002}', 6], ['Glenn Rhee', '{"TV Series":1001}', 4]] }
+    expect(shownName('Glenn Rhee (TV Series)', 'glenn rhee (tv series)', g, at({ 'TV Series': 3001 }))).toBeNull()
+  })
+  it('finds a page by the names you know', () => {
+    expect(knownNames(key, table, at({ 'TV Series': 2001 }))).toEqual(['Michonne'])
+    expect(knownNames(key, table, at({ 'TV Series': 2013 }))).toEqual(['Michonne Grimes', 'Michonne'])
   })
 })

@@ -57,6 +57,10 @@ export interface WikiInfo {
   spoilers?: WikiSpoilerSettings
   /** While pages are downloading: about how many seconds are left (once there's enough to go on). */
   secondsLeft?: number
+  /** While Orbit checks the downloaded pages for spoilers (after an update or a download): how far it's got, 0–99. */
+  checking?: number
+  /** The spoiler check went wrong (it's tried again after a few minutes). */
+  checkProblem?: boolean
 }
 
 /** What the spoiler settings show for a wiki. */
@@ -102,7 +106,10 @@ export interface WikiPageView {
 export interface WikiHit {
   wikiId: string
   wikiName: string
+  /** The page's title (to open it). */
   title: string
+  /** The name to show for it (with the spoiler limit, a name you know rather than a later one). */
+  shown: string
   section: string
   snippet: string
 }
@@ -111,7 +118,10 @@ export interface WikiSource {
   n: number
   wikiId: string
   wikiName: string
+  /** The page's title (to open it). */
   title: string
+  /** The name to show for it. */
+  shown: string
   section: string
 }
 

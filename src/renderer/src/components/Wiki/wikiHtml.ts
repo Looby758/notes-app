@@ -12,7 +12,9 @@ const KEEP = new Set(
 )
 /** Taken out with everything inside them. */
 const DROP = new Set('script style noscript iframe frame frameset object embed form input button select textarea option link meta base svg math video audio source track template canvas dialog map area'.split(' '))
-const ATTRS = new Set(['colspan', 'rowspan', 'alt', 'title'])
+// Not title or alt: the wiki puts the linked page's full name there ("Michonne Grimes" on a link that says
+// "Michonne Hawthorne"), which shows on hover and can give things away.
+const ATTRS = new Set(['colspan', 'rowspan'])
 
 export function cleanWikiHtml(html: string, page: WikiPageView, base: string): string {
   const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html')
@@ -75,7 +77,6 @@ function clean(el: Element, page: WikiPageView, base: string): void {
       else {
         child.setAttribute('data-ext', link.url)
         child.classList.add('wiki-ext')
-        child.setAttribute('title', link.url)
       }
       child.setAttribute('href', '#')
       // A link around a picture that wasn't downloaded: nothing left to click.

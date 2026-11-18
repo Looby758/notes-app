@@ -259,6 +259,10 @@ function Reader({ wiki, wikis, place }: { wiki: WikiInfo; wikis: WikiInfo[]; pla
         </button>
       </div>
       {wiki.status !== 'done' && <div className="wiki-notice">{statusText(wiki)}. Pages that haven’t arrived yet can’t be opened.</div>}
+      {wiki.checkProblem && <div className="wiki-notice">Orbit couldn’t finish checking this wiki for spoilers. It tries again in a few minutes.</div>}
+      {wiki.status === 'done' && wiki.checking !== undefined && (
+        <div className="wiki-notice">Orbit is checking this wiki for spoilers ({wiki.checking}% done). This happens once after a download or an update, and takes a few minutes for a big wiki.</div>
+      )}
       <div className="wiki-body">
         {place.search ? <SearchResults key={version} wiki={wiki} query={place.search} /> : <Article key={`${wiki.id}/${title}/${version}`} wiki={wiki} title={title} fragment={place.fragment} />}
         {side === 'brain' && <BrainPanel wiki={wiki} wikis={wikis} />}
@@ -269,7 +273,7 @@ function Reader({ wiki, wikis, place }: { wiki: WikiInfo; wikis: WikiInfo[]; pla
 }
 
 function TitleSearch({ wiki }: { wiki: WikiInfo }) {
-  const [titles, setTitles] = useState<string[]>([])
+  const [titles, setTitles] = useState<{ title: string; shown: string; known: string[] }[]>([])
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [at, setAt] = useState(0)
@@ -281,15 +285,19 @@ function TitleSearch({ wiki }: { wiki: WikiInfo }) {
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return []
-    const starts: string[] = []
-    const inside: string[] = []
+    // Matched and shown by the name you know (with the spoiler limit), opened by the page's title.
+    // Other names you'd know a page by count too: "Jesus" finds Paul Rovia.
+    type Entry = { title: string; shown: string; known: string[] }
+    const starts: Entry[] = []
+    const inside: Entry[] = []
     for (const t of titles) {
-      const l = t.toLowerCase()
-      if (l.startsWith(q)) starts.push(t)
-      else if (l.includes(q)) inside.push(t)
+      const names = [t.shown, ...t.known].map((n) => n.toLowerCase())
+      if (names.some((n) => n.startsWith(q))) starts.push(t)
+      else if (names.some((n) => n.includes(q))) inside.push(t)
       if (starts.length >= 10) break
     }
-    return [...starts.sort((a, b) => a.length - b.length), ...inside.sort((a, b) => a.length - b.length)].slice(0, 10)
+    const byLength = (a: Entry, b: Entry): number => a.shown.length - b.shown.length
+    return [...starts.sort(byLength), ...inside.sort(byLength)].slice(0, 10)
   }, [titles, query])
 
   const go = (title: string | null): void => {
@@ -321,7 +329,7 @@ function TitleSearch({ wiki }: { wiki: WikiInfo }) {
           } else if (e.key === 'ArrowUp') {
             e.preventDefault()
             setAt((a) => Math.max(a - 1, 0))
-          } else if (e.key === 'Enter') go(matches[at] ?? null)
+          } else if (e.key === 'Enter') go(matches[at]?.title ?? null)
           else if (e.key === 'Escape') {
             setQuery('')
             ;(e.target as HTMLInputElement).blur()
@@ -331,8 +339,8 @@ function TitleSearch({ wiki }: { wiki: WikiInfo }) {
       {open && query.trim() && (
         <div className="wiki-search-list">
           {matches.map((t, i) => (
-            <button key={t} className={i === at ? 'on' : ''} onMouseDown={(e) => e.preventDefault()} onClick={() => go(t)}>
-              {t}
+            <button key={t.title} className={i === at ? 'on' : ''} onMouseDown={(e) => e.preventDefault()} onClick={() => go(t.title)}>
+              {t.shown}
             </button>
           ))}
           <button className={at === matches.length ? 'on' : ''} onMouseDown={(e) => e.preventDefault()} onClick={() => go(null)}>
@@ -363,6 +371,8 @@ function Article({ wiki, title, fragment }: { wiki: WikiInfo; title: string; fra
   const onClick = useLinkClicks(wiki.id)
   // A page that hadn't arrived yet is looked for again as more pages arrive.
   const waiting = page === null && wiki.status !== 'done' ? wiki.done : -1
+  // …and when the spoiler check finishes.
+  const checked = wiki.checking === undefined
 
   useEffect(() => {
     let live = true
@@ -376,7 +386,7 @@ function Article({ wiki, title, fragment }: { wiki: WikiInfo; title: string; fra
     return () => {
       live = false
     }
-  }, [wiki.id, title, waiting, showUnplaced])
+  }, [wiki.id, title, waiting, showUnplaced, checked])
 
   const html = useMemo(() => (page ? cleanWikiHtml(page.html, page, wiki.base) : ''), [page, wiki.base])
 
@@ -396,7 +406,10 @@ function Article({ wiki, title, fragment }: { wiki: WikiInfo; title: string; fra
           <p>
             {page.blocked === 'later' && 'This page is about something you haven’t reached yet, so it’s hidden. Change how far you are in Spoilers to see it.'}
             {page.blocked === 'part' && 'This page is about a part of the story you’ve switched off (in Spoilers).'}
-            {page.blocked === 'unchecked' && 'Orbit hasn’t checked this page for spoilers yet. It will after more of the wiki has downloaded.'}
+            {page.blocked === 'unchecked' &&
+              (wiki.checking !== undefined
+                ? `Orbit is checking this wiki for spoilers (${wiki.checking}% done). This page shows when it’s finished.`
+                : 'Orbit hasn’t checked this page for spoilers yet. It will after more of the wiki has downloaded.')}
             {page.blocked === 'unplaced' && 'Orbit couldn’t tell when anything on this page happens, so it might spoil something.'}
           </p>
           {page.blocked === 'unplaced' && (
@@ -474,7 +487,7 @@ function SearchResults({ wiki, query }: { wiki: WikiInfo; query: string }) {
         {hits?.length === 0 && <p className="screens-note">Nothing in the downloaded pages matches that.</p>}
         {hits?.map((h) => (
           <button key={h.title} className="wiki-hit" onClick={() => goWiki({ wikiId: wiki.id, title: h.title })}>
-            <strong>{h.title}</strong>
+            <strong>{h.shown}</strong>
             {h.section && <span className="wiki-faint"> · {h.section}</span>}
             <span className="wiki-hit-text">{h.snippet}</span>
           </button>
@@ -597,7 +610,7 @@ function BrainPanel({ wiki, wikis }: { wiki: WikiInfo; wikis: WikiInfo[] }) {
             {answer.a.sources.map((s) => (
               <li key={s.n}>
                 <button onClick={() => openSource(s.n)}>
-                  <span className="wiki-cite">{s.n}</span> {s.title}
+                  <span className="wiki-cite">{s.n}</span> {s.shown}
                   {s.section && <span className="wiki-faint"> · {s.section}</span>}
                   {scope === 'all' && <span className="wiki-faint"> ({s.wikiName})</span>}
                 </button>
@@ -614,6 +627,7 @@ function BrainPanel({ wiki, wikis }: { wiki: WikiInfo; wikis: WikiInfo[] }) {
 
 function SpoilerPanel({ wiki }: { wiki: WikiInfo }) {
   const [view, setView] = useState<WikiSpoilerView | null>(null)
+  const [moreOpen, setMoreOpen] = useState(false)
   const version = wiki.spoilers?.updated ?? 0
   const status = wiki.status
 
@@ -623,9 +637,17 @@ function SpoilerPanel({ wiki }: { wiki: WikiInfo }) {
     return () => {
       live = false
     }
-  }, [wiki.id, version, status])
+  }, [wiki.id, version, status, wiki.checking === undefined])
 
-  if (!view) return <aside className="wiki-brain" />
+  if (!view)
+    return (
+      <aside className="wiki-brain wiki-spoilers">
+        <h3>
+          <Shield size={15} /> Spoilers
+        </h3>
+        <p className="screens-note">Loading…</p>
+      </aside>
+    )
   const s = view.settings
   const set = (patch: Partial<WikiSpoilerSettings>): void => {
     // Shown straight away; the saved setting follows.
@@ -634,7 +656,12 @@ function SpoilerPanel({ wiki }: { wiki: WikiInfo }) {
   }
   const hasShow = view.series.some((x) => x.part === 'show')
   const hasComics = view.series.some((x) => x.part === 'comics')
-  const shown = view.series.filter((x) => s.parts === 'both' || x.part === (s.parts === 'show' ? 'show' : 'comics'))
+  const inParts = view.series.filter((x) => s.parts === 'both' || x.part === (s.parts === 'show' ? 'show' : 'comics'))
+  // The main show and the comics are always listed. Other series (spin-offs) can give things away by
+  // their names alone ("Daryl Dixon" means he lives), so they stay hidden until you ask, unless you've set one.
+  const main = new Set([view.series.find((x) => x.part === 'show')?.name, view.series.find((x) => x.part === 'comics')?.name])
+  const shown = inParts.filter((x) => main.has(x.name) || moreOpen || (s.progress[x.name] ?? 0) > 0)
+  const more = inParts.length - shown.length
 
   return (
     <aside className="wiki-brain wiki-spoilers">
@@ -663,7 +690,13 @@ function SpoilerPanel({ wiki }: { wiki: WikiInfo }) {
       </label>
       {s.limit && (
         <>
-          {!view.ready && <p className="screens-note">Orbit works out the wiki’s episodes once some pages have downloaded. Until then, pages stay hidden.</p>}
+          {!view.ready && (
+            <p className="screens-note">
+              {wiki.checking !== undefined
+                ? `Orbit is checking this wiki for spoilers (${wiki.checking}% done). The list of episodes appears here when it’s finished, in a few minutes. Until then, pages stay hidden.`
+                : 'Orbit works out the wiki’s episodes once some pages have downloaded. Until then, pages stay hidden.'}
+            </p>
+          )}
           {view.ready && shown.length === 0 && <p className="screens-note">Orbit couldn’t find a list of episodes or issues in this wiki, so it can’t tell what’s a spoiler. Everything it can’t place stays hidden.</p>}
           {shown.map((series) => (
             <div key={series.name} className="wiki-spoiler-group">
@@ -680,6 +713,16 @@ function SpoilerPanel({ wiki }: { wiki: WikiInfo }) {
               </select>
             </div>
           ))}
+          {more > 0 && (
+            <div className="wiki-problem">
+              <p>
+                This wiki has {more} more series (like spin-off shows). Their names alone can give things away, like who survives, so they’re hidden. Until you set one, anything from it stays hidden.
+              </p>
+              <button className="btn" onClick={() => setMoreOpen(true)}>
+                Show their names
+              </button>
+            </div>
+          )}
           <p className="screens-note">
             Each paragraph is checked against the episodes and issues the wiki links it to. Where the wiki doesn’t say which episode something happens in, it may only be accurate to the season, and parts Orbit can’t place at all are hidden (each page lets you show them).
             {!view.finished && ' While the wiki is still downloading, some episodes aren’t known yet, so more stays hidden.'}
