@@ -1,5 +1,4 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'fs/promises'
-import { createRequire } from 'module'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import JSZip from 'jszip'
@@ -9,7 +8,12 @@ import { archiveKind, extractArchive, listArchive } from './index'
 import { createArchive, parseList, setSevenZipRunner } from './sevenZip'
 import { runSevenZip, type SevenZipFactory } from './sevenZipRun'
 import { storedRar } from './testArchives'
+import { createRequire } from 'module'
+import { setRarRunner } from './rar'
+import { runRar, type Unrar } from './rarRun'
 import { pack, unpack } from './unpack'
+
+setRarRunner((job, onProgress, cancelled) => runRar(createRequire(__filename)('node-unrar-js') as Unrar, job, onProgress, cancelled) as never)
 
 beforeAll(() => {
   const factory = createRequire(__filename)('7z-wasm') as SevenZipFactory
