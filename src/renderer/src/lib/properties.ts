@@ -195,7 +195,9 @@ export const SUGGESTED: { key: string; label: string; initial: () => PropValue }
   { key: 'people', label: 'People', initial: () => [] },
   { key: 'aliases', label: 'Other names', initial: () => [] },
   { key: 'font', label: 'Font', initial: () => 'serif' },
-  { key: 'source', label: 'Link', initial: () => 'https://' }
+  { key: 'source', label: 'Link', initial: () => 'https://' },
+  // Makes the note a video script: script markers first in the "/" menu, and its length along the bottom (lib/script.ts).
+  { key: 'type', label: 'Make it a video script', initial: () => 'script' }
 ]
 
 function today(): string {
