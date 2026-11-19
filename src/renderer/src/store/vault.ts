@@ -2,6 +2,7 @@ import { loadLock } from '../lib/lock/session'
 import { loadPasswords } from '../lib/passwords/session'
 import { loadSnippets } from './snippets'
 import { loadSavedSearches } from './savedSearches'
+import { loadScreenshots, remapScreenshots } from './screenshots'
 import { fixFileLinks } from '../lib/fileLinks'
 import { fixBoardLinks } from '../lib/boards'
 import { create } from 'zustand'
@@ -114,6 +115,7 @@ export const useVault = create<VaultState>((set, get) => {
       })
     }
     remapTabs(from, to)
+    remapScreenshots(from, to)
     remapStars(from, to)
     remapFlashcards(from, to)
     remapLockedFolders(from, to)
@@ -228,6 +230,7 @@ export const useVault = create<VaultState>((set, get) => {
       void loadPasswords()
       void loadSnippets()
       void loadSavedSearches()
+      void loadScreenshots()
       loadStarred()
       void loadFlashcards()
       loadVideoProgress()

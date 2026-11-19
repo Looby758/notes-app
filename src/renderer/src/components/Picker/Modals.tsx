@@ -20,6 +20,7 @@ import ImportDialog from './ImportDialog'
 import AiDialog from '../Ai/AiDialog'
 import PlaceDialog from './PlaceDialog'
 import ImageCueDialog from './ImageCueDialog'
+import EpisodeDialog from './EpisodeDialog'
 import { showKeys } from '@shared/platform'
 
 /** Ctrl+P (quick switcher), Ctrl+K (command palette) and "new note from template", shown over the app. */
@@ -39,6 +40,7 @@ export default function Modals() {
         {modal === 'ai' && <AiDialog close={close} />}
         {modal === 'place' && <PlaceDialog close={close} />}
         {modal === 'imageCue' && <ImageCueDialog close={close} />}
+        {modal === 'episode' && <EpisodeDialog close={close} />}
       </div>
     </div>
   )

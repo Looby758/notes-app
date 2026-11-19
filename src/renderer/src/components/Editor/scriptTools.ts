@@ -8,6 +8,7 @@ import { usePrefs, setPrefs } from '../../store/prefs'
 import { relativePath } from '../../lib/links'
 import { parentOf, toVaultUrl } from '../../lib/paths'
 import type { FileNode } from '@shared/types'
+import { findEpisodes } from '../../lib/episodes'
 import {
   findMarkers,
   formatLength,
@@ -119,6 +120,11 @@ function buildChips(view: EditorView): DecorationSet {
   let images: string[] | null = null
   for (const { from, to } of view.visibleRanges) {
     const text = state.sliceDoc(from, to)
+    // Episode references (S4E9, Issue 115): Ctrl+click finds everything from that episode.
+    for (const e of findEpisodes(text, from)) {
+      if (inCode(state, e.from)) continue
+      out.push(Decoration.mark({ class: 'cm-episode-ref', attributes: { title: `Ctrl+click to find everything from ${e.label}`, 'data-episode': e.label } }).range(e.from, e.to))
+    }
     if (!text.includes('[')) continue
     for (const m of findMarkers(text, from)) {
       if (inCode(state, m.from)) continue
@@ -265,7 +271,22 @@ function lengthPanel(view: EditorView): Panel {
 
 const lengthBar = showPanel.from(isScript, (on) => (on ? lengthPanel : null))
 
-export const scriptTools: Extension = [chips, isScript, lengthBar]
+/** Ctrl+click (Cmd+click on a Mac) on an episode reference: everything from that episode. */
+const episodeClicks = EditorView.domEventHandlers({
+  mousedown(e, view) {
+    if (!(e.ctrlKey || e.metaKey) || e.button !== 0) return false
+    const pos = view.posAtCoords({ x: e.clientX, y: e.clientY })
+    if (pos === null) return false
+    const line = view.state.doc.lineAt(pos)
+    const hit = findEpisodes(line.text, line.from).find((m) => m.from <= pos && pos <= m.to)
+    if (!hit) return false
+    e.preventDefault()
+    window.dispatchEvent(new CustomEvent('note:open-episode', { detail: { episode: hit.label } }))
+    return true
+  }
+})
+
+export const scriptTools: Extension = [chips, isScript, lengthBar, episodeClicks]
 
 /** Whether the editor is showing a script note (the "/" menu puts script markers first there). */
 export const inScript = (state: EditorState): boolean => state.field(isScript, false) ?? false

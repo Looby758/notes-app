@@ -176,3 +176,11 @@
 .image-cue-dialog .picker-item {
   min-height: 40px;
 }
+
+/* ---------- Episode references (S4E9, Issue 115) ---------- */
+
+.cm-episode-ref {
+  border-bottom: 1px dotted color-mix(in srgb, #f5d547 70%, transparent);
+  background: color-mix(in srgb, #f5d547 9%, transparent);
+  border-radius: 2px;
+}
