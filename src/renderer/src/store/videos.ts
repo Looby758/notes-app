@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import {
   emptyVideos,
+  findMovedFolder,
   MAX_TITLE,
   newVideoId,
   projectFolderFor,
@@ -13,6 +14,9 @@ import {
   type VideosData
 } from '../lib/videos'
 import { recordUndo } from '../lib/undo'
+import { isWithin, replacePrefix } from '../lib/paths'
+import type { FileNode } from '@shared/types'
+import { setPrefsQuietly, usePrefs } from './prefs'
 import { notify } from './notify'
 
 /**
@@ -167,13 +171,39 @@ export function folderForProject(p: VideoProject): string {
     .getState()
     .projects.map((q) => q.folder)
     .filter((f): f is string => !!f)
-  const folder = projectFolderFor(p.title, taken)
+  const folder = projectFolderFor(p.title, taken, usePrefs.getState().prefs.videosFolder)
   setProjectFolder(p.id, folder)
   return folder
 }
 
-/** Follows renames and moves of notes, files and folders. */
+/** Follows renames and moves of notes, files and folders (the videos folder setting too). */
 export function remapVideos(from: string, to: string): void {
   const next = remapProjects(useVideos.getState().projects, from, to)
   if (next) write({ projects: next })
+  const { videosFolder } = usePrefs.getState().prefs
+  if (from && videosFolder && isWithin(videosFolder, from)) setPrefsQuietly({ videosFolder: replacePrefix(videosFolder, from, to) })
+}
+
+function folderPaths(nodes: FileNode[], out: string[] = []): string[] {
+  for (const n of nodes) {
+    if (n.type !== 'folder') continue
+    out.push(n.path)
+    folderPaths(n.children ?? [], out)
+  }
+  return out
+}
+
+/**
+ * Called whenever the notes list is read again: if the videos folder was renamed or moved outside
+ * Orbit, the setting and every project follow it to its new name.
+ */
+export function followMovedVideosFolder(tree: FileNode[]): void {
+  const { loaded, projects } = useVideos.getState()
+  const old = usePrefs.getState().prefs.videosFolder
+  if (!loaded || !old || !tree.length) return
+  const folders = projects.map((p) => p.folder).filter((f): f is string => !!f)
+  const to = findMovedFolder(old, folders, folderPaths(tree))
+  if (!to) return
+  remapVideos(old, to)
+  notify(`Your videos folder is now “${to}”, so video projects follow it there.`, 'info')
 }

@@ -1,4 +1,4 @@
-import { isWithin, replacePrefix } from './paths'
+import { isWithin, parentOf, replacePrefix } from './paths'
 
 /**
  * Video projects: everything for one YouTube video in one place (its script note, research notes,
@@ -75,9 +75,6 @@ export const emptyVideos = (): VideosData => ({ projects: [], ideas: [] })
 export const newVideoId = (): string => Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
 
 export const MAX_TITLE = 120
-
-/** The folder new video projects go in. */
-export const VIDEOS_FOLDER = 'Videos'
 
 const str = (v: unknown): v is string => typeof v === 'string'
 const num = (v: unknown, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback)
@@ -182,10 +179,10 @@ export function folderName(title: string): string {
   return clean || 'Untitled video'
 }
 
-/** A folder for a new project under Videos/, not one another project already uses. */
-export function projectFolderFor(title: string, taken: Iterable<string>): string {
+/** A folder for a new project inside `videosFolder` ('' for the top level), not one another project already uses. */
+export function projectFolderFor(title: string, taken: Iterable<string>, videosFolder: string): string {
   const used = new Set([...taken].map((t) => t.toLowerCase()))
-  const base = `${VIDEOS_FOLDER}/${folderName(title)}`
+  const base = `${videosFolder ? videosFolder + '/' : ''}${folderName(title)}`
   if (!used.has(base.toLowerCase())) return base
   for (let n = 2; ; n++) if (!used.has(`${base} (${n})`.toLowerCase())) return `${base} (${n})`
 }
@@ -203,4 +200,20 @@ export function projectCounts(p: VideoProject): Record<VideoItemKind, number> {
   const out: Record<VideoItemKind, number> = { research: 0, image: 0, recording: 0, thumbnail: 0 }
   for (const i of p.items) out[i.kind]++
   return out
+}
+
+/**
+ * The videos folder was renamed or moved outside Orbit (File Explorer, Finder, Google Drive on
+ * another computer), so it's gone from where it was: where is it now? It's the one folder that
+ * now holds the project folders that used to be in it. Null if it's still there, or it can't be
+ * told for sure (no project folders to go by, or more than one folder fits).
+ */
+export function findMovedFolder(old: string, projectFolders: string[], folders: Iterable<string>): string | null {
+  if (!old) return null
+  const all = new Set(folders)
+  if (all.has(old)) return null
+  const names = [...new Set(projectFolders.filter((f) => parentOf(f) === old).map((f) => f.slice(old.length + 1)))]
+  if (!names.length) return null
+  const fits = [...all].filter((f) => f !== old && names.every((n) => all.has(f ? `${f}/${n}` : n)))
+  return fits.length === 1 ? fits[0] : null
 }

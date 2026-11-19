@@ -16,7 +16,7 @@ import { loadStarred, putBackStars, remapStars, removeStarsWithin, useStarred } 
 import { loadVideoProgress } from './videoPlayer'
 import { loadFlashcards, putBackFlashcards, remapFlashcards, removeFlashcardsWithin, useFlashcards } from './flashcards'
 import { loadMoney } from './money'
-import { loadVideos, remapVideos } from './videos'
+import { followMovedVideosFolder, loadVideos, remapVideos } from './videos'
 import { loadLockedFolders, putBackLockedFolders, remapLockedFolders, removeLockedFoldersWithin, useLockedFolders } from '../lib/lock/folders'
 import { history, recordUndo, undoChanged } from '../lib/undo'
 import type { CardProgress } from '../lib/flashcards'
@@ -234,7 +234,8 @@ export const useVault = create<VaultState>((set, get) => {
       void loadFlashcards()
       loadVideoProgress()
       void loadMoney()
-      void loadVideos()
+      // Whichever finishes last (this or reading the notes list) checks whether the videos folder moved.
+      void loadVideos().then(() => followMovedVideosFolder(get().tree))
       get().refresh()
     },
 
@@ -244,6 +245,7 @@ export const useVault = create<VaultState>((set, get) => {
         const { selected } = get()
         set({ tree, selected: selected && findNode(tree, selected) ? selected : null })
         closeMissing((path) => findNode(tree, path) !== null)
+        followMovedVideosFolder(tree)
         await syncIndex(notePaths(tree), changed)
       } catch (err) {
         notify(err)

@@ -20,7 +20,8 @@ import {
 } from '../../store/videos'
 import { fitsSection, projectCounts, type VideoItem, type VideoItemKind, type VideoProject } from '../../lib/videos'
 import { fileKind, openAttachment, vaultUrl } from '../../lib/fileKinds'
-import { openNote } from '../../lib/editorController'
+import { openNote, openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
+import { useUI } from '../../store/ui'
 import { computerFiles, getDrag } from '../../lib/dnd'
 import { noteTitle } from '../../lib/paths'
 import { fuzzyFilter } from '../../lib/fuzzy'
@@ -82,6 +83,7 @@ export default function VideosPage() {
 function ProjectList() {
   const projects = useVideos((s) => s.projects)
   const loaded = useVideos((s) => s.loaded)
+  const videosFolder = usePrefs((s) => s.prefs.videosFolder)
   const [adding, setAdding] = useState(false)
   return (
     <div className="videos-inner">
@@ -95,7 +97,19 @@ function ProjectList() {
           </button>
         )}
       </div>
-      <p className="videos-intro">Each video gets one place for its script, research notes, pictures, recordings and thumbnail ideas. Your notes and files stay where they are.</p>
+      <p className="videos-intro">
+        Each video gets one place for its script, research notes, pictures, recordings and thumbnail ideas. New script and research notes go in a folder for each video inside <strong>{videosFolder || 'the top of your notes'}</strong>.{' '}
+        <button
+          className="link-button"
+          onClick={() => {
+            openSpecialTab(SETTINGS_TAB)
+            useUI.setState({ settingsSection: 'files' })
+          }}
+          data-video-folder-setting
+        >
+          Change
+        </button>
+      </p>
       {adding && <NewProjectForm onClose={() => setAdding(false)} />}
       {loaded && !projects.length && !adding ? (
         <div className="videos-empty">

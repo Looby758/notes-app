@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fitsSection, folderName, projectFolderFor, readVideos, remapProjects, videosJson, type VideoProject } from './videos'
+import { findMovedFolder, fitsSection, folderName, projectFolderFor, readVideos, remapProjects, videosJson, type VideoProject } from './videos'
 
 const kind = (p: string): string => (/\.(png|jpg)$/i.test(p) ? 'image' : /\.(mp3|wav|webm)$/i.test(p) ? 'audio' : /\.mp4$/i.test(p) ? 'video' : 'other')
 
@@ -63,7 +63,9 @@ describe('folders', () => {
   it('makes titles safe and unique', () => {
     expect(folderName('What: really/happened?')).toBe('What really happened')
     expect(folderName('  ')).toBe('Untitled video')
-    expect(projectFolderFor('Maggie', ['Videos/maggie', 'Videos/Maggie (2)'])).toBe('Videos/Maggie (3)')
+    expect(projectFolderFor('Maggie', ['Videos/maggie', 'Videos/Maggie (2)'], 'Videos')).toBe('Videos/Maggie (3)')
+    expect(projectFolderFor('Maggie', [], 'YouTube/Walking Dead')).toBe('YouTube/Walking Dead/Maggie')
+    expect(projectFolderFor('Maggie', [], '')).toBe('Maggie')
   })
 })
 
@@ -76,5 +78,19 @@ describe('fitsSection', () => {
     expect(fitsSection('recording', 'a.wav', kind)).toBe(true)
     expect(fitsSection('recording', 'a.mp4', kind)).toBe(true)
     expect(fitsSection('recording', 'a.png', kind)).toBe(false)
+  })
+})
+
+describe('findMovedFolder', () => {
+  const projects = ['Videos/Maggie', 'Videos/Daryl']
+  it('finds the videos folder after a rename outside Orbit', () => {
+    expect(findMovedFolder('Videos', projects, ['YouTube', 'YouTube/Maggie', 'YouTube/Daryl', 'Research'])).toBe('YouTube')
+    expect(findMovedFolder('Videos', projects, ['Work', 'Work/YouTube', 'Work/YouTube/Maggie', 'Work/YouTube/Daryl'])).toBe('Work/YouTube')
+  })
+  it('leaves it alone when it is still there or it cannot tell', () => {
+    expect(findMovedFolder('Videos', projects, ['Videos', 'Videos/Maggie', 'Videos/Daryl'])).toBeNull()
+    expect(findMovedFolder('Videos', [], ['YouTube'])).toBeNull()
+    expect(findMovedFolder('Videos', projects, ['A', 'A/Maggie', 'A/Daryl', 'B', 'B/Maggie', 'B/Daryl'])).toBeNull()
+    expect(findMovedFolder('Videos', projects, ['Trash'])).toBeNull()
   })
 })

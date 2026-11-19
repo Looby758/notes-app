@@ -588,6 +588,16 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'template'
   },
   {
+    key: 'videosFolder',
+    section: 'files',
+    group: 'Folders',
+    type: 'folder',
+    placeholder: 'Videos',
+    label: 'Videos folder',
+    description: 'Each video project gets a folder in here for its script and research notes. Rename or move this folder in Orbit (or in File Explorer, Finder or Google Drive) and Orbit follows it. Leave empty for the top level.',
+    keywords: 'youtube video projects script research voiceover'
+  },
+  {
     key: 'showAttachments',
     section: 'files',
     group: 'Folders',

@@ -2,8 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const writes: string[] = []
 vi.stubGlobal('window', { api: { writeAppData: vi.fn(async (_n: string, c: string) => void writes.push(c)), readAppData: vi.fn(async () => null) } })
+// Settings, without the app's appearance and settings file behind them.
+vi.mock('./prefs', async () => {
+  const { create } = await import('zustand')
+  const usePrefs = create(() => ({ prefs: { videosFolder: 'Videos' } }))
+  return { usePrefs, setPrefsQuietly: (patch: object) => usePrefs.setState((s) => ({ prefs: { ...s.prefs, ...patch } })) }
+})
 
-const { useVideos, loadVideos, createProject, renameProject, addItems, deleteProject, remapVideos, folderForProject } = await import('./videos')
+const { useVideos, loadVideos, createProject, renameProject, addItems, deleteProject, remapVideos, folderForProject, followMovedVideosFolder } = await import('./videos')
+const { usePrefs } = await import('./prefs')
 const { history } = await import('../lib/undo')
 
 describe('video projects and Ctrl+Z', () => {
@@ -42,6 +49,17 @@ describe('video projects and Ctrl+Z', () => {
     const moved = useVideos.getState().projects.find((p) => p.id === a.id)!
     expect(moved.folder).toBe('Videos/Maggie Rhee')
     expect(moved.items[0].path).toBe('Videos/Maggie Rhee/Research.md')
+  })
+
+  it('follows the videos folder when it is renamed, in Orbit or outside it', () => {
+    const a = createProject('Maggie')
+    folderForProject(a)
+    remapVideos('Videos', 'YouTube')
+    expect(usePrefs.getState().prefs.videosFolder).toBe('YouTube')
+    const folder = (path: string, children: never[] = []) => ({ name: path.split('/').pop()!, path, type: 'folder' as const, children })
+    followMovedVideosFolder([folder('TWD', [folder('TWD/Maggie')] as never[])])
+    expect(usePrefs.getState().prefs.videosFolder).toBe('TWD')
+    expect(useVideos.getState().projects[0].folder).toBe('TWD/Maggie')
   })
 
   it("won't undo onto reloaded projects", async () => {

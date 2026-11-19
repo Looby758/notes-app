@@ -59,6 +59,11 @@ function recordChange(patch: Partial<Prefs>): void {
 /** Applies a change immediately, and saves it shortly after. */
 export function setPrefs(patch: Partial<Prefs>): void {
   recordChange(patch)
+  setPrefsQuietly(patch)
+}
+
+/** The same without a Ctrl+Z step of its own (for a setting following something that has one, like a folder rename). */
+export function setPrefsQuietly(patch: Partial<Prefs>): void {
   usePrefs.setState((s) => ({ prefs: { ...s.prefs, ...patch } }))
   pending = { ...pending, ...patch }
   clearTimeout(timer)
