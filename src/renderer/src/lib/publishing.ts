@@ -47,6 +47,14 @@ export interface VideoDraft {
   thumbnails: ThumbnailCard[]
   /** The picture you're going with. */
   chosenThumbnail: string | null
+  /** Upload checklist steps you've ticked, by step id, with when. */
+  ticked: Record<string, number>
+  /** Steps that don't apply to this video (no chapters on a short one, say). */
+  skipped: string[]
+  /** Steps of your own for this video. */
+  extraSteps: { id: string; text: string }[]
+  /** When it went up, and its link. */
+  uploaded: { on: string; url: string } | null
 }
 
 export interface PublishingData {
@@ -67,7 +75,24 @@ export const newPublishingId = (): string => Date.now().toString(36) + Math.rand
 export const emptyPublishing = (): PublishingData => ({ videos: [] })
 
 export function newDraft(name: string, id = newPublishingId(), now = Date.now()): VideoDraft {
-  return { id, name, created: now, updated: now, titles: [], chosenTitle: null, description: '', tags: [], chapters: [], chaptersInDescription: true, thumbnails: [], chosenThumbnail: null }
+  return {
+    id,
+    name,
+    created: now,
+    updated: now,
+    titles: [],
+    chosenTitle: null,
+    description: '',
+    tags: [],
+    chapters: [],
+    chaptersInDescription: true,
+    thumbnails: [],
+    chosenThumbnail: null,
+    ticked: {},
+    skipped: [],
+    extraSteps: [],
+    uploaded: null
+  }
 }
 
 const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback)
@@ -116,7 +141,14 @@ export function readPublishing(raw: string | null): PublishingData {
         .map((c) => ({ id: str(c.id), time: str(c.time), name: str(c.name) })),
       chaptersInDescription: v.chaptersInDescription !== false,
       thumbnails,
-      chosenThumbnail: thumbnails.some((t) => t.id === chosenThumb && t.kind === 'picture') ? chosenThumb : null
+      chosenThumbnail: thumbnails.some((t) => t.id === chosenThumb && t.kind === 'picture') ? chosenThumb : null,
+      ticked: Object.fromEntries(Object.entries(obj(v.ticked)).filter(([, at]) => typeof at === 'number')) as Record<string, number>,
+      skipped: arr(v.skipped).filter((s): s is string => typeof s === 'string'),
+      extraSteps: arr(v.extraSteps)
+        .map((s) => obj(s))
+        .filter((s) => str(s.id))
+        .map((s) => ({ id: str(s.id), text: str(s.text) })),
+      uploaded: obj(v.uploaded).on && typeof obj(v.uploaded).on === 'string' ? { on: str(obj(v.uploaded).on), url: str(obj(v.uploaded).url) } : null
     })
   }
   return { videos }
@@ -276,10 +308,10 @@ export function descriptionCheck(d: VideoDraft): { level: Level; message: string
 /** The first couple of lines show above "...more" on YouTube: roughly this many characters. */
 export const DESCRIPTION_PREVIEW = 150
 
-/** How many things are filled in, for the list of videos: title, thumbnail, description, tags, chapters. */
+/** How far through the upload checklist a video is, for the list of videos. */
 export function draftProgress(d: VideoDraft): { done: number; total: number } {
-  const parts = [!!chosenTitleText(d), !!chosenThumbnailCard(d), !!d.description.trim(), d.tags.length > 0, d.chapters.length >= CHAPTERS_MIN && !chapterProblems(d.chapters).length]
-  return { done: parts.filter(Boolean).length, total: parts.length }
+  const steps = checklist(d).filter((s) => !s.skipped)
+  return { done: steps.filter((s) => s.done).length, total: steps.length }
 }
 
 // ---------- thumbnails ----------
@@ -339,3 +371,146 @@ export function remapThumbnails(videos: VideoDraft[], from: string, to: string):
     v.thumbnails.some((t) => t.file && within(t.file)) ? { ...v, thumbnails: v.thumbnails.map((t) => (t.file && within(t.file) ? { ...t, file: to + t.file.slice(from.length) } : t)) } : v
   )
 }
+
+// ---------- the upload checklist ----------
+
+export type StepGroup = 'ready' | 'drafts' | 'studio'
+
+export const STEP_GROUPS: { id: StepGroup; label: string }[] = [
+  { id: 'ready', label: 'Get the video ready' },
+  { id: 'drafts', label: 'Before you upload' },
+  { id: 'studio', label: 'In YouTube Studio' }
+]
+
+/** Which part of the page an automatic step is about, so its "Go to it" can scroll there. */
+export type DraftSection = 'titles' | 'board' | 'description' | 'tags' | 'chapters'
+
+export interface ChecklistStep {
+  id: string
+  group: StepGroup
+  label: string
+  /** A line of help under it. */
+  hint?: string
+  /** Ticked by Orbit from the drafts, not by hand. */
+  auto?: DraftSection
+  done: boolean
+  /** For an automatic step that isn't done: what's missing. */
+  missing?: string
+  skipped: boolean
+  /** Can be marked "not needed for this video". */
+  skippable: boolean
+  /** One you added. */
+  extra?: boolean
+}
+
+interface StepDef {
+  id: string
+  group: StepGroup
+  label: string
+  hint?: string
+  skippable?: boolean
+  /** For automatic steps: null when it's done, or what's missing. */
+  check?: (d: VideoDraft) => string | null
+  auto?: DraftSection
+}
+
+const plural = (n: number, one: string): string => `${n} ${one}${n === 1 ? '' : 's'}`
+
+/** The set workflow every video goes through, ending with YouTube's own boxes. */
+export const STEPS: StepDef[] = [
+  { id: 'exported', group: 'ready', label: 'Final video exported', hint: 'The finished edit, rendered at full quality.' },
+  { id: 'watched', group: 'ready', label: 'Watched it all the way through', hint: 'Audio levels, pauses, images in the right places, nothing left in by mistake.' },
+  {
+    id: 'thumbnail',
+    group: 'drafts',
+    label: 'Thumbnail picked',
+    auto: 'board',
+    check: (d) => {
+      const card = chosenThumbnailCard(d)
+      if (!card?.file) return d.thumbnails.some((t) => t.kind === 'picture') ? 'Star a picture on the thumbnail board' : 'Add a picture to the thumbnail board and star it'
+      const bad = thumbnailProblems(card.file).find((p) => p.level === 'error')
+      return bad ? bad.message : null
+    }
+  },
+  {
+    id: 'title',
+    group: 'drafts',
+    label: 'Title chosen',
+    auto: 'titles',
+    check: (d) => {
+      const title = chosenTitleText(d)
+      if (!title) return 'Write a title option'
+      const c = titleCheck(title)
+      return c.level === 'error' ? c.message : null
+    }
+  },
+  {
+    id: 'description',
+    group: 'drafts',
+    label: 'Description written',
+    auto: 'description',
+    check: (d) => {
+      if (!d.description.trim()) return 'Write the description'
+      const c = descriptionCheck(d)
+      return c.level === 'error' ? c.message : null
+    }
+  },
+  {
+    id: 'tags',
+    group: 'drafts',
+    label: 'Tags added',
+    auto: 'tags',
+    skippable: true,
+    check: (d) => (!d.tags.length ? 'Add a few tags' : tagsLength(d.tags) > TAGS_MAX ? `Over YouTube’s ${TAGS_MAX} limit` : null)
+  },
+  {
+    id: 'chapters',
+    group: 'drafts',
+    label: 'Chapters ready',
+    auto: 'chapters',
+    skippable: true,
+    check: (d) => {
+      if (!d.chapters.length) return 'Add chapters (or mark them not needed)'
+      const problems = chapterProblems(d.chapters)
+      if (problems.length) return `${plural(problems.length, 'thing')} to fix`
+      return d.chaptersInDescription ? null : 'Tick “put the chapters at the end” so YouTube finds them'
+    }
+  },
+  { id: 'details', group: 'studio', label: 'Title, description and tags pasted in', hint: 'Use the Copy buttons above.' },
+  { id: 'thumbnail-up', group: 'studio', label: 'Thumbnail uploaded' },
+  { id: 'end-screen', group: 'studio', label: 'End screen added', hint: 'Point to another video or a playlist, plus Subscribe, in the last 5–20 seconds.' },
+  {
+    id: 'synthetic',
+    group: 'studio',
+    label: 'Answered the “altered or synthetic content” box',
+    hint: 'Under Details. Say Yes if a realistic person, place or event was made or changed with AI (an AI voice, say). Your own voice, real clips and edits are No.'
+  },
+  { id: 'audience', group: 'studio', label: '“Made for kids” answered', hint: 'Under Audience: almost always No for this kind of video.' },
+  { id: 'visibility', group: 'studio', label: 'Visibility set or scheduled', hint: 'Public, Unlisted, or a time to go live.' }
+]
+
+/** Every step for this video, with whether it's done. */
+export function checklist(d: VideoDraft): ChecklistStep[] {
+  const out: ChecklistStep[] = STEPS.map((s) => {
+    const skipped = !!s.skippable && d.skipped.includes(s.id)
+    const missing = s.check ? s.check(d) : null
+    return {
+      id: s.id,
+      group: s.group,
+      label: s.label,
+      hint: s.hint,
+      auto: s.auto,
+      done: s.check ? !missing : !!d.ticked[s.id],
+      missing: s.check && missing ? missing : undefined,
+      skipped,
+      skippable: !!s.skippable
+    }
+  })
+  // Your own steps go at the end of getting the video ready.
+  const extras: ChecklistStep[] = d.extraSteps.map((e) => ({ id: e.id, group: 'ready', label: e.text, done: !!d.ticked[e.id], skipped: false, skippable: false, extra: true }))
+  out.splice(out.filter((s) => s.group === 'ready').length, 0, ...extras)
+  return out
+}
+
+/** Whether everything that applies is done. */
+export const readyToUpload = (d: VideoDraft): boolean => checklist(d).every((s) => s.skipped || s.done)

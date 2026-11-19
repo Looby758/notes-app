@@ -544,3 +544,153 @@
 .pub-hint.pub-ok {
   color: var(--accent);
 }
+
+/* ---------- Upload checklist ---------- */
+.pub-list-progress.ready,
+.pub-list-progress.up {
+  color: var(--accent);
+}
+.pub-flash {
+  animation: pub-flash 1.2s var(--ease);
+}
+@keyframes pub-flash {
+  0%,
+  40% {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-dim);
+  }
+}
+.pub-checklist-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-raised);
+  overflow: hidden;
+}
+.pub-checklist-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.3s var(--ease);
+}
+.pub-step-group h4 {
+  margin: 10px 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+.pub-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 4px;
+  border-radius: var(--radius);
+}
+.pub-step:hover {
+  background: var(--bg-hover);
+}
+.pub-step-box {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  padding: 0;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 5px;
+  background: none;
+  color: var(--bg);
+  cursor: pointer;
+}
+.pub-step-box.auto {
+  border-style: dashed;
+  cursor: default;
+}
+.pub-step-box.on {
+  border: 1.5px solid var(--accent);
+  background: var(--accent);
+}
+.pub-step-box:disabled {
+  cursor: default;
+}
+.pub-step-body {
+  flex: 1;
+  min-width: 0;
+}
+.pub-step-label {
+  font-size: 14px;
+  color: var(--text-strong);
+}
+.pub-step.done .pub-step-label {
+  color: var(--text-muted);
+}
+.pub-step.skipped .pub-step-label {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+.pub-step-hint,
+.pub-step-missing {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.pub-step-missing {
+  color: #fbbf24;
+}
+.pub-step-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.pub-step-actions .link-button,
+.pub-add-step,
+.pub-uploaded .link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+.pub-add-step {
+  margin: 4px 0 0 34px;
+}
+.pub-new-step {
+  padding: 4px 4px 0 34px;
+}
+.pub-section .pub-new-step .text-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.pub-uploaded {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+.pub-uploaded.ready {
+  background: var(--accent-soft);
+}
+.pub-uploaded.done {
+  color: var(--accent);
+}
+.pub-uploaded.done > span {
+  flex: 1;
+  color: var(--text-strong);
+}
+.pub-uploaded-title {
+  font-weight: 600;
+  color: var(--text-strong);
+  margin-right: auto;
+}
+.pub-section .pub-uploaded-url {
+  width: 260px;
+}
+.pub-section .pub-uploaded-date {
+  width: 150px;
+}

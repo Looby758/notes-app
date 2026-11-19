@@ -17,6 +17,9 @@ import {
   thumbnailProblems,
   frameFileName,
   remapThumbnails,
+  checklist,
+  readyToUpload,
+  draftProgress,
   type Chapter
 } from './publishing'
 
@@ -196,5 +199,55 @@ describe('thumbnails', () => {
     ).videos[0]
     expect(v.thumbnails.map((t) => t.id)).toEqual(['a', 'c'])
     expect(v.chosenThumbnail).toBeNull()
+  })
+})
+
+describe('upload checklist', () => {
+  const ready = () => {
+    const d = newDraft('Maggie')
+    d.titles = [{ id: 't', text: 'The Entire Life of Maggie Rhee' }]
+    d.chosenTitle = 't'
+    d.thumbnails = [{ id: 'p', kind: 'picture', text: '', file: 'attachments/thumb.png', created: 0 }]
+    d.chosenThumbnail = 'p'
+    d.description = 'Her whole story.'
+    d.tags = ['twd']
+    d.chapters = [ch('0:00', 'Intro'), ch('1:00', 'Farm'), ch('5:00', 'Prison')]
+    return d
+  }
+  const step = (d: ReturnType<typeof newDraft>, id: string) => checklist(d).find((s) => s.id === id)!
+
+  it('ticks the draft steps itself and says what is missing', () => {
+    const d = newDraft('Maggie')
+    expect(step(d, 'thumbnail').missing).toMatch(/Add a picture/)
+    expect(step(d, 'title').missing).toBe('Write a title option')
+    expect(step(d, 'chapters').missing).toMatch(/not needed/)
+    const r = ready()
+    for (const id of ['thumbnail', 'title', 'description', 'tags', 'chapters']) expect(step(r, id).done).toBe(true)
+    r.chaptersInDescription = false
+    expect(step(r, 'chapters').missing).toMatch(/put the chapters at the end/)
+  })
+  it('won’t count a thumbnail YouTube would refuse', () => {
+    const d = ready()
+    d.thumbnails[0].file = 'attachments/thumb.webp'
+    expect(step(d, 'thumbnail').done).toBe(false)
+  })
+  it('is ready once every step is ticked or not needed', () => {
+    const d = ready()
+    expect(readyToUpload(d)).toBe(false)
+    for (const s of checklist(d)) if (!s.auto) d.ticked[s.id] = 1
+    expect(readyToUpload(d)).toBe(true)
+    d.chapters = []
+    expect(readyToUpload(d)).toBe(false)
+    d.skipped = ['chapters']
+    expect(readyToUpload(d)).toBe(true)
+    expect(draftProgress(d).total).toBe(checklist(d).length - 1)
+  })
+  it('puts your own steps at the end of getting the video ready', () => {
+    const d = ready()
+    d.extraSteps = [{ id: 'own-1', text: 'Sources double-checked' }]
+    const ids = checklist(d).map((s) => s.id)
+    expect(ids.indexOf('own-1')).toBe(ids.indexOf('watched') + 1)
+    expect(step(d, 'own-1').done).toBe(false)
+    expect(readyToUpload(d)).toBe(false)
   })
 })

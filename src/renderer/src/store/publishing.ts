@@ -285,3 +285,42 @@ export function remapPublishing(from: string, to: string): void {
   const next = remapThumbnails(usePublishing.getState().videos, from, to)
   if (next) write(next)
 }
+
+// ---------- upload checklist ----------
+
+export function tickStep(id: string, stepId: string, on: boolean): void {
+  change(
+    id,
+    (d) => {
+      const { [stepId]: _was, ...rest } = d.ticked
+      return { ticked: on ? { ...rest, [stepId]: Date.now() } : rest }
+    },
+    on ? 'Ticked a step' : 'Unticked a step'
+  )
+}
+
+/** "Not needed for this video" (or needed again). */
+export function skipStep(id: string, stepId: string, skip: boolean): void {
+  change(id, (d) => ({ skipped: skip ? [...d.skipped.filter((s) => s !== stepId), stepId] : d.skipped.filter((s) => s !== stepId) }), skip ? 'Marked a step not needed' : 'Marked a step needed again')
+}
+
+export function addStep(id: string, text: string): void {
+  const stepId = `own-${newPublishingId()}`
+  change(id, (d) => ({ extraSteps: [...d.extraSteps, { id: stepId, text: text.trim() }] }), 'Added a step')
+}
+
+export function deleteStep(id: string, stepId: string): void {
+  change(
+    id,
+    (d) => {
+      const { [stepId]: _was, ...ticked } = d.ticked
+      return { extraSteps: d.extraSteps.filter((s) => s.id !== stepId), ticked }
+    },
+    'Removed a step'
+  )
+}
+
+/** Marks the video as up on YouTube (on a day, with its link), or not up after all. */
+export function setUploaded(id: string, uploaded: { on: string; url: string } | null): void {
+  change(id, () => ({ uploaded }), uploaded ? 'Marked as uploaded' : 'Marked as not uploaded', uploaded ? 'uploaded' : undefined)
+}

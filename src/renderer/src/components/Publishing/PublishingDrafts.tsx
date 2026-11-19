@@ -38,6 +38,7 @@ import {
 } from '../../store/publishing'
 import { notify } from '../../store/notify'
 import ThumbnailBoard from './ThumbnailBoard'
+import UploadChecklist from './UploadChecklist'
 
 /** Copies text and says so. */
 function copy(text: string, what: string): void {
@@ -336,7 +337,7 @@ function Chapters({ d }: { d: VideoDraft }) {
 }
 
 /**
- * A video's title options, thumbnail board, description, tags and chapters. Shown on the Publishing page, and
+ * A video's title options, thumbnail board, description, tags, chapters and upload checklist. Shown on the Publishing page, and
  * meant to sit inside a video project too: give it the project's id (store/publishing's
  * videoDraftFor makes the record the first time).
  */
@@ -350,6 +351,7 @@ export default function PublishingDrafts({ videoId }: { videoId: string }) {
       <Description d={d} />
       <Tags d={d} />
       <Chapters d={d} />
+      <UploadChecklist d={d} />
     </div>
   )
 }

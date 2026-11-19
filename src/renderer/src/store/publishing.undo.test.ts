@@ -79,4 +79,23 @@ describe('publishing drafts and Ctrl+Z', () => {
     p.moveThumbnail(v.id, pic, draft(v.id).thumbnails[0].id)
     expect(draft(v.id).thumbnails[0].id).toBe(pic)
   })
+
+  it('ticks, skips and marks uploaded, all undoable', async () => {
+    const v = p.addVideo('Maggie')
+    p.tickStep(v.id, 'end-screen', true)
+    expect(draft(v.id).ticked['end-screen']).toBeTypeOf('number')
+    p.skipStep(v.id, 'chapters', true)
+    expect(draft(v.id).skipped).toEqual(['chapters'])
+    p.setUploaded(v.id, { on: '2026-11-20', url: 'https://youtu.be/x' })
+    await history.undo()
+    expect(draft(v.id).uploaded).toBeNull()
+    await history.undo()
+    expect(draft(v.id).skipped).toEqual([])
+    p.addStep(v.id, ' Sources checked ')
+    const own = draft(v.id).extraSteps[0]
+    expect(own.text).toBe('Sources checked')
+    p.tickStep(v.id, own.id, true)
+    p.deleteStep(v.id, own.id)
+    expect(draft(v.id).ticked[own.id]).toBeUndefined()
+  })
 })

@@ -3,6 +3,7 @@ import { Check, Pencil, Plus, Trash2, Upload, X } from 'lucide-react'
 import { addVideo, deleteVideo, ensurePublishing, renameVideo, usePublishing } from '../../store/publishing'
 import { chosenTitleText, draftProgress } from '../../lib/publishing'
 import { UNDO_KEY } from '../../lib/undo'
+import { formatDate } from '../../lib/dates'
 import { notify } from '../../store/notify'
 import PublishingDrafts from './PublishingDrafts'
 import './publishing.css'
@@ -135,8 +136,8 @@ export default function PublishingPage() {
             <button key={v.id} className={`pub-list-item ${open?.id === v.id ? 'on' : ''}`} onClick={() => setOpenId(v.id)} data-pub-video>
               <span className="pub-list-name">{v.name}</span>
               <span className="pub-list-sub">{chosenTitleText(v) || 'No title yet'}</span>
-              <span className="pub-list-progress" title="Title, thumbnail, description, tags and chapters">
-                {p.done}/{p.total} ready
+              <span className={`pub-list-progress ${v.uploaded ? 'up' : p.done === p.total ? 'ready' : ''}`} title="How far through the upload checklist">
+                {v.uploaded ? `Uploaded ${formatDate(new Date(`${v.uploaded.on}T12:00`), 'D MMM')}` : p.done === p.total ? 'Ready to upload' : `${p.done}/${p.total} steps done`}
               </span>
             </button>
           )
@@ -153,7 +154,7 @@ export default function PublishingPage() {
           !adding && (
             <div className="pub-empty">
               <span aria-hidden>🎬</span>
-              <p>Title options, a thumbnail board, the description, tags and chapters for each video, ready to copy into YouTube Studio.</p>
+              <p>Title options, a thumbnail board, the description, tags and chapters for each video, ready to copy into YouTube Studio, and a checklist to go through before it goes up.</p>
               <button className="btn btn-primary" onClick={() => setAdding(true)}>
                 <Plus size={14} /> New video
               </button>
