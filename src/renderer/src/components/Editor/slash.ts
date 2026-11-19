@@ -13,6 +13,8 @@ import { getNoteText } from '../../store/noteIndex'
 import { useUI } from '../../store/ui'
 import { addReminder, HIGHLIGHT_COLOURS } from './formatting'
 import { CALLOUT_TYPES, calloutLabel } from './livePreview'
+import { inScript } from './scriptTools'
+import { MARKER_INFO } from '../../lib/script'
 
 /**
  * Type "/" at the start of a line (or after a space) for a menu of things to insert:
@@ -23,7 +25,7 @@ interface SlashItem {
   label: string
   /** Extra words that find this item, e.g. "todo" for Checklist. */
   keywords: string
-  section: 'Format' | 'Insert' | 'Placeholders' | 'Templates'
+  section: 'Script' | 'Format' | 'Insert' | 'Placeholders' | 'Templates'
   detail?: string
   /** Replaces the typed "/query" (from..to) with this item. */
   apply: (view: EditorView, from: number, to: number) => void
@@ -214,6 +216,39 @@ const ITEMS: SlashItem[] = [
   }
 ]
 
+/**
+ * Video script markers: plain text tags like [IMAGE: rick.png] or [PAUSE] that show as chips
+ * (see scriptTools.ts and lib/script.ts). First in the menu in a script note.
+ */
+const SCRIPT_ITEMS: SlashItem[] = [
+  {
+    label: 'Image cue…',
+    keywords: 'script marker picture screenshot show still frame attachment',
+    section: 'Script',
+    detail: MARKER_INFO.IMAGE.icon,
+    apply: (view, from, to) => {
+      view.dispatch({ changes: { from, to, insert: '' } })
+      useUI.setState({ modal: 'imageCue' })
+    }
+  },
+  { label: 'Clip note', keywords: 'script marker footage video scene cut b-roll', section: 'Script', detail: MARKER_INFO.CLIP.icon, apply: tpl('[CLIP: ${what to show}]') },
+  { label: 'Pause', keywords: 'script marker breath beat wait stop', section: 'Script', detail: MARKER_INFO.PAUSE.icon, apply: text(() => '[PAUSE]') },
+  { label: 'Emphasis', keywords: 'script marker stress lean loud important', section: 'Script', detail: MARKER_INFO.EMPHASIS.icon, apply: tpl('[EMPHASIS: ${words}]') },
+  { label: 'Section', keywords: 'script marker part chapter break split heading', section: 'Script', detail: MARKER_INFO.SECTION.icon, apply: block('[SECTION: ${name}]\n${}') },
+  {
+    label: 'Source',
+    keywords: 'script marker reference research citation episode where from',
+    section: 'Script',
+    detail: MARKER_INFO.SOURCE.icon,
+    apply: (view, from, to) => {
+      // [SOURCE: [[|]]] with the note list open; type an episode or link instead if you like.
+      view.dispatch({ changes: { from, to, insert: '[SOURCE: [[]]]' }, selection: { anchor: from + '[SOURCE: [['.length } })
+      startCompletion(view)
+    }
+  },
+  { label: 'Note to self', keywords: 'script marker reminder todo comment private', section: 'Script', detail: MARKER_INFO.NOTE.icon, apply: tpl('[NOTE: ${}]') }
+]
+
 /** One item per note in the templates folder. */
 function templateItems(): SlashItem[] {
   const folder = usePrefs.getState().prefs.templatesFolder
@@ -256,7 +291,7 @@ function placeholderItems(): SlashItem[] {
   }))
 }
 
-const SECTION_ORDER = { Format: 0, Insert: 1, Placeholders: 2, Templates: 3 }
+const SECTION_ORDER = { Format: 0, Insert: 1, Script: 2, Placeholders: 3, Templates: 4 }
 
 /**
  * Best matches first: a word in the name starting with what you typed ("/check"), then a keyword
@@ -291,8 +326,13 @@ export function slashCompletions(ctx: CompletionContext): CompletionResult | nul
   const folder = usePrefs.getState().prefs.templatesFolder
   const path = ctx.state.facet(notePath)
   const inTemplate = !!folder && !!path && isWithin(path, folder)
-  const items = [...ITEMS, ...(inTemplate ? placeholderItems() : []), ...templateItems()]
+  const script = inScript(ctx.state)
+  const items = script
+    ? [...SCRIPT_ITEMS, ...ITEMS, ...(inTemplate ? placeholderItems() : []), ...templateItems()]
+    : [...ITEMS, ...SCRIPT_ITEMS, ...(inTemplate ? placeholderItems() : []), ...templateItems()]
   const ranked = query.trim() ? rank(items, query.trim()) : items
+  // In a script, the markers come first.
+  const order = (section: SlashItem['section']): number => (script && section === 'Script' ? -1 : SECTION_ORDER[section])
   if (ranked.length === 0) return null
 
   return {
@@ -305,8 +345,8 @@ export function slashCompletions(ctx: CompletionContext): CompletionResult | nul
         detail: item.detail,
         type: 'slash',
         // Keep the best fuzzy match first; with no query, group by section.
-        boost: query.trim() ? 99 - i : -SECTION_ORDER[item.section],
-        section: query.trim() ? undefined : { name: item.section, rank: SECTION_ORDER[item.section] },
+        boost: query.trim() ? 99 - i : -order(item.section),
+        section: query.trim() ? undefined : { name: item.section === 'Script' ? 'Script markers' : item.section, rank: order(item.section) },
         apply: (view, _c, from, to) => item.apply(view, from, to)
       })
     )

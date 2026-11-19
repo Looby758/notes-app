@@ -62,6 +62,10 @@ export const CONFLICTS_TAB = 'conflicts:'
 export const AI_TAB = 'ai:'
 export const CHAT_TAB = 'chat:'
 export const FLASHCARDS_TAB = 'flashcards:'
+/** The screenshot organiser: tag pictures by character and episode (components/Screenshots). */
+export const SCREENSHOTS_TAB = 'screenshots:'
+/** The story timeline: eras, what happened and where it was shown or told (components/Timeline). */
+export const TIMELINE_TAB = 'timeline:'
 export const TERMINAL_TAB = 'terminal:'
 export const PASSWORDS_TAB = 'passwords:'
 export const EMAIL_TAB = 'email:'
@@ -277,6 +281,22 @@ export function insertBlockIntoActiveNote(text: string | ((note: string) => stri
   const before = at > line.from ? '\n' : ''
   const after = at < line.to ? '\n' : ''
   view.dispatch({ changes: { from: at, insert: before + insert + after }, selection: { anchor: at + before.length + insert.length } })
+  return true
+}
+
+/** Puts text at the cursor of the note being edited, in the line (a script marker); false if no note is open. */
+export function insertInlineIntoActiveNote(text: string | ((note: string) => string)): boolean {
+  const pv = views.get(activePane())
+  if (!pv?.shown || !isNoteTab(pv.shown)) return false
+  const view = pv.view
+  const insert = typeof text === 'string' ? text : text(pv.shown)
+  const { from, to } = view.state.selection.main
+  // A space either side unless there's one already (or it's the start / end of the line).
+  const before = from > 0 && !/\s/.test(view.state.sliceDoc(from - 1, from)) ? ' ' : ''
+  const after = to < view.state.doc.length && !/\s/.test(view.state.sliceDoc(to, to + 1)) ? ' ' : ''
+  const value = before + insert + after
+  view.dispatch({ changes: { from, to, insert: value }, selection: { anchor: from + value.length }, userEvent: 'input' })
+  view.focus()
   return true
 }
 

@@ -90,6 +90,8 @@ export interface Prefs {
   vimMode: boolean
   cursorBlink: boolean
   showWordCount: boolean
+  /** How fast you read a video script out loud, in words a minute (for its length estimate). */
+  scriptWpm: number
   /** Opening a note adds a tab instead of changing the current one. */
   openInNewTab: boolean
   /** Web links in notes open in a web tab beside the note, instead of your usual browser. */
@@ -286,6 +288,7 @@ export const DEFAULT_PREFS: Prefs = {
   vimMode: false,
   cursorBlink: true,
   showWordCount: true,
+  scriptWpm: 150,
   openInNewTab: false,
   openLinksInApp: true,
   webRestoreTabs: true,
@@ -382,7 +385,8 @@ export const RANGES = {
   focusRounds: { min: 1, max: 12, step: 1 },
   autoLockMinutes: { min: 0, max: 120, step: 5 },
   screensaverMinutes: { min: 1, max: 60, step: 1 },
-  replaySeconds: { min: 10, max: 120, step: 5 }
+  replaySeconds: { min: 10, max: 120, step: 5 },
+  scriptWpm: { min: 80, max: 250, step: 5 }
 } as const
 
 const CHOICES = {
@@ -479,7 +483,7 @@ export function normalizePrefs(raw: unknown): Prefs {
     out.spellcheckLanguage = input.spellcheckLanguage
   }
   out.tabSize = Math.round(out.tabSize)
-  for (const k of ['focusMinutes', 'breakMinutes', 'longBreakMinutes', 'focusRounds', 'autoLockMinutes', 'replaySeconds'] as const) out[k] = Math.round(out[k])
+  for (const k of ['focusMinutes', 'breakMinutes', 'longBreakMinutes', 'focusRounds', 'autoLockMinutes', 'replaySeconds', 'scriptWpm'] as const) out[k] = Math.round(out[k])
   out.attachmentFolder = cleanFolder(input.attachmentFolder ?? DEFAULT_PREFS.attachmentFolder, DEFAULT_PREFS.attachmentFolder)
   out.webClipFolder = cleanFolder(input.webClipFolder ?? DEFAULT_PREFS.webClipFolder, DEFAULT_PREFS.webClipFolder)
   out.templatesFolder = cleanFolder(input.templatesFolder ?? DEFAULT_PREFS.templatesFolder, DEFAULT_PREFS.templatesFolder)

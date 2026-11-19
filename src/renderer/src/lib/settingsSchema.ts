@@ -374,6 +374,17 @@ export const SETTINGS: SettingDef[] = [
   { key: 'cursorBlink', section: 'editor', group: 'Display', type: 'toggle', label: 'Blinking cursor', keywords: 'caret' },
   { key: 'showWordCount', section: 'editor', group: 'Display', type: 'toggle', label: 'Word count in the status bar', keywords: 'words' },
   {
+    key: 'scriptWpm',
+    section: 'editor',
+    group: 'Display',
+    type: 'slider',
+    ...RANGES.scriptWpm,
+    format: (v) => `${v} words a minute`,
+    label: 'Speaking pace for video scripts',
+    description: 'How fast you read a script out loud, for the length shown at the bottom of a script note. Most people speak at around 130–160.',
+    keywords: 'youtube voiceover script length words per minute wpm duration video'
+  },
+  {
     key: 'typewriterCenter',
     section: 'editor',
     group: 'Typewriter mode',
