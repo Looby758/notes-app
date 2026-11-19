@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { ArrowUpRight, Check, CircleCheck, ExternalLink, Plus, Trash2, Undo2 } from 'lucide-react'
+import { ArrowUpRight, Check, CircleCheck, ExternalLink, Link2, Plus, Trash2, Undo2 } from 'lucide-react'
 import { checklist, readyToUpload, STEP_GROUPS, type ChecklistStep, type VideoDraft } from '../../lib/publishing'
 import { addStep, deleteStep, setUploaded, skipStep, tickStep } from '../../store/publishing'
 import { dayKeyOf } from '../../lib/when'
@@ -102,24 +102,68 @@ function AddStep({ id }: { id: string }) {
   )
 }
 
+/** A pasted link, or null (with a message) if it isn't one. Empty is fine. */
+function checkLink(text: string): string | null {
+  const link = text.trim()
+  if (link && !/^https?:\/\//i.test(link)) {
+    notify('That doesn’t look like a link. Paste the video’s address from YouTube, or leave it empty.', 'info')
+    return null
+  }
+  return link
+}
+
 function Uploaded({ d, ready }: { d: VideoDraft; ready: boolean }) {
   const [url, setUrl] = useState('')
   const [on, setOn] = useState(() => dayKeyOf(new Date()))
+  const [editing, setEditing] = useState(false)
   if (d.uploaded) {
+    const up = d.uploaded
+    const saveLink = (): void => {
+      const link = checkLink(url)
+      if (link === null) return
+      if (link !== up.url) setUploaded(d.id, { ...up, url: link })
+      setEditing(false)
+    }
     return (
       <div className="pub-uploaded done" data-pub-uploaded>
         <CircleCheck size={18} />
         <span>
-          Uploaded {formatDate(new Date(`${d.uploaded.on}T12:00`), 'ddd D MMM YYYY')}
-          {d.uploaded.url && (
+          Uploaded {formatDate(new Date(`${up.on}T12:00`), 'ddd D MMM YYYY')}
+          {up.url && !editing && (
             <>
               {' · '}
-              <button className="link-button" onClick={() => openLink(d.uploaded!.url, '')}>
+              <button className="link-button" onClick={() => openLink(up.url, '')}>
                 Open on YouTube <ExternalLink size={12} />
               </button>
             </>
           )}
         </span>
+        {editing ? (
+          <input
+            className="text-input pub-uploaded-url"
+            autoFocus
+            value={url}
+            placeholder="Paste its YouTube link"
+            aria-label="YouTube link"
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') saveLink()
+              if (e.key === 'Escape') setEditing(false)
+            }}
+            onBlur={saveLink}
+          />
+        ) : (
+          <button
+            className="link-button"
+            onClick={() => {
+              setUrl(up.url)
+              setEditing(true)
+            }}
+            data-pub-edit-link
+          >
+            <Link2 size={12} /> {up.url ? 'Change link' : 'Add its link'}
+          </button>
+        )}
         <button className="link-button" onClick={() => setUploaded(d.id, null)} title="It isn’t up yet after all">
           <Undo2 size={12} /> Not uploaded
         </button>
@@ -127,9 +171,8 @@ function Uploaded({ d, ready }: { d: VideoDraft; ready: boolean }) {
     )
   }
   const mark = (): void => {
-    const link = url.trim()
-    if (link && !/^https?:\/\//i.test(link)) return notify('That doesn’t look like a link. Paste the video’s address from YouTube, or leave it empty.', 'info')
-    setUploaded(d.id, { on, url: link })
+    const link = checkLink(url)
+    if (link !== null) setUploaded(d.id, { on, url: link })
   }
   return (
     <div className={`pub-uploaded ${ready ? 'ready' : ''}`} data-pub-uploaded>

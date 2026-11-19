@@ -1,12 +1,38 @@
 import { useEffect, useState } from 'react'
 import { Check, Pencil, Plus, Trash2, Upload, X } from 'lucide-react'
 import { addVideo, deleteVideo, ensurePublishing, renameVideo, usePublishing } from '../../store/publishing'
-import { chosenTitleText, draftProgress } from '../../lib/publishing'
+import { chosenThumbnailCard, chosenTitleText, draftProgress, isYouTubePlaceholder, youTubeThumbnailUrls, type VideoDraft } from '../../lib/publishing'
+import { vaultUrl } from '../../lib/fileKinds'
 import { UNDO_KEY } from '../../lib/undo'
 import { formatDate } from '../../lib/dates'
 import { notify } from '../../store/notify'
 import PublishingDrafts from './PublishingDrafts'
 import './publishing.css'
+
+/**
+ * Once a video is up and has its link, its thumbnail from YouTube; if YouTube can't be reached
+ * (offline) or doesn't have one, the picture starred on its thumbnail board.
+ */
+function VideoThumb({ v }: { v: VideoDraft }) {
+  const fromYouTube = v.uploaded?.url ? youTubeThumbnailUrls(v.uploaded.url) : []
+  const starred = chosenThumbnailCard(v)?.file
+  const sources = [...fromYouTube, ...(starred ? [vaultUrl(starred)] : [])]
+  const [i, setI] = useState(0)
+  if (!v.uploaded?.url || i >= sources.length) return null
+  const youTube = i < fromYouTube.length
+  return (
+    <span className="pub-list-thumb" data-pub-list-thumb={youTube ? 'youtube' : 'starred'}>
+      <img
+        src={sources[i]}
+        alt=""
+        draggable={false}
+        referrerPolicy="no-referrer"
+        onLoad={(e) => youTube && isYouTubePlaceholder(e.currentTarget.naturalWidth) && setI(i + 1)}
+        onError={() => setI(i + 1)}
+      />
+    </span>
+  )
+}
 
 /** Which video was open, so coming back to the page shows it again. */
 let lastOpen: string | null = null
@@ -134,6 +160,7 @@ export default function PublishingPage() {
           const p = draftProgress(v)
           return (
             <button key={v.id} className={`pub-list-item ${open?.id === v.id ? 'on' : ''}`} onClick={() => setOpenId(v.id)} data-pub-video>
+              <VideoThumb key={`${v.uploaded?.url ?? ''}|${v.chosenThumbnail ?? ''}`} v={v} />
               <span className="pub-list-name">{v.name}</span>
               <span className="pub-list-sub">{chosenTitleText(v) || 'No title yet'}</span>
               <span className={`pub-list-progress ${v.uploaded ? 'up' : p.done === p.total ? 'ready' : ''}`} title="How far through the upload checklist">

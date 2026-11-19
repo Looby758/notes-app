@@ -20,6 +20,8 @@ import {
   checklist,
   readyToUpload,
   draftProgress,
+  youTubeThumbnailUrls,
+  isYouTubePlaceholder,
   type Chapter
 } from './publishing'
 
@@ -249,5 +251,21 @@ describe('upload checklist', () => {
     expect(ids.indexOf('own-1')).toBe(ids.indexOf('watched') + 1)
     expect(step(d, 'own-1').done).toBe(false)
     expect(readyToUpload(d)).toBe(false)
+  })
+})
+
+describe('YouTube thumbnails', () => {
+  it('finds the thumbnail for any kind of YouTube link', () => {
+    const urls = ['https://youtu.be/dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=30', 'https://youtube.com/shorts/dQw4w9WgXcQ', ' https://m.youtube.com/watch?v=dQw4w9WgXcQ ']
+    for (const u of urls) expect(youTubeThumbnailUrls(u)).toEqual(['https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg', 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'])
+  })
+  it('has none for other links', () => {
+    expect(youTubeThumbnailUrls('https://example.com/watch?v=dQw4w9WgXcQ')).toEqual([])
+    expect(youTubeThumbnailUrls('https://www.youtube.com/@mychannel')).toEqual([])
+    expect(youTubeThumbnailUrls('')).toEqual([])
+  })
+  it('knows YouTube’s grey stand-in picture', () => {
+    expect(isYouTubePlaceholder(120)).toBe(true)
+    expect(isYouTubePlaceholder(1280)).toBe(false)
   })
 })

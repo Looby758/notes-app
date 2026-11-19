@@ -1,3 +1,5 @@
+import { youTubeVideoId } from '@shared/youtube'
+
 /**
  * Getting a video ready to publish on YouTube: title options, the description, tags and chapters,
  * kept per video in .notesapp/publishing.json (store/publishing.ts saves it).
@@ -514,3 +516,17 @@ export function checklist(d: VideoDraft): ChecklistStep[] {
 
 /** Whether everything that applies is done. */
 export const readyToUpload = (d: VideoDraft): boolean => checklist(d).every((s) => s.skipped || s.done)
+
+// ---------- the video once it's up ----------
+
+/**
+ * Where YouTube keeps a video's thumbnail, best first: the full-size one (only there for HD
+ * uploads), then the one every video has. Empty if the link isn't a YouTube video.
+ */
+export function youTubeThumbnailUrls(link: string): string[] {
+  const id = youTubeVideoId(link.trim())
+  return id ? [`https://i.ytimg.com/vi/${id}/maxresdefault.jpg`, `https://i.ytimg.com/vi/${id}/hqdefault.jpg`] : []
+}
+
+/** YouTube answers a missing thumbnail with a small grey picture (120×90) instead of an error. */
+export const isYouTubePlaceholder = (width: number): boolean => width <= 120
