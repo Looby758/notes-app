@@ -66,3 +66,14 @@ describe('radial menu', () => {
     expect(radialIndexAt(5, 5, 4, 30)).toBe(-1)
   })
 })
+
+describe('video ideas', () => {
+  it('reads an idea for the video inbox, keeping its question mark', () => {
+    expect(p('video idea: Was Negan right?')).toEqual({ kind: 'videoIdea', text: 'Was Negan right?' })
+    expect(p('yt idea Daryl ranks every weapon')).toEqual({ kind: 'videoIdea', text: 'Daryl ranks every weapon' })
+    expect(p('idea for a video - Carol vs the Whisperers')).toEqual({ kind: 'videoIdea', text: 'Carol vs the Whisperers' })
+    expect(describeSmart({ kind: 'videoIdea', text: 'Was Negan right?' })).toBe('Add “Was Negan right?” to your video ideas')
+    expect(validSmart({ kind: 'videoIdea', text: 'Glenn' })).toEqual({ kind: 'videoIdea', text: 'Glenn' })
+    expect(validSmart({ kind: 'videoIdea', text: '' })).toBeNull()
+  })
+})

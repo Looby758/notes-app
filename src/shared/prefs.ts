@@ -160,6 +160,8 @@ export interface Prefs {
   templatesFolder: string
   /** Notes in the templates folder don't show up under tags (or in #tag searches). */
   hideTemplatesFromTags: boolean
+  /** Where new video projects get their folders (each video's script and research notes go in one inside it). */
+  videosFolder: string
 
   // Calendar
   dailyFolder: string
@@ -322,6 +324,7 @@ export const DEFAULT_PREFS: Prefs = {
   attachmentFolder: 'attachments',
   templatesFolder: 'Templates',
   hideTemplatesFromTags: true,
+  videosFolder: 'Videos',
 
   dailyFolder: 'Daily',
   dailyFormat: 'YYYY-MM-DD',
@@ -485,6 +488,7 @@ export function normalizePrefs(raw: unknown): Prefs {
   out.webClipFolder = cleanFolder(input.webClipFolder ?? DEFAULT_PREFS.webClipFolder, DEFAULT_PREFS.webClipFolder)
   out.templatesFolder = cleanFolder(input.templatesFolder ?? DEFAULT_PREFS.templatesFolder, DEFAULT_PREFS.templatesFolder)
   out.dailyFolder = cleanFolder(input.dailyFolder ?? DEFAULT_PREFS.dailyFolder, DEFAULT_PREFS.dailyFolder)
+  out.videosFolder = cleanFolder(input.videosFolder ?? DEFAULT_PREFS.videosFolder, DEFAULT_PREFS.videosFolder)
   out.dailyTemplate = cleanFolder(input.dailyTemplate ?? '', '')
   out.weekStart = Math.round(out.weekStart)
   // The format becomes a file path: it must contain a day and nothing Windows can't use in a name.

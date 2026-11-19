@@ -1,4 +1,5 @@
 import { useEditor } from '../store/editor'
+import { focusIdeaBox } from '../store/videos'
 import { useVault } from '../store/vault'
 import { openExport, showRightView, showSearch, showSidebarView, toggleFocusMode, toggleMindMap, toggleZen, useUI } from '../store/ui'
 import { effectiveShortcut, setPrefs, usePrefs } from '../store/prefs'
@@ -29,6 +30,7 @@ import {
   DOWNLOADER_TAB,
   STUDIO_TAB,
   CLIPS_TAB,
+  VIDEOS_TAB,
   SOUNDBOARD_TAB,
   DISCORD_TAB,
   EXPLORER_TAB,
@@ -358,6 +360,11 @@ export const commands: Command[] = [
   { id: 'soundboard.stop', group: 'Navigation', title: 'Stop all soundboard sounds', run: () => void import('./soundboard').then((m) => m.stopAll()) },
   { id: 'studio.open', group: 'Navigation', title: 'Open the Studio (record your screen and webcam)', run: () => openSpecialTab(STUDIO_TAB) },
   { id: 'clips.open', group: 'Navigation', title: 'Open clips (instant replay and the clip editor)', run: () => openSpecialTab(CLIPS_TAB) },
+  { id: 'videos.idea', group: 'Navigation', title: 'Idea inbox for videos (jot down a video idea)', run: () => {
+    focusIdeaBox()
+    openSpecialTab(VIDEOS_TAB)
+  } },
+  { id: 'videos.open', group: 'Navigation', title: 'Video projects (script, research, pictures, recordings, thumbnail ideas)', run: () => openSpecialTab(VIDEOS_TAB) },
   { id: 'replay.save', group: 'Navigation', title: 'Save the last 30 seconds (instant replay)', run: () => void import('./replay').then((m) => m.saveReplay()) },
   { id: 'replay.toggle', group: 'Navigation', title: 'Turn instant replay on or off', run: () => setPrefs({ replayOn: !usePrefs.getState().prefs.replayOn }) },
   { id: 'studio.record', group: 'Navigation', title: 'Start or stop recording (Studio)', run: () => void import('./studio').then((m) => m.toggleRecording()) },

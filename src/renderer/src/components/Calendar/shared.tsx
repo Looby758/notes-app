@@ -4,7 +4,9 @@ import Private, { usePrivateTitle } from '../Streamer/Private'
 import { itemsByDay, useNoteIndex } from '../../store/noteIndex'
 import { usePrefs } from '../../store/prefs'
 import { ensureRange, useExternal, type ExternalItem } from '../../store/externalEvents'
-import { openNote } from '../../lib/editorController'
+import { openNote, openSpecialTab, VIDEOS_TAB } from '../../lib/editorController'
+import { selectProject, useVideos } from '../../store/videos'
+import { stageLabel, uploadsBetween } from '../../lib/videos'
 import { addEvent, displayTime, toggleCalendarTask } from '../../lib/daily'
 import { addDays, dayKey, formatDate, fromDayKey } from '../../lib/dates'
 import { useMoney } from '../../store/money'
@@ -84,12 +86,43 @@ export function useExternalRange(from: Date, to: Date): Map<string, ExternalItem
   }, [fromKey, toKey, generation])
   const byDay = useExternal((s) => s.byDay)
   const bills = useBillItems(from, to)
+  const uploads = useUploadItems(from, to)
   return useMemo(() => {
-    if (!bills.length) return byDay
+    if (!bills.length && !uploads.length) return byDay
     const merged = new Map(byDay)
-    for (const item of bills) merged.set(item.date, [item, ...(merged.get(item.date) ?? [])])
+    for (const item of [...bills, ...uploads]) merged.set(item.date, [item, ...(merged.get(item.date) ?? [])])
     return merged
-  }, [byDay, bills])
+  }, [byDay, bills, uploads])
+}
+
+const VIDEO_EVENT = 'videos:'
+
+/** Video projects' upload days (planned, or when they went up), as all-day calendar items. */
+function useUploadItems(from: Date, to: Date): ExternalItem[] {
+  const projects = useVideos((s) => s.projects)
+  const fromDay = dayKey(from)
+  const toDay = dayKey(new Date(to.getTime() - 1))
+  return useMemo(
+    () =>
+      uploadsBetween(projects, fromDay, toDay).map(({ date, project: p }) => {
+        const up = p.stage === 'uploaded'
+        return {
+          date,
+          allDay: true,
+          event: {
+            id: VIDEO_EVENT + p.id,
+            sourceId: 'videos',
+            calendarName: 'Video projects',
+            color: up ? '#199e70' : '#e5484d',
+            title: `🎬 ${up ? 'Went up' : 'Upload'}: ${p.title || 'Untitled video'}${up ? '' : ` (${stageLabel(p.stage)})`}`,
+            allDay: true,
+            start: date,
+            end: dayKey(addDays(fromDayKey(date)!, 1))
+          }
+        }
+      }),
+    [projects, fromDay, toDay]
+  )
 }
 
 /** Repeating payments and paydays the money tracker found, as all-day calendar items. */
@@ -194,6 +227,12 @@ interface Details {
 let setDetails: ((d: Details | null) => void) | null = null
 
 export function showEventDetails(item: ExternalItem, x: number, y: number): void {
+  // A video's upload day opens the video itself.
+  if (item.event.id.startsWith(VIDEO_EVENT)) {
+    selectProject(item.event.id.slice(VIDEO_EVENT.length))
+    openSpecialTab(VIDEOS_TAB)
+    return
+  }
   setDetails?.({ item, x, y })
 }
 
