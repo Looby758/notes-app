@@ -116,8 +116,8 @@ export const useVault = create<VaultState>((set, get) => {
       })
     }
     remapTabs(from, to)
-    remapScreenshots(from, to)
     remapStars(from, to)
+    remapScreenshots(from, to)
     remapFlashcards(from, to)
     remapLockedFolders(from, to)
   }
