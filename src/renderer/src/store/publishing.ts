@@ -22,6 +22,9 @@ import { recordUndo, undoChanged } from '../lib/undo'
  */
 export const usePublishing = create<PublishingData & { loaded: boolean }>(() => ({ ...emptyPublishing(), loaded: false }))
 
+/** The video open on the Publishing page (a video project's id, or a Publishing-only video's). */
+export const usePublishingOpen = create<{ id: string | null }>(() => ({ id: null }))
+
 const FILE = 'publishing.json'
 
 /** Bumped when publishing.json is read again (another notes folder, say): older undo steps no longer fit. */
@@ -119,7 +122,7 @@ export function addVideo(name: string): VideoDraft {
 export function videoDraftFor(id: string, name: string): VideoDraft {
   const found = draftOf(id)
   if (found) return found
-  const made = newDraft(name, id)
+  const made: VideoDraft = { ...newDraft(name, id), project: true }
   write([made, ...usePublishing.getState().videos])
   return made
 }

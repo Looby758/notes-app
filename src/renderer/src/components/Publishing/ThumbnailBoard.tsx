@@ -137,6 +137,9 @@ function FrameGrabber({ videoId, onClose }: { videoId: string; onClose: () => vo
 
 // ---------- the cards ----------
 
+/** A just-added idea card, so it opens ready to type in. */
+let typeInNext: string | null = null
+
 function Card({ d, card, dragging, setDragging }: { d: VideoDraft; card: ThumbnailCard; dragging: string | null; setDragging: (id: string | null) => void }) {
   const chosen = d.chosenThumbnail === card.id
   const facts = usePictureFacts(card.file)
@@ -186,6 +189,12 @@ function Card({ d, card, dragging, setDragging }: { d: VideoDraft; card: Thumbna
         rows={card.kind === 'idea' ? 4 : 1}
         placeholder={card.kind === 'idea' ? 'The idea: Maggie front and centre, Negan blurred behind, big red “WHY?”' : 'Add a note'}
         aria-label={card.kind === 'idea' ? 'Thumbnail idea' : 'Picture note'}
+        ref={(el) => {
+          if (el && typeInNext === card.id) {
+            typeInNext = null
+            el.focus()
+          }
+        }}
         onChange={(e) => setThumbnailText(d.id, card.id, e.target.value)}
       />
       <div className="pub-card-foot">
@@ -337,7 +346,7 @@ export default function ThumbnailBoard({ d }: { d: VideoDraft }) {
     >
       <header className="pub-section-head">
         <h3>Thumbnail board</h3>
-        <button className="link-button" onClick={() => addThumbnails(d.id, [{ kind: 'idea', text: '' }])} data-pub-add-idea>
+        <button className="link-button" onClick={() => ([typeInNext] = addThumbnails(d.id, [{ kind: 'idea', text: '' }]))} data-pub-add-idea>
           <Lightbulb size={13} /> Idea
         </button>
         <button className="link-button" onClick={() => void addPictures()} data-pub-add-picture>

@@ -13571,6 +13571,29 @@ body.reduce-motion .theme-loading-text {
   color: var(--text);
   font: inherit;
 }
+.video-publishing {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  color: var(--text-muted);
+}
+.video-publishing-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+}
+.video-publishing-text strong {
+  color: var(--text);
+  font-size: 13.5px;
+}
 .video-inbox {
   margin-bottom: 14px;
   border: 1px solid var(--border);

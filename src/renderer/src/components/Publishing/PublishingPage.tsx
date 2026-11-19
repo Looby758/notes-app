@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Check, Pencil, Plus, Trash2, Upload, X } from 'lucide-react'
-import { addVideo, deleteVideo, ensurePublishing, renameVideo, usePublishing } from '../../store/publishing'
+import { Check, Pencil, Plus, Trash2, Upload, Video, X } from 'lucide-react'
+import { deleteVideo, renameVideo, usePublishing, usePublishingOpen } from '../../store/publishing'
+import { renameProject, selectProject, useVideos } from '../../store/videos'
+import { draftsForProject, ensureVideoData, newVideoFromPublishing, publishingRows, type PublishingRow } from '../../store/videoLinks'
+import { stageLabel, uploadDateOf } from '../../lib/videos'
+import { openSpecialTab, VIDEOS_TAB } from '../../lib/editorController'
 import { chosenThumbnailCard, chosenTitleText, draftProgress, isYouTubePlaceholder, youTubeThumbnailUrls, type VideoDraft } from '../../lib/publishing'
 import { vaultUrl } from '../../lib/fileKinds'
 import { UNDO_KEY } from '../../lib/undo'
@@ -34,14 +38,11 @@ function VideoThumb({ v }: { v: VideoDraft }) {
   )
 }
 
-/** Which video was open, so coming back to the page shows it again. */
-let lastOpen: string | null = null
-
 function NewVideo({ onMade, onClose }: { onMade: (id: string) => void; onClose: () => void }) {
   const [name, setName] = useState('')
   const make = (): void => {
     if (!name.trim()) return notify('Give the video a working name first.', 'info')
-    onMade(addVideo(name).id)
+    void newVideoFromPublishing(name.trim()).then(onMade, notify)
   }
   return (
     <div className="pub-new">
@@ -68,7 +69,24 @@ function NewVideo({ onMade, onClose }: { onMade: (id: string) => void; onClose: 
   )
 }
 
-function VideoName({ id, name }: { id: string; name: string }) {
+const day = (key: string): string => formatDate(new Date(`${key}T12:00`), 'D MMM')
+
+/** The line under a video in the list: how far through the checklist it is, or when it went up. */
+function rowStatus({ project, draft }: PublishingRow): { text: string; tone: '' | 'ready' | 'up' } {
+  if (draft?.uploaded) return { text: `Uploaded ${day(draft.uploaded.on)}`, tone: 'up' }
+  const upDay = project && uploadDateOf(project)
+  if (project?.stage === 'uploaded') return { text: upDay ? `Uploaded ${day(upDay)}` : 'Uploaded', tone: 'up' }
+  if (!draft) return { text: project ? `${stageLabel(project.stage)} · not started here yet` : '', tone: '' }
+  const p = draftProgress(draft)
+  return p.done === p.total ? { text: 'Ready to upload', tone: 'ready' } : { text: `${p.done}/${p.total} steps done`, tone: '' }
+}
+
+function openInVideos(id: string): void {
+  selectProject(id)
+  openSpecialTab(VIDEOS_TAB)
+}
+
+function VideoName({ id, name, isProject }: { id: string; name: string; isProject: boolean }) {
   const [editing, setEditing] = useState(false)
   const [confirming, setConfirming] = useState(false)
   if (editing) {
@@ -80,7 +98,8 @@ function VideoName({ id, name }: { id: string; name: string }) {
         maxLength={120}
         aria-label="Video name"
         onBlur={(e) => {
-          if (e.target.value.trim() && e.target.value.trim() !== name) renameVideo(id, e.target.value.trim())
+          const to = e.target.value.trim()
+          if (to && to !== name) (isProject ? renameProject : renameVideo)(id, to)
           setEditing(false)
         }}
         onKeyDown={(e) => {
@@ -96,7 +115,11 @@ function VideoName({ id, name }: { id: string; name: string }) {
       <button className="icon-btn" onClick={() => setEditing(true)} title="Rename">
         <Pencil size={14} />
       </button>
-      {confirming ? (
+      {isProject ? (
+        <button className="link-button" onClick={() => openInVideos(id)} title="Its script, research, pictures, stage and upload date" data-pub-open-project>
+          <Video size={13} /> Open its video project
+        </button>
+      ) : confirming ? (
         <>
           <button
             className="link-button danger"
@@ -120,24 +143,33 @@ function VideoName({ id, name }: { id: string; name: string }) {
   )
 }
 
+const setOpenId = (id: string): void => usePublishingOpen.setState({ id })
+
 /**
- * Publishing: getting each video ready for YouTube. Until video projects exist, this keeps its
- * own simple list of videos; a video project can show the same drafts with PublishingDrafts.
+ * Publishing: getting each video ready for YouTube. The list is your video projects (a video made
+ * here is a project too, so it's on the Videos board), plus any videos made here before the two
+ * were joined.
  */
 export default function PublishingPage() {
-  const videos = usePublishing((s) => s.videos)
-  const loaded = usePublishing((s) => s.loaded)
-  const [openId, setOpenId] = useState<string | null>(lastOpen)
+  const drafts = usePublishing((s) => s.videos)
+  const projects = useVideos((s) => s.projects)
+  const pubLoaded = usePublishing((s) => s.loaded)
+  const videosLoaded = useVideos((s) => s.loaded)
+  const loaded = pubLoaded && videosLoaded
+  const openId = usePublishingOpen((s) => s.id)
   const [adding, setAdding] = useState(false)
 
   useEffect(() => {
-    void ensurePublishing()
+    void ensureVideoData()
   }, [])
 
-  const open = videos.find((v) => v.id === openId) ?? videos[0]
+  const rows = publishingRows(projects, drafts)
+  const open = rows.find((r) => r.id === openId) ?? rows[0]
   useEffect(() => {
-    lastOpen = open?.id ?? null
-  }, [open?.id])
+    if (open && open.id !== openId) setOpenId(open.id)
+    // A project opened here for the first time gets its (empty) drafts.
+    if (loaded && open?.project && !open.draft) void draftsForProject(open.id)
+  }, [open?.id, open?.draft, loaded])
 
   const made = (id: string): void => {
     setOpenId(id)
@@ -156,15 +188,15 @@ export default function PublishingPage() {
           </button>
         </header>
         {adding && <NewVideo onMade={made} onClose={() => setAdding(false)} />}
-        {videos.map((v) => {
-          const p = draftProgress(v)
+        {rows.map((r) => {
+          const status = rowStatus(r)
           return (
-            <button key={v.id} className={`pub-list-item ${open?.id === v.id ? 'on' : ''}`} onClick={() => setOpenId(v.id)} data-pub-video>
-              <VideoThumb key={`${v.uploaded?.url ?? ''}|${v.chosenThumbnail ?? ''}`} v={v} />
-              <span className="pub-list-name">{v.name}</span>
-              <span className="pub-list-sub">{chosenTitleText(v) || 'No title yet'}</span>
-              <span className={`pub-list-progress ${v.uploaded ? 'up' : p.done === p.total ? 'ready' : ''}`} title="How far through the upload checklist">
-                {v.uploaded ? `Uploaded ${formatDate(new Date(`${v.uploaded.on}T12:00`), 'D MMM')}` : p.done === p.total ? 'Ready to upload' : `${p.done}/${p.total} steps done`}
+            <button key={r.id} className={`pub-list-item ${open?.id === r.id ? 'on' : ''}`} onClick={() => setOpenId(r.id)} data-pub-video={r.id}>
+              {r.draft && <VideoThumb key={`${r.draft.uploaded?.url ?? ''}|${r.draft.chosenThumbnail ?? ''}`} v={r.draft} />}
+              <span className="pub-list-name">{r.name}</span>
+              <span className="pub-list-sub">{(r.draft && chosenTitleText(r.draft)) || 'No title yet'}</span>
+              <span className={`pub-list-progress ${status.tone}`} title="How far through the upload checklist">
+                {status.text}
               </span>
             </button>
           )
@@ -173,8 +205,8 @@ export default function PublishingPage() {
       <main className="pub-main">
         {open ? (
           <div className="pub-main-inner">
-            <VideoName key={open.id} id={open.id} name={open.name} />
-            <PublishingDrafts videoId={open.id} />
+            <VideoName key={open.id} id={open.id} name={open.name} isProject={!!open.project} />
+            {open.draft && <PublishingDrafts videoId={open.id} />}
           </div>
         ) : (
           loaded &&

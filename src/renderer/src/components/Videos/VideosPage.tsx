@@ -26,7 +26,10 @@ import {
 } from '../../store/videos'
 import { boardColumns, fitsSection, projectCounts, stageLabel, uploadDateOf, VIDEO_STAGES, type VideoIdea, type VideoItem, type VideoItemKind, type VideoProject, type VideoStage } from '../../lib/videos'
 import { fileKind, openAttachment, vaultUrl } from '../../lib/fileKinds'
-import { openNote, openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
+import { openNote, openSpecialTab, PUBLISHING_TAB, SETTINGS_TAB } from '../../lib/editorController'
+import { usePublishing, usePublishingOpen } from '../../store/publishing'
+import { draftsForProject } from '../../store/videoLinks'
+import { chosenTitleText, draftProgress } from '../../lib/publishing'
 import { useUI } from '../../store/ui'
 import { computerFiles, getDrag } from '../../lib/dnd'
 import { noteTitle } from '../../lib/paths'
@@ -458,6 +461,36 @@ function StageAndDate({ project: p }: { project: VideoProject }) {
   )
 }
 
+/** The video's titles, thumbnail board, description and upload checklist, on the Publishing page. */
+function PublishingLink({ project: p }: { project: VideoProject }) {
+  const draft = usePublishing((s) => s.videos.find((v) => v.id === p.id))
+  const progress = draft && draftProgress(draft)
+  const title = draft && chosenTitleText(draft)
+  const open = async (): Promise<void> => {
+    await draftsForProject(p.id)
+    usePublishingOpen.setState({ id: p.id })
+    openSpecialTab(PUBLISHING_TAB)
+  }
+  return (
+    <div className="video-publishing" data-video-publishing>
+      <Upload size={15} />
+      <span className="video-publishing-text">
+        <strong>Publishing</strong>
+        <span>
+          {!draft || !progress
+            ? 'Title options, thumbnail board, description, tags, chapters and the upload checklist'
+            : draft.uploaded
+              ? `Uploaded ${formatDate(new Date(`${draft.uploaded.on}T12:00`), 'D MMM')}`
+              : `${title ? `“${title}” · ` : ''}${progress.done}/${progress.total} checklist steps done`}
+        </span>
+      </span>
+      <button className="btn" onClick={() => void open().catch(notify)} data-video-open-publishing>
+        Open in Publishing <ArrowRight size={13} />
+      </button>
+    </div>
+  )
+}
+
 function NewProjectForm({ onClose }: { onClose: () => void }) {
   const [title, setTitle] = useState('')
   const submit = (): void => {
@@ -613,6 +646,7 @@ function ProjectView({ project: p }: { project: VideoProject }) {
       />
 
       <StageAndDate project={p} />
+      <PublishingLink project={p} />
 
       <DropSection project={p} kind="script" icon={<NotebookPen size={15} />} title="Script" hint="Drop a note here">
         {p.script ? (

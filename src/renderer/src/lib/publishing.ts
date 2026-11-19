@@ -57,6 +57,11 @@ export interface VideoDraft {
   extraSteps: { id: string; text: string }[]
   /** When it went up, and its link. */
   uploaded: { on: string; url: string } | null
+  /**
+   * True when these are the drafts of a video project (the draft's id is the project's id). The
+   * project is then the video itself (its title, stage and upload date); these are only its drafts.
+   */
+  project?: true
 }
 
 export interface PublishingData {
@@ -150,7 +155,8 @@ export function readPublishing(raw: string | null): PublishingData {
         .map((s) => obj(s))
         .filter((s) => str(s.id))
         .map((s) => ({ id: str(s.id), text: str(s.text) })),
-      uploaded: obj(v.uploaded).on && typeof obj(v.uploaded).on === 'string' ? { on: str(obj(v.uploaded).on), url: str(obj(v.uploaded).url) } : null
+      uploaded: obj(v.uploaded).on && typeof obj(v.uploaded).on === 'string' ? { on: str(obj(v.uploaded).on), url: str(obj(v.uploaded).url) } : null,
+      ...(v.project === true ? { project: true as const } : {})
     })
   }
   return { videos }

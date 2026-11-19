@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import { ArrowUpRight, Check, CircleCheck, ExternalLink, Link2, Plus, Trash2, Undo2 } from 'lucide-react'
 import { checklist, readyToUpload, STEP_GROUPS, type ChecklistStep, type VideoDraft } from '../../lib/publishing'
-import { addStep, deleteStep, setUploaded, skipStep, tickStep } from '../../store/publishing'
+import { addStep, deleteStep, skipStep, tickStep } from '../../store/publishing'
+import { markUploaded } from '../../store/videoLinks'
 import { dayKeyOf } from '../../lib/when'
 import { formatDate } from '../../lib/dates'
 import { notify } from '../../store/notify'
@@ -121,7 +122,7 @@ function Uploaded({ d, ready }: { d: VideoDraft; ready: boolean }) {
     const saveLink = (): void => {
       const link = checkLink(url)
       if (link === null) return
-      if (link !== up.url) setUploaded(d.id, { ...up, url: link })
+      if (link !== up.url) void markUploaded(d.id, { ...up, url: link })
       setEditing(false)
     }
     return (
@@ -164,7 +165,7 @@ function Uploaded({ d, ready }: { d: VideoDraft; ready: boolean }) {
             <Link2 size={12} /> {up.url ? 'Change link' : 'Add its link'}
           </button>
         )}
-        <button className="link-button" onClick={() => setUploaded(d.id, null)} title="It isn’t up yet after all">
+        <button className="link-button" onClick={() => void markUploaded(d.id, null)} title="It isn’t up yet after all">
           <Undo2 size={12} /> Not uploaded
         </button>
       </div>
@@ -172,7 +173,7 @@ function Uploaded({ d, ready }: { d: VideoDraft; ready: boolean }) {
   }
   const mark = (): void => {
     const link = checkLink(url)
-    if (link !== null) setUploaded(d.id, { on, url: link })
+    if (link !== null) void markUploaded(d.id, { on, url: link })
   }
   return (
     <div className={`pub-uploaded ${ready ? 'ready' : ''}`} data-pub-uploaded>
