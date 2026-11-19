@@ -9,7 +9,7 @@ vi.mock('./prefs', async () => {
   return { usePrefs, setPrefsQuietly: (patch: object) => usePrefs.setState((s) => ({ prefs: { ...s.prefs, ...patch } })) }
 })
 
-const { useVideos, loadVideos, createProject, renameProject, addItems, deleteProject, remapVideos, folderForProject, followMovedVideosFolder } = await import('./videos')
+const { useVideos, loadVideos, createProject, renameProject, addItems, deleteProject, remapVideos, folderForProject, followMovedVideosFolder, setStage, setUploadDate } = await import('./videos')
 const { usePrefs } = await import('./prefs')
 const { history } = await import('../lib/undo')
 
@@ -60,6 +60,21 @@ describe('video projects and Ctrl+Z', () => {
     followMovedVideosFolder([folder('TWD', [folder('TWD/Maggie')] as never[])])
     expect(usePrefs.getState().prefs.videosFolder).toBe('TWD')
     expect(useVideos.getState().projects[0].folder).toBe('TWD/Maggie')
+  })
+
+  it('moves a video along the pipeline, dating it when it goes up', async () => {
+    const a = createProject('Maggie')
+    setUploadDate(a.id, '2026-12-05')
+    setStage(a.id, 'uploaded')
+    expect(useVideos.getState().projects[0].uploadDate).toBe('2026-12-05')
+    const b = createProject('Negan')
+    setStage(b.id, 'uploaded')
+    expect(useVideos.getState().projects[0].uploadDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(await history.undo()).toBe('Moved “Negan” to Uploaded')
+    expect(useVideos.getState().projects[0].stage).toBe('idea')
+    expect(useVideos.getState().projects[0].uploadDate).toBeUndefined()
+    setUploadDate(b.id, 'next week')
+    expect(useVideos.getState().projects[0].uploadDate).toBeUndefined()
   })
 
   it("won't undo onto reloaded projects", async () => {

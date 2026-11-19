@@ -52,6 +52,8 @@ export interface VideoProject {
   /** The project's own folder in your notes, where new script and research notes go (made when first needed). */
   folder: string | null
   items: VideoItem[]
+  /** When it's planned to go up on YouTube (or went up), as a day key like "2026-12-05". Shown on the calendar. */
+  uploadDate?: string
   created: number
   updated: number
   /** Anything else (from a newer Orbit), kept as it was. */
@@ -107,6 +109,7 @@ function readProject(raw: unknown): VideoProject | null {
     script: cleanPath(r.script),
     folder: cleanPath(r.folder),
     items,
+    uploadDate: isDayKey(r.uploadDate) ? r.uploadDate : undefined,
     created: num(r.created, 0),
     updated: num(r.updated, num(r.created, 0))
   }
@@ -216,4 +219,42 @@ export function findMovedFolder(old: string, projectFolders: string[], folders: 
   if (!names.length) return null
   const fits = [...all].filter((f) => f !== old && names.every((n) => all.has(f ? `${f}/${n}` : n)))
   return fits.length === 1 ? fits[0] : null
+}
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/
+export const isDayKey = (v: unknown): v is string => typeof v === 'string' && DAY.test(v)
+
+/** A project's planned upload day (or the day it went up), if it has one. */
+export const uploadDateOf = (p: VideoProject): string | null => (isDayKey(p.uploadDate) ? p.uploadDate : null)
+
+/**
+ * The pipeline board's columns: every stage in order, each with its videos. Dated ones come first,
+ * soonest first, then the rest, newest first.
+ */
+export function boardColumns(projects: VideoProject[]): { stage: VideoStage; label: string; projects: VideoProject[] }[] {
+  return VIDEO_STAGES.map((s) => ({
+    stage: s.id,
+    label: s.label,
+    projects: projects
+      .filter((p) => p.stage === s.id)
+      .sort((a, b) => {
+        const da = uploadDateOf(a)
+        const db = uploadDateOf(b)
+        if (da && db) return da.localeCompare(db)
+        if (da || db) return da ? -1 : 1
+        return b.created - a.created
+      })
+  }))
+}
+
+export const stageLabel = (stage: VideoStage): string => VIDEO_STAGES.find((s) => s.id === stage)?.label ?? stage
+
+/** The videos due to go up (or that went up) on days `from` to `to` (day keys, both included), for the calendar. */
+export function uploadsBetween(projects: VideoProject[], from: string, to: string): { date: string; project: VideoProject }[] {
+  const out: { date: string; project: VideoProject }[] = []
+  for (const p of projects) {
+    const date = uploadDateOf(p)
+    if (date && date >= from && date <= to) out.push({ date, project: p })
+  }
+  return out
 }

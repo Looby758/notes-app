@@ -2,6 +2,10 @@ import { create } from 'zustand'
 import {
   emptyVideos,
   findMovedFolder,
+  isDayKey,
+  stageLabel,
+  uploadDateOf,
+  type VideoStage,
   MAX_TITLE,
   newVideoId,
   projectFolderFor,
@@ -15,6 +19,7 @@ import {
 } from '../lib/videos'
 import { recordUndo } from '../lib/undo'
 import { isWithin, replacePrefix } from '../lib/paths'
+import { dayKey } from '../lib/dates'
 import type { FileNode } from '@shared/types'
 import { setPrefsQuietly, usePrefs } from './prefs'
 import { notify } from './notify'
@@ -126,6 +131,20 @@ export function deleteProject(id: string): void {
   if (!gone) return
   if (selected === id) selectProject(null)
   save({ projects: projects.filter((p) => p.id !== id) }, `Deleted the video ${named(gone)}`)
+}
+
+/** Moves a video along the pipeline. Marking it uploaded with no date puts it on the calendar for today. */
+export function setStage(id: string, stage: VideoStage): void {
+  const p = projectById(id)
+  if (!p || p.stage === stage) return
+  const today = dayKey(new Date())
+  change(id, (q) => ({ stage, ...(stage === 'uploaded' && !uploadDateOf(q) ? { uploadDate: today } : {}) }), (q) => `Moved ${named(q)} to ${stageLabel(stage)}`)
+}
+
+/** The day it's planned to go up (or went up); null clears it. */
+export function setUploadDate(id: string, date: string | null): void {
+  if (date !== null && !isDayKey(date)) return
+  change(id, () => ({ uploadDate: date ?? undefined }), (q) => (date ? `Set the upload date for ${named(q)}` : `Cleared the upload date for ${named(q)}`), `upload:${id}`)
 }
 
 export function setScript(id: string, path: string | null): void {

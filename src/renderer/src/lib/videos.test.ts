@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findMovedFolder, fitsSection, folderName, projectFolderFor, readVideos, remapProjects, videosJson, type VideoProject } from './videos'
+import { boardColumns, findMovedFolder, uploadsBetween, fitsSection, folderName, projectFolderFor, readVideos, remapProjects, videosJson, type VideoProject } from './videos'
 
 const kind = (p: string): string => (/\.(png|jpg)$/i.test(p) ? 'image' : /\.(mp3|wav|webm)$/i.test(p) ? 'audio' : /\.mp4$/i.test(p) ? 'video' : 'other')
 
@@ -92,5 +92,20 @@ describe('findMovedFolder', () => {
     expect(findMovedFolder('Videos', [], ['YouTube'])).toBeNull()
     expect(findMovedFolder('Videos', projects, ['A', 'A/Maggie', 'A/Daryl', 'B', 'B/Maggie', 'B/Daryl'])).toBeNull()
     expect(findMovedFolder('Videos', projects, ['Trash'])).toBeNull()
+  })
+})
+
+describe('the pipeline', () => {
+  const p = (id: string, stage: VideoProject['stage'], uploadDate?: string, created = 0): VideoProject => project({ id, stage, uploadDate, created })
+  it('puts videos in stage columns, dated soonest first then newest', () => {
+    const cols = boardColumns([p('a', 'idea', undefined, 1), p('b', 'idea', '2026-12-09'), p('c', 'idea', '2026-12-01'), p('d', 'idea', undefined, 5), p('e', 'uploaded', '2026-11-01')])
+    expect(cols.map((c) => c.stage)).toEqual(['idea', 'research', 'script', 'recorded', 'edited', 'uploaded'])
+    expect(cols[0].projects.map((x) => x.id)).toEqual(['c', 'b', 'd', 'a'])
+    expect(cols[5].projects.map((x) => x.id)).toEqual(['e'])
+  })
+  it('finds upload days in a range and ignores bad dates', () => {
+    const list = [p('a', 'script', '2026-12-05'), p('b', 'idea', '2027-01-02'), p('c', 'idea', 'soon')]
+    expect(uploadsBetween(list, '2026-12-01', '2026-12-31').map((u) => u.project.id)).toEqual(['a'])
+    expect(readVideos(videosJson({ projects: list, ideas: [] })).projects.map((x) => x.uploadDate)).toEqual(['2026-12-05', '2027-01-02', undefined])
   })
 })

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
-import { ArrowLeft, FileText, FolderOpen, Image as ImageIcon, Lightbulb, Link2, Mic, NotebookPen, Plus, Trash2, Upload, Video, X } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Check, Columns3, LayoutGrid, FileText, FolderOpen, Image as ImageIcon, Lightbulb, Link2, Mic, NotebookPen, Plus, Trash2, Upload, Video, X } from 'lucide-react'
 import type { FileNode } from '@shared/types'
 import { useVault } from '../../store/vault'
 import { usePrefs } from '../../store/prefs'
@@ -15,17 +15,19 @@ import {
   renameProject,
   selectProject,
   setScript,
+  setStage,
   setSummary,
+  setUploadDate,
   useVideos
 } from '../../store/videos'
-import { fitsSection, projectCounts, type VideoItem, type VideoItemKind, type VideoProject } from '../../lib/videos'
+import { boardColumns, fitsSection, projectCounts, stageLabel, uploadDateOf, VIDEO_STAGES, type VideoItem, type VideoItemKind, type VideoProject, type VideoStage } from '../../lib/videos'
 import { fileKind, openAttachment, vaultUrl } from '../../lib/fileKinds'
 import { openNote, openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
 import { useUI } from '../../store/ui'
 import { computerFiles, getDrag } from '../../lib/dnd'
 import { noteTitle } from '../../lib/paths'
 import { fuzzyFilter } from '../../lib/fuzzy'
-import { formatDate } from '../../lib/dates'
+import { dayKey, formatDate, fromDayKey } from '../../lib/dates'
 import { UNDO_KEY } from '../../lib/undo'
 import Private from '../Streamer/Private'
 
@@ -85,16 +87,38 @@ function ProjectList() {
   const loaded = useVideos((s) => s.loaded)
   const videosFolder = usePrefs((s) => s.prefs.videosFolder)
   const [adding, setAdding] = useState(false)
+  const [view, setViewState] = useState<ListView>(savedView)
+  const setView = (v: ListView): void => {
+    setViewState(v)
+    try {
+      localStorage.setItem(VIEW_KEY, v)
+    } catch {
+      // only a convenience
+    }
+  }
+  const board = view === 'board' && projects.length > 0
   return (
-    <div className="videos-inner">
+    <div className={`videos-inner ${board ? 'videos-inner-wide' : ''}`}>
       <div className="videos-head">
         <h2>
           <Video size={20} /> Videos
         </h2>
-        {!adding && projects.length > 0 && (
-          <button className="btn btn-primary" onClick={() => setAdding(true)} data-video-new>
-            <Plus size={14} /> New video
-          </button>
+        {projects.length > 0 && (
+          <div className="videos-head-actions">
+            <div className="videos-view" role="radiogroup" aria-label="Show videos as">
+              <button role="radio" aria-checked={view === 'board'} className={view === 'board' ? 'on' : ''} onClick={() => setView('board')} data-video-view="board">
+                <Columns3 size={14} /> Pipeline
+              </button>
+              <button role="radio" aria-checked={view === 'cards'} className={view === 'cards' ? 'on' : ''} onClick={() => setView('cards')} data-video-view="cards">
+                <LayoutGrid size={14} /> Cards
+              </button>
+            </div>
+            {!adding && (
+              <button className="btn btn-primary" onClick={() => setAdding(true)} data-video-new>
+                <Plus size={14} /> New video
+              </button>
+            )}
+          </div>
         )}
       </div>
       <p className="videos-intro">
@@ -119,6 +143,8 @@ function ProjectList() {
             <Plus size={14} /> Start your first video
           </button>
         </div>
+      ) : board ? (
+        <PipelineBoard projects={projects} />
       ) : (
         <div className="videos-grid">
           {projects.map((p) => (
@@ -126,6 +152,154 @@ function ProjectList() {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+// ---------- the pipeline board ----------
+
+type ListView = 'board' | 'cards'
+const VIEW_KEY = 'videosView'
+const savedView = (): ListView => {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'cards' ? 'cards' : 'board'
+  } catch {
+    return 'board'
+  }
+}
+
+/** The video being dragged across the board (drop targets can't read drag data until the drop). */
+let draggingVideo: string | null = null
+
+/** "Fri 5 Dec", with the year if it isn't this one. */
+function dayText(date: string): string {
+  const d = fromDayKey(date)
+  if (!d) return date
+  return formatDate(d, d.getFullYear() === new Date().getFullYear() ? 'ddd D MMM' : 'ddd D MMM YYYY')
+}
+
+function UploadChip({ project: p }: { project: VideoProject }) {
+  const date = uploadDateOf(p)
+  if (!date) return null
+  const today = dayKey(new Date())
+  const late = p.stage !== 'uploaded' && date < today
+  return (
+    <span className={`video-upload-chip ${late ? 'late' : ''} ${p.stage === 'uploaded' ? 'done' : ''}`} title={p.stage === 'uploaded' ? 'Went up on YouTube' : late ? 'The planned upload day has passed' : 'Planned upload day'}>
+      <CalendarDays size={11} /> {p.stage === 'uploaded' ? 'Up ' : ''}
+      {date === today ? 'Today' : dayText(date)}
+    </span>
+  )
+}
+
+function PipelineBoard({ projects }: { projects: VideoProject[] }) {
+  const columns = boardColumns(projects)
+  const [over, setOver] = useState<VideoStage | null>(null)
+  return (
+    <div className="video-board" data-video-board>
+      {columns.map((col, i) => (
+        <section
+          key={col.stage}
+          className={`video-column stage-${col.stage} ${over === col.stage ? 'drop-over' : ''}`}
+          data-video-column={col.stage}
+          onDragOver={(e) => {
+            if (!draggingVideo) return
+            e.preventDefault()
+            e.dataTransfer.dropEffect = 'move'
+            if (over !== col.stage) setOver(col.stage)
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(null)
+          }}
+          onDrop={(e) => {
+            e.preventDefault()
+            setOver(null)
+            if (draggingVideo) setStage(draggingVideo, col.stage)
+            draggingVideo = null
+          }}
+        >
+          <h3>
+            <span className="video-column-step">{i + 1}</span> {col.label}
+            {col.projects.length > 0 && <span className="video-section-count">{col.projects.length}</span>}
+          </h3>
+          <div className="video-column-cards">
+            {col.projects.map((p) => (
+              <BoardCard key={p.id} project={p} />
+            ))}
+            {!col.projects.length && <div className="video-column-empty">Drag a video here</div>}
+          </div>
+        </section>
+      ))}
+    </div>
+  )
+}
+
+function BoardCard({ project: p }: { project: VideoProject }) {
+  const files = useFileSet()
+  const cover = p.items.find((i) => i.kind === 'thumbnail' && i.path) ?? p.items.find((i) => i.kind === 'image' && i.path)
+  const at = VIDEO_STAGES.findIndex((s) => s.id === p.stage)
+  const step = (dir: 1 | -1): void => {
+    const next = VIDEO_STAGES[at + dir]
+    if (next) setStage(p.id, next.id)
+  }
+  return (
+    <div
+      className="video-board-card"
+      draggable
+      tabIndex={0}
+      role="button"
+      title={`${p.title || 'Untitled video'}\nAlt+← / Alt+→ moves it along`}
+      data-video-board-card={p.id}
+      onDragStart={(e) => {
+        draggingVideo = p.id
+        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData('text/plain', p.title)
+      }}
+      onDragEnd={() => (draggingVideo = null)}
+      onClick={() => selectProject(p.id)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') selectProject(p.id)
+        if (e.altKey && e.key === 'ArrowRight') step(1)
+        if (e.altKey && e.key === 'ArrowLeft') step(-1)
+      }}
+    >
+      {cover?.path && files.has(cover.path) && <img className="video-board-cover" src={vaultUrl(cover.path)} alt="" loading="lazy" draggable={false} />}
+      <div className="video-board-title">
+        <Private>{p.title || 'Untitled video'}</Private>
+      </div>
+      <div className="video-board-meta">
+        <UploadChip project={p} />
+        {p.script && <span className="video-board-script">Script ✓</span>}
+      </div>
+    </div>
+  )
+}
+
+/** Where a video is in the pipeline, and when it goes up: on the video's own page. */
+function StageAndDate({ project: p }: { project: VideoProject }) {
+  const date = uploadDateOf(p)
+  return (
+    <div className="video-stage-row">
+      <div className="video-stages" role="radiogroup" aria-label="Where this video is">
+        {VIDEO_STAGES.map((s, i) => {
+          const at = VIDEO_STAGES.findIndex((x) => x.id === p.stage)
+          return (
+            <button key={s.id} role="radio" aria-checked={p.stage === s.id} className={`video-stage ${p.stage === s.id ? 'on' : ''} ${i < at ? 'past' : ''}`} onClick={() => setStage(p.id, s.id)} data-video-stage={s.id}>
+              {i < at && <Check size={11} />}
+              {s.label}
+            </button>
+          )
+        })}
+      </div>
+      <label className="video-upload-date">
+        <CalendarDays size={14} />
+        <span>{p.stage === 'uploaded' ? 'Went up' : 'Upload on'}</span>
+        <input type="date" value={date ?? ''} onChange={(e) => setUploadDate(p.id, e.target.value || null)} aria-label={p.stage === 'uploaded' ? 'Day it went up' : 'Planned upload day'} data-video-upload-date />
+        {date && (
+          <button className="icon-btn" title="Clear the date" onClick={() => setUploadDate(p.id, null)}>
+            <X size={12} />
+          </button>
+        )}
+      </label>
     </div>
   )
 }
@@ -182,6 +356,8 @@ function ProjectCard({ project: p }: { project: VideoProject }) {
         </div>
         {p.summary && <div className="video-card-summary">{p.summary}</div>}
         <div className="video-card-meta">
+          <span className="video-card-stage">{stageLabel(p.stage)}</span>
+          <UploadChip project={p} />
           <span className={p.script ? 'has' : ''}>{p.script ? 'Script ✓' : 'No script yet'}</span>
           {bits.length > 0 && <span>{bits.join(' · ')}</span>}
         </div>
@@ -281,6 +457,8 @@ function ProjectView({ project: p }: { project: VideoProject }) {
           setSummary(p.id, e.target.value)
         }}
       />
+
+      <StageAndDate project={p} />
 
       <DropSection project={p} kind="script" icon={<NotebookPen size={15} />} title="Script" hint="Drop a note here">
         {p.script ? (
