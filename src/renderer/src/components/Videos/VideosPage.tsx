@@ -222,7 +222,7 @@ function IdeaInbox() {
             <textarea
               ref={box}
               className="text-input"
-              rows={1}
+              rows={Math.min(5, text.split('\n').length)}
               value={text}
               maxLength={1000}
               placeholder="An idea for a video, e.g. Was Negan right? (Enter adds it, Shift+Enter for another line)"

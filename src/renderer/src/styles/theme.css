@@ -13620,13 +13620,20 @@ body.reduce-motion .theme-loading-text {
 .video-inbox-add textarea,
 .video-idea-edit {
   flex: 1;
-  resize: vertical;
+  width: auto;
+  height: auto;
   min-height: 34px;
+  padding: 7px 10px;
+  line-height: 18px;
+  resize: none;
   font: inherit;
   user-select: text;
 }
+.video-inbox-add .btn {
+  height: 34px;
+}
 .video-inbox-empty {
-  margin: 10px 0 0;
+  margin: 10px 0 0 2px;
   font-size: 12.5px;
   color: var(--text-faint);
 }
