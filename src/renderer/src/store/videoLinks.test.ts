@@ -66,12 +66,31 @@ describe('video projects and Publishing share one video', () => {
     expect(history.canUndo).toBe(false)
   })
 
-  it('not uploaded after all moves it back to Edited and keeps the day', async () => {
+  it('not uploaded after all takes it off the calendar when it had no planned day', async () => {
     const p = v.createProject('Carol')
     await links.draftsForProject(p.id)
     await links.markUploaded(p.id, { on: '2026-12-03', url: '' })
     await links.markUploaded(p.id, null)
-    expect(v.projectById(p.id)).toMatchObject({ stage: 'edited', uploadDate: '2026-12-03' })
+    expect(v.projectById(p.id)?.stage).toBe('edited')
+    expect(v.projectById(p.id)?.uploadDate).toBeUndefined()
+  })
+
+  it('not uploaded after all puts back the day it was planned for', async () => {
+    const p = v.createProject('Ezekiel')
+    v.setUploadDate(p.id, '2026-12-10')
+    await links.draftsForProject(p.id)
+    await links.markUploaded(p.id, { on: '2026-12-03', url: '' })
+    expect(v.projectById(p.id)?.uploadDate).toBe('2026-12-03')
+    await links.markUploaded(p.id, null)
+    expect(v.projectById(p.id)).toMatchObject({ stage: 'edited', uploadDate: '2026-12-10' })
+  })
+
+  it('moving it to Uploaded on the board and back again leaves the calendar as it was', () => {
+    const p = v.createProject('Michonne')
+    v.setStage(p.id, 'uploaded')
+    expect(v.projectById(p.id)?.uploadDate).toBeTruthy()
+    v.setStage(p.id, 'edited')
+    expect(v.projectById(p.id)?.uploadDate).toBeUndefined()
   })
 
   it('keeps the project flag when publishing.json is read back', async () => {

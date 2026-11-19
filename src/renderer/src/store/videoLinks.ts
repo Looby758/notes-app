@@ -54,7 +54,7 @@ export async function newVideoFromPublishing(name: string): Promise<string> {
 /**
  * Marking a video uploaded in its checklist (or not uploaded after all). For a video project it also
  * moves it to Uploaded and puts the day on the calendar, all as one Ctrl+Z step. Not uploaded after
- * all moves it back to Edited and keeps the day as the planned one.
+ * all moves it back to Edited and puts back the day it was planned for (or takes it off the calendar).
  */
 export async function markUploaded(id: string, uploaded: { on: string; url: string } | null): Promise<void> {
   const p = projectById(id)
@@ -64,8 +64,9 @@ export async function markUploaded(id: string, uploaded: { on: string; url: stri
     async () => {
       setUploaded(id, uploaded)
       if (uploaded) {
-        if (p.uploadDate !== uploaded.on) setUploadDate(id, uploaded.on)
+        // The stage first, so it remembers the planned day; then the day it went up.
         setStage(id, 'uploaded')
+        if (projectById(id)?.uploadDate !== uploaded.on) setUploadDate(id, uploaded.on)
       } else if (p.stage === 'uploaded') setStage(id, 'edited')
     }
   )

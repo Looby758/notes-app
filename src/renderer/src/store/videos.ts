@@ -178,12 +178,23 @@ export function promoteIdea(id: string): VideoProject | null {
   return made
 }
 
-/** Moves a video along the pipeline. Marking it uploaded with no date puts it on the calendar for today. */
+/**
+ * Moves a video along the pipeline. Marking it uploaded with no date puts it on the calendar for
+ * today; moving it back off Uploaded puts back the day it was planned for (or none).
+ */
 export function setStage(id: string, stage: VideoStage): void {
   const p = projectById(id)
   if (!p || p.stage === stage) return
   const today = dayKey(new Date())
-  change(id, (q) => ({ stage, ...(stage === 'uploaded' && !uploadDateOf(q) ? { uploadDate: today } : {}) }), (q) => `Moved ${named(q)} to ${stageLabel(stage)}`)
+  change(
+    id,
+    (q) => {
+      if (stage === 'uploaded') return { stage, plannedDate: uploadDateOf(q), uploadDate: uploadDateOf(q) ?? today }
+      if (q.stage === 'uploaded' && q.plannedDate !== undefined) return { stage, plannedDate: undefined, uploadDate: q.plannedDate ?? undefined }
+      return { stage }
+    },
+    (q) => `Moved ${named(q)} to ${stageLabel(stage)}`
+  )
 }
 
 /** The day it's planned to go up (or went up); null clears it. */

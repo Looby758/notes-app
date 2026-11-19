@@ -54,6 +54,11 @@ export interface VideoProject {
   items: VideoItem[]
   /** When it's planned to go up on YouTube (or went up), as a day key like "2026-12-05". Shown on the calendar. */
   uploadDate?: string
+  /**
+   * While it's at Uploaded: the planned day it had before (null for none), so moving it back off
+   * Uploaded (it wasn't really up) puts that back instead of leaving the day it was marked on.
+   */
+  plannedDate?: string | null
   created: number
   updated: number
   /** Anything else (from a newer Orbit), kept as it was. */
@@ -110,6 +115,7 @@ function readProject(raw: unknown): VideoProject | null {
     folder: cleanPath(r.folder),
     items,
     uploadDate: isDayKey(r.uploadDate) ? r.uploadDate : undefined,
+    plannedDate: r.plannedDate === null ? null : isDayKey(r.plannedDate) ? r.plannedDate : undefined,
     created: num(r.created, 0),
     updated: num(r.updated, num(r.created, 0))
   }
