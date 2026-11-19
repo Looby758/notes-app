@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ArrowRightLeft, AudioLines, Bot, Headphones, Joystick, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Hourglass, HardDrive, House, KeyRound, Layers, LibraryBig, Library, Mail, MessageSquare, MessagesSquare, Monitor, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Scissors, Settings, SlidersVertical, Sparkles, SquareTerminal, Star, StarOff, X, CloudDownload, VenetianMask, Volume2, VolumeX, Upload } from 'lucide-react'
+import { ArrowRightLeft, AudioLines, Bot, Headphones, Joystick, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Hourglass, HardDrive, House, KeyRound, Layers, LibraryBig, Library, Mail, MessageSquare, MessagesSquare, Monitor, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Scissors, Settings, SlidersVertical, Sparkles, SquareTerminal, Star, StarOff, X, CloudDownload, VenetianMask, Volume2, VolumeX } from 'lucide-react'
+import { Upload } from 'lucide-react'
 import Private from '../Streamer/Private'
 import { useHideNames } from '../../store/streamer'
 import { useEditor } from '../../store/editor'
