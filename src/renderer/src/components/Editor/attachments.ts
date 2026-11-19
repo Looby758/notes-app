@@ -11,6 +11,8 @@ import { relativePath } from '../../lib/links'
 import { parentOf } from '../../lib/paths'
 import { AUDIO_EXT } from '../../lib/voice'
 import { fileUrl, vaultRelative } from '../../lib/fileUrl'
+import { imageMarkerValue, markerText } from '../../lib/script'
+import { inScript, vaultImages } from './scriptTools'
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i
 /** Videos are embedded too: they show a player in the note (only loaded once you press play). */
@@ -52,9 +54,29 @@ function insertLinks(view: EditorView, links: string[], pos: number): void {
   view.focus()
 }
 
+/**
+ * Puts files from the notes folder into the note at `pos`: in a video script, pictures become
+ * image cues ([IMAGE: name.png]) in the line; otherwise each file is linked on its own line.
+ */
+function insertFiles(view: EditorView, files: string[], pos: number): void {
+  if (!files.length) return
+  if (inScript(view.state) && files.every((f) => IMAGE_EXT.test(f))) {
+    const images = vaultImages()
+    const at = Math.min(pos, view.state.doc.length)
+    const text = files.map((f) => markerText('IMAGE', imageMarkerValue(f, images))).join(' ')
+    const before = at > 0 && !/\s/.test(view.state.sliceDoc(at - 1, at)) ? ' ' : ''
+    const after = at < view.state.doc.length && !/\s/.test(view.state.sliceDoc(at, at + 1)) ? ' ' : ''
+    const insert = before + text + after
+    view.dispatch({ changes: { from: at, insert }, selection: { anchor: at + insert.length }, userEvent: 'input.drop' })
+    view.focus()
+    return
+  }
+  const note = view.state.facet(notePath)
+  insertLinks(view, files.map((f) => attachmentLink(f, note)), pos)
+}
+
 /** Saves files into the attachments folder and links them from the note. */
 async function attachFiles(view: EditorView, files: File[], pos: number): Promise<void> {
-  const note = view.state.facet(notePath)
   const folder = usePrefs.getState().prefs.attachmentFolder
   const links: string[] = []
   for (const file of files) {
@@ -63,14 +85,13 @@ async function attachFiles(view: EditorView, files: File[], pos: number): Promis
     const ext = EXT_FOR_TYPE[file.type] ?? (file.name.match(/\.[^.]+$/)?.[0] ?? '')
     const name = generic ? `Pasted image ${formatDate(new Date(), 'YYYYMMDD-HHmmss')}${ext}` : file.name
     try {
-      const saved = await window.api.saveAttachment(folder, name, new Uint8Array(await file.arrayBuffer()))
-      links.push(attachmentLink(saved, note))
+      links.push(await window.api.saveAttachment(folder, name, new Uint8Array(await file.arrayBuffer())))
     } catch (err) {
       notify(err)
     }
   }
   if (links.length) {
-    insertLinks(view, links, pos)
+    insertFiles(view, links, pos)
     useVault.getState().refresh()
   }
 }
@@ -82,6 +103,7 @@ async function attachFiles(view: EditorView, files: File[], pos: number): Promis
  */
 async function attachFromComputer(view: EditorView, sources: string[], pos: number, linkOnly = false): Promise<void> {
   const links: string[] = []
+  const saved: string[] = []
   let copied = false
   const root = linkOnly ? await window.api.getVault().catch(() => null) : null
   for (const source of sources) {
@@ -91,24 +113,23 @@ async function attachFromComputer(view: EditorView, sources: string[], pos: numb
         links.push(computerLink(source))
         continue
       }
-      const saved = await window.api.attachFromComputer(usePrefs.getState().prefs.attachmentFolder, source)
-      links.push(attachmentLink(saved, view.state.facet(notePath)))
+      saved.push(await window.api.attachFromComputer(usePrefs.getState().prefs.attachmentFolder, source))
       copied = true
     } catch (err) {
       notify(err)
     }
   }
-  if (!links.length) return
-  insertLinks(view, links, pos)
+  // With files linked where they are on the computer, everything is a plain link.
+  if (links.length) insertLinks(view, [...links, ...saved.map((f) => attachmentLink(f, view.state.facet(notePath)))], pos)
+  else insertFiles(view, saved, pos)
   if (copied) useVault.getState().refresh()
 }
 
 /** Lets you pick images (or any files) from disk, copies them in and links them at the cursor. */
 export async function pickAndAttach(view: EditorView, imagesOnly: boolean): Promise<void> {
-  const note = view.state.facet(notePath)
   try {
     const saved = await window.api.pickAttachment(usePrefs.getState().prefs.attachmentFolder, imagesOnly)
-    if (saved.length) insertLinks(view, saved.map((f) => attachmentLink(f, note)), view.state.selection.main.head)
+    insertFiles(view, saved, view.state.selection.main.head)
   } catch (err) {
     notify(err)
   }
@@ -168,7 +189,7 @@ export const attachmentHandlers = EditorView.domEventHandlers({
     if (drag?.kind === 'file') {
       e.preventDefault()
       const pos = view.posAtCoords({ x: e.clientX, y: e.clientY }) ?? view.state.selection.main.head
-      insertLinks(view, [attachmentLink(drag.path, view.state.facet(notePath))], pos)
+      insertFiles(view, [drag.path], pos)
       return true
     }
     const files = computerFiles(drag)

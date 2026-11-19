@@ -18,6 +18,8 @@ import {
   AI_TAB,
   CHAT_TAB,
   FLASHCARDS_TAB,
+  SCREENSHOTS_TAB,
+  TIMELINE_TAB,
   TERMINAL_TAB,
   PASSWORDS_TAB,
   EMAIL_TAB,
@@ -48,6 +50,8 @@ import {
 import { getDrag, setDrag, zoneAt, type DropZone } from '../../lib/dnd'
 import NewTabPage from '../Picker/NewTabPage'
 import SettingsPage from '../Settings/SettingsPage'
+import ScreenshotsPage from '../Screenshots/ScreenshotsPage'
+import TimelinePage from '../Timeline/TimelinePage'
 import CalendarPage from '../Calendar/CalendarPage'
 import GraphPage from '../Graph/GraphPage'
 import ReplacePage from '../Replace/ReplacePage'
@@ -202,6 +206,8 @@ export default function Pane({ pane }: { pane: string }) {
         {active === AI_TAB && <AiPage autoFocus={isActivePane} />}
         {active === CHAT_TAB && <ChatPage autoFocus={isActivePane} />}
         {active === FLASHCARDS_TAB && <FlashcardsPage />}
+        {active === SCREENSHOTS_TAB && <ScreenshotsPage />}
+        {active === TIMELINE_TAB && <TimelinePage />}
         {active === TERMINAL_TAB && <TerminalPage />}
         {active === PASSWORDS_TAB && <PasswordsPage autoFocus={isActivePane} />}
         {active === EMAIL_TAB && <EmailPage />}

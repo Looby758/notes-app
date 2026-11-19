@@ -168,7 +168,7 @@ export type PropKind = 'date' | 'tags' | 'list' | 'status' | 'priority' | 'font'
 export const STATUS_OPTIONS = ['to do', 'in progress', 'waiting', 'done']
 export const PRIORITY_OPTIONS = ['low', 'medium', 'high']
 const DATE_KEYS = /^(date|due|created|updated|modified|start|end|deadline|birthday|when)$/i
-const LIST_KEYS = /^(aliases|people|authors?|attendees|related|links)$/i
+const LIST_KEYS = /^(aliases|people|authors?|attendees|related|links|episodes)$/i
 
 export function kindOf(p: Pick<Property, 'key' | 'value'>): PropKind {
   const key = p.key.toLowerCase()
@@ -195,7 +195,11 @@ export const SUGGESTED: { key: string; label: string; initial: () => PropValue }
   { key: 'people', label: 'People', initial: () => [] },
   { key: 'aliases', label: 'Other names', initial: () => [] },
   { key: 'font', label: 'Font', initial: () => 'serif' },
-  { key: 'source', label: 'Link', initial: () => 'https://' }
+  { key: 'source', label: 'Link', initial: () => 'https://' },
+  // Episodes (S4E9) or comic issues (Issue 115) the note is about, found with "Find everything from an episode".
+  { key: 'episodes', label: 'Episodes', initial: () => [] },
+  // Makes the note a video script: script markers first in the "/" menu, and its length along the bottom (lib/script.ts).
+  { key: 'type', label: 'Make it a video script', initial: () => 'script' }
 ]
 
 function today(): string {

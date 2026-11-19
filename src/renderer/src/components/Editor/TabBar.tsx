@@ -4,6 +4,7 @@ import Private from '../Streamer/Private'
 import { useHideNames } from '../../store/streamer'
 import { useEditor } from '../../store/editor'
 import { toggleStar, useStarred } from '../../store/starred'
+import { Images, Clock } from 'lucide-react'
 import { useNoteIndex } from '../../store/noteIndex'
 import { isMindMap, openExport, toggleMindMap, useUI } from '../../store/ui'
 import {
@@ -15,6 +16,8 @@ import {
   REPLACE_TAB,
   CONFLICTS_TAB,
   FLASHCARDS_TAB,
+  SCREENSHOTS_TAB,
+  TIMELINE_TAB,
   TERMINAL_TAB,
   PASSWORDS_TAB,
   EMAIL_TAB,
@@ -91,6 +94,8 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === AI_TAB) return 'Ask everything'
   if (id === CHAT_TAB) return 'Chat'
   if (id === FLASHCARDS_TAB) return 'Flashcards'
+  if (id === SCREENSHOTS_TAB) return 'Screenshots'
+  if (id === TIMELINE_TAB) return 'Timeline'
   if (id === TERMINAL_TAB) return 'Terminal'
   if (id === PASSWORDS_TAB) return 'Passwords'
   if (id === EMAIL_TAB) return 'Email'
@@ -311,6 +316,8 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === AI_TAB && <Sparkles size={13} className="tab-icon" />}
               {id === CHAT_TAB && <MessageSquare size={13} className="tab-icon" />}
               {id === FLASHCARDS_TAB && <Layers size={13} className="tab-icon" />}
+              {id === SCREENSHOTS_TAB && <Images size={13} className="tab-icon" />}
+              {id === TIMELINE_TAB && <Clock size={13} className="tab-icon" />}
               {id === TERMINAL_TAB && <SquareTerminal size={13} className="tab-icon" />}
               {id === PASSWORDS_TAB && <KeyRound size={13} className="tab-icon" />}
               {id === EMAIL_TAB && <Mail size={13} className="tab-icon" />}

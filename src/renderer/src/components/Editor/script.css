@@ -1,0 +1,186 @@
+/* ---------- Video script markers ([IMAGE: …], [PAUSE] …) ---------- */
+
+.cm-script-marker {
+  --mk: #5ea8ff;
+  background: color-mix(in srgb, var(--mk) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--mk) 45%, transparent);
+  border-radius: 5px;
+  padding: 0 4px 0 2px;
+  color: color-mix(in srgb, var(--mk) 45%, var(--text-strong));
+  font-size: 0.9em;
+  font-family: var(--font-ui);
+  white-space: pre-wrap;
+}
+.cm-script-marker * {
+  color: inherit !important;
+  text-decoration: none;
+}
+.cm-script-image {
+  --mk: #5ea8ff;
+}
+.cm-script-clip {
+  --mk: #a78bfa;
+}
+.cm-script-pause {
+  --mk: #2dd4bf;
+}
+.cm-script-emphasis {
+  --mk: #fb923c;
+  font-weight: 600;
+}
+.cm-script-section {
+  --mk: #4ade80;
+  font-weight: 600;
+}
+.cm-script-source {
+  --mk: #f5d547;
+}
+.cm-script-note {
+  --mk: #f472b6;
+  font-style: italic;
+  color: color-mix(in srgb, var(--mk) 35%, var(--text-muted));
+}
+.cm-script-missing {
+  border-style: dashed;
+  text-decoration: underline wavy color-mix(in srgb, #e5484d 70%, transparent);
+  text-underline-offset: 3px;
+}
+
+.cm-script-icon {
+  position: relative;
+  display: inline-block;
+  margin-right: 3px;
+  font-size: 0.85em;
+  font-style: normal;
+  line-height: 1;
+}
+.cm-script-thumb {
+  width: 1.5em;
+  height: 1.1em;
+  object-fit: cover;
+  border-radius: 3px;
+  vertical-align: -0.15em;
+  cursor: pointer;
+}
+.cm-script-preview {
+  display: none;
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  z-index: 20;
+  max-width: 260px;
+  max-height: 180px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+  background: var(--bg-panel);
+  pointer-events: none;
+}
+.cm-script-icon:hover .cm-script-preview {
+  display: block;
+}
+
+/* ---------- Length bar along the bottom of a script note ---------- */
+
+.cm-script-bar {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border);
+}
+.cm-script-bar-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 5px 14px;
+}
+.cm-script-bar-summary b {
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  margin-right: 2px;
+}
+.cm-script-bar-pace {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.cm-script-bar-input {
+  width: 52px;
+  padding: 1px 4px;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.cm-script-bar-toggle {
+  margin-left: auto;
+  font: inherit;
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.cm-script-bar-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.cm-script-sections {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 0 8px 6px;
+}
+.cm-script-part {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 14px;
+  width: 100%;
+  padding: 4px 6px;
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.cm-script-part:hover {
+  background: var(--bg-hover);
+}
+.cm-script-part-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cm-script-part-words {
+  color: var(--text-faint);
+}
+.cm-script-part-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+/* ---------- Picking a picture for an image cue ---------- */
+
+.image-cue-thumb {
+  width: 44px;
+  height: 30px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--bg-hover);
+}
+.image-cue-dialog .picker-item {
+  min-height: 40px;
+}
+
+/* ---------- Episode references (S4E9, Issue 115) ---------- */
+
+.cm-episode-ref {
+  border-bottom: 1px dotted color-mix(in srgb, #f5d547 70%, transparent);
+  background: color-mix(in srgb, #f5d547 9%, transparent);
+  border-radius: 2px;
+}
