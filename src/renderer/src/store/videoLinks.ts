@@ -1,5 +1,5 @@
-import { createProject, ensureVideos, projectById, setStage, setUploadDate } from './videos'
-import { ensurePublishing, setUploaded, videoDraftFor } from './publishing'
+import { createProject, deleteProject, ensureVideos, projectById, setStage, setUploadDate } from './videos'
+import { deleteVideo, ensurePublishing, setUploaded, videoDraftFor } from './publishing'
 import { undoGroup } from '../lib/undo'
 import type { VideoDraft } from '../lib/publishing'
 import type { VideoProject } from '../lib/videos'
@@ -71,3 +71,19 @@ export async function markUploaded(id: string, uploaded: { on: string; url: stri
   )
 }
 
+
+/**
+ * Deletes a video from the Publishing page: its drafts, and for a video project the project too
+ * (its notes and files stay where they are). One Ctrl+Z step brings it all back.
+ */
+export async function deleteFromPublishing(id: string): Promise<void> {
+  const p = projectById(id)
+  if (!p) return deleteVideo(id)
+  await undoGroup(
+    () => `Deleted the video “${p.title.trim() || 'a video'}”`,
+    async () => {
+      deleteVideo(id)
+      deleteProject(id)
+    }
+  )
+}

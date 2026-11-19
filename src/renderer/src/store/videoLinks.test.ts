@@ -82,3 +82,32 @@ describe('video projects and Publishing share one video', () => {
     expect(back.videos[0].project).toBe(true)
   })
 })
+
+describe('deleting a video from the Publishing page', () => {
+  beforeEach(async () => {
+    await Promise.all([v.loadVideos(), pub.loadPublishing()])
+    history.clear()
+  })
+
+  it('deletes a Publishing-only video', async () => {
+    const old = pub.addVideo('Old test video')
+    history.clear()
+    await links.deleteFromPublishing(old.id)
+    expect(rows()).toHaveLength(0)
+    await history.undo()
+    expect(rows()[0].name).toBe('Old test video')
+  })
+
+  it('deletes a project and its drafts together, as one Ctrl+Z step', async () => {
+    const p = v.createProject('Rick')
+    await links.draftsForProject(p.id)
+    pub.addTags(p.id, ['twd'])
+    history.clear()
+    await links.deleteFromPublishing(p.id)
+    expect(v.projectById(p.id)).toBeUndefined()
+    expect(pub.draftOf(p.id)).toBeUndefined()
+    expect(await history.undo()).toBe('Deleted the video “Rick”')
+    expect(rows()[0].draft?.tags).toEqual(['twd'])
+    expect(history.canUndo).toBe(false)
+  })
+})

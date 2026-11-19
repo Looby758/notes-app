@@ -27,6 +27,32 @@
   margin: 0;
   font-size: 16px;
 }
+.pub-list-row {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.pub-list-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  opacity: 0;
+}
+.pub-list-row:hover .pub-list-delete,
+.pub-list-delete:focus-within,
+.pub-list-delete.asking {
+  opacity: 1;
+}
+.pub-list-delete .link-button.danger,
+.pub-name .link-button.danger {
+  color: var(--danger, #e5534b);
+}
 .pub-list-item {
   display: flex;
   flex-direction: column;

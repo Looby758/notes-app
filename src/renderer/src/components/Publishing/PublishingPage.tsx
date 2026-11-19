@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Check, Pencil, Plus, Trash2, Upload, Video, X } from 'lucide-react'
-import { deleteVideo, renameVideo, usePublishing, usePublishingOpen } from '../../store/publishing'
+import { renameVideo, usePublishing, usePublishingOpen } from '../../store/publishing'
 import { renameProject, selectProject, useVideos } from '../../store/videos'
-import { draftsForProject, ensureVideoData, newVideoFromPublishing, publishingRows, type PublishingRow } from '../../store/videoLinks'
+import { deleteFromPublishing, draftsForProject, ensureVideoData, newVideoFromPublishing, publishingRows, type PublishingRow } from '../../store/videoLinks'
 import { stageLabel, uploadDateOf } from '../../lib/videos'
 import { openSpecialTab, VIDEOS_TAB } from '../../lib/editorController'
 import { chosenThumbnailCard, chosenTitleText, draftProgress, isYouTubePlaceholder, youTubeThumbnailUrls, type VideoDraft } from '../../lib/publishing'
@@ -86,6 +86,37 @@ function openInVideos(id: string): void {
   openSpecialTab(VIDEOS_TAB)
 }
 
+function deleteWithNote(id: string, isProject: boolean): void {
+  void deleteFromPublishing(id).then(
+    () => notify(isProject ? `Deleted the video, here and on the Videos page (its notes and files stay in your notes). ${UNDO_KEY} brings it back.` : `Deleted. ${UNDO_KEY} to undo.`, 'info'),
+    notify
+  )
+}
+
+/** The bin on a video in the list; asks once before deleting. */
+function ListDelete({ row }: { row: PublishingRow }) {
+  const [asking, setAsking] = useState(false)
+  if (asking) {
+    return (
+      <span className="pub-list-delete asking">
+        <button className="link-button danger" onClick={() => deleteWithNote(row.id, !!row.project)} data-pub-list-delete-yes>
+          Delete
+        </button>
+        <button className="icon-btn" onClick={() => setAsking(false)} title="Keep it">
+          <X size={13} />
+        </button>
+      </span>
+    )
+  }
+  return (
+    <span className="pub-list-delete">
+      <button className="icon-btn" onClick={() => setAsking(true)} title={row.project ? 'Delete this video (here and on the Videos page)' : 'Delete this video'} data-pub-list-delete>
+        <Trash2 size={13} />
+      </button>
+    </span>
+  )
+}
+
 function VideoName({ id, name, isProject }: { id: string; name: string; isProject: boolean }) {
   const [editing, setEditing] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -115,20 +146,18 @@ function VideoName({ id, name, isProject }: { id: string; name: string; isProjec
       <button className="icon-btn" onClick={() => setEditing(true)} title="Rename">
         <Pencil size={14} />
       </button>
-      {isProject ? (
+      {isProject && (
         <button className="link-button" onClick={() => openInVideos(id)} title="Its script, research, pictures, stage and upload date" data-pub-open-project>
           <Video size={13} /> Open its video project
         </button>
-      ) : confirming ? (
+      )}
+      {confirming ? (
         <>
           <button
             className="link-button danger"
-            onClick={() => {
-              deleteVideo(id)
-              notify(`Deleted. ${UNDO_KEY} to undo.`, 'info')
-            }}
+            onClick={() => deleteWithNote(id, isProject)}
           >
-            Delete its drafts
+            {isProject ? 'Delete this video' : 'Delete its drafts'}
           </button>
           <button className="icon-btn" onClick={() => setConfirming(false)} title="Keep it">
             <X size={14} />
@@ -191,14 +220,17 @@ export default function PublishingPage() {
         {rows.map((r) => {
           const status = rowStatus(r)
           return (
-            <button key={r.id} className={`pub-list-item ${open?.id === r.id ? 'on' : ''}`} onClick={() => setOpenId(r.id)} data-pub-video={r.id}>
-              {r.draft && <VideoThumb key={`${r.draft.uploaded?.url ?? ''}|${r.draft.chosenThumbnail ?? ''}`} v={r.draft} />}
-              <span className="pub-list-name">{r.name}</span>
-              <span className="pub-list-sub">{(r.draft && chosenTitleText(r.draft)) || 'No title yet'}</span>
-              <span className={`pub-list-progress ${status.tone}`} title="How far through the upload checklist">
-                {status.text}
-              </span>
-            </button>
+            <div key={r.id} className="pub-list-row">
+              <button className={`pub-list-item ${open?.id === r.id ? 'on' : ''}`} onClick={() => setOpenId(r.id)} data-pub-video={r.id}>
+                {r.draft && <VideoThumb key={`${r.draft.uploaded?.url ?? ''}|${r.draft.chosenThumbnail ?? ''}`} v={r.draft} />}
+                <span className="pub-list-name">{r.name}</span>
+                <span className="pub-list-sub">{(r.draft && chosenTitleText(r.draft)) || 'No title yet'}</span>
+                <span className={`pub-list-progress ${status.tone}`} title="How far through the upload checklist">
+                  {status.text}
+                </span>
+              </button>
+              <ListDelete row={r} />
+            </div>
           )
         })}
       </aside>
