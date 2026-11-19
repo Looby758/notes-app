@@ -6,6 +6,7 @@ import { useEditor } from '../../store/editor'
 import { toggleStar, useStarred } from '../../store/starred'
 import { Images, Clock } from 'lucide-react'
 import { useNoteIndex } from '../../store/noteIndex'
+import { Upload } from 'lucide-react'
 import { isMindMap, openExport, toggleMindMap, useUI } from '../../store/ui'
 import {
   activateTab,
@@ -30,6 +31,7 @@ import {
   MINIGAMES_TAB,
   CLOCKS_TAB,
   COUNTDOWNS_TAB,
+  PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
   DOWNLOADER_TAB,
@@ -108,6 +110,7 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === MINIGAMES_TAB) return 'Mini games'
   if (id === CLOCKS_TAB) return 'World clocks'
   if (id === COUNTDOWNS_TAB) return 'Countdowns'
+  if (id === PUBLISHING_TAB) return 'Publishing'
   if (id === SCREENS_TAB) return 'Screens'
   if (id === MIXER_TAB) return 'Volume mixer'
   if (id === DOWNLOADER_TAB) return 'Download a video'
@@ -332,6 +335,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === MINIGAMES_TAB && <Joystick size={13} className="tab-icon" />}
               {id === CLOCKS_TAB && <Globe2 size={13} className="tab-icon" />}
               {id === COUNTDOWNS_TAB && <Hourglass size={13} className="tab-icon" />}
+              {id === PUBLISHING_TAB && <Upload size={13} className="tab-icon" />}
               {id === SCREENS_TAB && <Monitor size={13} className="tab-icon" />}
               {id === MIXER_TAB && <SlidersVertical size={13} className="tab-icon" />}
               {id === DOWNLOADER_TAB && <CloudDownload size={13} className="tab-icon" />}

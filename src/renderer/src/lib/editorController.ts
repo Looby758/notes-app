@@ -84,6 +84,8 @@ const renameOldTab = (t: string): string => (OLD_GAME_TABS.has(t) ? MINIGAMES_TA
 export const CLOCKS_TAB = 'clocks:'
 /** Big countdown cards (components/Countdowns). */
 export const COUNTDOWNS_TAB = 'countdowns:'
+/** Getting videos ready for YouTube: title options, description, tags, chapters (components/Publishing). */
+export const PUBLISHING_TAB = 'publishing:'
 /** Monitor brightness, contrast and input (components/Screens). */
 export const SCREENS_TAB = 'screens:'
 /** A volume for each app (components/Mixer). */
