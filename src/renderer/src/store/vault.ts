@@ -16,6 +16,7 @@ import { loadStarred, putBackStars, remapStars, removeStarsWithin, useStarred } 
 import { loadVideoProgress } from './videoPlayer'
 import { loadFlashcards, putBackFlashcards, remapFlashcards, removeFlashcardsWithin, useFlashcards } from './flashcards'
 import { loadMoney } from './money'
+import { loadPublishing } from './publishing'
 import { loadLockedFolders, putBackLockedFolders, remapLockedFolders, removeLockedFoldersWithin, useLockedFolders } from '../lib/lock/folders'
 import { history, recordUndo, undoChanged } from '../lib/undo'
 import type { CardProgress } from '../lib/flashcards'
@@ -232,6 +233,7 @@ export const useVault = create<VaultState>((set, get) => {
       void loadFlashcards()
       loadVideoProgress()
       void loadMoney()
+      void loadPublishing()
       get().refresh()
     },
 

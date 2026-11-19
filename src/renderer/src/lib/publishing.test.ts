@@ -1,0 +1,150 @@
+import { describe, expect, it } from 'vitest'
+import {
+  chapterProblems,
+  chaptersText,
+  chosenTitleText,
+  descriptionCheck,
+  formatTime,
+  fullDescription,
+  newDraft,
+  parseChapters,
+  parseTags,
+  parseTime,
+  readPublishing,
+  sortChapters,
+  tagsLength,
+  titleCheck,
+  type Chapter
+} from './publishing'
+
+const ch = (time: string, name = 'Part'): Chapter => ({ id: `${time}-${name}`, time, name })
+
+describe('times', () => {
+  it('reads m:ss and h:mm:ss', () => {
+    expect(parseTime('0:00')).toBe(0)
+    expect(parseTime('2:14')).toBe(134)
+    expect(parseTime(' 12:05 ')).toBe(725)
+    expect(parseTime('1:02:03')).toBe(3723)
+    expect(parseTime('75:00')).toBe(4500)
+  })
+  it('rejects what isn’t a time', () => {
+    expect(parseTime('')).toBeNull()
+    expect(parseTime('2:61')).toBeNull()
+    expect(parseTime('1:75:00')).toBeNull()
+    expect(parseTime('abc')).toBeNull()
+    expect(parseTime('214')).toBeNull()
+  })
+  it('writes times the way YouTube shows them', () => {
+    expect(formatTime(0)).toBe('0:00')
+    expect(formatTime(134)).toBe('2:14')
+    expect(formatTime(3723)).toBe('1:02:03')
+  })
+})
+
+describe('chapters', () => {
+  it('is happy with a good list', () => {
+    expect(chapterProblems([ch('0:00', 'Intro'), ch('1:30', 'Early life'), ch('6:45', 'The prison')])).toEqual([])
+  })
+  it('needs the first at 0:00, three of them, in order, 10 seconds apart', () => {
+    const list = [ch('0:05', 'Intro'), ch('0:10', 'B')]
+    const messages = chapterProblems(list).map((p) => p.message)
+    expect(messages).toContain('The first chapter has to start at 0:00')
+    expect(messages).toContain('Shorter than 10 seconds')
+    expect(messages).toContain('YouTube needs at least 3 chapters')
+    expect(chapterProblems([ch('0:00'), ch('2:00'), ch('1:00')]).map((p) => p.message)).toContain('Comes before the chapter above it')
+  })
+  it('flags bad times and missing names', () => {
+    const problems = chapterProblems([ch('0:00', ''), ch('x'), ch('3:00')])
+    expect(problems.map((p) => p.message)).toEqual(['Needs a name', '“x” isn’t a time (use 2:14 or 1:02:03)'])
+  })
+  it('has no problems while empty', () => {
+    expect(chapterProblems([])).toEqual([])
+  })
+  it('reads a pasted list', () => {
+    let n = 0
+    const list = parseChapters('0:00 Intro\n1:30 - Before the outbreak\n(1:02:03) Negan\nnot a chapter\n6:45: The prison', () => String(n++))
+    expect(list.map((c) => [c.time, c.name])).toEqual([
+      ['0:00', 'Intro'],
+      ['1:30', 'Before the outbreak'],
+      ['1:02:03', 'Negan'],
+      ['6:45', 'The prison']
+    ])
+  })
+  it('writes the list for the description and sorts by time', () => {
+    const list = [ch('0:00', 'Intro'), ch('10:00', 'End'), ch('01:30', 'Middle'), ch('', 'No time')]
+    expect(sortChapters(list).map((c) => c.name)).toEqual(['Intro', 'Middle', 'End', 'No time'])
+    expect(chaptersText(sortChapters(list))).toBe('0:00 Intro\n1:30 Middle\n10:00 End')
+  })
+})
+
+describe('tags', () => {
+  it('splits, tidies and drops repeats', () => {
+    expect(parseTags('walking dead, Rick Grimes;  #twd\nwalking dead, ,')).toEqual(['walking dead', 'Rick Grimes', 'twd'])
+  })
+  it('counts like YouTube: commas between, quotes round tags with spaces', () => {
+    expect(tagsLength([])).toBe(0)
+    expect(tagsLength(['twd'])).toBe(3)
+    expect(tagsLength(['twd', 'walking dead'])).toBe(3 + 1 + 12 + 2)
+  })
+})
+
+describe('titles and description', () => {
+  it('uses the starred title, or the first one written', () => {
+    const d = newDraft('Maggie')
+    expect(chosenTitleText(d)).toBe('')
+    d.titles = [
+      { id: 'a', text: '  ' },
+      { id: 'b', text: 'Life of Maggie' },
+      { id: 'c', text: 'Maggie Rhee, explained' }
+    ]
+    expect(chosenTitleText(d)).toBe('Life of Maggie')
+    d.chosenTitle = 'c'
+    expect(chosenTitleText(d)).toBe('Maggie Rhee, explained')
+  })
+  it('checks title length', () => {
+    expect(titleCheck('Short').level).toBe('ok')
+    expect(titleCheck('x'.repeat(80)).level).toBe('warn')
+    expect(titleCheck('x'.repeat(101)).level).toBe('error')
+    expect(titleCheck('a <b>').level).toBe('error')
+  })
+  it('puts chapters on the end of the description', () => {
+    const d = newDraft('Maggie')
+    d.description = 'The whole story.\n'
+    d.chapters = [ch('0:00', 'Intro'), ch('1:00', 'Then')]
+    expect(fullDescription(d)).toBe('The whole story.\n\n0:00 Intro\n1:00 Then')
+    d.chaptersInDescription = false
+    expect(fullDescription(d)).toBe('The whole story.')
+  })
+  it('counts the description in bytes, as YouTube does', () => {
+    const d = newDraft('x')
+    d.description = '🧟'.repeat(1300)
+    expect(descriptionCheck(d).level).toBe('error')
+    d.description = 'fine'
+    expect(descriptionCheck(d).level).toBe('ok')
+  })
+})
+
+describe('reading publishing.json', () => {
+  it('starts empty from nothing or junk', () => {
+    expect(readPublishing(null)).toEqual({ videos: [] })
+    expect(readPublishing('{nope')).toEqual({ videos: [] })
+  })
+  it('keeps what it can from a damaged file', () => {
+    const data = readPublishing(
+      JSON.stringify({
+        videos: [
+          { id: 'v1', name: 'Maggie', titles: [{ id: 't1', text: 'A' }, { text: 'no id' }], chosenTitle: 'gone', tags: ['twd', 3], chapters: [{ id: 'c', time: '0:00', name: 'Intro' }] },
+          { id: 'v1', name: 'duplicate' },
+          { name: 'no id' }
+        ]
+      })
+    )
+    expect(data.videos).toHaveLength(1)
+    const v = data.videos[0]
+    expect(v.titles).toEqual([{ id: 't1', text: 'A' }])
+    expect(v.chosenTitle).toBeNull()
+    expect(v.tags).toEqual(['twd'])
+    expect(v.description).toBe('')
+    expect(v.chaptersInDescription).toBe(true)
+  })
+})
