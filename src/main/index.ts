@@ -61,6 +61,7 @@ import { explorerFile, setupExplorer } from './explorer'
 import { openOutside } from './openOutside'
 import { openInOrbit, pathsFromArgv, setupOpenInOrbit } from './openInOrbit'
 import { hold, setupUndoBin } from './undoBin'
+import { setupVideoBin } from './videoBin'
 import { setupVideoPlayer, videoResponse } from './videoPlayer'
 import { releaseFiles, serveFile } from './fileLocks'
 import { comicResponse, setupComics, shareProgress as shareComicProgress } from './comics'
@@ -1062,6 +1063,7 @@ app.whenReady().then(async () => {
   safely('live streaming', setupLive)
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
   safely('undo', () => setupUndoBin(() => vault?.root ?? null))
+  safely('deleted videos', () => setupVideoBin(() => vault?.root ?? null))
   safely('video player', () => setupVideoPlayer(() => vault?.root ?? null))
   safely('video window', () => setupVideoWindow(() => mainWindow))
   safely('web window', () => setupWebWindow(() => mainWindow))

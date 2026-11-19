@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Check, Pencil, Plus, Trash2, Upload, Video, X } from 'lucide-react'
 import { renameVideo, usePublishing, usePublishingOpen } from '../../store/publishing'
 import { renameProject, selectProject, useVideos } from '../../store/videos'
-import { deleteFromPublishing, draftsForProject, ensureVideoData, newVideoFromPublishing, publishingRows, type PublishingRow } from '../../store/videoLinks'
+import { deleteVideoEverywhere, draftsForProject, ensureVideoData, newVideoFromPublishing, publishingRows, type PublishingRow } from '../../store/videoLinks'
 import { stageLabel, uploadDateOf } from '../../lib/videos'
 import { openSpecialTab, VIDEOS_TAB } from '../../lib/editorController'
 import { chosenThumbnailCard, chosenTitleText, draftProgress, isYouTubePlaceholder, youTubeThumbnailUrls, type VideoDraft } from '../../lib/publishing'
@@ -87,8 +87,8 @@ function openInVideos(id: string): void {
 }
 
 function deleteWithNote(id: string, isProject: boolean): void {
-  void deleteFromPublishing(id).then(
-    () => notify(isProject ? `Deleted the video, here and on the Videos page (its notes and files stay in your notes). ${UNDO_KEY} brings it back.` : `Deleted. ${UNDO_KEY} to undo.`, 'info'),
+  void deleteVideoEverywhere(id).then(
+    () => notify(`Deleted${isProject ? ', here and on the Videos page, with its folder' : ''}. ${UNDO_KEY} brings it back, or find it under Recently deleted on the Videos page for 30 days.`, 'info'),
     notify
   )
 }
@@ -110,7 +110,7 @@ function ListDelete({ row }: { row: PublishingRow }) {
   }
   return (
     <span className="pub-list-delete">
-      <button className="icon-btn" onClick={() => setAsking(true)} title={row.project ? 'Delete this video (here and on the Videos page)' : 'Delete this video'} data-pub-list-delete>
+      <button className="icon-btn" onClick={() => setAsking(true)} title={row.project ? 'Delete this video (here and on the Videos page, with its folder)' : 'Delete this video'} data-pub-list-delete>
         <Trash2 size={13} />
       </button>
     </span>

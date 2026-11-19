@@ -136,6 +136,11 @@ export function deleteProject(id: string): void {
   save({ projects: projects.filter((p) => p.id !== id) }, `Deleted the video ${named(gone)}`)
 }
 
+/** Puts a deleted project back as it was (from Recently deleted). */
+export function putBackProject(p: VideoProject): void {
+  save({ projects: [p, ...useVideos.getState().projects.filter((q) => q.id !== p.id)] }, `Brought back the video ${named(p)}`)
+}
+
 // ---------- the idea inbox ----------
 
 /** Jots an idea for a future video (newest first). */

@@ -1,6 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.stubGlobal('window', { api: { writeAppData: vi.fn(async () => undefined), readAppData: vi.fn(async () => null) }, dispatchEvent: () => true })
+// The notes folder: which folders exist, and the bin that deleted videos' folders go into.
+const folders = new Set<string>()
+const bin = new Map<string, string>()
+const api = {
+  writeAppData: vi.fn(async () => undefined),
+  readAppData: vi.fn(async () => null),
+  videoBinKeep: vi.fn(async (folder: string, id: string) => (folders.delete(folder) ? (bin.set(id, folder), true) : false)),
+  videoBinRestore: vi.fn(async (id: string, folder: string) => {
+    if (!bin.delete(id)) return null
+    const to = folders.has(folder) ? `${folder} (restored)` : folder
+    folders.add(to)
+    return to
+  }),
+  videoBinDrop: vi.fn(async (id: string) => void bin.delete(id))
+}
+vi.stubGlobal('window', { api, dispatchEvent: () => true })
+vi.mock('./vault', () => ({ useVault: { getState: () => ({ refresh: async () => undefined }) } }))
+vi.mock('../lib/editorController', () => ({ flushAll: async () => undefined, discardWithin: () => undefined }))
 vi.stubGlobal('CustomEvent', class {})
 vi.mock('./prefs', async () => {
   const { create } = await import('zustand')
@@ -11,6 +28,7 @@ vi.mock('./prefs', async () => {
 const v = await import('./videos')
 const pub = await import('./publishing')
 const links = await import('./videoLinks')
+const deleted = await import('./deletedVideos')
 const { history } = await import('../lib/undo')
 
 const rows = () => links.publishingRows(v.useVideos.getState().projects, pub.usePublishing.getState().videos)
@@ -102,31 +120,83 @@ describe('video projects and Publishing share one video', () => {
   })
 })
 
-describe('deleting a video from the Publishing page', () => {
+describe('deleting a video, and Recently deleted', () => {
   beforeEach(async () => {
-    await Promise.all([v.loadVideos(), pub.loadPublishing()])
+    await Promise.all([v.loadVideos(), pub.loadPublishing(), deleted.loadDeletedVideos()])
+    folders.clear()
+    bin.clear()
     history.clear()
   })
 
-  it('deletes a Publishing-only video', async () => {
+  it('deletes a Publishing-only video, and keeps it under Recently deleted', async () => {
     const old = pub.addVideo('Old test video')
     history.clear()
-    await links.deleteFromPublishing(old.id)
+    await links.deleteVideoEverywhere(old.id)
     expect(rows()).toHaveLength(0)
+    expect(deleted.useDeletedVideos.getState().list[0]).toMatchObject({ id: old.id, name: 'Old test video', folder: null })
     await history.undo()
     expect(rows()[0].name).toBe('Old test video')
+    expect(deleted.useDeletedVideos.getState().list).toHaveLength(0)
   })
 
-  it('deletes a project and its drafts together, as one Ctrl+Z step', async () => {
+  it('deletes a project, its drafts and its folder together, as one Ctrl+Z step', async () => {
     const p = v.createProject('Rick')
+    v.setProjectFolder(p.id, 'Videos/Rick')
+    folders.add('Videos/Rick')
     await links.draftsForProject(p.id)
     pub.addTags(p.id, ['twd'])
     history.clear()
-    await links.deleteFromPublishing(p.id)
+    await links.deleteVideoEverywhere(p.id)
     expect(v.projectById(p.id)).toBeUndefined()
     expect(pub.draftOf(p.id)).toBeUndefined()
+    expect(folders.has('Videos/Rick')).toBe(false)
+    expect(bin.get(p.id)).toBe('Videos/Rick')
     expect(await history.undo()).toBe('Deleted the video “Rick”')
+    expect(folders.has('Videos/Rick')).toBe(true)
     expect(rows()[0].draft?.tags).toEqual(['twd'])
+    expect(deleted.useDeletedVideos.getState().list).toHaveLength(0)
     expect(history.canUndo).toBe(false)
+  })
+
+  it('brings a video back from Recently deleted, folder and all', async () => {
+    const p = v.createProject('Maggie')
+    v.setProjectFolder(p.id, 'Videos/Maggie')
+    folders.add('Videos/Maggie')
+    await links.draftsForProject(p.id)
+    pub.addTags(p.id, ['hilltop'])
+    await links.deleteVideoEverywhere(p.id)
+    history.clear()
+    await links.restoreVideo(p.id)
+    expect(v.projectById(p.id)?.folder).toBe('Videos/Maggie')
+    expect(pub.draftOf(p.id)?.tags).toEqual(['hilltop'])
+    expect(folders.has('Videos/Maggie')).toBe(true)
+    expect(deleted.useDeletedVideos.getState().list).toHaveLength(0)
+    // and Ctrl+Z deletes it again
+    await history.undo()
+    expect(v.projectById(p.id)).toBeUndefined()
+    expect(folders.has('Videos/Maggie')).toBe(false)
+    expect(deleted.useDeletedVideos.getState().list).toHaveLength(1)
+  })
+
+  it('puts the folder beside a new one with the same name', async () => {
+    const p = v.createProject('Negan')
+    v.setProjectFolder(p.id, 'Videos/Negan')
+    folders.add('Videos/Negan')
+    await links.deleteVideoEverywhere(p.id)
+    folders.add('Videos/Negan')
+    await links.restoreVideo(p.id)
+    expect(v.projectById(p.id)?.folder).toBe('Videos/Negan (restored)')
+  })
+
+  it('lets go of videos deleted more than 30 days ago', async () => {
+    const p = v.createProject('Carl')
+    v.setProjectFolder(p.id, 'Videos/Carl')
+    folders.add('Videos/Carl')
+    await links.deleteVideoEverywhere(p.id)
+    const saved = JSON.stringify({ videos: deleted.useDeletedVideos.getState().list })
+    api.readAppData.mockImplementationOnce(async () => saved as never)
+    await deleted.loadDeletedVideos(Date.now() + 31 * 24 * 60 * 60 * 1000)
+    expect(deleted.useDeletedVideos.getState().list).toHaveLength(0)
+    expect(api.videoBinDrop).toHaveBeenCalledWith(p.id)
   })
 })

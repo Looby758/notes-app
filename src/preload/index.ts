@@ -735,6 +735,9 @@ const api: NotesApi = {
   undoHeld: (paths, inVault) => ipcRenderer.invoke('undo:held', paths, inVault),
   undoRestore: (paths, inVault) => ipcRenderer.invoke('undo:restore', paths, inVault),
   undoRelease: (paths, inVault) => ipcRenderer.invoke('undo:release', paths, inVault),
+  videoBinKeep: (folder, id) => ipcRenderer.invoke('videoBin:keep', folder, id),
+  videoBinRestore: (id, folder) => ipcRenderer.invoke('videoBin:restore', id, folder),
+  videoBinDrop: (id) => ipcRenderer.invoke('videoBin:drop', id),
   undoMoveBack: (items) => ipcRenderer.invoke('undo:moveBack', items),
   onEditCommand: (callback) => {
     const handler = (_e: unknown, which: 'undo' | 'redo'): void => callback(which)

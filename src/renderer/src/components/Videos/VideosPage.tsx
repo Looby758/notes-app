@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
-import { ArrowLeft, ArrowRight, ChevronDown, Inbox, CalendarDays, Check, Columns3, LayoutGrid, FileText, FolderOpen, Image as ImageIcon, Lightbulb, Link2, Mic, NotebookPen, Plus, Trash2, Upload, Video, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronDown, Inbox, CalendarDays, Check, Columns3, LayoutGrid, FileText, FolderOpen, Image as ImageIcon, Lightbulb, Link2, Mic, NotebookPen, Plus, Trash2, Undo2, Upload, Video, X } from 'lucide-react'
 import type { FileNode } from '@shared/types'
 import { useVault } from '../../store/vault'
 import { usePrefs } from '../../store/prefs'
@@ -12,7 +12,6 @@ import {
   promoteIdea,
   updateIdea,
   createProject,
-  deleteProject,
   ensureVideos,
   folderForProject,
   removeItem,
@@ -28,7 +27,8 @@ import { boardColumns, fitsSection, projectCounts, stageLabel, uploadDateOf, VID
 import { fileKind, openAttachment, vaultUrl } from '../../lib/fileKinds'
 import { openNote, openSpecialTab, PUBLISHING_TAB, SETTINGS_TAB } from '../../lib/editorController'
 import { usePublishing, usePublishingOpen } from '../../store/publishing'
-import { draftsForProject } from '../../store/videoLinks'
+import { deleteForGood, deleteVideoEverywhere, draftsForProject, restoreVideo } from '../../store/videoLinks'
+import { ensureDeletedVideos, goesOn, KEEP_DAYS, useDeletedVideos } from '../../store/deletedVideos'
 import { chosenTitleText, draftProgress } from '../../lib/publishing'
 import { useUI } from '../../store/ui'
 import { computerFiles, getDrag } from '../../lib/dnd'
@@ -160,7 +160,62 @@ function ProjectList() {
           ))}
         </div>
       )}
+      {loaded && <RecentlyDeleted />}
     </div>
+  )
+}
+
+// ---------- recently deleted ----------
+
+/** Deleted videos, kept for 30 days with their folder: bring one back, or let it go now. */
+function RecentlyDeleted() {
+  const list = useDeletedVideos((s) => s.list)
+  const [open, setOpen] = useState(false)
+  const [asking, setAsking] = useState<string | null>(null)
+  useEffect(() => {
+    void ensureDeletedVideos()
+  }, [])
+  if (!list.length) return null
+  return (
+    <section className={`video-deleted ${open ? 'open' : ''}`} data-video-deleted>
+      <button className="video-deleted-head" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <Trash2 size={14} />
+        <span>Recently deleted</span>
+        <span className="video-deleted-count">{list.length}</span>
+        <span className="video-deleted-hint">Kept for {KEEP_DAYS} days with their folders</span>
+        <ChevronDown size={14} className="video-deleted-chevron" />
+      </button>
+      {open && (
+        <ul className="video-deleted-list">
+          {list.map((d) => (
+            <li key={d.id} className="video-deleted-item" data-video-deleted-item={d.id}>
+              <span className="video-deleted-name">{d.name}</span>
+              <span className="video-deleted-when">
+                Deleted {agoText(d.deleted)}
+                {d.folder ? ' · with its folder' : ''} · goes {formatDate(new Date(goesOn(d)), 'D MMM')}
+              </span>
+              <button className="btn" onClick={() => void restoreVideo(d.id).then(() => notify(`Brought back “${d.name}”.`, 'info'), notify)} data-video-restore>
+                <Undo2 size={13} /> Bring it back
+              </button>
+              {asking === d.id ? (
+                <>
+                  <button className="link-button danger" onClick={() => void deleteForGood(d.id).catch(notify)} data-video-delete-now-yes>
+                    Delete for good
+                  </button>
+                  <button className="icon-btn" onClick={() => setAsking(null)} title="Keep it">
+                    <X size={13} />
+                  </button>
+                </>
+              ) : (
+                <button className="icon-btn" title="Delete now (its folder goes to the Recycle Bin)" onClick={() => setAsking(d.id)} data-video-delete-now>
+                  <Trash2 size={13} />
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }
 
@@ -609,10 +664,9 @@ function ProjectView({ project: p }: { project: VideoProject }) {
         <span className="video-project-dates">Started {formatDate(new Date(p.created), 'D MMM YYYY')}</span>
         <button
           className="icon-btn danger"
-          title="Delete this video project (its notes and files stay in your notes)"
+          title="Delete this video, with its folder (kept under Recently deleted for 30 days)"
           onClick={() => {
-            deleteProject(p.id)
-            notify(`Deleted the video project. Its notes and files are still in your notes. ${UNDO_KEY} brings it back.`, 'info')
+            void deleteVideoEverywhere(p.id).then(() => notify(`Deleted the video and its folder. ${UNDO_KEY} brings it back, or find it under Recently deleted for 30 days.`, 'info'), notify)
           }}
           data-video-delete
         >

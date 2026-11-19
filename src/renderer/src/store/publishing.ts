@@ -141,6 +141,11 @@ export function deleteVideo(id: string): void {
   )
 }
 
+/** Puts a deleted video's drafts back as they were (from Recently deleted). */
+export function putBackDraft(d: VideoDraft): void {
+  save([d, ...usePublishing.getState().videos.filter((v) => v.id !== d.id)], `Brought back ${named(d)}`)
+}
+
 // ---------- titles ----------
 
 export function addTitle(id: string, text = ''): string {

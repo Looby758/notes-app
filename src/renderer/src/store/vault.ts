@@ -18,6 +18,7 @@ import { loadStarred, putBackStars, remapStars, removeStarsWithin, useStarred } 
 import { loadVideoProgress } from './videoPlayer'
 import { loadFlashcards, putBackFlashcards, remapFlashcards, removeFlashcardsWithin, useFlashcards } from './flashcards'
 import { loadPublishing, remapPublishing } from './publishing'
+import { loadDeletedVideos } from './deletedVideos'
 import { loadMoney } from './money'
 import { followMovedVideosFolder, loadVideos, remapVideos } from './videos'
 import { loadLockedFolders, putBackLockedFolders, remapLockedFolders, removeLockedFoldersWithin, useLockedFolders } from '../lib/lock/folders'
@@ -240,6 +241,7 @@ export const useVault = create<VaultState>((set, get) => {
       loadStarred()
       void loadFlashcards()
       void loadPublishing()
+      void loadDeletedVideos()
       loadVideoProgress()
       void loadMoney()
       // Whichever finishes last (this or reading the notes list) checks whether the videos folder moved.

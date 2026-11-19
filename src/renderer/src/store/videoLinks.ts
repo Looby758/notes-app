@@ -1,6 +1,10 @@
-import { createProject, deleteProject, ensureVideos, projectById, setStage, setUploadDate } from './videos'
-import { deleteVideo, ensurePublishing, setUploaded, videoDraftFor } from './publishing'
-import { undoGroup } from '../lib/undo'
+import { createProject, deleteProject, ensureVideos, projectById, putBackProject, setStage, setUploadDate } from './videos'
+import { deleteVideo, draftOf, ensurePublishing, putBackDraft, setUploaded, videoDraftFor } from './publishing'
+import { addDeleted, ensureDeletedVideos, removeDeleted, useDeletedVideos, type DeletedVideo } from './deletedVideos'
+import { useVault } from './vault'
+import { recordUndo, undoChanged, undoGroup } from '../lib/undo'
+import { discardWithin, flushAll } from '../lib/editorController'
+import { remapProjects } from '../lib/videos'
 import type { VideoDraft } from '../lib/publishing'
 import type { VideoProject } from '../lib/videos'
 
@@ -73,18 +77,79 @@ export async function markUploaded(id: string, uploaded: { on: string; url: stri
 }
 
 
+// ---------- deleting, and Recently deleted ----------
+
+/** Puts a video's folder (if it has one) in the bin and lists it under Recently deleted. */
+async function intoBin(entry: DeletedVideo): Promise<void> {
+  if (entry.folder) {
+    await flushAll()
+    discardWithin(entry.folder)
+    if (!(await window.api.videoBinKeep(entry.folder, entry.id))) entry.folder = null
+    await useVault.getState().refresh()
+  }
+  addDeleted(entry)
+  undoChanged('videos')
+}
+
+/** Takes it off Recently deleted and puts its folder back (where it was, or beside it if that's taken). */
+async function outOfBin(entry: DeletedVideo): Promise<void> {
+  removeDeleted(entry.id)
+  if (entry.folder) {
+    const back = await window.api.videoBinRestore(entry.id, entry.folder)
+    if (back && back !== entry.folder) {
+      if (entry.project) entry.project = remapProjects([entry.project], entry.folder, back)?.[0] ?? entry.project
+      entry.folder = back
+    }
+    await useVault.getState().refresh()
+  }
+  undoChanged('videos')
+}
+
 /**
- * Deletes a video from the Publishing page: its drafts, and for a video project the project too
- * (its notes and files stay where they are). One Ctrl+Z step brings it all back.
+ * Deletes a video everywhere: its drafts, the video project, and the project's folder (with its
+ * script and research notes). All of it is kept under Recently deleted on the Videos page for 30
+ * days, and Ctrl+Z puts it straight back.
  */
-export async function deleteFromPublishing(id: string): Promise<void> {
-  const p = projectById(id)
-  if (!p) return deleteVideo(id)
+export async function deleteVideoEverywhere(id: string): Promise<void> {
+  await Promise.all([ensureVideoData(), ensureDeletedVideos()])
+  const project = projectById(id) ?? null
+  const draft = draftOf(id) ?? null
+  if (!project && !draft) return
+  const name = (project?.title || draft?.name || '').trim() || 'Untitled video'
+  const entry: DeletedVideo = { id, name, project, draft, folder: project?.folder ?? null, deleted: Date.now() }
+  const label = `Deleted the video “${name}”`
   await undoGroup(
-    () => `Deleted the video “${p.title.trim() || 'a video'}”`,
+    () => label,
     async () => {
-      deleteVideo(id)
-      deleteProject(id)
+      if (draft) deleteVideo(id)
+      if (project) deleteProject(id)
+      await intoBin(entry)
+      recordUndo({ label, undo: () => outOfBin(entry), redo: () => intoBin(entry) })
     }
   )
+}
+
+/** Brings a video back from Recently deleted: the project, its drafts and its folder. */
+export async function restoreVideo(id: string): Promise<void> {
+  await Promise.all([ensureVideoData(), ensureDeletedVideos()])
+  const entry = useDeletedVideos.getState().list.find((d) => d.id === id)
+  if (!entry) return
+  const label = `Brought back the video “${entry.name}”`
+  await undoGroup(
+    () => label,
+    async () => {
+      await outOfBin(entry)
+      recordUndo({ label, undo: () => intoBin(entry), redo: () => outOfBin(entry) })
+      if (entry.project) putBackProject(entry.project)
+      if (entry.draft) putBackDraft(entry.draft)
+    }
+  )
+}
+
+/** "Delete now" on Recently deleted: its folder goes on to the Recycle Bin / Bin, and it can't be brought back here. */
+export async function deleteForGood(id: string): Promise<void> {
+  const entry = useDeletedVideos.getState().list.find((d) => d.id === id)
+  if (!entry) return
+  removeDeleted(id)
+  if (entry.folder) await window.api.videoBinDrop(id)
 }
