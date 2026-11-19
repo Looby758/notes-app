@@ -1,10 +1,22 @@
 import { create } from 'zustand'
-import { dedupeTags, emptyPublishing, newDraft, newPublishingId, readPublishing, sortChapters, type Chapter, type PublishingData, type VideoDraft } from '../lib/publishing'
+import {
+  dedupeTags,
+  emptyPublishing,
+  newDraft,
+  newPublishingId,
+  readPublishing,
+  remapThumbnails,
+  sortChapters,
+  type Chapter,
+  type PublishingData,
+  type ThumbnailCard,
+  type VideoDraft
+} from '../lib/publishing'
 import { notify } from './notify'
 import { recordUndo, undoChanged } from '../lib/undo'
 
 /**
- * Title options, descriptions, tags and chapters for your videos. Saved in the vault
+ * Title options, thumbnail boards, descriptions, tags and chapters for your videos. Saved in the vault
  * (.notesapp/publishing.json) so they follow your notes to other computers via Google Drive.
  * Ctrl+Z (outside a text box) undoes changes, like everywhere else.
  */
@@ -214,4 +226,62 @@ export function sortVideoChapters(id: string): void {
 /** Replaces (or adds to) the chapters with ones pasted as text. */
 export function setChapters(id: string, chapters: Chapter[], label = 'Pasted chapters'): void {
   change(id, () => ({ chapters }), label)
+}
+
+// ---------- thumbnail board ----------
+
+/** Adds cards to the board; the first picture on a board with none picked becomes the pick. */
+export function addThumbnails(id: string, cards: Omit<ThumbnailCard, 'id' | 'created'>[]): string[] {
+  if (!cards.length) return []
+  const made = cards.map((c) => ({ ...c, id: newPublishingId(), created: Date.now() }))
+  const pictures = made.filter((c) => c.kind === 'picture').length
+  change(
+    id,
+    (d) => ({ thumbnails: [...d.thumbnails, ...made], chosenThumbnail: d.chosenThumbnail ?? made.find((c) => c.kind === 'picture')?.id ?? null }),
+    pictures > 1 ? `Added ${pictures} pictures` : pictures ? 'Added a picture' : 'Added a thumbnail idea'
+  )
+  return made.map((c) => c.id)
+}
+
+export function setThumbnailText(id: string, cardId: string, text: string): void {
+  change(id, (d) => ({ thumbnails: d.thumbnails.map((t) => (t.id === cardId ? { ...t, text } : t)) }), 'Changed a thumbnail card', `thumb:${cardId}`)
+}
+
+export function chooseThumbnail(id: string, cardId: string | null): void {
+  change(id, () => ({ chosenThumbnail: cardId }), cardId ? 'Picked a thumbnail' : 'Unpicked the thumbnail')
+}
+
+export function deleteThumbnail(id: string, cardId: string): void {
+  change(
+    id,
+    (d) => {
+      const thumbnails = d.thumbnails.filter((t) => t.id !== cardId)
+      return { thumbnails, chosenThumbnail: d.chosenThumbnail === cardId ? null : d.chosenThumbnail }
+    },
+    'Removed a thumbnail card'
+  )
+}
+
+/** Moves a card to where another one is (dragging on the board). */
+export function moveThumbnail(id: string, cardId: string, toId: string): void {
+  if (cardId === toId) return
+  change(
+    id,
+    (d) => {
+      const from = d.thumbnails.findIndex((t) => t.id === cardId)
+      const to = d.thumbnails.findIndex((t) => t.id === toId)
+      if (from < 0 || to < 0) return {}
+      const thumbnails = [...d.thumbnails]
+      const [card] = thumbnails.splice(from, 1)
+      thumbnails.splice(to, 0, card)
+      return { thumbnails }
+    },
+    'Moved a thumbnail card'
+  )
+}
+
+/** Keeps pictures on the boards pointing at their files after a rename or move in the notes folder. */
+export function remapPublishing(from: string, to: string): void {
+  const next = remapThumbnails(usePublishing.getState().videos, from, to)
+  if (next) write(next)
 }

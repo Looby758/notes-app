@@ -15,7 +15,7 @@ import { resetIndex, syncIndex } from './noteIndex'
 import { loadStarred, putBackStars, remapStars, removeStarsWithin, useStarred } from './starred'
 import { loadVideoProgress } from './videoPlayer'
 import { loadFlashcards, putBackFlashcards, remapFlashcards, removeFlashcardsWithin, useFlashcards } from './flashcards'
-import { loadPublishing } from './publishing'
+import { loadPublishing, remapPublishing } from './publishing'
 import { loadMoney } from './money'
 import { loadLockedFolders, putBackLockedFolders, remapLockedFolders, removeLockedFoldersWithin, useLockedFolders } from '../lib/lock/folders'
 import { history, recordUndo, undoChanged } from '../lib/undo'
@@ -115,6 +115,7 @@ export const useVault = create<VaultState>((set, get) => {
       })
     }
     remapTabs(from, to)
+    remapPublishing(from, to)
     remapStars(from, to)
     remapFlashcards(from, to)
     remapLockedFolders(from, to)

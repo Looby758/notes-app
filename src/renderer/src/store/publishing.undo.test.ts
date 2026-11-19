@@ -65,4 +65,18 @@ describe('publishing drafts and Ctrl+Z', () => {
     await p.loadPublishing()
     await expect(history.undo()).rejects.toThrow(/reloaded/)
   })
+
+  it('picks the first picture on the board, and undoes removing a card', async () => {
+    const v = p.addVideo('Maggie')
+    p.addThumbnails(v.id, [{ kind: 'idea', text: 'Big red WHY' }])
+    expect(draft(v.id).chosenThumbnail).toBeNull()
+    const [pic] = p.addThumbnails(v.id, [{ kind: 'picture', text: '', file: 'attachments/a.png' }])
+    expect(draft(v.id).chosenThumbnail).toBe(pic)
+    p.deleteThumbnail(v.id, pic)
+    expect(draft(v.id).chosenThumbnail).toBeNull()
+    await history.undo()
+    expect(draft(v.id).chosenThumbnail).toBe(pic)
+    p.moveThumbnail(v.id, pic, draft(v.id).thumbnails[0].id)
+    expect(draft(v.id).thumbnails[0].id).toBe(pic)
+  })
 })

@@ -135,7 +135,7 @@ export default function PublishingPage() {
             <button key={v.id} className={`pub-list-item ${open?.id === v.id ? 'on' : ''}`} onClick={() => setOpenId(v.id)} data-pub-video>
               <span className="pub-list-name">{v.name}</span>
               <span className="pub-list-sub">{chosenTitleText(v) || 'No title yet'}</span>
-              <span className="pub-list-progress" title="Title, description, tags and chapters">
+              <span className="pub-list-progress" title="Title, thumbnail, description, tags and chapters">
                 {p.done}/{p.total} ready
               </span>
             </button>
@@ -153,7 +153,7 @@ export default function PublishingPage() {
           !adding && (
             <div className="pub-empty">
               <span aria-hidden>🎬</span>
-              <p>Title options, the description, tags and chapters for each video, ready to copy into YouTube Studio.</p>
+              <p>Title options, a thumbnail board, the description, tags and chapters for each video, ready to copy into YouTube Studio.</p>
               <button className="btn btn-primary" onClick={() => setAdding(true)}>
                 <Plus size={14} /> New video
               </button>

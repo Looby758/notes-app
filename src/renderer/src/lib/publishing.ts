@@ -18,6 +18,17 @@ export interface Chapter {
   name: string
 }
 
+/** A card on a video's thumbnail board: an idea written down, or a picture (a frame, a mock-up, a reference). */
+export interface ThumbnailCard {
+  id: string
+  kind: 'idea' | 'picture'
+  /** The idea, or a caption for the picture. */
+  text: string
+  /** The picture, by its place in the notes folder ("attachments/maggie frame 2m14s.png"). */
+  file?: string
+  created: number
+}
+
 export interface VideoDraft {
   id: string
   /** What the video is called in Orbit (its working name, not necessarily the YouTube title). */
@@ -32,6 +43,10 @@ export interface VideoDraft {
   chapters: Chapter[]
   /** Put the chapter list at the end of the description when copying it. */
   chaptersInDescription: boolean
+  /** The thumbnail board, in the order you arranged it. */
+  thumbnails: ThumbnailCard[]
+  /** The picture you're going with. */
+  chosenThumbnail: string | null
 }
 
 export interface PublishingData {
@@ -52,7 +67,7 @@ export const newPublishingId = (): string => Date.now().toString(36) + Math.rand
 export const emptyPublishing = (): PublishingData => ({ videos: [] })
 
 export function newDraft(name: string, id = newPublishingId(), now = Date.now()): VideoDraft {
-  return { id, name, created: now, updated: now, titles: [], chosenTitle: null, description: '', tags: [], chapters: [], chaptersInDescription: true }
+  return { id, name, created: now, updated: now, titles: [], chosenTitle: null, description: '', tags: [], chapters: [], chaptersInDescription: true, thumbnails: [], chosenThumbnail: null }
 }
 
 const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback)
@@ -81,6 +96,11 @@ export function readPublishing(raw: string | null): PublishingData {
       .filter((t) => str(t.id))
       .map((t) => ({ id: str(t.id), text: str(t.text) }))
     const chosen = str(v.chosenTitle)
+    const thumbnails: ThumbnailCard[] = arr(v.thumbnails)
+      .map((t) => obj(t))
+      .filter((t) => str(t.id) && (t.kind === 'idea' || (t.kind === 'picture' && str(t.file))))
+      .map((t) => ({ id: str(t.id), kind: t.kind as ThumbnailCard['kind'], text: str(t.text), ...(t.kind === 'picture' ? { file: str(t.file) } : {}), created: num(t.created, 0) }))
+    const chosenThumb = str(v.chosenThumbnail)
     videos.push({
       id,
       name: str(v.name, 'Untitled video'),
@@ -94,7 +114,9 @@ export function readPublishing(raw: string | null): PublishingData {
         .map((c) => obj(c))
         .filter((c) => str(c.id))
         .map((c) => ({ id: str(c.id), time: str(c.time), name: str(c.name) })),
-      chaptersInDescription: v.chaptersInDescription !== false
+      chaptersInDescription: v.chaptersInDescription !== false,
+      thumbnails,
+      chosenThumbnail: thumbnails.some((t) => t.id === chosenThumb && t.kind === 'picture') ? chosenThumb : null
     })
   }
   return { videos }
@@ -254,8 +276,66 @@ export function descriptionCheck(d: VideoDraft): { level: Level; message: string
 /** The first couple of lines show above "...more" on YouTube: roughly this many characters. */
 export const DESCRIPTION_PREVIEW = 150
 
-/** How many things are filled in, for the list of videos: title, description, tags, chapters. */
+/** How many things are filled in, for the list of videos: title, thumbnail, description, tags, chapters. */
 export function draftProgress(d: VideoDraft): { done: number; total: number } {
-  const parts = [!!chosenTitleText(d), !!d.description.trim(), d.tags.length > 0, d.chapters.length >= CHAPTERS_MIN && !chapterProblems(d.chapters).length]
+  const parts = [!!chosenTitleText(d), !!chosenThumbnailCard(d), !!d.description.trim(), d.tags.length > 0, d.chapters.length >= CHAPTERS_MIN && !chapterProblems(d.chapters).length]
   return { done: parts.filter(Boolean).length, total: parts.length }
+}
+
+// ---------- thumbnails ----------
+
+/** What YouTube asks for: 1280×720 (16:9), at least 640 wide, under 2 MB, JPG, PNG or GIF. */
+export const THUMB_WIDTH = 1280
+export const THUMB_HEIGHT = 720
+export const THUMB_MIN_WIDTH = 640
+export const THUMB_MAX_BYTES = 2 * 1024 * 1024
+const THUMB_TYPES = new Set(['jpg', 'jpeg', 'png', 'gif'])
+
+export const extOf = (file: string): string => /\.([^./\\]+)$/.exec(file)?.[1]?.toLowerCase() ?? ''
+
+export interface ThumbProblem {
+  level: Level
+  message: string
+}
+
+/** Whether a picture will do as a YouTube thumbnail. Width, height and bytes are left out when not known yet. */
+export function thumbnailProblems(file: string, size?: { width: number; height: number }, bytes?: number): ThumbProblem[] {
+  const out: ThumbProblem[] = []
+  const ext = extOf(file)
+  if (!THUMB_TYPES.has(ext)) out.push({ level: 'error', message: `YouTube takes JPG, PNG or GIF${ext ? `, not .${ext}` : ''}` })
+  if (bytes !== undefined && bytes > THUMB_MAX_BYTES) out.push({ level: 'error', message: `${(bytes / 1024 / 1024).toFixed(1)} MB: YouTube’s limit is 2 MB (save it as a JPG)` })
+  if (size) {
+    if (size.width < THUMB_MIN_WIDTH) out.push({ level: 'error', message: `${size.width}×${size.height}: YouTube needs at least ${THUMB_MIN_WIDTH} wide` })
+    else if (size.width < THUMB_WIDTH) out.push({ level: 'warn', message: `${size.width}×${size.height}: ${THUMB_WIDTH}×${THUMB_HEIGHT} looks sharper` })
+    const ratio = size.width / size.height
+    if (Math.abs(ratio - 16 / 9) > 0.02) out.push({ level: 'warn', message: `Not 16:9, so YouTube adds black bars (crop it to ${THUMB_WIDTH}×${THUMB_HEIGHT})` })
+  }
+  return out
+}
+
+/** The picture you picked, or null. */
+export const chosenThumbnailCard = (d: VideoDraft): ThumbnailCard | null => d.thumbnails.find((t) => t.id === d.chosenThumbnail && t.kind === 'picture') ?? null
+
+/** A name for a grabbed frame: "Maggie 2m14s.png". */
+export function frameFileName(video: string, seconds: number): string {
+  const base =
+    video
+      .split(/[\\/]/)
+      .pop()!
+      .replace(/\.[^.]+$/, '')
+      .replace(/[<>:"|?*]+/g, '')
+      .trim() || 'Frame'
+  const s = Math.max(0, Math.floor(seconds))
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  return `${base} ${h ? `${h}h` : ''}${m}m${String(s % 60).padStart(2, '0')}s.png`
+}
+
+/** Keeps the board's pictures pointing at the right files after a rename or move in the notes folder. */
+export function remapThumbnails(videos: VideoDraft[], from: string, to: string): VideoDraft[] | null {
+  const within = (p: string): boolean => p === from || p.startsWith(`${from}/`)
+  if (!videos.some((v) => v.thumbnails.some((t) => t.file && within(t.file)))) return null
+  return videos.map((v) =>
+    v.thumbnails.some((t) => t.file && within(t.file)) ? { ...v, thumbnails: v.thumbnails.map((t) => (t.file && within(t.file) ? { ...t, file: to + t.file.slice(from.length) } : t)) } : v
+  )
 }

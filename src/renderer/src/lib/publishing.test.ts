@@ -14,6 +14,9 @@ import {
   sortChapters,
   tagsLength,
   titleCheck,
+  thumbnailProblems,
+  frameFileName,
+  remapThumbnails,
   type Chapter
 } from './publishing'
 
@@ -146,5 +149,52 @@ describe('reading publishing.json', () => {
     expect(v.tags).toEqual(['twd'])
     expect(v.description).toBe('')
     expect(v.chaptersInDescription).toBe(true)
+  })
+})
+
+describe('thumbnails', () => {
+  it('is happy with a 1280×720 PNG under 2 MB', () => {
+    expect(thumbnailProblems('attachments/a.png', { width: 1280, height: 720 }, 900_000)).toEqual([])
+  })
+  it('flags what YouTube would refuse or show badly', () => {
+    expect(thumbnailProblems('a.webp').map((p) => p.level)).toEqual(['error'])
+    expect(thumbnailProblems('a.jpg', undefined, 3 * 1024 * 1024)[0].message).toMatch(/2 MB/)
+    expect(thumbnailProblems('a.jpg', { width: 500, height: 281 })[0].level).toBe('error')
+    expect(thumbnailProblems('a.jpg', { width: 960, height: 540 }).map((p) => p.level)).toEqual(['warn'])
+    expect(thumbnailProblems('a.jpg', { width: 1280, height: 1024 }).map((p) => p.message)).toEqual([expect.stringMatching(/16:9/)])
+  })
+  it('names grabbed frames after the video and the time', () => {
+    expect(frameFileName('C:\\Videos\\Maggie take 2.mp4', 134.6)).toBe('Maggie take 2 2m14s.png')
+    expect(frameFileName('/v/ep.mkv', 3723)).toBe('ep 1h2m03s.png')
+  })
+  it('follows pictures that were renamed or moved', () => {
+    const d = newDraft('x')
+    d.thumbnails = [
+      { id: '1', kind: 'picture', text: '', file: 'attachments/a.png', created: 0 },
+      { id: '2', kind: 'idea', text: 'idea', created: 0 }
+    ]
+    expect(remapThumbnails([d], 'other', 'elsewhere')).toBeNull()
+    expect(remapThumbnails([d], 'attachments', 'pics')![0].thumbnails[0].file).toBe('pics/a.png')
+    expect(remapThumbnails([d], 'attachments/a.png', 'attachments/b.png')![0].thumbnails[0].file).toBe('attachments/b.png')
+  })
+  it('reads boards back, dropping broken cards and a pick that isn’t a picture', () => {
+    const v = readPublishing(
+      JSON.stringify({
+        videos: [
+          {
+            id: 'v',
+            thumbnails: [
+              { id: 'a', kind: 'picture', file: 'attachments/a.png' },
+              { id: 'b', kind: 'picture' },
+              { id: 'c', kind: 'idea', text: 'big red text' },
+              { id: 'd', kind: 'sticker' }
+            ],
+            chosenThumbnail: 'c'
+          }
+        ]
+      })
+    ).videos[0]
+    expect(v.thumbnails.map((t) => t.id)).toEqual(['a', 'c'])
+    expect(v.chosenThumbnail).toBeNull()
   })
 })
