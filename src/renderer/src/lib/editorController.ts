@@ -278,6 +278,22 @@ export function insertBlockIntoActiveNote(text: string | ((note: string) => stri
   return true
 }
 
+/** Puts text at the cursor of the note being edited, in the line (a script marker); false if no note is open. */
+export function insertInlineIntoActiveNote(text: string | ((note: string) => string)): boolean {
+  const pv = views.get(activePane())
+  if (!pv?.shown || !isNoteTab(pv.shown)) return false
+  const view = pv.view
+  const insert = typeof text === 'string' ? text : text(pv.shown)
+  const { from, to } = view.state.selection.main
+  // A space either side unless there's one already (or it's the start / end of the line).
+  const before = from > 0 && !/\s/.test(view.state.sliceDoc(from - 1, from)) ? ' ' : ''
+  const after = to < view.state.doc.length && !/\s/.test(view.state.sliceDoc(to, to + 1)) ? ' ' : ''
+  const value = before + insert + after
+  view.dispatch({ changes: { from, to, insert: value }, selection: { anchor: from + value.length }, userEvent: 'input' })
+  view.focus()
+  return true
+}
+
 const live = new Map<string, { view: EditorView; from: number; length: number }>()
 
 /**

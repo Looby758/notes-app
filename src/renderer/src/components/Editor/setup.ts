@@ -35,6 +35,7 @@ import { typewriter } from './typewriter'
 import { calculator } from './calculator'
 import { codeRunner } from './codeRunner'
 import { autocomplete } from './autocomplete'
+import { scriptTools } from './scriptTools'
 import { usePrefs } from '../../store/prefs'
 
 /** Zen mode turns typewriter mode on for as long as it lasts (without changing your settings). */
@@ -93,6 +94,7 @@ const base: Extension = [
   songs,
   calculator,
   codeRunner,
+  scriptTools,
   editorTheme,
   placeholder('Start writing…'),
   keymap.of([...completionKeymap, ...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab])
