@@ -3,6 +3,7 @@ import { loadPasswords } from '../lib/passwords/session'
 import { loadSnippets } from './snippets'
 import { loadSavedSearches } from './savedSearches'
 import { loadScreenshots, remapScreenshots } from './screenshots'
+import { loadTimeline } from './timeline'
 import { fixFileLinks } from '../lib/fileLinks'
 import { fixBoardLinks } from '../lib/boards'
 import { create } from 'zustand'
@@ -231,6 +232,7 @@ export const useVault = create<VaultState>((set, get) => {
       void loadSnippets()
       void loadSavedSearches()
       void loadScreenshots()
+      void loadTimeline()
       loadStarred()
       void loadFlashcards()
       loadVideoProgress()

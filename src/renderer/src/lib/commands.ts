@@ -12,6 +12,7 @@ import {
   CONFLICTS_TAB,
   FLASHCARDS_TAB,
   SCREENSHOTS_TAB,
+  TIMELINE_TAB,
   TERMINAL_TAB,
   PASSWORDS_TAB,
   EMAIL_TAB,
@@ -325,6 +326,17 @@ export const commands: Command[] = [
   { id: 'home.open', group: 'Navigation', title: 'Go to Home', shortcut: 'Ctrl+Shift+J', run: () => openSpecialTab(HOME_TAB) },
   { id: 'flashcards.open', group: 'Navigation', title: 'Review flashcards', shortcut: 'Ctrl+Shift+Y', run: () => openSpecialTab(FLASHCARDS_TAB) },
   { id: 'screenshots.open', group: 'Navigation', title: 'Screenshot organiser (tag pictures by character and episode)', run: () => openSpecialTab(SCREENSHOTS_TAB) },
+  { id: 'timeline.open', group: 'Navigation', title: 'Timeline (what happened in the story, by era and episode)', run: () => openSpecialTab(TIMELINE_TAB) },
+  {
+    id: 'timeline.capture',
+    group: 'Navigation',
+    title: 'Add to the timeline… (quick capture while watching)',
+    run: () =>
+      void import('../components/Timeline/TimelinePage').then((m) => {
+        m.captureNext()
+        openSpecialTab(TIMELINE_TAB)
+      })
+  },
   { id: 'episode.find', group: 'Navigation', title: 'Find everything from an episode (S4E9) or comic issue…', run: () => useUI.setState({ modal: 'episode' }) },
   { id: 'terminal.open', group: 'Navigation', title: 'Open terminal (command line in the notes folder)', shortcut: 'Ctrl+Alt+T', run: () => openSpecialTab(TERMINAL_TAB) },
   { id: 'money.open', group: 'Navigation', title: 'Open money tracker', shortcut: 'Ctrl+Shift+B', run: () => openSpecialTab(MONEY_TAB) },

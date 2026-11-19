@@ -64,6 +64,8 @@ export const CHAT_TAB = 'chat:'
 export const FLASHCARDS_TAB = 'flashcards:'
 /** The screenshot organiser: tag pictures by character and episode (components/Screenshots). */
 export const SCREENSHOTS_TAB = 'screenshots:'
+/** The story timeline: eras, what happened and where it was shown or told (components/Timeline). */
+export const TIMELINE_TAB = 'timeline:'
 export const TERMINAL_TAB = 'terminal:'
 export const PASSWORDS_TAB = 'passwords:'
 export const EMAIL_TAB = 'email:'
