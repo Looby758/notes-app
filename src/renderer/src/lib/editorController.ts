@@ -90,6 +90,8 @@ export const DOWNLOADER_TAB = 'downloader:'
 export const STUDIO_TAB = 'studio:'
 /** Instant replay and the clip editor (components/Clips). */
 export const CLIPS_TAB = 'clips:'
+/** Video projects: script, research, pictures, recordings and thumbnail ideas for each video (components/Videos). */
+export const VIDEOS_TAB = 'videos:'
 /** Sound clips with hotkeys, the voice changer and music into a voice call (components/Soundboard). */
 export const SOUNDBOARD_TAB = 'soundboard:'
 /** Who's in your Discord voice channel, with mute and deafen (components/Discord). */

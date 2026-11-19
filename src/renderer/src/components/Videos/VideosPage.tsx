@@ -1,0 +1,587 @@
+import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
+import { ArrowLeft, FileText, FolderOpen, Image as ImageIcon, Lightbulb, Link2, Mic, NotebookPen, Plus, Trash2, Upload, Video, X } from 'lucide-react'
+import type { FileNode } from '@shared/types'
+import { useVault } from '../../store/vault'
+import { usePrefs } from '../../store/prefs'
+import { notify } from '../../store/notify'
+import {
+  addItems,
+  addThumbnailText,
+  createProject,
+  deleteProject,
+  ensureVideos,
+  folderForProject,
+  removeItem,
+  renameProject,
+  selectProject,
+  setScript,
+  setSummary,
+  useVideos
+} from '../../store/videos'
+import { fitsSection, projectCounts, type VideoItem, type VideoItemKind, type VideoProject } from '../../lib/videos'
+import { fileKind, openAttachment, vaultUrl } from '../../lib/fileKinds'
+import { openNote } from '../../lib/editorController'
+import { computerFiles, getDrag } from '../../lib/dnd'
+import { noteTitle } from '../../lib/paths'
+import { fuzzyFilter } from '../../lib/fuzzy'
+import { formatDate } from '../../lib/dates'
+import { UNDO_KEY } from '../../lib/undo'
+import Private from '../Streamer/Private'
+
+type Section = VideoItemKind | 'script'
+
+/** Every note and file path in the notes folder. */
+function allFiles(nodes: FileNode[], out: string[] = []): string[] {
+  for (const n of nodes) {
+    if (n.type === 'folder') allFiles(n.children ?? [], out)
+    else out.push(n.path)
+  }
+  return out
+}
+
+function useFileSet(): { list: string[]; has: (p: string) => boolean } {
+  const tree = useVault((s) => s.tree)
+  return useMemo(() => {
+    const list = allFiles(tree)
+    const set = new Set(list)
+    // Before the tree has loaded, assume everything is there.
+    return { list, has: (p: string) => !list.length || set.has(p) }
+  }, [tree])
+}
+
+const fileName = (path: string): string => path.slice(path.lastIndexOf('/') + 1)
+const shown = (path: string): string => (/\.md$/i.test(path) ? noteTitle(path) : fileName(path))
+
+const openPath = (path: string): void => (/\.md$/i.test(path) ? openNote(path) : openAttachment(path))
+
+/** A note name in `folder` that isn't taken: "Research", then "Research 2"… */
+function freeNotePath(folder: string, name: string, taken: string[]): string {
+  const used = new Set(taken.map((t) => t.toLowerCase()))
+  for (let n = 1; ; n++) {
+    const path = `${folder}/${n === 1 ? name : `${name} ${n}`}.md`
+    if (!used.has(path.toLowerCase())) return path
+  }
+}
+
+// ---------- the page ----------
+
+export default function VideosPage() {
+  const loaded = useVideos((s) => s.loaded)
+  const selected = useVideos((s) => s.selected)
+  const project = useVideos((s) => s.projects.find((p) => p.id === s.selected))
+  useEffect(() => {
+    void ensureVideos()
+  }, [])
+  // A project deleted elsewhere (or undone away): back to the list.
+  useEffect(() => {
+    if (loaded && selected && !project) selectProject(null)
+  }, [loaded, selected, project])
+  return <div className="videos-page">{project ? <ProjectView project={project} /> : <ProjectList />}</div>
+}
+
+function ProjectList() {
+  const projects = useVideos((s) => s.projects)
+  const loaded = useVideos((s) => s.loaded)
+  const [adding, setAdding] = useState(false)
+  return (
+    <div className="videos-inner">
+      <div className="videos-head">
+        <h2>
+          <Video size={20} /> Videos
+        </h2>
+        {!adding && projects.length > 0 && (
+          <button className="btn btn-primary" onClick={() => setAdding(true)} data-video-new>
+            <Plus size={14} /> New video
+          </button>
+        )}
+      </div>
+      <p className="videos-intro">Each video gets one place for its script, research notes, pictures, recordings and thumbnail ideas. Your notes and files stay where they are.</p>
+      {adding && <NewProjectForm onClose={() => setAdding(false)} />}
+      {loaded && !projects.length && !adding ? (
+        <div className="videos-empty">
+          <span aria-hidden>🎬</span>
+          <p>No video projects yet.</p>
+          <button className="btn btn-primary" onClick={() => setAdding(true)} data-video-new>
+            <Plus size={14} /> Start your first video
+          </button>
+        </div>
+      ) : (
+        <div className="videos-grid">
+          {projects.map((p) => (
+            <ProjectCard key={p.id} project={p} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function NewProjectForm({ onClose }: { onClose: () => void }) {
+  const [title, setTitle] = useState('')
+  const submit = (): void => {
+    if (!title.trim()) return notify('Give the video a working title first, e.g. “The life of Maggie Rhee”.', 'info')
+    const made = createProject(title)
+    onClose()
+    selectProject(made.id)
+  }
+  return (
+    <div className="videos-new" data-video-form>
+      <input
+        className="text-input"
+        autoFocus
+        value={title}
+        maxLength={120}
+        placeholder="Working title, e.g. The life of Maggie Rhee"
+        aria-label="Video title"
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') submit()
+          if (e.key === 'Escape') onClose()
+        }}
+      />
+      <button className="btn btn-primary" onClick={submit}>
+        Make it
+      </button>
+      <button className="btn" onClick={onClose}>
+        Cancel
+      </button>
+    </div>
+  )
+}
+
+function ProjectCard({ project: p }: { project: VideoProject }) {
+  const counts = projectCounts(p)
+  const cover = p.items.find((i) => i.kind === 'thumbnail' && i.path) ?? p.items.find((i) => i.kind === 'image' && i.path)
+  const files = useFileSet()
+  const bits = [
+    counts.research && `${counts.research} research`,
+    counts.image && `${counts.image} ${counts.image === 1 ? 'picture' : 'pictures'}`,
+    counts.recording && `${counts.recording} ${counts.recording === 1 ? 'recording' : 'recordings'}`,
+    counts.thumbnail && `${counts.thumbnail} thumbnail ${counts.thumbnail === 1 ? 'idea' : 'ideas'}`
+  ].filter(Boolean)
+  return (
+    <button className="video-card" onClick={() => selectProject(p.id)} data-video-card={p.id}>
+      <div className="video-card-cover">{cover?.path && files.has(cover.path) ? <img src={vaultUrl(cover.path)} alt="" loading="lazy" /> : <Video size={28} />}</div>
+      <div className="video-card-body">
+        <div className="video-card-title">
+          <Private>{p.title || 'Untitled video'}</Private>
+        </div>
+        {p.summary && <div className="video-card-summary">{p.summary}</div>}
+        <div className="video-card-meta">
+          <span className={p.script ? 'has' : ''}>{p.script ? 'Script ✓' : 'No script yet'}</span>
+          {bits.length > 0 && <span>{bits.join(' · ')}</span>}
+        </div>
+      </div>
+    </button>
+  )
+}
+
+// ---------- one project ----------
+
+function ProjectView({ project: p }: { project: VideoProject }) {
+  const files = useFileSet()
+  const [picking, setPicking] = useState<Section | null>(null)
+  const [title, setTitle] = useState(p.title)
+  const [summary, setSummaryText] = useState(p.summary)
+  // Follow undo/redo (and other changes) while not typing in the box.
+  const titleBox = useRef<HTMLInputElement>(null)
+  const summaryBox = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    if (document.activeElement !== titleBox.current) setTitle(p.title)
+  }, [p.title])
+  useEffect(() => {
+    if (document.activeElement !== summaryBox.current) setSummaryText(p.summary)
+  }, [p.summary])
+
+  const items = (kind: VideoItemKind): VideoItem[] => p.items.filter((i) => i.kind === kind)
+
+  const newNote = async (kind: 'script' | 'research'): Promise<void> => {
+    const folder = folderForProject(p)
+    const path = freeNotePath(folder, kind === 'script' ? 'Script' : 'Research', files.list)
+    const heading = kind === 'script' ? `# ${p.title || 'Script'}\n\n` : `# Research: ${p.title || 'video'}\n\n`
+    const made = await useVault.getState().createNoteAt(path, heading, heading.length)
+    if (!made) return
+    if (kind === 'script') setScript(p.id, made)
+    else addItems(p.id, 'research', [made])
+  }
+
+  const fromComputer = async (kind: VideoItemKind): Promise<void> => {
+    try {
+      const saved = await window.api.pickAttachment(usePrefs.getState().prefs.attachmentFolder, kind !== 'recording')
+      if (!saved.length) return
+      void useVault.getState().refresh()
+      const fit = saved.filter((s) => fitsSection(kind, s, fileKind))
+      if (fit.length < saved.length) notify(kind === 'recording' ? 'Only sound and video files go in Recordings; the others were saved to your attachments.' : 'Only pictures go here; the others were saved to your attachments.', 'info')
+      addItems(p.id, kind, fit)
+    } catch (err) {
+      notify(err)
+    }
+  }
+
+  const remove = (item: VideoItem): void => {
+    removeItem(p.id, item.id)
+    notify(`Taken out of this video (the file is still in your notes). ${UNDO_KEY} puts it back.`, 'info')
+  }
+
+  return (
+    <div className="videos-inner video-project" data-video-project={p.id}>
+      <div className="video-project-top">
+        <button className="btn" onClick={() => selectProject(null)} data-video-back>
+          <ArrowLeft size={14} /> All videos
+        </button>
+        <span className="video-project-dates">Started {formatDate(new Date(p.created), 'D MMM YYYY')}</span>
+        <button
+          className="icon-btn danger"
+          title="Delete this video project (its notes and files stay in your notes)"
+          onClick={() => {
+            deleteProject(p.id)
+            notify(`Deleted the video project. Its notes and files are still in your notes. ${UNDO_KEY} brings it back.`, 'info')
+          }}
+          data-video-delete
+        >
+          <Trash2 size={15} />
+        </button>
+      </div>
+      <input
+        ref={titleBox}
+        className="video-title-input"
+        value={title}
+        maxLength={120}
+        placeholder="Untitled video"
+        aria-label="Video title"
+        onChange={(e) => {
+          setTitle(e.target.value)
+          renameProject(p.id, e.target.value)
+        }}
+      />
+      <textarea
+        ref={summaryBox}
+        className="video-summary-input"
+        value={summary}
+        rows={2}
+        maxLength={2000}
+        placeholder="What’s this video about? A line or two."
+        aria-label="What the video is about"
+        onChange={(e) => {
+          setSummaryText(e.target.value)
+          setSummary(p.id, e.target.value)
+        }}
+      />
+
+      <DropSection project={p} kind="script" icon={<NotebookPen size={15} />} title="Script" hint="Drop a note here">
+        {p.script ? (
+          <ItemRow path={p.script} missing={!files.has(p.script)} onRemove={() => setScript(p.id, null)} removeTitle="Unlink the script (the note stays)" />
+        ) : (
+          <div className="video-actions">
+            <button className="btn btn-primary" onClick={() => void newNote('script')} data-video-new-script>
+              <Plus size={13} /> Start a script note
+            </button>
+            <button className="btn" onClick={() => setPicking('script')}>
+              <Link2 size={13} /> Use a note you have
+            </button>
+          </div>
+        )}
+      </DropSection>
+
+      <DropSection project={p} kind="research" icon={<FileText size={15} />} title="Research notes" count={items('research').length} hint="Drop notes here">
+        {items('research').map((i) => (
+          <ItemRow key={i.id} path={i.path!} missing={!files.has(i.path!)} onRemove={() => remove(i)} />
+        ))}
+        <div className="video-actions">
+          <button className="btn" onClick={() => void newNote('research')} data-video-new-research>
+            <Plus size={13} /> New research note
+          </button>
+          <button className="btn" onClick={() => setPicking('research')}>
+            <Link2 size={13} /> Add notes you have
+          </button>
+        </div>
+      </DropSection>
+
+      <DropSection project={p} kind="image" icon={<ImageIcon size={15} />} title="Pictures" count={items('image').length} hint="Drop pictures here">
+        <PictureGrid items={items('image')} has={files.has} onRemove={remove} />
+        <div className="video-actions">
+          <button className="btn" onClick={() => setPicking('image')}>
+            <FolderOpen size={13} /> From your notes
+          </button>
+          <button className="btn" onClick={() => void fromComputer('image')}>
+            <Upload size={13} /> From the computer
+          </button>
+        </div>
+      </DropSection>
+
+      <DropSection project={p} kind="recording" icon={<Mic size={15} />} title="Recordings" count={items('recording').length} hint="Drop recordings here">
+        {items('recording').map((i) => (
+          <ItemRow key={i.id} path={i.path!} missing={!files.has(i.path!)} onRemove={() => remove(i)} />
+        ))}
+        <div className="video-actions">
+          <button className="btn" onClick={() => setPicking('recording')}>
+            <FolderOpen size={13} /> From your notes
+          </button>
+          <button className="btn" onClick={() => void fromComputer('recording')}>
+            <Upload size={13} /> From the computer
+          </button>
+        </div>
+      </DropSection>
+
+      <DropSection project={p} kind="thumbnail" icon={<Lightbulb size={15} />} title="Thumbnail ideas" count={items('thumbnail').length} hint="Drop pictures here">
+        <PictureGrid items={items('thumbnail')} has={files.has} onRemove={remove} />
+        <ThumbnailText project={p} />
+        <div className="video-actions">
+          <button className="btn" onClick={() => setPicking('thumbnail')}>
+            <FolderOpen size={13} /> Picture from your notes
+          </button>
+          <button className="btn" onClick={() => void fromComputer('thumbnail')}>
+            <Upload size={13} /> From the computer
+          </button>
+        </div>
+      </DropSection>
+
+      {picking && (
+        <FilePicker
+          kind={picking}
+          files={files.list}
+          already={picking === 'script' ? [] : items(picking).map((i) => i.path!)}
+          onPick={(paths) => {
+            setPicking(null)
+            if (picking === 'script') setScript(p.id, paths[0])
+            else addItems(p.id, picking, paths)
+          }}
+          onClose={() => setPicking(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+/** A section of a project that notes or files can be dropped on (from the notes list, the Files tab or the computer). */
+function DropSection({ project, kind, icon, title, count, hint, children }: { project: VideoProject; kind: Section; icon: ReactNode; title: string; count?: number; hint: string; children: ReactNode }) {
+  const [over, setOver] = useState(false)
+  const accepts = (e: DragEvent): boolean => {
+    const drag = getDrag()
+    if (drag?.kind === 'note' || drag?.kind === 'file') return fitsSection(kind, drag.path, fileKind)
+    if (kind === 'script' || kind === 'research') return false
+    return computerFiles(drag).length > 0 || e.dataTransfer.types.includes('Files')
+  }
+  const drop = async (e: DragEvent): Promise<void> => {
+    e.preventDefault()
+    setOver(false)
+    const drag = getDrag()
+    const take = (paths: string[]): void => {
+      if (kind === 'script') setScript(project.id, paths[0])
+      else addItems(project.id, kind, paths)
+    }
+    if (drag?.kind === 'note' || drag?.kind === 'file') {
+      if (fitsSection(kind, drag.path, fileKind)) take([drag.path])
+      return
+    }
+    // From the Files tab or the computer: copied into your attachments folder first.
+    const folder = usePrefs.getState().prefs.attachmentFolder
+    const saved: string[] = []
+    const fromFilesTab = computerFiles(drag)
+    try {
+      if (fromFilesTab.length) {
+        for (const source of fromFilesTab) if (fitsSection(kind, source, fileKind)) saved.push(await window.api.attachFromComputer(folder, source))
+      } else {
+        for (const file of Array.from(e.dataTransfer.files)) {
+          if (!fitsSection(kind, file.name, fileKind)) continue
+          saved.push(await window.api.saveAttachment(folder, file.name, new Uint8Array(await file.arrayBuffer())))
+        }
+      }
+    } catch (err) {
+      notify(err)
+    }
+    if (saved.length) {
+      void useVault.getState().refresh()
+      take(saved)
+    } else notify(kind === 'recording' ? 'Only sound and video files go in Recordings.' : 'Only pictures go here.', 'info')
+  }
+  return (
+    <section
+      className={`video-section ${over ? 'drop-over' : ''}`}
+      data-video-section={kind}
+      onDragOver={(e) => {
+        if (!accepts(e)) return
+        e.preventDefault()
+        if (!over) setOver(true)
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(false)
+      }}
+      onDrop={(e) => void drop(e)}
+    >
+      <h3>
+        {icon} {title}
+        {count ? <span className="video-section-count">{count}</span> : null}
+        <span className="video-section-hint">{hint}</span>
+      </h3>
+      {children}
+    </section>
+  )
+}
+
+function ItemRow({ path, missing, onRemove, removeTitle = 'Take out of this video (the file stays in your notes)' }: { path: string; missing: boolean; onRemove: () => void; removeTitle?: string }) {
+  const kind = /\.md$/i.test(path) ? 'note' : fileKind(path)
+  return (
+    <div className={`video-item ${missing ? 'missing' : ''}`}>
+      <button className="video-item-open" onClick={() => !missing && openPath(path)} title={missing ? `Can’t find ${path} in your notes any more` : path} disabled={missing}>
+        {kind === 'note' ? <FileText size={14} /> : kind === 'video' ? <Video size={14} /> : <Mic size={14} />}
+        <span className="video-item-name">
+          <Private>{shown(path)}</Private>
+        </span>
+        {missing && <span className="video-item-missing">missing</span>}
+      </button>
+      <button className="icon-btn" title={removeTitle} onClick={onRemove}>
+        <X size={13} />
+      </button>
+    </div>
+  )
+}
+
+function PictureGrid({ items, has, onRemove }: { items: VideoItem[]; has: (p: string) => boolean; onRemove: (i: VideoItem) => void }) {
+  const pics = items.filter((i) => i.path)
+  if (!pics.length) return null
+  return (
+    <div className="video-pictures">
+      {pics.map((i) => (
+        <div key={i.id} className={`video-picture ${has(i.path!) ? '' : 'missing'}`} title={i.path}>
+          {has(i.path!) ? (
+            <button className="video-picture-open" onClick={() => openAttachment(i.path!)}>
+              <img src={vaultUrl(i.path!)} alt={fileName(i.path!)} loading="lazy" />
+            </button>
+          ) : (
+            <span className="video-picture-gone">missing</span>
+          )}
+          <button className="icon-btn video-picture-remove" title="Take out of this video (the picture stays in your notes)" onClick={() => onRemove(i)}>
+            <X size={12} />
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ThumbnailText({ project: p }: { project: VideoProject }) {
+  const [text, setText] = useState('')
+  const ideas = p.items.filter((i) => i.kind === 'thumbnail' && i.text)
+  const add = (): void => {
+    if (!text.trim()) return
+    addThumbnailText(p.id, text)
+    setText('')
+  }
+  return (
+    <>
+      {ideas.length > 0 && (
+        <ul className="video-thumb-ideas">
+          {ideas.map((i) => (
+            <li key={i.id}>
+              <Lightbulb size={13} />
+              <span>{i.text}</span>
+              <button className="icon-btn" title="Remove this idea" onClick={() => removeItem(p.id, i.id)}>
+                <X size={12} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="video-thumb-add">
+        <input
+          className="text-input"
+          value={text}
+          maxLength={500}
+          placeholder="Write an idea, e.g. Maggie close-up, red text “SHE WAS RIGHT”"
+          aria-label="Thumbnail idea"
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && add()}
+          data-video-thumb-text
+        />
+        <button className="btn" onClick={add} disabled={!text.trim()}>
+          Add
+        </button>
+      </div>
+    </>
+  )
+}
+
+// ---------- picking notes and files ----------
+
+const PICK_TEXT: Record<Section, string> = {
+  script: 'Pick the script note…',
+  research: 'Add research notes…',
+  image: 'Add pictures…',
+  recording: 'Add recordings…',
+  thumbnail: 'Add a thumbnail picture…'
+}
+
+function FilePicker({ kind, files, already, onPick, onClose }: { kind: Section; files: string[]; already: string[]; onPick: (paths: string[]) => void; onClose: () => void }) {
+  const [query, setQuery] = useState('')
+  const [index, setIndex] = useState(0)
+  const [chosen, setChosen] = useState<string[]>([])
+  const many = kind !== 'script'
+  const list = useMemo(() => {
+    const have = new Set(already)
+    const fit = files.filter((f) => !have.has(f) && fitsSection(kind, f, fileKind)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+    return query.trim() ? fuzzyFilter(fit, query, (f) => f).map((r) => r.item) : fit
+  }, [files, already, kind, query])
+  const shownList = list.slice(0, 200)
+  const toggle = (path: string): void => {
+    if (!many) return onPick([path])
+    setChosen((c) => (c.includes(path) ? c.filter((x) => x !== path) : [...c, path]))
+  }
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <div className="modal video-picker" onMouseDown={(e) => e.stopPropagation()} data-video-picker={kind}>
+        <div className="picker">
+          <div className="picker-input">
+            {kind === 'image' || kind === 'thumbnail' ? <ImageIcon size={15} /> : kind === 'recording' ? <Mic size={15} /> : <FileText size={15} />}
+            <input
+              autoFocus
+              value={query}
+              placeholder={PICK_TEXT[kind]}
+              onChange={(e) => {
+                setQuery(e.target.value)
+                setIndex(0)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') onClose()
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault()
+                  setIndex((i) => Math.min(i + 1, shownList.length - 1))
+                }
+                if (e.key === 'ArrowUp') {
+                  e.preventDefault()
+                  setIndex((i) => Math.max(i - 1, 0))
+                }
+                if (e.key === 'Enter') {
+                  if ((e.ctrlKey || e.metaKey) && chosen.length) onPick(chosen)
+                  else if (shownList[index]) toggle(shownList[index])
+                }
+              }}
+            />
+          </div>
+          <div className="picker-list">
+            {shownList.map((path, i) => (
+              <button key={path} className={`picker-item ${i === index ? 'selected' : ''}`} onMouseEnter={() => setIndex(i)} onClick={() => toggle(path)}>
+                {many && <input type="checkbox" readOnly checked={chosen.includes(path)} tabIndex={-1} />}
+                {(kind === 'image' || kind === 'thumbnail') && <img className="video-picker-thumb" src={vaultUrl(path)} alt="" loading="lazy" />}
+                <span className="picker-label">{shown(path)}</span>
+                <span className="picker-detail">{path}</span>
+              </button>
+            ))}
+            {!shownList.length && <div className="picker-empty">{query ? 'Nothing matches.' : kind === 'script' || kind === 'research' ? 'No notes to add.' : kind === 'recording' ? 'No sound or video files in your notes yet. Use “From the computer” instead.' : 'No pictures in your notes yet. Use “From the computer” instead.'}</div>}
+          </div>
+          {many && (
+            <div className="video-picker-foot">
+              <span>{chosen.length ? `${chosen.length} chosen` : 'Click to choose one or more'}</span>
+              <button className="btn" onClick={onClose}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" disabled={!chosen.length} onClick={() => onPick(chosen)}>
+                Add
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

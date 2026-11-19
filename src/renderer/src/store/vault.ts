@@ -16,6 +16,7 @@ import { loadStarred, putBackStars, remapStars, removeStarsWithin, useStarred } 
 import { loadVideoProgress } from './videoPlayer'
 import { loadFlashcards, putBackFlashcards, remapFlashcards, removeFlashcardsWithin, useFlashcards } from './flashcards'
 import { loadMoney } from './money'
+import { loadVideos, remapVideos } from './videos'
 import { loadLockedFolders, putBackLockedFolders, remapLockedFolders, removeLockedFoldersWithin, useLockedFolders } from '../lib/lock/folders'
 import { history, recordUndo, undoChanged } from '../lib/undo'
 import type { CardProgress } from '../lib/flashcards'
@@ -117,6 +118,7 @@ export const useVault = create<VaultState>((set, get) => {
     remapStars(from, to)
     remapFlashcards(from, to)
     remapLockedFolders(from, to)
+    remapVideos(from, to)
   }
 
   /** Closes and forgets deleted things (tabs, stars, flashcard progress, locked folders). */
@@ -232,6 +234,7 @@ export const useVault = create<VaultState>((set, get) => {
       void loadFlashcards()
       loadVideoProgress()
       void loadMoney()
+      void loadVideos()
       get().refresh()
     },
 
