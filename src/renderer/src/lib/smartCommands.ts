@@ -5,6 +5,7 @@ import { addEntry, addGoal, ensureMoney, useMoney } from '../store/money'
 import { musicControl, musicPlay, setMusicOpen } from '../store/music'
 import { useVault } from '../store/vault'
 import { askEverything } from '../store/ai'
+import { addIdea, ensureVideos } from '../store/videos'
 import { saveCapture } from './capture'
 import { featureById, FEATURES } from './features'
 import { FEATURE_INFO } from './featureInfo'
@@ -52,6 +53,12 @@ export async function runSmart(a: SmartAction): Promise<string> {
       if (!r.ok) throw new Error(r.error ?? 'Couldn’t save it.')
       notify(`Saved in ${r.where}.`, 'info')
       return `Saved in ${r.where}`
+    }
+    case 'videoIdea': {
+      await ensureVideos()
+      addIdea(a.text)
+      notify('Added to your video ideas (Videos page).', 'info')
+      return 'Added to your video ideas'
     }
     case 'note': {
       const vault = useVault.getState()

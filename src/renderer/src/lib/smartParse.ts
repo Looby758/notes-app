@@ -17,6 +17,8 @@ export type SmartAction =
   | { kind: 'event'; date: string; time?: string; title: string; remind: boolean }
   | { kind: 'note'; title: string }
   | { kind: 'jot'; text: string }
+  /** A line for the video idea inbox (Videos page). */
+  | { kind: 'videoIdea'; text: string }
   | { kind: 'convert'; format: string }
   | { kind: 'play'; query: string }
   | { kind: 'music'; action: 'toggle' | 'next' | 'previous' }
@@ -154,6 +156,9 @@ export function parseSmart(input: string, ctx: ParseContext = {}): SmartAction |
   const now = ctx.now ?? new Date()
   let m: RegExpExecArray | null
 
+  // An idea for a video, kept as typed (a question keeps its "?"). Before sums, so "video idea: top 10 kills" is an idea.
+  if ((m = /^(?:(?:new\s+|add\s+(?:a\s+)?)?(?:youtube\s+|yt\s+)?video\s+idea|idea\s+for\s+a\s+(?:youtube\s+)?video|yt\s+idea)\s*[:\-–]?\s+(.+)$/is.exec(input.trim().replace(/[ \t]+/g, ' ')))) return { kind: 'videoIdea', text: m[1].trim() }
+
   // A sum: "12*4", "= 20% of 85", "£12.50 / 3".
   const sum = text.replace(/^=\s*/, '')
   if (/\d/.test(sum) && !/^(?:spent|spend|paid|pay|got|earned|received|save|saving|remind|play|convert)\b/i.test(sum)) {
@@ -229,6 +234,8 @@ export function describeSmart(a: SmartAction, ctx: ParseContext = {}): string {
       return a.title ? `New note called “${a.title}”` : 'New note'
     case 'jot':
       return `Jot “${a.text.replace(/^- \[ \] /, '')}” in today's note`
+    case 'videoIdea':
+      return `Add “${a.text}” to your video ideas`
     case 'convert':
       return `Convert files to ${a.format.toUpperCase()}`
     case 'play':
@@ -276,6 +283,10 @@ export function validSmart(v: unknown, ctx: ParseContext = {}): SmartAction | nu
     case 'jot': {
       const text = str('text', 2000)
       return text ? { kind: 'jot', text } : null
+    }
+    case 'videoIdea': {
+      const text = str('text', 1000)
+      return text ? { kind: 'videoIdea', text } : null
     }
     case 'convert':
       return typeof a.format === 'string' && (CONVERT_FORMATS as readonly string[]).includes(a.format) ? { kind: 'convert', format: a.format } : null

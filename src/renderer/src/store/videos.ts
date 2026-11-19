@@ -2,6 +2,9 @@ import { create } from 'zustand'
 import {
   emptyVideos,
   findMovedFolder,
+  ideaToProject,
+  shortIdea,
+  type VideoIdea,
   isDayKey,
   stageLabel,
   uploadDateOf,
@@ -28,7 +31,7 @@ import { notify } from './notify'
  * Video projects. Saved in the vault (.notesapp/videos.json) so they follow your notes to other
  * computers via Google Drive. Every change can be undone with Ctrl+Z (outside a text box).
  */
-export const useVideos = create<VideosData & { loaded: boolean; selected: string | null }>(() => ({ ...emptyVideos(), loaded: false, selected: null }))
+export const useVideos = create<VideosData & { loaded: boolean; selected: string | null; ideaFocus: number }>(() => ({ ...emptyVideos(), loaded: false, selected: null, ideaFocus: 0 }))
 
 const FILE = 'videos.json'
 
@@ -131,6 +134,48 @@ export function deleteProject(id: string): void {
   if (!gone) return
   if (selected === id) selectProject(null)
   save({ projects: projects.filter((p) => p.id !== id) }, `Deleted the video ${named(gone)}`)
+}
+
+// ---------- the idea inbox ----------
+
+/** Jots an idea for a future video (newest first). */
+export function addIdea(text: string): VideoIdea | null {
+  const clean = text.trim().slice(0, 1000)
+  if (!clean) return null
+  const made: VideoIdea = { id: newVideoId(), text: clean, created: Date.now() }
+  save({ ideas: [made, ...useVideos.getState().ideas] }, `Jotted the video idea “${shortIdea(clean)}”`)
+  return made
+}
+
+export function updateIdea(id: string, text: string): void {
+  const { ideas } = useVideos.getState()
+  const old = ideas.find((i) => i.id === id)
+  if (!old || !text.trim()) return
+  save({ ideas: ideas.map((i) => (i.id === id ? { ...i, text: text.slice(0, 1000) } : i)) }, `Changed the video idea “${shortIdea(old.text)}”`, `idea:${id}`)
+}
+
+export function deleteIdea(id: string): void {
+  const { ideas } = useVideos.getState()
+  const gone = ideas.find((i) => i.id === id)
+  if (!gone) return
+  save({ ideas: ideas.filter((i) => i.id !== id) }, `Deleted the video idea “${shortIdea(gone.text)}”`)
+}
+
+/** Opens the Videos page's list with the idea box ready to type in. */
+export function focusIdeaBox(): void {
+  useVideos.setState((s) => ({ selected: null, ideaFocus: s.ideaFocus + 1 }))
+}
+
+/** Turns an idea into a video project (at the Idea stage), taking it out of the inbox, as one Ctrl+Z step. */
+export function promoteIdea(id: string): VideoProject | null {
+  const { ideas, projects } = useVideos.getState()
+  const idea = ideas.find((i) => i.id === id)
+  if (!idea) return null
+  const { title, summary } = ideaToProject(idea.text)
+  const now = Date.now()
+  const made: VideoProject = { id: newVideoId(), title, stage: 'idea', summary, script: null, folder: null, items: [], created: now, updated: now }
+  save({ ideas: ideas.filter((i) => i.id !== id), projects: [made, ...projects] }, `Made the video “${shortIdea(title)}” from an idea`)
+  return made
 }
 
 /** Moves a video along the pipeline. Marking it uploaded with no date puts it on the calendar for today. */

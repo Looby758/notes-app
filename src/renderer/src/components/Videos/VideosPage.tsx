@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
-import { ArrowLeft, CalendarDays, Check, Columns3, LayoutGrid, FileText, FolderOpen, Image as ImageIcon, Lightbulb, Link2, Mic, NotebookPen, Plus, Trash2, Upload, Video, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronDown, Inbox, CalendarDays, Check, Columns3, LayoutGrid, FileText, FolderOpen, Image as ImageIcon, Lightbulb, Link2, Mic, NotebookPen, Plus, Trash2, Upload, Video, X } from 'lucide-react'
 import type { FileNode } from '@shared/types'
 import { useVault } from '../../store/vault'
 import { usePrefs } from '../../store/prefs'
@@ -7,6 +7,10 @@ import { notify } from '../../store/notify'
 import {
   addItems,
   addThumbnailText,
+  addIdea,
+  deleteIdea,
+  promoteIdea,
+  updateIdea,
   createProject,
   deleteProject,
   ensureVideos,
@@ -20,7 +24,7 @@ import {
   setUploadDate,
   useVideos
 } from '../../store/videos'
-import { boardColumns, fitsSection, projectCounts, stageLabel, uploadDateOf, VIDEO_STAGES, type VideoItem, type VideoItemKind, type VideoProject, type VideoStage } from '../../lib/videos'
+import { boardColumns, fitsSection, projectCounts, stageLabel, uploadDateOf, VIDEO_STAGES, type VideoIdea, type VideoItem, type VideoItemKind, type VideoProject, type VideoStage } from '../../lib/videos'
 import { fileKind, openAttachment, vaultUrl } from '../../lib/fileKinds'
 import { openNote, openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
 import { useUI } from '../../store/ui'
@@ -135,6 +139,7 @@ function ProjectList() {
         </button>
       </p>
       {adding && <NewProjectForm onClose={() => setAdding(false)} />}
+      {loaded && <IdeaInbox />}
       {loaded && !projects.length && !adding ? (
         <div className="videos-empty">
           <span aria-hidden>🎬</span>
@@ -153,6 +158,155 @@ function ProjectList() {
         </div>
       )}
     </div>
+  )
+}
+
+// ---------- the idea inbox ----------
+
+const INBOX_KEY = 'videosInboxOpen'
+
+/** "just now", "3 days ago", "12 Oct". */
+function agoText(ms: number): string {
+  const mins = (Date.now() - ms) / 60000
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${Math.floor(mins)} min ago`
+  const hours = mins / 60
+  if (hours < 24) return `${Math.floor(hours)} h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return days === 1 ? 'yesterday' : `${days} days ago`
+  const d = new Date(ms)
+  return formatDate(d, d.getFullYear() === new Date().getFullYear() ? 'D MMM' : 'D MMM YYYY')
+}
+
+/** Quick-capture ideas for future videos; one click turns an idea into a project. */
+function IdeaInbox() {
+  const ideas = useVideos((s) => s.ideas)
+  const focus = useVideos((s) => s.ideaFocus)
+  const [text, setText] = useState('')
+  const [open, setOpenState] = useState(() => {
+    try {
+      return localStorage.getItem(INBOX_KEY) !== 'closed'
+    } catch {
+      return true
+    }
+  })
+  const setOpen = (on: boolean): void => {
+    setOpenState(on)
+    try {
+      localStorage.setItem(INBOX_KEY, on ? 'open' : 'closed')
+    } catch {
+      // only a convenience
+    }
+  }
+  const box = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    if (!focus) return
+    setOpenState(true)
+    requestAnimationFrame(() => box.current?.focus())
+  }, [focus])
+  const add = (): void => {
+    if (addIdea(text)) setText('')
+  }
+  return (
+    <section className={`video-inbox ${open ? 'open' : ''}`} data-video-inbox>
+      <button className="video-inbox-head" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <Inbox size={15} />
+        <span>Idea inbox</span>
+        {ideas.length > 0 && <span className="video-section-count">{ideas.length}</span>}
+        <span className="video-inbox-tip">Jot ideas here, or type “video idea: …” in Ctrl+K or the summon bar</span>
+        <ChevronDown size={14} className="video-inbox-chevron" />
+      </button>
+      {open && (
+        <div className="video-inbox-body">
+          <div className="video-inbox-add">
+            <textarea
+              ref={box}
+              className="text-input"
+              rows={1}
+              value={text}
+              maxLength={1000}
+              placeholder="An idea for a video, e.g. Was Negan right? (Enter adds it, Shift+Enter for another line)"
+              aria-label="New video idea"
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  add()
+                }
+              }}
+              data-video-idea-text
+            />
+            <button className="btn" onClick={add} disabled={!text.trim()}>
+              <Plus size={13} /> Add
+            </button>
+          </div>
+          {ideas.length > 0 ? (
+            <ul className="video-ideas">
+              {ideas.map((i) => (
+                <IdeaRow key={i.id} idea={i} />
+              ))}
+            </ul>
+          ) : (
+            <p className="video-inbox-empty">No ideas waiting. When one comes to you, jot it here before it’s gone.</p>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function IdeaRow({ idea }: { idea: VideoIdea }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(idea.text)
+  useEffect(() => {
+    if (!editing) setDraft(idea.text)
+  }, [idea.text, editing])
+  const [first, ...rest] = idea.text.split('\n')
+  return (
+    <li className="video-idea" data-video-idea={idea.id}>
+      <Lightbulb size={14} className="video-idea-bulb" />
+      {editing ? (
+        <textarea
+          className="text-input video-idea-edit"
+          autoFocus
+          rows={Math.min(5, draft.split('\n').length)}
+          value={draft}
+          maxLength={1000}
+          aria-label="Edit idea"
+          onChange={(e) => {
+            setDraft(e.target.value)
+            if (e.target.value.trim()) updateIdea(idea.id, e.target.value)
+          }}
+          onBlur={() => setEditing(false)}
+          onKeyDown={(e) => {
+            if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Escape') {
+              e.preventDefault()
+              setEditing(false)
+            }
+          }}
+        />
+      ) : (
+        <button className="video-idea-text" onClick={() => setEditing(true)} title="Click to edit">
+          <span className="video-idea-first">{first}</span>
+          {rest.length > 0 && <span className="video-idea-rest">{rest.join(' ')}</span>}
+        </button>
+      )}
+      <span className="video-idea-when">{agoText(idea.created)}</span>
+      <button
+        className="btn video-idea-promote"
+        title="Make a video project from this idea (it starts at the Idea stage)"
+        onClick={() => {
+          const made = promoteIdea(idea.id)
+          if (made) selectProject(made.id)
+        }}
+        data-video-idea-promote
+      >
+        <ArrowRight size={13} /> Make it a video
+      </button>
+      <button className="icon-btn" title={`Delete this idea (${UNDO_KEY} brings it back)`} onClick={() => deleteIdea(idea.id)}>
+        <X size={13} />
+      </button>
+    </li>
   )
 }
 

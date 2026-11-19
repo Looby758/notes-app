@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boardColumns, findMovedFolder, uploadsBetween, fitsSection, folderName, projectFolderFor, readVideos, remapProjects, videosJson, type VideoProject } from './videos'
+import { boardColumns, findMovedFolder, ideaToProject, uploadsBetween, fitsSection, folderName, projectFolderFor, readVideos, remapProjects, videosJson, type VideoProject } from './videos'
 
 const kind = (p: string): string => (/\.(png|jpg)$/i.test(p) ? 'image' : /\.(mp3|wav|webm)$/i.test(p) ? 'audio' : /\.mp4$/i.test(p) ? 'video' : 'other')
 
@@ -107,5 +107,17 @@ describe('the pipeline', () => {
     const list = [p('a', 'script', '2026-12-05'), p('b', 'idea', '2027-01-02'), p('c', 'idea', 'soon')]
     expect(uploadsBetween(list, '2026-12-01', '2026-12-31').map((u) => u.project.id)).toEqual(['a'])
     expect(readVideos(videosJson({ projects: list, ideas: [] })).projects.map((x) => x.uploadDate)).toEqual(['2026-12-05', '2027-01-02', undefined])
+  })
+})
+
+describe('ideaToProject', () => {
+  it('uses the first line as the title and the rest as the summary', () => {
+    expect(ideaToProject('Was Negan right?\nLook at every choice he made.')).toEqual({ title: 'Was Negan right?', summary: 'Look at every choice he made.' })
+    expect(ideaToProject('  Glenn  ')).toEqual({ title: 'Glenn', summary: '' })
+  })
+  it('cuts a long first line at a sensible place', () => {
+    const { title, summary } = ideaToProject('Every time Rick should have listened to Michonne: a full rundown of the prison, Alexandria and the bridge years in order')
+    expect(title).toBe('Every time Rick should have listened to Michonne')
+    expect(summary).toBe('a full rundown of the prison, Alexandria and the bridge years in order')
   })
 })

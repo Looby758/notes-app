@@ -258,3 +258,28 @@ export function uploadsBetween(projects: VideoProject[], from: string, to: strin
   }
   return out
 }
+
+/** "Daryl: show-only character" for an undo message, cut short if it's long. */
+export const shortIdea = (text: string): string => {
+  const line = text.trim().split('\n')[0]
+  return line.length > 40 ? `${line.slice(0, 39).trimEnd()}…` : line
+}
+
+/**
+ * An idea's text as a new project: its first line is the title (cut at a sentence end or ~80
+ * letters if it's long), and anything after that is what the video's about.
+ */
+export function ideaToProject(text: string): { title: string; summary: string } {
+  const clean = text.trim()
+  const [first, ...rest] = clean.split(/\r?\n/)
+  let title = first.trim()
+  let more = rest.join('\n').trim()
+  if (title.length > 80) {
+    const cut = title.slice(0, 80)
+    const end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('? '), cut.lastIndexOf('! '), cut.lastIndexOf(': '))
+    const at = end > 20 ? end + 1 : cut.lastIndexOf(' ') > 20 ? cut.lastIndexOf(' ') : 80
+    more = [title.slice(at).trim(), more].filter(Boolean).join('\n')
+    title = title.slice(0, at).trim().replace(/[:.]$/, '')
+  }
+  return { title: title.slice(0, MAX_TITLE), summary: more.slice(0, 2000) }
+}

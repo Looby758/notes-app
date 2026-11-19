@@ -9,7 +9,7 @@ vi.mock('./prefs', async () => {
   return { usePrefs, setPrefsQuietly: (patch: object) => usePrefs.setState((s) => ({ prefs: { ...s.prefs, ...patch } })) }
 })
 
-const { useVideos, loadVideos, createProject, renameProject, addItems, deleteProject, remapVideos, folderForProject, followMovedVideosFolder, setStage, setUploadDate } = await import('./videos')
+const { useVideos, loadVideos, createProject, renameProject, addItems, deleteProject, remapVideos, folderForProject, followMovedVideosFolder, setStage, setUploadDate, addIdea, promoteIdea, deleteIdea } = await import('./videos')
 const { usePrefs } = await import('./prefs')
 const { history } = await import('../lib/undo')
 
@@ -75,6 +75,21 @@ describe('video projects and Ctrl+Z', () => {
     expect(useVideos.getState().projects[0].uploadDate).toBeUndefined()
     setUploadDate(b.id, 'next week')
     expect(useVideos.getState().projects[0].uploadDate).toBeUndefined()
+  })
+
+  it('turns an idea into a project in one undoable step', async () => {
+    const idea = addIdea('Was Negan right?\nEvery choice he made.')!
+    addIdea('Carol vs the Whisperers')
+    expect(useVideos.getState().ideas.map((i) => i.text)).toEqual(['Carol vs the Whisperers', 'Was Negan right?\nEvery choice he made.'])
+    const made = promoteIdea(idea.id)!
+    expect(made).toMatchObject({ title: 'Was Negan right?', summary: 'Every choice he made.', stage: 'idea' })
+    expect(useVideos.getState().ideas).toHaveLength(1)
+    await history.undo()
+    expect(useVideos.getState().ideas).toHaveLength(2)
+    expect(useVideos.getState().projects.some((p) => p.id === made.id)).toBe(false)
+    deleteIdea(idea.id)
+    expect(useVideos.getState().ideas.map((i) => i.text)).toEqual(['Carol vs the Whisperers'])
+    expect(addIdea('   ')).toBeNull()
   })
 
   it("won't undo onto reloaded projects", async () => {
