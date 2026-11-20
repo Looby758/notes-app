@@ -1,3 +1,4 @@
+import type { SpokenWord, TranscribeProgress, TranscriberState } from './transcribe'
 import type { ExplorerEntry, ExplorerPlace, PasteMode } from './explorer'
 import type { ArchiveEntry } from './archive'
 import type { ComicOpened, ComicPreparing, ComicSettings, ComicShelf } from './comics'
@@ -339,6 +340,16 @@ export interface AiReply {
 }
 
 /** The offline AI (src/main/localAi.ts): an optional download that runs on this computer's graphics card. */
+/** A finished transcript from main/transcriber.ts. */
+export interface TranscribeResult {
+  words: SpokenWord[]
+  /** How long the recording is, in seconds. */
+  length: number
+  model: string
+  fileTime: number
+  fileSize: number
+}
+
 export interface LocalAiState {
   state: 'missing' | 'downloading' | 'ready' | 'unsupported'
   /** While downloading: which part, and how far (0–1). */
@@ -1048,6 +1059,16 @@ export interface NotesApi {
   aiMeaning(word: string, sentence: string): Promise<string>
   /** Writing autocomplete: the next few words after `before`, from the offline AI (empty when there's no guess). */
   aiSuggest(title: string, before: string): Promise<string>
+  // Auto transcripts (main/transcriber.ts)
+  transcriberState(): Promise<TranscriberState>
+  /** Downloads what transcripts need (ffmpeg and the Whisper model); resolves when it's done or has failed. */
+  transcriberSetup(model?: string): Promise<TranscriberState>
+  transcriberRemove(): Promise<TranscriberState>
+  /** What's said in a recording (a path in the notes folder), word by word with times. */
+  transcribe(path: string): Promise<TranscribeResult>
+  transcribeCancel(): Promise<void>
+  onTranscriberState(callback: (state: TranscriberState) => void): () => void
+  onTranscribeProgress(callback: (progress: TranscribeProgress) => void): () => void
   // The offline AI
   localAiState(): Promise<LocalAiState>
   /** Downloads the engine and a model (resumes a stopped download); resolves when it's done or has failed. */
