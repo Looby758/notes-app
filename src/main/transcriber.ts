@@ -2,16 +2,7 @@ import { app, BrowserWindow, ipcMain, MessageChannelMain, session, type MessageP
 import { spawn, type ChildProcess } from 'child_process'
 import { existsSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import {
-  isSilent,
-  quietCuts,
-  SAMPLE_RATE,
-  suggestedTranscribeModel,
-  transcribeModelById,
-  type SpokenWord,
-  type TranscribeProgress,
-  type TranscriberState
-} from '@shared/transcribe'
+import { isSilent, quietCuts, SAMPLE_RATE, suggestedTranscribeModel, transcribeModelById, type SpokenWord, type TranscribeProgress, type TranscriberState } from '@shared/transcribe'
 import type { TranscribeResult } from '@shared/types'
 import { downloadFfmpeg, ffmpegPath, onFfmpegState } from './ffmpeg'
 import { logError } from './log'
@@ -61,8 +52,23 @@ let lastError: string | undefined
 export function transcriberState(): TranscriberState {
   const c = loadConfig()
   const ffmpeg = existsSync(ffmpegPath())
-  if (downloading) return { state: 'downloading', model: downloading.model, progress: downloading.progress, bytes: downloading.bytes, ffmpeg, gpu: c.gpu ?? null, error: lastError }
-  return { state: c.model && ffmpeg ? 'ready' : 'missing', model: c.model, ffmpeg, gpu: c.gpu ?? null, error: lastError }
+  if (downloading)
+    return {
+      state: 'downloading',
+      model: downloading.model,
+      progress: downloading.progress,
+      bytes: downloading.bytes,
+      ffmpeg,
+      gpu: c.gpu ?? null,
+      error: lastError
+    }
+  return {
+    state: c.model && ffmpeg ? 'ready' : 'missing',
+    model: c.model,
+    ffmpeg,
+    gpu: c.gpu ?? null,
+    error: lastError
+  }
 }
 
 /** Every Orbit window except the hidden one. */
@@ -117,9 +123,22 @@ function openWorker(): Worker {
   win.webContents.on('will-navigate', (e) => e.preventDefault())
   const { port1, port2 } = new MessageChannelMain()
   let ready!: () => void
-  const w: Worker = { win, port: port1, ready: new Promise<void>((r) => (ready = r)), waiting: new Map() }
+  const w: Worker = {
+    win,
+    port: port1,
+    ready: new Promise<void>((r) => (ready = r)),
+    waiting: new Map()
+  }
   port1.on('message', ({ data }) => {
-    const msg = data as { type: string; id?: number; words?: SpokenWord[]; error?: string; progress?: number; bytes?: number; gpu?: boolean }
+    const msg = data as {
+      type: string
+      id?: number
+      words?: SpokenWord[]
+      error?: string
+      progress?: number
+      bytes?: number
+      gpu?: boolean
+    }
     if (msg.type === 'ready') ready()
     else if (msg.type === 'download') w.onDownload?.(msg.progress ?? 0, msg.bytes ?? 0)
     else if (msg.type === 'loaded') {
@@ -308,7 +327,6 @@ function readSound(file: string, j: Job, progress: (done: number) => void): Prom
   })
 }
 
-
 async function transcribe(rel: string, abs: (rel: string) => string): Promise<TranscribeResult> {
   if (job) throw new Error('Orbit is already making a transcript. Wait for it to finish, or stop it.')
   const c = loadConfig()
@@ -328,19 +346,35 @@ async function transcribe(rel: string, abs: (rel: string) => string): Promise<Tr
     const words: SpokenWord[] = []
     for (let i = 0; i < cuts.length; i++) {
       if (j.cancelled) throw new Error('Stopped.')
-      progress({ stage: 'listening', progress: i / cuts.length, at: cuts[i] / SAMPLE_RATE, length })
+      progress({
+        stage: 'listening',
+        progress: i / cuts.length,
+        at: cuts[i] / SAMPLE_RATE,
+        length
+      })
       const piece = samples.subarray(cuts[i], cuts[i + 1] ?? samples.length)
       if (isSilent(piece)) continue
       const id = nextId++
       const got = await new Promise<SpokenWord[]>((resolve, reject) => {
         w.waiting.set(id, { resolve, reject })
         // Copied, so only this piece is sent rather than the whole recording.
-        w.port.postMessage({ type: 'run', id, samples: piece.slice(), offset: cuts[i] / SAMPLE_RATE })
+        w.port.postMessage({
+          type: 'run',
+          id,
+          samples: piece.slice(),
+          offset: cuts[i] / SAMPLE_RATE
+        })
       })
       words.push(...got)
     }
     progress({ stage: 'listening', progress: 1, at: length, length })
-    return { words, length, model, fileTime: stat.mtimeMs, fileSize: stat.size }
+    return {
+      words,
+      length,
+      model,
+      fileTime: stat.mtimeMs,
+      fileSize: stat.size
+    }
   } catch (err) {
     if (j.cancelled) throw new Error('Stopped.')
     throw err

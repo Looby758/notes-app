@@ -1,5 +1,6 @@
 import { useEditor } from '../store/editor'
 import { focusIdeaBox } from '../store/videos'
+import { showTranscripts } from '../store/transcripts'
 import { useVault } from '../store/vault'
 import { openExport, showRightView, showSearch, showSidebarView, toggleFocusMode, toggleMindMap, toggleZen, useUI } from '../store/ui'
 import { effectiveShortcut, setPrefs, usePrefs } from '../store/prefs'
@@ -365,6 +366,7 @@ export const commands: Command[] = [
     focusIdeaBox()
     openSpecialTab(VIDEOS_TAB)
   } },
+  { id: 'videos.transcripts', group: 'Navigation', title: 'Transcripts of video recordings (what you said, lined up with the script)', run: showTranscripts },
   { id: 'videos.open', group: 'Navigation', title: 'Video projects (script, research, pictures, recordings, thumbnail ideas)', run: () => openSpecialTab(VIDEOS_TAB) },
   { id: 'replay.save', group: 'Navigation', title: 'Save the last 30 seconds (instant replay)', run: () => void import('./replay').then((m) => m.saveReplay()) },
   { id: 'replay.toggle', group: 'Navigation', title: 'Turn instant replay on or off', run: () => setPrefs({ replayOn: !usePrefs.getState().prefs.replayOn }) },

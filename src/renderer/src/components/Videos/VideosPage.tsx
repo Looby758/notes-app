@@ -37,6 +37,7 @@ import { fuzzyFilter } from '../../lib/fuzzy'
 import { dayKey, formatDate, fromDayKey } from '../../lib/dates'
 import { UNDO_KEY } from '../../lib/undo'
 import Private from '../Streamer/Private'
+import { PostProductionSection } from './PostProduction'
 
 type Section = VideoItemKind | 'script'
 
@@ -756,6 +757,8 @@ function ProjectView({ project: p }: { project: VideoProject }) {
           </button>
         </div>
       </DropSection>
+
+      <PostProductionSection project={p} has={files.has} />
 
       <DropSection project={p} kind="thumbnail" icon={<Lightbulb size={15} />} title="Thumbnail ideas" count={items('thumbnail').length} hint="Drop pictures here">
         <PictureGrid items={items('thumbnail')} has={files.has} onRemove={remove} />

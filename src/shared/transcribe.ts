@@ -31,9 +31,21 @@ export interface TranscribeModel {
 
 export const TRANSCRIBE_MODELS: TranscribeModel[] = [
   // Fast enough on a graphics card to do a 20-minute recording in a minute or two.
-  { id: 'small', name: 'Accurate', repo: 'onnx-community/whisper-small.en_timestamped', mb: 590, dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' } },
+  {
+    id: 'small',
+    name: 'Accurate',
+    repo: 'onnx-community/whisper-small.en_timestamped',
+    mb: 590,
+    dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' }
+  },
   // For computers where it has to run on the processor.
-  { id: 'base', name: 'Quick', repo: 'onnx-community/whisper-base.en_timestamped', mb: 210, dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' } }
+  {
+    id: 'base',
+    name: 'Quick',
+    repo: 'onnx-community/whisper-base.en_timestamped',
+    mb: 210,
+    dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' }
+  }
 ]
 
 export const transcribeModelById = (id: string | undefined): TranscribeModel | undefined => TRANSCRIBE_MODELS.find((m) => m.id === id)
@@ -129,7 +141,11 @@ export function piecesWords(chunks: { text: string; timestamp: [number | null, n
     const prev = out[out.length - 1]
     const s = c.timestamp[0] ?? (prev ? prev.e - offset : 0)
     const e = c.timestamp[1] ?? Math.min(length, s + 0.3)
-    out.push({ w, s: round(offset + Math.max(0, s)), e: round(offset + Math.max(s, Math.min(length, e))) })
+    out.push({
+      w,
+      s: round(offset + Math.max(0, s)),
+      e: round(offset + Math.max(s, Math.min(length, e)))
+    })
   }
   return dropRepeats(out)
 }

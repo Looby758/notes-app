@@ -10,13 +10,13 @@ import { piecesWords, SAMPLE_RATE, transcribeModelById } from '@shared/transcrib
  */
 
 // The ONNX runtime comes with Orbit rather than from a CDN.
-env.backends.onnx.wasm!.wasmPaths = { mjs: new URL(ortMjs, location.href).href, wasm: new URL(ortWasm, location.href).href }
+env.backends.onnx.wasm!.wasmPaths = {
+  mjs: new URL(ortMjs, location.href).href,
+  wasm: new URL(ortWasm, location.href).href
+}
 env.allowLocalModels = false
 
-type Request =
-  | { type: 'load'; model: string }
-  | { type: 'run'; id: number; samples: Float32Array; offset: number }
-  | { type: 'gpu' }
+type Request = { type: 'load'; model: string } | { type: 'run'; id: number; samples: Float32Array; offset: number } | { type: 'gpu' }
 
 let asr: AutomaticSpeechRecognitionPipeline | null = null
 let loaded = ''
@@ -40,27 +40,45 @@ async function load(port: MessagePort, id: string): Promise<void> {
   device ??= (await hasGpu()) ? 'webgpu' : 'wasm'
   // How much of each file has come, so one bar covers them all.
   const files = new Map<string, { loaded: number; total: number }>()
-  asr = (await pipeline('automatic-speech-recognition', model.repo, {
-    device,
-    dtype: model.dtype as never,
-    progress_callback: (p: { status: string; file?: string; loaded?: number; total?: number }) => {
-      if (p.status !== 'progress' || !p.file) return
-      files.set(p.file, { loaded: p.loaded ?? 0, total: p.total ?? 0 })
-      let got = 0
-      let all = 0
-      for (const f of files.values()) {
-        got += f.loaded
-        all += f.total
-      }
-      port.postMessage({ type: 'download', progress: all ? got / all : 0, bytes: all })
+  const progress_callback = (p: { status: string; file?: string; loaded?: number; total?: number }): void => {
+    if (p.status !== 'progress' || !p.file) return
+    files.set(p.file, { loaded: p.loaded ?? 0, total: p.total ?? 0 })
+    let got = 0
+    let all = 0
+    for (const f of files.values()) {
+      got += f.loaded
+      all += f.total
     }
-  })) as AutomaticSpeechRecognitionPipeline
+    port.postMessage({
+      type: 'download',
+      progress: all ? got / all : 0,
+      bytes: all
+    })
+  }
+  const make = (on: 'webgpu' | 'wasm'): Promise<AutomaticSpeechRecognitionPipeline> =>
+    pipeline('automatic-speech-recognition', model.repo, {
+      device: on,
+      dtype: model.dtype as never,
+      progress_callback
+    }) as Promise<AutomaticSpeechRecognitionPipeline>
+  try {
+    asr = await make(device)
+  } catch (err) {
+    // A graphics card that won't run it (an old driver, say): the processor does instead.
+    if (device !== 'webgpu') throw err
+    device = 'wasm'
+    asr = await make(device)
+  }
   loaded = id
 }
 
 async function run(samples: Float32Array, offset: number): Promise<ReturnType<typeof piecesWords>> {
   if (!asr) throw new Error('The transcript model isn’t loaded.')
-  const out = (await asr(samples, { return_timestamps: 'word', chunk_length_s: 30, stride_length_s: 5 })) as {
+  const out = (await asr(samples, {
+    return_timestamps: 'word',
+    chunk_length_s: 30,
+    stride_length_s: 5
+  })) as {
     chunks?: { text: string; timestamp: [number | null, number | null] }[]
   }
   return piecesWords(out.chunks ?? [], offset, samples.length / SAMPLE_RATE)
@@ -76,9 +94,18 @@ window.addEventListener('message', (e) => {
       else if (req.type === 'load') {
         await load(port, req.model)
         port.postMessage({ type: 'loaded', device })
-      } else if (req.type === 'run') port.postMessage({ type: 'words', id: req.id, words: await run(req.samples, req.offset) })
+      } else if (req.type === 'run')
+        port.postMessage({
+          type: 'words',
+          id: req.id,
+          words: await run(req.samples, req.offset)
+        })
     } catch (err) {
-      port.postMessage({ type: 'error', id: 'id' in req ? req.id : undefined, error: err instanceof Error ? err.message : String(err) })
+      port.postMessage({
+        type: 'error',
+        id: 'id' in req ? req.id : undefined,
+        error: err instanceof Error ? err.message : String(err)
+      })
     }
   }
   port.start()
