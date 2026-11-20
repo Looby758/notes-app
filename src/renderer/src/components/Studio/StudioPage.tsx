@@ -27,7 +27,7 @@ import type { StudioCaptureSource } from '@shared/types'
 import { dragRect, formatDuration, itemAt, newItem, QUALITIES, snap, SOURCE_LABELS, studioId, type Handle, type StudioItem, type StudioSourceKind } from '@shared/studio'
 import { activeScene, addItem, removeItem, reorderItem, setAudioOnly, setMic, setMicGain, switchScene, updateItem, updateScene, useStudio } from '../../store/studio'
 import { GoLive } from './GoLive'
-import { AudioOnlyPanel, AudioStrip, ClipWarning, LastRecording, Meter, MicCleanupSettings, MicPresets, TrimSettingsBox } from './AudioTools'
+import { AudioOnlyPanel, AudioStrip, ClipWarning, LastRecording, Meter, MicCleanupSettings, MicPresets, TrimSettingsBox, VoiceEffects } from './AudioTools'
 import { Teleprompter } from './Teleprompter'
 import { openPrompter, usePrompter } from '../../store/teleprompter'
 import { desktopAudioSupported, hasChannel, retrySource, startRecording, stopRecording, studioCanvas, studioPage } from '../../lib/studio'
@@ -493,6 +493,7 @@ function Mixer() {
         <Meter which="mic" />
         <ClipWarning />
         <MicCleanupSettings />
+        <VoiceEffects />
       </div>
       <div className="studio-channel">
         <div className="studio-row">

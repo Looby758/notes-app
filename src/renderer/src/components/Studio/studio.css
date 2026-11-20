@@ -1096,3 +1096,91 @@
   font-size: 11px;
   color: var(--text-faint);
 }
+
+/* Voice effects (the Sound box) */
+.studio-voice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.studio-voice-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+.studio-voice-styles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.studio-voice-style {
+  padding: 5px 4px;
+  border: 0;
+  border-left: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.studio-voice-style:first-child {
+  border-left: 0;
+}
+.studio-voice-style:hover:not(:disabled) {
+  background: var(--bg-hover, var(--bg-raised));
+}
+.studio-voice-style.on {
+  background: var(--accent);
+  color: #fff;
+}
+.studio-voice-style:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.studio-voice .studio-hint {
+  margin: 0;
+}
+.studio-voice-more summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 2px 0;
+}
+.studio-voice-more[open] summary {
+  margin-bottom: 4px;
+}
+.studio-fx {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 0;
+  border-top: 1px dashed var(--border);
+}
+.studio-fx-name {
+  font-size: 13px;
+  color: var(--text);
+}
+.studio-box label.studio-fx-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+.studio-fx-slider.off {
+  opacity: 0.5;
+}
+.studio-fx-slider input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.studio-box label.studio-monitor {
+  margin-top: 2px;
+}

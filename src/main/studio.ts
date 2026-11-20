@@ -5,7 +5,7 @@ import { rm, writeFile } from 'fs/promises'
 import { isAbsolute, join } from 'path'
 import { IS_MAC } from '@shared/platform'
 import { recordingFileName } from '@shared/studio'
-import { cleanTrim, cutArgs, detectArgs, isRecordingExt, keepSegments, keptLength, parseSilences, trimmedPath, type TrimSettings } from '@shared/studioAudio'
+import { cleanTrim, cleanedPath, cutArgs, detectArgs, isRecordingExt, keepSegments, keptLength, parseSilences, type TrimSettings } from '@shared/studioAudio'
 import { ffmpegPath } from './ffmpeg'
 import type { StudioCaptureSource } from '@shared/types'
 import { logError } from './log'
@@ -107,8 +107,9 @@ export function setupStudio(): void {
     if (!isAppPage(e.sender)) throw new Error('Not allowed')
     // Only the Studio's own recordings, never any other file on the computer.
     if (typeof path !== 'string' || !made.has(path) || !existsSync(path)) throw new Error('That recording isn’t there any more.')
-    const out = trimmedPath(path)
-    const res = await trimSilences(path, out, cleanTrim(settings))
+    const t = cleanTrim(settings)
+    const out = cleanedPath(path, t)
+    const res = await trimSilences(path, out, t)
     made.add(out)
     return { path: out, ...res }
   })
@@ -153,23 +154,26 @@ function runFfmpeg(args: string[]): Promise<{ log: string; at: number }> {
     child.on('close', (code) => {
       if (code === 0) return resolve({ log, at })
       logError('studio trim', new Error(log.split('\n').slice(-6).join('\n')))
-      reject(new Error(/No space left/i.test(log) ? 'There’s no room left on this computer to save it.' : 'The silences couldn’t be trimmed from this recording.'))
+      reject(new Error(/No space left/i.test(log) ? 'There’s no room left on this computer to save it.' : 'This recording couldn’t be cleaned up.'))
     })
   })
 }
 
-/** Finds the long pauses, then saves a copy without them. Resolves with the length before and after, in seconds. */
+/**
+ * Finds the long pauses, then saves a cleaned copy without them (mouth clicks, hiss and loudness
+ * too, as the settings say). Resolves with the length before and after, in seconds.
+ */
 async function trimSilences(input: string, output: string, settings: TrimSettings): Promise<{ before: number; after: number }> {
   const found = await runFfmpeg(detectArgs(input, settings))
   const d = /Duration: (\d+:\d{2}:\d{2}(?:\.\d+)?)/.exec(found.log)
   // Recordings written as they're made may not say how long they are: then how far ffmpeg read is used.
   const before = Math.max(found.at, d ? parseTime(d[1]) : 0)
-  const segs = keepSegments(parseSilences(found.log, before), before, settings.keep)
+  const segs = settings.pauses ? keepSegments(parseSilences(found.log, before), before, settings.keep) : null
   try {
-    await runFfmpeg(cutArgs(input, output, segs))
+    await runFfmpeg(cutArgs(input, output, segs, settings))
   } catch (err) {
     await rm(output, { force: true })
     throw err
   }
-  return { before, after: keptLength(segs) }
+  return { before, after: segs ? keptLength(segs) : before }
 }

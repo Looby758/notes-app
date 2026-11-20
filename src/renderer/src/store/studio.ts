@@ -7,7 +7,11 @@ import {
   cleanTrim,
   DEFAULT_MIC,
   DEFAULT_TRIM,
+  cleanVoice,
   matchesPreset,
+  sameVoice,
+  VOICE_STYLES,
+  type VoiceFx,
   presetName,
   resolvePresetMic,
   type MicPreset,
@@ -70,7 +74,10 @@ export type MicCleanup = Omit<MicSettings, 'gain'>
 const SCENES_KEY = 'studio.scenes'
 const SETTINGS_KEY = 'studio.settings'
 
-const cleanup = ({ noiseSuppression, echoCancellation, autoGain, lowCut }: MicSettings): MicCleanup => ({ noiseSuppression, echoCancellation, autoGain, lowCut })
+const cleanup = ({ noiseSuppression, echoCancellation, autoGain, lowCut, voice }: MicSettings): MicCleanup => ({ noiseSuppression, echoCancellation, autoGain, lowCut, voice })
+
+/** The on/off clean-up switches (the voice effects have their own setter). */
+export type MicSwitch = Exclude<keyof MicCleanup, 'voice'>
 
 function load(): Partial<StudioState> {
   try {
@@ -233,16 +240,49 @@ export function setMicGain(gain: number): void {
   changeMic('Changed the mic volume', { micGain: Math.min(2, Math.max(0, gain)) }, 'studio.micGain')
 }
 
-const CLEAN_LABELS: Record<keyof MicCleanup, string> = {
+const CLEAN_LABELS: Record<MicSwitch, string> = {
   noiseSuppression: 'background noise removal',
   echoCancellation: 'echo removal',
   autoGain: 'automatic mic volume',
   lowCut: 'the low rumble cut'
 }
 
-export function setMicClean(key: keyof MicCleanup, on: boolean): void {
+export function setMicClean(key: MicSwitch, on: boolean): void {
   changeMic(`Turned ${on ? 'on' : 'off'} ${CLEAN_LABELS[key]}`, { micClean: { ...useStudio.getState().micClean, [key]: on } })
 }
+
+const VOICE_LABELS: Record<keyof VoiceFx, string> = {
+  gate: 'the noise gate',
+  gateThreshold: 'the noise gate level',
+  deess: 'the de-esser',
+  deessAmount: 'the de-esser amount',
+  warmth: 'warmth',
+  clarity: 'clarity',
+  mudCut: 'the mud cut',
+  compress: 'the compressor',
+  compressAmount: 'the compressor amount',
+  limiter: 'the limiter',
+  lowCutHz: 'the low cut'
+}
+
+/** Changes one voice effect; Ctrl+Z puts it back (a slider drag is one step). */
+export function setVoice<K extends keyof VoiceFx>(key: K, value: VoiceFx[K]): void {
+  const clean = useStudio.getState().micClean
+  const voice = cleanVoice({ ...clean.voice, [key]: value })
+  if (sameVoice(voice, clean.voice)) return
+  const label = typeof value === 'boolean' ? `Turned ${value ? 'on' : 'off'} ${VOICE_LABELS[key]}` : `Changed ${VOICE_LABELS[key]}`
+  changeMic(label, { micClean: { ...clean, voice } }, typeof value === 'boolean' ? undefined : `studio.voice.${key}`)
+}
+
+/** One click: a ready-made voice (Plain, Natural, Broadcast). */
+export function setVoiceStyle(id: string): void {
+  const st = VOICE_STYLES.find((x) => x.id === id)
+  if (!st) return
+  changeMic(`Changed the voice to ${st.label}`, { micClean: { ...useStudio.getState().micClean, voice: st.voice, lowCut: st.lowCut } })
+}
+
+/** Hearing yourself (with the effects) in your headphones, while you set them up. Not saved: it starts off. */
+export const useMonitor = create<{ on: boolean }>(() => ({ on: false }))
 
 export function setMic(micId: string): void {
   changeMic('Changed the microphone', { micId })
@@ -337,5 +377,5 @@ export function setTrim(patch: Partial<TrimSettings>): void {
   const before = useStudio.getState().trim
   const after = cleanTrim({ ...before, ...patch })
   useStudio.setState({ trim: after })
-  recordUndo({ label: 'Changed the silence trimming', mergeKey: 'studio.trim', undo: () => useStudio.setState({ trim: before }), redo: () => useStudio.setState({ trim: after }) })
+  recordUndo({ label: 'Changed the clean-up settings', mergeKey: 'studio.trim', undo: () => useStudio.setState({ trim: before }), redo: () => useStudio.setState({ trim: after }) })
 }

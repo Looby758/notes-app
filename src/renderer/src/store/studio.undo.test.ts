@@ -69,6 +69,28 @@ describe('studio mic presets and Ctrl+Z', () => {
     expect(s.useStudio.getState().micGain).toBe(1)
   })
 
+  it('picks a voice style, fine-tunes it, saves it in a preset and undoes each step', async () => {
+    s.setVoiceStyle('broadcast')
+    let st = s.useStudio.getState()
+    expect(st.micClean.voice.gate).toBe(true)
+    expect(st.micClean.lowCut).toBe(true)
+    s.setVoice('gateThreshold', -60)
+    s.setVoice('gateThreshold', -62)
+    s.setVoice('deess', false)
+    const p = s.savePreset('HyperX QuadCast 2')
+    expect(p.voice.gateThreshold).toBe(-62)
+    expect(p.voice.deess).toBe(false)
+    await history.undo()
+    expect(await history.undo()).toBe('Turned off the de-esser')
+    // A slider drag is one step.
+    expect(await history.undo()).toBe('Changed the noise gate level')
+    st = s.useStudio.getState()
+    expect(st.micClean.voice.gateThreshold).toBe(-48)
+    expect(await history.undo()).toBe('Changed the voice to Broadcast')
+    s.setVoice('gateThreshold', -500)
+    expect(s.useStudio.getState().micClean.voice.gateThreshold).toBe(-75)
+  })
+
   it('switches audio only on and off, but not while recording', async () => {
     s.setAudioOnly(true)
     expect(s.useStudio.getState().audioOnly).toBe(true)

@@ -380,7 +380,7 @@ export const commands: Command[] = [
     openSpecialTab(STUDIO_TAB)
   } },
   { id: 'teleprompter.toggle', group: 'Navigation', title: 'Teleprompter: pause / carry on scrolling', shortcut: 'Ctrl+Alt+Space', run: () => void import('../store/teleprompter').then((m) => m.togglePrompter()) },
-  { id: 'studio.trim', group: 'Navigation', title: 'Studio: trim the silences out of the last voiceover', run: () => {
+  { id: 'studio.trim', group: 'Navigation', title: 'Studio: clean up the last voiceover (silences, mouth clicks, loudness)', run: () => {
     openSpecialTab(STUDIO_TAB)
     void import('./studio').then((m) => m.trimLastRecording())
   } },

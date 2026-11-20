@@ -14,8 +14,119 @@ export interface MicSettings {
   echoCancellation: boolean
   /** Lets the computer turn the mic up and down by itself. Off gives steadier voiceovers. */
   autoGain: boolean
-  /** Cuts low rumble (desk knocks, traffic, air con) below about 80 Hz. */
+  /** Cuts low rumble (desk knocks, traffic, air con) below `voice.lowCutHz`. */
   lowCut: boolean
+  /** The voice effects (gate, de-esser, EQ, compressor, limiter). */
+  voice: VoiceFx
+}
+
+/**
+ * Live voice effects, in the order they're applied: low cut → de-esser → noise gate → EQ →
+ * compressor → your volume → limiter.
+ */
+export interface VoiceFx {
+  /** Turns the quiet bits between words right down (breaths, room noise, mouth noises between sentences). */
+  gate: boolean
+  /** Below this (dB) counts as not talking. */
+  gateThreshold: number
+  /** Softens harsh "s" and "sh" sounds. */
+  deess: boolean
+  deessAmount: number
+  /** EQ, in dB: low-shelf body around 150 Hz. */
+  warmth: number
+  /** EQ, in dB: presence around 4.5 kHz, for clearer words. */
+  clarity: number
+  /** EQ, in dB taken out around 300 Hz, where a voice sounds boxy or muddy. */
+  mudCut: number
+  /** Evens out loud and quiet words. */
+  compress: boolean
+  compressAmount: number
+  /** Stops anything from ever going over the top (no more red). */
+  limiter: boolean
+  /** Where the low cut starts, in Hz. */
+  lowCutHz: number
+}
+
+export const DEFAULT_VOICE: VoiceFx = {
+  gate: false,
+  gateThreshold: -50,
+  deess: false,
+  deessAmount: 0.4,
+  warmth: 0,
+  clarity: 0,
+  mudCut: 0,
+  compress: false,
+  compressAmount: 0.4,
+  limiter: true,
+  lowCutHz: 80
+}
+
+/** Ready-made voice settings, one click each. */
+export const VOICE_STYLES: { id: string; label: string; hint: string; voice: VoiceFx; lowCut: boolean }[] = [
+  { id: 'off', label: 'Plain', hint: 'No effects: your mic as it is.', lowCut: false, voice: { ...DEFAULT_VOICE, limiter: false } },
+  {
+    id: 'natural',
+    label: 'Natural',
+    hint: 'Light clean-up: quieter gaps, softer “s” sounds, a little evening out.',
+    lowCut: true,
+    voice: { ...DEFAULT_VOICE, gate: true, gateThreshold: -52, deess: true, deessAmount: 0.35, mudCut: 2, clarity: 1, compress: true, compressAmount: 0.3, limiter: true, lowCutHz: 80 }
+  },
+  {
+    id: 'broadcast',
+    label: 'Broadcast',
+    hint: 'The YouTube voiceover sound: full, clear and even.',
+    lowCut: true,
+    voice: { ...DEFAULT_VOICE, gate: true, gateThreshold: -48, deess: true, deessAmount: 0.55, warmth: 2, clarity: 3, mudCut: 3, compress: true, compressAmount: 0.6, limiter: true, lowCutHz: 90 }
+  }
+]
+
+/** Which ready-made style the settings are (null if they've been changed by hand). */
+export function voiceStyleOf(voice: VoiceFx, lowCut: boolean): string | null {
+  return VOICE_STYLES.find((st) => st.lowCut === lowCut && sameVoice(st.voice, voice))?.id ?? null
+}
+
+export function sameVoice(a: VoiceFx, b: VoiceFx): boolean {
+  return (Object.keys(DEFAULT_VOICE) as (keyof VoiceFx)[]).every((k) => (typeof a[k] === 'number' ? Math.abs((a[k] as number) - (b[k] as number)) < 0.001 : a[k] === b[k]))
+}
+
+/** The compressor's settings for an amount (0 = gentle, 1 = heavy), and the volume it gives back. */
+export function compressorFor(amount: number): { threshold: number; ratio: number; knee: number; attack: number; release: number; makeup: number } {
+  const a = Math.min(1, Math.max(0, amount))
+  const threshold = -14 - 16 * a
+  const ratio = 2 + 4 * a
+  // Give back about half of what it takes off the loud parts, so it isn't quieter overall.
+  const makeup = (-threshold * (1 - 1 / ratio)) / 2
+  return { threshold, ratio, knee: 0, attack: 0.004, release: 0.18, makeup }
+}
+
+/** The limiter's ceiling: peaks never go over this (dB). */
+export const LIMIT_DB = -1.5
+
+/**
+ * How much the browser's compressor (Web Audio's DynamicsCompressorNode, with no knee) turns the
+ * sound up by itself afterwards, in dB: it's 0.6 × what it would take off a full-volume sound.
+ */
+export function autoMakeupDb(threshold: number, ratio: number): number {
+  if (threshold >= 0 || ratio <= 1) return 0
+  return -0.6 * threshold * (1 - 1 / ratio)
+}
+
+export function cleanVoice(raw: unknown): VoiceFx {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Partial<VoiceFx>
+  const d = DEFAULT_VOICE
+  return {
+    gate: bool(r.gate, d.gate),
+    gateThreshold: num(r.gateThreshold, d.gateThreshold, -75, -25),
+    deess: bool(r.deess, d.deess),
+    deessAmount: num(r.deessAmount, d.deessAmount, 0, 1),
+    warmth: num(r.warmth, d.warmth, -6, 6),
+    clarity: num(r.clarity, d.clarity, -6, 6),
+    mudCut: num(r.mudCut, d.mudCut, 0, 8),
+    compress: bool(r.compress, d.compress),
+    compressAmount: num(r.compressAmount, d.compressAmount, 0, 1),
+    limiter: bool(r.limiter, d.limiter),
+    lowCutHz: num(r.lowCutHz, d.lowCutHz, 40, 200)
+  }
 }
 
 /** A saved set of mic settings, e.g. "HyperX QuadCast 2". */
@@ -33,11 +144,10 @@ export const DEFAULT_MIC: MicSettings = {
   noiseSuppression: true,
   echoCancellation: true,
   autoGain: false,
-  lowCut: false
+  lowCut: false,
+  voice: DEFAULT_VOICE
 }
 
-/** The low-cut filter's corner frequency, in Hz. */
-export const LOW_CUT_HZ = 80
 
 /** Trimming silences after a recording. */
 export interface TrimSettings {
@@ -49,13 +159,25 @@ export interface TrimSettings {
   keep: number
   /** Quieter than this (dB) counts as silence. */
   threshold: number
+  /** Shorten the long pauses (the settings above). */
+  pauses: boolean
+  /** Take out mouth clicks, lip smacks and tongue clicks. */
+  declick: boolean
+  /** Take out the steady hiss and hum underneath your voice. */
+  denoise: boolean
+  /** Even out the loudness to what YouTube expects (about −14 LUFS). */
+  loudness: boolean
 }
 
 export const DEFAULT_TRIM: TrimSettings = {
   auto: false,
   longerThan: 0.8,
   keep: 0.35,
-  threshold: -45
+  threshold: -45,
+  pauses: true,
+  declick: true,
+  denoise: false,
+  loudness: true
 }
 
 const num = (v: unknown, d: number, lo: number, hi: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d)
@@ -68,7 +190,8 @@ export function cleanMicSettings(raw: unknown): MicSettings {
     noiseSuppression: bool(r.noiseSuppression, DEFAULT_MIC.noiseSuppression),
     echoCancellation: bool(r.echoCancellation, DEFAULT_MIC.echoCancellation),
     autoGain: bool(r.autoGain, DEFAULT_MIC.autoGain),
-    lowCut: bool(r.lowCut, DEFAULT_MIC.lowCut)
+    lowCut: bool(r.lowCut, DEFAULT_MIC.lowCut),
+    voice: cleanVoice(r.voice)
   }
 }
 
@@ -79,9 +202,16 @@ export function cleanTrim(raw: unknown): TrimSettings {
     auto: bool(r.auto, DEFAULT_TRIM.auto),
     longerThan,
     keep: num(r.keep, DEFAULT_TRIM.keep, 0, longerThan),
-    threshold: num(r.threshold, DEFAULT_TRIM.threshold, -80, -10)
+    threshold: num(r.threshold, DEFAULT_TRIM.threshold, -80, -10),
+    pauses: bool(r.pauses, DEFAULT_TRIM.pauses),
+    declick: bool(r.declick, DEFAULT_TRIM.declick),
+    denoise: bool(r.denoise, DEFAULT_TRIM.denoise),
+    loudness: bool(r.loudness, DEFAULT_TRIM.loudness)
   }
 }
+
+/** Whether a clean-up would do anything at all. */
+export const cleansAnything = (t: TrimSettings): boolean => t.pauses || t.declick || t.denoise || t.loudness
 
 /** Makes saved presets safe to use: drops anything malformed and repeated ids. */
 export function cleanPresets(raw: unknown): MicPreset[] {
@@ -112,7 +242,8 @@ export function matchesPreset(p: MicPreset, micId: string, s: MicSettings): bool
     p.noiseSuppression === s.noiseSuppression &&
     p.echoCancellation === s.echoCancellation &&
     p.autoGain === s.autoGain &&
-    p.lowCut === s.lowCut
+    p.lowCut === s.lowCut &&
+    sameVoice(p.voice, s.voice)
   )
 }
 
@@ -228,6 +359,12 @@ export function trimmedPath(path: string): string {
   return path.replace(/(\.[^./\\]+)?$/, ' (trimmed).wav')
 }
 
+/** "… (trimmed).wav" when only the pauses are shortened, otherwise "… (clean).wav". */
+export function cleanedPath(path: string, t: TrimSettings): string {
+  const onlyPauses = t.pauses && !t.declick && !t.denoise && !t.loudness
+  return onlyPauses ? trimmedPath(path) : path.replace(/(\.[^./\\]+)?$/, ' (clean).wav')
+}
+
 const sec = (n: number): string => String(Math.round(n * 1000) / 1000)
 
 /**
@@ -281,10 +418,37 @@ export function keepSegments(silences: { start: number; end: number }[], length:
 /** How long the kept parts add up to, in seconds. */
 export const keptLength = (segs: { start: number; end: number }[]): number => segs.reduce((n, s) => n + (s.end - s.start), 0)
 
-/** The second pass: keeps only `segs` of the recording, joined up, saved as a WAV for editing. */
-export function cutArgs(input: string, output: string, segs: { start: number; end: number }[]): string[] {
-  const pick = segs.map((s) => `between(t,${sec(s.start)},${sec(s.end)})`).join('+') || '1'
-  return ['-i', input, '-vn', '-af', `aselect='${pick}',asetpts=N/SR/TB`, '-c:a', 'pcm_s16le', output]
+/** YouTube plays voices back at about −14 LUFS; a touch under leaves room for music. */
+export const TARGET_LUFS = -16
+
+/**
+ * The second pass: keeps only `segs` of the recording (all of it when `segs` is null), joined up,
+ * cleaned as `t` asks, and saved as a WAV for editing.
+ */
+export function cutArgs(input: string, output: string, segs: { start: number; end: number }[] | null, t: Partial<TrimSettings> = {}): string[] {
+  const chain: string[] = []
+  if (segs) {
+    const pick = segs.map((s) => `between(t,${sec(s.start)},${sec(s.end)})`).join('+') || '1'
+    chain.push(`aselect='${pick}'`, 'asetpts=N/SR/TB')
+  }
+  // Mouth clicks are short spikes: adeclick finds them and draws the sound through underneath.
+  if (t.declick) chain.push('adeclick=w=40:o=75:t=3:b=10')
+  // Learns the hiss from the quiet bits and takes about 12 dB of it out, gently.
+  if (t.denoise) chain.push('afftdn=nr=12:nf=-50:tn=1')
+  if (t.loudness) chain.push(`loudnorm=I=${TARGET_LUFS}:TP=-1.5:LRA=11`)
+  const af = chain.length ? ['-af', chain.join(',')] : []
+  // loudnorm works at a very high sample rate inside; write a normal one.
+  return ['-i', input, '-vn', ...af, '-ar', '48000', '-c:a', 'pcm_s16le', output]
+}
+
+/** "Took out 1:12 of silence (8:40 → 7:28). Removed mouth clicks and evened out the loudness." */
+export function cleanSummary(before: number, after: number, t: TrimSettings): string {
+  const done = [t.declick && 'removed mouth clicks', t.denoise && 'took out the hiss', t.loudness && 'evened out the loudness for YouTube'].filter(Boolean) as string[]
+  const extra = done.length ? `${done.slice(0, -1).join(', ')}${done.length > 1 ? ' and ' : ''}${done[done.length - 1]}` : ''
+  const sentence = extra ? `${extra[0].toUpperCase()}${extra.slice(1)}.` : ''
+  if (!t.pauses) return sentence || 'Saved a copy.'
+  const pauses = trimSummary(before, after)
+  return sentence ? `${pauses} ${sentence}` : pauses
 }
 
 /** "Took out 1:12 of silence (8:40 → 7:28)". Lengths in seconds. */

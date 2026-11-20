@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import {
   ClipWatch,
+  autoMakeupDb,
+  cleanVoice,
+  compressorFor,
+  voiceStyleOf,
+  VOICE_STYLES,
+  DEFAULT_VOICE,
   cleanMicLabel,
   cleanPresets,
   cleanTrim,
+  cleanSummary,
+  cleanedPath,
+  DEFAULT_TRIM,
   isRecordingExt,
   levelZone,
   matchesPreset,
@@ -32,6 +41,7 @@ const preset = (over: Partial<MicPreset> = {}): MicPreset => ({
   echoCancellation: false,
   autoGain: false,
   lowCut: true,
+  voice: DEFAULT_VOICE,
   ...over
 })
 
@@ -61,7 +71,7 @@ describe('mic presets', () => {
 
   it('knows when the settings in use still match the preset', () => {
     const p = preset()
-    const s = { gain: 1.2, noiseSuppression: true, echoCancellation: false, autoGain: false, lowCut: true }
+    const s = { gain: 1.2, noiseSuppression: true, echoCancellation: false, autoGain: false, lowCut: true, voice: DEFAULT_VOICE }
     expect(matchesPreset(p, 'abc', s)).toBe(true)
     expect(matchesPreset(p, 'abc', { ...s, gain: 1.3 })).toBe(false)
     expect(matchesPreset(p, 'other', s)).toBe(false)
@@ -135,7 +145,7 @@ describe('trimming silences', () => {
   })
 
   it('keeps the settings sensible', () => {
-    expect(cleanTrim({ longerThan: 0.5, keep: 2, threshold: -200 })).toEqual({ auto: false, longerThan: 0.5, keep: 0.5, threshold: -80 })
+    expect(cleanTrim({ longerThan: 0.5, keep: 2, threshold: -200 })).toEqual({ ...DEFAULT_TRIM, longerThan: 0.5, keep: 0.5, threshold: -80 })
     expect(cleanTrim(null).longerThan).toBe(0.8)
   })
 
@@ -168,7 +178,7 @@ describe('trimming silences', () => {
   })
 
   it('builds the two ffmpeg passes', () => {
-    expect(detectArgs('in.m4a', { auto: false, longerThan: 1, keep: 0.3, threshold: -45 })).toEqual(['-i', 'in.m4a', '-vn', '-af', 'silencedetect=noise=-45dB:d=1', '-f', 'null', '-'])
+    expect(detectArgs('in.m4a', { ...DEFAULT_TRIM, longerThan: 1, keep: 0.3, threshold: -45 })).toEqual(['-i', 'in.m4a', '-vn', '-af', 'silencedetect=noise=-45dB:d=1', '-f', 'null', '-'])
     const cut = cutArgs('in.m4a', 'out.wav', [
       { start: 0, end: 2.25 },
       { start: 4, end: 6 }
@@ -178,8 +188,58 @@ describe('trimming silences', () => {
     expect(cut.at(-1)).toBe('out.wav')
   })
 
+  it('cleans up mouth clicks, hiss and loudness in the same pass', () => {
+    const all = cutArgs('in.m4a', 'out.wav', [{ start: 0, end: 2 }], { declick: true, denoise: true, loudness: true })
+    const af = all[all.indexOf('-af') + 1]
+    expect(af).toMatch(/^aselect='between\(t,0,2\)',asetpts=N\/SR\/TB,adeclick=[^,]+,afftdn=[^,]+,loudnorm=I=-16:/)
+    expect(all.slice(all.indexOf('-ar'), all.indexOf('-ar') + 2)).toEqual(['-ar', '48000'])
+    // Pauses left alone: no aselect, just the clean-up.
+    const keepAll = cutArgs('in.m4a', 'out.wav', null, { declick: true })
+    expect(keepAll[keepAll.indexOf('-af') + 1]).toMatch(/^adeclick=/)
+    expect(cutArgs('in.m4a', 'out.wav', null)).not.toContain('-af')
+  })
+
+  it('names the copy after what was done', () => {
+    const onlyPauses = { ...DEFAULT_TRIM, declick: false, loudness: false }
+    expect(cleanedPath('/v/Voiceover.m4a', onlyPauses)).toBe('/v/Voiceover (trimmed).wav')
+    expect(cleanedPath('/v/Voiceover.m4a', DEFAULT_TRIM)).toBe('/v/Voiceover (clean).wav')
+  })
+
+  it('says what the clean-up did', () => {
+    expect(cleanSummary(520, 448, DEFAULT_TRIM)).toBe('Took out 1:12 of silence (8:40 → 7:28). Removed mouth clicks and evened out the loudness for YouTube.')
+    expect(cleanSummary(60, 60, { ...DEFAULT_TRIM, pauses: false, loudness: false, denoise: true })).toBe('Removed mouth clicks and took out the hiss.')
+    expect(cleanSummary(60, 50, { ...DEFAULT_TRIM, declick: false, loudness: false })).toMatch(/^Took out 0:10/)
+  })
+
   it('says how much was taken out', () => {
     expect(trimSummary(520, 448)).toBe('Took out 1:12 of silence (8:40 → 7:28).')
     expect(trimSummary(60, 59.8)).toMatch(/weren’t any long pauses/)
+  })
+})
+
+describe('voice effects', () => {
+  it('knows how much the browser compressor turns itself up', () => {
+    // Measured in Chromium: −24 dB, 4:1, no knee lifts a quiet sound by 10.8 dB.
+    expect(autoMakeupDb(-24, 4)).toBeCloseTo(10.8)
+    expect(autoMakeupDb(0, 1)).toBe(0)
+    expect(autoMakeupDb(-1.5, 20)).toBeCloseTo(0.855)
+  })
+
+  it('gives back about half of what the compressor takes off the loudest bits', () => {
+    const gentle = compressorFor(0)
+    const heavy = compressorFor(1)
+    expect(heavy.threshold).toBeLessThan(gentle.threshold)
+    expect(heavy.ratio).toBeGreaterThan(gentle.ratio)
+    const reduction = -heavy.threshold * (1 - 1 / heavy.ratio)
+    expect(heavy.makeup).toBeCloseTo(reduction / 2)
+    // Never more than the browser already adds, so the extra gain is a small cut, not a boost.
+    expect(heavy.makeup).toBeLessThan(autoMakeupDb(heavy.threshold, heavy.ratio))
+  })
+
+  it('recognises the ready-made styles and keeps settings in range', () => {
+    for (const st of VOICE_STYLES) expect(voiceStyleOf(st.voice, st.lowCut)).toBe(st.id)
+    const broadcast = VOICE_STYLES.find((x) => x.id === 'broadcast')!
+    expect(voiceStyleOf({ ...broadcast.voice, warmth: 5 }, true)).toBeNull()
+    expect(cleanVoice({ gateThreshold: 10, warmth: -40, lowCutHz: 1000, deessAmount: 'lots' })).toMatchObject({ gateThreshold: -25, warmth: -6, lowCutHz: 200, deessAmount: 0.4 })
   })
 })
