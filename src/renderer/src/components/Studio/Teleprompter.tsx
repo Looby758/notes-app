@@ -1,4 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import '@fontsource/opendyslexic/400.css'
+import '@fontsource/opendyslexic/700.css'
 import { ChevronsDown, ChevronsUp, Expand, FlipHorizontal, Minus, Pause, Play, Plus, RefreshCw, RotateCcw, Settings2, X } from 'lucide-react'
 import type { FileNode } from '@shared/types'
 import { showKeys } from '@shared/platform'
@@ -6,11 +8,13 @@ import { isScriptNote, MARKER_INFO, resolveImage } from '../../lib/script'
 import { crossed, holdFor, prompterBlocks, prompterWords, scrollSpeed, sectionJump, type PlacedMarker, type PrompterBlock } from '../../lib/teleprompter'
 import { toVaultUrl } from '../../lib/paths'
 import { isTyping } from '../../lib/undo'
+import { listFonts } from '../../lib/fonts'
 import { vaultImages } from '../Editor/scriptTools'
 import { useVault } from '../../store/vault'
 import { usePrefs } from '../../store/prefs'
 import { ensureVideos, useVideos } from '../../store/videos'
 import {
+  BUILT_IN_FONTS,
   chooseScript,
   LOOK_LIMITS,
   markerReached,
@@ -137,7 +141,7 @@ export function Teleprompter({ compactTop }: { compactTop?: React.ReactNode }) {
     if (page.current) ro.observe(page.current)
     if (box.current) ro.observe(box.current)
     return () => ro.disconnect()
-  }, [blocks, s.fontSize, s.linePos, boxH])
+  }, [blocks, s.fontSize, s.linePos, s.font, boxH])
 
   // Back to the top for a new script or a restart.
   useEffect(() => {
@@ -274,7 +278,7 @@ export function Teleprompter({ compactTop }: { compactTop?: React.ReactNode }) {
       {compactTop}
       <div className="prompter-screen" ref={box} style={{ ['--prompter-line' as string]: `${s.linePos * 100}%` }}>
         <div className="prompter-scroll" ref={scroller} onWheel={() => (holdUntil.current = 0)}>
-          <div className="prompter-page" ref={page} style={{ fontSize: s.fontSize, transform: s.mirror ? 'scaleX(-1)' : undefined, paddingTop: Math.max(0, boxH * s.linePos - s.fontSize * 0.7), paddingBottom: boxH }}>
+          <div className="prompter-page" ref={page} style={{ fontSize: s.fontSize, fontFamily: prompterFont(s.font), transform: s.mirror ? 'scaleX(-1)' : undefined, paddingTop: Math.max(0, boxH * s.linePos - s.fontSize * 0.7), paddingBottom: boxH }}>
             {problem ? (
               <p className="prompter-empty">{problem}</p>
             ) : !s.script ? (
@@ -309,6 +313,9 @@ export function Teleprompter({ compactTop }: { compactTop?: React.ReactNode }) {
     </div>
   )
 }
+
+/** The CSS font for a choice, falling back to Orbit's own font while it loads or if it's gone. */
+export const prompterFont = (font: string): string | undefined => (font ? `"${font}", var(--font-ui)` : undefined)
 
 function chooseScriptQuietly(path: string): void {
   usePrompter.setState({ script: path, playing: false, countdown: null, restartAt: Date.now() })
@@ -355,8 +362,32 @@ function PrompterSettings({ onClose }: { onClose: () => void }) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
+  const [installed, setInstalled] = useState<string[]>([])
+  useEffect(() => void listFonts().then(setInstalled), [])
+  const others = installed.filter((f) => !(BUILT_IN_FONTS as readonly string[]).includes(f))
   return (
     <div className="prompter-settings" data-prompter-settings-menu>
+      <label>
+        Font
+        <select value={s.font} onChange={(e) => setLook('font', e.target.value)} style={{ fontFamily: prompterFont(s.font) }} data-prompter-font>
+          <option value="">Orbit’s font</option>
+          <optgroup label="Built in">
+            <option value="OpenDyslexic" style={{ fontFamily: prompterFont('OpenDyslexic') }}>
+              OpenDyslexic (easier to read with dyslexia)
+            </option>
+          </optgroup>
+          {others.length > 0 && (
+            <optgroup label="On this computer">
+              {s.font && !BUILT_IN_FONTS.includes(s.font as never) && !others.includes(s.font) && <option value={s.font}>{s.font}</option>}
+              {others.map((f) => (
+                <option key={f} value={f} style={{ fontFamily: prompterFont(f) }}>
+                  {f}
+                </option>
+              ))}
+            </optgroup>
+          )}
+        </select>
+      </label>
       <label>
         Text size {s.fontSize}px
         <input type="range" min={LOOK_LIMITS.fontSize[0]} max={LOOK_LIMITS.fontSize[1]} step={2} value={s.fontSize} onChange={(e) => setLook('fontSize', Number(e.target.value))} />

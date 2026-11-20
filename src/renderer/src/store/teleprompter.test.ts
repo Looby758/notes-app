@@ -12,7 +12,7 @@ const { history } = await import('../lib/undo')
 
 describe('teleprompter', () => {
   beforeEach(() => {
-    t.usePrompter.setState({ open: true, script: 'Videos/Maggie/Script.md', playing: false, countdown: null, autoStart: false, speed: 1, fontSize: 40 })
+    t.usePrompter.setState({ open: true, script: 'Videos/Maggie/Script.md', playing: false, countdown: null, autoStart: false, speed: 1, fontSize: 40, font: '' })
     useStudio.setState({ recording: null })
     history.clear()
     studioWriteCues.mockClear()
@@ -28,6 +28,14 @@ describe('teleprompter', () => {
     expect(t.usePrompter.getState().speed).toBeCloseTo(1.1)
     await history.undo()
     expect(t.usePrompter.getState().speed).toBe(1)
+  })
+
+  it('keeps the font choice safe and undoable', async () => {
+    t.setLook('font', 'OpenDyslexic')
+    expect(t.usePrompter.getState().font).toBe('OpenDyslexic')
+    expect(t.cleanLook({ font: 'Bad"; } body { x' }).font).toBe('Bad  body  x')
+    expect(await history.undo()).toBe('Changed the teleprompter font')
+    expect(t.usePrompter.getState().font).toBe('')
   })
 
   it('pauses and carries on', () => {

@@ -22,9 +22,14 @@ export interface PrompterLook {
   autoStart: boolean
   /** Stop for a moment at each [PAUSE] marker. */
   holdPauses: boolean
+  /** The font: '' = Orbit's own, OpenDyslexic (built in), or a font installed on this computer. */
+  font: string
 }
 
-export const DEFAULT_LOOK: PrompterLook = { speed: 1, fontSize: 40, linePos: 0.35, mirror: false, autoStart: true, holdPauses: true }
+/** Built into Orbit, so it's there on every computer. */
+export const BUILT_IN_FONTS = ['OpenDyslexic'] as const
+
+export const DEFAULT_LOOK: PrompterLook = { speed: 1, fontSize: 40, linePos: 0.35, mirror: false, autoStart: true, holdPauses: true, font: '' }
 
 export const LOOK_LIMITS = { speed: [0.5, 2], fontSize: [20, 96], linePos: [0.15, 0.7] } as const
 
@@ -51,7 +56,9 @@ export function cleanLook(raw: unknown): PrompterLook {
     linePos: clampNum(r.linePos, LOOK_LIMITS.linePos, DEFAULT_LOOK.linePos),
     mirror: r.mirror === true,
     autoStart: r.autoStart !== false,
-    holdPauses: r.holdPauses !== false
+    holdPauses: r.holdPauses !== false,
+    // A font family name: no quotes or brackets that could break out of the style.
+    font: typeof r.font === 'string' ? r.font.replace(/["'\\;{}<>]/g, '').trim().slice(0, 100) : ''
   }
 }
 
@@ -71,8 +78,8 @@ usePrompter.subscribe((s) => {
   clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
     try {
-      const { speed, fontSize, linePos, mirror, autoStart, holdPauses, open, script } = s
-      localStorage.setItem(KEY, JSON.stringify({ speed, fontSize, linePos, mirror, autoStart, holdPauses, open, script }))
+      const { speed, fontSize, linePos, mirror, autoStart, holdPauses, font, open, script } = s
+      localStorage.setItem(KEY, JSON.stringify({ speed, fontSize, linePos, mirror, autoStart, holdPauses, font, open, script }))
     } catch {
       // Not remembered this time; it still works.
     }
@@ -85,7 +92,8 @@ const LOOK_LABELS: Record<keyof PrompterLook, string> = {
   linePos: 'Moved the reading line',
   mirror: 'Flipped the teleprompter',
   autoStart: 'Changed when the teleprompter starts',
-  holdPauses: 'Changed stopping at pauses'
+  holdPauses: 'Changed stopping at pauses',
+  font: 'Changed the teleprompter font'
 }
 
 /** Changes how the teleprompter looks or scrolls; Ctrl+Z puts it back (a slider drag is one step). */
@@ -102,7 +110,7 @@ export function setLook<K extends keyof PrompterLook>(key: K, value: PrompterLoo
   })
 }
 
-const pickLook = (s: PrompterState): PrompterLook => ({ speed: s.speed, fontSize: s.fontSize, linePos: s.linePos, mirror: s.mirror, autoStart: s.autoStart, holdPauses: s.holdPauses })
+const pickLook = (s: PrompterState): PrompterLook => ({ speed: s.speed, fontSize: s.fontSize, linePos: s.linePos, mirror: s.mirror, autoStart: s.autoStart, holdPauses: s.holdPauses, font: s.font })
 
 export function nudgeSpeed(by: number): void {
   setLook('speed', Math.round((usePrompter.getState().speed + by) * 20) / 20)

@@ -886,6 +886,14 @@
   align-items: center;
   gap: 6px;
 }
+.prompter-settings select {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 5px 7px;
+  font-size: 13px;
+}
 .prompter-settings input[type='range'] {
   width: 100%;
   accent-color: var(--accent);
