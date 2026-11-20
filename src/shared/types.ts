@@ -477,6 +477,13 @@ export interface NotesApi {
   undoRestore(paths: string[], inVault: boolean): Promise<string[]>
   /** They can't be undone any more: on to the Recycle Bin / Bin. */
   undoRelease(paths: string[], inVault: boolean): Promise<void>
+  // Recently deleted videos (main/videoBin.ts): a deleted video's folder, kept for 30 days.
+  /** Moves a video's folder into .notesapp/deleted-videos/<id>. False if the folder wasn't there. */
+  videoBinKeep(folder: string, id: string): Promise<boolean>
+  /** Puts it back at `folder` (or "<name> (restored)"). Returns where it went, or null if it's gone. */
+  videoBinRestore(id: string, folder: string): Promise<string | null>
+  /** Sends a kept folder on to the Recycle Bin / Bin. */
+  videoBinDrop(id: string): Promise<void>
   /** Moves things back (full paths): each `to` goes back to `from`. Returns the moves made. */
   undoMoveBack(items: { from: string; to: string }[]): Promise<{ from: string; to: string }[]>
   /** Undo / Redo from the Mac's Edit menu. */

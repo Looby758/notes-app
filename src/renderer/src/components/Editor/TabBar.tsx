@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ArrowRightLeft, AudioLines, Bot, Headphones, Joystick, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Hourglass, HardDrive, House, KeyRound, Layers, LibraryBig, Library, Mail, MessageSquare, MessagesSquare, Monitor, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Scissors, Settings, SlidersVertical, Sparkles, SquareTerminal, Star, StarOff, X, CloudDownload, VenetianMask, Volume2, VolumeX } from 'lucide-react'
+import { ArrowRightLeft, AudioLines, Bot, Headphones, Joystick, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Hourglass, HardDrive, House, KeyRound, Layers, LibraryBig, Library, Mail, MessageSquare, MessagesSquare, Monitor, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Scissors, Settings, SlidersVertical, Video, Sparkles, SquareTerminal, Star, StarOff, X, CloudDownload, VenetianMask, Volume2, VolumeX } from 'lucide-react'
 import Private from '../Streamer/Private'
 import { useHideNames } from '../../store/streamer'
 import { useEditor } from '../../store/editor'
 import { toggleStar, useStarred } from '../../store/starred'
 import { Images, Clock } from 'lucide-react'
 import { useNoteIndex } from '../../store/noteIndex'
+import { Upload } from 'lucide-react'
 import { isMindMap, openExport, toggleMindMap, useUI } from '../../store/ui'
 import {
   activateTab,
@@ -30,11 +31,13 @@ import {
   MINIGAMES_TAB,
   CLOCKS_TAB,
   COUNTDOWNS_TAB,
+  PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
   DOWNLOADER_TAB,
   STUDIO_TAB,
   CLIPS_TAB,
+  VIDEOS_TAB,
   SOUNDBOARD_TAB,
   DISCORD_TAB,
   MESSAGES_TAB,
@@ -107,11 +110,13 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === MINIGAMES_TAB) return 'Mini games'
   if (id === CLOCKS_TAB) return 'World clocks'
   if (id === COUNTDOWNS_TAB) return 'Countdowns'
+  if (id === PUBLISHING_TAB) return 'Publishing'
   if (id === SCREENS_TAB) return 'Screens'
   if (id === MIXER_TAB) return 'Volume mixer'
   if (id === DOWNLOADER_TAB) return 'Download a video'
   if (id === STUDIO_TAB) return 'Studio'
   if (id === CLIPS_TAB) return 'Clips'
+  if (id === VIDEOS_TAB) return 'Videos'
   if (id === SOUNDBOARD_TAB) return 'Soundboard'
   if (id === DISCORD_TAB) return 'Discord voice'
   if (id === MESSAGES_TAB) return 'Messages'
@@ -330,11 +335,13 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === MINIGAMES_TAB && <Joystick size={13} className="tab-icon" />}
               {id === CLOCKS_TAB && <Globe2 size={13} className="tab-icon" />}
               {id === COUNTDOWNS_TAB && <Hourglass size={13} className="tab-icon" />}
+              {id === PUBLISHING_TAB && <Upload size={13} className="tab-icon" />}
               {id === SCREENS_TAB && <Monitor size={13} className="tab-icon" />}
               {id === MIXER_TAB && <SlidersVertical size={13} className="tab-icon" />}
               {id === DOWNLOADER_TAB && <CloudDownload size={13} className="tab-icon" />}
               {id === STUDIO_TAB && <Clapperboard size={13} className="tab-icon" />}
               {id === CLIPS_TAB && <Scissors size={13} className="tab-icon" />}
+              {id === VIDEOS_TAB && <Video size={13} className="tab-icon" />}
               {id === SOUNDBOARD_TAB && <AudioLines size={13} className="tab-icon" />}
               {id === DISCORD_TAB && <Headphones size={13} className="tab-icon" />}
               {id === MESSAGES_TAB && <MessagesSquare size={13} className="tab-icon" />}

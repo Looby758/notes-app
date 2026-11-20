@@ -32,11 +32,13 @@ import {
   MINIGAMES_TAB,
   CLOCKS_TAB,
   COUNTDOWNS_TAB,
+  PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
   DOWNLOADER_TAB,
   STUDIO_TAB,
   CLIPS_TAB,
+  VIDEOS_TAB,
   SOUNDBOARD_TAB,
   DISCORD_TAB,
   MESSAGES_TAB,
@@ -78,10 +80,12 @@ import ComicsPage from '../Comics/ComicsPage'
 import WikiPage from '../Wiki/WikiPage'
 import WorldClocksPage from '../Clocks/WorldClocksPage'
 import CountdownsPage from '../Countdowns/CountdownsPage'
+import PublishingPage from '../Publishing/PublishingPage'
 import ScreensPage from '../Screens/ScreensPage'
 import MixerPage from '../Mixer/MixerPage'
 import StudioPage from '../Studio/StudioPage'
 import ClipsPage from '../Clips/ClipsPage'
+import VideosPage from '../Videos/VideosPage'
 import SoundboardPage from '../Soundboard/SoundboardPage'
 import DiscordVoicePage from '../Discord/DiscordVoicePage'
 import GamesPage from '../Games/GamesPage'
@@ -219,11 +223,13 @@ export default function Pane({ pane }: { pane: string }) {
         {active === MINIGAMES_TAB && <MiniGamesPage />}
         {active === CLOCKS_TAB && <WorldClocksPage />}
         {active === COUNTDOWNS_TAB && <CountdownsPage />}
+        {active === PUBLISHING_TAB && <PublishingPage />}
         {active === SCREENS_TAB && <ScreensPage />}
         {active === MIXER_TAB && <MixerPage />}
         {active === DOWNLOADER_TAB && <VideoDownloaderPage />}
         {active === STUDIO_TAB && <StudioPage />}
         {active === CLIPS_TAB && <ClipsPage />}
+        {active === VIDEOS_TAB && <VideosPage />}
         {active === SOUNDBOARD_TAB && <SoundboardPage />}
         {active === DISCORD_TAB && <DiscordVoicePage />}
         {active === GAMES_TAB && <GamesPage />}

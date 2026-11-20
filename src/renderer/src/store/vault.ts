@@ -17,7 +17,10 @@ import { resetIndex, syncIndex } from './noteIndex'
 import { loadStarred, putBackStars, remapStars, removeStarsWithin, useStarred } from './starred'
 import { loadVideoProgress } from './videoPlayer'
 import { loadFlashcards, putBackFlashcards, remapFlashcards, removeFlashcardsWithin, useFlashcards } from './flashcards'
+import { loadPublishing, remapPublishing } from './publishing'
+import { loadDeletedVideos } from './deletedVideos'
 import { loadMoney } from './money'
+import { followMovedVideosFolder, loadVideos, remapVideos } from './videos'
 import { loadLockedFolders, putBackLockedFolders, remapLockedFolders, removeLockedFoldersWithin, useLockedFolders } from '../lib/lock/folders'
 import { history, recordUndo, undoChanged } from '../lib/undo'
 import type { CardProgress } from '../lib/flashcards'
@@ -116,10 +119,12 @@ export const useVault = create<VaultState>((set, get) => {
       })
     }
     remapTabs(from, to)
+    remapPublishing(from, to)
     remapStars(from, to)
     remapScreenshots(from, to)
     remapFlashcards(from, to)
     remapLockedFolders(from, to)
+    remapVideos(from, to)
   }
 
   /** Closes and forgets deleted things (tabs, stars, flashcard progress, locked folders). */
@@ -235,8 +240,12 @@ export const useVault = create<VaultState>((set, get) => {
       void loadTimeline()
       loadStarred()
       void loadFlashcards()
+      void loadPublishing()
+      void loadDeletedVideos()
       loadVideoProgress()
       void loadMoney()
+      // Whichever finishes last (this or reading the notes list) checks whether the videos folder moved.
+      void loadVideos().then(() => followMovedVideosFolder(get().tree))
       get().refresh()
     },
 
@@ -246,6 +255,7 @@ export const useVault = create<VaultState>((set, get) => {
         const { selected } = get()
         set({ tree, selected: selected && findNode(tree, selected) ? selected : null })
         closeMissing((path) => findNode(tree, path) !== null)
+        followMovedVideosFolder(tree)
         await syncIndex(notePaths(tree), changed)
       } catch (err) {
         notify(err)

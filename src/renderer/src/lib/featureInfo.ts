@@ -32,6 +32,7 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'reading', name: 'Reading mode', blurb: 'Notes become read-only', group: 'Notes', command: 'view.reading' },
 
   { id: 'calendar', name: 'Calendar', blurb: 'Events, reminders and bills', group: 'Plan', command: 'calendar.open', keywords: 'events schedule' },
+  { id: 'publishing', name: 'Publishing', blurb: 'Title options, description, tags and chapters for a video', group: 'Plan', command: 'publishing.open', keywords: 'youtube upload title description tags chapters timestamps video publish seo' },
   { id: 'countdowns', name: 'Countdowns', blurb: 'Days until a new season, game update, trip or birthday', group: 'Plan', command: 'countdowns.open', keywords: 'countdown days until timer event release birthday holiday trip season' },
   { id: 'clocks', name: 'World clocks', blurb: 'The time in other places, daylight saving included', group: 'Plan', command: 'clocks.open', keywords: 'time zone timezone dst daylight saving world clock' },
   { id: 'timeline', name: 'Timeline', blurb: 'What happened in the story, by era and episode', group: 'Plan', command: 'timeline.open', keywords: 'timeline story era episode flashback told shown character life comics show chronology youtube script' },
@@ -75,6 +76,7 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'replay', name: 'Save replay', blurb: 'Save the last 30 seconds of your screen', group: 'Tools', command: 'replay.save', keywords: 'instant replay clip that save highlight' },
   { id: 'offline-ai', name: 'Offline AI', blurb: 'AI on your own graphics card: get it or manage it', group: 'Tools', keywords: 'ai local gpu llm private download model qwen llama' },
   { id: 'studio', name: 'Studio', blurb: 'Record your screen and webcam, or go live', group: 'Tools', command: 'studio.open', keywords: 'record obs stream twitch youtube webcam live' },
+  { id: 'videos', name: 'Video projects', blurb: 'Script, research, pictures and recordings for each video', group: 'Tools', command: 'videos.open', keywords: 'youtube video project script research voiceover thumbnail recording channel episode' },
   { id: 'terminal', name: 'Terminal', blurb: 'Command line in your notes folder', group: 'Tools', command: 'terminal.open', keywords: 'shell cmd powershell' },
   { id: 'streamer', name: 'Streamer mode', blurb: 'Blur private things while sharing', group: 'Tools', command: 'view.streamer', keywords: 'privacy blur stream obs' },
   { id: 'settings', name: 'Settings', blurb: 'Make Orbit yours', group: 'Tools', command: 'settings', keywords: 'preferences options' }

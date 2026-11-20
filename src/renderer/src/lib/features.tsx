@@ -18,6 +18,7 @@ import {
   Globe,
   Globe2,
   Hourglass,
+  Upload,
   HardDrive,
   House,
   KeyRound,
@@ -51,6 +52,7 @@ import {
   History,
   Scissors,
   Bot,
+  Video,
   type LucideIcon
 } from 'lucide-react'
 import { openGrokTab } from '../components/Grok/GrokPage'
@@ -75,6 +77,7 @@ import {
   CONVERT_TAB,
   STUDIO_TAB,
   CLIPS_TAB,
+  VIDEOS_TAB,
   SOUNDBOARD_TAB,
   DISCORD_TAB,
   EMAIL_TAB,
@@ -89,6 +92,7 @@ import {
   MESSAGES_TAB,
   CLOCKS_TAB,
   COUNTDOWNS_TAB,
+  PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
   DOWNLOADER_TAB,
@@ -177,6 +181,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   calendar: { icon: CalendarDays, run: () => openSpecialTab(CALENDAR_TAB) },
   clocks: { icon: Globe2, run: () => openSpecialTab(CLOCKS_TAB) },
   countdowns: { icon: Hourglass, run: () => openSpecialTab(COUNTDOWNS_TAB) },
+  publishing: { icon: Upload, run: () => openSpecialTab(PUBLISHING_TAB) },
   screens: { icon: Monitor, run: () => openSpecialTab(SCREENS_TAB) },
   mixer: { icon: SlidersVertical, run: () => openSpecialTab(MIXER_TAB) },
   screenshots: { icon: Images, run: () => openSpecialTab(SCREENSHOTS_TAB) },
@@ -224,6 +229,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   },
   studio: { icon: Clapperboard, run: () => openSpecialTab(STUDIO_TAB) },
   clips: { icon: Scissors, run: () => openSpecialTab(CLIPS_TAB) },
+  videos: { icon: Video, run: () => openSpecialTab(VIDEOS_TAB) },
   replay: { icon: History, run: () => void import('./replay').then((m) => m.saveReplay()), useActive: () => usePrefs((s) => s.prefs.replayOn) },
   soundboard: { icon: AudioLines, run: () => openSpecialTab(SOUNDBOARD_TAB) },
   'discord-voice': { icon: Headphones, run: () => openSpecialTab(DISCORD_TAB) },

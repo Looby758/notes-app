@@ -348,6 +348,7 @@ Reply with only one JSON object, one of:
 {"kind":"event","date":"YYYY-MM-DD","time":"HH:MM","title":"...","remind":true}   (time optional; remind true for "remind me")
 {"kind":"note","title":"..."}             a new note
 {"kind":"jot","text":"..."}               a line added to today's note
+{"kind":"videoIdea","text":"..."}         an idea for a future YouTube video, into the video idea inbox
 {"kind":"convert","format":"pdf|docx|html|md|txt|jpg|png|webp|mp3|wav"}
 {"kind":"play","query":"song or artist"}
 {"kind":"music","action":"toggle|next|previous"}

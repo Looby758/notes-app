@@ -84,6 +84,8 @@ const renameOldTab = (t: string): string => (OLD_GAME_TABS.has(t) ? MINIGAMES_TA
 export const CLOCKS_TAB = 'clocks:'
 /** Big countdown cards (components/Countdowns). */
 export const COUNTDOWNS_TAB = 'countdowns:'
+/** Getting videos ready for YouTube: title options, description, tags, chapters (components/Publishing). */
+export const PUBLISHING_TAB = 'publishing:'
 /** Monitor brightness, contrast and input (components/Screens). */
 export const SCREENS_TAB = 'screens:'
 /** A volume for each app (components/Mixer). */
@@ -94,6 +96,8 @@ export const DOWNLOADER_TAB = 'downloader:'
 export const STUDIO_TAB = 'studio:'
 /** Instant replay and the clip editor (components/Clips). */
 export const CLIPS_TAB = 'clips:'
+/** Video projects: script, research, pictures, recordings and thumbnail ideas for each video (components/Videos). */
+export const VIDEOS_TAB = 'videos:'
 /** Sound clips with hotkeys, the voice changer and music into a voice call (components/Soundboard). */
 export const SOUNDBOARD_TAB = 'soundboard:'
 /** Who's in your Discord voice channel, with mute and deafen (components/Discord). */

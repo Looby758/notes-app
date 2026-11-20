@@ -1,4 +1,5 @@
 import { useEditor } from '../store/editor'
+import { focusIdeaBox } from '../store/videos'
 import { useVault } from '../store/vault'
 import { openExport, showRightView, showSearch, showSidebarView, toggleFocusMode, toggleMindMap, toggleZen, useUI } from '../store/ui'
 import { effectiveShortcut, setPrefs, usePrefs } from '../store/prefs'
@@ -24,11 +25,13 @@ import {
   WIKI_TAB,
   CLOCKS_TAB,
   COUNTDOWNS_TAB,
+  PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
   DOWNLOADER_TAB,
   STUDIO_TAB,
   CLIPS_TAB,
+  VIDEOS_TAB,
   SOUNDBOARD_TAB,
   DISCORD_TAB,
   EXPLORER_TAB,
@@ -358,6 +361,11 @@ export const commands: Command[] = [
   { id: 'soundboard.stop', group: 'Navigation', title: 'Stop all soundboard sounds', run: () => void import('./soundboard').then((m) => m.stopAll()) },
   { id: 'studio.open', group: 'Navigation', title: 'Open the Studio (record your screen and webcam)', run: () => openSpecialTab(STUDIO_TAB) },
   { id: 'clips.open', group: 'Navigation', title: 'Open clips (instant replay and the clip editor)', run: () => openSpecialTab(CLIPS_TAB) },
+  { id: 'videos.idea', group: 'Navigation', title: 'Idea inbox for videos (jot down a video idea)', run: () => {
+    focusIdeaBox()
+    openSpecialTab(VIDEOS_TAB)
+  } },
+  { id: 'videos.open', group: 'Navigation', title: 'Video projects (script, research, pictures, recordings, thumbnail ideas)', run: () => openSpecialTab(VIDEOS_TAB) },
   { id: 'replay.save', group: 'Navigation', title: 'Save the last 30 seconds (instant replay)', run: () => void import('./replay').then((m) => m.saveReplay()) },
   { id: 'replay.toggle', group: 'Navigation', title: 'Turn instant replay on or off', run: () => setPrefs({ replayOn: !usePrefs.getState().prefs.replayOn }) },
   { id: 'studio.record', group: 'Navigation', title: 'Start or stop recording (Studio)', run: () => void import('./studio').then((m) => m.toggleRecording()) },
@@ -368,6 +376,7 @@ export const commands: Command[] = [
   { id: 'screens.brighter', group: 'Navigation', title: 'Make every screen brighter', run: () => void window.api.monitorAction('all', { kind: 'brightness', mode: 'up', amount: 10 }) },
   { id: 'screens.dimmer', group: 'Navigation', title: 'Make every screen dimmer', run: () => void window.api.monitorAction('all', { kind: 'brightness', mode: 'down', amount: 10 }) },
   { id: 'downloader.open', group: 'Navigation', title: 'Download a video from a link (YouTube, X, Instagram, TikTok…)', run: () => openSpecialTab(DOWNLOADER_TAB) },
+  { id: 'publishing.open', group: 'Navigation', title: 'Publishing (titles, description, tags and chapters for a video)', run: () => openSpecialTab(PUBLISHING_TAB) },
   { id: 'countdowns.open', group: 'Navigation', title: 'Countdowns (days until a new season, trip, birthday…)', run: () => openSpecialTab(COUNTDOWNS_TAB) },
   { id: 'clocks.open', group: 'Navigation', title: 'World clocks (the time in other places)', run: () => openSpecialTab(CLOCKS_TAB) },
   { id: 'games.open', group: 'Navigation', title: 'Games (play your Steam and other games)', run: () => openSpecialTab(GAMES_TAB) },
