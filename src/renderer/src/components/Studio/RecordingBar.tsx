@@ -10,6 +10,7 @@ export default function RecordingBar() {
   const live = useStudio((s) => s.live)
   const scenes = useStudio((s) => s.scenes)
   const active = useStudio((s) => s.activeScene)
+  const audioOnly = useStudio((s) => s.recording?.audioOnly ?? false)
   const now = useNow(!!recording || !!live)
   if (!recording && !live) return null
   return (
@@ -21,13 +22,17 @@ export default function RecordingBar() {
           <span className="studio-float-time">{formatDuration(now - recording.startedAt)}</span>
         </>
       )}
-      <select value={active} onChange={(e) => switchScene(e.target.value)} title="Scene">
-        {scenes.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name}
-          </option>
-        ))}
-      </select>
+      {audioOnly ? (
+        <span className="studio-float-what">Voiceover</span>
+      ) : (
+        <select value={active} onChange={(e) => switchScene(e.target.value)} title="Scene">
+          {scenes.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      )}
       <button className="icon-btn" title="Open the Studio" onClick={() => openSpecialTab(STUDIO_TAB)}>
         <Clapperboard size={14} />
       </button>
