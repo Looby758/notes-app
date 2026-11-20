@@ -24,9 +24,10 @@ import {
 } from 'lucide-react'
 import type { StudioCaptureSource } from '@shared/types'
 import { dragRect, formatDuration, itemAt, newItem, QUALITIES, snap, SOURCE_LABELS, studioId, type Handle, type StudioItem, type StudioSourceKind } from '@shared/studio'
-import { activeScene, addItem, removeItem, reorderItem, switchScene, updateItem, updateScene, useStudio } from '../../store/studio'
+import { activeScene, addItem, removeItem, reorderItem, setAudioOnly, setMic, setMicGain, switchScene, updateItem, updateScene, useStudio } from '../../store/studio'
 import { GoLive } from './GoLive'
-import { desktopAudioSupported, hasChannel, level, retrySource, startRecording, stopRecording, studioCanvas, studioPage } from '../../lib/studio'
+import { AudioOnlyPanel, ClipWarning, Meter, MicCleanupSettings, MicPresets, TrimSettingsBox } from './AudioTools'
+import { desktopAudioSupported, hasChannel, retrySource, startRecording, stopRecording, studioCanvas, studioPage } from '../../lib/studio'
 import { showKeys } from '@shared/platform'
 
 const KIND_ICONS: Record<StudioSourceKind, typeof Monitor> = { screen: Monitor, camera: Camera, image: ImageIcon, text: Type, nowPlaying: Music }
@@ -39,6 +40,7 @@ export default function StudioPage() {
   const item = scene.items.find((i) => i.id === selected) ?? null
   const [picking, setPicking] = useState<null | 'screen'>(null)
   const [adding, setAdding] = useState(false)
+  const audioOnly = useStudio((s) => s.audioOnly)
 
   useEffect(() => {
     studioPage(true)
@@ -55,85 +57,16 @@ export default function StudioPage() {
   return (
     <div className="studio-page" data-studio-page>
       <RecordBar />
-      <div className="studio-body">
+      <div className={`studio-body ${audioOnly ? 'audio-only' : ''}`}>
+        {audioOnly ? (
+          <main className="studio-main">
+            <AudioOnlyPanel />
+          </main>
+        ) : (
+          <ScenesView adding={adding} setAdding={setAdding} add={add} />
+        )}
         <aside className="studio-side">
-          <section className="studio-box">
-            <header>
-              <h3>Scenes</h3>
-              <button
-                className="icon-btn"
-                title="New scene"
-                onClick={() => {
-                  const id = studioId()
-                  useStudio.setState((s) => ({ scenes: [...s.scenes, { id, name: `Scene ${s.scenes.length + 1}`, items: [] }] }))
-                  switchScene(id)
-                }}
-              >
-                <Plus size={14} />
-              </button>
-            </header>
-            <ul className="studio-list">
-              {scenes.map((s, i) => (
-                <li key={s.id} className={s.id === scene.id ? 'active' : ''} onClick={() => switchScene(s.id)} title={i < 9 ? `Switch with ${showKeys(`Ctrl+Shift+${i + 1}`)}` : undefined}>
-                  <span className="studio-key">{i < 9 ? i + 1 : ''}</span>
-                  <input className="studio-name" value={s.name} onChange={(e) => updateScene(s.id, { name: e.target.value })} onClick={(e) => e.stopPropagation()} onFocus={() => switchScene(s.id)} />
-                  {scenes.length > 1 && (
-                    <button
-                      className="icon-btn studio-row-btn"
-                      title="Delete scene"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        useStudio.setState((st) => {
-                          const rest = st.scenes.filter((x) => x.id !== s.id)
-                          return { scenes: rest, activeScene: st.activeScene === s.id ? rest[0].id : st.activeScene }
-                        })
-                      }}
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
-          <section className="studio-box">
-            <header>
-              <h3>Sources</h3>
-              <div className="studio-add">
-                <button className="icon-btn" title="Add a source" onClick={() => setAdding((a) => !a)} data-studio-add>
-                  <Plus size={14} />
-                </button>
-                {adding && (
-                  <div className="studio-menu" onMouseLeave={() => setAdding(false)}>
-                    {(Object.keys(SOURCE_LABELS) as StudioSourceKind[]).map((k) => {
-                      const Icon = KIND_ICONS[k]
-                      return (
-                        <button key={k} onClick={() => add(k)}>
-                          <Icon size={14} /> {SOURCE_LABELS[k]}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            </header>
-            {scene.items.length === 0 ? (
-              <p className="studio-hint">Nothing in this scene yet. Press + to add your screen, webcam, a picture or some text.</p>
-            ) : (
-              <ul className="studio-list">
-                {[...scene.items].reverse().map((i) => (
-                  <SourceRow key={i.id} item={i} selected={i.id === selected} />
-                ))}
-              </ul>
-            )}
-          </section>
-        </aside>
-        <main className="studio-main">
-          <Preview />
-          <p className="studio-hint">Drag sources to move them, drag a corner to resize (hold Shift to stretch). Delete removes the selected one.</p>
-        </main>
-        <aside className="studio-side">
-          {item ? <ItemSettings item={item} onPickScreen={() => setPicking('screen')} /> : <p className="studio-hint studio-box">Click a source to change it.</p>}
+          {!audioOnly && (item ? <ItemSettings item={item} onPickScreen={() => setPicking('screen')} /> : <p className="studio-hint studio-box">Click a source to change it.</p>)}
           <Mixer />
           <RecordingSettings />
         </aside>
@@ -149,6 +82,94 @@ export default function StudioPage() {
         />
       )}
     </div>
+  )
+}
+
+/** The scenes and sources (left) and the picture (middle), in video mode. */
+function ScenesView({ adding, setAdding, add }: { adding: boolean; setAdding: React.Dispatch<React.SetStateAction<boolean>>; add: (kind: StudioSourceKind) => void }) {
+  const scenes = useStudio((s) => s.scenes)
+  const sceneId = useStudio((s) => s.activeScene)
+  const scene = scenes.find((s) => s.id === sceneId) ?? scenes[0]
+  const selected = useStudio((s) => s.selected)
+  return (
+    <>
+      <aside className="studio-side">
+        <section className="studio-box">
+          <header>
+            <h3>Scenes</h3>
+            <button
+              className="icon-btn"
+              title="New scene"
+              onClick={() => {
+                const id = studioId()
+                useStudio.setState((s) => ({ scenes: [...s.scenes, { id, name: `Scene ${s.scenes.length + 1}`, items: [] }] }))
+                switchScene(id)
+              }}
+            >
+              <Plus size={14} />
+            </button>
+          </header>
+          <ul className="studio-list">
+            {scenes.map((s, i) => (
+              <li key={s.id} className={s.id === scene.id ? 'active' : ''} onClick={() => switchScene(s.id)} title={i < 9 ? `Switch with ${showKeys(`Ctrl+Shift+${i + 1}`)}` : undefined}>
+                <span className="studio-key">{i < 9 ? i + 1 : ''}</span>
+                <input className="studio-name" value={s.name} onChange={(e) => updateScene(s.id, { name: e.target.value })} onClick={(e) => e.stopPropagation()} onFocus={() => switchScene(s.id)} />
+                {scenes.length > 1 && (
+                  <button
+                    className="icon-btn studio-row-btn"
+                    title="Delete scene"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      useStudio.setState((st) => {
+                        const rest = st.scenes.filter((x) => x.id !== s.id)
+                        return { scenes: rest, activeScene: st.activeScene === s.id ? rest[0].id : st.activeScene }
+                      })
+                    }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+        <section className="studio-box">
+          <header>
+            <h3>Sources</h3>
+            <div className="studio-add">
+              <button className="icon-btn" title="Add a source" onClick={() => setAdding((a) => !a)} data-studio-add>
+                <Plus size={14} />
+              </button>
+              {adding && (
+                <div className="studio-menu" onMouseLeave={() => setAdding(false)}>
+                  {(Object.keys(SOURCE_LABELS) as StudioSourceKind[]).map((k) => {
+                    const Icon = KIND_ICONS[k]
+                    return (
+                      <button key={k} onClick={() => add(k)}>
+                        <Icon size={14} /> {SOURCE_LABELS[k]}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </header>
+          {scene.items.length === 0 ? (
+            <p className="studio-hint">Nothing in this scene yet. Press + to add your screen, webcam, a picture or some text.</p>
+          ) : (
+            <ul className="studio-list">
+              {[...scene.items].reverse().map((i) => (
+                <SourceRow key={i.id} item={i} selected={i.id === selected} />
+              ))}
+            </ul>
+          )}
+        </section>
+      </aside>
+      <main className="studio-main">
+        <Preview />
+        <p className="studio-hint">Drag sources to move them, drag a corner to resize (hold Shift to stretch). Delete removes the selected one.</p>
+      </main>
+    </>
   )
 }
 
@@ -182,10 +203,20 @@ function pickPicture(): void {
 function RecordBar() {
   const recording = useStudio((s) => s.recording)
   const last = useStudio((s) => s.lastRecording)
+  const audioOnly = useStudio((s) => s.audioOnly)
+  const live = useStudio((s) => !!s.live)
   const now = useNow(!!recording)
   return (
     <header className="studio-top">
       <h2>Studio</h2>
+      <div className="studio-mode" role="group" aria-label="What to record">
+        <button className={!audioOnly ? 'on' : ''} disabled={!!recording || live} onClick={() => setAudioOnly(false)} title="Record your scenes: screen, webcam, pictures and sound">
+          <Monitor size={13} /> Video
+        </button>
+        <button className={audioOnly ? 'on' : ''} disabled={!!recording || live} onClick={() => setAudioOnly(true)} title="Record sound only, for voiceovers" data-studio-audio-only>
+          <Mic size={13} /> Audio only
+        </button>
+      </div>
       <span className="studio-top-gap" />
       {last && !recording && (
         <button className="btn" onClick={() => void window.api.studioReveal(last)} title={last}>
@@ -201,7 +232,7 @@ function RecordBar() {
           <Circle size={13} fill="currentColor" /> Record
         </button>
       )}
-<GoLive />
+      {!audioOnly && <GoLive />}
     </header>
   )
 }
@@ -406,27 +437,6 @@ function useDevices(kind: MediaDeviceKind): MediaDeviceInfo[] {
   return list
 }
 
-function Meter({ which }: { which: 'mic' | 'desktop' }) {
-  const bar = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    let raf = 0
-    let shown = 0
-    const tick = (): void => {
-      const v = level(which)
-      shown = Math.max(v, shown * 0.9)
-      if (bar.current) bar.current.style.transform = `scaleX(${shown})`
-      raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [which])
-  return (
-    <div className="studio-meter">
-      <div ref={bar} />
-    </div>
-  )
-}
-
 function Mixer() {
   const s = useStudio()
   const mics = useDevices('audioinput')
@@ -435,12 +445,13 @@ function Mixer() {
       <header>
         <h3>Sound</h3>
       </header>
+      <MicPresets />
       <div className="studio-channel">
         <div className="studio-row">
           <button className="icon-btn" title={s.micMuted ? 'Unmute' : 'Mute'} onClick={() => useStudio.setState({ micMuted: !s.micMuted })} disabled={s.micId === 'off'}>
             {s.micMuted || s.micId === 'off' ? <MicOff size={14} /> : <Mic size={14} />}
           </button>
-          <select value={s.micId} onChange={(e) => useStudio.setState({ micId: e.target.value })}>
+          <select value={s.micId} onChange={(e) => setMic(e.target.value)} aria-label="Microphone">
             <option value="">Default microphone</option>
             {mics.map((d) => (
               <option key={d.deviceId} value={d.deviceId}>
@@ -450,8 +461,13 @@ function Mixer() {
             <option value="off">No microphone</option>
           </select>
         </div>
-        <input type="range" min={0} max={2} step={0.05} value={s.micGain} onChange={(e) => useStudio.setState({ micGain: Number(e.target.value) })} title={`${Math.round(s.micGain * 100)}%`} />
+        <label className="studio-gain">
+          <span>Mic volume {Math.round(s.micGain * 100)}%</span>
+          <input type="range" min={0} max={2} step={0.05} value={s.micGain} onChange={(e) => setMicGain(Number(e.target.value))} aria-label="Mic volume" />
+        </label>
         <Meter which="mic" />
+        <ClipWarning />
+        <MicCleanupSettings />
       </div>
       <div className="studio-channel">
         <div className="studio-row">
@@ -481,6 +497,7 @@ function RecordingSettings() {
   const quality = useStudio((s) => s.quality)
   const folder = useStudio((s) => s.folder)
   const recording = useStudio((s) => !!s.recording)
+  const audioOnly = useStudio((s) => s.audioOnly)
   const [fallback, setFallback] = useState('')
   useEffect(() => void window.api.studioDefaultFolder().then(setFallback), [])
   return (
@@ -488,16 +505,18 @@ function RecordingSettings() {
       <header>
         <h3>Recording</h3>
       </header>
-      <label>
-        Quality
-        <select value={quality} disabled={recording} onChange={(e) => useStudio.setState({ quality: e.target.value as typeof quality })}>
-          {QUALITIES.map((q) => (
-            <option key={q.id} value={q.id}>
-              {q.label}
-            </option>
-          ))}
-        </select>
-      </label>
+      {!audioOnly && (
+        <label>
+          Quality
+          <select value={quality} disabled={recording} onChange={(e) => useStudio.setState({ quality: e.target.value as typeof quality })}>
+            {QUALITIES.map((q) => (
+              <option key={q.id} value={q.id}>
+                {q.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label>
         Save in
         <div className="studio-row">
@@ -518,6 +537,7 @@ function RecordingSettings() {
           </button>
         </div>
       </label>
+      {audioOnly && <TrimSettingsBox />}
     </section>
   )
 }

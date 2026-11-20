@@ -369,6 +369,16 @@ export const commands: Command[] = [
   { id: 'replay.save', group: 'Navigation', title: 'Save the last 30 seconds (instant replay)', run: () => void import('./replay').then((m) => m.saveReplay()) },
   { id: 'replay.toggle', group: 'Navigation', title: 'Turn instant replay on or off', run: () => setPrefs({ replayOn: !usePrefs.getState().prefs.replayOn }) },
   { id: 'studio.record', group: 'Navigation', title: 'Start or stop recording (Studio)', run: () => void import('./studio').then((m) => m.toggleRecording()) },
+  { id: 'studio.voiceover', group: 'Navigation', title: 'Record a voiceover (Studio, audio only)', run: () => {
+    void import('../store/studio').then((m) => m.setAudioOnly(true))
+    openSpecialTab(STUDIO_TAB)
+  } },
+  { id: 'studio.audioOnly', group: 'Navigation', title: 'Studio: switch between audio only and video', run: () => void import('../store/studio').then((m) => m.setAudioOnly(!m.useStudio.getState().audioOnly)) },
+  { id: 'studio.nextPreset', group: 'Navigation', title: 'Studio: load the next mic preset', run: () => void import('../store/studio').then((m) => m.nextPreset()) },
+  { id: 'studio.trim', group: 'Navigation', title: 'Studio: trim the silences out of the last voiceover', run: () => {
+    openSpecialTab(STUDIO_TAB)
+    void import('./studio').then((m) => m.trimLastRecording())
+  } },
   { id: 'minesweeper.open', group: 'Navigation', title: 'Play minesweeper (take a quick break)', run: () => openMiniGames('minesweeper') },
   { id: 'video.open', group: 'Navigation', title: 'Video player (play any video, MKV, AVI…)', run: () => openSpecialTab(VIDEO_TAB) },
   { id: 'mixer.open', group: 'Navigation', title: 'Volume mixer (a volume for each app)', run: () => openSpecialTab(MIXER_TAB) },

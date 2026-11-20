@@ -520,7 +520,9 @@ export interface NotesApi {
   studioDefaultFolder(): Promise<string>
   studioPickFolder(): Promise<string | null>
   /** Starts a recording file in `folder` (null = Videos/Orbit Recordings). */
-  studioStart(folder: string | null, ext: 'mp4' | 'webm'): Promise<{ id: number; path: string }>
+  studioStart(folder: string | null, ext: 'mp4' | 'webm' | 'm4a', kind?: 'video' | 'voiceover'): Promise<{ id: number; path: string }>
+  /** Saves a copy of a Studio recording with the long pauses shortened ("… (trimmed).wav"); lengths in seconds. */
+  studioTrim(path: string, settings: import('./studioAudio').TrimSettings): Promise<{ path: string; before: number; after: number }>
   studioChunk(id: number, data: Uint8Array): Promise<{ ok: boolean; error?: string }>
   /** Finishes the file; resolves to its path. */
   studioStop(id: number): Promise<string | null>

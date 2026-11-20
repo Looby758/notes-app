@@ -1,8 +1,12 @@
 import { app, BrowserWindow, desktopCapturer, dialog, ipcMain, shell, systemPreferences, type WebContents } from 'electron'
+import { spawn } from 'child_process'
 import { createWriteStream, existsSync, mkdirSync, statSync, type WriteStream } from 'fs'
+import { rm } from 'fs/promises'
 import { isAbsolute, join } from 'path'
 import { IS_MAC } from '@shared/platform'
 import { recordingFileName } from '@shared/studio'
+import { cleanTrim, cutArgs, detectArgs, isRecordingExt, keepSegments, keptLength, parseSilences, trimmedPath, type TrimSettings } from '@shared/studioAudio'
+import { ffmpegPath } from './ffmpeg'
 import type { StudioCaptureSource } from '@shared/types'
 import { logError } from './log'
 
@@ -61,12 +65,12 @@ export function setupStudio(): void {
     return res.canceled ? null : (res.filePaths[0] ?? null)
   })
 
-  ipcMain.handle('studio:start', (e, folder: string | null, ext: string) => {
+  ipcMain.handle('studio:start', (e, folder: string | null, ext: string, kind?: string) => {
     if (!isAppPage(e.sender)) throw new Error('Not allowed')
     const dir = folder && isAbsolute(folder) ? folder : defaultRecordingsFolder()
     mkdirSync(dir, { recursive: true })
     if (!statSync(dir).isDirectory()) throw new Error('That recordings folder isn’t a folder.')
-    let path = join(dir, recordingFileName(new Date(), ext === 'webm' ? 'webm' : 'mp4'))
+    let path = join(dir, recordingFileName(new Date(), isRecordingExt(ext) ? ext : 'mp4', kind === 'voiceover' ? 'Voiceover' : 'Recording'))
     for (let n = 2; existsSync(path); n++) path = path.replace(/( \(\d+\))?\.(\w+)$/, ` (${n}).$2`)
     const out = createWriteStream(path)
     const id = nextId++
@@ -99,6 +103,16 @@ export function setupStudio(): void {
     return rec.path
   })
 
+  ipcMain.handle('studio:trim', async (e, path: string, settings: unknown) => {
+    if (!isAppPage(e.sender)) throw new Error('Not allowed')
+    // Only the Studio's own recordings, never any other file on the computer.
+    if (typeof path !== 'string' || !made.has(path) || !existsSync(path)) throw new Error('That recording isn’t there any more.')
+    const out = trimmedPath(path)
+    const res = await trimSilences(path, out, cleanTrim(settings))
+    made.add(out)
+    return { path: out, ...res }
+  })
+
   ipcMain.handle('studio:reveal', (_e, path: string) => {
     if (made.has(path) && existsSync(path)) shell.showItemInFolder(path)
     else void shell.openPath(defaultRecordingsFolder())
@@ -108,4 +122,46 @@ export function setupStudio(): void {
     mkdirSync(dir, { recursive: true })
     return shell.openPath(dir)
   })
+}
+
+const parseTime = (t: string): number => {
+  const [h, m, sec] = t.split(':').map(Number)
+  return h * 3600 + m * 60 + sec
+}
+
+/** Runs ffmpeg once; resolves with what it printed and how far it got (seconds). */
+function runFfmpeg(args: string[]): Promise<{ log: string; at: number }> {
+  const binary = ffmpegPath()
+  if (!existsSync(binary)) return Promise.reject(new Error('Download the sound and video converter first.'))
+  return new Promise((resolve, reject) => {
+    const child = spawn(binary, ['-hide_banner', '-nostdin', '-y', ...args.slice(0, -1), '-progress', 'pipe:1', '-nostats', args[args.length - 1]], { windowsHide: true })
+    let log = ''
+    let at = 0
+    child.stderr.on('data', (chunk: Buffer) => (log = (log + chunk.toString()).slice(-400_000)))
+    child.stdout.on('data', (chunk: Buffer) => {
+      for (const m of chunk.toString().matchAll(/out_time_us=(\d+)/g)) at = Math.max(at, Number(m[1]) / 1e6)
+    })
+    child.on('error', () => reject(new Error('The converter couldn’t start.')))
+    child.on('close', (code) => {
+      if (code === 0) return resolve({ log, at })
+      logError('studio trim', new Error(log.split('\n').slice(-6).join('\n')))
+      reject(new Error(/No space left/i.test(log) ? 'There’s no room left on this computer to save it.' : 'The silences couldn’t be trimmed from this recording.'))
+    })
+  })
+}
+
+/** Finds the long pauses, then saves a copy without them. Resolves with the length before and after, in seconds. */
+async function trimSilences(input: string, output: string, settings: TrimSettings): Promise<{ before: number; after: number }> {
+  const found = await runFfmpeg(detectArgs(input, settings))
+  const d = /Duration: (\d+:\d{2}:\d{2}(?:\.\d+)?)/.exec(found.log)
+  // Recordings written as they're made may not say how long they are: then how far ffmpeg read is used.
+  const before = Math.max(found.at, d ? parseTime(d[1]) : 0)
+  const segs = keepSegments(parseSilences(found.log, before), before, settings.keep)
+  try {
+    await runFfmpeg(cutArgs(input, output, segs))
+  } catch (err) {
+    await rm(output, { force: true })
+    throw err
+  }
+  return { before, after: keptLength(segs) }
 }

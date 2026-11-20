@@ -1,7 +1,8 @@
 import { fitRect, pickRecordingType, qualityById, type StudioItem } from '@shared/studio'
+import { ClipWatch, LOW_CUT_HZ, pickAudioType, trimSummary } from '@shared/studioAudio'
 import type { LiveService } from '@shared/live'
 import { IS_MAC } from '@shared/platform'
-import { activeScene, useStudio } from '../store/studio'
+import { activePreset, activeScene, loadPreset, micDevices, useStudio } from '../store/studio'
 import { useMusic, watchMusic } from '../store/music'
 import { notify } from '../store/notify'
 import { errorMessage } from './paths'
@@ -36,7 +37,12 @@ let mixOut: MediaStreamAudioDestinationNode | null = null
 interface Channel {
   stream: MediaStream
   source: MediaStreamAudioSourceNode
+  /** The low-cut (rumble) filter: a high-pass that's set to almost nothing when it's off. */
+  filter: BiquadFilterNode
   gain: GainNode
+  /** Before Orbit's gain: how loud the mic itself is. */
+  input: AnalyserNode
+  /** After it: what's recorded. */
   meter: AnalyserNode
   key: string
 }
@@ -146,6 +152,8 @@ function closeFeed(key: string): void {
 /** The feeds any scene uses, so switching scenes is instant. */
 function wanted(): Set<string> {
   const keys = new Set<string>()
+  // Audio only: no screens or webcams running at all.
+  if (useStudio.getState().audioOnly) return keys
   for (const s of useStudio.getState().scenes) for (const i of s.items) {
     const k = feedKey(i)
     if (k) keys.add(k)
@@ -290,6 +298,7 @@ function clip(c: CanvasRenderingContext2D, text: string, maxW: number): string {
 }
 
 function draw(): void {
+  if (useStudio.getState().audioOnly) return
   const cv = studioCanvas()
   const c = ctx
   if (!c) return
@@ -316,13 +325,17 @@ function closeChannel(which: 'mic' | 'desktop'): void {
   if (!ch) return
   ch.stream.getTracks().forEach((t) => t.stop())
   ch.source.disconnect()
+  ch.filter.disconnect()
   ch.gain.disconnect()
   channels[which] = null
 }
 
 function applyGains(): void {
   const s = useStudio.getState()
-  if (channels.mic) channels.mic.gain.gain.value = s.micMuted ? 0 : s.micGain
+  if (channels.mic) {
+    channels.mic.gain.gain.value = s.micMuted ? 0 : s.micGain
+    channels.mic.filter.frequency.value = s.micClean.lowCut ? LOW_CUT_HZ : 5
+  }
   if (channels.desktop) channels.desktop.gain.gain.value = s.desktopMuted ? 0 : s.desktopGain
 }
 
@@ -332,8 +345,15 @@ async function openChannel(which: 'mic' | 'desktop', key: string): Promise<void>
     let stream: MediaStream
     if (which === 'mic') {
       await window.api.micAccess()
+      const { micId, micClean } = useStudio.getState()
       stream = await navigator.mediaDevices.getUserMedia({
-        audio: { ...(key ? { deviceId: { exact: key } } : {}), echoCancellation: true, noiseSuppression: true, autoGainControl: false },
+        audio: {
+          ...(micId ? { deviceId: { exact: micId } } : {}),
+          echoCancellation: micClean.echoCancellation,
+          noiseSuppression: micClean.noiseSuppression,
+          autoGainControl: micClean.autoGain,
+          sampleRate: { ideal: 48000 }
+        },
         video: false
       })
     } else {
@@ -353,13 +373,20 @@ async function openChannel(which: 'mic' | 'desktop', key: string): Promise<void>
     }
     closeChannel(which)
     const source = audio.createMediaStreamSource(stream)
+    const filter = audio.createBiquadFilter()
+    filter.type = 'highpass'
+    filter.frequency.value = 5
     const gain = audio.createGain()
+    const input = audio.createAnalyser()
     const meter = audio.createAnalyser()
-    meter.fftSize = 1024
-    source.connect(gain)
+    input.fftSize = 2048
+    meter.fftSize = 2048
+    source.connect(input)
+    source.connect(filter)
+    filter.connect(gain)
     gain.connect(meter)
     gain.connect(mixOut)
-    channels[which] = { stream, source, gain, meter, key }
+    channels[which] = { stream, source, filter, gain, input, meter, key }
     applyGains()
     useStudio.setState({ audioProblem: null })
   } catch (err) {
@@ -370,7 +397,8 @@ async function openChannel(which: 'mic' | 'desktop', key: string): Promise<void>
 /** What each channel should be listening to (null = nothing). */
 function desiredKey(which: 'mic' | 'desktop'): string | null {
   const s = useStudio.getState()
-  if (which === 'mic') return s.micId === 'off' ? null : s.micId
+  // The clean-up switches are part of the key: changing one opens the mic again with them.
+  if (which === 'mic') return s.micId === 'off' ? null : `${s.micId}|${+s.micClean.noiseSuppression}${+s.micClean.echoCancellation}${+s.micClean.autoGain}`
   return s.desktopOn && desktopAudioSupported ? 'desktop' : null
 }
 
@@ -386,8 +414,8 @@ function syncAudio(): void {
 }
 
 /** How loud a channel is right now, 0–1 (for the meters). */
-export function level(which: 'mic' | 'desktop'): number {
-  const m = channels[which]?.meter
+export function level(which: 'mic' | 'desktop', stage: 'meter' | 'input' = 'meter'): number {
+  const m = channels[which]?.[stage]
   if (!m) return 0
   const data = new Float32Array(m.fftSize)
   m.getFloatTimeDomainData(data)
@@ -397,6 +425,39 @@ export function level(which: 'mic' | 'desktop'): number {
 }
 
 export const hasChannel = (which: 'mic' | 'desktop'): boolean => !!channels[which]
+
+// ---------- clipping ----------
+
+const micClip = new ClipWatch()
+const gainClip = new ClipWatch()
+let clipTimer: ReturnType<typeof setInterval> | undefined
+
+/** Checks the mic for clipping 20 times a second while the Studio is awake. */
+function watchClipping(on: boolean): void {
+  clearInterval(clipTimer)
+  clipTimer = undefined
+  if (!on) {
+    if (useStudio.getState().clipping) useStudio.setState({ clipping: null })
+    return
+  }
+  clipTimer = setInterval(() => {
+    const now = performance.now()
+    const muted = useStudio.getState().micMuted
+    micClip.push(muted ? 0 : level('mic', 'input'), now)
+    gainClip.push(muted ? 0 : level('mic'), now)
+    const clipping = micClip.clipping(now) ? 'mic' : gainClip.clipping(now) ? 'gain' : null
+    const s = useStudio.getState()
+    const clips = s.recording ? Math.max(micClip.clips, gainClip.clips) : s.clips
+    if (clipping !== s.clipping || clips !== s.clips) useStudio.setState({ clipping, clips })
+  }, 50)
+}
+
+/** Starts counting clips from zero (when a recording starts). */
+function resetClips(): void {
+  micClip.reset()
+  gainClip.reset()
+  useStudio.setState({ clips: 0 })
+}
 
 // ---------- wake / sleep ----------
 
@@ -420,14 +481,16 @@ function wake(): void {
   startLoop()
   syncFeeds()
   syncAudio()
+  void refreshPresetMic()
+  watchClipping(true)
   stopWatchingMusic = watchMusic()
   unsubscribe = useStudio.subscribe((s, prev) => {
-    if (s.scenes !== prev.scenes) syncFeeds()
+    if (s.scenes !== prev.scenes || s.audioOnly !== prev.audioOnly) syncFeeds()
     if (s.quality !== prev.quality) {
       studioCanvas()
       startLoop()
     }
-    if (s.micId !== prev.micId || s.desktopOn !== prev.desktopOn) syncAudio()
+    if (s.micId !== prev.micId || s.desktopOn !== prev.desktopOn || s.micClean !== prev.micClean) syncAudio()
     else if (s.micGain !== prev.micGain || s.micMuted !== prev.micMuted || s.desktopGain !== prev.desktopGain || s.desktopMuted !== prev.desktopMuted) applyGains()
   })
 }
@@ -437,6 +500,7 @@ function sleep(): void {
   clearInterval(loop)
   loop = undefined
   window.removeEventListener('keydown', onSceneKey, true)
+  watchClipping(false)
   unsubscribe?.()
   unsubscribe = null
   stopWatchingMusic?.()
@@ -447,6 +511,18 @@ function sleep(): void {
   void audio?.close()
   audio = null
   mixOut = null
+}
+
+/**
+ * Mic presets load again each session: if the last preset's mic came back with a new id (a
+ * different USB port, a Windows update), it's found again by its name.
+ */
+async function refreshPresetMic(): Promise<void> {
+  const s = useStudio.getState()
+  const p = activePreset(s)
+  if (!p || !p.micId || p.micId === 'off') return
+  const devices = await micDevices()
+  if (devices.length && !devices.some((d) => d.deviceId === p.micId)) loadPreset(p.id, devices)
 }
 
 /** The Studio page opened (true) or closed (false). */
@@ -460,6 +536,7 @@ export function studioPage(open: boolean): void {
 
 export async function startRecording(): Promise<void> {
   if (recorder) return
+  if (useStudio.getState().audioOnly) return startAudioRecording()
   const type = pickRecordingType((m) => MediaRecorder.isTypeSupported(m))
   if (!type) {
     notify('This computer can’t record video.')
@@ -486,9 +563,53 @@ export async function startRecording(): Promise<void> {
     notify(`Couldn’t start recording: ${errorMessage(err)}`)
     return
   }
+  beginWriting(rec, file, video, false)
+}
+
+/** Audio only (voiceovers): just the mic (and desktop sound, if it's on), saved as an .m4a. */
+async function startAudioRecording(): Promise<void> {
+  const type = pickAudioType((m) => MediaRecorder.isTypeSupported(m))
+  if (!type) {
+    notify('This computer can’t record sound.')
+    return
+  }
+  wake()
+  await audioReady()
+  if (!channels.mic && !channels.desktop) {
+    notify(useStudio.getState().micId === 'off' ? 'Pick a microphone first (Sound, on the right).' : 'The microphone isn’t working yet. Check Sound, on the right.')
+    return
+  }
+  const s = useStudio.getState()
+  let file: { id: number; path: string }
+  try {
+    file = await window.api.studioStart(s.folder, type.ext, 'voiceover')
+  } catch (err) {
+    notify(`Couldn’t start recording: ${errorMessage(err)}`)
+    return
+  }
+  let rec: MediaRecorder
+  try {
+    rec = new MediaRecorder(new MediaStream(mixOut?.stream.getAudioTracks() ?? []), { mimeType: type.mime, audioBitsPerSecond: 256_000 })
+  } catch (err) {
+    await window.api.studioStop(file.id)
+    notify(`Couldn’t start recording: ${errorMessage(err)}`)
+    return
+  }
+  beginWriting(rec, file, [], true)
+}
+
+/** Waits (up to 2 seconds) for the mic to finish opening, so a recording doesn't start silent. */
+async function audioReady(): Promise<void> {
+  for (let i = 0; i < 40 && !channels.mic && desiredKey('mic') !== null && !useStudio.getState().audioProblem; i++) await new Promise((r) => setTimeout(r, 50))
+}
+
+/** Sends a recorder's pieces to the file as they're made, and tidies up when it stops. */
+function beginWriting(rec: MediaRecorder, file: { id: number; path: string }, ownTracks: MediaStreamTrack[], audioOnly: boolean): void {
   recorder = rec
   recordingId = file.id
   writes = Promise.resolve()
+  resetClips()
+  const startedAt = Date.now()
   rec.ondataavailable = (e) => {
     if (!e.data.size) return
     const id = file.id
@@ -501,16 +622,79 @@ export async function startRecording(): Promise<void> {
     })
   }
   rec.onstop = () => {
-    video.forEach((t) => t.stop())
+    ownTracks.forEach((t) => t.stop())
     void writes.then(async () => {
       const path = await window.api.studioStop(file.id)
-      useStudio.setState({ recording: null, lastRecording: path })
-      if (path) notify(`Saved your recording: ${path.split(/[\\/]/).pop()}`, 'info')
+      const clips = useStudio.getState().clips
+      useStudio.setState({ recording: null, lastRecording: path, lastRecordingInfo: { audioOnly, clips, length: (Date.now() - startedAt) / 1000 }, trimming: null })
+      if (path) {
+        const name = path.split(/[\\/]/).pop()
+        notify(clips ? `Saved ${name}. Heads up: the mic was too loud ${clips === 1 ? 'once' : `${clips} times`}.` : `Saved your recording: ${name}`, 'info')
+        if (audioOnly && useStudio.getState().trim.auto) void trimRecording(path)
+      }
       sleep()
     })
   }
   rec.start(1000)
-  useStudio.setState({ recording: { startedAt: Date.now(), path: file.path } })
+  useStudio.setState({ recording: { startedAt, path: file.path, audioOnly } })
+}
+
+// ---------- trimming silences ----------
+
+/**
+ * Makes a copy of a recording with the long pauses shortened ("… (trimmed).wav", beside it), using
+ * the converter (ffmpeg). The original is never changed.
+ */
+export async function trimRecording(path: string): Promise<void> {
+  if (useStudio.getState().trimming?.state === 'working') return
+  const status = await window.api.videoConverterStatus().catch(() => null)
+  if (status?.state !== 'ready') {
+    useStudio.setState({
+      trimming: {
+        source: path,
+        state: 'error',
+        needsFfmpeg: status?.state === 'missing',
+        message:
+          status?.state === 'downloading'
+            ? 'The sound and video converter is still downloading. Try again in a moment.'
+            : status?.state === 'unsupported'
+              ? 'Trimming silences needs the converter, which isn’t available for this computer.'
+              : 'Trimming silences uses Orbit’s sound and video converter (ffmpeg). Download it once, then trim.'
+      }
+    })
+    return
+  }
+  useStudio.setState({ trimming: { source: path, state: 'working' } })
+  try {
+    const res = await window.api.studioTrim(path, useStudio.getState().trim)
+    // A file that's written as it's recorded may not say how long it is: use how long the recording ran.
+    const info = useStudio.getState().lastRecordingInfo
+    const before = res.before > res.after + 0.05 || !info || useStudio.getState().lastRecording !== path ? res.before : Math.max(res.before, info.length)
+    useStudio.setState({ trimming: { source: path, state: 'done', path: res.path, message: trimSummary(before, res.after) } })
+  } catch (err) {
+    useStudio.setState({ trimming: { source: path, state: 'error', message: errorMessage(err) } })
+  }
+}
+
+/** Downloads the converter, then trims what was waiting for it. */
+export async function getConverterAndTrim(): Promise<void> {
+  const t = useStudio.getState().trimming
+  if (!t) return
+  useStudio.setState({ trimming: { source: t.source, state: 'working', message: 'Downloading the converter…' } })
+  const state = await window.api.getVideoConverter().catch(() => null)
+  if (state?.state !== 'ready') {
+    useStudio.setState({ trimming: { source: t.source, state: 'error', needsFfmpeg: true, message: state?.error ? `The download didn’t work: ${state.error}` : 'The download didn’t work. Try again.' } })
+    return
+  }
+  useStudio.setState({ trimming: null })
+  await trimRecording(t.source)
+}
+
+/** Ctrl+K: trims the last audio-only recording. */
+export function trimLastRecording(): void {
+  const s = useStudio.getState()
+  if (!s.lastRecording || !s.lastRecordingInfo?.audioOnly) return notify('Record something with Audio only turned on first (in the Studio).', 'info')
+  void trimRecording(s.lastRecording)
 }
 
 export async function stopRecording(): Promise<void> {
