@@ -520,7 +520,11 @@ export interface NotesApi {
   studioDefaultFolder(): Promise<string>
   studioPickFolder(): Promise<string | null>
   /** Starts a recording file in `folder` (null = Videos/Orbit Recordings). */
-  studioStart(folder: string | null, ext: 'mp4' | 'webm' | 'm4a', kind?: 'video' | 'voiceover'): Promise<{ id: number; path: string }>
+  studioStart(folder: string | null, ext: 'mp4' | 'webm' | 'm4a', kind?: 'video' | 'voiceover' | 'take', take?: { script: string; index: number; title: string }): Promise<{ id: number; path: string }>
+  /** A section take's sound (record by section), to play it back. */
+  studioReadTake(path: string): Promise<Uint8Array>
+  /** Joins section takes, in order, into "<script> voiceover (joined).wav" beside them; length in seconds. */
+  studioJoinTakes(parts: import('./takes').JoinPart[], script: string): Promise<{ path: string; length: number }>
   /** Saves a copy of a Studio recording with the long pauses shortened ("… (trimmed).wav"); lengths in seconds. */
   studioTrim(path: string, settings: import('./studioAudio').TrimSettings): Promise<{ path: string; before: number; after: number }>
   /** Saves the teleprompter's cue times beside a Studio recording ("<recording>.cues.json"). */

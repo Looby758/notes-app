@@ -650,9 +650,14 @@ export function studioPage(open: boolean): void {
 
 // ---------- recording ----------
 
-export async function startRecording(): Promise<void> {
+/** What a recording is for: `take` makes it one section's take (record by section, audio only). */
+export interface RecordOptions {
+  take?: { script: string; index: number; title: string }
+}
+
+export async function startRecording(opts: RecordOptions = {}): Promise<void> {
   if (recorder) return
-  if (useStudio.getState().audioOnly) return startAudioRecording()
+  if (useStudio.getState().audioOnly || opts.take) return startAudioRecording(opts)
   const type = pickRecordingType((m) => MediaRecorder.isTypeSupported(m))
   if (!type) {
     notify('This computer can’t record video.')
@@ -683,7 +688,7 @@ export async function startRecording(): Promise<void> {
 }
 
 /** Audio only (voiceovers): just the mic (and desktop sound, if it's on), saved as an .m4a. */
-async function startAudioRecording(): Promise<void> {
+async function startAudioRecording(opts: RecordOptions = {}): Promise<void> {
   const type = pickAudioType((m) => MediaRecorder.isTypeSupported(m))
   if (!type) {
     notify('This computer can’t record sound.')
@@ -698,7 +703,7 @@ async function startAudioRecording(): Promise<void> {
   const s = useStudio.getState()
   let file: { id: number; path: string }
   try {
-    file = await window.api.studioStart(s.folder, type.ext, 'voiceover')
+    file = opts.take ? await window.api.studioStart(s.folder, type.ext, 'take', opts.take) : await window.api.studioStart(s.folder, type.ext, 'voiceover')
   } catch (err) {
     notify(`Couldn’t start recording: ${errorMessage(err)}`)
     return

@@ -42,6 +42,8 @@ export interface PrompterState extends PrompterLook {
   countdown: number | null
   /** Asked to go back to the top (the scroller watches this). */
   restartAt: number
+  /** Asked to go to a place in the script (a section's start: its offset in the note). */
+  jump: { from: number; at: number } | null
 }
 
 const KEY = 'studio.teleprompter'
@@ -71,7 +73,7 @@ function load(): Partial<PrompterState> {
   }
 }
 
-export const usePrompter = create<PrompterState>(() => ({ ...DEFAULT_LOOK, open: false, script: null, ...load(), playing: false, countdown: null, restartAt: 0 }))
+export const usePrompter = create<PrompterState>(() => ({ ...DEFAULT_LOOK, open: false, script: null, ...load(), playing: false, countdown: null, restartAt: 0, jump: null }))
 
 let saveTimer: ReturnType<typeof setTimeout> | undefined
 usePrompter.subscribe((s) => {
@@ -161,6 +163,12 @@ export function togglePrompter(): void {
   else startPrompter(false)
 }
 
+/** Scrolls to a place in the script (`from`, an offset in the note; 0 = the top) and waits there. */
+export function jumpPrompter(from: number): void {
+  pausePrompter()
+  usePrompter.setState({ jump: { from, at: Date.now() } })
+}
+
 export function restartPrompter(): void {
   pausePrompter()
   usePrompter.setState({ restartAt: Date.now() })
@@ -169,6 +177,11 @@ export function restartPrompter(): void {
 // ---------- cue times while recording ----------
 
 let take: { path: string; startedAt: number; script: string; cues: Cue[] } | null = null
+/** The cues of recent recordings (for joining section takes), by recording path. */
+const recentCues = new Map<string, Cue[]>()
+
+/** The cue times saved for a recording made this session ([] if none). */
+export const cuesOf = (path: string): Cue[] => recentCues.get(path) ?? []
 
 /** A marker reached the reading line (called by the scroller). */
 export function markerReached(at: number, marker: string): void {
@@ -189,6 +202,10 @@ useStudio.subscribe((s, prev) => {
     const done = take
     take = null
     if (usePrompter.getState().playing || usePrompter.getState().countdown !== null) pausePrompter()
+    if (done) {
+      recentCues.set(done.path, done.cues)
+      if (recentCues.size > 200) recentCues.delete(recentCues.keys().next().value as string)
+    }
     if (done && done.cues.length) void saveCues(done)
   }
 })

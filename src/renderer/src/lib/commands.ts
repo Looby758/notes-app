@@ -380,6 +380,22 @@ export const commands: Command[] = [
     openSpecialTab(STUDIO_TAB)
   } },
   { id: 'teleprompter.toggle', group: 'Navigation', title: 'Teleprompter: pause / carry on scrolling', shortcut: 'Ctrl+Alt+Space', run: () => void import('../store/teleprompter').then((m) => m.togglePrompter()) },
+  { id: 'takes.bySection', group: 'Navigation', title: 'Teleprompter: record by section (one section at a time)', run: () => {
+    openSpecialTab(STUDIO_TAB)
+    void import('../store/takes').then((m) => m.setBySection(!m.useTakes.getState().on))
+  } },
+  { id: 'takes.record', group: 'Navigation', title: 'Record by section: record (or stop) this section', run: () => {
+    openSpecialTab(STUDIO_TAB)
+    void import('../store/takes').then((m) => {
+      if (!m.useTakes.getState().on) m.setBySection(true)
+      void m.recordSection()
+    })
+  } },
+  { id: 'takes.retake', group: 'Navigation', title: 'Record by section: quick retake (start this section again)', run: () => void import('../store/takes').then((m) => m.quickRetake()) },
+  { id: 'takes.join', group: 'Navigation', title: 'Record by section: join the takes into one voiceover', run: () => {
+    openSpecialTab(STUDIO_TAB)
+    void import('../store/takes').then((m) => m.joinTakes())
+  } },
   { id: 'studio.trim', group: 'Navigation', title: 'Studio: clean up the last voiceover (silences, mouth clicks, loudness)', run: () => {
     openSpecialTab(STUDIO_TAB)
     void import('./studio').then((m) => m.trimLastRecording())

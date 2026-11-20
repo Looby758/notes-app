@@ -1,11 +1,12 @@
 import { app, BrowserWindow, desktopCapturer, dialog, ipcMain, shell, systemPreferences, type WebContents } from 'electron'
 import { spawn } from 'child_process'
 import { createWriteStream, existsSync, mkdirSync, statSync, type WriteStream } from 'fs'
-import { rm, writeFile } from 'fs/promises'
-import { isAbsolute, join } from 'path'
+import { readFile, rm, stat, writeFile } from 'fs/promises'
+import { basename, dirname, isAbsolute, join } from 'path'
 import { IS_MAC } from '@shared/platform'
 import { recordingFileName } from '@shared/studio'
 import { cleanTrim, cleanedPath, cutArgs, detectArgs, isRecordingExt, keepSegments, keptLength, parseSilences, type TrimSettings } from '@shared/studioAudio'
+import { isTakePath, joinArgs, joinedFileName, takeFileName, takesFolderName, type JoinPart } from '@shared/takes'
 import { ffmpegPath } from './ffmpeg'
 import type { StudioCaptureSource } from '@shared/types'
 import { logError } from './log'
@@ -65,13 +66,25 @@ export function setupStudio(): void {
     return res.canceled ? null : (res.filePaths[0] ?? null)
   })
 
-  ipcMain.handle('studio:start', (e, folder: string | null, ext: string, kind?: string) => {
+  ipcMain.handle('studio:start', (e, folder: string | null, ext: string, kind?: string, take?: { script?: unknown; index?: unknown; title?: unknown }) => {
     if (!isAppPage(e.sender)) throw new Error('Not allowed')
-    const dir = folder && isAbsolute(folder) ? folder : defaultRecordingsFolder()
+    const base = folder && isAbsolute(folder) ? folder : defaultRecordingsFolder()
+    const safeExt = isRecordingExt(ext) ? ext : 'mp4'
+    // A take of one section: "<script> sections/02 The prison - take 3.m4a".
+    const isTake = kind === 'take' && !!take && typeof take.script === 'string' && typeof take.title === 'string' && Number.isInteger(take.index)
+    const dir = isTake ? join(base, takesFolderName(take.script as string)) : base
     mkdirSync(dir, { recursive: true })
     if (!statSync(dir).isDirectory()) throw new Error('That recordings folder isn’t a folder.')
-    let path = join(dir, recordingFileName(new Date(), isRecordingExt(ext) ? ext : 'mp4', kind === 'voiceover' ? 'Voiceover' : 'Recording'))
-    for (let n = 2; existsSync(path); n++) path = path.replace(/( \(\d+\))?\.(\w+)$/, ` (${n}).$2`)
+    let path: string
+    if (isTake) {
+      const index = Math.max(0, Math.min(998, take.index as number))
+      let n = 1
+      while (existsSync(join(dir, takeFileName(index, take.title as string, n, safeExt)))) n++
+      path = join(dir, takeFileName(index, take.title as string, n, safeExt))
+    } else {
+      path = join(dir, recordingFileName(new Date(), safeExt, kind === 'voiceover' ? 'Voiceover' : 'Recording'))
+      for (let n = 2; existsSync(path); n++) path = path.replace(/( \(\d+\))?\.(\w+)$/, ` (${n}).$2`)
+    }
     const out = createWriteStream(path)
     const id = nextId++
     const rec: Recording = { path, out }
@@ -122,8 +135,39 @@ export function setupStudio(): void {
     await writeFile(`${path}.cues.json`, json, 'utf8')
   })
 
+  // A take's sound, to listen back to while you pick the best one.
+  ipcMain.handle('studio:readTake', async (e, path: string) => {
+    if (!isAppPage(e.sender)) throw new Error('Not allowed')
+    if (!ownTake(path)) throw new Error('That take isn’t there any more.')
+    if ((await stat(path)).size > 300_000_000) throw new Error('That take is too long to play here.')
+    return new Uint8Array(await readFile(path))
+  })
+
+  // Joins the takes you picked, in order, into one WAV beside them.
+  ipcMain.handle('studio:joinTakes', async (e, parts: unknown, script: string) => {
+    if (!isAppPage(e.sender)) throw new Error('Not allowed')
+    if (!Array.isArray(parts) || !parts.length || parts.length > 500 || typeof script !== 'string') throw new Error('There are no takes to join.')
+    const clean: JoinPart[] = parts.map((p: Partial<JoinPart>) => {
+      if (!p || typeof p.path !== 'string' || !ownTake(p.path)) throw new Error('One of the takes isn’t there any more. Record it again, or pick another take.')
+      const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(36_000, v)) : 0)
+      return { path: p.path, from: num(p.from), length: num(p.length) }
+    })
+    const dir = dirname(clean[0].path)
+    let n = 1
+    while (existsSync(join(dir, joinedFileName(script, n)))) n++
+    const out = join(dir, joinedFileName(script, n))
+    try {
+      const res = await runFfmpeg(joinArgs(clean, out), 'The takes couldn’t be joined.')
+      made.add(out)
+      return { path: out, length: res.at }
+    } catch (err) {
+      await rm(out, { force: true })
+      throw err
+    }
+  })
+
   ipcMain.handle('studio:reveal', (_e, path: string) => {
-    if (made.has(path) && existsSync(path)) shell.showItemInFolder(path)
+    if ((made.has(path) || ownTake(path)) && existsSync(path)) shell.showItemInFolder(path)
     else void shell.openPath(defaultRecordingsFolder())
   })
   ipcMain.handle('studio:openFolder', (_e, folder: string | null) => {
@@ -133,13 +177,19 @@ export function setupStudio(): void {
   })
 }
 
+/** A take the Studio recorded (this session, or an earlier one: then known by its name and folder). */
+function ownTake(path: unknown): path is string {
+  if (typeof path !== 'string' || !isAbsolute(path) || !existsSync(path)) return false
+  return made.has(path) || (isTakePath(path) && basename(dirname(path)).endsWith(' sections'))
+}
+
 const parseTime = (t: string): number => {
   const [h, m, sec] = t.split(':').map(Number)
   return h * 3600 + m * 60 + sec
 }
 
 /** Runs ffmpeg once; resolves with what it printed and how far it got (seconds). */
-function runFfmpeg(args: string[]): Promise<{ log: string; at: number }> {
+function runFfmpeg(args: string[], failed = 'This recording couldn’t be cleaned up.'): Promise<{ log: string; at: number }> {
   const binary = ffmpegPath()
   if (!existsSync(binary)) return Promise.reject(new Error('Download the sound and video converter first.'))
   return new Promise((resolve, reject) => {
@@ -154,7 +204,7 @@ function runFfmpeg(args: string[]): Promise<{ log: string; at: number }> {
     child.on('close', (code) => {
       if (code === 0) return resolve({ log, at })
       logError('studio trim', new Error(log.split('\n').slice(-6).join('\n')))
-      reject(new Error(/No space left/i.test(log) ? 'There’s no room left on this computer to save it.' : 'This recording couldn’t be cleaned up.'))
+      reject(new Error(/No space left/i.test(log) ? 'There’s no room left on this computer to save it.' : failed))
     })
   })
 }

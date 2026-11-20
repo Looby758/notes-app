@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import '@fontsource/opendyslexic/400.css'
 import '@fontsource/opendyslexic/700.css'
-import { ChevronsDown, ChevronsUp, Expand, FlipHorizontal, Minus, Pause, Play, Plus, RefreshCw, RotateCcw, Settings2, X } from 'lucide-react'
+import { ChevronsDown, ChevronsUp, Expand, FlipHorizontal, ListOrdered, Minus, Pause, Play, Plus, RefreshCw, RotateCcw, Settings2, X } from 'lucide-react'
 import type { FileNode } from '@shared/types'
 import { showKeys } from '@shared/platform'
 import { isScriptNote, MARKER_INFO, resolveImage } from '../../lib/script'
@@ -9,6 +9,9 @@ import { crossed, holdFor, prompterBlocks, prompterWords, scrollSpeed, sectionJu
 import { toVaultUrl } from '../../lib/paths'
 import { isTyping } from '../../lib/undo'
 import { listFonts } from '../../lib/fonts'
+import { sectionsOf } from '../../lib/takes'
+import { quickRetake, recordSection, scriptEndReached, sectionMarkerReached, setBySection, setTakeSections, stepSection, useTakes } from '../../store/takes'
+import { SectionTakes } from './SectionTakes'
 import { vaultImages } from '../Editor/scriptTools'
 import { useVault } from '../../store/vault'
 import { usePrefs } from '../../store/prefs'
@@ -100,6 +103,10 @@ export function Teleprompter({ compactTop }: { compactTop?: React.ReactNode }) {
 
   const blocks = useMemo(() => (text === null ? [] : prompterBlocks(text)), [text])
   const words = useMemo(() => prompterWords(blocks), [blocks])
+  const bySection = useTakes((t) => t.on)
+  const currentFrom = useTakes((t) => (t.on ? (t.sections.find((x) => x.key === t.current)?.from ?? null) : null))
+  // Record by section works from the script's sections.
+  useEffect(() => setTakeSections(text === null ? null : s.script, text === null ? [] : sectionsOf(text, wpm)), [text, s.script, wpm])
 
   // ---------- scrolling ----------
 
@@ -150,6 +157,22 @@ export function Teleprompter({ compactTop }: { compactTop?: React.ReactNode }) {
     if (scroller.current) scroller.current.scrollTop = 0
   }, [s.restartAt, s.script])
 
+  // To a section's start (record by section): its title just under the reading line.
+  useEffect(() => {
+    if (!s.jump) return
+    const go = (): void => {
+      measure()
+      const m = markers.current.find((x) => x.from === s.jump!.from && x.type === 'SECTION')
+      pos.current = m ? Math.max(0, m.y - live.current.fontSize * 1.6) : 0
+      holdUntil.current = 0
+      if (scroller.current) scroller.current.scrollTop = pos.current
+    }
+    go()
+    // Once more after the script has laid out (a jump can come with a new script).
+    const t = setTimeout(go, 120)
+    return () => clearTimeout(t)
+  }, [s.jump, blocks])
+
   useEffect(() => {
     let raf = 0
     let last = performance.now()
@@ -167,10 +190,14 @@ export function Teleprompter({ compactTop }: { compactTop?: React.ReactNode }) {
           const max = el.scrollHeight - el.clientHeight
           pos.current = Math.min(max, pos.current + speed * dt)
           el.scrollTop = pos.current
-          if (pos.current >= max - 0.5) pausePrompter()
+          if (pos.current >= max - 0.5) {
+            pausePrompter()
+            scriptEndReached()
+          }
         }
         for (const m of crossed(markers.current, before, pos.current)) {
           markerReached(m.from, m.text)
+          if (m.type === 'SECTION') sectionMarkerReached(m.from)
           if (st.holdPauses && holdFor(m) > 0) holdUntil.current = now + holdFor(m) * 1000
           if (m.type === 'IMAGE') {
             const img = resolveImage(m.value, vaultImages(), usePrefs.getState().prefs.attachmentFolder)
@@ -205,11 +232,14 @@ export function Teleprompter({ compactTop }: { compactTop?: React.ReactNode }) {
       const k = e.key
       // A button you just clicked keeps the focus: Space shouldn't press it again as well.
       if (k === ' ' && e.target instanceof HTMLButtonElement) e.target.blur()
+      const sections = useTakes.getState().on
       if (k === ' ') togglePrompter()
       else if (k === 'ArrowUp') nudgeSpeed(0.05)
       else if (k === 'ArrowDown') nudgeSpeed(-0.05)
-      else if (k === 'PageDown') jump(1)
-      else if (k === 'PageUp') jump(-1)
+      else if (k === 'PageDown') (sections ? stepSection(1) : jump(1))
+      else if (k === 'PageUp') (sections ? stepSection(-1) : jump(-1))
+      else if (sections && k === 'Enter' && !(e.target instanceof HTMLButtonElement)) void recordSection()
+      else if (sections && (k === 'r' || k === 'R')) quickRetake()
       else if (k === 'Home') restartPrompter()
       else return
       e.preventDefault()
@@ -237,14 +267,17 @@ export function Teleprompter({ compactTop }: { compactTop?: React.ReactNode }) {
         <button className="icon-btn" title="Load the script again (after editing it)" onClick={() => setReload((n) => n + 1)}>
           <RefreshCw size={14} />
         </button>
+        <button className={`btn prompter-by-section ${bySection ? 'on' : ''}`} onClick={() => setBySection(!bySection)} title="Record one section at a time, then join the best takes" aria-pressed={bySection} data-prompter-by-section>
+          <ListOrdered size={14} /> By section
+        </button>
         <span className="prompter-gap" />
-        <button className="icon-btn" title={`Back a section (${showKeys('PageUp')})`} onClick={() => jump(-1)}>
+        <button className="icon-btn" title={`Back a section (${showKeys('PageUp')})`} onClick={() => (bySection ? stepSection(-1) : jump(-1))}>
           <ChevronsUp size={15} />
         </button>
         <button className={`btn prompter-play ${s.playing ? 'on' : ''}`} onClick={() => (s.playing || s.countdown !== null ? pausePrompter() : startPrompter(false))} title="Pause or carry on (Space)" data-prompter-play>
           {s.playing ? <Pause size={14} /> : <Play size={14} />} {s.playing ? 'Pause' : s.countdown !== null ? s.countdown : 'Scroll'}
         </button>
-        <button className="icon-btn" title={`On a section (${showKeys('PageDown')})`} onClick={() => jump(1)}>
+        <button className="icon-btn" title={`On a section (${showKeys('PageDown')})`} onClick={() => (bySection ? stepSection(1) : jump(1))}>
           <ChevronsDown size={15} />
         </button>
         <button className="icon-btn" title="Back to the top (Home)" onClick={() => restartPrompter()}>
@@ -276,6 +309,8 @@ export function Teleprompter({ compactTop }: { compactTop?: React.ReactNode }) {
         </button>
       </div>
       {compactTop}
+      <div className="prompter-body">
+      {bySection && <SectionTakes />}
       <div className="prompter-screen" ref={box} style={{ ['--prompter-line' as string]: `${s.linePos * 100}%` }}>
         <div className="prompter-scroll" ref={scroller} onWheel={() => (holdUntil.current = 0)}>
           <div className="prompter-page" ref={page} style={{ fontSize: s.fontSize, fontFamily: prompterFont(s.font), transform: s.mirror ? 'scaleX(-1)' : undefined, paddingTop: Math.max(0, boxH * s.linePos - s.fontSize * 0.7), paddingBottom: boxH }}>
@@ -288,7 +323,7 @@ export function Teleprompter({ compactTop }: { compactTop?: React.ReactNode }) {
             ) : !blocks.length ? (
               <p className="prompter-empty">This script is empty. Write it first, then come back.</p>
             ) : (
-              blocks.map((b) => <Block key={`${b.kind}:${b.from}`} block={b} images={images} folder={folder} />)
+              blocks.map((b) => <Block key={`${b.kind}:${b.from}`} block={b} images={images} folder={folder} current={b.kind === 'section' && b.from === currentFrom} />)
             )}
           </div>
         </div>
@@ -301,6 +336,7 @@ export function Teleprompter({ compactTop }: { compactTop?: React.ReactNode }) {
           </div>
         )}
       </div>
+      </div>
       <div className="prompter-foot">
         {words > 0 && (
           <span>
@@ -308,7 +344,7 @@ export function Teleprompter({ compactTop }: { compactTop?: React.ReactNode }) {
           </span>
         )}
         <span className="prompter-gap" />
-        <span>Space pause · ↑↓ speed · PgUp/PgDn sections · {showKeys('Ctrl+Alt+Space')} anywhere in Orbit</span>
+        <span>{bySection ? 'Enter record or stop · R quick retake · PgUp/PgDn pick a section · Space pause' : `Space pause · ↑↓ speed · PgUp/PgDn sections · ${showKeys('Ctrl+Alt+Space')} anywhere in Orbit`}</span>
       </div>
     </div>
   )
@@ -321,10 +357,10 @@ function chooseScriptQuietly(path: string): void {
   usePrompter.setState({ script: path, playing: false, countdown: null, restartAt: Date.now() })
 }
 
-function Block({ block, images, folder }: { block: PrompterBlock; images: string[]; folder: string }) {
+function Block({ block, images, folder, current }: { block: PrompterBlock; images: string[]; folder: string; current?: boolean }) {
   if (block.kind === 'section')
     return (
-      <div className="prompter-block prompter-section" data-section data-cue-from={block.from} data-cue-text={block.text} data-cue-type="SECTION" data-cue-value={block.title}>
+      <div className={`prompter-block prompter-section ${current ? 'current' : ''}`} data-section data-cue-from={block.from} data-cue-text={block.text} data-cue-type="SECTION" data-cue-value={block.title}>
         <span className="prompter-icon prompter-icon-section">§</span> {block.title || 'New section'}
       </div>
     )
