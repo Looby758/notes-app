@@ -50,6 +50,7 @@ import { setupVideoDownloader } from './videoDownload'
 import { isAppPage, setupStudio } from './studio'
 import { applyReplayShortcut, clipResponse, setupClips } from './clips'
 import { setupLocalAi } from './localAi'
+import { setupTranscriber } from './transcriber'
 import { reloadSoundboard, setupSoundboard, soundboardFolder, soundFile } from './soundboard'
 import { setupDiscord, teardownDiscord } from './discord'
 import { setupOrbitSync, syncOrbitSoon, type PartHandler } from './orbitSync'
@@ -1057,6 +1058,7 @@ app.whenReady().then(async () => {
   safely('video downloader', () => setupVideoDownloader(() => vault))
   safely('studio', setupStudio)
   safely('offline AI', setupLocalAi)
+  safely('transcripts', () => setupTranscriber((path) => currentVault().abs(path)))
   safely('soundboard', setupSoundboard)
   safely('Discord voice', setupDiscord)
   safely('Discord voice pop-out', () => setupDiscordPopout(currentPrefs))

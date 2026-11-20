@@ -21,6 +21,7 @@ import { loadPublishing, remapPublishing } from './publishing'
 import { loadDeletedVideos } from './deletedVideos'
 import { loadMoney } from './money'
 import { followMovedVideosFolder, loadVideos, remapVideos } from './videos'
+import { forgetTranscripts } from './transcripts'
 import { loadLockedFolders, putBackLockedFolders, remapLockedFolders, removeLockedFoldersWithin, useLockedFolders } from '../lib/lock/folders'
 import { history, recordUndo, undoChanged } from '../lib/undo'
 import type { CardProgress } from '../lib/flashcards'
@@ -243,6 +244,7 @@ export const useVault = create<VaultState>((set, get) => {
       void loadPublishing()
       void loadDeletedVideos()
       loadVideoProgress()
+      forgetTranscripts()
       void loadMoney()
       // Whichever finishes last (this or reading the notes list) checks whether the videos folder moved.
       void loadVideos().then(() => followMovedVideosFolder(get().tree))
