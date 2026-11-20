@@ -375,6 +375,11 @@ export const commands: Command[] = [
   } },
   { id: 'studio.audioOnly', group: 'Navigation', title: 'Studio: switch between audio only and video', run: () => void import('../store/studio').then((m) => m.setAudioOnly(!m.useStudio.getState().audioOnly)) },
   { id: 'studio.nextPreset', group: 'Navigation', title: 'Studio: load the next mic preset', run: () => void import('../store/studio').then((m) => m.nextPreset()) },
+  { id: 'teleprompter.open', group: 'Navigation', title: 'Teleprompter (read your script while you record)', run: () => {
+    void import('../store/teleprompter').then((m) => m.openPrompter(true))
+    openSpecialTab(STUDIO_TAB)
+  } },
+  { id: 'teleprompter.toggle', group: 'Navigation', title: 'Teleprompter: pause / carry on scrolling', shortcut: 'Ctrl+Alt+Space', run: () => void import('../store/teleprompter').then((m) => m.togglePrompter()) },
   { id: 'studio.trim', group: 'Navigation', title: 'Studio: trim the silences out of the last voiceover', run: () => {
     openSpecialTab(STUDIO_TAB)
     void import('./studio').then((m) => m.trimLastRecording())

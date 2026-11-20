@@ -39,6 +39,7 @@ const api: NotesApi = {
   studioPickFolder: () => ipcRenderer.invoke('studio:pickFolder'),
   studioStart: (folder, ext, kind) => ipcRenderer.invoke('studio:start', folder, ext, kind),
   studioTrim: (path, settings) => ipcRenderer.invoke('studio:trim', path, settings),
+  studioWriteCues: (path, json) => ipcRenderer.invoke('studio:writeCues', path, json),
   studioChunk: (id, data) => ipcRenderer.invoke('studio:chunk', id, data),
   studioStop: (id) => ipcRenderer.invoke('studio:stop', id),
   studioReveal: (path) => ipcRenderer.invoke('studio:reveal', path),

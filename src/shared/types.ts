@@ -523,6 +523,8 @@ export interface NotesApi {
   studioStart(folder: string | null, ext: 'mp4' | 'webm' | 'm4a', kind?: 'video' | 'voiceover'): Promise<{ id: number; path: string }>
   /** Saves a copy of a Studio recording with the long pauses shortened ("… (trimmed).wav"); lengths in seconds. */
   studioTrim(path: string, settings: import('./studioAudio').TrimSettings): Promise<{ path: string; before: number; after: number }>
+  /** Saves the teleprompter's cue times beside a Studio recording ("<recording>.cues.json"). */
+  studioWriteCues(path: string, json: string): Promise<void>
   studioChunk(id: number, data: Uint8Array): Promise<{ ok: boolean; error?: string }>
   /** Finishes the file; resolves to its path. */
   studioStop(id: number): Promise<string | null>

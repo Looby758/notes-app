@@ -273,8 +273,29 @@ export function AudioOnlyPanel() {
   )
 }
 
+/** A slim version of the audio-only panel, above the teleprompter: the mic, the time and the meter. */
+export function AudioStrip() {
+  const recording = useStudio((s) => s.recording)
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    if (!recording) return
+    const t = setInterval(() => setNow(Date.now()), 250)
+    return () => clearInterval(t)
+  }, [recording])
+  return (
+    <div className="studio-audio-strip" data-studio-audio-strip>
+      <span className={`studio-strip-dot ${recording ? 'rec' : ''}`}>
+        <Mic size={14} />
+      </span>
+      <span className="studio-strip-time">{recording ? formatDuration(now - recording.startedAt) : 'Ready'}</span>
+      <Meter which="mic" />
+      <ClipWarning />
+    </div>
+  )
+}
+
 /** After an audio-only recording: show it, and trim its silences. */
-function LastRecording() {
+export function LastRecording() {
   const last = useStudio((s) => s.lastRecording)
   const info = useStudio((s) => s.lastRecordingInfo)
   const trimming = useStudio((s) => s.trimming)

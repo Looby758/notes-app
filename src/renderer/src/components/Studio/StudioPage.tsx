@@ -2,6 +2,7 @@ import './studio.css'
 import { useEffect, useRef, useState } from 'react'
 import {
   Camera,
+  ScrollText,
   ChevronDown,
   ChevronUp,
   Circle,
@@ -26,7 +27,9 @@ import type { StudioCaptureSource } from '@shared/types'
 import { dragRect, formatDuration, itemAt, newItem, QUALITIES, snap, SOURCE_LABELS, studioId, type Handle, type StudioItem, type StudioSourceKind } from '@shared/studio'
 import { activeScene, addItem, removeItem, reorderItem, setAudioOnly, setMic, setMicGain, switchScene, updateItem, updateScene, useStudio } from '../../store/studio'
 import { GoLive } from './GoLive'
-import { AudioOnlyPanel, ClipWarning, Meter, MicCleanupSettings, MicPresets, TrimSettingsBox } from './AudioTools'
+import { AudioOnlyPanel, AudioStrip, ClipWarning, LastRecording, Meter, MicCleanupSettings, MicPresets, TrimSettingsBox } from './AudioTools'
+import { Teleprompter } from './Teleprompter'
+import { openPrompter, usePrompter } from '../../store/teleprompter'
 import { desktopAudioSupported, hasChannel, retrySource, startRecording, stopRecording, studioCanvas, studioPage } from '../../lib/studio'
 import { showKeys } from '@shared/platform'
 
@@ -41,6 +44,7 @@ export default function StudioPage() {
   const [picking, setPicking] = useState<null | 'screen'>(null)
   const [adding, setAdding] = useState(false)
   const audioOnly = useStudio((s) => s.audioOnly)
+  const prompterOpen = usePrompter((s) => s.open)
 
   useEffect(() => {
     studioPage(true)
@@ -60,7 +64,14 @@ export default function StudioPage() {
       <div className={`studio-body ${audioOnly ? 'audio-only' : ''}`}>
         {audioOnly ? (
           <main className="studio-main">
-            <AudioOnlyPanel />
+            {prompterOpen ? (
+              <>
+                <Teleprompter compactTop={<AudioStrip />} />
+                <LastRecording />
+              </>
+            ) : (
+              <AudioOnlyPanel />
+            )}
           </main>
         ) : (
           <ScenesView adding={adding} setAdding={setAdding} add={add} />
@@ -87,6 +98,7 @@ export default function StudioPage() {
 
 /** The scenes and sources (left) and the picture (middle), in video mode. */
 function ScenesView({ adding, setAdding, add }: { adding: boolean; setAdding: React.Dispatch<React.SetStateAction<boolean>>; add: (kind: StudioSourceKind) => void }) {
+  const prompterOpen = usePrompter((s) => s.open)
   const scenes = useStudio((s) => s.scenes)
   const sceneId = useStudio((s) => s.activeScene)
   const scene = scenes.find((s) => s.id === sceneId) ?? scenes[0]
@@ -165,10 +177,19 @@ function ScenesView({ adding, setAdding, add }: { adding: boolean; setAdding: Re
           )}
         </section>
       </aside>
-      <main className="studio-main">
-        <Preview />
-        <p className="studio-hint">Drag sources to move them, drag a corner to resize (hold Shift to stretch). Delete removes the selected one.</p>
-      </main>
+      {prompterOpen ? (
+        <main className="studio-main with-prompter">
+          <Teleprompter />
+          <div className="studio-mini-preview" title="What’s being recorded">
+            <Preview />
+          </div>
+        </main>
+      ) : (
+        <main className="studio-main">
+          <Preview />
+          <p className="studio-hint">Drag sources to move them, drag a corner to resize (hold Shift to stretch). Delete removes the selected one.</p>
+        </main>
+      )}
     </>
   )
 }
@@ -205,6 +226,7 @@ function RecordBar() {
   const last = useStudio((s) => s.lastRecording)
   const audioOnly = useStudio((s) => s.audioOnly)
   const live = useStudio((s) => !!s.live)
+  const prompterOpen = usePrompter((s) => s.open)
   const now = useNow(!!recording)
   return (
     <header className="studio-top">
@@ -217,6 +239,9 @@ function RecordBar() {
           <Mic size={13} /> Audio only
         </button>
       </div>
+      <button className={`btn studio-prompter-btn ${prompterOpen ? 'on' : ''}`} onClick={() => openPrompter(!prompterOpen)} title="Read your script while you record" data-studio-prompter>
+        <ScrollText size={14} /> Teleprompter
+      </button>
       <span className="studio-top-gap" />
       {last && !recording && (
         <button className="btn" onClick={() => void window.api.studioReveal(last)} title={last}>

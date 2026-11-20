@@ -1,7 +1,7 @@
 import { app, BrowserWindow, desktopCapturer, dialog, ipcMain, shell, systemPreferences, type WebContents } from 'electron'
 import { spawn } from 'child_process'
 import { createWriteStream, existsSync, mkdirSync, statSync, type WriteStream } from 'fs'
-import { rm } from 'fs/promises'
+import { rm, writeFile } from 'fs/promises'
 import { isAbsolute, join } from 'path'
 import { IS_MAC } from '@shared/platform'
 import { recordingFileName } from '@shared/studio'
@@ -111,6 +111,14 @@ export function setupStudio(): void {
     const res = await trimSilences(path, out, cleanTrim(settings))
     made.add(out)
     return { path: out, ...res }
+  })
+
+  // The teleprompter's cue times for a recording, saved beside it (read by the shot list).
+  ipcMain.handle('studio:writeCues', async (e, path: string, json: string) => {
+    if (!isAppPage(e.sender)) throw new Error('Not allowed')
+    if (typeof path !== 'string' || !made.has(path) || typeof json !== 'string' || json.length > 5_000_000) throw new Error('That recording isn’t there any more.')
+    JSON.parse(json)
+    await writeFile(`${path}.cues.json`, json, 'utf8')
   })
 
   ipcMain.handle('studio:reveal', (_e, path: string) => {
