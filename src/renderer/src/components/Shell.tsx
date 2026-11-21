@@ -376,6 +376,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       </div>
 
       <footer className="statusbar">
+        <TestCopyBadge />
         {/* The folder's path usually has your name in it. */}
         <Private>
           <span title={streamer ? undefined : vault}>{vault}</span>
@@ -428,4 +429,23 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <Screensaver />
     </div>
   )
+}
+
+/** "Test copy" in the status bar, so a copy started from Orbit's code is never mistaken for the real one. */
+function TestCopyBadge() {
+  const [test, setTest] = useState(false)
+  useEffect(() => {
+    window.api
+      .appsIsTestCopy()
+      .then((t) => {
+        setTest(t)
+        if (t) document.title = 'Orbit (test copy)'
+      })
+      .catch(() => undefined)
+  }, [])
+  return test ? (
+    <span className="statusbar-testcopy" title="Started from Orbit’s code: it has its own settings and notes, separate from your normal Orbit">
+      Test copy
+    </span>
+  ) : null
 }

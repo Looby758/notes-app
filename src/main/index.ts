@@ -86,6 +86,7 @@ import { closeYouTube, setupYouTube } from './youtube'
 import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
 import { setupAppStudio } from './appStudio'
+import { TEST_COPY, TEST_COPY_FOLDER } from './testCopy'
 import { setupGames } from './games'
 import { setupGameCovers } from './gameCovers'
 import { applyIconOutsideApp, taskbarIcon } from './appIcon'
@@ -104,7 +105,8 @@ let hubReleased: Promise<void> = Promise.resolve()
 logCrashes()
 
 // The app used to be called Notes: keep its data folder so settings and sign-ins carry over.
-app.setPath('userData', join(app.getPath('appData'), 'Notes'))
+// A test copy (started from the code) has its own, so it can run next to your normal Orbit.
+app.setPath('userData', join(app.getPath('appData'), TEST_COPY ? TEST_COPY_FOLDER : 'Notes'))
 
 // Screens between the two computers: the picture goes straight across the home network, so the
 // computers need each other's real local addresses (Chromium hides them behind made-up names by
@@ -112,7 +114,7 @@ app.setPath('userData', join(app.getPath('appData'), 'Notes'))
 app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns')
 
 // Windows shows notifications under this app id (it matches the installer's).
-if (process.platform === 'win32') app.setAppUserModelId('com.notesapp.desktop')
+if (process.platform === 'win32') app.setAppUserModelId(TEST_COPY ? 'com.notesapp.desktop.testcopy' : 'com.notesapp.desktop')
 
 // Only one copy of Notes runs; starting it again just brings the window back.
 if (!app.requestSingleInstanceLock()) {
@@ -455,6 +457,7 @@ function createWindow(): BrowserWindow {
     minHeight: 480,
     show: false,
     backgroundColor: BG,
+    ...(TEST_COPY ? { title: 'Orbit (test copy)' } : {}),
     ...(IS_MAC
       ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 14, y: 12 } }
       : {

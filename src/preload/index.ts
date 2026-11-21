@@ -603,6 +603,7 @@ const api: NotesApi = {
   terminalHome: () => ipcRenderer.invoke('term:home'),
   terminalOpenIn: (folder, where) => ipcRenderer.invoke('term:openIn', folder, where),
   appsGithubStatus: () => ipcRenderer.invoke('apps:githubStatus'),
+  appsIsTestCopy: () => ipcRenderer.invoke('apps:isTestCopy'),
   appsSetToken: (token) => ipcRenderer.invoke('apps:setToken', token),
   appsClearToken: () => ipcRenderer.invoke('apps:clearToken'),
   appsInfo: (folder) => ipcRenderer.invoke('apps:info', folder),

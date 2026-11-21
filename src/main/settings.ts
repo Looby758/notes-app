@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { existsSync, readFileSync, renameSync, unwatchFile, watchFile, writeFileSync } from 'fs'
 import { join } from 'path'
 import type { Settings } from '@shared/types'
+import { TEST_COPY } from './testCopy'
 
 const defaults: Settings = { vaultPath: null }
 
@@ -21,7 +22,8 @@ function legacySettingsFile(): string {
 export function loadSettings(): Settings {
   if (cache) return cache
   try {
-    const file = existsSync(settingsFile()) ? settingsFile() : legacySettingsFile()
+    // A test copy starts fresh rather than picking up the very old settings.
+    const file = existsSync(settingsFile()) || TEST_COPY ? settingsFile() : legacySettingsFile()
     cache = existsSync(file) ? { ...defaults, ...JSON.parse(readFileSync(file, 'utf8')) } : { ...defaults }
   } catch {
     cache = { ...defaults }

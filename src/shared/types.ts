@@ -1114,6 +1114,8 @@ export interface NotesApi {
   // App Studio
   /** Whether a GitHub token is saved (and whose it is). */
   appsGithubStatus(): Promise<GitHubStatus>
+  /** Whether this is a test copy (started from Orbit's code), with its own settings and data. */
+  appsIsTestCopy(): Promise<boolean>
   /** Checks a GitHub token with GitHub, then saves it encrypted. */
   appsSetToken(token: string): Promise<GitHubStatus>
   appsClearToken(): Promise<GitHubStatus>

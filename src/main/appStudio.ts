@@ -4,6 +4,7 @@ import { existsSync, readFileSync, renameSync, statSync, writeFileSync } from 'f
 import { isAbsolute, join } from 'path'
 import { githubRepo, type AppInfo, type GitHubStatus, type PullRequest } from '@shared/appStudio'
 import { logError } from './log'
+import { TEST_COPY } from './testCopy'
 
 /**
  * App Studio's side of things: what git knows about each app's folder, and its pull requests on
@@ -196,6 +197,7 @@ function needToken(): void {
 
 export function setupAppStudio(): void {
   ipcMain.handle('apps:githubStatus', () => status())
+  ipcMain.handle('apps:isTestCopy', () => TEST_COPY)
   ipcMain.handle('apps:setToken', (_e, key: unknown) => setToken(String(key ?? '')))
   ipcMain.handle('apps:clearToken', () => {
     save({})
