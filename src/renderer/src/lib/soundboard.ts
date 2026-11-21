@@ -1,4 +1,4 @@
-import type { SoundboardAction, SoundboardStatus } from '@shared/soundboard'
+import { MIC_LEVELLER, type SoundboardAction, type SoundboardStatus } from '@shared/soundboard'
 import { useSoundboard, type SoundboardState } from '../store/soundboard'
 import { localMusicStream } from '../store/localMusic'
 import { useMusic } from '../store/music'
@@ -10,7 +10,7 @@ import { buildEffect, type Effect } from './voiceFx'
  * hear yourself (the clips, and your own voice with "Hear yourself") goes to your headphones
  * through a second path, so it never ends up in the call twice.
  *
- *   mic → voice changer → mic level ─┬──────────────┐
+ *   mic → leveller → mic level → voice changer ─┬──┐
  *   clips ──────────── sounds level ─┼── limiter → to the cable (the call)
  *   your music ─────── music level ──┘              │
  *   (mic, clips) → monitor level → your headphones (Hear yourself / hear the sounds)
@@ -24,7 +24,12 @@ interface Graph {
   meter: AnalyserNode
   /** The voice after the changer (into it go the mic and the effect). */
   voice: GainNode
-  /** Into this goes the mic, before the effect. */
+  /** The mic's stream comes in here, before the leveller. */
+  micRaw: GainNode
+  /** The leveller ("Level my voice"): boost → compressor → lift. */
+  levelIn: GainNode
+  levelOut: GainNode
+  /** The mic after the leveller, at the mic volume, before the effect. */
   micIn: GainNode
   micMeter: AnalyserNode
   clips: GainNode
@@ -72,7 +77,18 @@ function makeGraph(): Graph {
   meter.fftSize = 512
   limiter.connect(meter)
 
+  const micRaw = g()
+  const levelIn = g(MIC_LEVELLER.preGain)
+  const comp = ctx.createDynamicsCompressor()
+  comp.threshold.value = MIC_LEVELLER.thresholdDb
+  comp.knee.value = MIC_LEVELLER.kneeDb
+  comp.ratio.value = MIC_LEVELLER.ratio
+  comp.attack.value = MIC_LEVELLER.attack
+  comp.release.value = MIC_LEVELLER.release
+  const levelOut = g(MIC_LEVELLER.makeupGain)
+  levelIn.connect(comp).connect(levelOut)
   const micIn = g()
+  levelOut.connect(micIn)
   const micMeter = ctx.createAnalyser()
   micMeter.fftSize = 512
   micIn.connect(micMeter)
@@ -91,7 +107,8 @@ function makeGraph(): Graph {
   const monitorDest = ctx.createMediaStreamDestination()
   monitor.connect(monitorDest)
 
-  graph = { ctx, send, meter, voice, micIn, micMeter, clips, music, voiceToMonitor, clipsToMonitor, monitor, monitorDest }
+  graph = { ctx, send, meter, voice, micRaw, levelIn, levelOut, micIn, micMeter, clips, music, voiceToMonitor, clipsToMonitor, monitor, monitorDest }
+  applyLeveller()
   applyEffect()
   applyLevels()
   void applySend()
@@ -165,6 +182,13 @@ function applyLevels(): void {
   smooth(graph.monitor.gain, s.monitorVolume)
   smooth(graph.voiceToMonitor.gain, s.hearYourself && s.micOn ? 1 : 0)
   smooth(graph.clipsToMonitor.gain, s.hearSounds ? 1 : 0)
+}
+
+/** Sends the mic through the leveller, or straight past it. */
+function applyLeveller(): void {
+  if (!graph) return
+  graph.micRaw.disconnect()
+  graph.micRaw.connect(st().micLevelling ? graph.levelIn : graph.micIn)
 }
 
 function applyEffect(): void {
@@ -248,7 +272,7 @@ async function applyMic(): Promise<void> {
         return
       }
       const source = g.ctx.createMediaStreamSource(stream)
-      source.connect(g.micIn)
+      source.connect(g.micRaw)
       mic = { stream, source, key }
       stream.getAudioTracks()[0]?.addEventListener('ended', () => {
         if (mic?.stream === stream) {
@@ -392,7 +416,7 @@ function rms(a: AnalyserNode | undefined): number {
 
 /** How loud what the call hears is right now (0…1). */
 export const callLevel = (): number => rms(graph?.meter)
-/** How loud your mic is, before the voice changer (0…1). */
+/** How loud your mic is, after the leveller and mic volume, before the voice changer (0…1). */
 export const micLevel = (): number => (mic ? rms(graph?.micMeter) : 0)
 
 // ---------------------------------------------------------------------------------------------
@@ -420,6 +444,7 @@ export function startSoundboard(): () => void {
   const offStore = useSoundboard.subscribe((s, b) => {
     if (s.micOn !== b.micOn || s.micId !== b.micId || s.noiseSuppression !== b.noiseSuppression) void applyMic()
     if (s.voice !== b.voice || s.voiceOn !== b.voiceOn) applyEffect()
+    if (s.micLevelling !== b.micLevelling) applyLeveller()
     if (s.sendId !== b.sendId) void applySend()
     if (s.monitorId !== b.monitorId) void applyMonitor()
     if (s.musicOn !== b.musicOn) applyMusic()

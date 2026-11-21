@@ -7,6 +7,7 @@ import {
   hotkeyOwner,
   isVirtualCableInput,
   isVirtualCableOutput,
+  MAX_MIC_VOLUME,
   SOUND_COLOURS,
   SOUND_TYPES,
   VOICE_EFFECTS,
@@ -477,13 +478,13 @@ function Toggle({ checked, onChange, children, disabled }: { checked: boolean; o
   )
 }
 
-function Slider({ label, value, onChange, disabled }: { label: string; value: number; onChange: (v: number) => void; disabled?: boolean }) {
+function Slider({ label, value, onChange, disabled, max = 2 }: { label: string; value: number; onChange: (v: number) => void; disabled?: boolean; max?: number }) {
   return (
     <label className="sb-slider">
       <span>
         {label} <em>{Math.round(value * 100)}%</em>
       </span>
-      <input type="range" min={0} max={2} step={0.05} value={value} disabled={disabled} onChange={(e) => onChange(Number(e.target.value))} />
+      <input type="range" min={0} max={max} step={0.05} value={value} disabled={disabled} onChange={(e) => onChange(Number(e.target.value))} />
     </label>
   )
 }
@@ -551,7 +552,10 @@ function VoiceChanger() {
         <Headphones size={12} /> Hear yourself
       </Toggle>
       {s.hearYourself && s.micOn && <p className="sb-hint">Use headphones, or your speakers will feed back into the mic.</p>}
-      <Slider label="Mic volume" value={s.micVolume} onChange={(v) => setSoundboard({ micVolume: v })} disabled={!s.micOn} />
+      <Toggle checked={s.micLevelling} onChange={(on) => setSoundboard({ micLevelling: on })} disabled={!s.micOn}>
+        Level my voice (louder, evened out)
+      </Toggle>
+      <Slider label="Mic volume" value={s.micVolume} max={MAX_MIC_VOLUME} onChange={(v) => setSoundboard({ micVolume: v })} disabled={!s.micOn} />
       <Toggle checked={s.noiseSuppression} onChange={(on) => setSoundboard({ noiseSuppression: on })} disabled={!s.micOn}>
         Cut background noise
       </Toggle>

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { EMPTY_HOTKEYS, voiceEffect, type SoundboardData, type VoiceEffectId } from '@shared/soundboard'
+import { EMPTY_HOTKEYS, MAX_MIC_VOLUME, voiceEffect, type SoundboardData, type VoiceEffectId } from '@shared/soundboard'
 
 /**
  * The soundboard's settings (kept on this computer) and what it's doing right now. The clips and
@@ -26,7 +26,7 @@ export interface SoundboardSettings {
   hearSounds: boolean
   /** Your own Orbit music goes into the call. */
   musicOn: boolean
-  /** 0 to 2 (100% is 1). */
+  /** 0 to 4 (100% is 1); the others are 0 to 2. */
   micVolume: number
   soundsVolume: number
   musicVolume: number
@@ -35,6 +35,8 @@ export interface SoundboardSettings {
   /** Mic muted (the sounds and music still go through). */
   micMuted: boolean
   noiseSuppression: boolean
+  /** "Level my voice": boost and even out the mic so it's as loud in the call as a normal mic in Discord. */
+  micLevelling: boolean
   repeat: RepeatPress
 }
 
@@ -67,13 +69,14 @@ export const DEFAULT_SETTINGS: SoundboardSettings = {
   monitorVolume: 0.8,
   micMuted: false,
   noiseSuppression: true,
+  micLevelling: true,
   repeat: 'restart'
 }
 
 function load(): SoundboardSettings {
   try {
     const s = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<SoundboardSettings>
-    const vol = (v: unknown, d: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.min(2, Math.max(0, v)) : d)
+    const vol = (v: unknown, d: number, max = 2): number => (typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(0, v)) : d)
     const bool = (v: unknown, d: boolean): boolean => (typeof v === 'boolean' ? v : d)
     const text = (v: unknown): string => (typeof v === 'string' ? v : '')
     return {
@@ -86,12 +89,13 @@ function load(): SoundboardSettings {
       hearYourself: bool(s.hearYourself, false),
       hearSounds: bool(s.hearSounds, true),
       musicOn: bool(s.musicOn, false),
-      micVolume: vol(s.micVolume, DEFAULT_SETTINGS.micVolume),
+      micVolume: vol(s.micVolume, DEFAULT_SETTINGS.micVolume, MAX_MIC_VOLUME),
       soundsVolume: vol(s.soundsVolume, DEFAULT_SETTINGS.soundsVolume),
       musicVolume: vol(s.musicVolume, DEFAULT_SETTINGS.musicVolume),
       monitorVolume: vol(s.monitorVolume, DEFAULT_SETTINGS.monitorVolume),
       micMuted: bool(s.micMuted, false),
       noiseSuppression: bool(s.noiseSuppression, true),
+      micLevelling: bool(s.micLevelling, DEFAULT_SETTINGS.micLevelling),
       repeat: s.repeat === 'stop' || s.repeat === 'overlap' ? s.repeat : 'restart'
     }
   } catch {
