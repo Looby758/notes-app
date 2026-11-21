@@ -791,13 +791,37 @@ function readLines(child: ChildProcessWithoutNullStreams, onLine: LineHandler, l
   child.stdin.on('error', (err) => logError(label, err))
 }
 
-function winWrite(line: string): void {
+/**
+ * The helper is too long to pass on the command line (Windows allows 32,767 characters), so it's
+ * written to a script file next to Orbit's settings (not in the synced macros folder) and run from there.
+ */
+function helperScript(): string {
+  const file = join(app.getPath('userData'), 'macro-helper.ps1')
+  // With a byte-order mark, so Windows PowerShell reads it as UTF-8.
+  const text = '\ufeff' + WIN_HELPER
+  let current = ''
+  try {
+    current = readFileSync(file, 'utf8')
+  } catch {
+    // Not written yet.
+  }
+  if (current !== text) writeFileSync(file, text, 'utf8')
+  return file
+}
+
+/** Sends a line to the Windows helper, starting it if needed. False if it couldn't be started. */
+function winWrite(line: string): boolean {
   if (!winHelper) {
-    const child = spawn(
-      'powershell.exe',
-      ['-NoProfile', '-NoLogo', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(WIN_HELPER, 'utf16le').toString('base64')],
-      { windowsHide: true }
-    )
+    let child: ChildProcessWithoutNullStreams
+    try {
+      child = spawn('powershell.exe', ['-NoProfile', '-NoLogo', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', helperScript()], { windowsHide: true })
+    } catch (err) {
+      logError('macros', err)
+      lastError = `Orbit couldn’t start the part that records and presses keys (${err instanceof Error ? err.message : String(err)}).`
+      if (activity.kind !== 'idle') activity = { kind: 'idle' }
+      broadcast()
+      return false
+    }
     readLines(child, onHelperLine, 'macros')
     child.on('exit', () => {
       if (winHelper === child) winHelper = null
@@ -808,6 +832,7 @@ function winWrite(line: string): void {
     if (!line.startsWith('keys ')) queueMicrotask(applyHotkeys)
   }
   winHelper.stdin.write(line + '\n')
+  return true
 }
 
 const stopFilePath = (): string => join(tmpdir(), `orbit-macro-stop-${process.pid}-${randomUUID().slice(0, 8)}`)
@@ -1198,8 +1223,14 @@ function markUsed(): void {
 export function setupMacros(): void {
   load()
   used = existsSync(dataFile())
-  applyHotkeys()
-  if (used && !IS_MAC && SUPPORTED) setTimeout(() => winWrite('ping'), 8000)
+  // Hotkeys (and the helper) after the handlers below, so the page always works even if they fail.
+  setTimeout(() => {
+    try {
+      applyHotkeys()
+    } catch (err) {
+      logError('macros', err)
+    }
+  }, 0)
 
   ipcMain.handle('macros:get', () => {
     markUsed()
