@@ -1,4 +1,4 @@
-import { latestAndRunCommand } from './terminalTools'
+import { latestAndRunCommand, PACKAGE_FILES } from './terminalTools'
 
 /**
  * App Studio: a place in Orbit for the apps you make with Claude Code (Orbit, Eclipse…). Each app
@@ -153,21 +153,62 @@ export interface BoardItem {
   pictures: string[]
   created: string
   updated: string
+  /** When it was last sent to Claude. */
+  sentAt?: string
+  /** The pull request Claude opened for it ("owner/name#12"), once matched. */
+  pull?: string
+}
+
+/** A screenshot of one of an app's features, for its gallery. */
+export interface Shot {
+  id: string
+  /** The app's board key. */
+  app: string
+  /** The feature it shows (a pull request's title, say). */
+  feature: string
+  /** Notes-folder path of the picture. */
+  picture: string
+  /** When it was taken or merged. */
+  date: string
+  note?: string
+  /** Where it was imported from (an image in a pull request), so it isn't imported twice. */
+  source?: string
 }
 
 export interface BoardData {
   items: BoardItem[]
+  /** Each app's Claude project link, by board key. */
+  claude: Record<string, string>
+  shots: Shot[]
 }
 
 const COLUMN_IDS = new Set<string>(BOARD_COLUMNS.map((c) => c.id))
 
 /** Reads the saved board, leaving out anything that isn't a proper item. */
 export function readBoard(json: string | null): BoardData {
-  if (!json) return { items: [] }
+  if (!json) return { items: [], claude: {}, shots: [] }
   try {
-    const raw = JSON.parse(json) as { items?: unknown }
+    const raw = JSON.parse(json) as { items?: unknown; claude?: unknown; shots?: unknown }
     const items = Array.isArray(raw.items) ? raw.items : []
+    const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined)
+    const claude = Object.fromEntries(
+      Object.entries(raw.claude && typeof raw.claude === 'object' ? (raw.claude as Record<string, unknown>) : {}).filter((e): e is [string, string] => typeof e[1] === 'string')
+    )
+    const shots = (Array.isArray(raw.shots) ? raw.shots : [])
+      .filter((i): i is Record<string, unknown> => !!i && typeof i === 'object')
+      .filter((i) => typeof i.id === 'string' && typeof i.app === 'string' && typeof i.picture === 'string')
+      .map((i) => ({
+        id: i.id as string,
+        app: i.app as string,
+        feature: str(i.feature) ?? 'Other',
+        picture: i.picture as string,
+        date: str(i.date) ?? new Date(0).toISOString(),
+        note: str(i.note),
+        source: str(i.source)
+      }))
     return {
+      claude,
+      shots,
       items: items
         .filter((i): i is Record<string, unknown> => !!i && typeof i === 'object')
         .filter((i) => typeof i.id === 'string' && typeof i.app === 'string' && typeof i.title === 'string')
@@ -180,11 +221,13 @@ export function readBoard(json: string | null): BoardData {
           column: typeof i.column === 'string' && COLUMN_IDS.has(i.column) ? (i.column as BoardColumn) : 'ideas',
           pictures: Array.isArray(i.pictures) ? i.pictures.filter((p): p is string => typeof p === 'string') : [],
           created: typeof i.created === 'string' ? i.created : new Date(0).toISOString(),
-          updated: typeof i.updated === 'string' ? i.updated : typeof i.created === 'string' ? i.created : new Date(0).toISOString()
+          updated: typeof i.updated === 'string' ? i.updated : typeof i.created === 'string' ? i.created : new Date(0).toISOString(),
+          sentAt: str(i.sentAt),
+          pull: str(i.pull)
         }))
     }
   } catch {
-    return { items: [] }
+    return { items: [], claude: {}, shots: [] }
   }
 }
 
@@ -336,4 +379,115 @@ export function notesTarget(version: string | undefined, releases: Release[]): s
   const now = `v${version}`
   if (!releases.some((r) => r.tag === now)) return now
   return `v${bumpVersion(version, 'minor') ?? version}`
+}
+
+// ---------- Test copies ----------
+
+/** A separate copy of an app (a git worktree) with a pull request's version in it, so the app's own folder isn't touched. */
+export interface TestCopy {
+  path: string
+  /** The commit it's on. */
+  head: string
+}
+
+/** The folder name for a branch's test copy: "claude/dark-mode-x1" → "claude-dark-mode-x1". */
+export function copyFolderName(branch: string): string {
+  return branch.replace(/[^\w.-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '').slice(-60) || 'copy'
+}
+
+const quoteBranch = (branch: string): string => (/^[\w./@+-]+$/.test(branch) ? branch : `"${branch.replace(/"/g, '')}"`)
+
+/**
+ * Runs a test copy: gets the branch's latest, installs packages if they changed (or never were),
+ * then starts the app. Each step only runs if the one before worked.
+ */
+export function copyRunCommand(windows: boolean, branch: string, run = 'npm run dev'): string {
+  const b = quoteBranch(branch)
+  const files = PACKAGE_FILES.join(' ')
+  if (windows) {
+    return (
+      `$before = git rev-parse HEAD; git fetch origin ${b}; if ($LASTEXITCODE -eq 0) { git checkout --detach FETCH_HEAD; if ($LASTEXITCODE -eq 0) { ` +
+      `if (-not (Test-Path node_modules) -or (git diff --name-only $before HEAD -- ${files})) { npm install }; ` +
+      `if ($LASTEXITCODE -eq 0) { ${run} } } }`
+    )
+  }
+  return (
+    `before=$(git rev-parse HEAD) && git fetch origin ${b} && git checkout --detach FETCH_HEAD && ` +
+    `{ if [ ! -d node_modules ] || ! git diff --quiet "$before" HEAD -- ${files}; then npm install; fi; } && ${run}`
+  )
+}
+
+// ---------- Matching pull requests to cards ----------
+
+export const pullKey = (repo: string, number: number): string => `${repo}#${number}`
+
+const STOP = new Set('a an and are as at be but by can do for from has have i in into is it its me my of on or so that the this to was when with you your add make fix please new app should would want like just also it\'s there them then than'.split(' '))
+
+/** The words that say what something is about: lower case, without little words. */
+export function keywords(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]+/g, ' ')
+      .split(/\s+/)
+      .map((w) => w.replace(/(ing|ed|es|s)$/, ''))
+      .filter((w) => w.length > 2 && !STOP.has(w))
+  )
+}
+
+/**
+ * Which card (sent to Claude, not matched yet) a new pull request is for: the one whose title
+ * shares the most words with the pull request's title and description, if it shares enough.
+ */
+export function matchPull(items: BoardItem[], pull: { title: string; body: string; createdAt: string }): BoardItem | null {
+  const words = keywords(`${pull.title}\n${pull.body}`)
+  const titleWords = keywords(pull.title)
+  let best: { item: BoardItem; score: number } | null = null
+  for (const item of items) {
+    if (item.pull || !item.sentAt || item.column === 'done') continue
+    // Sent after the pull request was opened: can't be what it's for.
+    if (Date.parse(item.sentAt) > Date.parse(pull.createdAt) + 60_000) continue
+    const mine = [...keywords(item.title)]
+    if (!mine.length) continue
+    const shared = mine.filter((w) => words.has(w)).length
+    const inTitle = mine.filter((w) => titleWords.has(w)).length
+    const score = shared / mine.length + inTitle * 0.1
+    const enough = shared >= Math.min(2, mine.length) && shared / mine.length >= 0.5
+    if (enough && (!best || score > best.score)) best = { item, score }
+  }
+  return best?.item ?? null
+}
+
+// ---------- Screenshots ----------
+
+/** Image links in a pull request's description (markdown images and <img> tags) that are GitHub's own. */
+export function imageUrls(body: string): string[] {
+  const found = [
+    ...[...(body ?? '').matchAll(/!\[[^\]]*\]\((https:\/\/[^\s)]+)\)/g)].map((m) => m[1]),
+    ...[...(body ?? '').matchAll(/<img[^>]*\ssrc=["'](https:\/\/[^"']+)["']/gi)].map((m) => m[1])
+  ]
+  return [...new Set(found)].filter(isGitHubImage)
+}
+
+export function isGitHubImage(url: string): boolean {
+  try {
+    const { protocol, hostname, pathname } = new URL(url)
+    if (protocol !== 'https:') return false
+    if (hostname === 'github.com') return /^\/(user-attachments\/assets|[\w.-]+\/[\w.-]+\/assets)\//.test(pathname)
+    return /^(user-images|private-user-images|raw)\.githubusercontent\.com$/.test(hostname)
+  } catch {
+    return false
+  }
+}
+
+/** Screenshots grouped by feature, newest feature first, each group's pictures newest first. */
+export function shotsByFeature(shots: Shot[]): { feature: string; shots: Shot[]; latest: string }[] {
+  const groups = new Map<string, Shot[]>()
+  for (const s of shots) groups.set(s.feature, [...(groups.get(s.feature) ?? []), s])
+  return [...groups.entries()]
+    .map(([feature, list]) => {
+      const sorted = [...list].sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
+      return { feature, shots: sorted, latest: sorted[0].date }
+    })
+    .sort((a, b) => Date.parse(b.latest) - Date.parse(a.latest))
 }

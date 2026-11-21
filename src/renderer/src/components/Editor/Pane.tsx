@@ -46,6 +46,7 @@ import {
   DISCORD_TAB,
   MESSAGES_TAB,
   GROK_TAB,
+  CLAUDE_TAB,
   GAMES_TAB,
   VIDEO_TAB,
   isExplorerTab,
@@ -74,6 +75,7 @@ import PasswordsPage from '../Passwords/PasswordsPage'
 import EmailPage from '../Email/EmailPage'
 import MessagesPage from '../Messages/MessagesPage'
 import GrokPage from '../Grok/GrokPage'
+import ChatSitePage from '../ChatSite/ChatSite'
 import HomePage from '../Home/HomePage'
 import MoneyPage from '../Money/MoneyPage'
 import ConvertPage from '../Convert/ConvertPage'
@@ -208,6 +210,7 @@ export default function Pane({ pane }: { pane: string }) {
         {tabs?.includes(MESSAGES_TAB) && <MessagesPage hidden={active !== MESSAGES_TAB} autoFocus={isActivePane} />}
         {/* And Grok, so a chat isn't lost by looking at a note. */}
         {tabs?.includes(GROK_TAB) && <GrokPage hidden={active !== GROK_TAB} autoFocus={isActivePane} />}
+        {tabs?.includes(CLAUDE_TAB) && <ChatSitePage site="claude" hidden={active !== CLAUDE_TAB} autoFocus={isActivePane} />}
         {active === SETTINGS_TAB && <SettingsPage />}
         {active === CALENDAR_TAB && <CalendarPage />}
         {active === GRAPH_TAB && <GraphPage />}

@@ -53,13 +53,15 @@ import {
   History,
   Scissors,
   Bot,
+  Asterisk,
   Video,
   Hammer,
   ArrowDownToLine,
   type LucideIcon
 } from 'lucide-react'
 import { openGrokTab } from '../components/Grok/GrokPage'
-import { useGrok } from '../store/grok'
+import { openSiteTab } from '../components/ChatSite/ChatSite'
+import { useChatSites, useGrok } from '../store/grok'
 import { openMiniGames } from '../store/miniGames'
 import { useVault } from '../store/vault'
 import { setPrefs, usePrefs } from '../store/prefs'
@@ -213,6 +215,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   web: { icon: Globe, run: () => openWebTab('', { beside: true }) },
   chat: { icon: MessageSquare, run: () => openSpecialTab(CHAT_TAB) },
   grok: { icon: Bot, run: openGrokTab, useActive: () => useGrok((s) => s.floating) },
+  claude: { icon: Asterisk, run: () => openSiteTab('claude'), useActive: () => useChatSites((s) => s.claude.floating) },
   ask: { icon: Sparkles, run: () => openAsk() },
   music: { icon: Music, run: toggleMusic, useActive: () => useMusic((s) => s.open) },
   songid: { icon: Ear, run: showAndFindSong, useActive: () => useSongId((s) => s.phase === 'listening' || s.phase === 'thinking') },

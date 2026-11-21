@@ -1,4 +1,4 @@
-import type { AppInfo, GitHubStatus, MergedPull, PullRequest, Release } from './appStudio'
+import type { AppInfo, GitHubStatus, MergedPull, PullRequest, Release, TestCopy } from './appStudio'
 import type { ExplorerEntry, ExplorerPlace, PasteMode } from './explorer'
 import type { ArchiveEntry } from './archive'
 import type { ComicOpened, ComicPreparing, ComicSettings, ComicShelf } from './comics'
@@ -1169,6 +1169,15 @@ export interface NotesApi {
   appsSetReleaseNotes(repo: string, tag: string, body: string, title: string): Promise<Release>
   /** The AI helper writes "What's new" notes from changelogSource(). */
   aiWhatsNew(source: string): Promise<string>
+  /** An app's test copies (git worktrees in "<app>-test-copies" beside it). */
+  appsCopies(folder: string): Promise<TestCopy[]>
+  /** Makes a test copy with a branch's latest (or finds it); its folder. */
+  appsAddCopy(folder: string, branch: string): Promise<string>
+  appsRemoveCopy(folder: string, path: string): Promise<void>
+  /** Whether pull requests are open, merged or closed. */
+  appsPullStates(repo: string, numbers: number[]): Promise<Record<number, 'open' | 'merged' | 'closed'>>
+  /** Downloads a picture from a pull request's description. */
+  appsFetchImage(url: string): Promise<{ bytes: Uint8Array; type: string }>
   appsMerge(repo: string, number: number): Promise<void>
   appsClose(repo: string, number: number): Promise<void>
   /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */

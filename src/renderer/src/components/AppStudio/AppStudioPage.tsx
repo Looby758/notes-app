@@ -15,18 +15,22 @@ import {
   Pencil,
   Trash2,
   X,
-  FlaskConical
+  FlaskConical,
+  Copy as CopyIcon,
+  Play,
+  ChevronDown
 } from 'lucide-react'
-import { prSummary, timeAgo, type PullRequest } from '@shared/appStudio'
+import { boardKey, pullKey, prSummary, timeAgo, type PullRequest, type TestCopy } from '@shared/appStudio'
 import { FILE_MANAGER } from '@shared/platform'
 import { addProject, removeProject, updateProject, useTerminals, type TerminalProject } from '../../store/terminals'
-import { appRepos, dropPull, refreshApps, refreshGithub, refreshPulls, setGithub, setSection, useAppStudio } from '../../store/appStudio'
-import { getLatestAndRun, tryBranch } from '../../lib/terminal'
+import { appRepos, dropPull, makeCopy, refreshApps, refreshGithub, refreshPulls, removeCopy, setGithub, setSection, useAppStudio } from '../../store/appStudio'
+import { closeCopyTerminals, getLatestAndRun, runTestCopy, tryBranch } from '../../lib/terminal'
 import { openSpecialTab, TERMINAL_TAB } from '../../lib/editorController'
 import { notify } from '../../store/notify'
-import { useAppBoard } from '../../store/appBoard'
+import { linkPull, useAppBoard } from '../../store/appBoard'
 import Board from './Board'
 import Releases from './Releases'
+import Screenshots from './Screenshots'
 
 /** Pull requests are fetched again when you come back after this long. */
 const PULLS_FRESH_MS = 2 * 60_000
@@ -82,11 +86,14 @@ export default function AppStudioPage() {
           <button className={section === 'pulls' ? 'active' : ''} onClick={() => setSection('pulls')}>
             Pull requests {pulls.length > 0 && <span className="appstudio-count accent">{pulls.length}</span>}
           </button>
+          <button className={section === 'shots' ? 'active' : ''} onClick={() => setSection('shots')}>
+            Screenshots
+          </button>
           <button className={section === 'releases' ? 'active' : ''} onClick={() => setSection('releases')}>
             Releases
           </button>
         </nav>
-        {section === 'apps' ? <MyApps /> : section === 'board' ? <Board /> : section === 'releases' ? <Releases /> : <PullInbox />}
+        {section === 'apps' ? <MyApps /> : section === 'board' ? <Board /> : section === 'releases' ? <Releases /> : section === 'shots' ? <Screenshots /> : <PullInbox />}
       </div>
     </div>
   )
@@ -205,6 +212,7 @@ function AppCard({ project }: { project: TerminalProject }) {
           )}
         </>
       )}
+      <CopyList project={project} />
       <div className="appstudio-card-actions">
         <button className="btn btn-primary" onClick={() => getLatestAndRun(project)} title="Pulls the latest code, runs npm install if the packages changed, then starts the app">
           <Rocket size={14} /> Get latest and run
@@ -220,6 +228,74 @@ function AppCard({ project }: { project: TerminalProject }) {
         </button>
       </div>
     </section>
+  )
+}
+
+/** An app's test copies: each pull request tried in a folder of its own, to run again or remove. */
+function CopyList({ project }: { project: TerminalProject }) {
+  const copies = useAppStudio((s) => s.copies[project.folder])
+  if (!copies?.length) return null
+  return (
+    <div className="appstudio-copies">
+      <div className="appstudio-copies-head muted">
+        <CopyIcon size={12} /> Test copies
+      </div>
+      {copies.map((c) => (
+        <CopyRow key={c.path} project={project} copy={c} />
+      ))}
+    </div>
+  )
+}
+
+function CopyRow({ project, copy }: { project: TerminalProject; copy: TestCopy }) {
+  const meta = useAppStudio((s) => s.copyInfo[copy.path])
+  const [removing, setRemoving] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const name = copy.path.split(/[\\/]/).pop() ?? copy.path
+  const remove = async (): Promise<void> => {
+    if (!removing) {
+      setRemoving(true)
+      return
+    }
+    setBusy(true)
+    closeCopyTerminals(copy.path)
+    try {
+      // Give the app a moment to let go of its files.
+      await new Promise((r) => setTimeout(r, 800))
+      await removeCopy(project.folder, copy.path)
+    } catch (err) {
+      notify(err)
+    } finally {
+      setBusy(false)
+      setRemoving(false)
+    }
+  }
+  return (
+    <div className="appstudio-copy">
+      <span className="appstudio-copy-name" title={copy.path}>
+        {meta?.label ?? name}
+      </span>
+      <button
+        className="icon-btn"
+        title={meta ? 'Get its latest and run it' : 'Orbit doesn’t know which branch this copy is for'}
+        disabled={!meta}
+        onClick={() => meta && runTestCopy(project, copy.path, meta.branch, meta.label)}
+      >
+        <Play size={13} />
+      </button>
+      <button className="icon-btn" title={`Open the folder in ${FILE_MANAGER}`} onClick={() => window.api.terminalOpenIn(copy.path, 'files').catch(notify)}>
+        <FolderOpen size={13} />
+      </button>
+      <button
+        className={removing ? 'appstudio-remove confirm' : 'icon-btn'}
+        title={removing ? undefined : 'Remove this copy (closes it if it’s running)'}
+        disabled={busy}
+        onClick={() => void remove()}
+        onBlur={() => !busy && setRemoving(false)}
+      >
+        {busy ? <Loader2 size={13} className="spin" /> : removing ? 'Remove?' : <Trash2 size={13} />}
+      </button>
+    </div>
   )
 }
 
@@ -258,7 +334,22 @@ function PullCard({ pull, canAct }: { pull: PullRequest; canAct: boolean }) {
   const project = projects.find((p) => info[p.folder]?.repo === pull.repo)
   const [confirm, setConfirm] = useState<'merge' | 'close' | null>(null)
   const [busy, setBusy] = useState(false)
+  const [menu, setMenu] = useState(false)
   const summary = prSummary(pull.body)
+  const making = useAppStudio((s) => (project ? !!s.making[`${project.folder}|${pull.branch}`] : false))
+  const hasCopy = useAppStudio((s) => (project ? !!s.copies[project.folder]?.some((c) => s.copyInfo[c.path]?.branch === pull.branch) : false))
+  const label = `#${pull.number} ${pull.title}`.slice(0, 60)
+
+  /** Try it: in a test copy of its own, so the app's folder isn't touched. */
+  const tryInCopy = async (): Promise<void> => {
+    if (!project) return
+    try {
+      const path = await makeCopy(project.folder, pull.branch, { label, repo: pull.repo, number: pull.number })
+      runTestCopy(project, path, pull.branch, label)
+    } catch (err) {
+      notify(err)
+    }
+  }
 
   const act = async (what: 'merge' | 'close'): Promise<void> => {
     if (confirm !== what) {
@@ -303,6 +394,7 @@ function PullCard({ pull, canAct }: { pull: PullRequest; canAct: boolean }) {
           </span>
         )}
       </div>
+      {project && <ForCard pull={pull} appKeys={[pull.repo, project.name, boardKey({ name: project.name, repo: pull.repo })]} />}
       {summary.length > 0 && (
         <ul className="appstudio-pull-summary">
           {summary.map((line, i) => (
@@ -311,14 +403,30 @@ function PullCard({ pull, canAct }: { pull: PullRequest; canAct: boolean }) {
         </ul>
       )}
       <div className="appstudio-pull-actions">
-        <button
-          className="btn btn-primary"
-          disabled={!project}
-          title={project ? `Switches ${project.name} to this branch, gets its latest, and starts it` : 'Add this app’s folder in My apps to try it'}
-          onClick={() => project && tryBranch(project, pull.branch)}
-        >
-          <FlaskConical size={14} /> Try it
-        </button>
+        <span className="appstudio-split">
+          <button
+            className="btn btn-primary"
+            disabled={!project || making}
+            title={project ? `Makes a test copy of ${project.name} with this pull request in it (beside its folder), and starts it. ${project.name}’s own folder isn’t touched.` : 'Add this app’s folder in My apps to try it'}
+            onClick={() => void tryInCopy()}
+          >
+            {making ? <Loader2 size={14} className="spin" /> : <FlaskConical size={14} />} {making ? 'Making a copy…' : hasCopy ? 'Run its copy' : 'Try it'}
+          </button>
+          <button className="btn btn-primary appstudio-split-more" disabled={!project} title="More ways to try it" onClick={() => setMenu(!menu)} onBlur={() => setTimeout(() => setMenu(false), 150)}>
+            <ChevronDown size={14} />
+          </button>
+          {menu && project && (
+            <div className="appstudio-menu">
+              <button onMouseDown={(e) => e.preventDefault()} onClick={() => (setMenu(false), void tryInCopy())}>
+                Try it in a test copy
+              </button>
+              <button onMouseDown={(e) => e.preventDefault()} onClick={() => (setMenu(false), tryBranch(project, pull.branch))}>
+                Try it in {project.name}’s own folder (switches its branch)
+              </button>
+            </div>
+          )}
+        </span>
+
         <button
           className={`btn${confirm === 'merge' ? ' btn-primary appstudio-confirm' : ''}`}
           disabled={busy || !canAct}
@@ -423,6 +531,35 @@ function TestCopyNote() {
     <div className="appstudio-testcopy">
       This is Orbit’s <strong>test copy</strong>, with its own settings, so your apps aren’t here. Use App Studio in your normal Orbit to try and merge things, and use
       this copy to test them.
+    </div>
+  )
+}
+
+/** Which idea or bug a pull request is for (matched when Claude opened it; can be changed). */
+function ForCard({ pull, appKeys }: { pull: PullRequest; appKeys: string[] }) {
+  const key = pullKey(pull.repo, pull.number)
+  const items = useAppBoard((s) => s.items)
+  const loaded = useAppBoard((s) => s.loaded)
+  const linked = items.find((i) => i.pull === key)
+  const choices = items.filter((i) => appKeys.includes(i.app) && (i.column !== 'done' || i === linked))
+  if (!loaded || !choices.length) return null
+  return (
+    <div className="appstudio-for">
+      <span className="muted">For</span>
+      <select
+        className="board-select"
+        value={linked?.id ?? ''}
+        onChange={(e) => linkPull(pull.repo, pull.number, e.target.value || null)}
+        title="Which idea or bug this is for. Its card moves to Testing now, and to Done when this is merged."
+      >
+        <option value="">No card</option>
+        {choices.map((i) => (
+          <option key={i.id} value={i.id}>
+            {i.kind === 'bug' ? 'Bug: ' : 'Idea: '}
+            {i.title}
+          </option>
+        ))}
+      </select>
     </div>
   )
 }

@@ -1,5 +1,7 @@
 import { create } from 'zustand'
-import { readBoard, type BoardColumn, type BoardItem } from '@shared/appStudio'
+import { claudePrompt, matchPull, pullKey, readBoard, type BoardColumn, type BoardItem, type PullRequest, type Shot } from '@shared/appStudio'
+import { isClaudeLink } from '@shared/chatSites'
+import { sendToSite } from '../components/ChatSite/ChatSite'
 import { notify } from './notify'
 
 /**
@@ -10,6 +12,10 @@ import { notify } from './notify'
 
 interface BoardState {
   items: BoardItem[]
+  /** Each app's Claude project link, by board key. */
+  claude: Record<string, string>
+  /** Feature screenshots. */
+  shots: Shot[]
   loaded: boolean
   /** The app whose board is showing (its board key). */
   app: string | null
@@ -19,17 +25,17 @@ interface BoardState {
   picked: string[]
 }
 
-export const useAppBoard = create<BoardState>(() => ({ items: [], loaded: false, app: null, editing: null, picked: [] }))
+export const useAppBoard = create<BoardState>(() => ({ items: [], claude: {}, shots: [], loaded: false, app: null, editing: null, picked: [] }))
 
 const FILE = 'app-studio.json'
 let generation = 0
 
 export async function loadAppBoard(): Promise<void> {
   const gen = ++generation
-  useAppBoard.setState({ items: [], loaded: false, editing: null, picked: [] })
+  useAppBoard.setState({ items: [], claude: {}, shots: [], loaded: false, editing: null, picked: [] })
   try {
-    const { items } = readBoard(await window.api.readAppData(FILE))
-    if (gen === generation) useAppBoard.setState({ items, loaded: true })
+    const { items, claude, shots } = readBoard(await window.api.readAppData(FILE))
+    if (gen === generation) useAppBoard.setState({ items, claude, shots, loaded: true })
   } catch {
     if (gen === generation) useAppBoard.setState({ loaded: true })
   }
@@ -45,7 +51,7 @@ function persist(): void {
   }
   writing = true
   window.api
-    .writeAppData(FILE, JSON.stringify({ items: useAppBoard.getState().items }, null, 2))
+    .writeAppData(FILE, JSON.stringify((({ items, claude, shots }) => ({ items, claude, shots }))(useAppBoard.getState()), null, 2))
     .catch(notify)
     .finally(() => {
       writing = false
@@ -134,3 +140,136 @@ export async function reportBugFromSnip(png: Uint8Array, folder: string, appKey:
     notify(err)
   }
 }
+
+// ---------- Claude ----------
+
+export function setClaudeLink(app: string, url: string): void {
+  const link = url.trim()
+  useAppBoard.setState((s) => {
+    const claude = { ...s.claude }
+    if (link) claude[app] = link
+    else delete claude[app]
+    return { claude }
+  })
+  persist()
+}
+
+/**
+ * Sends ideas and bugs to Claude: opens the app's Claude project inside Orbit with the prompt in
+ * its message box (and on the clipboard, in case), and moves the cards to Building. False if the
+ * app has no Claude project link yet.
+ */
+export async function sendToClaude(appKey: string, app: { name: string; repo?: string }, items: BoardItem[]): Promise<boolean> {
+  const link = useAppBoard.getState().claude[appKey]
+  if (!link || !isClaudeLink(link) || !items.length) return false
+  const prompt = claudePrompt(app, items)
+  await navigator.clipboard.writeText(prompt).catch(() => {})
+  const ids = new Set(items.map((i) => i.id))
+  const t = now()
+  useAppBoard.setState((s) => ({
+    items: s.items.map((i) => (ids.has(i.id) ? { ...i, sentAt: t, column: i.column === 'ideas' ? 'building' : i.column, updated: t } : i)),
+    picked: [],
+    editing: s.editing && ids.has(s.editing.id) ? null : s.editing
+  }))
+  persist()
+  const typed = await sendToSite('claude', link, prompt)
+  const pictures = items.some((i) => i.pictures.length)
+  if (!typed) notify('Claude is open. The prompt is copied: paste it in with Ctrl+V.', 'info')
+  else if (pictures) notify('The prompt is in Claude’s message box. Copy each picture across too (Copy picture on the card), then send it.', 'info')
+  return true
+}
+
+// ---------- Matching pull requests to cards ----------
+
+/** Says which card a pull request is for (or none, with null). */
+export function linkPull(repo: string, number: number, itemId: string | null): void {
+  const key = pullKey(repo, number)
+  const t = now()
+  useAppBoard.setState((s) => ({
+    items: s.items.map((i) => {
+      if (i.id === itemId) return { ...i, pull: key, column: i.column === 'ideas' || i.column === 'building' ? 'testing' : i.column, updated: t }
+      if (i.pull === key) return { ...i, pull: undefined, updated: t }
+      return i
+    })
+  }))
+  persist()
+}
+
+/**
+ * Keeps the board up with the pull requests: a new one Claude opened is matched to the card it's
+ * for (moved to Testing), and a card's pull request that was merged moves it to Done. One closed
+ * without merging puts its card back in Building, ready for another try.
+ */
+export async function syncPulls(pulls: PullRequest[], errors: Record<string, string>, appOf: (repo: string) => { keys: string[] } | null): Promise<void> {
+  const { items, loaded } = useAppBoard.getState()
+  if (!loaded) return
+  const t = now()
+  let changed = false
+  let next = items
+  for (const p of pulls) {
+    const key = pullKey(p.repo, p.number)
+    const app = appOf(p.repo)
+    if (!app) continue
+    const linked = next.find((i) => i.pull === key)
+    if (linked) {
+      if (linked.column === 'ideas' || linked.column === 'building') {
+        next = next.map((i) => (i === linked ? { ...i, column: 'testing', updated: t } : i))
+        changed = true
+      }
+      continue
+    }
+    const item = matchPull(
+      next.filter((i) => app.keys.includes(i.app)),
+      p
+    )
+    if (item) {
+      next = next.map((i) => (i === item ? { ...i, pull: key, column: 'testing', updated: t } : i))
+      changed = true
+    }
+  }
+  // Cards whose pull request isn't open any more.
+  const open = new Set(pulls.map((p) => pullKey(p.repo, p.number)))
+  const gone = new Map<string, number[]>()
+  for (const i of next) {
+    if (!i.pull || open.has(i.pull) || i.column === 'done') continue
+    const [repo, n] = i.pull.split('#')
+    if (errors[repo] || !Number(n)) continue
+    gone.set(repo, [...(gone.get(repo) ?? []), Number(n)])
+  }
+  if (changed) {
+    useAppBoard.setState({ items: next })
+    persist()
+  }
+  for (const [repo, numbers] of gone) {
+    const states = await window.api.appsPullStates(repo, numbers).catch(() => ({}) as Record<number, string>)
+    useAppBoard.setState((s) => ({
+      items: s.items.map((i) => {
+        const state = i.pull?.startsWith(repo + '#') ? states[Number(i.pull.split('#')[1])] : undefined
+        if (state === 'merged') return { ...i, column: 'done', updated: now() }
+        if (state === 'closed') return { ...i, pull: undefined, column: 'building', updated: now() }
+        return i
+      })
+    }))
+    if (Object.values(states).some((v) => v !== 'open')) persist()
+  }
+}
+
+// ---------- Screenshots ----------
+
+export function addShots(shots: Shot[]): void {
+  if (!shots.length) return
+  useAppBoard.setState((s) => ({ shots: [...s.shots, ...shots] }))
+  persist()
+}
+
+export function updateShot(id: string, patch: Partial<Shot>): void {
+  useAppBoard.setState((s) => ({ shots: s.shots.map((x) => (x.id === id ? { ...x, ...patch } : x)) }))
+  persist()
+}
+
+export function deleteShot(id: string): void {
+  useAppBoard.setState((s) => ({ shots: s.shots.filter((x) => x.id !== id) }))
+  persist()
+}
+
+export const newShotId = newId

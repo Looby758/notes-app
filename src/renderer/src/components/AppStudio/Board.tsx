@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent } from 'react'
-import { Bug, Camera, Check, ClipboardCopy, Copy, Image as ImageIcon, Lightbulb, PenLine, Plus, Trash2, X } from 'lucide-react'
+import { Asterisk, Bug, Camera, Check, ClipboardCopy, Copy, ExternalLink, GitPullRequest, Image as ImageIcon, Lightbulb, Link2, PenLine, Plus, Send, Trash2, X } from 'lucide-react'
 import { BOARD_COLUMNS, boardKey, claudePrompt, type BoardColumn, type BoardItem } from '@shared/appStudio'
+import { isClaudeLink } from '@shared/chatSites'
+import { openSiteTab } from '../ChatSite/ChatSite'
+import { useChatSites } from '../../store/grok'
 import { useTerminals, type TerminalProject } from '../../store/terminals'
 import { useAppStudio } from '../../store/appStudio'
 import {
@@ -11,7 +14,9 @@ import {
   editItem,
   finishEditing,
   moveItem,
+  sendToClaude,
   setBoardApp,
+  setClaudeLink,
   startItem,
   togglePicked,
   useAppBoard
@@ -57,6 +62,9 @@ export default function Board() {
   const editing = useAppBoard((s) => s.editing)
   const loaded = useAppBoard((s) => s.loaded)
   const app = apps.find((a) => a.key === selected || a.name === selected) ?? apps[0]
+  const claudeLink = useAppBoard((s) => (app ? s.claude[app.key] : undefined))
+  // Asking for the app's Claude project link (then sending these, if any).
+  const [asking, setAsking] = useState<BoardItem[] | null>(null)
 
   if (!apps.length) return <p className="appstudio-empty">Add an app in My apps first, then its ideas and bugs go here.</p>
   if (!app) return null
@@ -69,6 +77,15 @@ export default function Board() {
       .writeText(claudePrompt(app, list))
       .then(() => notify(list.some((i) => i.pictures.length) ? 'Copied. Paste it into Claude Code, then copy each picture across too.' : 'Copied. Paste it into Claude Code.', 'info'))
       .catch((err) => notify(err))
+  }
+
+  const send = (list: BoardItem[]): void => {
+    if (!list.length) return
+    if (!claudeLink) {
+      setAsking(list)
+      return
+    }
+    void sendToClaude(app.key, app, list)
   }
 
   return (
@@ -85,7 +102,10 @@ export default function Board() {
         <span className="board-spacer" />
         {pickedItems.length > 0 ? (
           <>
-            <button className="btn btn-primary" onClick={() => copyPrompt(pickedItems)}>
+            <button className="btn btn-primary" onClick={() => send(pickedItems)} title="Opens Claude with these in one prompt">
+              <Send size={14} /> Send {pickedItems.length} to Claude
+            </button>
+            <button className="btn" onClick={() => copyPrompt(pickedItems)}>
               <ClipboardCopy size={14} /> Copy {pickedItems.length} as Claude prompt
             </button>
             <button className="icon-btn" title="Unpick all" onClick={clearPicked}>
@@ -93,8 +113,11 @@ export default function Board() {
             </button>
           </>
         ) : (
-          <span className="board-hint">Tick cards to copy several as one prompt</span>
+          <span className="board-hint">Tick cards to send several as one prompt</span>
         )}
+        <button className={`btn${claudeLink ? '' : ' muted'}`} onClick={() => setAsking([])} title={claudeLink ? `${app.name}’s Claude project: ${claudeLink}` : `Set ${app.name}’s Claude project, where Send to Claude goes`}>
+          <Asterisk size={14} /> {claudeLink ? 'Claude project' : 'Set Claude project'}
+        </button>
         <button className="btn" onClick={() => startItem(app.key, 'idea')}>
           <Lightbulb size={14} /> Idea
         </button>
@@ -110,16 +133,55 @@ export default function Board() {
       ) : (
         <div className="board-columns">
           {BOARD_COLUMNS.map((c) => (
-            <Column key={c.id} column={c.id} label={c.label} items={mine.filter((i) => i.column === c.id)} picked={picked} onCopy={(i) => copyPrompt([i])} />
+            <Column key={c.id} column={c.id} label={c.label} items={mine.filter((i) => i.column === c.id)} picked={picked} onCopy={(i) => copyPrompt([i])} onSend={(i) => send([i])} />
           ))}
         </div>
       )}
-      {editing && <Editor item={editing} apps={apps} onCopy={(i) => copyPrompt([i])} />}
+      {editing && (
+        <Editor
+          item={editing}
+          apps={apps}
+          onCopy={(i) => copyPrompt([i])}
+          onSend={(i) => {
+            finishEditing()
+            const saved = useAppBoard.getState().items.find((x) => x.id === i.id)
+            if (saved) send([saved])
+          }}
+        />
+      )}
+      {asking && (
+        <ClaudeLinkDialog
+          app={app}
+          link={claudeLink}
+          sending={asking.length}
+          onClose={() => setAsking(null)}
+          onSave={(url) => {
+            setClaudeLink(app.key, url)
+            const list = asking
+            setAsking(null)
+            if (url && list.length) void sendToClaude(app.key, app, list)
+          }}
+        />
+      )}
     </div>
   )
 }
 
-function Column({ column, label, items, picked, onCopy }: { column: BoardColumn; label: string; items: BoardItem[]; picked: string[]; onCopy: (i: BoardItem) => void }) {
+function Column({
+  column,
+  label,
+  items,
+  picked,
+  onCopy,
+  onSend
+}: {
+  column: BoardColumn
+  label: string
+  items: BoardItem[]
+  picked: string[]
+  onCopy: (i: BoardItem) => void
+  onSend: (i: BoardItem) => void
+}) {
   const [over, setOver] = useState(false)
   const drop = (e: DragEvent, before?: string): void => {
     e.preventDefault()
@@ -146,7 +208,7 @@ function Column({ column, label, items, picked, onCopy }: { column: BoardColumn;
       </header>
       <div className="board-cards">
         {items.map((i) => (
-          <Card key={i.id} item={i} picked={picked.includes(i.id)} onDrop={(e) => drop(e, i.id)} onCopy={() => onCopy(i)} />
+          <Card key={i.id} item={i} picked={picked.includes(i.id)} onDrop={(e) => drop(e, i.id)} onCopy={() => onCopy(i)} onSend={() => onSend(i)} />
         ))}
         {!items.length && <p className="board-column-empty">{column === 'ideas' ? 'New ideas and bugs land here' : 'Drag cards here'}</p>}
       </div>
@@ -154,7 +216,7 @@ function Column({ column, label, items, picked, onCopy }: { column: BoardColumn;
   )
 }
 
-function Card({ item, picked, onDrop, onCopy }: { item: BoardItem; picked: boolean; onDrop: (e: DragEvent) => void; onCopy: () => void }) {
+function Card({ item, picked, onDrop, onCopy, onSend }: { item: BoardItem; picked: boolean; onDrop: (e: DragEvent) => void; onCopy: () => void; onSend: () => void }) {
   return (
     <article
       className={`board-card ${item.kind}${picked ? ' picked' : ''}`}
@@ -189,8 +251,31 @@ function Card({ item, picked, onDrop, onCopy }: { item: BoardItem; picked: boole
         >
           <ClipboardCopy size={13} />
         </button>
+        <button
+          className="icon-btn board-card-copy"
+          title={item.sentAt ? 'Send to Claude again' : 'Send to Claude'}
+          onClick={(e) => {
+            e.stopPropagation()
+            onSend()
+          }}
+        >
+          <Send size={13} />
+        </button>
       </div>
       {item.details && <p className="board-card-details">{item.details}</p>}
+      {(item.pull || item.sentAt) && (
+        <div className="board-card-status">
+          {item.pull ? (
+            <a href={`https://github.com/${item.pull.replace('#', '/pull/')}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title="Claude’s pull request for this">
+              <GitPullRequest size={12} /> #{item.pull.split('#')[1]}
+            </a>
+          ) : (
+            <span title={`Sent ${new Date(item.sentAt!).toLocaleString()}`}>
+              <Send size={11} /> Sent to Claude
+            </span>
+          )}
+        </div>
+      )}
       {item.pictures.length > 0 && (
         <div className="board-card-pictures">
           {item.pictures.slice(0, 3).map((p) => (
@@ -228,10 +313,10 @@ async function pictureAsPng(path: string): Promise<Blob> {
   }
 }
 
-async function copyPicture(path: string): Promise<void> {
+export async function copyPicture(path: string): Promise<void> {
   try {
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': await pictureAsPng(path) })])
-    notify('Picture copied. Paste it into Claude Code.', 'info')
+    notify('Picture copied.', 'info')
   } catch (err) {
     notify(err)
   }
@@ -239,7 +324,7 @@ async function copyPicture(path: string): Promise<void> {
 
 const pictureName = (kind: string, ext: string): string => `${kind}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.${ext}`
 
-function Editor({ item, apps, onCopy }: { item: BoardItem; apps: BoardApp[]; onCopy: (i: BoardItem) => void }) {
+function Editor({ item, apps, onCopy, onSend }: { item: BoardItem; apps: BoardApp[]; onCopy: (i: BoardItem) => void; onSend: (i: BoardItem) => void }) {
   const folder = usePrefs((s) => s.prefs.attachmentFolder)
   const isNew = !useAppBoard((s) => s.items.some((i) => i.id === item.id))
   const title = useRef<HTMLInputElement>(null)
@@ -370,8 +455,11 @@ function Editor({ item, apps, onCopy }: { item: BoardItem; apps: BoardApp[]; onC
           </div>
         </div>
         <div className="board-editor-actions">
-          <button className="btn btn-primary" disabled={!item.title.trim()} onClick={() => onCopy(item)}>
-            <ClipboardCopy size={14} /> Copy as Claude prompt
+          <button className="btn btn-primary" disabled={!item.title.trim()} onClick={() => onSend(item)} title="Opens the app’s Claude project with this as the prompt">
+            <Send size={14} /> Send to Claude
+          </button>
+          <button className="btn" disabled={!item.title.trim()} onClick={() => onCopy(item)}>
+            <ClipboardCopy size={14} /> Copy prompt
           </button>
           <span className="board-spacer" />
           {!isNew && (
@@ -396,6 +484,72 @@ function Editor({ item, apps, onCopy }: { item: BoardItem; apps: BoardApp[]; onC
             ) : (
               <>
                 <Check size={14} /> Done
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Asks for an app's Claude project link: where Send to Claude opens. */
+function ClaudeLinkDialog({ app, link, sending, onClose, onSave }: { app: BoardApp; link?: string; sending: number; onClose: () => void; onSave: (url: string) => void }) {
+  const [url, setUrl] = useState(link ?? '')
+  const current = useChatSites((s) => s.claude.url)
+  const onProject = /^https:\/\/claude\.ai\/project\//.test(current)
+  const ok = !url.trim() || isClaudeLink(url)
+  return (
+    <div
+      className="board-editor-backdrop"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div className="board-editor board-link-dialog" role="dialog" aria-label="Claude project">
+        <div className="board-editor-top">
+          <strong>
+            <Asterisk size={14} /> {app.name}’s Claude project
+          </strong>
+          <span className="board-spacer" />
+          <button className="icon-btn" title="Close" onClick={onClose}>
+            <X size={15} />
+          </button>
+        </div>
+        <p className="muted">
+          Send to Claude opens this inside Orbit with your ideas and bugs as the message. Open the project on claude.ai and copy its address (it starts with
+          claude.ai/project/).
+        </p>
+        <input
+          className="board-editor-title"
+          placeholder="https://claude.ai/project/…"
+          value={url}
+          autoFocus
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && ok) onSave(url)
+            if (e.key === 'Escape') onClose()
+          }}
+        />
+        {!ok && <p className="appstudio-error">That isn’t a claude.ai link.</p>}
+        <div className="board-editor-actions">
+          <button className="btn" onClick={() => openSiteTab('claude')} title="Open Claude in Orbit to find the project">
+            <ExternalLink size={14} /> Open Claude
+          </button>
+          {onProject && current !== url && (
+            <button className="btn" onClick={() => setUrl(current)} title={current}>
+              <Link2 size={14} /> Use the project Claude is on
+            </button>
+          )}
+          <span className="board-spacer" />
+          <button className="btn btn-primary" disabled={!ok} onClick={() => onSave(url)}>
+            {sending ? (
+              <>
+                <Send size={14} /> Save and send
+              </>
+            ) : (
+              <>
+                <Check size={14} /> Save
               </>
             )}
           </button>

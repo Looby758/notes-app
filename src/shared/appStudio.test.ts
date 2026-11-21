@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boardKey, bumpVersion, changelogSource, claudePrompt, githubRepo, looksLikeGitHubToken, notesTarget, plainChangelog, prSummary, readBoard, releaseCommand, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release } from './appStudio'
+import { boardKey, bumpVersion, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
 
 describe('githubRepo', () => {
   it('reads https and ssh remotes', () => {
@@ -162,5 +162,83 @@ describe('switchBranchCommand', () => {
   it('switches and pulls', () => {
     expect(switchBranchCommand(false, 'main')).toBe('git checkout main && git pull')
     expect(switchBranchCommand(true, 'main')).toBe('git checkout main; if ($LASTEXITCODE -eq 0) { git pull }')
+  })
+})
+
+describe('test copies', () => {
+  it('names a copy after its branch', () => {
+    expect(copyFolderName('claude/dark-mode-x1')).toBe('claude-dark-mode-x1')
+    expect(copyFolderName('feature/über cool')).toBe('feature-ber-cool')
+    expect(copyFolderName('---')).toBe('copy')
+  })
+  it('runs a copy with the branch’s latest', () => {
+    expect(copyRunCommand(false, 'claude/x', 'npm run dev')).toBe(
+      'before=$(git rev-parse HEAD) && git fetch origin claude/x && git checkout --detach FETCH_HEAD && { if [ ! -d node_modules ] || ! git diff --quiet "$before" HEAD -- package.json package-lock.json yarn.lock pnpm-lock.yaml; then npm install; fi; } && npm run dev'
+    )
+    expect(copyRunCommand(true, 'claude/x')).toContain('git fetch origin claude/x; if ($LASTEXITCODE -eq 0) { git checkout --detach FETCH_HEAD;')
+  })
+})
+
+describe('matching pull requests to cards', () => {
+  const item = (over: Partial<BoardItem>): BoardItem => ({
+    id: 'a',
+    app: 'me/app',
+    kind: 'idea',
+    title: 'Dark mode for the player',
+    details: '',
+    column: 'building',
+    pictures: [],
+    created: '2026-11-01T00:00:00Z',
+    updated: '2026-11-01T00:00:00Z',
+    sentAt: '2026-11-20T10:00:00Z',
+    ...over
+  })
+  const pull = { title: 'Add dark mode to the music player', body: 'Adds a toggle.', createdAt: '2026-11-20T11:00:00Z' }
+
+  it('finds the card a pull request is for', () => {
+    const items = [item({}), item({ id: 'b', title: 'Keyboard shortcuts list' })]
+    expect(matchPull(items, pull)?.id).toBe('a')
+  })
+  it('leaves out cards not sent, already matched, done, or sent after it opened', () => {
+    expect(matchPull([item({ sentAt: undefined })], pull)).toBeNull()
+    expect(matchPull([item({ pull: 'me/app#3' })], pull)).toBeNull()
+    expect(matchPull([item({ column: 'done' })], pull)).toBeNull()
+    expect(matchPull([item({ sentAt: '2026-11-21T00:00:00Z' })], pull)).toBeNull()
+  })
+  it('needs enough words in common', () => {
+    expect(matchPull([item({ title: 'Better player' })], pull)).toBeNull()
+    expect(matchPull([item({ title: 'Faster sync for notes' })], pull)).toBeNull()
+  })
+  it('makes keys', () => {
+    expect(pullKey('me/app', 12)).toBe('me/app#12')
+    expect([...keywords('The Save buttons are broken!')]).toEqual(['save', 'button', 'broken'])
+  })
+})
+
+describe('screenshots', () => {
+  it('finds GitHub images in a description', () => {
+    const body = '![shot](https://github.com/user-attachments/assets/abc-123)\n<img width="400" src="https://user-images.githubusercontent.com/1/2.png">\n![x](https://evil.example/a.png) ![y](https://github.com/me/app/assets/1/def)'
+    expect(imageUrls(body)).toEqual(['https://github.com/user-attachments/assets/abc-123', 'https://github.com/me/app/assets/1/def', 'https://user-images.githubusercontent.com/1/2.png'])
+    expect(isGitHubImage('http://github.com/user-attachments/assets/a')).toBe(false)
+    expect(isGitHubImage('https://github.com/login')).toBe(false)
+  })
+  it('groups by feature, newest first', () => {
+    const shot = (id: string, feature: string, date: string): Shot => ({ id, app: 'a', feature, picture: `${id}.png`, date })
+    const groups = shotsByFeature([shot('1', 'Board', '2026-11-01'), shot('2', 'Releases', '2026-11-05'), shot('3', 'Board', '2026-11-03')])
+    expect(groups.map((g) => g.feature)).toEqual(['Releases', 'Board'])
+    expect(groups[1].shots.map((s) => s.id)).toEqual(['3', '1'])
+  })
+  it('reads links, screenshots and matches from the saved board', () => {
+    const data = readBoard(
+      JSON.stringify({
+        items: [{ id: 'a', app: 'x', title: 't', sentAt: '2026-11-20T10:00:00Z', pull: 'me/x#2' }],
+        claude: { x: 'https://claude.ai/project/1', bad: 3 },
+        shots: [{ id: 's', app: 'x', picture: 'a.png' }, { id: 'nope' }]
+      })
+    )
+    expect(data.items[0]).toMatchObject({ sentAt: '2026-11-20T10:00:00Z', pull: 'me/x#2' })
+    expect(data.claude).toEqual({ x: 'https://claude.ai/project/1' })
+    expect(data.shots).toEqual([{ id: 's', app: 'x', feature: 'Other', picture: 'a.png', date: new Date(0).toISOString(), note: undefined, source: undefined }])
+    expect(readBoard(null)).toEqual({ items: [], claude: {}, shots: [] })
   })
 })

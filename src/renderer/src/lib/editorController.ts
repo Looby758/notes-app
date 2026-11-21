@@ -112,6 +112,8 @@ export const DISCORD_TAB = 'discord-voice:'
 export const MESSAGES_TAB = 'messages:'
 /** Grok, xAI's chat bot (components/Grok); it can float over your notes instead (store/grok). */
 export const GROK_TAB = 'grok:'
+/** Claude (claude.ai), the same way as Grok: a tab, or floating over your notes (components/ChatSite). */
+export const CLAUDE_TAB = 'claude:'
 export const GAMES_TAB = 'games:'
 /** The video player (components/Video); which video it shows is in store/videoPlayer. */
 export const VIDEO_TAB = 'video:'

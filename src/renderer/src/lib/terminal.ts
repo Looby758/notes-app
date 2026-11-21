@@ -5,7 +5,7 @@ import '@xterm/xterm/css/xterm.css'
 import { useEditor } from '../store/editor'
 import { commandForKey, type Command } from './commands'
 import { openSpecialTab, TERMINAL_TAB } from './editorController'
-import { releaseCommand, switchBranchCommand, tryBranchCommand, type VersionBump } from '@shared/appStudio'
+import { copyRunCommand, releaseCommand, switchBranchCommand, tryBranchCommand, type VersionBump } from '@shared/appStudio'
 import { IS_MAC } from '@shared/platform'
 import { commandLabel, findFiles, isErrorLine, keepsRunning, latestAndRunCommand, LineTracker, resolveFrom, runCommandOf } from '@shared/terminalTools'
 import {
@@ -533,6 +533,40 @@ export function tryBranch(project: TerminalProject, branch: string): void {
 /** App Studio's release button: bumps the version, commits and tags it, and pushes, in the project's own terminal. */
 export function releaseApp(project: TerminalProject, bump: VersionBump): void {
   runProjectCommand(project, releaseCommand(IS_WINDOWS, bump))
+}
+
+/**
+ * Runs a test copy of a project (a pull request's version, in a folder of its own): in the copy's
+ * own terminal (made if needed, started fresh), gets the branch's latest, installs if needed, and
+ * starts it. Restart afterwards just starts it again.
+ */
+export function runTestCopy(project: TerminalProject, path: string, branch: string, label: string): void {
+  const run = runCommandOf(project.commands)
+  rememberCommand(`git checkout ${branch}`)
+  const line = copyRunCommand(IS_WINDOWS, branch, run)
+  const existing = useTerminals.getState().terminals.find((t) => t.folder === path && t.command === run)
+  if (existing) {
+    setActiveTerminal(existing.id)
+    openSpecialTab(TERMINAL_TAB)
+    const s = sessions.get(existing.id)
+    if (s) {
+      restartTerminal(existing.id)
+      s.pending = line
+    } else pendingFor.set(existing.id, line)
+    return
+  }
+  const t = addTerminal({ name: `${project.name} · ${label}`, folder: path, command: run })
+  openSpecialTab(TERMINAL_TAB)
+  queueMicrotask(() => {
+    const s = sessions.get(t.id)
+    if (s) s.pending = line
+    else pendingFor.set(t.id, line)
+  })
+}
+
+/** Closes a test copy's terminals (ending the app running from it), so its folder can be removed. */
+export function closeCopyTerminals(path: string): void {
+  for (const t of useTerminals.getState().terminals) if (t.folder === path) closeTerminal(t.id)
 }
 
 /** Switches the project to a branch (main, for a release) and gets its latest, in the project's own terminal. */

@@ -1,8 +1,8 @@
 import { app, ipcMain, net, safeStorage } from 'electron'
 import { execFile } from 'child_process'
 import { existsSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
-import { isAbsolute, join } from 'path'
-import { githubRepo, type AppInfo, type GitHubStatus, type MergedPull, type PullRequest, type Release } from '@shared/appStudio'
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'path'
+import { copyFolderName, githubRepo, isGitHubImage, type AppInfo, type TestCopy, type GitHubStatus, type MergedPull, type PullRequest, type Release } from '@shared/appStudio'
 import { logError } from './log'
 import { TEST_COPY } from './testCopy'
 
@@ -108,6 +108,62 @@ function git(folder: string, args: string[]): Promise<string | null> {
   return new Promise((resolve) => {
     execFile('git', args, { cwd: folder, timeout: 10_000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 }, (err, stdout) => resolve(err ? null : stdout.trim()))
   })
+}
+
+/** Runs git for longer jobs (fetching, making a copy); its output, or git's own error message. */
+function gitLong(folder: string, args: string[]): Promise<{ ok: boolean; out: string; err: string }> {
+  return new Promise((done) => {
+    execFile('git', args, { cwd: folder, timeout: 180_000, windowsHide: true, maxBuffer: 8 * 1024 * 1024 }, (err, stdout, stderr) =>
+      done({ ok: !err, out: String(stdout).trim(), err: String(stderr || err?.message || '').trim() })
+    )
+  })
+}
+
+/** Where an app's test copies go: a folder beside it, "<app>-test-copies". */
+const copiesDir = (folder: string): string => join(dirname(folder), `${basename(folder)}-test-copies`)
+
+const inside = (dir: string, path: string): boolean => {
+  const rel = relative(dir, resolve(path))
+  return !!rel && !rel.startsWith('..') && !isAbsolute(rel)
+}
+
+function validFolder(folder: unknown): folder is string {
+  return typeof folder === 'string' && isAbsolute(folder) && !!statSync(folder, { throwIfNoEntry: false })?.isDirectory()
+}
+
+async function copies(folder: string): Promise<TestCopy[]> {
+  const list = await git(folder, ['worktree', 'list', '--porcelain'])
+  if (!list) return []
+  const dir = copiesDir(folder)
+  return list
+    .split(/\n\s*\n/)
+    .map((block) => {
+      const path = /^worktree (.+)$/m.exec(block)?.[1]
+      const head = /^HEAD (\w+)$/m.exec(block)?.[1] ?? ''
+      return path ? { path: resolve(path), head } : null
+    })
+    .filter((c): c is TestCopy => !!c && inside(dir, c.path) && existsSync(c.path))
+}
+
+/** Makes a test copy with the branch's latest in it (or finds the one already made). */
+async function addCopy(folder: string, branch: string): Promise<string> {
+  const path = join(copiesDir(folder), copyFolderName(branch))
+  if ((await copies(folder)).some((c) => c.path === resolve(path))) return path
+  if (existsSync(path)) throw new Error(`There’s already a folder at ${path} that isn’t a test copy. Move it out of the way first.`)
+  const fetched = await gitLong(folder, ['fetch', 'origin', branch])
+  if (!fetched.ok) throw new Error(`Git couldn’t get the branch ${branch}: ${fetched.err.split('\n').pop()}`)
+  const made = await gitLong(folder, ['worktree', 'add', '--detach', path, 'FETCH_HEAD'])
+  if (!made.ok) throw new Error(`Git couldn’t make the test copy: ${made.err.split('\n').pop()}`)
+  return path
+}
+
+async function removeCopy(folder: string, path: string): Promise<void> {
+  if (!inside(copiesDir(folder), path)) throw new Error('Not allowed')
+  const done = await gitLong(folder, ['worktree', 'remove', '--force', path])
+  await gitLong(folder, ['worktree', 'prune'])
+  if (!done.ok && existsSync(path)) {
+    throw new Error(/busy|denied|permission|in use/i.test(done.err) ? 'Some of its files are in use. Close the app running from this copy first.' : `Git couldn’t remove it: ${done.err.split('\n').pop()}`)
+  }
 }
 
 async function appInfo(folder: string): Promise<AppInfo> {
@@ -274,6 +330,39 @@ async function setReleaseNotes(repo: string, tag: string, body: string, title: s
   return { tag: r.tag_name, name: r.name || r.tag_name, date: r.published_at ?? r.created_at, draft: r.draft, prerelease: r.prerelease, url: r.html_url, body: r.body ?? '' }
 }
 
+/** Whether each pull request is still open, was merged, or was closed without merging. */
+async function pullStates(repo: string, numbers: number[]): Promise<Record<number, 'open' | 'merged' | 'closed'>> {
+  const out: Record<number, 'open' | 'merged' | 'closed'> = {}
+  await Promise.all(
+    numbers.slice(0, 20).map(async (n) => {
+      try {
+        const p = await github<{ state: string; merged_at: string | null }>(`/repos/${repo}/pulls/${n}`)
+        out[n] = p.merged_at ? 'merged' : p.state === 'open' ? 'open' : 'closed'
+      } catch {
+        // Unknown for now; asked again next time.
+      }
+    })
+  )
+  return out
+}
+
+/** Downloads a picture from a pull request's description (GitHub's own image addresses only). */
+async function fetchImage(url: string): Promise<{ bytes: Uint8Array; type: string }> {
+  if (!isGitHubImage(url)) throw new Error('Not allowed')
+  const key = token()
+  let res: Response
+  try {
+    res = await net.fetch(url, { headers: { 'User-Agent': 'Orbit', ...(key ? { Authorization: `Bearer ${key}` } : {}) } })
+  } catch {
+    throw new Error('Couldn’t reach GitHub. Check your internet connection.')
+  }
+  const type = res.headers.get('content-type') ?? ''
+  if (!res.ok || !type.startsWith('image/')) throw new Error(`GitHub didn’t send the picture (${res.status}).`)
+  const bytes = new Uint8Array(await res.arrayBuffer())
+  if (bytes.length > 25 * 1024 * 1024) throw new Error('That picture is too big.')
+  return { bytes, type }
+}
+
 function needToken(): void {
   if (!token()) throw new Error('Connect GitHub in App Studio first, so Orbit can do that for you.')
 }
@@ -301,6 +390,20 @@ export function setupAppStudio(): void {
     needToken()
     return setReleaseNotes(repo, tag, String(body ?? '').slice(0, 100_000), String(title || tag).slice(0, 200))
   })
+  ipcMain.handle('apps:copies', (_e, folder: unknown) => (validFolder(folder) ? copies(folder) : []))
+  ipcMain.handle('apps:addCopy', (_e, folder: unknown, branch: unknown) => {
+    if (!validFolder(folder) || typeof branch !== 'string' || !/^[\w./@+-]{1,200}$/.test(branch) || branch.startsWith('-')) throw new Error('Not allowed')
+    return addCopy(folder, branch)
+  })
+  ipcMain.handle('apps:removeCopy', (_e, folder: unknown, path: unknown) => {
+    if (!validFolder(folder) || typeof path !== 'string') throw new Error('Not allowed')
+    return removeCopy(folder, path)
+  })
+  ipcMain.handle('apps:pullStates', (_e, repo: unknown, numbers: unknown) => {
+    if (!validRepo(repo) || !Array.isArray(numbers)) throw new Error('Not allowed')
+    return pullStates(repo, numbers.filter((n): n is number => Number.isInteger(n) && n > 0))
+  })
+  ipcMain.handle('apps:fetchImage', (_e, url: unknown) => fetchImage(String(url)))
   ipcMain.handle('apps:merge', async (_e, repo: unknown, number: unknown) => {
     if (!validRepo(repo) || typeof number !== 'number') throw new Error('Not allowed')
     needToken()

@@ -68,6 +68,7 @@ import Screensaver from './Screensaver/Screensaver'
 import Pet from './Motion/Pet'
 import MusicPlayer from './Music/MusicPlayer'
 import { GrokFloat } from './Grok/GrokPage'
+import { ChatSiteFloat } from './ChatSite/ChatSite'
 import RecordingBar from './Studio/RecordingBar'
 import ZenBar, { StatusTimer } from './ZenBar'
 import VoiceRecorder from './VoiceRecorder'
@@ -426,6 +427,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <DeviceDrop />
       <MusicPlayer />
       <GrokFloat />
+      <ChatSiteFloat site="claude" />
       <RecordingBar />
       <ZenBar />
       <VoiceRecorder />

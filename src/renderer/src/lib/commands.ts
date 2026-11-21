@@ -77,6 +77,7 @@ import { sendToPhone } from '../store/phone'
 import { toggleDiscord } from '../store/discord'
 import { openRadial } from '../components/Nav/RadialMenu'
 import { openGrokTab, toggleGrokFloat } from '../components/Grok/GrokPage'
+import { openSiteTab, toggleSiteFloat } from '../components/ChatSite/ChatSite'
 import { startSnip } from './snip'
 import { openMiniGames } from '../store/miniGames'
 import { changeNotesPassword, lockAllNow, lockFolder, lockNote, lockNoteOwn, removeLock } from './lock/actions'
@@ -242,6 +243,8 @@ export const commands: Command[] = [
       openSpecialTab(MESSAGES_TAB)
     }
   },
+  { id: 'claude.open', group: 'Navigation', title: 'Open Claude in a tab', run: () => openSiteTab('claude') },
+  { id: 'claude.float', group: 'Navigation', title: 'Claude: float over your notes (pop out inside Orbit), or put it away', run: () => toggleSiteFloat('claude') },
   { id: 'grok.open', group: 'Navigation', title: 'Open Grok in a tab', run: () => openGrokTab() },
   { id: 'grok.float', group: 'Navigation', title: 'Grok: float over your notes (pop out inside Orbit), or put it away', run: () => toggleGrokFloat() },
   { id: 'email.open', group: 'Navigation', title: 'Open email', shortcut: 'Ctrl+Shift+A', run: () => openSpecialTab(EMAIL_TAB) },

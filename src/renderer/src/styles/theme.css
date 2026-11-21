@@ -15539,3 +15539,206 @@ button.board-add-picture:hover {
 .release-warning svg {
   flex-shrink: 0;
 }
+
+/* App Studio: Send to Claude, test copies, pull request ↔ card, screenshots */
+.board-card-status {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.board-card-status a,
+.board-card-status span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  text-decoration: none;
+}
+.board-link-dialog {
+  max-width: 520px;
+}
+.board-link-dialog p {
+  margin: 0;
+  font-size: 13px;
+}
+.board-link-dialog strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn.muted {
+  color: var(--text-muted);
+}
+.appstudio-copies {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0 2px;
+  border-top: 1px solid var(--border);
+}
+.appstudio-copies-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.appstudio-copy {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12.5px;
+  min-width: 0;
+}
+.appstudio-copy-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.appstudio-split {
+  position: relative;
+  display: inline-flex;
+}
+.appstudio-split > .btn:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.appstudio-split-more {
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-left: 1px solid rgba(0, 0, 0, 0.2) !important;
+  padding-left: 6px !important;
+  padding-right: 6px !important;
+}
+.appstudio-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 260px;
+  padding: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+.appstudio-menu button {
+  padding: 7px 10px;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.appstudio-menu button:hover {
+  background: var(--bg-hover, var(--accent-soft));
+}
+.appstudio-for {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+}
+.appstudio-for .board-select {
+  max-width: 360px;
+}
+.shots {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 300px;
+  border-radius: calc(var(--radius) * 1.5);
+}
+.shots.over {
+  outline: 2px dashed var(--accent);
+  outline-offset: 4px;
+}
+.shots-feature {
+  width: 220px;
+}
+.shots-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 48px 16px;
+  border: 1px dashed var(--border-strong);
+  border-radius: calc(var(--radius) * 1.5);
+  color: var(--text-muted);
+  text-align: center;
+}
+.shots-empty p {
+  margin: 0;
+  color: var(--text-strong);
+}
+.shots-group header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.shots-group h3 {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-strong);
+}
+.shots-group header .muted {
+  font-size: 12px;
+}
+.shots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+.shots-thumb {
+  aspect-ratio: 16 / 10;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  cursor: zoom-in;
+}
+.shots-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top left;
+  display: block;
+}
+.shots-thumb:hover {
+  border-color: var(--accent);
+}
+.shots-viewer {
+  width: min(1100px, 92vw);
+  max-width: none;
+}
+.shots-viewer img {
+  max-width: 100%;
+  max-height: 64vh;
+  object-fit: contain;
+  align-self: center;
+  border-radius: var(--radius);
+}
+.shots-viewer-fields {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.shots-viewer-fields .text-input {
+  flex: 1;
+}
