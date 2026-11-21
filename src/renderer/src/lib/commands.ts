@@ -31,6 +31,7 @@ import {
   MIXER_TAB,
   DOWNLOADS_TAB,
   STUDIO_TAB,
+  APPSTUDIO_TAB,
   CLIPS_TAB,
   VIDEOS_TAB,
   SOUNDBOARD_TAB,
@@ -76,6 +77,7 @@ import { sendToPhone } from '../store/phone'
 import { toggleDiscord } from '../store/discord'
 import { openRadial } from '../components/Nav/RadialMenu'
 import { openGrokTab, toggleGrokFloat } from '../components/Grok/GrokPage'
+import { openSiteTab, toggleSiteFloat } from '../components/ChatSite/ChatSite'
 import { startSnip } from './snip'
 import { openMiniGames } from '../store/miniGames'
 import { changeNotesPassword, lockAllNow, lockFolder, lockNote, lockNoteOwn, removeLock } from './lock/actions'
@@ -241,6 +243,8 @@ export const commands: Command[] = [
       openSpecialTab(MESSAGES_TAB)
     }
   },
+  { id: 'claude.open', group: 'Navigation', title: 'Open Claude in a tab', run: () => openSiteTab('claude') },
+  { id: 'claude.float', group: 'Navigation', title: 'Claude: float over your notes (pop out inside Orbit), or put it away', run: () => toggleSiteFloat('claude') },
   { id: 'grok.open', group: 'Navigation', title: 'Open Grok in a tab', run: () => openGrokTab() },
   { id: 'grok.float', group: 'Navigation', title: 'Grok: float over your notes (pop out inside Orbit), or put it away', run: () => toggleGrokFloat() },
   { id: 'email.open', group: 'Navigation', title: 'Open email', shortcut: 'Ctrl+Shift+A', run: () => openSpecialTab(EMAIL_TAB) },
@@ -367,6 +371,8 @@ export const commands: Command[] = [
   { id: 'macros.record', group: 'Macros', title: 'Macros: start / stop recording', run: () => void window.api.macrosRecord() },
   { id: 'macros.stop', group: 'Macros', title: 'Macros: stop playing or the auto-clicker', run: () => void window.api.macrosStop() },
   { id: 'studio.open', group: 'Navigation', title: 'Open the Studio (record your screen and webcam)', run: () => openSpecialTab(STUDIO_TAB) },
+  { id: 'appstudio.open', group: 'Navigation', title: 'Open App Studio (your apps and their pull requests)', run: () => openSpecialTab(APPSTUDIO_TAB) },
+  { id: 'appstudio.bug', group: 'Tools', title: 'Report a bug in one of your apps (snip the screen, then Report bug)', run: () => void window.api.startSnip() },
   { id: 'clips.open', group: 'Navigation', title: 'Open clips (instant replay and the clip editor)', run: () => openSpecialTab(CLIPS_TAB) },
   { id: 'videos.idea', group: 'Navigation', title: 'Idea inbox for videos (jot down a video idea)', run: () => {
     focusIdeaBox()

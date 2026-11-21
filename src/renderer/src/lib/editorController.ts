@@ -96,6 +96,8 @@ export const MIXER_TAB = 'mixer:'
 export const DOWNLOADS_TAB = 'downloads:'
 /** Scenes, webcam and screen recording (components/Studio). */
 export const STUDIO_TAB = 'studio:'
+/** The apps you make with Claude Code: their cards and pull requests (components/AppStudio). */
+export const APPSTUDIO_TAB = 'appstudio:'
 /** Instant replay and the clip editor (components/Clips). */
 export const CLIPS_TAB = 'clips:'
 /** Video projects: script, research, pictures, recordings and thumbnail ideas for each video (components/Videos). */
@@ -110,6 +112,8 @@ export const DISCORD_TAB = 'discord-voice:'
 export const MESSAGES_TAB = 'messages:'
 /** Grok, xAI's chat bot (components/Grok); it can float over your notes instead (store/grok). */
 export const GROK_TAB = 'grok:'
+/** Claude (claude.ai), the same way as Grok: a tab, or floating over your notes (components/ChatSite). */
+export const CLAUDE_TAB = 'claude:'
 export const GAMES_TAB = 'games:'
 /** The video player (components/Video); which video it shows is in store/videoPlayer. */
 export const VIDEO_TAB = 'video:'

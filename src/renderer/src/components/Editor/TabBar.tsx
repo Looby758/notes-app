@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type MouseEvent } from 'react'
 import { unseenTerminalErrors, useTerminals } from '../../store/terminals'
-import { ArrowRightLeft, AudioLines, Bot, Headphones, Joystick, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Hourglass, HardDrive, House, KeyRound, Layers, LibraryBig, Library, Mail, MessageSquare, MessagesSquare, Monitor, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Scissors, Settings, SlidersVertical, Video, Sparkles, SquareTerminal, Star, StarOff, X, VenetianMask, Volume2, VolumeX } from 'lucide-react'
+import { Asterisk, Hammer, ArrowRightLeft, AudioLines, Bot, Headphones, Joystick, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Hourglass, HardDrive, House, KeyRound, Layers, LibraryBig, Library, Mail, MessageSquare, MessagesSquare, Monitor, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Scissors, Settings, SlidersVertical, Video, Sparkles, SquareTerminal, Star, StarOff, X, VenetianMask, Volume2, VolumeX } from 'lucide-react'
 import Private from '../Streamer/Private'
 import { useHideNames } from '../../store/streamer'
 import { useEditor } from '../../store/editor'
@@ -39,6 +39,7 @@ import {
   MIXER_TAB,
   DOWNLOADS_TAB,
   STUDIO_TAB,
+  APPSTUDIO_TAB,
   CLIPS_TAB,
   VIDEOS_TAB,
   SOUNDBOARD_TAB,
@@ -46,6 +47,7 @@ import {
   DISCORD_TAB,
   MESSAGES_TAB,
   GROK_TAB,
+  CLAUDE_TAB,
   GAMES_TAB,
   VIDEO_TAB,
   closePane,
@@ -120,6 +122,7 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === MIXER_TAB) return 'Volume mixer'
   if (id === DOWNLOADS_TAB) return 'Downloads'
   if (id === STUDIO_TAB) return 'Studio'
+  if (id === APPSTUDIO_TAB) return 'App Studio'
   if (id === CLIPS_TAB) return 'Clips'
   if (id === VIDEOS_TAB) return 'Videos'
   if (id === SOUNDBOARD_TAB) return 'Soundboard'
@@ -127,6 +130,7 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === DISCORD_TAB) return 'Discord voice'
   if (id === MESSAGES_TAB) return 'Messages'
   if (id === GROK_TAB) return 'Grok'
+  if (id === CLAUDE_TAB) return 'Claude'
   if (id === GAMES_TAB) return 'Games'
   if (id === VIDEO_TAB) {
     const current = useVideoPlayer.getState().current
@@ -348,6 +352,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === MIXER_TAB && <SlidersVertical size={13} className="tab-icon" />}
               {id === DOWNLOADS_TAB && <ArrowDownToLine size={13} className="tab-icon" />}
               {id === STUDIO_TAB && <Clapperboard size={13} className="tab-icon" />}
+              {id === APPSTUDIO_TAB && <Hammer size={13} className="tab-icon" />}
               {id === CLIPS_TAB && <Scissors size={13} className="tab-icon" />}
               {id === VIDEOS_TAB && <Video size={13} className="tab-icon" />}
               {id === SOUNDBOARD_TAB && <AudioLines size={13} className="tab-icon" />}
@@ -355,6 +360,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === DISCORD_TAB && <Headphones size={13} className="tab-icon" />}
               {id === MESSAGES_TAB && <MessagesSquare size={13} className="tab-icon" />}
               {id === GROK_TAB && <Bot size={13} className="tab-icon" />}
+              {id === CLAUDE_TAB && <Asterisk size={13} className="tab-icon" />}
               {id === GAMES_TAB && <Gamepad2 size={13} className="tab-icon" />}
               {id === VIDEO_TAB && <Film size={13} className="tab-icon" />}
               {isExplorerTab(id) && <HardDrive size={13} className="tab-icon" />}

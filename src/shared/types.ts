@@ -1,3 +1,4 @@
+import type { AppInfo, GitHubStatus, MergedPull, PullRequest, Release, TestCopy } from './appStudio'
 import type { ExplorerEntry, ExplorerPlace, PasteMode } from './explorer'
 import type { ArchiveEntry } from './archive'
 import type { ComicOpened, ComicPreparing, ComicSettings, ComicShelf } from './comics'
@@ -943,6 +944,10 @@ export interface NotesApi {
   /** Snip window: the text in part of the picture (read offline). */
   snipRead(png: Uint8Array): Promise<string>
   snipClose(): Promise<void>
+  /** The snip's "Report bug": this picture of the boxed part of the screen goes to App Studio as a new bug. */
+  snipReportBug(png: Uint8Array): Promise<void>
+  /** A bug reported from the screen snip, with its picture (App Studio opens it). */
+  onAppStudioBug(callback: (png: Uint8Array) => void): () => void
   /** Snip window: what to do with the text (closes the snip). */
   snipSend(action: 'copy' | 'note' | 'web' | 'translate' | 'ask', text: string): Promise<void>
   /** Main window: snipped text to save in today's note or ask the AI about. */
@@ -1144,6 +1149,37 @@ export interface NotesApi {
   terminalHome(): Promise<string>
   /** Opens a project's folder in File Explorer / Finder, or in VS Code. */
   terminalOpenIn(folder: string, where: 'files' | 'vscode'): Promise<void>
+  // App Studio
+  /** Whether a GitHub token is saved (and whose it is). */
+  appsGithubStatus(): Promise<GitHubStatus>
+  /** Whether this is a test copy (started from Orbit's code), with its own settings and data. */
+  appsIsTestCopy(): Promise<boolean>
+  /** Checks a GitHub token with GitHub, then saves it encrypted. */
+  appsSetToken(token: string): Promise<GitHubStatus>
+  appsClearToken(): Promise<GitHubStatus>
+  /** What git and package.json say about an app's folder. */
+  appsInfo(folder: string): Promise<AppInfo>
+  /** Open pull requests on these GitHub repositories ("owner/name"), newest first; errors by repository. */
+  appsPulls(repos: string[]): Promise<{ pulls: PullRequest[]; errors: Record<string, string> }>
+  /** A repository's releases, newest first (drafts too, when the token can see them). */
+  appsReleases(repo: string): Promise<Release[]>
+  /** Pull requests merged after `since` (or recently, without it). */
+  appsMerged(repo: string, since?: string): Promise<MergedPull[]>
+  /** Puts notes on the release for a tag (making a draft release if there isn't one). Needs GitHub connected. */
+  appsSetReleaseNotes(repo: string, tag: string, body: string, title: string): Promise<Release>
+  /** The AI helper writes "What's new" notes from changelogSource(). */
+  aiWhatsNew(source: string): Promise<string>
+  /** An app's test copies (git worktrees in "<app>-test-copies" beside it). */
+  appsCopies(folder: string): Promise<TestCopy[]>
+  /** Makes a test copy with a branch's latest (or finds it); its folder. */
+  appsAddCopy(folder: string, branch: string): Promise<string>
+  appsRemoveCopy(folder: string, path: string): Promise<void>
+  /** Whether pull requests are open, merged or closed. */
+  appsPullStates(repo: string, numbers: number[]): Promise<Record<number, 'open' | 'merged' | 'closed'>>
+  /** Downloads a picture from a pull request's description. */
+  appsFetchImage(url: string): Promise<{ bytes: Uint8Array; type: string }>
+  appsMerge(repo: string, number: number): Promise<void>
+  appsClose(repo: string, number: number): Promise<void>
   /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */
   aiChat(messages: AiChatMessage[], engine?: AiEngine): Promise<AiReply>
   /** Saved chats, kept in the settings folder on this computer. */

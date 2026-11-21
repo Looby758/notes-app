@@ -119,6 +119,13 @@ export function setupSnip(h: Hooks): void {
   ipcMain.handle('snip:image', () => (shot ? { png: new Uint8Array(shot.png), scale: shot.scale } : null))
   ipcMain.handle('snip:read', async (_e, png: Uint8Array) => (await readPrintedText(png)).replace(/[ \t]+\n/g, '\n').trim())
   ipcMain.handle('snip:close', () => closeSnip())
+  // "Report bug": the boxed part of the screen goes to App Studio as a new bug, with this picture.
+  ipcMain.handle('snip:bug', (_e, png: Uint8Array) => {
+    closeSnip()
+    hooks.showMain()
+    const main = hooks.getMain()
+    if (main && !main.isDestroyed() && png instanceof Uint8Array && png.length < 40 * 1024 * 1024) main.webContents.send('appstudio:bug', png)
+  })
   // What to do with the text: done here so it works whether or not Orbit's window is open.
   ipcMain.handle('snip:send', (_e, action: 'copy' | 'note' | 'web' | 'translate' | 'ask', text: string) => {
     const t = String(text).slice(0, 20000)

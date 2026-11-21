@@ -4,20 +4,12 @@
  * the Orbit window, so it isn't another window to keep track of.
  */
 
-export const GROK_URL = 'https://grok.com/'
+import { CHAT_SITES, isSiteUrl } from './chatSites'
 
-/** Grok's own addresses, which the tab and the panel remember as the place to come back to. */
-const GROK_HOSTS = ['grok.com']
+export const GROK_URL = CHAT_SITES.grok.home
 
 /** Whether `url` is a page on grok.com (a chat, the home page…), not a sign-in page or a link out. */
-export function isGrokUrl(url: string): boolean {
-  try {
-    const { protocol, hostname } = new URL(url)
-    return protocol === 'https:' && GROK_HOSTS.some((h) => hostname === h || hostname.endsWith(`.${h}`))
-  } catch {
-    return false
-  }
-}
+export const isGrokUrl = (url: string): boolean => isSiteUrl('grok', url)
 
 /** Where the floating panel sits in the Orbit window, in CSS pixels from its top-left corner. */
 export interface FloatRect {

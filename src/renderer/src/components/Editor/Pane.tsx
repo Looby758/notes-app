@@ -38,6 +38,7 @@ import {
   MIXER_TAB,
   DOWNLOADS_TAB,
   STUDIO_TAB,
+  APPSTUDIO_TAB,
   CLIPS_TAB,
   VIDEOS_TAB,
   SOUNDBOARD_TAB,
@@ -45,6 +46,7 @@ import {
   DISCORD_TAB,
   MESSAGES_TAB,
   GROK_TAB,
+  CLAUDE_TAB,
   GAMES_TAB,
   VIDEO_TAB,
   isExplorerTab,
@@ -73,6 +75,7 @@ import PasswordsPage from '../Passwords/PasswordsPage'
 import EmailPage from '../Email/EmailPage'
 import MessagesPage from '../Messages/MessagesPage'
 import GrokPage from '../Grok/GrokPage'
+import ChatSitePage from '../ChatSite/ChatSite'
 import HomePage from '../Home/HomePage'
 import MoneyPage from '../Money/MoneyPage'
 import ConvertPage from '../Convert/ConvertPage'
@@ -87,6 +90,7 @@ import PublishingPage from '../Publishing/PublishingPage'
 import ScreensPage from '../Screens/ScreensPage'
 import MixerPage from '../Mixer/MixerPage'
 import StudioPage from '../Studio/StudioPage'
+import AppStudioPage from '../AppStudio/AppStudioPage'
 import ClipsPage from '../Clips/ClipsPage'
 import VideosPage from '../Videos/VideosPage'
 import SoundboardPage from '../Soundboard/SoundboardPage'
@@ -206,6 +210,7 @@ export default function Pane({ pane }: { pane: string }) {
         {tabs?.includes(MESSAGES_TAB) && <MessagesPage hidden={active !== MESSAGES_TAB} autoFocus={isActivePane} />}
         {/* And Grok, so a chat isn't lost by looking at a note. */}
         {tabs?.includes(GROK_TAB) && <GrokPage hidden={active !== GROK_TAB} autoFocus={isActivePane} />}
+        {tabs?.includes(CLAUDE_TAB) && <ChatSitePage site="claude" hidden={active !== CLAUDE_TAB} autoFocus={isActivePane} />}
         {active === SETTINGS_TAB && <SettingsPage />}
         {active === CALENDAR_TAB && <CalendarPage />}
         {active === GRAPH_TAB && <GraphPage />}
@@ -233,6 +238,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === MIXER_TAB && <MixerPage />}
         {active === DOWNLOADS_TAB && <DownloadsPage />}
         {active === STUDIO_TAB && <StudioPage />}
+        {active === APPSTUDIO_TAB && <AppStudioPage />}
         {active === CLIPS_TAB && <ClipsPage />}
         {active === VIDEOS_TAB && <VideosPage />}
         {active === SOUNDBOARD_TAB && <SoundboardPage />}

@@ -144,7 +144,11 @@ function startHelper(): ChildProcessWithoutNullStreams {
       }
     }
   })
-  child.stderr.on('data', (d: Buffer) => logError('screen controls', new Error(d.toString().trim())))
+  child.stderr.on('data', (d: Buffer) => {
+    // PowerShell reports its own progress on stderr as '#< CLIXML ...'; that isn't an error.
+    const text = d.toString().trim()
+    if (text && !text.startsWith('#< CLIXML')) logError('screen controls', new Error(text))
+  })
   child.on('error', (err) => logError('screen controls', err))
   child.on('exit', () => {
     if (helper === child) helper = null

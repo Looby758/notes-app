@@ -1,6 +1,6 @@
 import './snip.css'
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
-import { Copy, FilePlus, Globe, Languages, Loader2, Sparkles, X } from 'lucide-react'
+import { Bug, Copy, FilePlus, Globe, Languages, Loader2, Sparkles, X } from 'lucide-react'
 
 interface Box {
   x: number
@@ -105,6 +105,20 @@ export default function SnipApp() {
     void read(b)
   }
 
+  /** "Report bug": the boxed part of the screen, as it is (not made bigger), goes to App Studio. */
+  const reportBug = async (): Promise<void> => {
+    const el = img.current
+    if (!el || !box) return
+    const sx = el.naturalWidth / el.clientWidth
+    const sy = el.naturalHeight / el.clientHeight
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(box.w * sx))
+    canvas.height = Math.max(1, Math.round(box.h * sy))
+    canvas.getContext('2d')!.drawImage(el, box.x * sx, box.y * sy, box.w * sx, box.h * sy, 0, 0, canvas.width, canvas.height)
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'))
+    if (blob) await window.api.snipReportBug(new Uint8Array(await blob.arrayBuffer()))
+  }
+
   const send = (action: 'copy' | 'note' | 'web' | 'translate' | 'ask'): void => {
     if (text) void window.api.snipSend(action, text)
   }
@@ -156,6 +170,9 @@ export default function SnipApp() {
               </div>
             </>
           )}
+          <button className="btn snip-bug" onClick={() => void reportBug()} title="Send this part of the screen to App Studio as a bug in one of your apps" data-snip-bug>
+            <Bug size={13} /> Report bug
+          </button>
           <button className="icon-btn snip-close" onClick={() => void window.api.snipClose()} title="Close (Esc)">
             <X size={13} />
           </button>

@@ -4,6 +4,7 @@ import { loadSnippets } from './snippets'
 import { loadSavedSearches } from './savedSearches'
 import { loadScreenshots, remapScreenshots } from './screenshots'
 import { loadTimeline } from './timeline'
+import { loadAppBoard } from './appBoard'
 import { fixFileLinks } from '../lib/fileLinks'
 import { fixBoardLinks } from '../lib/boards'
 import { create } from 'zustand'
@@ -238,6 +239,7 @@ export const useVault = create<VaultState>((set, get) => {
       void loadSavedSearches()
       void loadScreenshots()
       void loadTimeline()
+      void loadAppBoard()
       loadStarred()
       void loadFlashcards()
       void loadPublishing()

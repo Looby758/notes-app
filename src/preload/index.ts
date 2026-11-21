@@ -455,6 +455,12 @@ const api: NotesApi = {
   snipImage: () => ipcRenderer.invoke('snip:image'),
   snipRead: (png) => ipcRenderer.invoke('snip:read', png),
   snipClose: () => ipcRenderer.invoke('snip:close'),
+  snipReportBug: (png) => ipcRenderer.invoke('snip:bug', png),
+  onAppStudioBug: (callback) => {
+    const handler = (_e: unknown, png: Uint8Array): void => callback(png)
+    ipcRenderer.on('appstudio:bug', handler)
+    return () => ipcRenderer.removeListener('appstudio:bug', handler)
+  },
   snipSend: (action, text) => ipcRenderer.invoke('snip:send', action, text),
   onSnipText: (callback) => {
     const handler = (_e: unknown, action: 'note' | 'ask', text: string): void => callback(action, text)
@@ -627,6 +633,23 @@ const api: NotesApi = {
   terminalPickFolder: () => ipcRenderer.invoke('term:pickFolder'),
   terminalHome: () => ipcRenderer.invoke('term:home'),
   terminalOpenIn: (folder, where) => ipcRenderer.invoke('term:openIn', folder, where),
+  appsGithubStatus: () => ipcRenderer.invoke('apps:githubStatus'),
+  appsIsTestCopy: () => ipcRenderer.invoke('apps:isTestCopy'),
+  appsSetToken: (token) => ipcRenderer.invoke('apps:setToken', token),
+  appsClearToken: () => ipcRenderer.invoke('apps:clearToken'),
+  appsInfo: (folder) => ipcRenderer.invoke('apps:info', folder),
+  appsPulls: (repos) => ipcRenderer.invoke('apps:pulls', repos),
+  appsReleases: (repo) => ipcRenderer.invoke('apps:releases', repo),
+  appsMerged: (repo, since) => ipcRenderer.invoke('apps:merged', repo, since),
+  appsSetReleaseNotes: (repo, tag, body, title) => ipcRenderer.invoke('apps:setReleaseNotes', repo, tag, body, title),
+  aiWhatsNew: (source) => ipcRenderer.invoke('ai:whatsNew', source),
+  appsCopies: (folder) => ipcRenderer.invoke('apps:copies', folder),
+  appsAddCopy: (folder, branch) => ipcRenderer.invoke('apps:addCopy', folder, branch),
+  appsRemoveCopy: (folder, path) => ipcRenderer.invoke('apps:removeCopy', folder, path),
+  appsPullStates: (repo, numbers) => ipcRenderer.invoke('apps:pullStates', repo, numbers),
+  appsFetchImage: (url) => ipcRenderer.invoke('apps:fetchImage', url),
+  appsMerge: (repo, number) => ipcRenderer.invoke('apps:merge', repo, number),
+  appsClose: (repo, number) => ipcRenderer.invoke('apps:close', repo, number),
   aiChat: (messages, engine) => ipcRenderer.invoke('ai:chat', messages, engine),
   aiLoadChats: () => ipcRenderer.invoke('ai:loadChats'),
   aiSaveChats: (chats) => ipcRenderer.invoke('ai:saveChats', chats),

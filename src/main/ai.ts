@@ -266,6 +266,18 @@ export async function chat(messages: AiChatMessage[], engine?: AiEngine): Promis
   return { text: await askClaude(chatSystem(), turns, 'medium'), offline: false, hard: false }
 }
 
+const WHATS_NEW_SYSTEM = `You write the "What's new" notes for a new version of a person's app, for the people who use it.
+You're given the pull requests merged since the last version: each one's title and a summary of its description.
+Write short plain-English notes in markdown: a "What's new" list of new features and improvements, then a "Fixes" list, leaving out either if empty.
+One line per change, starting with what the user can now do or what's better, not how it was built. Combine pull requests about the same thing.
+Leave out changes people using the app wouldn't notice (tests, build setup, code tidying). Don't make anything up.
+Reply with only the notes: no preamble, no version number heading.`
+
+/** App Studio: release notes from the pull requests merged since the last release. */
+export function whatsNew(source: string): Promise<string> {
+  return ask(WHATS_NEW_SYSTEM, [{ role: 'user', content: source }], 'low')
+}
+
 /** Money tracker: sorts statement lines into categories, on the offline AI only (bank details never leave the computer). */
 export async function sortMoney(rows: AiSortRow[], categories: { id: string; name: string; income?: boolean }[]): Promise<Record<number, string>> {
   if (!localAiInstalled()) throw new Error('Sorting payments needs the offline AI. Get it in Settings → AI helper.')

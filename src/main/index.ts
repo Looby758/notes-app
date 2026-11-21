@@ -87,6 +87,8 @@ import { setupOperaImport } from './operaImport'
 import { closeYouTube, setupYouTube } from './youtube'
 import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
+import { setupAppStudio } from './appStudio'
+import { TEST_COPY, TEST_COPY_FOLDER } from './testCopy'
 import { setupGames } from './games'
 import { setupGameCovers } from './gameCovers'
 import { applyIconOutsideApp, taskbarIcon } from './appIcon'
@@ -104,8 +106,12 @@ let hubReleased: Promise<void> = Promise.resolve()
 
 logCrashes()
 
+// Each part of the app tidies up as it quits; there are more than Node's default warning level of 10.
+app.setMaxListeners(30)
+
 // The app used to be called Notes: keep its data folder so settings and sign-ins carry over.
-app.setPath('userData', join(app.getPath('appData'), 'Notes'))
+// A test copy (started from the code) has its own, so it can run next to your normal Orbit.
+app.setPath('userData', join(app.getPath('appData'), TEST_COPY ? TEST_COPY_FOLDER : 'Notes'))
 
 // Screens between the two computers: the picture goes straight across the home network, so the
 // computers need each other's real local addresses (Chromium hides them behind made-up names by
@@ -113,7 +119,7 @@ app.setPath('userData', join(app.getPath('appData'), 'Notes'))
 app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns')
 
 // Windows shows notifications under this app id (it matches the installer's).
-if (process.platform === 'win32') app.setAppUserModelId('com.notesapp.desktop')
+if (process.platform === 'win32') app.setAppUserModelId(TEST_COPY ? 'com.notesapp.desktop.testcopy' : 'com.notesapp.desktop')
 
 // Only one copy of Notes runs; starting it again just brings the window back.
 if (!app.requestSingleInstanceLock()) {
@@ -457,6 +463,7 @@ function createWindow(): BrowserWindow {
     minHeight: 480,
     show: false,
     backgroundColor: BG,
+    ...(TEST_COPY ? { title: 'Orbit (test copy)' } : {}),
     ...(IS_MAC
       ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 14, y: 12 } }
       : {
@@ -696,6 +703,7 @@ function registerIpc(): void {
   setupGames()
   setupGameCovers()
   setupTerminal(() => vault?.root ?? null)
+  setupAppStudio()
   // The Mac asks once whether Notes may use the microphone.
   ipcMain.handle('voice:access', async () => (IS_MAC ? systemPreferences.askForMediaAccess('microphone') : true))
   ipcMain.handle('app:fullscreen', (event, on: boolean) => BrowserWindow.fromWebContents(event.sender)?.setFullScreen(on))
@@ -834,6 +842,7 @@ function registerIpc(): void {
     ai.askNotes(question, notes, history, extra, engine)
   )
   ipcMain.handle('ai:emailContext', (_e, question: string, engine?: AiEngine) => ai.emailContext(question, engine))
+  ipcMain.handle('ai:whatsNew', (_e, source: string) => ai.whatsNew(String(source).slice(0, 60_000)))
   ipcMain.handle('ai:chat', (_e, messages: AiChatMessage[], engine?: AiEngine) => ai.chat(messages, engine))
   ipcMain.handle('ai:setEngine', (_e, use: AiEngine) => ai.setEngine(use))
   ipcMain.handle('ai:sortMoney', (_e, rows: AiSortRow[], categories: { id: string; name: string; income?: boolean }[]) =>
@@ -847,7 +856,8 @@ function registerIpc(): void {
   ipcMain.handle('ai:saveChats', (_e, chats: AiChat[]) => ai.saveChats(chats))
   ipcMain.handle('handwriting:read', (_e, png: Uint8Array, reader: 'ai' | 'offline') => (reader === 'ai' ? ai.readHandwriting(png) : readHandwritingOffline(png)))
 
-  ipcMain.handle('vault:readAppData', (_e, name: string) => currentVault().readAppData(name))
+  // Before a notes folder is picked (a fresh start), there's nothing saved yet.
+  ipcMain.handle('vault:readAppData', (_e, name: string) => (vault ? vault.readAppData(name) : null))
   ipcMain.handle('vault:writeAppData', (_e, name: string, content: string) => currentVault().writeAppData(name, content))
   ipcMain.handle('safe:read', (_e, id: string) => currentVault().readSafeFile(id))
   ipcMain.handle('safe:write', (_e, id: string, data: Uint8Array) => currentVault().writeSafeFile(id, data))
