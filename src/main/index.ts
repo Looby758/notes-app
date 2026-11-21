@@ -85,6 +85,7 @@ import { setupOperaImport } from './operaImport'
 import { closeYouTube, setupYouTube } from './youtube'
 import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
+import { setupAppStudio } from './appStudio'
 import { setupGames } from './games'
 import { setupGameCovers } from './gameCovers'
 import { applyIconOutsideApp, taskbarIcon } from './appIcon'
@@ -693,6 +694,7 @@ function registerIpc(): void {
   setupGames()
   setupGameCovers()
   setupTerminal(() => vault?.root ?? null)
+  setupAppStudio()
   // The Mac asks once whether Notes may use the microphone.
   ipcMain.handle('voice:access', async () => (IS_MAC ? systemPreferences.askForMediaAccess('microphone') : true))
   ipcMain.handle('app:fullscreen', (event, on: boolean) => BrowserWindow.fromWebContents(event.sender)?.setFullScreen(on))

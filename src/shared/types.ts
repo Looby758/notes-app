@@ -1,3 +1,4 @@
+import type { AppInfo, GitHubStatus, PullRequest } from './appStudio'
 import type { ExplorerEntry, ExplorerPlace, PasteMode } from './explorer'
 import type { ArchiveEntry } from './archive'
 import type { ComicOpened, ComicPreparing, ComicSettings, ComicShelf } from './comics'
@@ -1110,6 +1111,18 @@ export interface NotesApi {
   terminalHome(): Promise<string>
   /** Opens a project's folder in File Explorer / Finder, or in VS Code. */
   terminalOpenIn(folder: string, where: 'files' | 'vscode'): Promise<void>
+  // App Studio
+  /** Whether a GitHub token is saved (and whose it is). */
+  appsGithubStatus(): Promise<GitHubStatus>
+  /** Checks a GitHub token with GitHub, then saves it encrypted. */
+  appsSetToken(token: string): Promise<GitHubStatus>
+  appsClearToken(): Promise<GitHubStatus>
+  /** What git and package.json say about an app's folder. */
+  appsInfo(folder: string): Promise<AppInfo>
+  /** Open pull requests on these GitHub repositories ("owner/name"), newest first; errors by repository. */
+  appsPulls(repos: string[]): Promise<{ pulls: PullRequest[]; errors: Record<string, string> }>
+  appsMerge(repo: string, number: number): Promise<void>
+  appsClose(repo: string, number: number): Promise<void>
   /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */
   aiChat(messages: AiChatMessage[], engine?: AiEngine): Promise<AiReply>
   /** Saved chats, kept in the settings folder on this computer. */

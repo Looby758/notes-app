@@ -69,6 +69,7 @@ const FEATURE_EMOJI: Record<string, string> = {
   explorer: '🗂️',
   convert: '🔄',
   studio: '🎬',
+  appstudio: '🛠️',
   clips: '🎞️',
   replay: '⏪',
   soundboard: '🔊',

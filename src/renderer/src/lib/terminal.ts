@@ -5,6 +5,7 @@ import '@xterm/xterm/css/xterm.css'
 import { useEditor } from '../store/editor'
 import { commandForKey, type Command } from './commands'
 import { openSpecialTab, TERMINAL_TAB } from './editorController'
+import { tryBranchCommand } from '@shared/appStudio'
 import { IS_MAC } from '@shared/platform'
 import { commandLabel, findFiles, isErrorLine, keepsRunning, latestAndRunCommand, LineTracker, resolveFrom, runCommandOf } from '@shared/terminalTools'
 import {
@@ -519,8 +520,21 @@ export function endFind(): void {
  */
 export function getLatestAndRun(project: TerminalProject): void {
   const run = runCommandOf(project.commands)
-  const line = latestAndRunCommand(!IS_MAC && /win/i.test(navigator.platform), run)
   rememberCommand('git pull')
+  runInAppTerminal(project, latestAndRunCommand(IS_WINDOWS, run))
+}
+
+/** App Studio's "Try it": switches the app to a pull request's branch, gets its latest, and starts it. */
+export function tryBranch(project: TerminalProject, branch: string): void {
+  rememberCommand(`git checkout ${branch}`)
+  runInAppTerminal(project, tryBranchCommand(IS_WINDOWS, branch, runCommandOf(project.commands)))
+}
+
+const IS_WINDOWS = !IS_MAC && /win/i.test(navigator.platform)
+
+/** Types a command line into the project's app terminal (made if needed, started fresh), and shows it. */
+function runInAppTerminal(project: TerminalProject, line: string): void {
+  const run = runCommandOf(project.commands)
   const existing = useTerminals.getState().terminals.find((t) => t.projectId === project.id && t.command === run)
   if (existing) {
     setActiveTerminal(existing.id)

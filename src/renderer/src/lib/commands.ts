@@ -31,6 +31,7 @@ import {
   MIXER_TAB,
   DOWNLOADER_TAB,
   STUDIO_TAB,
+  APPSTUDIO_TAB,
   CLIPS_TAB,
   VIDEOS_TAB,
   SOUNDBOARD_TAB,
@@ -363,6 +364,7 @@ export const commands: Command[] = [
   { id: 'soundboard.open', group: 'Navigation', title: 'Open the soundboard and voice changer', run: () => openSpecialTab(SOUNDBOARD_TAB) },
   { id: 'soundboard.stop', group: 'Navigation', title: 'Stop all soundboard sounds', run: () => void import('./soundboard').then((m) => m.stopAll()) },
   { id: 'studio.open', group: 'Navigation', title: 'Open the Studio (record your screen and webcam)', run: () => openSpecialTab(STUDIO_TAB) },
+  { id: 'appstudio.open', group: 'Navigation', title: 'Open App Studio (your apps and their pull requests)', run: () => openSpecialTab(APPSTUDIO_TAB) },
   { id: 'clips.open', group: 'Navigation', title: 'Open clips (instant replay and the clip editor)', run: () => openSpecialTab(CLIPS_TAB) },
   { id: 'videos.idea', group: 'Navigation', title: 'Idea inbox for videos (jot down a video idea)', run: () => {
     focusIdeaBox()

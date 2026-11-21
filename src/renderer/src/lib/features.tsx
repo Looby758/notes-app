@@ -54,6 +54,7 @@ import {
   Scissors,
   Bot,
   Video,
+  Hammer,
   type LucideIcon
 } from 'lucide-react'
 import { openGrokTab } from '../components/Grok/GrokPage'
@@ -78,6 +79,7 @@ import {
   CONVERT_TAB,
   PDF_EDITOR_TAB,
   STUDIO_TAB,
+  APPSTUDIO_TAB,
   CLIPS_TAB,
   VIDEOS_TAB,
   SOUNDBOARD_TAB,
@@ -231,6 +233,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
     }
   },
   studio: { icon: Clapperboard, run: () => openSpecialTab(STUDIO_TAB) },
+  appstudio: { icon: Hammer, run: () => openSpecialTab(APPSTUDIO_TAB) },
   clips: { icon: Scissors, run: () => openSpecialTab(CLIPS_TAB) },
   videos: { icon: Video, run: () => openSpecialTab(VIDEOS_TAB) },
   replay: { icon: History, run: () => void import('./replay').then((m) => m.saveReplay()), useActive: () => usePrefs((s) => s.prefs.replayOn) },

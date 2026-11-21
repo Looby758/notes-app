@@ -96,6 +96,8 @@ export const MIXER_TAB = 'mixer:'
 export const DOWNLOADER_TAB = 'downloader:'
 /** Scenes, webcam and screen recording (components/Studio). */
 export const STUDIO_TAB = 'studio:'
+/** The apps you make with Claude Code: their cards and pull requests (components/AppStudio). */
+export const APPSTUDIO_TAB = 'appstudio:'
 /** Instant replay and the clip editor (components/Clips). */
 export const CLIPS_TAB = 'clips:'
 /** Video projects: script, research, pictures, recordings and thumbnail ideas for each video (components/Videos). */

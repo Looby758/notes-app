@@ -38,6 +38,7 @@ import {
   MIXER_TAB,
   DOWNLOADER_TAB,
   STUDIO_TAB,
+  APPSTUDIO_TAB,
   CLIPS_TAB,
   VIDEOS_TAB,
   SOUNDBOARD_TAB,
@@ -86,6 +87,7 @@ import PublishingPage from '../Publishing/PublishingPage'
 import ScreensPage from '../Screens/ScreensPage'
 import MixerPage from '../Mixer/MixerPage'
 import StudioPage from '../Studio/StudioPage'
+import AppStudioPage from '../AppStudio/AppStudioPage'
 import ClipsPage from '../Clips/ClipsPage'
 import VideosPage from '../Videos/VideosPage'
 import SoundboardPage from '../Soundboard/SoundboardPage'
@@ -231,6 +233,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === MIXER_TAB && <MixerPage />}
         {active === DOWNLOADER_TAB && <VideoDownloaderPage />}
         {active === STUDIO_TAB && <StudioPage />}
+        {active === APPSTUDIO_TAB && <AppStudioPage />}
         {active === CLIPS_TAB && <ClipsPage />}
         {active === VIDEOS_TAB && <VideosPage />}
         {active === SOUNDBOARD_TAB && <SoundboardPage />}
