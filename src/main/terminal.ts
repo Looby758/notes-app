@@ -1,19 +1,24 @@
-import { app, ipcMain, type WebContents } from 'electron'
-import { accessSync, chmodSync, constants } from 'fs'
+import { app, BrowserWindow, dialog, ipcMain, type WebContents } from 'electron'
+import { accessSync, chmodSync, constants, statSync } from 'fs'
 import { homedir } from 'os'
-import { dirname, join } from 'path'
+import { dirname, isAbsolute, join } from 'path'
 import type { IPty } from 'node-pty'
 import type { TerminalStart } from '@shared/types'
 import { IS_MAC } from '@shared/platform'
 import { logError } from './log'
 
 /**
- * The Terminal tab: one real command line (PowerShell on Windows, your usual shell on a Mac),
- * started in the notes folder. It only ever runs what you type into the tab; nothing else in the
- * app writes to it.
+ * The Terminal tab's command lines (PowerShell on Windows, your usual shell on a Mac). There can be
+ * several at once, each with its own id and folder (the notes folder unless another is picked). They
+ * only ever run what's typed into them, or what a run button on the Terminal tab types for you.
  */
 
-let shell: { pty: IPty; owner: WebContents } | null = null
+interface Shell {
+  pty: IPty
+  owner: WebContents
+}
+
+const shells = new Map<string, Shell>()
 
 function shellToRun(): { file: string; args: string[]; name: string } {
   if (process.platform === 'win32') return { file: 'powershell.exe', args: ['-NoLogo'], name: 'PowerShell' }
@@ -53,9 +58,9 @@ function makeHelperRunnable(): void {
   }
 }
 
-function stop(): void {
-  const s = shell
-  shell = null
+function stop(id: string): void {
+  const s = shells.get(id)
+  shells.delete(id)
   if (!s) return
   try {
     s.pty.kill()
@@ -64,11 +69,29 @@ function stop(): void {
   }
 }
 
-async function start(owner: WebContents, folder: string | null, cols: number, rows: number): Promise<TerminalStart> {
-  // Already running (the tab was moved or switched away from and back): carry on with it.
-  if (shell && shell.owner === owner) return { ok: true, name: shellToRun().name, resumed: true }
-  stop()
-  const { file, args, name } = shellToRun()
+function stopAll(): void {
+  for (const id of [...shells.keys()]) stop(id)
+}
+
+/** The folder to start in: the one asked for if it's there, else the notes folder (or home). */
+function startFolder(folder: string | null, notes: string | null): string {
+  if (folder && isAbsolute(folder)) {
+    try {
+      if (statSync(folder).isDirectory()) return folder
+    } catch {
+      // Gone: use the notes folder instead.
+    }
+  }
+  return notes ?? homedir()
+}
+
+async function start(owner: WebContents, id: string, cwd: string, cols: number, rows: number): Promise<TerminalStart> {
+  const { name } = shellToRun()
+  // Already running (the window was reloaded, or the tab moved): carry on with it.
+  const existing = shells.get(id)
+  if (existing && existing.owner === owner) return { ok: true, name, resumed: true, folder: cwd }
+  stop(id)
+  const { file, args } = shellToRun()
   try {
     makeHelperRunnable()
     const { spawn } = await import('node-pty')
@@ -76,36 +99,56 @@ async function start(owner: WebContents, folder: string | null, cols: number, ro
       name: 'xterm-256color',
       cols: Math.max(2, cols),
       rows: Math.max(2, rows),
-      cwd: folder ?? homedir(),
+      cwd,
       env: environment()
     })
-    const current = { pty, owner }
-    shell = current
+    const current: Shell = { pty, owner }
+    shells.set(id, current)
     pty.onData((data) => {
-      if (!owner.isDestroyed()) owner.send('term:data', data)
+      // A command line that was stopped or restarted can still flush a little; that's dropped.
+      if (shells.get(id) === current && !owner.isDestroyed()) owner.send('term:data', id, data)
     })
     pty.onExit(({ exitCode }) => {
-      if (shell === current) shell = null
-      if (!owner.isDestroyed()) owner.send('term:exit', exitCode)
+      const now = shells.get(id)
+      if (now === current) shells.delete(id)
+      // Restarted: a new command line already has this id, and it's still running.
+      if (now && now !== current) return
+      if (!owner.isDestroyed()) owner.send('term:exit', id, exitCode)
     })
     owner.once('destroyed', () => {
-      if (shell === current) stop()
+      if (shells.get(id) === current) stop(id)
     })
-    return { ok: true, name, resumed: false }
+    return { ok: true, name, resumed: false, folder: cwd }
   } catch (err) {
     logError('terminal', err)
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
 }
 
+const validId = (id: unknown): id is string => typeof id === 'string' && /^[\w-]{1,64}$/.test(id)
+
 export function setupTerminal(getFolder: () => string | null): void {
-  ipcMain.handle('term:start', (e, cols: number, rows: number) => start(e.sender, getFolder(), cols, rows))
-  ipcMain.handle('term:stop', () => stop())
-  ipcMain.on('term:input', (e, data: string) => {
-    if (shell?.owner === e.sender) shell.pty.write(data)
+  ipcMain.handle('term:start', (e, id: unknown, folder: unknown, cols: number, rows: number) => {
+    if (!validId(id)) throw new Error('Not allowed')
+    return start(e.sender, id, startFolder(typeof folder === 'string' ? folder : null, getFolder()), cols, rows)
   })
-  ipcMain.on('term:resize', (e, cols: number, rows: number) => {
-    if (shell?.owner === e.sender && cols > 1 && rows > 1) shell.pty.resize(cols, rows)
+  ipcMain.handle('term:stop', (e, id: unknown) => {
+    if (validId(id) && shells.get(id)?.owner === e.sender) stop(id)
   })
-  app.on('will-quit', stop)
+  ipcMain.on('term:input', (e, id: unknown, data: string) => {
+    const s = validId(id) ? shells.get(id) : undefined
+    if (s?.owner === e.sender && typeof data === 'string') s.pty.write(data)
+  })
+  ipcMain.on('term:resize', (e, id: unknown, cols: number, rows: number) => {
+    const s = validId(id) ? shells.get(id) : undefined
+    if (s?.owner === e.sender && cols > 1 && rows > 1) s.pty.resize(cols, rows)
+  })
+  ipcMain.handle('term:pickFolder', async (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender)
+    const opts = { title: 'Pick the app’s folder', properties: ['openDirectory'] as 'openDirectory'[] }
+    const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+    return res.canceled ? null : (res.filePaths[0] ?? null)
+  })
+  ipcMain.handle('term:home', () => homedir())
+  app.on('will-quit', stopAll)
 }
