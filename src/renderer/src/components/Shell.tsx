@@ -61,6 +61,7 @@ import { startDictionary } from '../lib/dictionary'
 import { EventDetails } from './Calendar/shared'
 import Resizer from './Resizer'
 import UpdateToast from './UpdateToast'
+import SkyblockCard from './Games/SkyblockCard'
 import { DownloadPrompt } from './Web/Downloads'
 import { startBrowser, tabsByPage } from '../store/browser'
 import StartupNotices from './Notices/StartupNotices'
@@ -422,6 +423,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <EventDetails />
       <Pet />
       <UpdateToast />
+      <SkyblockCard />
       <DownloadPrompt />
       <StartupNotices />
       <DeviceDrop />

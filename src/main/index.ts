@@ -91,6 +91,7 @@ import { setupAppStudio } from './appStudio'
 import { TEST_COPY, TEST_COPY_FOLDER } from './testCopy'
 import { setupGames } from './games'
 import { setupGameCovers } from './gameCovers'
+import { setupSkyblock } from './skyblock'
 import { applyIconOutsideApp, taskbarIcon } from './appIcon'
 import { broadcastThemes, loadImportedThemes, setupThemes, THEME_SCHEME, themeFilePath, themesDir } from './themes'
 import { CODE_SANDBOX_SCHEME, registerCodeSandbox } from './codeSandbox'
@@ -702,6 +703,7 @@ function registerIpc(): void {
   setupImporter()
   setupGames()
   setupGameCovers()
+  setupSkyblock({ getMain: () => mainWindow })
   setupTerminal(() => vault?.root ?? null)
   setupAppStudio()
   // The Mac asks once whether Notes may use the microphone.
