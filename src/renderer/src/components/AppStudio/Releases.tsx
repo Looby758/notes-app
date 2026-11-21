@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ClipboardCopy, GitBranch, ExternalLink, Hammer, Loader2, RefreshCw, Rocket, Sparkles, Tag, Upload, Wand2 } from 'lucide-react'
-import { boardKey, bumpVersion, isTokenPermissionError, changelogSource, notesTarget, plainChangelog, timeAgo, VERSION_BUMPS, type Release, type VersionBump } from '@shared/appStudio'
+import { boardKey, bumpVersion, describeChange, isTokenPermissionError, changelogSource, notesTarget, plainChangelog, timeAgo, VERSION_BUMPS, type Release, type VersionBump } from '@shared/appStudio'
 import { useTerminals, type TerminalProject } from '../../store/terminals'
 import { refreshApps, setSection, useAppStudio } from '../../store/appStudio'
 import { lastRelease, loadReleases, putRelease, setNotes, setReleasesApp, useAppReleases } from '../../store/appReleases'
-import { releaseApp, runProjectCommand, switchBranch } from '../../lib/terminal'
+import { commitChanges, releaseApp, runProjectCommand, stashChanges, switchBranch } from '../../lib/terminal'
 import { notify } from '../../store/notify'
 import TokenProblem from './TokenProblem'
 import { errorMessage } from '../../lib/paths'
@@ -171,11 +171,7 @@ function NextRelease({ project, releases }: { project: TerminalProject; releases
               </button>
             ))}
           </div>
-          {dirty && (
-            <div className="release-warning">
-              <AlertTriangle size={13} /> {info?.changedFiles === 1 ? '1 file isn’t committed yet. Commit it (or put it away) first.' : `${info?.changedFiles} files aren’t committed yet. Commit them (or put them away) first.`}
-            </div>
-          )}
+          {dirty && <Uncommitted project={project} />}
           {offMain && (
             <div className="release-warning">
               <AlertTriangle size={13} />
@@ -346,3 +342,71 @@ function WhatsNew({ project, repo }: { project: TerminalProject; repo: string })
   )
 }
 
+
+/**
+ * Files changed but not committed, which would be left out of the release: which ones, and buttons
+ * to put them away (a git stash, brought back with `git stash pop`) or commit them.
+ */
+function Uncommitted({ project }: { project: TerminalProject }) {
+  const info = useAppStudio((s) => s.info[project.folder])
+  const [committing, setCommitting] = useState(false)
+  const [message, setMessage] = useState('')
+  const count = info?.changedFiles ?? 0
+  const list = info?.changes ?? []
+  const lockOnly = list.length === 1 && /package-lock\.json/.test(list[0])
+  const after = (): void => {
+    window.setTimeout(() => void refreshApps(), 3000)
+    window.setTimeout(() => void refreshApps(), 8000)
+  }
+  return (
+    <div className="release-warning release-uncommitted">
+      <div className="release-uncommitted-text">
+        <AlertTriangle size={13} />
+        <span>
+          {count === 1 ? '1 file has' : `${count} files have`} changed since the last commit, so {count === 1 ? 'it' : 'they'} wouldn’t be in the release:{' '}
+          <strong>{list.map(describeChange).join(', ')}</strong>
+          {count > list.length && ` and ${count - list.length} more`}.
+          {lockOnly && ' npm often changes this file by itself, so putting it away is usually right.'}
+        </span>
+      </div>
+      {committing ? (
+        <form
+          className="release-commit"
+          onSubmit={(e) => {
+            e.preventDefault()
+            commitChanges(project, message)
+            setCommitting(false)
+            after()
+          }}
+        >
+          <input className="text-input" autoFocus placeholder="What changed? e.g. Small fixes" value={message} onChange={(e) => setMessage(e.target.value)} />
+          <button className="btn btn-primary" type="submit" disabled={!message.trim()}>
+            Commit
+          </button>
+          <button className="btn" type="button" onClick={() => setCommitting(false)}>
+            Cancel
+          </button>
+        </form>
+      ) : (
+        <div className="release-uncommitted-actions">
+          <button
+            className="btn"
+            title="Sets the changes aside (git stash), so the release is made from what’s committed. Bring them back later with git stash pop."
+            onClick={() => {
+              stashChanges(project)
+              after()
+            }}
+          >
+            {count === 1 ? 'Put it away' : 'Put them away'}
+          </button>
+          <button className="btn" title="Commits the changes so they’re in the release" onClick={() => setCommitting(true)}>
+            {count === 1 ? 'Commit it' : 'Commit them'}
+          </button>
+          <button className="btn" title="Show the changes in the terminal (git status)" onClick={() => runProjectCommand(project, 'git status')}>
+            Show in terminal
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}

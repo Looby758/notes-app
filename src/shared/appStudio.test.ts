@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boardKey, isTokenPermissionError, newTokenUrl, TOKEN_NOT_ALLOWED, bumpVersion, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
+import { boardKey, commitAllCommand, describeChange, stashCommand, isTokenPermissionError, newTokenUrl, TOKEN_NOT_ALLOWED, bumpVersion, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
 
 describe('githubRepo', () => {
   it('reads https and ssh remotes', () => {
@@ -252,5 +252,20 @@ describe('token permissions', () => {
     expect(url.searchParams.get('target_name')).toBe('Looby758')
     expect(isTokenPermissionError(`${TOKEN_NOT_ALLOWED} merge pull requests on a/b.`)).toBe(true)
     expect(isTokenPermissionError('GitHub said no (403).')).toBe(false)
+  })
+})
+
+describe('uncommitted changes', () => {
+  it('describes git status lines', () => {
+    expect(describeChange(' M package-lock.json')).toBe('package-lock.json (changed)')
+    expect(describeChange('?? notes.txt')).toBe('notes.txt (new)')
+    expect(describeChange(' D old.ts')).toBe('old.ts (deleted)')
+    expect(describeChange('R  a.ts -> b.ts')).toBe('b.ts (renamed)')
+    expect(describeChange('?? "with space.txt"')).toBe('with space.txt (new)')
+  })
+  it('commits and stashes', () => {
+    expect(commitAllCommand(false, 'Small "fixes"')).toBe('git add -A && git commit -m "Small fixes"')
+    expect(commitAllCommand(true, 'x')).toBe('git add -A; if ($LASTEXITCODE -eq 0) { git commit -m "x" }')
+    expect(stashCommand()).toContain('git stash push --include-untracked')
   })
 })
