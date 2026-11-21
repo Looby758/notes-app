@@ -59,7 +59,7 @@ import { cleanPrefsPart, prefsPart } from '@shared/orbitSync'
 import { setupMonitors, teardownMonitors } from './monitors'
 import { setupMixer, teardownMixer } from './mixer'
 import { setupLive } from './live'
-import { explorerFile, setupExplorer } from './explorer'
+import { explorerFile, setFileIndexOn, setupExplorer } from './explorer'
 import { openOutside } from './openOutside'
 import { openInOrbit, pathsFromArgv, setupOpenInOrbit } from './openInOrbit'
 import { hold, setupUndoBin } from './undoBin'
@@ -321,6 +321,14 @@ function broadcastPrefs(prefs: Prefs): void {
     win.webContents.send('prefs:changed', prefs)
   }
   safely('system settings', () => applySystemPrefs(prefs))
+  safely('whole PC search', () => applyFileIndex(prefs))
+}
+
+/** Whole PC search's list of files (Settings → Files), with its progress sent to every window. */
+function applyFileIndex(prefs: Prefs): void {
+  setFileIndexOn(prefs.filesWholePcSearch, app.getPath('userData'), (status) => {
+    for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send('explorer:indexStatus', status)
+  })
 }
 
 /** The parts of Orbit kept in the notes folder for your other computers (see orbitSync.ts). */
@@ -1077,6 +1085,8 @@ app.whenReady().then(async () => {
   safely('Discord voice pop-out', () => setupDiscordPopout(currentPrefs))
   safely('live streaming', setupLive)
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
+  // A few seconds in, so walking the drives doesn't slow Orbit's start.
+  setTimeout(() => safely('whole PC search', () => applyFileIndex(currentPrefs())), 5000)
   safely('undo', () => setupUndoBin(() => vault?.root ?? null))
   safely('deleted videos', () => setupVideoBin(() => vault?.root ?? null))
   safely('video player', () => setupVideoPlayer(() => vault?.root ?? null))

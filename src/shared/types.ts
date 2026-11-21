@@ -1,5 +1,6 @@
 import type { AppInfo, GitHubStatus, MergedPull, PullRequest, Release, TestCopy } from './appStudio'
-import type { ExplorerEntry, ExplorerPlace, PasteMode } from './explorer'
+import type { ExplorerEntry, ExplorerPlace, PasteMode, PcIndexStatus } from './explorer'
+import type { FileTagStore, TagColour } from './fileTags'
 import type { ArchiveEntry } from './archive'
 import type { ComicOpened, ComicPreparing, ComicSettings, ComicShelf } from './comics'
 import type { WikiAnswer, WikiCheck, WikiHit, WikiInfo, WikiPageView, WikiPictureChoice, WikiSpoilerView } from './wiki'
@@ -1337,6 +1338,22 @@ export interface NotesApi {
   explorerTrash(paths: string[]): Promise<string[]>
   /** Finds names under a folder and all its subfolders. */
   explorerSearch(dir: string, query: string, showHidden: boolean): Promise<ExplorerEntry[]>
+  /** Whole PC search: every file and folder on the computer whose name has each word, best first. */
+  explorerSearchPc(query: string, showHidden: boolean): Promise<{ entries: ExplorerEntry[]; status: PcIndexStatus; system: boolean }>
+  /** How Whole PC search's list of files is getting on (`everything`: the Everything app's helper is installed). */
+  explorerIndexStatus(): Promise<PcIndexStatus & { everything: boolean; wanted: boolean }>
+  onExplorerIndexStatus(callback: (status: PcIndexStatus) => void): () => void
+  /** Walks the drives again now. */
+  explorerReindex(): Promise<void>
+  /** Everything with this colour tag (that's still there). */
+  explorerTagged(colour: TagColour): Promise<ExplorerEntry[]>
+  // Colour tags and favourite folders (Files tab)
+  tagsGet(): Promise<FileTagStore>
+  tagsSet(paths: string[], colour: TagColour, on: boolean): Promise<void>
+  /** Names a colour ("School"); an empty name goes back to the colour's own. */
+  tagsLabel(colour: TagColour, label: string): Promise<void>
+  tagsFavourites(paths: string[]): Promise<void>
+  onTagsChanged(callback: (store: FileTagStore) => void): () => void
   // Comic book reader
   comicsShelf(): Promise<ComicShelf>
   /** Adds comic files (asks which, when no paths are given). */

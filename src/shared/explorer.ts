@@ -170,3 +170,50 @@ export function whereIn(path: string, from: string): string {
 
 /** Searching subfolders stops after this many matches. */
 export const SEARCH_LIMIT = 500
+
+/** Whole PC search shows at most this many (each one is looked up for its size and date). */
+export const PC_SEARCH_LIMIT = 300
+
+/** Whether a name contains every (lowercase) word. */
+export const matchesWords = (name: string, words: string[]): boolean => {
+  const lower = name.toLowerCase()
+  return words.every((w) => lower.includes(w))
+}
+
+/**
+ * Paths the system's own search turns up that are only an app's workings (caches, AppData,
+ * ~/Library, dot folders): left out of Whole PC results, like Orbit's own list leaves them out.
+ */
+export function looksLikeAppFiles(path: string, showHidden: boolean): boolean {
+  const parts = path.split(/[\\/]+/).filter(Boolean)
+  const lower = parts.map((p) => p.toLowerCase())
+  if (lower.some((p) => p === 'appdata' || p === 'node_modules' || p === '$recycle.bin' || p === 'caches' || p === 'cache')) return true
+  // A Mac's system folders: /System, /Library, /private and the like, and ~/Library.
+  if (lower[0] === 'system' || lower[0] === 'library' || lower[0] === 'private' || lower[0] === 'usr' || lower[0] === 'opt') return true
+  if (lower[0] === 'users' && lower[2] === 'library') return true
+  // Inside an app (Name.app/Contents/…).
+  if (lower.slice(0, -1).some((p) => p.endsWith('.app'))) return true
+  if (!showHidden && parts.some((p) => isHiddenName(p))) return true
+  return false
+}
+
+/** How Whole PC search's list of files is getting on (see main/fileIndex). */
+export interface PcIndexStatus {
+  state: 'off' | 'loading' | 'building' | 'ready'
+  /** Files and folders in the list. */
+  count: number
+  /** When the drives were last walked in full (ms), or 0. */
+  builtAt: number
+  /** While walking the drives: how many found so far. */
+  progress: number
+  /** Changes are being picked up as they happen. */
+  live: boolean
+  /** Where the list starts from (every drive on Windows). */
+  roots: string[]
+}
+
+/** "1.2 million files", "48,210 files". */
+export function describeCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} million`
+  return n.toLocaleString('en-GB')
+}

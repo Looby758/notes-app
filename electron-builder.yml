@@ -34,6 +34,8 @@ asarUnpack:
   # The zip / RAR / 7z opener's 7-Zip (WebAssembly) and the worker thread that runs it.
   - node_modules/7z-wasm/**
   - out/main/**/sevenZipWorker*.js
+  # Whole PC search's worker thread, which keeps the list of every file (Files tab).
+  - out/main/**/fileIndexWorker*.js
 win:
   target:
     - target: nsis
