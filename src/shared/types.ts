@@ -1075,6 +1075,8 @@ export interface NotesApi {
   /** What's said in a recording (a path in the notes folder), word by word with times. */
   transcribe(path: string): Promise<TranscribeResult>
   transcribeCancel(): Promise<void>
+  /** The teleprompter's cue times saved beside a recording ("<recording>.cues.json"), as text; null if there are none. */
+  transcribeReadCues(path: string): Promise<string | null>
   onTranscriberState(callback: (state: TranscriberState) => void): () => void
   onTranscribeProgress(callback: (progress: TranscribeProgress) => void): () => void
   // The offline AI

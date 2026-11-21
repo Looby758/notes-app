@@ -397,6 +397,17 @@ export function setupTranscriber(abs: (rel: string) => string): void {
   ipcMain.handle('transcribe:setup', (_e, model?: string) => setUp(typeof model === 'string' ? model : undefined))
   ipcMain.handle('transcribe:run', (_e, path: string) => transcribe(String(path), abs))
   ipcMain.handle('transcribe:cancel', () => cancel())
+  // The teleprompter's times saved beside a recording in the notes folder (for the shot list).
+  ipcMain.handle('transcribe:readCues', async (_e, path: string) => {
+    if (typeof path !== 'string' || !/\.(m4a|webm|mp4|mkv|mov|wav|mp3|ogg|opus|flac|aac)$/i.test(path)) return null
+    const file = `${abs(path)}.cues.json`
+    try {
+      if (statSync(file).size > 5_000_000) return null
+      return readFileSync(file, 'utf8')
+    } catch {
+      return null
+    }
+  })
   ipcMain.handle('transcribe:remove', () => remove())
   onFfmpegState(() => tell())
   app.on('will-quit', () => {

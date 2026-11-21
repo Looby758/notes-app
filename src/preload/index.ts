@@ -563,6 +563,7 @@ const api: NotesApi = {
   transcriberRemove: () => ipcRenderer.invoke('transcribe:remove'),
   transcribe: (path) => ipcRenderer.invoke('transcribe:run', path),
   transcribeCancel: () => ipcRenderer.invoke('transcribe:cancel'),
+  transcribeReadCues: (path) => ipcRenderer.invoke('transcribe:readCues', path),
   onTranscriberState: (callback) => on('transcribe:state', callback),
   onTranscribeProgress: (callback) => on('transcribe:progress', callback),
   localAiState: () => ipcRenderer.invoke('localAi:state'),

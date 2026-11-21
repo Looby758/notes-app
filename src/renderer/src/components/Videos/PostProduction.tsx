@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { AudioLines, Captions, Download, FileAudio, Play, RotateCcw, Square, Trash2, X } from 'lucide-react'
+import { AudioLines, Captions, Clapperboard, Copy, Crosshair, Download, FileAudio, Image as ImageIcon, Play, RotateCcw, Square, Trash2, Undo2, X } from 'lucide-react'
 import { clock, transcribeModelById, TRANSCRIBE_MODELS, type SpokenWord } from '@shared/transcribe'
 import type { VideoItem, VideoProject } from '../../lib/videos'
 import { vaultUrl } from '../../lib/fileKinds'
@@ -7,13 +7,31 @@ import { MARKER_INFO } from '../../lib/script'
 import { lineUp, sentences, type LinedUp, type Transcript } from '../../lib/transcript'
 import { UNDO_KEY, useUndoChanges } from '../../lib/undo'
 import { notify } from '../../store/notify'
-import { deleteTranscript, loadTranscript, makeTranscript, setUpTranscripts, stopTranscript, useTranscripts, watchTranscriber } from '../../store/transcripts'
+import {
+  deleteTranscript,
+  loadCues,
+  loadShotOverrides,
+  loadTranscript,
+  makeTranscript,
+  setShotPrefer,
+  setShotTime,
+  setUpTranscripts,
+  stopTranscript,
+  useCues,
+  useTranscripts,
+  watchTranscriber
+} from '../../store/transcripts'
+import { buildShots, fineClock, parseClock, shotListText, type Shot } from '../../lib/shotList'
+import { resolveImage } from '../../lib/script'
+import { vaultImages } from '../Editor/scriptTools'
+import { usePrefs } from '../../store/prefs'
 import Private from '../Streamer/Private'
 import './postProduction.css'
 
 /**
  * The video page's post-production section: an auto transcript of each recording, lined up with
- * the script so every line and marker gets the time it was said at.
+ * the script so every line and marker gets the time it was said at, and the shot list (when each
+ * picture and clip goes on screen) built from it or from the teleprompter's times.
  */
 
 const fileName = (path: string): string => path.slice(path.lastIndexOf('/') + 1)
@@ -24,25 +42,30 @@ export const POST_PRODUCTION_EVENT = 'videos:post-production'
 export function PostProductionSection({ project: p, has }: { project: VideoProject; has: (path: string) => boolean }) {
   const recordings = p.items.filter((i) => i.kind === 'recording' && i.path)
   const engine = useTranscripts((s) => s.engine)
-  const [open, setOpen] = useState<VideoItem | null>(null)
+  const [open, setOpen] = useState<{ item: VideoItem; tab: Tab } | null>(null)
   const box = useRef<HTMLElement>(null)
   useEffect(() => watchTranscriber(), [])
   useEffect(() => {
-    const show = (): void => box.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    const show = (e: Event): void => {
+      box.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      // Ctrl+K "Shot list": straight to the first recording's shot list.
+      const first = p.items.find((i) => i.kind === 'recording' && i.path)
+      if ((e as CustomEvent<string | undefined>).detail === 'shots' && first) setOpen({ item: first, tab: 'shots' })
+    }
     window.addEventListener(POST_PRODUCTION_EVENT, show)
     return () => window.removeEventListener(POST_PRODUCTION_EVENT, show)
-  }, [])
+  }, [p.items])
 
   return (
     <section className="video-section post-production" ref={box} data-post-production>
       <h3>
-        <Captions size={15} /> Transcripts
-        <span className="video-section-hint">What you said in each recording, lined up with the script</span>
+        <Captions size={15} /> Transcripts and shot lists
+        <span className="video-section-hint">What you said in each recording, and when each picture goes on screen</span>
       </h3>
       {engine && engine.state !== 'ready' && <SetUp />}
       {!recordings.length && <div className="pp-empty">Add a recording above, then Orbit can write down what you said and line it up with the script.</div>}
       {recordings.map((i) => (
-        <RecordingRow key={i.id} project={p} item={i} missing={!has(i.path!)} ready={engine?.state === 'ready'} onOpen={() => setOpen(i)} />
+        <RecordingRow key={i.id} project={p} item={i} missing={!has(i.path!)} ready={engine?.state === 'ready'} onOpen={(tab) => setOpen({ item: i, tab })} />
       ))}
       {engine?.state === 'ready' && recordings.length > 0 && (
         <div className="pp-foot">
@@ -57,7 +80,7 @@ export function PostProductionSection({ project: p, has }: { project: VideoProje
           </button>
         </div>
       )}
-      {open && <TranscriptView project={p} item={open} onClose={() => setOpen(null)} />}
+      {open && <TranscriptView key={open.item.id} project={p} item={open.item} start={open.tab} onClose={() => setOpen(null)} />}
     </section>
   )
 }
@@ -101,8 +124,10 @@ function SetUp() {
   )
 }
 
-function RecordingRow({ project: p, item, missing, ready, onOpen }: { project: VideoProject; item: VideoItem; missing: boolean; ready: boolean; onOpen: () => void }) {
+function RecordingRow({ project: p, item, missing, ready, onOpen }: { project: VideoProject; item: VideoItem; missing: boolean; ready: boolean; onOpen: (tab: Tab) => void }) {
   const t = useTranscripts((s) => s.byItem[item.id])
+  const cues = useCues((s) => s.byItem[item.id])
+  useEffect(() => void loadCues(item.id, item.path!), [item.id, item.path])
   const job = useTranscripts((s) => s.job)
   const [found, setFound] = useState<number | null>(null)
   const name = fileName(item.path!)
@@ -139,9 +164,21 @@ function RecordingRow({ project: p, item, missing, ready, onOpen }: { project: V
       <span className="pp-status">
         {clock(t.length)} · {t.words.length} words
         {found !== null && ` · ${Math.round(found * 100)}% of the script`}
+        {cues?.length ? ' · teleprompter times' : ''}
       </span>
     )
-  } else status = <span className="pp-status faint">{missing ? 'Can’t find this recording' : 'No transcript yet'}</span>
+  } else
+    status = (
+      <span className="pp-status faint">
+        {missing ? 'Can’t find this recording' : 'No transcript yet'}
+        {!missing && cues?.length ? ' · teleprompter times' : ''}
+      </span>
+    )
+  const shotButton = p.script && (t || cues?.length) && (
+    <button className="btn" onClick={() => onOpen('shots')} title="When each picture and clip goes on screen" data-pp-shots>
+      <Clapperboard size={13} /> Shot list
+    </button>
+  )
 
   return (
     <div className="pp-row" data-pp-row={item.id}>
@@ -157,7 +194,8 @@ function RecordingRow({ project: p, item, missing, ready, onOpen }: { project: V
           </button>
         ) : t ? (
           <>
-            <button className="btn btn-primary" onClick={onOpen} data-pp-open>
+            {shotButton}
+            <button className="btn btn-primary" onClick={() => onOpen(p.script ? 'script' : 'said')} data-pp-open>
               <AudioLines size={13} /> Open
             </button>
             <button className="icon-btn" title="Make it again" disabled={!ready || missing || !!job} onClick={() => void makeTranscript(item.id, item.path!, name)}>
@@ -172,9 +210,12 @@ function RecordingRow({ project: p, item, missing, ready, onOpen }: { project: V
             </button>
           </>
         ) : (
-          <button className="btn" disabled={!ready || missing || !!job} title={ready ? '' : 'Set up transcripts first'} onClick={() => void makeTranscript(item.id, item.path!, name)} data-pp-make>
-            <Captions size={13} /> Make transcript
-          </button>
+          <>
+            {shotButton}
+            <button className="btn" disabled={!ready || missing || !!job} title={ready ? '' : 'Set up transcripts first'} onClick={() => void makeTranscript(item.id, item.path!, name)} data-pp-make>
+              <Captions size={13} /> Make transcript
+            </button>
+          </>
         )}
       </span>
     </div>
@@ -183,13 +224,15 @@ function RecordingRow({ project: p, item, missing, ready, onOpen }: { project: V
 
 // ---------- the transcript ----------
 
-type Tab = 'script' | 'said'
+type Tab = 'script' | 'said' | 'shots'
 
-function TranscriptView({ project: p, item, onClose }: { project: VideoProject; item: VideoItem; onClose: () => void }) {
+function TranscriptView({ project: p, item, start, onClose }: { project: VideoProject; item: VideoItem; start: Tab; onClose: () => void }) {
   const t = useTranscripts((s) => s.byItem[item.id])
+  const cues = useCues((s) => s.byItem[item.id])
   const [script, setScript] = useState<string | null>(null)
-  const [tab, setTab] = useState<Tab>(p.script ? 'script' : 'said')
+  const [tab, setTab] = useState<Tab>(start)
   const [now, setNow] = useState(0)
+  const [duration, setDuration] = useState<number | null>(null)
   const audio = useRef<HTMLAudioElement>(null)
   const [scriptAgain, setScriptAgain] = useState(0)
   useUndoChanges('transcripts', () => void loadTranscript(item.id))
@@ -220,7 +263,7 @@ function TranscriptView({ project: p, item, onClose }: { project: VideoProject; 
     void a.play()
   }
 
-  if (!t) return null
+  if (!t && !cues?.length) return null
   return (
     <div className="modal-backdrop pp-backdrop" onMouseDown={onClose}>
       <div className="modal pp-modal" onMouseDown={(e) => e.stopPropagation()} data-transcript-view>
@@ -234,24 +277,41 @@ function TranscriptView({ project: p, item, onClose }: { project: VideoProject; 
               role="tab"
               aria-selected={tab === 'script'}
               className={tab === 'script' ? 'on' : ''}
-              disabled={!p.script}
+              disabled={!p.script || !t}
               onClick={() => setTab('script')}
-              title={p.script ? '' : 'This video has no script note'}
+              title={!p.script ? 'This video has no script note' : !t ? 'Make a transcript first' : ''}
             >
               Lined up with the script
             </button>
-            <button role="tab" aria-selected={tab === 'said'} className={tab === 'said' ? 'on' : ''} onClick={() => setTab('said')}>
+            <button role="tab" aria-selected={tab === 'said'} className={tab === 'said' ? 'on' : ''} disabled={!t} onClick={() => setTab('said')}>
               What you said
+            </button>
+            <button role="tab" aria-selected={tab === 'shots'} className={tab === 'shots' ? 'on' : ''} disabled={!p.script} onClick={() => setTab('shots')} data-pp-tab-shots>
+              Shot list
             </button>
           </div>
           <button className="icon-btn" onClick={onClose} title="Close (Esc)">
             <X size={15} />
           </button>
         </div>
-        <audio ref={audio} className="pp-audio" src={vaultUrl(item.path!)} controls preload="metadata" onTimeUpdate={(e) => setNow(e.currentTarget.currentTime)} />
-        <Summary t={t} lined={tab === 'script' ? lined : null} onRefresh={() => setScriptAgain((n) => n + 1)} />
+        <audio
+          ref={audio}
+          className="pp-audio"
+          src={vaultUrl(item.path!)}
+          controls
+          preload="metadata"
+          onTimeUpdate={(e) => setNow(e.currentTarget.currentTime)}
+          onLoadedMetadata={(e) => Number.isFinite(e.currentTarget.duration) && setDuration(e.currentTarget.duration)}
+        />
+        {t && tab !== 'shots' && <Summary t={t} lined={tab === 'script' ? lined : null} onRefresh={() => setScriptAgain((n) => n + 1)} />}
         <div className="pp-body">
-          {tab === 'script' && lined && script !== null ? <LinedUpScript text={script} lined={lined} now={now} play={play} /> : <Said words={t.words} now={now} play={play} />}
+          {tab === 'shots' && script !== null ? (
+            <ShotList project={p} item={item} text={script} lined={lined} length={t?.length ?? duration} now={now} play={play} onRefresh={() => setScriptAgain((n) => n + 1)} />
+          ) : tab === 'script' && lined && script !== null ? (
+            <LinedUpScript text={script} lined={lined} now={now} play={play} />
+          ) : t ? (
+            <Said words={t.words} now={now} play={play} />
+          ) : null}
         </div>
       </div>
     </div>
@@ -454,6 +514,172 @@ function Said({ words, now, play }: { words: SpokenWord[]; now: number; play: (a
           <div className="pp-text">{s.text}</div>
         </div>
       ))}
+    </div>
+  )
+}
+
+// ---------- the shot list ----------
+
+const SOURCE_TEXT: Record<string, string> = {
+  transcript: 'From the transcript',
+  teleprompter: 'From the teleprompter (when it reached the reading line)',
+  you: 'Set by you'
+}
+
+/** When each picture and clip goes on screen, with a way to fix any time that's off. */
+function ShotList({
+  project: p,
+  item,
+  text,
+  lined,
+  length,
+  now,
+  play,
+  onRefresh
+}: {
+  project: VideoProject
+  item: VideoItem
+  text: string
+  lined: LinedUp | null
+  length: number | null
+  now: number
+  play: (at: number) => void
+  onRefresh: () => void
+}) {
+  const cues = useCues((s) => s.byItem[item.id])
+  const own = useCues((s) => s.shots[item.id])
+  const folder = usePrefs((s) => s.prefs.attachmentFolder)
+  useEffect(() => void loadShotOverrides(item.id), [item.id])
+  useUndoChanges('transcripts', onRefresh)
+  const shots = useMemo(() => buildShots(text, { lined, cues, overrides: own?.times, prefer: own?.prefer, length: length ?? undefined }), [text, lined, cues, own, length])
+  const images = vaultImages()
+  const pictures = shots.filter((s) => s.kind !== 'SECTION')
+  const timed = pictures.filter((s) => s.time !== null).length
+  let current: string | null = null
+  for (const s of [...pictures].filter((x) => x.time !== null).sort((a, b) => a.time! - b.time!)) if (s.time! <= now + 0.05) current = s.key
+
+  const copy = (): void => {
+    void navigator.clipboard.writeText(shotListText(shots, p.title || '')).then(
+      () => notify('Copied the shot list.', 'info'),
+      () => notify('Couldn’t copy the shot list.')
+    )
+  }
+
+  if (!shots.length) return <div className="pp-empty pp-shots-empty">The script has no pictures, clips or sections yet. Add some with / in the script note ([IMAGE: …], [CLIP: …], [SECTION: …]).</div>
+
+  return (
+    <div className="pp-shots" data-pp-shot-list>
+      <div className="pp-shots-bar">
+        <span>
+          <strong>{timed}</strong> of {pictures.length} pictures and clips timed
+        </span>
+        {lined && !!cues?.length && (
+          <label className="pp-prefer">
+            Time from
+            <select
+              className="text-input"
+              value={own?.prefer ?? 'transcript'}
+              onChange={(e) => void setShotPrefer(item.id, e.target.value as 'transcript' | 'teleprompter').catch(notify)}
+              data-pp-prefer
+            >
+              <option value="transcript">the transcript</option>
+              <option value="teleprompter">the teleprompter</option>
+            </select>
+          </label>
+        )}
+        <span className="pp-shots-tools">
+          <button className="btn" onClick={onRefresh} title="Read the script note again (after changing it)">
+            <RotateCcw size={12} /> Script changed?
+          </button>
+          <button className="btn" onClick={copy} data-pp-copy-shots>
+            <Copy size={12} /> Copy as text
+          </button>
+        </span>
+      </div>
+      {!lined && !cues?.length && <div className="pp-empty">Make a transcript (or record with the teleprompter) to time these.</div>}
+      {shots.map((s) =>
+        s.kind === 'SECTION' ? (
+          <div key={s.key} className="pp-shot-section">
+            <span className="pp-shot-time-text">{s.time === null ? '–' : clock(s.time)}</span>
+            <span>§ {s.value || 'Section'}</span>
+          </div>
+        ) : (
+          <ShotRow key={s.key} shot={s} item={item} picture={s.kind === 'IMAGE' ? resolveImage(s.value, images, folder) : null} current={s.key === current} now={now} play={play} />
+        )
+      )}
+    </div>
+  )
+}
+
+function ShotRow({ shot: s, item, picture, current, now, play }: { shot: Shot; item: VideoItem; picture: string | null; current: boolean; now: number; play: (at: number) => void }) {
+  const [editing, setEditing] = useState<string | null>(null)
+  const name = s.kind === 'CLIP' ? `the clip “${s.value}”` : s.value || 'a picture'
+  const set = (time: number | null): void => void setShotTime(item.id, s.key, time, name).catch(notify)
+  const commit = (): void => {
+    if (editing === null) return
+    const t = parseClock(editing)
+    setEditing(null)
+    if (t === null) return notify('Type a time like 2:14.', 'info')
+    set(t)
+  }
+  return (
+    <div className={`pp-shot ${current ? 'now' : ''} ${s.time === null ? 'untimed' : ''}`} data-pp-shot={s.key}>
+      {editing !== null ? (
+        <input
+          className="text-input pp-shot-input"
+          autoFocus
+          value={editing}
+          aria-label="Start time"
+          onChange={(e) => setEditing(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit()
+            if (e.key === 'Escape') {
+              e.stopPropagation()
+              setEditing(null)
+            }
+          }}
+        />
+      ) : (
+        <button className="pp-shot-time" onClick={() => setEditing(s.time === null ? '' : fineClock(s.time))} title="Click to type a time">
+          {s.time === null ? '--:--' : fineClock(s.time)}
+        </button>
+      )}
+      <span className="pp-shot-thumb">{picture ? <img src={vaultUrl(picture)} alt="" loading="lazy" /> : s.kind === 'CLIP' ? <Clapperboard size={16} /> : <ImageIcon size={16} />}</span>
+      <span className="pp-shot-name">
+        {s.kind === 'CLIP' && <span className="pp-shot-kind">Clip</span>}
+        <Private>{s.value || '(no name)'}</Private>
+        {s.kind === 'IMAGE' && !picture && (
+          <span className="pp-shot-missing" title="No picture with this name in your notes">
+            not found
+          </span>
+        )}
+      </span>
+      <span className="pp-shot-length" title="How long it’s on screen (until the next one)">
+        {s.length !== null ? `${s.length < 10 ? s.length.toFixed(1) : Math.round(s.length)}s` : ''}
+      </span>
+      <span className={`pp-shot-source ${s.source ?? 'none'}`} title={s.source ? SOURCE_TEXT[s.source] : 'Not in this recording'}>
+        {s.source === 'you' ? 'yours' : s.source === 'teleprompter' ? 'prompter' : s.source === 'transcript' ? 'transcript' : 'not timed'}
+      </span>
+      <span className="pp-shot-actions">
+        <button className="icon-btn" disabled={s.time === null} onClick={() => s.time !== null && play(s.time)} title="Play from here">
+          <Play size={12} />
+        </button>
+        <button className="icon-btn" disabled={s.time === null} onClick={() => s.time !== null && set(s.time - 0.5)} title="Half a second earlier">
+          −½
+        </button>
+        <button className="icon-btn" disabled={s.time === null} onClick={() => s.time !== null && set(s.time + 0.5)} title="Half a second later">
+          +½
+        </button>
+        <button className="icon-btn" onClick={() => set(now)} title={`Start it where the recording is now (${clock(now)})`}>
+          <Crosshair size={12} />
+        </button>
+        {s.source === 'you' && (
+          <button className="icon-btn" onClick={() => set(null)} title="Go back to the transcript or teleprompter time">
+            <Undo2 size={12} />
+          </button>
+        )}
+      </span>
     </div>
   )
 }
