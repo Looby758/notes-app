@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type MouseEvent } from 'react'
+import { unseenTerminalErrors, useTerminals } from '../../store/terminals'
 import { ArrowRightLeft, AudioLines, Bot, Headphones, Joystick, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Hourglass, HardDrive, House, KeyRound, Layers, LibraryBig, Library, Mail, MessageSquare, MessagesSquare, Monitor, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Scissors, Settings, SlidersVertical, Video, Sparkles, SquareTerminal, Star, StarOff, X, CloudDownload, VenetianMask, Volume2, VolumeX } from 'lucide-react'
 import Private from '../Streamer/Private'
 import { useHideNames } from '../../store/streamer'
@@ -324,6 +325,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === SCREENSHOTS_TAB && <Images size={13} className="tab-icon" />}
               {id === TIMELINE_TAB && <Clock size={13} className="tab-icon" />}
               {id === TERMINAL_TAB && <SquareTerminal size={13} className="tab-icon" />}
+              {id === TERMINAL_TAB && <TerminalErrorDot />}
               {id === PASSWORDS_TAB && <KeyRound size={13} className="tab-icon" />}
               {id === EMAIL_TAB && <Mail size={13} className="tab-icon" />}
               {isWebTab(id) && (isPrivateWebTab(id) ? <VenetianMask size={13} className="tab-icon" /> : web[id]?.url ? <SiteIcon url={web[id].url} size={13} className="tab-icon" /> : <Globe size={13} className="tab-icon" />)}
@@ -420,6 +422,12 @@ export default function TabBar({ pane }: { pane: string }) {
 }
 
 /** A speaker on a web tab that's playing sound (or muted); clicking it mutes or unmutes the tab. */
+/** A red dot on the Terminal tab when a command printed errors you haven't looked at yet. */
+function TerminalErrorDot() {
+  const errors = useTerminals(unseenTerminalErrors)
+  return errors > 0 ? <span className="tab-error-dot" title={`${errors} error line${errors === 1 ? '' : 's'} in the terminal`} /> : null
+}
+
 function TabAudio({ tab }: { tab: string }) {
   const audio = useBrowser((s) => s.audio[tab])
   if (!audio || (!audio.audible && !audio.muted)) return null

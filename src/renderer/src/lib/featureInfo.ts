@@ -75,9 +75,9 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'clips', name: 'Clips', blurb: 'Instant replay: save the last 30 seconds, trim it, send it', group: 'Tools', command: 'clips.open', keywords: 'instant replay shadowplay clip highlight discord trim caption game' },
   { id: 'replay', name: 'Save replay', blurb: 'Save the last 30 seconds of your screen', group: 'Tools', command: 'replay.save', keywords: 'instant replay clip that save highlight' },
   { id: 'offline-ai', name: 'Offline AI', blurb: 'AI on your own graphics card: get it or manage it', group: 'Tools', keywords: 'ai local gpu llm private download model qwen llama' },
-  { id: 'studio', name: 'Studio', blurb: 'Record your screen and webcam, or go live', group: 'Tools', command: 'studio.open', keywords: 'record obs stream twitch youtube webcam live' },
+  { id: 'studio', name: 'Studio', blurb: 'Record your screen, webcam or a voiceover (with a teleprompter), or go live', group: 'Tools', command: 'studio.open', keywords: 'record obs stream twitch youtube webcam live voiceover audio mic microphone preset podcast teleprompter autocue script noise gate de-esser compressor eq mouth clicks loudness sections takes retake' },
   { id: 'videos', name: 'Video projects', blurb: 'Script, research, pictures and recordings for each video', group: 'Tools', command: 'videos.open', keywords: 'youtube video project script research voiceover thumbnail recording channel episode' },
-  { id: 'terminal', name: 'Terminal', blurb: 'Command line in your notes folder', group: 'Tools', command: 'terminal.open', keywords: 'shell cmd powershell' },
+  { id: 'terminal', name: 'Terminal', blurb: 'Command lines, with run buttons for your apps', group: 'Tools', command: 'terminal.open', keywords: 'shell cmd powershell npm git dev run projects eclipse' },
   { id: 'streamer', name: 'Streamer mode', blurb: 'Blur private things while sharing', group: 'Tools', command: 'view.streamer', keywords: 'privacy blur stream obs' },
   { id: 'settings', name: 'Settings', blurb: 'Make Orbit yours', group: 'Tools', command: 'settings', keywords: 'preferences options' }
 ]

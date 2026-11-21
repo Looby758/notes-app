@@ -531,7 +531,15 @@ export interface NotesApi {
   studioDefaultFolder(): Promise<string>
   studioPickFolder(): Promise<string | null>
   /** Starts a recording file in `folder` (null = Videos/Orbit Recordings). */
-  studioStart(folder: string | null, ext: 'mp4' | 'webm'): Promise<{ id: number; path: string }>
+  studioStart(folder: string | null, ext: 'mp4' | 'webm' | 'm4a', kind?: 'video' | 'voiceover' | 'take', take?: { script: string; index: number; title: string }): Promise<{ id: number; path: string }>
+  /** A section take's sound (record by section), to play it back. */
+  studioReadTake(path: string): Promise<Uint8Array>
+  /** Joins section takes, in order, into "<script> voiceover (joined).wav" beside them; length in seconds. */
+  studioJoinTakes(parts: import('./takes').JoinPart[], script: string): Promise<{ path: string; length: number }>
+  /** Saves a copy of a Studio recording with the long pauses shortened ("… (trimmed).wav"); lengths in seconds. */
+  studioTrim(path: string, settings: import('./studioAudio').TrimSettings): Promise<{ path: string; before: number; after: number }>
+  /** Saves the teleprompter's cue times beside a Studio recording ("<recording>.cues.json"). */
+  studioWriteCues(path: string, json: string): Promise<void>
   studioChunk(id: number, data: Uint8Array): Promise<{ ok: boolean; error?: string }>
   /** Finishes the file; resolves to its path. */
   studioStop(id: number): Promise<string | null>
@@ -1104,16 +1112,25 @@ export interface NotesApi {
   /** A game started or stopped, or more time was counted. */
   onGamesChanged(callback: () => void): () => void
   // Terminal tab
-  /** Starts the command line in the notes folder (or carries on with the one already running). */
-  terminalStart(cols: number, rows: number): Promise<TerminalStart>
-  /** Ends the command line (and whatever is running in it). */
-  terminalStop(): Promise<void>
-  /** What you typed or pasted into the Terminal tab. */
-  terminalInput(data: string): void
-  terminalResize(cols: number, rows: number): void
-  onTerminalData(callback: (data: string) => void): () => void
-  /** The command line ended (you typed exit, or it closed). */
-  onTerminalExit(callback: (code: number) => void): () => void
+  /**
+   * Starts command line `id` in `folder` (the notes folder when it's null or missing), or carries on
+   * with the one already running under that id.
+   */
+  terminalStart(id: string, folder: string | null, cols: number, rows: number): Promise<TerminalStart>
+  /** Ends a command line (and whatever is running in it). */
+  terminalStop(id: string): Promise<void>
+  /** What you typed or pasted into a terminal. */
+  terminalInput(id: string, data: string): void
+  terminalResize(id: string, cols: number, rows: number): void
+  onTerminalData(callback: (id: string, data: string) => void): () => void
+  /** A command line ended (you typed exit, or it closed). */
+  onTerminalExit(callback: (id: string, code: number) => void): () => void
+  /** Asks for an app's folder, for a Terminal project. Null if cancelled. */
+  terminalPickFolder(): Promise<string | null>
+  /** Your home folder (for paths starting with ~ in what a command prints). */
+  terminalHome(): Promise<string>
+  /** Opens a project's folder in File Explorer / Finder, or in VS Code. */
+  terminalOpenIn(folder: string, where: 'files' | 'vscode'): Promise<void>
   /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */
   aiChat(messages: AiChatMessage[], engine?: AiEngine): Promise<AiReply>
   /** Saved chats, kept in the settings folder on this computer. */
@@ -1377,7 +1394,7 @@ export interface AppleNote {
   locked: boolean
 }
 /** How starting the Terminal tab's command line went. */
-export type TerminalStart = { ok: true; name: string; resumed: boolean } | { ok: false; error: string }
+export type TerminalStart = { ok: true; name: string; resumed: boolean; folder: string } | { ok: false; error: string }
 
 /** A Google Sheet (.gsheet file) fetched for the spreadsheet viewer, or why it couldn't be. */
 export type GoogleSheetResult =

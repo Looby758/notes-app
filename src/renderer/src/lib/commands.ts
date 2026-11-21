@@ -343,6 +343,7 @@ export const commands: Command[] = [
   },
   { id: 'episode.find', group: 'Navigation', title: 'Find everything from an episode (S4E9) or comic issue…', run: () => useUI.setState({ modal: 'episode' }) },
   { id: 'terminal.open', group: 'Navigation', title: 'Open terminal (command line in the notes folder)', shortcut: 'Ctrl+Alt+T', run: () => openSpecialTab(TERMINAL_TAB) },
+  { id: 'terminal.new', group: 'Navigation', title: 'New terminal (another command line, in the notes folder)', run: () => void import('./terminal').then((t) => t.newTerminal()) },
   { id: 'money.open', group: 'Navigation', title: 'Open money tracker', shortcut: 'Ctrl+Shift+B', run: () => openSpecialTab(MONEY_TAB) },
   { id: 'convert.open', group: 'Navigation', title: 'Convert files (photos, Word, audio…)', run: () => openSpecialTab(CONVERT_TAB) },
   { id: 'explorer.open', group: 'Navigation', title: 'Browse files on this computer (and Google Drive)', run: () => openSpecialTab(EXPLORER_TAB) },
@@ -371,6 +372,37 @@ export const commands: Command[] = [
   { id: 'replay.save', group: 'Navigation', title: 'Save the last 30 seconds (instant replay)', run: () => void import('./replay').then((m) => m.saveReplay()) },
   { id: 'replay.toggle', group: 'Navigation', title: 'Turn instant replay on or off', run: () => setPrefs({ replayOn: !usePrefs.getState().prefs.replayOn }) },
   { id: 'studio.record', group: 'Navigation', title: 'Start or stop recording (Studio)', run: () => void import('./studio').then((m) => m.toggleRecording()) },
+  { id: 'studio.voiceover', group: 'Navigation', title: 'Record a voiceover (Studio, audio only)', run: () => {
+    void import('../store/studio').then((m) => m.setAudioOnly(true))
+    openSpecialTab(STUDIO_TAB)
+  } },
+  { id: 'studio.audioOnly', group: 'Navigation', title: 'Studio: switch between audio only and video', run: () => void import('../store/studio').then((m) => m.setAudioOnly(!m.useStudio.getState().audioOnly)) },
+  { id: 'studio.nextPreset', group: 'Navigation', title: 'Studio: load the next mic preset', run: () => void import('../store/studio').then((m) => m.nextPreset()) },
+  { id: 'teleprompter.open', group: 'Navigation', title: 'Teleprompter (read your script while you record)', run: () => {
+    void import('../store/teleprompter').then((m) => m.openPrompter(true))
+    openSpecialTab(STUDIO_TAB)
+  } },
+  { id: 'teleprompter.toggle', group: 'Navigation', title: 'Teleprompter: pause / carry on scrolling', shortcut: 'Ctrl+Alt+Space', run: () => void import('../store/teleprompter').then((m) => m.togglePrompter()) },
+  { id: 'takes.bySection', group: 'Navigation', title: 'Teleprompter: record by section (one section at a time)', run: () => {
+    openSpecialTab(STUDIO_TAB)
+    void import('../store/takes').then((m) => m.setBySection(!m.useTakes.getState().on))
+  } },
+  { id: 'takes.record', group: 'Navigation', title: 'Record by section: record (or stop) this section', run: () => {
+    openSpecialTab(STUDIO_TAB)
+    void import('../store/takes').then((m) => {
+      if (!m.useTakes.getState().on) m.setBySection(true)
+      void m.recordSection()
+    })
+  } },
+  { id: 'takes.retake', group: 'Navigation', title: 'Record by section: quick retake (start this section again)', run: () => void import('../store/takes').then((m) => m.quickRetake()) },
+  { id: 'takes.join', group: 'Navigation', title: 'Record by section: join the takes into one voiceover', run: () => {
+    openSpecialTab(STUDIO_TAB)
+    void import('../store/takes').then((m) => m.joinTakes())
+  } },
+  { id: 'studio.trim', group: 'Navigation', title: 'Studio: clean up the last voiceover (silences, mouth clicks, loudness)', run: () => {
+    openSpecialTab(STUDIO_TAB)
+    void import('./studio').then((m) => m.trimLastRecording())
+  } },
   { id: 'minesweeper.open', group: 'Navigation', title: 'Play minesweeper (take a quick break)', run: () => openMiniGames('minesweeper') },
   { id: 'video.open', group: 'Navigation', title: 'Video player (play any video, MKV, AVI…)', run: () => openSpecialTab(VIDEO_TAB) },
   { id: 'mixer.open', group: 'Navigation', title: 'Volume mixer (a volume for each app)', run: () => openSpecialTab(MIXER_TAB) },

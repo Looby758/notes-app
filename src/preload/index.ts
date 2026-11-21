@@ -37,7 +37,11 @@ const api: NotesApi = {
   studioAccess: (what) => ipcRenderer.invoke('studio:access', what),
   studioDefaultFolder: () => ipcRenderer.invoke('studio:defaultFolder'),
   studioPickFolder: () => ipcRenderer.invoke('studio:pickFolder'),
-  studioStart: (folder, ext) => ipcRenderer.invoke('studio:start', folder, ext),
+  studioStart: (folder, ext, kind, take) => ipcRenderer.invoke('studio:start', folder, ext, kind, take),
+  studioReadTake: (path) => ipcRenderer.invoke('studio:readTake', path),
+  studioJoinTakes: (parts, script) => ipcRenderer.invoke('studio:joinTakes', parts, script),
+  studioTrim: (path, settings) => ipcRenderer.invoke('studio:trim', path, settings),
+  studioWriteCues: (path, json) => ipcRenderer.invoke('studio:writeCues', path, json),
   studioChunk: (id, data) => ipcRenderer.invoke('studio:chunk', id, data),
   studioStop: (id) => ipcRenderer.invoke('studio:stop', id),
   studioReveal: (path) => ipcRenderer.invoke('studio:reveal', path),
@@ -588,20 +592,23 @@ const api: NotesApi = {
     ipcRenderer.on('games:changed', handler)
     return () => ipcRenderer.removeListener('games:changed', handler)
   },
-  terminalStart: (cols, rows) => ipcRenderer.invoke('term:start', cols, rows),
-  terminalStop: () => ipcRenderer.invoke('term:stop'),
-  terminalInput: (data) => ipcRenderer.send('term:input', data),
-  terminalResize: (cols, rows) => ipcRenderer.send('term:resize', cols, rows),
+  terminalStart: (id, folder, cols, rows) => ipcRenderer.invoke('term:start', id, folder, cols, rows),
+  terminalStop: (id) => ipcRenderer.invoke('term:stop', id),
+  terminalInput: (id, data) => ipcRenderer.send('term:input', id, data),
+  terminalResize: (id, cols, rows) => ipcRenderer.send('term:resize', id, cols, rows),
   onTerminalData: (callback) => {
-    const handler = (_e: unknown, data: string): void => callback(data)
+    const handler = (_e: unknown, id: string, data: string): void => callback(id, data)
     ipcRenderer.on('term:data', handler)
     return () => ipcRenderer.removeListener('term:data', handler)
   },
   onTerminalExit: (callback) => {
-    const handler = (_e: unknown, code: number): void => callback(code)
+    const handler = (_e: unknown, id: string, code: number): void => callback(id, code)
     ipcRenderer.on('term:exit', handler)
     return () => ipcRenderer.removeListener('term:exit', handler)
   },
+  terminalPickFolder: () => ipcRenderer.invoke('term:pickFolder'),
+  terminalHome: () => ipcRenderer.invoke('term:home'),
+  terminalOpenIn: (folder, where) => ipcRenderer.invoke('term:openIn', folder, where),
   aiChat: (messages, engine) => ipcRenderer.invoke('ai:chat', messages, engine),
   aiLoadChats: () => ipcRenderer.invoke('ai:loadChats'),
   aiSaveChats: (chats) => ipcRenderer.invoke('ai:saveChats', chats),
