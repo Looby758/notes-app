@@ -33,6 +33,7 @@ import {
   CLIPS_TAB,
   VIDEOS_TAB,
   SOUNDBOARD_TAB,
+  MACROS_TAB,
   DISCORD_TAB,
   EXPLORER_TAB,
   openExplorerTab,
@@ -360,6 +361,9 @@ export const commands: Command[] = [
   { id: 'discord.deafen', group: 'Discord', title: 'Discord: deafen / undeafen', run: () => void toggleDiscord('deaf') },
   { id: 'soundboard.open', group: 'Navigation', title: 'Open the soundboard and voice changer', run: () => openSpecialTab(SOUNDBOARD_TAB) },
   { id: 'soundboard.stop', group: 'Navigation', title: 'Stop all soundboard sounds', run: () => void import('./soundboard').then((m) => m.stopAll()) },
+  { id: 'macros.open', group: 'Navigation', title: 'Macros: record and play keys and mouse, auto-clicker', run: () => openSpecialTab(MACROS_TAB) },
+  { id: 'macros.record', group: 'Macros', title: 'Macros: start / stop recording', run: () => void window.api.macrosRecord() },
+  { id: 'macros.stop', group: 'Macros', title: 'Macros: stop playing or the auto-clicker', run: () => void window.api.macrosStop() },
   { id: 'studio.open', group: 'Navigation', title: 'Open the Studio (record your screen and webcam)', run: () => openSpecialTab(STUDIO_TAB) },
   { id: 'clips.open', group: 'Navigation', title: 'Open clips (instant replay and the clip editor)', run: () => openSpecialTab(CLIPS_TAB) },
   { id: 'videos.idea', group: 'Navigation', title: 'Idea inbox for videos (jot down a video idea)', run: () => {

@@ -7,7 +7,7 @@ import { useEditor } from '../../store/editor'
 import { toggleStar, useStarred } from '../../store/starred'
 import { Images, Clock } from 'lucide-react'
 import { useNoteIndex } from '../../store/noteIndex'
-import { Upload } from 'lucide-react'
+import { Keyboard, Upload } from 'lucide-react'
 import { isMindMap, openExport, toggleMindMap, useUI } from '../../store/ui'
 import {
   activateTab,
@@ -40,6 +40,7 @@ import {
   CLIPS_TAB,
   VIDEOS_TAB,
   SOUNDBOARD_TAB,
+  MACROS_TAB,
   DISCORD_TAB,
   MESSAGES_TAB,
   GROK_TAB,
@@ -119,6 +120,7 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === CLIPS_TAB) return 'Clips'
   if (id === VIDEOS_TAB) return 'Videos'
   if (id === SOUNDBOARD_TAB) return 'Soundboard'
+  if (id === MACROS_TAB) return 'Macros'
   if (id === DISCORD_TAB) return 'Discord voice'
   if (id === MESSAGES_TAB) return 'Messages'
   if (id === GROK_TAB) return 'Grok'
@@ -345,6 +347,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === CLIPS_TAB && <Scissors size={13} className="tab-icon" />}
               {id === VIDEOS_TAB && <Video size={13} className="tab-icon" />}
               {id === SOUNDBOARD_TAB && <AudioLines size={13} className="tab-icon" />}
+              {id === MACROS_TAB && <Keyboard size={13} className="tab-icon" />}
               {id === DISCORD_TAB && <Headphones size={13} className="tab-icon" />}
               {id === MESSAGES_TAB && <MessagesSquare size={13} className="tab-icon" />}
               {id === GROK_TAB && <Bot size={13} className="tab-icon" />}

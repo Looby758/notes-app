@@ -40,6 +40,7 @@ import {
   CLIPS_TAB,
   VIDEOS_TAB,
   SOUNDBOARD_TAB,
+  MACROS_TAB,
   DISCORD_TAB,
   MESSAGES_TAB,
   GROK_TAB,
@@ -87,6 +88,7 @@ import StudioPage from '../Studio/StudioPage'
 import ClipsPage from '../Clips/ClipsPage'
 import VideosPage from '../Videos/VideosPage'
 import SoundboardPage from '../Soundboard/SoundboardPage'
+import MacrosPage from '../Macros/MacrosPage'
 import DiscordVoicePage from '../Discord/DiscordVoicePage'
 import GamesPage from '../Games/GamesPage'
 import VideoPage from '../Video/VideoPage'
@@ -231,6 +233,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === CLIPS_TAB && <ClipsPage />}
         {active === VIDEOS_TAB && <VideosPage />}
         {active === SOUNDBOARD_TAB && <SoundboardPage />}
+        {active === MACROS_TAB && <MacrosPage />}
         {active === DISCORD_TAB && <DiscordVoicePage />}
         {active === GAMES_TAB && <GamesPage />}
         {active === VIDEO_TAB && <VideoPage autoFocus={isActivePane} />}

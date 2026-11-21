@@ -100,6 +100,8 @@ export const CLIPS_TAB = 'clips:'
 export const VIDEOS_TAB = 'videos:'
 /** Sound clips with hotkeys, the voice changer and music into a voice call (components/Soundboard). */
 export const SOUNDBOARD_TAB = 'soundboard:'
+/** The macro recorder and auto-clicker (components/Macros). */
+export const MACROS_TAB = 'macros:'
 /** Who's in your Discord voice channel, with mute and deafen (components/Discord). */
 export const DISCORD_TAB = 'discord-voice:'
 /** WhatsApp and Discord in one tab (components/Messages). */
