@@ -848,7 +848,7 @@ function MoveTo({ clip, folder, folders, onMoved }: { clip: ClipInfo; folder: st
         <FolderInput size={14} />
       </button>
       {open && (
-        <div className="clips-move-menu" role="menu">
+        <div className="clips-move-menu" role="menu" onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}>
           {folders
             .filter((f) => f !== clip.folder)
             .map((f) => (
