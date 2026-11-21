@@ -127,6 +127,8 @@ describe('releases', () => {
   it('makes the release command for each shell', () => {
     expect(releaseCommand(false, 'minor')).toBe('npm version minor -m "Release %s" && git push --follow-tags')
     expect(releaseCommand(true, 'patch')).toBe('npm version patch -m "Release %s"; if ($LASTEXITCODE -eq 0) { git push --follow-tags }')
+    expect(releaseCommand(false, 'patch', true)).toBe('npm test && npm version patch -m "Release %s" && git push --follow-tags')
+    expect(releaseCommand(true, 'patch', true)).toBe('npm test; if ($LASTEXITCODE -eq 0) { npm version patch -m "Release %s"; if ($LASTEXITCODE -eq 0) { git push --follow-tags } }')
   })
 
   it('writes plain notes from pull request titles', () => {

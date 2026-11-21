@@ -138,7 +138,7 @@ function NextRelease({ project, releases }: { project: TerminalProject; releases
       return
     }
     setConfirm(false)
-    releaseApp(project, bump)
+    releaseApp(project, bump, !!info?.hasTests)
     notify(info?.releaseWorkflow ? `Releasing v${next}. GitHub builds the installers next.` : `Releasing v${next} in the terminal.`, 'info')
     // The version changes once npm has run.
     window.setTimeout(() => void refreshApps(), 8000)
@@ -189,9 +189,10 @@ function NextRelease({ project, releases }: { project: TerminalProject; releases
             </button>
           </div>
           <p className="muted release-explain">
+            {info?.hasTests && 'Runs the tests first and stops if any fail. Then it '}
             {info?.releaseWorkflow
-              ? `Sets the version to ${next}, commits it, tags it v${next} and pushes. GitHub then builds the installers and publishes the release, which takes a few minutes.`
-              : `Sets the version to ${next}, commits it, tags it v${next} and pushes. This app has no release workflow on GitHub, so build the installers here.`}
+              ? `${info?.hasTests ? 's' : 'S'}ets the version to ${next}, commits it, tags it v${next} and pushes. GitHub then builds the installers and publishes the release, which takes a few minutes.`
+              : `${info?.hasTests ? 's' : 'S'}ets the version to ${next}, commits it, tags it v${next} and pushes. This app has no release workflow on GitHub, so build the installers here.`}
           </p>
         </>
       )}
