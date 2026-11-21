@@ -531,8 +531,8 @@ export function tryBranch(project: TerminalProject, branch: string): void {
 }
 
 /** App Studio's release button: bumps the version, commits and tags it, and pushes, in the project's own terminal. */
-export function releaseApp(project: TerminalProject, bump: VersionBump): void {
-  runProjectCommand(project, releaseCommand(IS_WINDOWS, bump))
+export function releaseApp(project: TerminalProject, bump: VersionBump, test = false): void {
+  runProjectCommand(project, releaseCommand(IS_WINDOWS, bump, test))
 }
 
 /**

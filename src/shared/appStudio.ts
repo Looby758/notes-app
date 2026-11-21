@@ -27,6 +27,8 @@ export interface AppInfo {
   releaseWorkflow?: boolean
   /** package.json scripts that build the app (build, build:win, dist…). */
   buildScripts?: string[]
+  /** Whether package.json has a real test script (run before a release). */
+  hasTests?: boolean
 }
 
 export interface PullRequest {
@@ -315,13 +317,16 @@ export function bumpVersion(version: string, bump: VersionBump): string | null {
 }
 
 /**
- * The release button's command line: npm bumps the version in package.json, commits it and tags it
- * (v1.2.3), then the commit and tag are pushed. A release workflow on GitHub picks the tag up.
+ * The release button's command line: the app's tests first (when it has them, so a release that
+ * would fail on GitHub stops here instead), then npm bumps the version in package.json, commits it
+ * and tags it (v1.2.3), and the commit and tag are pushed. A release workflow on GitHub picks the
+ * tag up.
  */
-export function releaseCommand(windows: boolean, bump: VersionBump): string {
-  const version = `npm version ${bump} -m "Release %s"`
-  const push = 'git push --follow-tags'
-  return windows ? `${version}; if ($LASTEXITCODE -eq 0) { ${push} }` : `${version} && ${push}`
+export function releaseCommand(windows: boolean, bump: VersionBump, test = false): string {
+  const steps = [...(test ? ['npm test'] : []), `npm version ${bump} -m "Release %s"`, 'git push --follow-tags']
+  if (!windows) return steps.join(' && ')
+  // PowerShell: each step only if the one before worked.
+  return steps.reduceRight((rest, step) => `${step}; if ($LASTEXITCODE -eq 0) { ${rest} }`)
 }
 
 /** Switches to a branch and gets its latest, in the app's terminal. */

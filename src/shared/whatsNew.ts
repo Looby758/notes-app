@@ -12,6 +12,18 @@ export interface ReleaseNotes {
 /** Newest first. Add an entry with each release. */
 export const RELEASE_NOTES: readonly ReleaseNotes[] = [
   {
+    version: '1.12.1',
+    items: [
+      'App Studio: a home for the apps you make with Claude. See each app’s branch, last change and open pull requests, and get the latest and run it in one click.',
+      'Pull request inbox: try what Claude made in a separate test copy (your app’s own folder isn’t touched), then merge or close it.',
+      'Ideas & bugs board for each app, with Send to Claude. Report a bug straight from the screen snip, or sketch a screen.',
+      'Releases: bump the version and release in one click, and write the “What’s new” notes from the merged pull requests.',
+      'Screenshots: a gallery of each app’s features.',
+      'Claude as a tab or a panel floating inside Orbit, like Grok.',
+      'Terminal: several terminals, project run buttons, saved commands, and errors that stand out.'
+    ]
+  },
+  {
     version: '1.11.1',
     items: [
       'The web browser is now a full browser.',

@@ -178,16 +178,19 @@ async function appInfo(folder: string): Promise<AppInfo> {
   if (!isAbsolute(folder) || !statSync(folder, { throwIfNoEntry: false })?.isDirectory()) return { ok: false, error: 'This app’s folder isn’t there any more.' }
   let version: string | undefined
   let buildScripts: string[] | undefined
+  let hasTests = false
   try {
     const pkg = JSON.parse(readFileSync(join(folder, 'package.json'), 'utf8')) as { version?: string; scripts?: Record<string, string> }
     version = pkg.version
     buildScripts = Object.keys(pkg.scripts ?? {}).filter((k) => /^(build|dist|make|package)(:|$)/.test(k))
+    const test = pkg.scripts?.test
+    hasTests = !!test && !/no test specified/.test(test)
   } catch {
     // No package.json: not every app has one.
   }
   const releaseWorkflow = hasReleaseWorkflow(folder)
   const inside = await git(folder, ['rev-parse', '--is-inside-work-tree'])
-  if (inside !== 'true') return { ok: true, version, buildScripts, releaseWorkflow, error: inside === null && !(await git(folder, ['--version'])) ? 'Git isn’t installed on this computer.' : 'This folder isn’t a git repository.' }
+  if (inside !== 'true') return { ok: true, version, buildScripts, hasTests, releaseWorkflow, error: inside === null && !(await git(folder, ['--version'])) ? 'Git isn’t installed on this computer.' : 'This folder isn’t a git repository.' }
   const [branch, last, changes, remote, originHead] = await Promise.all([
     git(folder, ['rev-parse', '--abbrev-ref', 'HEAD']),
     git(folder, ['log', '-1', '--format=%s%x1f%cI%x1f%an']),
@@ -207,6 +210,7 @@ async function appInfo(folder: string): Promise<AppInfo> {
     repo: (remote && githubRepo(remote)) ?? undefined,
     mainBranch,
     buildScripts,
+    hasTests,
     releaseWorkflow
   }
 }
