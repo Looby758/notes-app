@@ -3,6 +3,7 @@ import type { Prefs } from '@shared/prefs'
 import {
   Ear,
   ArrowRightLeft,
+  FilePen,
   AudioLines,
   Clapperboard,
   Cpu,
@@ -49,11 +50,11 @@ import {
   Webcam,
   Zap,
   Headphones,
-  CloudDownload,
   History,
   Scissors,
   Bot,
   Video,
+  ArrowDownToLine,
   type LucideIcon
 } from 'lucide-react'
 import { openGrokTab } from '../components/Grok/GrokPage'
@@ -76,6 +77,7 @@ import {
   COMICS_TAB,
   WIKI_TAB,
   CONVERT_TAB,
+  PDF_EDITOR_TAB,
   STUDIO_TAB,
   CLIPS_TAB,
   VIDEOS_TAB,
@@ -97,7 +99,7 @@ import {
   PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
-  DOWNLOADER_TAB,
+  DOWNLOADS_TAB,
   MONEY_TAB,
   PASSWORDS_TAB,
   SETTINGS_TAB,
@@ -221,7 +223,8 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   snip: { icon: Scan, run: () => void startSnip() },
   explorer: { icon: HardDrive, run: () => openSpecialTab(EXPLORER_TAB) },
   convert: { icon: ArrowRightLeft, run: () => openSpecialTab(CONVERT_TAB) },
-  downloader: { icon: CloudDownload, run: () => openSpecialTab(DOWNLOADER_TAB) },
+  'pdf-editor': { icon: FilePen, run: () => openSpecialTab(PDF_EDITOR_TAB) },
+  downloads: { icon: ArrowDownToLine, run: () => openSpecialTab(DOWNLOADS_TAB) },
   'offline-ai': {
     icon: Cpu,
     run: () => {

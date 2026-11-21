@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type MouseEvent } from 'react'
 import { unseenTerminalErrors, useTerminals } from '../../store/terminals'
-import { ArrowRightLeft, AudioLines, Bot, Headphones, Joystick, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Hourglass, HardDrive, House, KeyRound, Layers, LibraryBig, Library, Mail, MessageSquare, MessagesSquare, Monitor, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Scissors, Settings, SlidersVertical, Video, Sparkles, SquareTerminal, Star, StarOff, X, CloudDownload, VenetianMask, Volume2, VolumeX } from 'lucide-react'
+import { ArrowRightLeft, AudioLines, Bot, Headphones, Joystick, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Hourglass, HardDrive, House, KeyRound, Layers, LibraryBig, Library, Mail, MessageSquare, MessagesSquare, Monitor, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Scissors, Settings, SlidersVertical, Video, Sparkles, SquareTerminal, Star, StarOff, X, VenetianMask, Volume2, VolumeX } from 'lucide-react'
 import Private from '../Streamer/Private'
 import { useHideNames } from '../../store/streamer'
 import { useEditor } from '../../store/editor'
 import { toggleStar, useStarred } from '../../store/starred'
 import { Images, Clock } from 'lucide-react'
 import { useNoteIndex } from '../../store/noteIndex'
-import { Keyboard, Upload } from 'lucide-react'
+import { ArrowDownToLine, Keyboard, Upload } from 'lucide-react'
+import { FilePen } from 'lucide-react'
 import { isMindMap, openExport, toggleMindMap, useUI } from '../../store/ui'
 import {
   activateTab,
@@ -26,6 +27,7 @@ import {
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
+  PDF_EDITOR_TAB,
   isExplorerTab,
   COMICS_TAB,
   WIKI_TAB,
@@ -35,7 +37,7 @@ import {
   PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
-  DOWNLOADER_TAB,
+  DOWNLOADS_TAB,
   STUDIO_TAB,
   CLIPS_TAB,
   VIDEOS_TAB,
@@ -107,6 +109,7 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === HOME_TAB) return 'Home'
   if (id === MONEY_TAB) return 'Money'
   if (id === CONVERT_TAB) return 'Convert files'
+  if (id === PDF_EDITOR_TAB) return 'PDF editor'
   if (id === COMICS_TAB) return 'Comics'
   if (id === WIKI_TAB) return 'Wikis'
   if (id === MINIGAMES_TAB) return 'Mini games'
@@ -115,7 +118,7 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === PUBLISHING_TAB) return 'Publishing'
   if (id === SCREENS_TAB) return 'Screens'
   if (id === MIXER_TAB) return 'Volume mixer'
-  if (id === DOWNLOADER_TAB) return 'Download a video'
+  if (id === DOWNLOADS_TAB) return 'Downloads'
   if (id === STUDIO_TAB) return 'Studio'
   if (id === CLIPS_TAB) return 'Clips'
   if (id === VIDEOS_TAB) return 'Videos'
@@ -334,6 +337,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === HOME_TAB && <House size={13} className="tab-icon" />}
               {id === MONEY_TAB && <PoundSterling size={13} className="tab-icon" />}
               {id === CONVERT_TAB && <ArrowRightLeft size={13} className="tab-icon" />}
+              {id === PDF_EDITOR_TAB && <FilePen size={13} className="tab-icon" />}
               {id === COMICS_TAB && <LibraryBig size={13} className="tab-icon" />}
               {id === WIKI_TAB && <Library size={13} className="tab-icon" />}
               {id === MINIGAMES_TAB && <Joystick size={13} className="tab-icon" />}
@@ -342,7 +346,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === PUBLISHING_TAB && <Upload size={13} className="tab-icon" />}
               {id === SCREENS_TAB && <Monitor size={13} className="tab-icon" />}
               {id === MIXER_TAB && <SlidersVertical size={13} className="tab-icon" />}
-              {id === DOWNLOADER_TAB && <CloudDownload size={13} className="tab-icon" />}
+              {id === DOWNLOADS_TAB && <ArrowDownToLine size={13} className="tab-icon" />}
               {id === STUDIO_TAB && <Clapperboard size={13} className="tab-icon" />}
               {id === CLIPS_TAB && <Scissors size={13} className="tab-icon" />}
               {id === VIDEOS_TAB && <Video size={13} className="tab-icon" />}

@@ -27,6 +27,7 @@ import {
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
+  PDF_EDITOR_TAB,
   COMICS_TAB,
   WIKI_TAB,
   MINIGAMES_TAB,
@@ -35,7 +36,7 @@ import {
   PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
-  DOWNLOADER_TAB,
+  DOWNLOADS_TAB,
   STUDIO_TAB,
   CLIPS_TAB,
   VIDEOS_TAB,
@@ -75,7 +76,8 @@ import GrokPage from '../Grok/GrokPage'
 import HomePage from '../Home/HomePage'
 import MoneyPage from '../Money/MoneyPage'
 import ConvertPage from '../Convert/ConvertPage'
-import VideoDownloaderPage from '../Downloader/VideoDownloaderPage'
+import DownloadsPage from '../Downloads/DownloadsPage'
+import PdfEditorPage from '../PdfEditor/PdfEditorPage'
 import MiniGamesPage from '../MiniGames/MiniGamesPage'
 import ComicsPage from '../Comics/ComicsPage'
 import WikiPage from '../Wiki/WikiPage'
@@ -220,6 +222,7 @@ export default function Pane({ pane }: { pane: string }) {
         {(active === HOME_TAB || !active) && <HomePage />}
         {active === MONEY_TAB && <MoneyPage />}
         {active === CONVERT_TAB && <ConvertPage />}
+        {active === PDF_EDITOR_TAB && <PdfEditorPage />}
         {active === COMICS_TAB && <ComicsPage />}
         {active === WIKI_TAB && <WikiPage />}
         {active === MINIGAMES_TAB && <MiniGamesPage />}
@@ -228,7 +231,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === PUBLISHING_TAB && <PublishingPage />}
         {active === SCREENS_TAB && <ScreensPage />}
         {active === MIXER_TAB && <MixerPage />}
-        {active === DOWNLOADER_TAB && <VideoDownloaderPage />}
+        {active === DOWNLOADS_TAB && <DownloadsPage />}
         {active === STUDIO_TAB && <StudioPage />}
         {active === CLIPS_TAB && <ClipsPage />}
         {active === VIDEOS_TAB && <VideosPage />}

@@ -48,6 +48,9 @@ const watchers = new Set<WebContents>()
 const jobs: VideoDownload[] = []
 const running = new Map<number, ChildProcess>()
 let nextId = 1
+/** The download manager (downloadManager.ts) hears about every change, for the videos it queued. */
+const jobListeners = new Set<(jobs: VideoDownload[]) => void>()
+let vaultGetter: () => Vault | null = () => null
 
 function state(): VideoDownloaderState {
   const ffmpeg = ffmpegState()
@@ -65,6 +68,7 @@ const tellState = (): void => send('vdl:state', state())
 let jobsTimer: ReturnType<typeof setTimeout> | null = null
 /** The list goes to the window at most a few times a second (progress lines come much faster). */
 function tellJobs(now = false): void {
+  for (const listener of jobListeners) listener(jobs)
   if (now) {
     if (jobsTimer) clearTimeout(jobsTimer)
     jobsTimer = null
@@ -277,7 +281,7 @@ function start(req: VideoDownloadRequest, vault: () => Vault | null): VideoDownl
   const quality: DownloadQuality = req.quality === '720' || req.quality === 'audio' ? req.quality : '1080'
   // The folder picked in the downloader ('' is the top of the notes folder). The vault keeps it inside the notes folder.
   const folder = typeof req.folder === 'string' ? req.folder.replace(/^\/+|\/+$/g, '') : 'attachments'
-  const job: VideoDownload = { id: nextId++, url: url.href, site: siteName(url), quality, status: 'working', stage: 'starting', startedAt: Date.now() }
+  const job: VideoDownload = { id: nextId++, url: url.href, site: siteName(url), quality, status: 'working', stage: 'starting', startedAt: Date.now(), ...(req.manager ? { manager: true } : {}) }
   jobs.unshift(job)
   // Old finished ones drop off the end.
   for (let i = jobs.length - 1; i >= 0 && jobs.length > 30; i--) if (jobs[i].status !== 'working') jobs.splice(i, 1)
@@ -286,7 +290,26 @@ function start(req: VideoDownloadRequest, vault: () => Vault | null): VideoDownl
   return job
 }
 
+/** Starts a video download for the download manager (when its turn comes). */
+export const startVideoJob = (req: VideoDownloadRequest): VideoDownload => start(req, vaultGetter)
+
+/** Stops a video download (the manager's pause: a video starts over when it carries on). */
+export function cancelVideoJob(id: number): void {
+  const job = jobs.find((j) => j.id === id)
+  if (!job || job.status !== 'working') return
+  job.status = 'cancelled'
+  const child = running.get(id)
+  if (child) kill(child)
+  tellJobs(true)
+}
+
+export function onVideoJobs(listener: (jobs: VideoDownload[]) => void): () => void {
+  jobListeners.add(listener)
+  return () => jobListeners.delete(listener)
+}
+
 export function setupVideoDownloader(vault: () => Vault | null): void {
+  vaultGetter = vault
   onFfmpegState(() => tellState())
   ipcMain.handle('vdl:state', (e) => {
     watch(e.sender)
@@ -298,14 +321,7 @@ export function setupVideoDownloader(vault: () => Vault | null): void {
     return jobs
   })
   ipcMain.handle('vdl:start', (_e, req: VideoDownloadRequest) => start(req, vault))
-  ipcMain.handle('vdl:cancel', (_e, id: number) => {
-    const job = jobs.find((j) => j.id === id)
-    if (!job || job.status !== 'working') return
-    job.status = 'cancelled'
-    const child = running.get(id)
-    if (child) kill(child)
-    tellJobs(true)
-  })
+  ipcMain.handle('vdl:cancel', (_e, id: number) => cancelVideoJob(id))
   ipcMain.handle('vdl:forget', (_e, id: number) => {
     const i = jobs.findIndex((j) => j.id === id)
     if (i >= 0 && jobs[i].status !== 'working') jobs.splice(i, 1)
