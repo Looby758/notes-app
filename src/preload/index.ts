@@ -321,6 +321,15 @@ const api: NotesApi = {
   },
   cancelVideoDownload: (id) => ipcRenderer.invoke('vdl:cancel', id),
   forgetVideoDownload: (id) => ipcRenderer.invoke('vdl:forget', id),
+  downloadsState: () => ipcRenderer.invoke('dm:state'),
+  onDownloadsState: (callback) => on('dm:state', callback),
+  downloadsAdd: (request) => ipcRenderer.invoke('dm:add', request),
+  downloadsAct: (id, action) => ipcRenderer.invoke('dm:act', id, action),
+  downloadsAll: (action) => ipcRenderer.invoke('dm:all', action),
+  downloadsSettings: (patch) => ipcRenderer.invoke('dm:settings', patch),
+  steamDownloads: () => ipcRenderer.invoke('dm:steam'),
+  steamInstall: (appId) => ipcRenderer.invoke('dm:steamInstall', appId),
+  steamOpenDownloads: () => ipcRenderer.invoke('dm:steamOpen'),
   convertVideo: (request) => ipcRenderer.invoke('convert:video', request),
   cancelVideo: (id) => ipcRenderer.invoke('convert:video-cancel', id),
   onVideoProgress: (callback) => {
@@ -382,6 +391,22 @@ const api: NotesApi = {
     const handler = (_e: unknown, status: Parameters<typeof callback>[0]): void => callback(status)
     ipcRenderer.on('soundboard:changed', handler)
     return () => ipcRenderer.removeListener('soundboard:changed', handler)
+  },
+  macrosGet: () => ipcRenderer.invoke('macros:get'),
+  macrosRecord: () => ipcRenderer.invoke('macros:record'),
+  macrosPlay: (id) => ipcRenderer.invoke('macros:play', id),
+  macrosStop: () => ipcRenderer.invoke('macros:stop'),
+  macrosClicker: (on) => ipcRenderer.invoke('macros:clicker', on),
+  macrosUpdate: (id, patch) => ipcRenderer.invoke('macros:update', id, patch),
+  macrosRemove: (id) => ipcRenderer.invoke('macros:remove', id),
+  macrosSetCurrent: (id) => ipcRenderer.invoke('macros:current', id),
+  macrosSettings: (patch) => ipcRenderer.invoke('macros:settings', patch),
+  macrosDismiss: () => ipcRenderer.invoke('macros:dismiss'),
+  macrosPointer: () => ipcRenderer.invoke('macros:pointer'),
+  onMacrosChanged: (callback) => {
+    const handler = (_e: unknown, status: Parameters<typeof callback>[0]): void => callback(status)
+    ipcRenderer.on('macros:changed', handler)
+    return () => ipcRenderer.removeListener('macros:changed', handler)
   },
 
   discordGet: () => ipcRenderer.invoke('discord:get'),

@@ -36,12 +36,13 @@ import {
   PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
-  DOWNLOADER_TAB,
+  DOWNLOADS_TAB,
   STUDIO_TAB,
   APPSTUDIO_TAB,
   CLIPS_TAB,
   VIDEOS_TAB,
   SOUNDBOARD_TAB,
+  MACROS_TAB,
   DISCORD_TAB,
   MESSAGES_TAB,
   GROK_TAB,
@@ -76,8 +77,8 @@ import GrokPage from '../Grok/GrokPage'
 import HomePage from '../Home/HomePage'
 import MoneyPage from '../Money/MoneyPage'
 import ConvertPage from '../Convert/ConvertPage'
+import DownloadsPage from '../Downloads/DownloadsPage'
 import PdfEditorPage from '../PdfEditor/PdfEditorPage'
-import VideoDownloaderPage from '../Downloader/VideoDownloaderPage'
 import MiniGamesPage from '../MiniGames/MiniGamesPage'
 import ComicsPage from '../Comics/ComicsPage'
 import WikiPage from '../Wiki/WikiPage'
@@ -91,6 +92,7 @@ import AppStudioPage from '../AppStudio/AppStudioPage'
 import ClipsPage from '../Clips/ClipsPage'
 import VideosPage from '../Videos/VideosPage'
 import SoundboardPage from '../Soundboard/SoundboardPage'
+import MacrosPage from '../Macros/MacrosPage'
 import DiscordVoicePage from '../Discord/DiscordVoicePage'
 import GamesPage from '../Games/GamesPage'
 import VideoPage from '../Video/VideoPage'
@@ -231,12 +233,13 @@ export default function Pane({ pane }: { pane: string }) {
         {active === PUBLISHING_TAB && <PublishingPage />}
         {active === SCREENS_TAB && <ScreensPage />}
         {active === MIXER_TAB && <MixerPage />}
-        {active === DOWNLOADER_TAB && <VideoDownloaderPage />}
+        {active === DOWNLOADS_TAB && <DownloadsPage />}
         {active === STUDIO_TAB && <StudioPage />}
         {active === APPSTUDIO_TAB && <AppStudioPage />}
         {active === CLIPS_TAB && <ClipsPage />}
         {active === VIDEOS_TAB && <VideosPage />}
         {active === SOUNDBOARD_TAB && <SoundboardPage />}
+        {active === MACROS_TAB && <MacrosPage />}
         {active === DISCORD_TAB && <DiscordVoicePage />}
         {active === GAMES_TAB && <GamesPage />}
         {active === VIDEO_TAB && <VideoPage autoFocus={isActivePane} />}

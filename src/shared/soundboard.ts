@@ -107,7 +107,8 @@ export function cleanBoard(raw: unknown): SoundboardData {
 // ---------------------------------------------------------------------------------------------
 // Hotkeys
 
-const NAMED: Record<string, string> = {
+/** Electron's name for a key, by its KeyboardEvent.code (for keys that aren't letters, digits or F keys). */
+export const NAMED: Record<string, string> = {
   Space: 'Space',
   Enter: 'Enter',
   Tab: 'Tab',

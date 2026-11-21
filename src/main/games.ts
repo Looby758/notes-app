@@ -29,7 +29,9 @@ import {
   type GameSource,
   type GamesList,
   type PlayRecord,
-  type SteamPlaytime
+  type SteamPlaytime,
+  steamDownloadFromManifest,
+  type SteamDownload
 } from '@shared/games'
 import { IS_MAC } from '@shared/platform'
 import { logError } from './log'
@@ -189,6 +191,36 @@ async function findSteam(): Promise<{ games: Found[]; installed: boolean }> {
     }
   }
   return { games, installed: true }
+}
+
+/** The games Steam is downloading or updating right now, from its manifests (all its libraries). */
+export async function steamDownloads(): Promise<SteamDownload[]> {
+  let root: string | null = null
+  for (const r of steamRoots()) if (await exists(join(r, 'steamapps'))) {
+    root = r
+    break
+  }
+  if (!root) return []
+  const libraries = new Set([root])
+  try {
+    for (const l of steamLibraryFolders(await readFile(join(root, 'steamapps', 'libraryfolders.vdf'), 'utf8'))) libraries.add(l)
+  } catch {
+    // only the main library
+  }
+  const out: SteamDownload[] = []
+  for (const lib of libraries) {
+    const apps = join(lib, 'steamapps')
+    for (const file of await list(apps)) {
+      if (!/^appmanifest_\d+\.acf$/i.test(file)) continue
+      try {
+        const d = steamDownloadFromManifest(await readFile(join(apps, file), 'utf8'))
+        if (d && !out.some((o) => o.appId === d.appId)) out.push(d)
+      } catch {
+        // Steam is writing it right now
+      }
+    }
+  }
+  return out
 }
 
 /** The .app a Mac game's program sits in, for its icon. */

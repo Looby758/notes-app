@@ -23,6 +23,7 @@ import {
   HardDrive,
   House,
   KeyRound,
+  Keyboard,
   Layers,
   Images,
   Clock,
@@ -49,12 +50,12 @@ import {
   Webcam,
   Zap,
   Headphones,
-  CloudDownload,
   History,
   Scissors,
   Bot,
   Video,
   Hammer,
+  ArrowDownToLine,
   type LucideIcon
 } from 'lucide-react'
 import { openGrokTab } from '../components/Grok/GrokPage'
@@ -83,6 +84,7 @@ import {
   CLIPS_TAB,
   VIDEOS_TAB,
   SOUNDBOARD_TAB,
+  MACROS_TAB,
   DISCORD_TAB,
   EMAIL_TAB,
   EXPLORER_TAB,
@@ -99,7 +101,7 @@ import {
   PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
-  DOWNLOADER_TAB,
+  DOWNLOADS_TAB,
   MONEY_TAB,
   PASSWORDS_TAB,
   SETTINGS_TAB,
@@ -224,7 +226,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   explorer: { icon: HardDrive, run: () => openSpecialTab(EXPLORER_TAB) },
   convert: { icon: ArrowRightLeft, run: () => openSpecialTab(CONVERT_TAB) },
   'pdf-editor': { icon: FilePen, run: () => openSpecialTab(PDF_EDITOR_TAB) },
-  downloader: { icon: CloudDownload, run: () => openSpecialTab(DOWNLOADER_TAB) },
+  downloads: { icon: ArrowDownToLine, run: () => openSpecialTab(DOWNLOADS_TAB) },
   'offline-ai': {
     icon: Cpu,
     run: () => {
@@ -240,6 +242,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   soundboard: { icon: AudioLines, run: () => openSpecialTab(SOUNDBOARD_TAB) },
   'discord-voice': { icon: Headphones, run: () => openSpecialTab(DISCORD_TAB) },
   terminal: { icon: SquareTerminal, run: () => openSpecialTab(TERMINAL_TAB) },
+  macros: { icon: Keyboard, run: () => openSpecialTab(MACROS_TAB) },
   streamer: { icon: Eye, run: toggleStreamerMode, useActive: () => usePrefs((s) => s.prefs.streamerMode) },
   settings: { icon: Settings, run: () => openSpecialTab(SETTINGS_TAB) }
 }

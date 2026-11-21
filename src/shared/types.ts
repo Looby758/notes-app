@@ -14,6 +14,7 @@ import type { LocalLibrary } from './localMusic'
 import type { MixerState } from './mixer'
 import type { MonitorAction, MonitorSaved, MonitorSetting, MonitorsStatus, MonitorTarget } from './monitors'
 import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
+import type { ClickerSettings, Macro, MacroHotkeys, MacroStatus } from './macros'
 import type { CallRecord, DiscordStatus, SavedPlace } from './discord'
 import type { WifiNetwork } from './wifi'
 import type { MusicAction, MusicDevice, MusicItem, MusicQueue, MusicSearchResults, MusicState, MusicStatus } from './spotify'
@@ -790,6 +791,21 @@ export interface NotesApi {
   /** Takes a finished or failed download off the list (the file stays). */
   forgetVideoDownload(id: number): Promise<void>
 
+  // Download manager (main/downloadManager.ts)
+  /** The queue, its settings, and whether it's night. Starts sending changes to onDownloadsState. */
+  downloadsState(): Promise<import('./downloadManager').DmState>
+  onDownloadsState(callback: (state: import('./downloadManager').DmState) => void): () => void
+  /** Adds links to the end of the queue (video pages go to the video downloader when their turn comes). */
+  downloadsAdd(request: import('./downloadManager').DmAddRequest): Promise<import('./downloadManager').DmItem[]>
+  downloadsAct(id: string, action: 'pause' | 'resume' | 'retry' | 'remove' | 'now' | 'tonight' | 'up' | 'down' | 'top'): Promise<void>
+  downloadsAll(action: 'pause' | 'resume' | 'clear'): Promise<void>
+  downloadsSettings(patch: Partial<import('./downloadManager').DmSettings>): Promise<import('./downloadManager').DmState>
+  /** What Steam is downloading or updating (read from its files), with a speed when it's going. */
+  steamDownloads(): Promise<(import('./games').SteamDownload & { speed?: number })[]>
+  /** Opens Steam's install window for a game (Steam asks which drive). */
+  steamInstall(appId: string): Promise<void>
+  steamOpenDownloads(): Promise<void>
+
   // Video player
   /** What's in a video (its tracks need the video helper, ffmpeg) and the subtitle files beside it. */
   videoInfo(path: string): Promise<VideoInfo>
@@ -853,6 +869,24 @@ export interface NotesApi {
   /** A soundboard hotkey was pressed (anywhere, even in a game). */
   onSoundboardHotkey(callback: (action: SoundboardAction) => void): () => void
   onSoundboardChanged(callback: (status: SoundboardStatus) => void): () => void
+  // Macro recorder and auto-clicker (main/macros.ts; the timing is done by a helper process)
+  macrosGet(): Promise<MacroStatus>
+  /** Starts recording a new macro, or stops (and keeps it). */
+  macrosRecord(): Promise<MacroStatus>
+  macrosPlay(id: string): Promise<MacroStatus>
+  /** Stops recording, playing or the auto-clicker. Held keys and buttons are let go of. */
+  macrosStop(): Promise<MacroStatus>
+  macrosClicker(on: boolean): Promise<MacroStatus>
+  macrosUpdate(id: string, patch: Partial<Pick<Macro, 'name' | 'hotkey' | 'repeat' | 'times' | 'speed' | 'mouse'>>): Promise<MacroStatus>
+  macrosRemove(id: string): Promise<MacroStatus>
+  /** The macro the Play hotkey plays. */
+  macrosSetCurrent(id: string): Promise<MacroStatus>
+  macrosSettings(patch: { hotkeys?: Partial<MacroHotkeys>; clicker?: Partial<ClickerSettings>; skipLeadingWait?: boolean }): Promise<MacroStatus>
+  /** Clears the last error and play report. */
+  macrosDismiss(): Promise<void>
+  /** Where the pointer is now (for the auto-clicker's spot). */
+  macrosPointer(): Promise<{ x: number; y: number }>
+  onMacrosChanged(callback: (status: MacroStatus) => void): () => void
 
   // Discord voice controls (main/discord.ts, through Discord's official local RPC)
   discordGet(): Promise<DiscordStatus>
@@ -1443,6 +1477,8 @@ export interface VideoDownloadRequest {
   quality: import('./videoDownload').DownloadQuality
   /** The folder to save it in, inside the notes folder ('' for the top level). Made if it isn't there. */
   folder: string
+  /** From the download manager's queue. */
+  manager?: boolean
 }
 
 /** One video being downloaded from a link (or done, or failed). */
@@ -1462,6 +1498,8 @@ export interface VideoDownload {
   size?: number
   error?: string
   startedAt: number
+  /** Started by the download manager's queue (it shows it there itself). */
+  manager?: boolean
 }
 
 /** Whether ffmpeg (downloaded only when asked, for converting videos and streaming) is on this computer. */

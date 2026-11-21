@@ -47,10 +47,12 @@ import { setupSettingsHealth } from './settingsHealth'
 import { setupExport } from './exporter'
 import { setupConverter } from './converter'
 import { setupVideoDownloader } from './videoDownload'
+import { setupDownloadManager } from './downloadManager'
 import { isAppPage, setupStudio } from './studio'
 import { applyReplayShortcut, clipResponse, setupClips } from './clips'
 import { setupLocalAi } from './localAi'
 import { reloadSoundboard, setupSoundboard, soundboardFolder, soundFile } from './soundboard'
+import { macrosFolder, reloadMacros, setupMacros, teardownMacros } from './macros'
 import { setupDiscord, teardownDiscord } from './discord'
 import { setupOrbitSync, syncOrbitSoon, type PartHandler } from './orbitSync'
 import { cleanPrefsPart, prefsPart } from '@shared/orbitSync'
@@ -322,7 +324,7 @@ function broadcastPrefs(prefs: Prefs): void {
 }
 
 /** The parts of Orbit kept in the notes folder for your other computers (see orbitSync.ts). */
-function orbitParts(themesChanged: () => void): Record<'settings' | 'home' | 'themes' | 'soundboard' | 'calendar', PartHandler> {
+function orbitParts(themesChanged: () => void): Record<'settings' | 'home' | 'themes' | 'soundboard' | 'macros' | 'calendar', PartHandler> {
   const prefsHandler = (part: 'settings' | 'home'): PartHandler => ({
     kind: 'value',
     // Never changed from how Orbit starts: nothing to share, so another computer's is taken in.
@@ -350,6 +352,7 @@ function orbitParts(themesChanged: () => void): Record<'settings' | 'home' | 'th
       }
     },
     soundboard: { kind: 'folder', folder: soundboardFolder, reload: reloadSoundboard },
+    macros: { kind: 'folder', folder: macrosFolder, reload: reloadMacros },
     calendar: {
       kind: 'value',
       read: () => calendars.syncedCalendars(),
@@ -1064,9 +1067,11 @@ app.whenReady().then(async () => {
   safely('export', setupExport)
   safely('converter', setupConverter)
   safely('video downloader', () => setupVideoDownloader(() => vault))
+  safely('download manager', setupDownloadManager)
   safely('studio', setupStudio)
   safely('offline AI', setupLocalAi)
   safely('soundboard', setupSoundboard)
+  safely('macros', setupMacros)
   safely('Discord voice', setupDiscord)
   safely('Discord voice pop-out', () => setupDiscordPopout(currentPrefs))
   safely('live streaming', setupLive)
@@ -1124,6 +1129,7 @@ app.on('will-quit', () => {
   safely('Discord voice', teardownDiscord)
   safely('screen controls', teardownMonitors)
   safely('volume mixer', teardownMixer)
+  safely('macros', teardownMacros)
   clearSecret()
 })
 

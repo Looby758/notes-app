@@ -79,9 +79,9 @@ export const PDF_EDITOR_TAB = 'pdf-editor:'
 export const WIKI_TAB = 'wiki:'
 /** Sudoku, Minesweeper, Nonograms, Jigsaw and Wordle (components/MiniGames); which one is showing is in store/miniGames. */
 export const MINIGAMES_TAB = 'minigames:'
-/** Sudoku and Minesweeper had tabs of their own before Mini games; a saved tab of theirs opens Mini games. */
-const OLD_GAME_TABS = new Set(['sudoku:', 'minesweeper:'])
-const renameOldTab = (t: string): string => (OLD_GAME_TABS.has(t) ? MINIGAMES_TAB : t)
+/** Tabs of features folded into others: Sudoku and Minesweeper open Mini games, the old video downloader opens Downloads. */
+const OLD_TABS: Record<string, string> = { 'sudoku:': 'minigames:', 'minesweeper:': 'minigames:', 'downloader:': 'downloads:' }
+const renameOldTab = (t: string): string => OLD_TABS[t] ?? t
 /** Clocks for places around the world (components/Clocks). */
 export const CLOCKS_TAB = 'clocks:'
 /** Big countdown cards (components/Countdowns). */
@@ -92,8 +92,8 @@ export const PUBLISHING_TAB = 'publishing:'
 export const SCREENS_TAB = 'screens:'
 /** A volume for each app (components/Mixer). */
 export const MIXER_TAB = 'mixer:'
-/** Download a video from a link into the attachments folder (components/Downloader). */
-export const DOWNLOADER_TAB = 'downloader:'
+/** The download manager: a queue that pauses, carries on and can wait for the night (components/Downloads). */
+export const DOWNLOADS_TAB = 'downloads:'
 /** Scenes, webcam and screen recording (components/Studio). */
 export const STUDIO_TAB = 'studio:'
 /** The apps you make with Claude Code: their cards and pull requests (components/AppStudio). */
@@ -104,6 +104,8 @@ export const CLIPS_TAB = 'clips:'
 export const VIDEOS_TAB = 'videos:'
 /** Sound clips with hotkeys, the voice changer and music into a voice call (components/Soundboard). */
 export const SOUNDBOARD_TAB = 'soundboard:'
+/** The macro recorder and auto-clicker (components/Macros). */
+export const MACROS_TAB = 'macros:'
 /** Who's in your Discord voice channel, with mute and deafen (components/Discord). */
 export const DISCORD_TAB = 'discord-voice:'
 /** WhatsApp and Discord in one tab (components/Messages). */
