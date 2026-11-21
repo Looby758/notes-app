@@ -10575,6 +10575,495 @@ body.theme-light .wordle-page {
   background: var(--wordle-right);
 }
 
+/* ---------- stats shared by Solitaire, 2048 and Chess ---------- */
+.games-numbers {
+  display: grid;
+  gap: 8px;
+  text-align: center;
+}
+.games-numbers strong {
+  display: block;
+  color: var(--text-strong);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+.games-numbers span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* ---------- solitaire (shares the sudoku page's layout) ---------- */
+.sol-inner {
+  max-width: 820px;
+  outline: none;
+}
+.sol-page {
+  --card-w: clamp(54px, 9.4vw, 84px);
+  --card-h: calc(var(--card-w) * 1.4);
+  --fan-down: calc(var(--card-w) * 0.12);
+  --fan-up: calc(var(--card-w) * 0.3);
+}
+.sol-table {
+  position: relative;
+  padding: 16px;
+  border-radius: 12px;
+  background: color-mix(in srgb, #1f7a4a 55%, var(--bg-panel));
+  user-select: none;
+}
+body.theme-light .sol-table {
+  background: #2f8a58;
+}
+.sol-top,
+.sol-piles {
+  display: grid;
+  grid-template-columns: repeat(7, var(--card-w));
+  justify-content: space-between;
+  gap: 8px;
+}
+.sol-piles {
+  margin-top: 18px;
+  min-height: calc(var(--card-h) + var(--extent, 2) * var(--card-w) + 8px);
+}
+.sol-slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--card-w);
+  height: var(--card-h);
+  padding: 0;
+  border: 2px dashed rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.12);
+  color: rgba(255, 255, 255, 0.5);
+  font: inherit;
+}
+.sol-stock {
+  cursor: pointer;
+}
+.sol-stock.has {
+  border: none;
+  background: none;
+}
+.sol-stock .sol-card {
+  position: static;
+}
+.sol-home-mark {
+  font-size: 22px;
+  font-weight: 700;
+  opacity: 0.6;
+}
+.sol-home .sol-card {
+  inset: -2px;
+}
+.sol-waste {
+  position: relative;
+  grid-column: span 2;
+  height: var(--card-h);
+}
+.sol-waste .sol-card {
+  left: calc(var(--i) * var(--card-w) * 0.28);
+}
+.sol-waste.n1 .sol-card,
+.sol-waste.n2 .sol-card:first-child,
+.sol-waste.n3 .sol-card:not(:last-child) {
+  pointer-events: none;
+}
+.sol-gap {
+  display: none;
+}
+.sol-pile {
+  position: relative;
+  min-height: var(--card-h);
+}
+.sol-pile .sol-card {
+  top: calc(var(--down) * var(--fan-down) + var(--up) * var(--fan-up));
+}
+.sol-card {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  width: var(--card-w);
+  height: var(--card-h);
+  border-radius: 7px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+.sol-card.back {
+  border: 3px solid #f4f4f6;
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.14) 0 4px, transparent 4px 9px),
+    linear-gradient(160deg, #3b5bdb, #2a3f9e);
+}
+.sol-card.up {
+  border: 1px solid #c9ccd6;
+  background: #fbfbfd;
+  color: #20222a;
+  cursor: grab;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.sol-card.up.red {
+  color: #d0303a;
+}
+.sol-card.up:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+.sol-card.selected {
+  outline: 3px solid #ffd43b;
+  outline-offset: -1px;
+  transform: translateY(-3px);
+}
+.sol-corner {
+  position: absolute;
+  top: 3px;
+  left: 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: calc(var(--card-w) * 0.2);
+  font-weight: 700;
+  line-height: 1;
+}
+.sol-corner i {
+  font-style: normal;
+  font-size: 0.9em;
+}
+.sol-corner.flip {
+  top: auto;
+  left: auto;
+  right: 5px;
+  bottom: 3px;
+  transform: rotate(180deg);
+}
+.sol-pip {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(var(--card-w) * 0.42);
+  font-weight: 600;
+}
+.sol-result {
+  border-radius: 12px;
+  z-index: 2;
+}
+
+/* ---------- 2048 (shares the sudoku page's layout) ---------- */
+.g2048-inner {
+  max-width: 560px;
+}
+.g2048-logo {
+  padding: 2px 10px;
+  border-radius: 6px;
+  background: #edc22e;
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+.g2048-scores {
+  display: flex;
+  gap: 8px;
+}
+.g2048-scores div {
+  min-width: 76px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  text-align: center;
+}
+.g2048-scores span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.g2048-scores strong {
+  color: var(--text-strong);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.g2048-board {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  width: min(100%, 440px);
+  aspect-ratio: 1;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--bg-panel);
+  border: 2px solid var(--border-strong);
+  outline: none;
+  touch-action: none;
+  user-select: none;
+}
+.g2048-board:focus-visible {
+  border-color: var(--accent);
+}
+.g2048-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--bg-raised);
+  color: #fff;
+  font-size: clamp(20px, 5vw, 36px);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.g2048-cell.wide {
+  font-size: clamp(16px, 4vw, 28px);
+}
+.g2048-cell.pop {
+  animation: g2048-pop 0.16s ease-out;
+}
+@keyframes g2048-pop {
+  from {
+    transform: scale(0.7);
+  }
+  60% {
+    transform: scale(1.08);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .g2048-cell.pop {
+    animation: none;
+  }
+}
+.g2048-cell.t2 { background: #eee4da; color: #776e65; }
+.g2048-cell.t4 { background: #ede0c8; color: #776e65; }
+.g2048-cell.t8 { background: #f2b179; }
+.g2048-cell.t16 { background: #f59563; }
+.g2048-cell.t32 { background: #f67c5f; }
+.g2048-cell.t64 { background: #f65e3b; }
+.g2048-cell.t128 { background: #edcf72; }
+.g2048-cell.t256 { background: #edcc61; }
+.g2048-cell.t512 { background: #edc850; }
+.g2048-cell.t1024 { background: #edc53f; }
+.g2048-cell.t2048 { background: #edc22e; box-shadow: 0 0 18px rgba(237, 194, 46, 0.6); }
+.g2048-cell.tbig { background: #3c3a32; }
+.g2048-result {
+  border-radius: 10px;
+}
+.g2048-result-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* ---------- chess (shares the sudoku page's layout) ---------- */
+.chess-inner {
+  max-width: 900px;
+}
+.chess-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+.chess-options .sudoku-level,
+.sudoku-head .sudoku-level {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.chess-turn {
+  color: var(--text);
+}
+.chess-turn.check {
+  color: #f97066;
+  font-weight: 600;
+}
+.chess-turn.over {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+.chess-play {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.chess-board-wrap {
+  width: min(100%, 520px);
+}
+.chess-board {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-rows: repeat(8, minmax(0, 1fr));
+  aspect-ratio: 1;
+  border: 2px solid var(--border-strong);
+  border-radius: 6px;
+  overflow: hidden;
+  user-select: none;
+}
+.chess-sq {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  font: inherit;
+  cursor: default;
+}
+.chess-board.live .chess-sq {
+  cursor: pointer;
+}
+.chess-sq.light {
+  background: #e9dcc0;
+}
+.chess-sq.dark {
+  background: #a9825e;
+}
+.chess-sq.last.light {
+  background: #f1e08a;
+}
+.chess-sq.last.dark {
+  background: #c9ac55;
+}
+.chess-sq.selected {
+  box-shadow: inset 0 0 0 4px var(--accent);
+}
+.chess-sq.check {
+  background: radial-gradient(circle, #ff5a4f 0%, #e0352b 45%, transparent 80%), #a9825e;
+}
+.chess-sq.move::after {
+  content: '';
+  width: 28%;
+  height: 28%;
+  border-radius: 50%;
+  background: rgba(20, 20, 30, 0.28);
+}
+.chess-sq.capture::after {
+  content: '';
+  position: absolute;
+  inset: 4%;
+  border-radius: 50%;
+  border: 5px solid rgba(20, 20, 30, 0.28);
+}
+.chess-rank,
+.chess-file {
+  position: absolute;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(60, 40, 20, 0.6);
+}
+.chess-rank {
+  top: 2px;
+  left: 3px;
+}
+.chess-file {
+  right: 3px;
+  bottom: 1px;
+}
+.chess-piece {
+  font-family: 'Segoe UI Symbol', 'DejaVu Sans', 'Noto Sans Symbols 2', 'Apple Symbols', sans-serif;
+  line-height: 1;
+}
+.chess-sq .chess-piece {
+  position: relative;
+  z-index: 1;
+  font-size: clamp(26px, 5.6vw, 50px);
+}
+.chess-piece.w {
+  color: #fff;
+  -webkit-text-stroke: 1.2px #2a2a2a;
+  text-shadow: 0 2px 2px rgba(0, 0, 0, 0.3);
+}
+.chess-piece.b {
+  color: #1d1d22;
+  -webkit-text-stroke: 0.6px #000;
+  text-shadow: 0 2px 2px rgba(0, 0, 0, 0.25);
+}
+.chess-taken {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  min-height: 26px;
+  padding: 2px 0;
+  font-size: 18px;
+}
+.chess-taken small {
+  margin-left: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.chess-promo,
+.chess-result {
+  z-index: 2;
+}
+.chess-promo {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+  color: var(--text-strong);
+}
+.chess-promo div {
+  display: flex;
+  gap: 8px;
+}
+.chess-promo div button {
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #e9dcc0;
+  font-size: 44px;
+  cursor: pointer;
+}
+.chess-promo div button:hover {
+  outline: 3px solid var(--accent);
+}
+.chess-side {
+  flex: 1;
+  min-width: 200px;
+  max-width: 300px;
+}
+.chess-side h3 {
+  margin: 30px 0 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.chess-moves {
+  max-height: 420px;
+  margin: 0;
+  padding: 6px 0;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  list-style: none;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.chess-moves li {
+  display: grid;
+  grid-template-columns: 34px 1fr 1fr;
+  padding: 2px 10px;
+}
+.chess-moves li:nth-child(even) {
+  background: var(--bg-raised);
+}
+.chess-moves li > span:first-child {
+  color: var(--text-faint);
+}
+.chess-moves .chess-none {
+  display: block;
+  color: var(--text-faint);
+}
+
 /* ---------- jigsaw ---------- */
 .jig-inner {
   max-width: 1100px;

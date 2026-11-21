@@ -77,7 +77,7 @@ export const COMICS_TAB = 'comics:'
 export const PDF_EDITOR_TAB = 'pdf-editor:'
 /** Downloaded wikis, read offline (components/Wiki). */
 export const WIKI_TAB = 'wiki:'
-/** Sudoku, Minesweeper, Nonograms, Jigsaw and Wordle (components/MiniGames); which one is showing is in store/miniGames. */
+/** The mini games, from Sudoku to Chess (components/MiniGames); which one is showing is in store/miniGames. */
 export const MINIGAMES_TAB = 'minigames:'
 /** Tabs of features folded into others: Sudoku and Minesweeper open Mini games, the old video downloader opens Downloads. */
 const OLD_TABS: Record<string, string> = { 'sudoku:': 'minigames:', 'minesweeper:': 'minigames:', 'downloader:': 'downloads:' }

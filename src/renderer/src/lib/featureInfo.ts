@@ -65,7 +65,7 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'youtube', name: 'YouTube', blurb: 'A mini window that floats on top', group: 'Media', command: 'youtube.open', keywords: 'video' },
 
   { id: 'games', name: 'Games', blurb: 'Your Steam and other games', group: 'Play', command: 'games.open', keywords: 'steam epic play' },
-  { id: 'mini-games', name: 'Mini games', blurb: 'Sudoku, Minesweeper, Nonograms, Jigsaw and Wordle', group: 'Play', command: 'minigames.open', keywords: 'sudoku minesweeper nonogram picross griddler jigsaw puzzle photo wordle word guess walking dead quick break' },
+  { id: 'mini-games', name: 'Mini games', blurb: 'Sudoku, Minesweeper, Nonograms, Jigsaw, Wordle, Solitaire, 2048 and Chess', group: 'Play', command: 'minigames.open', keywords: 'sudoku minesweeper nonogram picross griddler jigsaw puzzle photo wordle word guess walking dead solitaire klondike patience cards 2048 chess quick break' },
 
   { id: 'snip', name: 'Screen snip', blurb: 'Grab text from anywhere on screen', group: 'Tools', command: 'snip.start', keywords: 'ocr screenshot copy text translate' },
   { id: 'mixer', name: 'Volume mixer', blurb: 'A volume for each app: games, Discord, Spotify', group: 'Tools', command: 'mixer.open', keywords: 'sound audio volume loud quiet mute discord spotify game per app levels' },
