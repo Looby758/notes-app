@@ -341,6 +341,11 @@ export interface AiReply {
 }
 
 /** The offline AI (src/main/localAi.ts): an optional download that runs on this computer's graphics card. */
+/** The screen snip's offline translation, or why there isn't one (`problem`). */
+export type SnipTranslation =
+  | { from: string; text: string; problem?: undefined; error?: undefined }
+  | { problem: 'missing' | 'downloading' | 'unsupported' | 'game' | 'failed'; error: string }
+
 export interface LocalAiState {
   state: 'missing' | 'downloading' | 'ready' | 'unsupported'
   /** While downloading: which part, and how far (0–1). */
@@ -941,17 +946,23 @@ export interface NotesApi {
   snipStatus(): Promise<{ shortcut: string; error?: string }>
   /** Snip window: the picture of the screen (PNG) and the screen's scale factor. */
   snipImage(): Promise<{ png: Uint8Array; scale: number } | null>
-  /** Snip window: the text in part of the picture (read offline). */
-  snipRead(png: Uint8Array): Promise<string>
+  /** Snip window: the text in part of the picture (read offline), with an extra language reader if it's downloaded. */
+  snipRead(png: Uint8Array, lang?: string): Promise<string>
+  /** Snip window: which extra language readers are downloaded (codes from OCR_LANGS). */
+  snipOcrLangs(): Promise<string[]>
+  /** Snip window: downloads one extra language reader (a couple of MB, checked before it's used). */
+  snipGetOcrLang(code: string): Promise<{ ok: true } | { error: string }>
+  /** Snip window: translates the text with the offline AI. Never goes online. */
+  snipTranslate(text: string, target: string): Promise<SnipTranslation>
   snipClose(): Promise<void>
   /** The snip's "Report bug": this picture of the boxed part of the screen goes to App Studio as a new bug. */
   snipReportBug(png: Uint8Array): Promise<void>
   /** A bug reported from the screen snip, with its picture (App Studio opens it). */
   onAppStudioBug(callback: (png: Uint8Array) => void): () => void
   /** Snip window: what to do with the text (closes the snip). */
-  snipSend(action: 'copy' | 'note' | 'web' | 'translate' | 'ask', text: string): Promise<void>
-  /** Main window: snipped text to save in today's note or ask the AI about. */
-  onSnipText(callback: (action: 'note' | 'ask', text: string) => void): () => void
+  snipSend(action: 'copy' | 'note' | 'web' | 'translate-online' | 'ask' | 'setup-ai', text: string, target?: string): Promise<void>
+  /** Main window: snipped text to save in today's note or ask the AI about, or "set up the offline AI". */
+  onSnipText(callback: (action: 'note' | 'ask' | 'setup-ai', text: string) => void): () => void
   onSnipFailed(callback: (message: string) => void): () => void
   openCapture(): Promise<void>
   closeCapture(): Promise<void>

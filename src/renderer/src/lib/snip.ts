@@ -1,6 +1,8 @@
 import { notify } from '../store/notify'
 import { askEverything } from '../store/ai'
 import { saveCapture } from './capture'
+import { openSpecialTab, SETTINGS_TAB } from './editorController'
+import { useUI } from '../store/ui'
 
 /** Screen snip, from inside the app (the system-wide shortcut goes straight to main/snip.ts). */
 export function startSnip(): Promise<void> {
@@ -10,6 +12,12 @@ export function startSnip(): Promise<void> {
 /** Main window: what to do with text that came back from a snip. */
 export function watchSnips(): () => void {
   const offText = window.api.onSnipText((action, text) => {
+    // "Set up the offline AI" from the snip's Translate.
+    if (action === 'setup-ai') {
+      openSpecialTab(SETTINGS_TAB)
+      useUI.setState({ settingsSection: 'ai' })
+      return
+    }
     if (action === 'ask') {
       void askEverything(`Here's some text from my screen:\n\n${text}\n\nWhat is this, and what should I know about it?`)
       return

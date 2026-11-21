@@ -115,3 +115,76 @@ body.snip-window #root {
 .snip-bug svg {
   color: #e5484d;
 }
+
+/* "Text is in": which reader to use, and the one-off download for another alphabet. */
+.snip-lang {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.snip-lang label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.snip-lang select,
+.snip-target {
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+.snip-lang-get {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg);
+}
+.snip-lang-get span {
+  flex: 1 1 240px;
+  line-height: 1.4;
+}
+
+/* The translation, right in the snip. */
+.snip-translation-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 28px 8px 2px;
+  font-size: 13px;
+  color: var(--text-strong);
+}
+.snip-muted {
+  margin: 8px 2px 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+.snip-offline-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.snip-problem > p:first-child {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 4px 28px 0 2px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-strong);
+}
+.snip-problem > p:first-child svg {
+  flex: none;
+  margin-top: 2px;
+}
+.snip-problem .snip-actions {
+  margin-top: 10px;
+}

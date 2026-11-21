@@ -453,7 +453,10 @@ const api: NotesApi = {
   startSnip: () => ipcRenderer.invoke('snip:start'),
   snipStatus: () => ipcRenderer.invoke('snip:status'),
   snipImage: () => ipcRenderer.invoke('snip:image'),
-  snipRead: (png) => ipcRenderer.invoke('snip:read', png),
+  snipRead: (png, lang) => ipcRenderer.invoke('snip:read', png, lang),
+  snipOcrLangs: () => ipcRenderer.invoke('snip:ocrLangs'),
+  snipGetOcrLang: (code) => ipcRenderer.invoke('snip:getOcrLang', code),
+  snipTranslate: (text, target) => ipcRenderer.invoke('snip:translate', text, target),
   snipClose: () => ipcRenderer.invoke('snip:close'),
   snipReportBug: (png) => ipcRenderer.invoke('snip:bug', png),
   onAppStudioBug: (callback) => {
@@ -461,9 +464,9 @@ const api: NotesApi = {
     ipcRenderer.on('appstudio:bug', handler)
     return () => ipcRenderer.removeListener('appstudio:bug', handler)
   },
-  snipSend: (action, text) => ipcRenderer.invoke('snip:send', action, text),
+  snipSend: (action, text, target) => ipcRenderer.invoke('snip:send', action, text, target),
   onSnipText: (callback) => {
-    const handler = (_e: unknown, action: 'note' | 'ask', text: string): void => callback(action, text)
+    const handler = (_e: unknown, action: 'note' | 'ask' | 'setup-ai', text: string): void => callback(action, text)
     ipcRenderer.on('snip:text', handler)
     return () => ipcRenderer.removeListener('snip:text', handler)
   },
