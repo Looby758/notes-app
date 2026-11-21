@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { AppWindow, Bell, Globe, RefreshCw, SlidersVertical, Speaker, Volume1, Volume2, VolumeX } from 'lucide-react'
+import { AppWindow, Bell, Globe, MessagesSquare, RefreshCw, SlidersVertical, Speaker, Volume1, Volume2, VolumeX } from 'lucide-react'
 import { notify } from '../../store/notify'
+import { setPrefs, usePrefs } from '../../store/prefs'
 import { addHomeCard } from '../../lib/home'
 import { MIXER_TAB, openSpecialTab } from '../../lib/editorController'
 import { HomeBox } from '../Home/HomePage'
@@ -142,8 +143,43 @@ export default function MixerPage() {
           </section>
         )}
         {state?.note && <p className="screens-note">{state.note}</p>}
+        <DuckCard />
       </div>
     </div>
+  )
+}
+
+/** Music dipping (main/musicDuck.ts): the same switches as Settings → Studio → Discord voice. */
+function DuckCard() {
+  const on = usePrefs((s) => s.prefs.duckMusic)
+  const level = usePrefs((s) => s.prefs.duckLevel)
+  const spotify = usePrefs((s) => s.prefs.duckSpotify)
+  const orbit = usePrefs((s) => s.prefs.duckOrbit)
+  return (
+    <section className="mixer-card mixer-duck" data-mixer-duck>
+      <label className="mixer-duck-main">
+        <input type="checkbox" checked={on} onChange={(e) => setPrefs({ duckMusic: e.target.checked })} />
+        <MessagesSquare size={15} />
+        <span>
+          <strong>Turn music down while friends talk</strong>
+          <em>In a Discord call, music dips while someone else speaks and comes back up a moment after. Needs Discord connected in Orbit.</em>
+        </span>
+      </label>
+      {on && (
+        <div className="mixer-duck-options">
+          <label>
+            <input type="checkbox" checked={spotify} onChange={(e) => setPrefs({ duckSpotify: e.target.checked })} /> Spotify
+          </label>
+          <label>
+            <input type="checkbox" checked={orbit} onChange={(e) => setPrefs({ duckOrbit: e.target.checked })} /> Orbit’s music
+          </label>
+          <label className="mixer-duck-level">
+            Down to {Math.round(level * 100)}%
+            <input type="range" min={0.1} max={0.8} step={0.05} value={level} onChange={(e) => setPrefs({ duckLevel: Number(e.target.value) })} aria-label="Music volume while they talk" />
+          </label>
+        </div>
+      )}
+    </section>
   )
 }
 

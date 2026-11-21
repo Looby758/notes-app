@@ -907,6 +907,41 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'discord voice call pop out popout second monitor screen notification join vc'
   },
   {
+    key: 'duckMusic',
+    section: 'studio',
+    group: 'Discord voice',
+    type: 'toggle',
+    label: 'Turn music down while friends talk',
+    description: 'In a Discord call, your music dips while someone else is speaking and comes back up a moment after they stop. Needs Discord connected in Orbit.',
+    keywords: 'duck ducking dip lower music volume spotify discord talk speaking friends mixer auto'
+  },
+  {
+    key: 'duckLevel',
+    section: 'studio',
+    group: 'Discord voice',
+    type: 'slider',
+    ...RANGES.duckLevel,
+    format: pct,
+    label: 'Music volume while they talk',
+    keywords: 'duck dip level how quiet'
+  },
+  {
+    key: 'duckSpotify',
+    section: 'studio',
+    group: 'Discord voice',
+    type: 'toggle',
+    label: 'Dip Spotify',
+    keywords: 'duck spotify'
+  },
+  {
+    key: 'duckOrbit',
+    section: 'studio',
+    group: 'Discord voice',
+    type: 'toggle',
+    label: 'Dip Orbit’s own music',
+    keywords: 'duck music player own songs'
+  },
+  {
     key: 'snipShortcut',
     section: 'capture',
     group: 'Screen snip',

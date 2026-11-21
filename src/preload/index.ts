@@ -56,6 +56,11 @@ const api: NotesApi = {
     ipcRenderer.on('replay:save', handler)
     return () => ipcRenderer.removeListener('replay:save', handler)
   },
+  onMusicDuck: (callback) => {
+    const handler = (_e: unknown, level: number): void => callback(level)
+    ipcRenderer.on('music:duck', handler)
+    return () => ipcRenderer.removeListener('music:duck', handler)
+  },
   onClipsOpen: (callback) => {
     const handler = (_e: unknown, path: string): void => callback(path)
     ipcRenderer.on('clips:open', handler)

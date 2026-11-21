@@ -553,6 +553,8 @@ export interface NotesApi {
   onReplaySave(callback: () => void): () => void
   /** Main window: open this clip in the clip editor (a click on the "Replay saved" notification). */
   onClipsOpen(callback: (path: string) => void): () => void
+  /** Music dipping (main/musicDuck.ts): turn Orbit's own music to this level (1 = normal) while friends talk in Discord. */
+  onMusicDuck(callback: (level: number) => void): () => void
   /** The videos in the recordings folder, newest first. */
   clipsList(folder: string | null): Promise<ClipInfo[]>
   /** The game folders in the recordings folder, and which game goes in which. */

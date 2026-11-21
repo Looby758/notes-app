@@ -212,6 +212,13 @@ export interface Prefs {
   replayMic: boolean
   /** Joining a Discord voice call shows a small note in the corner offering the voice pop-out (it goes away by itself). */
   discordPopoutPrompt: boolean
+  /** Turn your music down while friends talk in a Discord call, then back up (main/musicDuck.ts). */
+  duckMusic: boolean
+  /** How loud the music goes while they talk, as a fraction of its normal volume (0.1–0.8). */
+  duckLevel: number
+  /** Which music: Spotify (its own app) and Orbit's own music player. */
+  duckSpotify: boolean
+  duckOrbit: boolean
   /** Closing the window keeps Notes running in the tray (so quick capture still works). */
   closeToTray: boolean
   launchAtStartup: boolean
@@ -353,6 +360,10 @@ export const DEFAULT_PREFS: Prefs = {
   replaySound: true,
   replayMic: false,
   discordPopoutPrompt: true,
+  duckMusic: true,
+  duckLevel: 0.3,
+  duckSpotify: true,
+  duckOrbit: true,
   closeToTray: true,
   launchAtStartup: false,
 
@@ -386,6 +397,7 @@ export const RANGES = {
   autoLockMinutes: { min: 0, max: 120, step: 5 },
   screensaverMinutes: { min: 1, max: 60, step: 1 },
   replaySeconds: { min: 10, max: 120, step: 5 },
+  duckLevel: { min: 0.1, max: 0.8, step: 0.05 },
   scriptWpm: { min: 80, max: 250, step: 5 }
 } as const
 

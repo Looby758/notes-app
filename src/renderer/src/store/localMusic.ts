@@ -214,16 +214,22 @@ export function localRepeat(): void {
 }
 
 let analyser: AnalyserNode | null = null
-let graph: { ctx: AudioContext; source: MediaElementAudioSourceNode } | null = null
+let graph: { ctx: AudioContext; source: MediaElementAudioSourceNode; duck: GainNode } | null = null
+/** Music dipping's level (1 = normal), for a graph made while it's dipped. */
+let duckLevel = 1
 
 /** Your music's sound in Web Audio (an element can only be wired in once, so the visualiser and the soundboard share it). */
-function musicGraph(): { ctx: AudioContext; source: MediaElementAudioSourceNode } | null {
+function musicGraph(): { ctx: AudioContext; source: MediaElementAudioSourceNode; duck: GainNode } | null {
   if (graph || !audio) return graph
   try {
     const ctx = new AudioContext()
     const source = ctx.createMediaElementSource(audio)
-    source.connect(ctx.destination)
-    graph = { ctx, source }
+    // What you hear goes through the dip (a friend talking in Discord); the visualiser and the call don't.
+    const duck = ctx.createGain()
+    duck.gain.value = duckLevel
+    source.connect(duck)
+    duck.connect(ctx.destination)
+    graph = { ctx, source, duck }
     // Browsers start an AudioContext paused until something's been clicked.
     if (ctx.state === 'suspended') void ctx.resume()
     audio.addEventListener('play', () => ctx.state === 'suspended' && void ctx.resume())
@@ -266,6 +272,23 @@ export function localMusicStream(): MediaStream | null {
   undoVolume()
   el.addEventListener('volumechange', undoVolume)
   return dest.stream
+}
+
+/**
+ * Music dipping: turns what you hear of your own music to `level` (1 = normal) smoothly, quicker
+ * going down than coming back up. Only what you hear: music sent into a call keeps its own level.
+ */
+export function localDuck(level: number): void {
+  const next = Math.min(1, Math.max(0, Number.isFinite(level) ? level : 1))
+  if (next === duckLevel) return
+  const down = next < duckLevel
+  duckLevel = next
+  // Nothing playing yet: a graph made later starts at this level.
+  if (!audio) return
+  const g = musicGraph()
+  if (!g) return
+  g.duck.gain.cancelScheduledValues(g.ctx.currentTime)
+  g.duck.gain.setTargetAtTime(next, g.ctx.currentTime, down ? 0.06 : 0.25)
 }
 
 /** Skips to a song further along the queue. */

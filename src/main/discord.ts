@@ -106,6 +106,7 @@ function update(patch: Partial<DiscordStatus>): void {
   }
   trackCall()
   broadcast()
+  for (const l of statusListeners) l(status)
   if (before !== after) for (const l of channelListeners) l(before, after, firstLook)
 }
 
@@ -162,6 +163,14 @@ function finishCall(): void {
   const before = loadCalls()
   calls = addCall(before, { ...c.record, end: Date.now(), people: [...c.people] })
   if (calls !== before) saveCalls()
+}
+
+const statusListeners = new Set<(status: DiscordStatus) => void>()
+
+/** Called on every change (who's talking included), for main/musicDuck.ts. */
+export function onDiscordStatus(listener: (status: DiscordStatus) => void): () => void {
+  statusListeners.add(listener)
+  return () => statusListeners.delete(listener)
 }
 
 type ChannelListener = (before: string | null, after: string | null, firstLook: boolean) => void
