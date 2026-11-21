@@ -31,6 +31,7 @@ import {
   openNote,
   openSpecialTab,
   APPSTUDIO_TAB,
+  MONEY_TAB,
   openWebTab,
   activateTab,
   refreshEmbeds,
@@ -79,6 +80,8 @@ import { toggleStreamerMode } from '../store/streamer'
 import Private from './Streamer/Private'
 import DeviceDrop from './Share/DeviceDrop'
 import { startReminders, stopReminders } from '../lib/reminderScheduler'
+import { MONEY_IOU_LINK, startIouReminders, stopIouReminders } from '../lib/iouReminders'
+import { useMoneyView } from '../store/money'
 
 interface Props {
   vault: string
@@ -135,8 +138,14 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     initEditor(vault)
     const stopHistory = startNavHistory()
     void startReminders()
-    // (The test notification from Settings has no note to open.)
-    const offReminder = window.api.onReminderOpen((path, line) => path && openNote(path, { line }))
+    startIouReminders()
+    // (The test notification from Settings has no note to open.) An IOU reminder opens Money → IOUs.
+    const offReminder = window.api.onReminderOpen((path, line) => {
+      if (path === MONEY_IOU_LINK) {
+        useMoneyView.setState({ view: 'ious' })
+        openSpecialTab(MONEY_TAB)
+      } else if (path) openNote(path, { line })
+    })
     // "Open in Orbit" from File Explorer / Finder: any that came in while Orbit was starting, then each new one.
     const offOpenFile = window.api.onOpenFile(openFromComputer)
     void window.api.takeOpenedFiles().then((paths) => paths.forEach(openFromComputer))
@@ -187,6 +196,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       offSnips()
       offReplay()
       stopReminders()
+      stopIouReminders()
     }
   }, [vault])
 

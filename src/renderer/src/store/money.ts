@@ -1,12 +1,15 @@
 import { create } from 'zustand'
 import {
+  dayOf,
   emptyMoney,
   merchantKey,
   newId,
   readMoney,
   OTHER,
   OTHER_INCOME,
+  type Account,
   type Balance,
+  type Iou,
   type ManualSubscription,
   type MoneyCategory,
   type MoneyData,
@@ -16,6 +19,7 @@ import {
 } from '../lib/money'
 import { notify } from './notify'
 import { recordUndo } from '../lib/undo'
+import { netWorth, recordNetWorth } from '../lib/moneyAccounts'
 
 /**
  * The money tracker. Saved in the vault (.notesapp/money.json) so it follows your notes to other
@@ -49,9 +53,12 @@ function persist(): void {
     return
   }
   writing = true
-  const { categories, entries, budgets, rules, goals, notRecurring, subscriptions, cancelled, balance } = useMoney.getState()
+  const { categories, entries, budgets, rules, goals, notRecurring, subscriptions, cancelled, balance, accounts, netWorth, ious } = useMoney.getState()
   window.api
-    .writeAppData(FILE, JSON.stringify({ categories, entries, budgets, rules, goals, notRecurring, subscriptions, cancelled, balance }, null, 2))
+    .writeAppData(
+      FILE,
+      JSON.stringify({ categories, entries, budgets, rules, goals, notRecurring, subscriptions, cancelled, balance, accounts, netWorth, ious }, null, 2)
+    )
     .catch(notify)
     .finally(() => {
       writing = false
@@ -222,3 +229,101 @@ export function setCancelled(key: string, on: string | null): void {
 export function setBalance(balance: Balance | null): void {
   save({ balance }, balance ? 'Set your balance' : 'Cleared your balance')
 }
+
+// ---------- accounts and net worth ----------
+
+export function addAccount(account: Omit<Account, 'id'>): Account {
+  const made: Account = { ...account, id: newId() }
+  save({ accounts: [...useMoney.getState().accounts, made] }, `Added ${named(made.name, 'an account')}`)
+  return made
+}
+
+export function updateAccount(id: string, change: Partial<Omit<Account, 'id'>>): void {
+  const acc = useMoney.getState().accounts.find((a) => a.id === id)
+  save({ accounts: useMoney.getState().accounts.map((a) => (a.id === id ? { ...a, ...change } : a)) }, `Changed ${named(acc?.name, 'an account')}`, `account:${id}:${Object.keys(change).sort().join(',')}`)
+}
+
+export function deleteAccount(id: string): Account | undefined {
+  const { accounts } = useMoney.getState()
+  const gone = accounts.find((a) => a.id === id)
+  if (!gone) return undefined
+  save({ accounts: accounts.filter((a) => a.id !== id) }, `Removed ${named(gone.name, 'an account')}`)
+  return gone
+}
+
+/**
+ * Writes today's net worth into the history when it has changed (an account, your balance, an IOU,
+ * or something logged against your current account). Not an undo step of its own: undoing the
+ * change that moved it moves it back.
+ */
+export function snapshot(): void {
+  const state = useMoney.getState()
+  if (!state.loaded) return
+  const today = dayOf(new Date())
+  const nw = netWorth(state, today)
+  if (!nw.any) return
+  const next = recordNetWorth(state.netWorth, today, nw.total)
+  if (next !== state.netWorth) write({ netWorth: next })
+}
+
+useMoney.subscribe((now, before) => {
+  if (now.loaded && (now.accounts !== before.accounts || now.balance !== before.balance || now.ious !== before.ious || now.entries !== before.entries || now.loaded !== before.loaded)) snapshot()
+})
+
+// ---------- IOUs ----------
+
+export function addIous(list: Omit<Iou, 'id' | 'paid'>[]): Iou[] {
+  const made: Iou[] = list.map((i) => ({ ...i, paid: 0, id: newId() }))
+  const label =
+    made.length === 1
+      ? made[0].theyOwe
+        ? `Added that ${made[0].person} owes you`
+        : `Added that you owe ${made[0].person}`
+      : `Split a bill with ${made.length} people`
+  save({ ious: [...useMoney.getState().ious, ...made] }, label)
+  return made
+}
+
+export function updateIou(id: string, change: Partial<Omit<Iou, 'id'>>): void {
+  save({ ious: useMoney.getState().ious.map((i) => (i.id === id ? { ...i, ...change } : i)) }, 'Changed an IOU', `iou:${id}:${Object.keys(change).sort().join(',')}`)
+}
+
+/** Some (or all) of it paid back. All of it marks it settled. */
+export function payBackIou(id: string, pence: number): void {
+  const iou = useMoney.getState().ious.find((i) => i.id === id)
+  if (!iou) return
+  const paid = Math.min(iou.amount, iou.paid + Math.max(0, pence))
+  const settled = paid >= iou.amount ? dayOf(new Date()) : undefined
+  save(
+    { ious: useMoney.getState().ious.map((i) => (i.id === id ? { ...i, paid, ...(settled ? { settled } : {}) } : i)) },
+    settled ? `Settled up with ${iou.person}` : `${iou.person} paid back part`
+  )
+}
+
+/** All paid back (or forgotten about): moves it to Settled. */
+export function settleIou(id: string): void {
+  const iou = useMoney.getState().ious.find((i) => i.id === id)
+  if (!iou) return
+  save({ ious: useMoney.getState().ious.map((i) => (i.id === id ? { ...i, settled: dayOf(new Date()) } : i)) }, `Settled up with ${iou.person}`)
+}
+
+export function reopenIou(id: string): void {
+  save({ ious: useMoney.getState().ious.map((i) => (i.id === id ? { ...i, settled: undefined, paid: i.paid >= i.amount ? 0 : i.paid } : i)) }, 'Opened an IOU again')
+}
+
+export function deleteIou(id: string): Iou | undefined {
+  const { ious } = useMoney.getState()
+  const gone = ious.find((i) => i.id === id)
+  if (!gone) return undefined
+  save({ ious: ious.filter((i) => i.id !== id) }, `Deleted an IOU with ${gone.person}`)
+  return gone
+}
+
+/** Notes that the reminder for these IOUs has gone off (not an undo step). */
+export function markReminded(ids: string[]): void {
+  const set = new Set(ids)
+  write({ ious: useMoney.getState().ious.map((i) => (set.has(i.id) ? { ...i, reminded: i.remind } : i)) })
+}
+
+/** Which part of the Money page to show next time it opens (a reminder opens IOUs). */
+export const useMoneyView = create<{ view: string | null }>(() => ({ view: null }))

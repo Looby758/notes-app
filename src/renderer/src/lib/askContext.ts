@@ -1,6 +1,7 @@
 import type { CalEvent } from '@shared/types'
 import { formatPounds, monthName, monthTotals, addMonths, type MoneyData } from './money'
 import { allRecurring, forecastMonth, monthlyCost } from './moneyInsights'
+import { iouLeft, netWorth, openIous } from './moneyAccounts'
 
 /**
  * "Ask everything": besides the notes that match, the AI gets a short, plain-text digest of your
@@ -19,7 +20,7 @@ const line = (cells: (string | number | undefined)[]): string => cells.filter((c
 
 /** Money as text: this month and the last few, budgets, goals, repeating payments, and entries (matching ones first). */
 export function moneyContext(data: MoneyData, today: string, question: string, budget = 14000): string {
-  if (!data.entries.length && !data.goals.length && !data.subscriptions.length && !data.balance) return ''
+  if (!data.entries.length && !data.goals.length && !data.subscriptions.length && !data.balance && !data.accounts.length && !data.ious.length) return ''
   const name = (id: string): string => data.categories.find((c) => c.id === id)?.name ?? id
   const month = today.slice(0, 7)
   const out: string[] = []
@@ -37,6 +38,10 @@ export function moneyContext(data: MoneyData, today: string, question: string, b
   for (const r of recurring) out.push(`Repeating ${r.income ? 'income' : 'payment'}: ${r.name}, ${formatPounds(r.amount)} ${r.interval} (about ${formatPounds(monthlyCost(r))} a month)${r.manual ? ', added by hand' : ''}${r.last ? `, last ${r.last}` : ''}, next ${r.next}`)
   const f = forecastMonth(data.entries, recurring, today, data.balance)
   if (f.balanceNow !== undefined) out.push(`Balance: about ${formatPounds(f.balanceNow)} now (you entered ${formatPounds(data.balance!.amount)} on ${data.balance!.date})`)
+  for (const a of data.accounts) out.push(`Account: ${a.name} (${a.kind}), ${formatPounds(a.amount)} as of ${a.date}`)
+  const nw = netWorth(data, today)
+  if (nw.any) out.push(`Net worth: ${formatPounds(nw.total)} (accounts ${formatPounds(nw.inAccounts)}, owed to you ${formatPounds(nw.owedToYou)}, you owe ${formatPounds(nw.youOwe)})`)
+  for (const i of openIous(data.ious)) out.push(`IOU: ${i.theyOwe ? `${i.person} owes you` : `you owe ${i.person}`} ${formatPounds(iouLeft(i))}${i.note ? ` for ${i.note}` : ''} (since ${i.date})`)
   out.push(`Forecast for the end of ${monthName(month)}: ${f.endOfMonth >= 0 ? `${formatPounds(f.endOfMonth)} left` : `${formatPounds(-f.endOfMonth)} short`}`)
 
   const words = questionWords(question)
