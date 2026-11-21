@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { AudioLines, Captions, Clapperboard, Copy, Crosshair, Download, FileAudio, Image as ImageIcon, Play, RotateCcw, Square, Trash2, Undo2, X } from 'lucide-react'
+import { AudioLines, Captions, Clapperboard, Copy, Crosshair, Download, FileAudio, FolderOutput, Image as ImageIcon, Play, RotateCcw, Square, Trash2, Undo2, X } from 'lucide-react'
 import { clock, transcribeModelById, TRANSCRIBE_MODELS, type SpokenWord } from '@shared/transcribe'
 import type { VideoItem, VideoProject } from '../../lib/videos'
 import { vaultUrl } from '../../lib/fileKinds'
@@ -21,6 +21,7 @@ import {
   useTranscripts,
   watchTranscriber
 } from '../../store/transcripts'
+import { exportPlan } from '../../lib/editExport'
 import { buildShots, fineClock, parseClock, shotListText, type Shot } from '../../lib/shotList'
 import { resolveImage } from '../../lib/script'
 import { vaultImages } from '../Editor/scriptTools'
@@ -306,7 +307,17 @@ function TranscriptView({ project: p, item, start, onClose }: { project: VideoPr
         {t && tab !== 'shots' && <Summary t={t} lined={tab === 'script' ? lined : null} onRefresh={() => setScriptAgain((n) => n + 1)} />}
         <div className="pp-body">
           {tab === 'shots' && script !== null ? (
-            <ShotList project={p} item={item} text={script} lined={lined} length={t?.length ?? duration} now={now} play={play} onRefresh={() => setScriptAgain((n) => n + 1)} />
+            <ShotList
+              project={p}
+              item={item}
+              text={script}
+              lined={lined}
+              words={t?.words ?? null}
+              length={t?.length ?? duration}
+              now={now}
+              play={play}
+              onRefresh={() => setScriptAgain((n) => n + 1)}
+            />
           ) : tab === 'script' && lined && script !== null ? (
             <LinedUpScript text={script} lined={lined} now={now} play={play} />
           ) : t ? (
@@ -532,6 +543,7 @@ function ShotList({
   item,
   text,
   lined,
+  words,
   length,
   now,
   play,
@@ -541,6 +553,7 @@ function ShotList({
   item: VideoItem
   text: string
   lined: LinedUp | null
+  words: SpokenWord[] | null
   length: number | null
   now: number
   play: (at: number) => void
@@ -557,6 +570,37 @@ function ShotList({
   const timed = pictures.filter((s) => s.time !== null).length
   let current: string | null = null
   for (const s of [...pictures].filter((x) => x.time !== null).sort((a, b) => a.time! - b.time!)) if (s.time! <= now + 0.05) current = s.key
+
+  const [exporting, setExporting] = useState(false)
+  const exportIt = async (): Promise<void> => {
+    const plan = exportPlan({
+      title: p.title,
+      recordingName: fileName(item.path!),
+      shots,
+      shotListText: shotListText(shots, p.title || ''),
+      picture: (s) => (s.kind === 'IMAGE' ? resolveImage(s.value, images, folder) : null),
+      words,
+      length
+    })
+    setExporting(true)
+    try {
+      const dir = await window.api.transcribeExport({ folder: plan.folder, recording: item.path!, pictures: plan.pictures, files: plan.files })
+      if (!dir) return
+      const missing = pictures.filter((s) => s.kind === 'IMAGE' && !resolveImage(s.value, images, folder)).length
+      const untimed = pictures.length - timed
+      notify(
+        `Exported to “${dir.slice(Math.max(dir.lastIndexOf('/'), dir.lastIndexOf('\\')) + 1)}”: the recording, ${plan.pictures.length} numbered ${plan.pictures.length === 1 ? 'picture' : 'pictures'} and the shot list, markers and subtitles.` +
+          (missing ? ` ${missing} ${missing === 1 ? 'picture wasn’t' : 'pictures weren’t'} found in your notes.` : '') +
+          (untimed ? ` ${untimed} without a time ${untimed === 1 ? 'is' : 'are'} at the end of the spreadsheet.` : ''),
+        'info'
+      )
+      void window.api.transcribeShowExport(dir)
+    } catch (err) {
+      notify(err instanceof Error ? err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(err))
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const copy = (): void => {
     void navigator.clipboard.writeText(shotListText(shots, p.title || '')).then(
@@ -593,6 +637,15 @@ function ShotList({
           </button>
           <button className="btn" onClick={copy} data-pp-copy-shots>
             <Copy size={12} /> Copy as text
+          </button>
+          <button
+            className="btn btn-primary"
+            disabled={exporting || !timed}
+            onClick={() => void exportIt()}
+            title="A folder with the recording, the pictures numbered in order, the shot list, DaVinci Resolve markers, subtitles and YouTube chapters"
+            data-pp-export
+          >
+            <FolderOutput size={12} /> {exporting ? 'Exporting…' : 'Export for editing'}
           </button>
         </span>
       </div>

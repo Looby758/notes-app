@@ -1075,6 +1075,10 @@ export interface NotesApi {
   /** What's said in a recording (a path in the notes folder), word by word with times. */
   transcribe(path: string): Promise<TranscribeResult>
   transcribeCancel(): Promise<void>
+  /** Export for editing: asks where, then copies the recording and pictures and writes the files there. The folder made, or null if cancelled. */
+  transcribeExport(req: { folder: string; recording: string; pictures: { path: string; name: string }[]; files: { name: string; text: string }[] }): Promise<string | null>
+  /** Opens a folder "Export for editing" made. */
+  transcribeShowExport(dir: string): Promise<void>
   /** The teleprompter's cue times saved beside a recording ("<recording>.cues.json"), as text; null if there are none. */
   transcribeReadCues(path: string): Promise<string | null>
   onTranscriberState(callback: (state: TranscriberState) => void): () => void

@@ -1,7 +1,8 @@
-import { app, BrowserWindow, ipcMain, MessageChannelMain, session, type MessagePortMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, MessageChannelMain, session, shell, type MessagePortMain } from 'electron'
 import { spawn, type ChildProcess } from 'child_process'
 import { existsSync, readFileSync, statSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { copyFile, mkdir, rmdir, writeFile } from 'fs/promises'
+import { basename, join } from 'path'
 import { isSilent, quietCuts, SAMPLE_RATE, suggestedTranscribeModel, transcribeModelById, type SpokenWord, type TranscribeProgress, type TranscriberState } from '@shared/transcribe'
 import type { TranscribeResult } from '@shared/types'
 import { downloadFfmpeg, ffmpegPath, onFfmpegState } from './ffmpeg'
@@ -25,6 +26,8 @@ interface Config {
   /** The model downloaded and working. */
   model?: string
   gpu?: boolean
+  /** Where "Export for editing" last saved to. */
+  exportTo?: string
 }
 
 const configFile = (): string => join(app.getPath('userData'), 'transcriber.json')
@@ -392,11 +395,60 @@ function cancel(): void {
   closeWorker('Stopped.')
 }
 
+// ---------- Export for editing ----------
+
+export interface EditExport {
+  /** The folder to make (just its name). */
+  folder: string
+  /** The recording, a path in the notes folder. */
+  recording: string
+  pictures: { path: string; name: string }[]
+  files: { name: string; text: string }[]
+}
+
+/** Folders "Export for editing" made: the only ones "Show" will open. */
+const exported = new Set<string>()
+
+/** A plain file or folder name: nothing that could reach outside the export folder. */
+const plainName = (name: unknown): name is string => typeof name === 'string' && !!name && name.length < 200 && !/[\\/:*?"<>|\u0000-\u001f]/.test(name) && name !== '.' && name !== '..'
+
+async function exportForEditing(win: BrowserWindow | null, req: EditExport, abs: (rel: string) => string): Promise<string | null> {
+  if (!plainName(req.folder) || !req.pictures.every((p) => plainName(p.name)) || !req.files.every((f) => plainName(f.name) && typeof f.text === 'string'))
+    throw new Error('Those export names aren’t allowed.')
+  const c = loadConfig()
+  const opts = {
+    title: 'Export for editing into…',
+    defaultPath: c.exportTo && existsSync(c.exportTo) ? c.exportTo : app.getPath('videos'),
+    properties: ['openDirectory', 'createDirectory'] as ('openDirectory' | 'createDirectory')[]
+  }
+  const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+  const parent = res.canceled ? null : res.filePaths[0]
+  if (!parent) return null
+  c.exportTo = parent
+  saveConfig()
+  let dir = join(parent, req.folder)
+  for (let n = 2; existsSync(dir); n++) dir = join(parent, `${req.folder} (${n})`)
+  await mkdir(join(dir, 'Pictures'), { recursive: true })
+  const recording = abs(req.recording)
+  if (!existsSync(recording)) throw new Error('That recording isn’t in your notes folder any more.')
+  await copyFile(recording, join(dir, basename(recording)))
+  for (const p of req.pictures) await copyFile(abs(p.path), join(dir, 'Pictures', p.name))
+  if (!req.pictures.length) await rmdir(join(dir, 'Pictures')).catch(() => undefined)
+  // A byte-order mark so Excel reads the spreadsheet's names right.
+  for (const f of req.files) await writeFile(join(dir, f.name), (f.name.endsWith('.csv') ? '\ufeff' : '') + f.text, 'utf8')
+  exported.add(dir)
+  return dir
+}
+
 export function setupTranscriber(abs: (rel: string) => string): void {
   ipcMain.handle('transcribe:state', () => transcriberState())
   ipcMain.handle('transcribe:setup', (_e, model?: string) => setUp(typeof model === 'string' ? model : undefined))
   ipcMain.handle('transcribe:run', (_e, path: string) => transcribe(String(path), abs))
   ipcMain.handle('transcribe:cancel', () => cancel())
+  ipcMain.handle('transcribe:export', (e, req: EditExport) => exportForEditing(BrowserWindow.fromWebContents(e.sender), req, abs))
+  ipcMain.handle('transcribe:showExport', (_e, dir: string) => {
+    if (exported.has(dir) && existsSync(dir)) void shell.openPath(dir)
+  })
   // The teleprompter's times saved beside a recording in the notes folder (for the shot list).
   ipcMain.handle('transcribe:readCues', async (_e, path: string) => {
     if (typeof path !== 'string' || !/\.(m4a|webm|mp4|mkv|mov|wav|mp3|ogg|opus|flac|aac)$/i.test(path)) return null
