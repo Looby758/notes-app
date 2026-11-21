@@ -842,6 +842,7 @@ function registerIpc(): void {
     ai.askNotes(question, notes, history, extra, engine)
   )
   ipcMain.handle('ai:emailContext', (_e, question: string, engine?: AiEngine) => ai.emailContext(question, engine))
+  ipcMain.handle('ai:whatsNew', (_e, source: string) => ai.whatsNew(String(source).slice(0, 60_000)))
   ipcMain.handle('ai:chat', (_e, messages: AiChatMessage[], engine?: AiEngine) => ai.chat(messages, engine))
   ipcMain.handle('ai:setEngine', (_e, use: AiEngine) => ai.setEngine(use))
   ipcMain.handle('ai:sortMoney', (_e, rows: AiSortRow[], categories: { id: string; name: string; income?: boolean }[]) =>

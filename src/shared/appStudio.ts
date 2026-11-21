@@ -19,6 +19,10 @@ export interface AppInfo {
   changedFiles?: number
   /** "owner/name" when the folder's origin is on GitHub. */
   repo?: string
+  /** A GitHub Actions workflow that runs when a version tag is pushed (it builds and publishes the release). */
+  releaseWorkflow?: boolean
+  /** package.json scripts that build the app (build, build:win, dist…). */
+  buildScripts?: string[]
 }
 
 export interface PullRequest {
@@ -219,4 +223,109 @@ export function claudePrompt(app: { name: string; repo?: string }, items: BoardI
   if (pictures) parts.push(pictures === 1 ? 'I’ve attached a picture to show what I mean.' : `I’ve attached ${pictures} pictures to show what I mean.`)
   parts.push('When it’s done, open a pull request.')
   return parts.join('\n\n')
+}
+
+// ---------- Releases ----------
+
+export interface Release {
+  tag: string
+  name: string
+  /** When it was published (or made, for a draft). */
+  date: string
+  draft: boolean
+  prerelease: boolean
+  url: string
+  /** Its notes, as written. */
+  body: string
+}
+
+/** A pull request that was merged. */
+export interface MergedPull {
+  number: number
+  title: string
+  body: string
+  author: string
+  url: string
+  mergedAt: string
+}
+
+export type VersionBump = 'patch' | 'minor' | 'major'
+
+export const VERSION_BUMPS: { id: VersionBump; label: string; hint: string }[] = [
+  { id: 'patch', label: 'Fixes', hint: 'Small fixes' },
+  { id: 'minor', label: 'New features', hint: 'New things added' },
+  { id: 'major', label: 'Big update', hint: 'A big change' }
+]
+
+/** The next version: 1.4.2 → 1.4.3 (patch), 1.5.0 (minor) or 2.0.0 (major). Null if it isn't a plain version. */
+export function bumpVersion(version: string, bump: VersionBump): string | null {
+  const m = /^v?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/.exec((version ?? '').trim())
+  if (!m) return null
+  const [major, minor, patch] = [Number(m[1]), Number(m[2]), Number(m[3])]
+  if (bump === 'major') return `${major + 1}.0.0`
+  if (bump === 'minor') return `${major}.${minor + 1}.0`
+  return `${major}.${minor}.${patch + 1}`
+}
+
+/**
+ * The release button's command line: npm bumps the version in package.json, commits it and tags it
+ * (v1.2.3), then the commit and tag are pushed. A release workflow on GitHub picks the tag up.
+ */
+export function releaseCommand(windows: boolean, bump: VersionBump): string {
+  const version = `npm version ${bump} -m "Release %s"`
+  const push = 'git push --follow-tags'
+  return windows ? `${version}; if ($LASTEXITCODE -eq 0) { ${push} }` : `${version} && ${push}`
+}
+
+/** A pull request title as a line for people using the app: no "feat:"/"fix(x):" prefix, starting with a capital. */
+export function plainTitle(title: string): string {
+  const t = title
+    .trim()
+    .replace(/^\[[^\]]*\]\s*/, '')
+    .replace(/^(feat|feature|fix|bugfix|chore|docs|refactor|perf|style|test|build|ci)(\([^)]*\))?!?:\s*/i, '')
+    .replace(/\s*\(#\d+\)$/, '')
+    .replace(/\.$/, '')
+  return t ? t[0].toUpperCase() + t.slice(1) : ''
+}
+
+const FIX_WORDS = /^(fix(es|ed)?|stop|don.?t|no longer|correct|repair|handle|avoid|prevent)\b/i
+const SKIP_WORDS = /^(chore|ci|test|tests|build|refactor|docs?)\b|\b(bump (deps|dependencies)|update dependencies|merge branch)\b/i
+
+/** A plain "What's new" list made from the pull requests' titles: new things first, then fixes. Internal-only changes are left out. */
+export function plainChangelog(pulls: { title: string }[]): string {
+  const added: string[] = []
+  const fixed: string[] = []
+  for (const p of pulls) {
+    if (SKIP_WORDS.test(p.title.trim())) continue
+    const line = plainTitle(p.title)
+    if (!line) continue
+    ;(/^(fix|bugfix)\b/i.test(p.title.trim()) || FIX_WORDS.test(line) ? fixed : added).push(line)
+  }
+  const parts: string[] = []
+  if (added.length) parts.push("What's new", ...added.map((l) => `- ${l}`))
+  if (fixed.length) parts.push(...(added.length ? [''] : []), 'Fixes', ...fixed.map((l) => `- ${l}`))
+  return parts.join('\n')
+}
+
+/** What the AI helper is given to write the notes from: each pull request's title and a short summary. */
+export function changelogSource(app: string, pulls: MergedPull[]): string {
+  const lines = [`App: ${app}`, '', 'Pull requests merged since the last release:']
+  for (const p of pulls) {
+    lines.push('', `- ${p.title}`)
+    for (const l of prSummary(p.body, 6, 240)) lines.push(`  ${l}`)
+  }
+  return lines.join('\n')
+}
+
+/**
+ * Which release the notes go on: a draft waiting to be published, else the version in package.json
+ * if it hasn't been released yet (just bumped), else the next version up.
+ */
+export function notesTarget(version: string | undefined, releases: Release[]): string | null {
+  const draft = releases.find((r) => r.draft)
+  if (draft) return draft.tag
+  if (!version) return null
+  const now = `v${version}`
+  if (!releases.some((r) => r.tag === now)) return now
+  return `v${bumpVersion(version, 'minor') ?? version}`
 }

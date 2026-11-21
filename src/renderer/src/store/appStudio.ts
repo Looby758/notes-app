@@ -9,7 +9,7 @@ import { useTerminals } from './terminals'
  */
 
 interface AppStudioState {
-  section: 'apps' | 'pulls' | 'board'
+  section: 'apps' | 'pulls' | 'board' | 'releases'
   /** By folder. */
   info: Record<string, AppInfo>
   pulls: PullRequest[]

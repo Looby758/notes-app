@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boardKey, claudePrompt, githubRepo, looksLikeGitHubToken, prSummary, readBoard, timeAgo, tryBranchCommand, type BoardItem } from './appStudio'
+import { boardKey, bumpVersion, changelogSource, claudePrompt, githubRepo, looksLikeGitHubToken, notesTarget, plainChangelog, prSummary, readBoard, releaseCommand, timeAgo, tryBranchCommand, type BoardItem, type Release } from './appStudio'
 
 describe('githubRepo', () => {
   it('reads https and ssh remotes', () => {
@@ -112,5 +112,48 @@ describe('idea board', () => {
     expect(p).toContain('Bugs to fix:\n\n1. Login button does nothing\n   (A picture is attached for this.)')
     expect(p).toContain('New features to add:\n\n2. Dark mode')
     expect(p).toContain('I’ve attached a picture to show what I mean.')
+  })
+})
+
+describe('releases', () => {
+  it('bumps versions', () => {
+    expect(bumpVersion('1.11.1', 'patch')).toBe('1.11.2')
+    expect(bumpVersion('1.11.1', 'minor')).toBe('1.12.0')
+    expect(bumpVersion('v1.11.1', 'major')).toBe('2.0.0')
+    expect(bumpVersion('1.2.3-beta.1', 'patch')).toBe('1.2.4')
+    expect(bumpVersion('nope', 'patch')).toBeNull()
+  })
+
+  it('makes the release command for each shell', () => {
+    expect(releaseCommand(false, 'minor')).toBe('npm version minor -m "Release %s" && git push --follow-tags')
+    expect(releaseCommand(true, 'patch')).toBe('npm version patch -m "Release %s"; if ($LASTEXITCODE -eq 0) { git push --follow-tags }')
+  })
+
+  it('writes plain notes from pull request titles', () => {
+    const notes = plainChangelog([
+      { title: 'feat: add a dark mode' },
+      { title: 'Fix the export button on Safari (#12)' },
+      { title: 'chore: bump dependencies' },
+      { title: 'App Studio: release builder.' },
+      { title: 'fix(sync): lost edits' }
+    ])
+    expect(notes).toBe("What's new\n- Add a dark mode\n- App Studio: release builder\n\nFixes\n- Fix the export button on Safari\n- Lost edits")
+    expect(plainChangelog([{ title: 'Fix crash' }])).toBe('Fixes\n- Fix crash')
+    expect(plainChangelog([])).toBe('')
+  })
+
+  it('gives the AI helper titles and short summaries', () => {
+    const src = changelogSource('Orbit', [{ number: 3, title: 'Add a thing', body: '## Summary\n- It does X\n\n## Testing\n- ran it', author: 'a', url: '', mergedAt: '' }])
+    expect(src).toContain('App: Orbit')
+    expect(src).toContain('- Add a thing\n  • It does X')
+    expect(src).not.toContain('ran it')
+  })
+
+  it('picks the release the notes go on', () => {
+    const r = (tag: string, draft = false): Release => ({ tag, name: tag, date: '', draft, prerelease: false, url: '', body: '' })
+    expect(notesTarget('1.2.0', [r('v1.3.0', true), r('v1.2.0')])).toBe('v1.3.0')
+    expect(notesTarget('1.3.0', [r('v1.2.0')])).toBe('v1.3.0')
+    expect(notesTarget('1.2.0', [r('v1.2.0')])).toBe('v1.3.0')
+    expect(notesTarget(undefined, [])).toBeNull()
   })
 })

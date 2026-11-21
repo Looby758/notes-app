@@ -1,4 +1,4 @@
-import type { AppInfo, GitHubStatus, PullRequest } from './appStudio'
+import type { AppInfo, GitHubStatus, MergedPull, PullRequest, Release } from './appStudio'
 import type { ExplorerEntry, ExplorerPlace, PasteMode } from './explorer'
 import type { ArchiveEntry } from './archive'
 import type { ComicOpened, ComicPreparing, ComicSettings, ComicShelf } from './comics'
@@ -1161,6 +1161,14 @@ export interface NotesApi {
   appsInfo(folder: string): Promise<AppInfo>
   /** Open pull requests on these GitHub repositories ("owner/name"), newest first; errors by repository. */
   appsPulls(repos: string[]): Promise<{ pulls: PullRequest[]; errors: Record<string, string> }>
+  /** A repository's releases, newest first (drafts too, when the token can see them). */
+  appsReleases(repo: string): Promise<Release[]>
+  /** Pull requests merged after `since` (or recently, without it). */
+  appsMerged(repo: string, since?: string): Promise<MergedPull[]>
+  /** Puts notes on the release for a tag (making a draft release if there isn't one). Needs GitHub connected. */
+  appsSetReleaseNotes(repo: string, tag: string, body: string, title: string): Promise<Release>
+  /** The AI helper writes "What's new" notes from changelogSource(). */
+  aiWhatsNew(source: string): Promise<string>
   appsMerge(repo: string, number: number): Promise<void>
   appsClose(repo: string, number: number): Promise<void>
   /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */

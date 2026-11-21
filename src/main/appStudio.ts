@@ -1,8 +1,8 @@
 import { app, ipcMain, net, safeStorage } from 'electron'
 import { execFile } from 'child_process'
-import { existsSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
+import { existsSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
 import { isAbsolute, join } from 'path'
-import { githubRepo, type AppInfo, type GitHubStatus, type PullRequest } from '@shared/appStudio'
+import { githubRepo, type AppInfo, type GitHubStatus, type MergedPull, type PullRequest, type Release } from '@shared/appStudio'
 import { logError } from './log'
 import { TEST_COPY } from './testCopy'
 
@@ -113,13 +113,17 @@ function git(folder: string, args: string[]): Promise<string | null> {
 async function appInfo(folder: string): Promise<AppInfo> {
   if (!isAbsolute(folder) || !statSync(folder, { throwIfNoEntry: false })?.isDirectory()) return { ok: false, error: 'This app’s folder isn’t there any more.' }
   let version: string | undefined
+  let buildScripts: string[] | undefined
   try {
-    version = (JSON.parse(readFileSync(join(folder, 'package.json'), 'utf8')) as { version?: string }).version
+    const pkg = JSON.parse(readFileSync(join(folder, 'package.json'), 'utf8')) as { version?: string; scripts?: Record<string, string> }
+    version = pkg.version
+    buildScripts = Object.keys(pkg.scripts ?? {}).filter((k) => /^(build|dist|make|package)(:|$)/.test(k))
   } catch {
     // No package.json: not every app has one.
   }
+  const releaseWorkflow = hasReleaseWorkflow(folder)
   const inside = await git(folder, ['rev-parse', '--is-inside-work-tree'])
-  if (inside !== 'true') return { ok: true, version, error: inside === null && !(await git(folder, ['--version'])) ? 'Git isn’t installed on this computer.' : 'This folder isn’t a git repository.' }
+  if (inside !== 'true') return { ok: true, version, buildScripts, releaseWorkflow, error: inside === null && !(await git(folder, ['--version'])) ? 'Git isn’t installed on this computer.' : 'This folder isn’t a git repository.' }
   const [branch, last, changes, remote] = await Promise.all([
     git(folder, ['rev-parse', '--abbrev-ref', 'HEAD']),
     git(folder, ['log', '-1', '--format=%s%x1f%cI%x1f%an']),
@@ -133,7 +137,24 @@ async function appInfo(folder: string): Promise<AppInfo> {
     branch: branch ?? undefined,
     lastChange: subject ? { subject, date, author } : undefined,
     changedFiles: changes ? changes.split('\n').filter(Boolean).length : 0,
-    repo: (remote && githubRepo(remote)) ?? undefined
+    repo: (remote && githubRepo(remote)) ?? undefined,
+    buildScripts,
+    releaseWorkflow
+  }
+}
+
+/** Whether a GitHub Actions workflow in the folder runs when a tag is pushed. */
+function hasReleaseWorkflow(folder: string): boolean {
+  const dir = join(folder, '.github', 'workflows')
+  try {
+    return readdirSync(dir)
+      .filter((f) => /\.ya?ml$/i.test(f))
+      .some((f) => {
+        const text = readFileSync(join(dir, f), 'utf8')
+        return /^\s*push\s*:/m.test(text) && /^\s*tags\s*:/m.test(text)
+      })
+  } catch {
+    return false
   }
 }
 
@@ -191,6 +212,65 @@ async function pulls(repos: string[]): Promise<{ pulls: PullRequest[]; errors: R
   return { pulls: out, errors }
 }
 
+interface ApiRelease {
+  id: number
+  tag_name: string
+  name: string | null
+  body: string | null
+  draft: boolean
+  prerelease: boolean
+  html_url: string
+  created_at: string
+  published_at: string | null
+}
+
+async function releases(repo: string): Promise<Release[]> {
+  const list = await github<ApiRelease[]>(`/repos/${repo}/releases?per_page=20`)
+  return list.map((r) => ({
+    tag: r.tag_name,
+    name: r.name || r.tag_name,
+    date: r.published_at ?? r.created_at,
+    draft: r.draft,
+    prerelease: r.prerelease,
+    url: r.html_url,
+    body: r.body ?? ''
+  }))
+}
+
+interface ApiClosedPull extends ApiPull {
+  merged_at: string | null
+}
+
+/** Pull requests merged after `since` (all recent ones without it), newest first. */
+async function merged(repo: string, since?: string): Promise<MergedPull[]> {
+  const after = since ? Date.parse(since) : 0
+  const out: MergedPull[] = []
+  for (let page = 1; page <= 3; page++) {
+    const list = await github<ApiClosedPull[]>(`/repos/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=50&page=${page}`)
+    for (const p of list) {
+      if (p.merged_at && Date.parse(p.merged_at) > after) {
+        out.push({ number: p.number, title: p.title, body: p.body ?? '', author: p.user?.login ?? '', url: p.html_url, mergedAt: p.merged_at })
+      }
+    }
+    // Sorted by last update, so once one is older than `since` the rest are too.
+    if (list.length < 50 || !after || Date.parse(list[list.length - 1].updated_at) < after) break
+  }
+  return out.sort((a, b) => Date.parse(b.mergedAt) - Date.parse(a.mergedAt))
+}
+
+/**
+ * Puts the notes on the release for `tag`: the existing one (a draft too), or a new draft. A
+ * release workflow that later finds the draft publishes it, notes and all.
+ */
+async function setReleaseNotes(repo: string, tag: string, body: string, title: string): Promise<Release> {
+  const list = await github<ApiRelease[]>(`/repos/${repo}/releases?per_page=30`)
+  const found = list.find((r) => r.tag_name === tag)
+  const r = found
+    ? await github<ApiRelease>(`/repos/${repo}/releases/${found.id}`, { method: 'PATCH', body: { body } })
+    : await github<ApiRelease>(`/repos/${repo}/releases`, { method: 'POST', body: { tag_name: tag, name: title, body, draft: true } })
+  return { tag: r.tag_name, name: r.name || r.tag_name, date: r.published_at ?? r.created_at, draft: r.draft, prerelease: r.prerelease, url: r.html_url, body: r.body ?? '' }
+}
+
 function needToken(): void {
   if (!token()) throw new Error('Connect GitHub in App Studio first, so Orbit can do that for you.')
 }
@@ -205,6 +285,19 @@ export function setupAppStudio(): void {
   })
   ipcMain.handle('apps:info', (_e, folder: unknown) => (typeof folder === 'string' ? appInfo(folder) : { ok: false, error: 'No folder.' }))
   ipcMain.handle('apps:pulls', (_e, repos: unknown) => pulls(Array.isArray(repos) ? repos.slice(0, 30) : []))
+  ipcMain.handle('apps:releases', (_e, repo: unknown) => {
+    if (!validRepo(repo)) throw new Error('Not allowed')
+    return releases(repo)
+  })
+  ipcMain.handle('apps:merged', (_e, repo: unknown, since: unknown) => {
+    if (!validRepo(repo)) throw new Error('Not allowed')
+    return merged(repo, typeof since === 'string' && since ? since : undefined)
+  })
+  ipcMain.handle('apps:setReleaseNotes', async (_e, repo: unknown, tag: unknown, body: unknown, title: unknown) => {
+    if (!validRepo(repo) || typeof tag !== 'string' || !/^[\w.+-]{1,60}$/.test(tag)) throw new Error('Not allowed')
+    needToken()
+    return setReleaseNotes(repo, tag, String(body ?? '').slice(0, 100_000), String(title || tag).slice(0, 200))
+  })
   ipcMain.handle('apps:merge', async (_e, repo: unknown, number: unknown) => {
     if (!validRepo(repo) || typeof number !== 'number') throw new Error('Not allowed')
     needToken()

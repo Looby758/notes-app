@@ -5,7 +5,7 @@ import '@xterm/xterm/css/xterm.css'
 import { useEditor } from '../store/editor'
 import { commandForKey, type Command } from './commands'
 import { openSpecialTab, TERMINAL_TAB } from './editorController'
-import { tryBranchCommand } from '@shared/appStudio'
+import { releaseCommand, tryBranchCommand, type VersionBump } from '@shared/appStudio'
 import { IS_MAC } from '@shared/platform'
 import { commandLabel, findFiles, isErrorLine, keepsRunning, latestAndRunCommand, LineTracker, resolveFrom, runCommandOf } from '@shared/terminalTools'
 import {
@@ -528,6 +528,11 @@ export function getLatestAndRun(project: TerminalProject): void {
 export function tryBranch(project: TerminalProject, branch: string): void {
   rememberCommand(`git checkout ${branch}`)
   runInAppTerminal(project, tryBranchCommand(IS_WINDOWS, branch, runCommandOf(project.commands)))
+}
+
+/** App Studio's release button: bumps the version, commits and tags it, and pushes, in the project's own terminal. */
+export function releaseApp(project: TerminalProject, bump: VersionBump): void {
+  runProjectCommand(project, releaseCommand(IS_WINDOWS, bump))
 }
 
 const IS_WINDOWS = !IS_MAC && /win/i.test(navigator.platform)

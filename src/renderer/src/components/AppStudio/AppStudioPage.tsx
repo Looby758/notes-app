@@ -26,6 +26,7 @@ import { openSpecialTab, TERMINAL_TAB } from '../../lib/editorController'
 import { notify } from '../../store/notify'
 import { useAppBoard } from '../../store/appBoard'
 import Board from './Board'
+import Releases from './Releases'
 
 /** Pull requests are fetched again when you come back after this long. */
 const PULLS_FRESH_MS = 2 * 60_000
@@ -81,8 +82,11 @@ export default function AppStudioPage() {
           <button className={section === 'pulls' ? 'active' : ''} onClick={() => setSection('pulls')}>
             Pull requests {pulls.length > 0 && <span className="appstudio-count accent">{pulls.length}</span>}
           </button>
+          <button className={section === 'releases' ? 'active' : ''} onClick={() => setSection('releases')}>
+            Releases
+          </button>
         </nav>
-        {section === 'apps' ? <MyApps /> : section === 'board' ? <Board /> : <PullInbox />}
+        {section === 'apps' ? <MyApps /> : section === 'board' ? <Board /> : section === 'releases' ? <Releases /> : <PullInbox />}
       </div>
     </div>
   )
