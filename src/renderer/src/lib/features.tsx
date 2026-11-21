@@ -3,6 +3,7 @@ import type { Prefs } from '@shared/prefs'
 import {
   Ear,
   ArrowRightLeft,
+  FilePen,
   AudioLines,
   Clapperboard,
   Cpu,
@@ -75,6 +76,7 @@ import {
   COMICS_TAB,
   WIKI_TAB,
   CONVERT_TAB,
+  PDF_EDITOR_TAB,
   STUDIO_TAB,
   CLIPS_TAB,
   VIDEOS_TAB,
@@ -219,6 +221,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   snip: { icon: Scan, run: () => void startSnip() },
   explorer: { icon: HardDrive, run: () => openSpecialTab(EXPLORER_TAB) },
   convert: { icon: ArrowRightLeft, run: () => openSpecialTab(CONVERT_TAB) },
+  'pdf-editor': { icon: FilePen, run: () => openSpecialTab(PDF_EDITOR_TAB) },
   downloads: { icon: ArrowDownToLine, run: () => openSpecialTab(DOWNLOADS_TAB) },
   'offline-ai': {
     icon: Cpu,

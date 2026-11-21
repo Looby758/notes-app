@@ -73,6 +73,8 @@ export const HOME_TAB = 'home:'
 export const MONEY_TAB = 'money:'
 export const CONVERT_TAB = 'convert:'
 export const COMICS_TAB = 'comics:'
+/** Sign, merge, split, reorder and fill in PDFs (components/PdfEditor); what's open is in store/pdfEditor. */
+export const PDF_EDITOR_TAB = 'pdf-editor:'
 /** Downloaded wikis, read offline (components/Wiki). */
 export const WIKI_TAB = 'wiki:'
 /** Sudoku, Minesweeper, Nonograms, Jigsaw and Wordle (components/MiniGames); which one is showing is in store/miniGames. */

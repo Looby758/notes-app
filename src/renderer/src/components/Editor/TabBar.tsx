@@ -8,6 +8,7 @@ import { toggleStar, useStarred } from '../../store/starred'
 import { Images, Clock } from 'lucide-react'
 import { useNoteIndex } from '../../store/noteIndex'
 import { ArrowDownToLine, Upload } from 'lucide-react'
+import { FilePen } from 'lucide-react'
 import { isMindMap, openExport, toggleMindMap, useUI } from '../../store/ui'
 import {
   activateTab,
@@ -26,6 +27,7 @@ import {
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
+  PDF_EDITOR_TAB,
   isExplorerTab,
   COMICS_TAB,
   WIKI_TAB,
@@ -106,6 +108,7 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === HOME_TAB) return 'Home'
   if (id === MONEY_TAB) return 'Money'
   if (id === CONVERT_TAB) return 'Convert files'
+  if (id === PDF_EDITOR_TAB) return 'PDF editor'
   if (id === COMICS_TAB) return 'Comics'
   if (id === WIKI_TAB) return 'Wikis'
   if (id === MINIGAMES_TAB) return 'Mini games'
@@ -332,6 +335,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === HOME_TAB && <House size={13} className="tab-icon" />}
               {id === MONEY_TAB && <PoundSterling size={13} className="tab-icon" />}
               {id === CONVERT_TAB && <ArrowRightLeft size={13} className="tab-icon" />}
+              {id === PDF_EDITOR_TAB && <FilePen size={13} className="tab-icon" />}
               {id === COMICS_TAB && <LibraryBig size={13} className="tab-icon" />}
               {id === WIKI_TAB && <Library size={13} className="tab-icon" />}
               {id === MINIGAMES_TAB && <Joystick size={13} className="tab-icon" />}

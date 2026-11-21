@@ -73,6 +73,8 @@ import { isComicBookFile } from '@shared/comics'
 import { shelveComicFile } from '../../store/comics'
 import { useFilesReveal } from '../../store/filesReveal'
 import { notify } from '../../store/notify'
+import { openInPdfEditor } from '../../store/pdfEditor'
+import { FilePen } from 'lucide-react'
 import ContextMenu, { type MenuItem } from '../ContextMenu'
 import FileIcon from '../FileIcon'
 import { sendToDevice, useDropTargets } from '../Share/DeviceDrop'
@@ -1077,6 +1079,11 @@ function Preview({
         <button className="btn btn-primary" onClick={() => onOpen(entry)}>
           {entry.isDir ? <FolderOpen size={13} /> : <ExternalLink size={13} />} Open
         </button>
+        {kind === 'pdf' && (
+          <button className="btn" onClick={() => void openInPdfEditor(entry.name, url).catch(notify)} title="Sign it, fill it in, or change its pages" data-explorer-edit-pdf>
+            <FilePen size={13} /> Edit PDF
+          </button>
+        )}
         <button className="btn" onClick={() => window.api.explorerReveal(entry.path).catch(notify)}>
           <FolderSearch size={13} /> Show in {FILE_MANAGER}
         </button>
