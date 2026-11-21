@@ -426,8 +426,8 @@ export const CAPTURE_SHORTCUTS = CHOICES.captureShortcut
 const cleanIds = (v: unknown): string[] =>
   Array.isArray(v) ? [...new Set(v.filter((id): id is string => typeof id === 'string' && /^[a-z0-9-]{1,40}$/.test(id)))].slice(0, 50) : []
 
-/** Features that were folded into another one: Sudoku and Minesweeper now live in Mini games. */
-const RENAMED_FEATURES: Record<string, string> = { sudoku: 'mini-games', minesweeper: 'mini-games' }
+/** Features that were folded into another one: Sudoku and Minesweeper now live in Mini games, the video downloader in Downloads. */
+const RENAMED_FEATURES: Record<string, string> = { sudoku: 'mini-games', minesweeper: 'mini-games', downloader: 'downloads' }
 const renameFeatures = (ids: string[]): string[] => [...new Set(ids.map((id) => RENAMED_FEATURES[id] ?? id))]
 
 const isHex = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)

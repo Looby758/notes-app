@@ -789,6 +789,21 @@ export interface NotesApi {
   /** Takes a finished or failed download off the list (the file stays). */
   forgetVideoDownload(id: number): Promise<void>
 
+  // Download manager (main/downloadManager.ts)
+  /** The queue, its settings, and whether it's night. Starts sending changes to onDownloadsState. */
+  downloadsState(): Promise<import('./downloadManager').DmState>
+  onDownloadsState(callback: (state: import('./downloadManager').DmState) => void): () => void
+  /** Adds links to the end of the queue (video pages go to the video downloader when their turn comes). */
+  downloadsAdd(request: import('./downloadManager').DmAddRequest): Promise<import('./downloadManager').DmItem[]>
+  downloadsAct(id: string, action: 'pause' | 'resume' | 'retry' | 'remove' | 'now' | 'tonight' | 'up' | 'down' | 'top'): Promise<void>
+  downloadsAll(action: 'pause' | 'resume' | 'clear'): Promise<void>
+  downloadsSettings(patch: Partial<import('./downloadManager').DmSettings>): Promise<import('./downloadManager').DmState>
+  /** What Steam is downloading or updating (read from its files), with a speed when it's going. */
+  steamDownloads(): Promise<(import('./games').SteamDownload & { speed?: number })[]>
+  /** Opens Steam's install window for a game (Steam asks which drive). */
+  steamInstall(appId: string): Promise<void>
+  steamOpenDownloads(): Promise<void>
+
   // Video player
   /** What's in a video (its tracks need the video helper, ffmpeg) and the subtitle files beside it. */
   videoInfo(path: string): Promise<VideoInfo>
@@ -1428,6 +1443,8 @@ export interface VideoDownloadRequest {
   quality: import('./videoDownload').DownloadQuality
   /** The folder to save it in, inside the notes folder ('' for the top level). Made if it isn't there. */
   folder: string
+  /** From the download manager's queue. */
+  manager?: boolean
 }
 
 /** One video being downloaded from a link (or done, or failed). */
@@ -1447,6 +1464,8 @@ export interface VideoDownload {
   size?: number
   error?: string
   startedAt: number
+  /** Started by the download manager's queue (it shows it there itself). */
+  manager?: boolean
 }
 
 /** Whether ffmpeg (downloaded only when asked, for converting videos and streaming) is on this computer. */
