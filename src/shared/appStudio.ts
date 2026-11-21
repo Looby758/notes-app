@@ -19,6 +19,8 @@ export interface AppInfo {
   changedFiles?: number
   /** "owner/name" when the folder's origin is on GitHub. */
   repo?: string
+  /** The repository's main branch (origin's default), e.g. "main". */
+  mainBranch?: string
   /** A GitHub Actions workflow that runs when a version tag is pushed (it builds and publishes the release). */
   releaseWorkflow?: boolean
   /** package.json scripts that build the app (build, build:win, dist…). */
@@ -275,6 +277,12 @@ export function releaseCommand(windows: boolean, bump: VersionBump): string {
   const version = `npm version ${bump} -m "Release %s"`
   const push = 'git push --follow-tags'
   return windows ? `${version}; if ($LASTEXITCODE -eq 0) { ${push} }` : `${version} && ${push}`
+}
+
+/** Switches to a branch and gets its latest, in the app's terminal. */
+export function switchBranchCommand(windows: boolean, branch: string): string {
+  const b = /^[\w./@+-]+$/.test(branch) ? branch : `"${branch.replace(/"/g, '')}"`
+  return windows ? `git checkout ${b}; if ($LASTEXITCODE -eq 0) { git pull }` : `git checkout ${b} && git pull`
 }
 
 /** A pull request title as a line for people using the app: no "feat:"/"fix(x):" prefix, starting with a capital. */

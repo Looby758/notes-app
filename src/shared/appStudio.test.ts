@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boardKey, bumpVersion, changelogSource, claudePrompt, githubRepo, looksLikeGitHubToken, notesTarget, plainChangelog, prSummary, readBoard, releaseCommand, timeAgo, tryBranchCommand, type BoardItem, type Release } from './appStudio'
+import { boardKey, bumpVersion, changelogSource, claudePrompt, githubRepo, looksLikeGitHubToken, notesTarget, plainChangelog, prSummary, readBoard, releaseCommand, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release } from './appStudio'
 
 describe('githubRepo', () => {
   it('reads https and ssh remotes', () => {
@@ -155,5 +155,12 @@ describe('releases', () => {
     expect(notesTarget('1.3.0', [r('v1.2.0')])).toBe('v1.3.0')
     expect(notesTarget('1.2.0', [r('v1.2.0')])).toBe('v1.3.0')
     expect(notesTarget(undefined, [])).toBeNull()
+  })
+})
+
+describe('switchBranchCommand', () => {
+  it('switches and pulls', () => {
+    expect(switchBranchCommand(false, 'main')).toBe('git checkout main && git pull')
+    expect(switchBranchCommand(true, 'main')).toBe('git checkout main; if ($LASTEXITCODE -eq 0) { git pull }')
   })
 })

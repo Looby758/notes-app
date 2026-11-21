@@ -5,7 +5,7 @@ import '@xterm/xterm/css/xterm.css'
 import { useEditor } from '../store/editor'
 import { commandForKey, type Command } from './commands'
 import { openSpecialTab, TERMINAL_TAB } from './editorController'
-import { releaseCommand, tryBranchCommand, type VersionBump } from '@shared/appStudio'
+import { releaseCommand, switchBranchCommand, tryBranchCommand, type VersionBump } from '@shared/appStudio'
 import { IS_MAC } from '@shared/platform'
 import { commandLabel, findFiles, isErrorLine, keepsRunning, latestAndRunCommand, LineTracker, resolveFrom, runCommandOf } from '@shared/terminalTools'
 import {
@@ -533,6 +533,11 @@ export function tryBranch(project: TerminalProject, branch: string): void {
 /** App Studio's release button: bumps the version, commits and tags it, and pushes, in the project's own terminal. */
 export function releaseApp(project: TerminalProject, bump: VersionBump): void {
   runProjectCommand(project, releaseCommand(IS_WINDOWS, bump))
+}
+
+/** Switches the project to a branch (main, for a release) and gets its latest, in the project's own terminal. */
+export function switchBranch(project: TerminalProject, branch: string): void {
+  runProjectCommand(project, switchBranchCommand(IS_WINDOWS, branch))
 }
 
 const IS_WINDOWS = !IS_MAC && /win/i.test(navigator.platform)

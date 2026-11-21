@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ClipboardCopy, ExternalLink, Hammer, Loader2, RefreshCw, Rocket, Sparkles, Tag, Upload, Wand2 } from 'lucide-react'
+import { AlertTriangle, ClipboardCopy, GitBranch, ExternalLink, Hammer, Loader2, RefreshCw, Rocket, Sparkles, Tag, Upload, Wand2 } from 'lucide-react'
 import { boardKey, bumpVersion, changelogSource, notesTarget, plainChangelog, timeAgo, VERSION_BUMPS, type Release, type VersionBump } from '@shared/appStudio'
 import { useTerminals, type TerminalProject } from '../../store/terminals'
 import { refreshApps, setSection, useAppStudio } from '../../store/appStudio'
 import { lastRelease, loadReleases, putRelease, setNotes, setReleasesApp, useAppReleases } from '../../store/appReleases'
-import { releaseApp, runProjectCommand } from '../../lib/terminal'
+import { releaseApp, runProjectCommand, switchBranch } from '../../lib/terminal'
 import { notify } from '../../store/notify'
 
 /** Releases are read from GitHub again when you come back after this long. */
@@ -120,7 +120,15 @@ function NextRelease({ project, releases }: { project: TerminalProject; releases
   const next = version ? bumpVersion(version, bump) : null
   const last = lastRelease(releases)
   const dirty = (info?.changedFiles ?? 0) > 0
-  const offMain = !!info?.branch && !/^(main|master)$/.test(info.branch)
+  const main = info?.mainBranch ?? 'main'
+  const offMain = !!info?.branch && info.branch !== main
+
+  const toMain = (): void => {
+    switchBranch(project, main)
+    // The card catches up once git has switched.
+    window.setTimeout(() => void refreshApps(), 4000)
+    window.setTimeout(() => void refreshApps(), 10000)
+  }
 
   const release = (): void => {
     if (!confirm) {
@@ -163,12 +171,18 @@ function NextRelease({ project, releases }: { project: TerminalProject; releases
           </div>
           {dirty && (
             <div className="release-warning">
-              <AlertTriangle size={13} /> {info?.changedFiles} file{info?.changedFiles === 1 ? ' isn’t' : 's aren’t'} committed yet. Commit them (or put them away) first.
+              <AlertTriangle size={13} /> {info?.changedFiles === 1 ? '1 file isn’t committed yet. Commit it (or put it away) first.' : `${info?.changedFiles} files aren’t committed yet. Commit them (or put them away) first.`}
             </div>
           )}
-          {offMain && !dirty && (
+          {offMain && (
             <div className="release-warning">
-              <AlertTriangle size={13} /> It’s on the branch <code>{info?.branch}</code>. Releases are usually made from main.
+              <AlertTriangle size={13} />
+              <span>
+                It’s on the branch <code>{info?.branch}</code>. Releases are usually made from {main}.
+              </span>
+              <button className="btn release-warning-btn" disabled={dirty} title={dirty ? 'Commit or put away the changes first' : `Runs git checkout ${main} and git pull in ${project.name}’s terminal`} onClick={toMain}>
+                <GitBranch size={13} /> Switch to {main}
+              </button>
             </div>
           )}
           <div className="appstudio-pull-actions">
