@@ -17,6 +17,8 @@ export interface AppInfo {
   lastChange?: { subject: string; date: string; author: string }
   /** Files changed but not committed. */
   changedFiles?: number
+  /** The first few of them, as git lists them (" M package-lock.json", "?? notes.txt"). */
+  changes?: string[]
   /** "owner/name" when the folder's origin is on GitHub. */
   repo?: string
   /** The repository's main branch (origin's default), e.g. "main". */
@@ -508,4 +510,23 @@ export function newTokenUrl(owner?: string): string {
   const q = new URLSearchParams({ name: 'Orbit App Studio', description: 'Merge, close and release from Orbit’s App Studio', pull_requests: 'write', contents: 'write', metadata: 'read' })
   if (owner) q.set('target_name', owner)
   return `https://github.com/settings/personal-access-tokens/new?${q.toString()}`
+}
+
+// ---------- Uncommitted changes ----------
+
+/** "package-lock.json (changed)" from a line of `git status --porcelain`. */
+export function describeChange(line: string): string {
+  const code = line.slice(0, 2)
+  const file = line.slice(3).replace(/^"(.*)"$/, '$1')
+  const what = code === '??' ? 'new' : code.includes('D') ? 'deleted' : code.includes('R') ? 'renamed' : code.includes('A') ? 'added' : 'changed'
+  return `${file.includes(' -> ') ? file.split(' -> ')[1] : file} (${what})`
+}
+
+/** Puts uncommitted changes (new files too) aside in a git stash, to bring back later with `git stash pop`. */
+export const stashCommand = (): string => 'git stash push --include-untracked -m "Put away by Orbit before a release"'
+
+/** Commits every change, with a message. */
+export function commitAllCommand(windows: boolean, message: string): string {
+  const m = message.replace(/["`$\\]/g, '').trim() || 'Update'
+  return windows ? `git add -A; if ($LASTEXITCODE -eq 0) { git commit -m "${m}" }` : `git add -A && git commit -m "${m}"`
 }

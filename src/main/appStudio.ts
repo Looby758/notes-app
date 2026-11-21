@@ -114,7 +114,7 @@ async function setToken(raw: string): Promise<GitHubStatus> {
 /** Runs git in a folder; its output, or null if git failed. */
 function git(folder: string, args: string[]): Promise<string | null> {
   return new Promise((resolve) => {
-    execFile('git', args, { cwd: folder, timeout: 10_000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 }, (err, stdout) => resolve(err ? null : stdout.trim()))
+    execFile('git', args, { cwd: folder, timeout: 10_000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 }, (err, stdout) => resolve(err ? null : stdout.trimEnd()))
   })
 }
 
@@ -203,6 +203,7 @@ async function appInfo(folder: string): Promise<AppInfo> {
     branch: branch ?? undefined,
     lastChange: subject ? { subject, date, author } : undefined,
     changedFiles: changes ? changes.split('\n').filter(Boolean).length : 0,
+    changes: changes ? changes.split('\n').filter(Boolean).slice(0, 8) : [],
     repo: (remote && githubRepo(remote)) ?? undefined,
     mainBranch,
     buildScripts,

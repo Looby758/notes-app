@@ -5,7 +5,7 @@ import '@xterm/xterm/css/xterm.css'
 import { useEditor } from '../store/editor'
 import { commandForKey, type Command } from './commands'
 import { openSpecialTab, TERMINAL_TAB } from './editorController'
-import { copyRunCommand, releaseCommand, switchBranchCommand, tryBranchCommand, type VersionBump } from '@shared/appStudio'
+import { commitAllCommand, copyRunCommand, releaseCommand, stashCommand, switchBranchCommand, tryBranchCommand, type VersionBump } from '@shared/appStudio'
 import { IS_MAC } from '@shared/platform'
 import { commandLabel, findFiles, isErrorLine, keepsRunning, latestAndRunCommand, LineTracker, resolveFrom, runCommandOf } from '@shared/terminalTools'
 import {
@@ -567,6 +567,16 @@ export function runTestCopy(project: TerminalProject, path: string, branch: stri
 /** Closes a test copy's terminals (ending the app running from it), so its folder can be removed. */
 export function closeCopyTerminals(path: string): void {
   for (const t of useTerminals.getState().terminals) if (t.folder === path) closeTerminal(t.id)
+}
+
+/** Puts the project's uncommitted changes aside (a git stash), in its own terminal. */
+export function stashChanges(project: TerminalProject): void {
+  runProjectCommand(project, stashCommand())
+}
+
+/** Commits all the project's changes, in its own terminal. */
+export function commitChanges(project: TerminalProject, message: string): void {
+  runProjectCommand(project, commitAllCommand(IS_WINDOWS, message))
 }
 
 /** Switches the project to a branch (main, for a release) and gets its latest, in the project's own terminal. */

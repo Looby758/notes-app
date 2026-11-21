@@ -15759,3 +15759,29 @@ button.board-add-picture:hover {
 .appstudio-token-problem .btn {
   text-decoration: none;
 }
+.release-uncommitted {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.release-uncommitted-text {
+  display: flex;
+  gap: 6px;
+}
+.release-uncommitted-text svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.release-uncommitted-text strong {
+  overflow-wrap: anywhere;
+}
+.release-uncommitted-actions,
+.release-commit {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.release-commit .text-input {
+  flex: 1;
+  min-width: 180px;
+}
