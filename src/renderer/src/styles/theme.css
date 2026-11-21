@@ -14562,3 +14562,11 @@ a.appstudio-repo:hover {
   text-transform: uppercase;
   line-height: 16px;
 }
+.appstudio-testcopy {
+  margin-top: 16px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: rgba(210, 146, 21, 0.14);
+  color: var(--text);
+  font-size: 13px;
+}

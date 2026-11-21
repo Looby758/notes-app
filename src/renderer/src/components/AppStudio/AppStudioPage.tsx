@@ -65,6 +65,7 @@ export default function AppStudioPage() {
             {loading ? <Loader2 size={15} className="spin" /> : <RefreshCw size={15} />}
           </button>
         </header>
+        <TestCopyNote />
         <nav className="appstudio-tabs">
           <button className={section === 'apps' ? 'active' : ''} onClick={() => setSection('apps')}>
             My apps <span className="appstudio-count">{projects.length}</span>
@@ -356,6 +357,24 @@ function GitHubConnect() {
           <ExternalLink size={13} /> Make a token
         </a>
       </form>
+    </div>
+  )
+}
+
+/** In a test copy (started from Orbit's code), App Studio starts empty: its apps are set up in your normal Orbit. */
+function TestCopyNote() {
+  const [test, setTest] = useState(false)
+  useEffect(() => {
+    window.api
+      .appsIsTestCopy()
+      .then(setTest)
+      .catch(() => undefined)
+  }, [])
+  if (!test) return null
+  return (
+    <div className="appstudio-testcopy">
+      This is Orbit’s <strong>test copy</strong>, with its own settings, so your apps aren’t here. Use App Studio in your normal Orbit to try and merge things, and use
+      this copy to test them.
     </div>
   )
 }

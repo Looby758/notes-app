@@ -104,6 +104,9 @@ let hubReleased: Promise<void> = Promise.resolve()
 
 logCrashes()
 
+// Each part of the app tidies up as it quits; there are more than Node's default warning level of 10.
+app.setMaxListeners(30)
+
 // The app used to be called Notes: keep its data folder so settings and sign-ins carry over.
 // A test copy (started from the code) has its own, so it can run next to your normal Orbit.
 app.setPath('userData', join(app.getPath('appData'), TEST_COPY ? TEST_COPY_FOLDER : 'Notes'))
@@ -849,7 +852,8 @@ function registerIpc(): void {
   ipcMain.handle('ai:saveChats', (_e, chats: AiChat[]) => ai.saveChats(chats))
   ipcMain.handle('handwriting:read', (_e, png: Uint8Array, reader: 'ai' | 'offline') => (reader === 'ai' ? ai.readHandwriting(png) : readHandwritingOffline(png)))
 
-  ipcMain.handle('vault:readAppData', (_e, name: string) => currentVault().readAppData(name))
+  // Before a notes folder is picked (a fresh start), there's nothing saved yet.
+  ipcMain.handle('vault:readAppData', (_e, name: string) => (vault ? vault.readAppData(name) : null))
   ipcMain.handle('vault:writeAppData', (_e, name: string, content: string) => currentVault().writeAppData(name, content))
   ipcMain.handle('safe:read', (_e, id: string) => currentVault().readSafeFile(id))
   ipcMain.handle('safe:write', (_e, id: string, data: Uint8Array) => currentVault().writeSafeFile(id, data))
