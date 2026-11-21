@@ -27,6 +27,7 @@ import {
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
+  PDF_EDITOR_TAB,
   COMICS_TAB,
   WIKI_TAB,
   MINIGAMES_TAB,
@@ -74,6 +75,7 @@ import GrokPage from '../Grok/GrokPage'
 import HomePage from '../Home/HomePage'
 import MoneyPage from '../Money/MoneyPage'
 import ConvertPage from '../Convert/ConvertPage'
+import PdfEditorPage from '../PdfEditor/PdfEditorPage'
 import VideoDownloaderPage from '../Downloader/VideoDownloaderPage'
 import MiniGamesPage from '../MiniGames/MiniGamesPage'
 import ComicsPage from '../Comics/ComicsPage'
@@ -218,6 +220,7 @@ export default function Pane({ pane }: { pane: string }) {
         {(active === HOME_TAB || !active) && <HomePage />}
         {active === MONEY_TAB && <MoneyPage />}
         {active === CONVERT_TAB && <ConvertPage />}
+        {active === PDF_EDITOR_TAB && <PdfEditorPage />}
         {active === COMICS_TAB && <ComicsPage />}
         {active === WIKI_TAB && <WikiPage />}
         {active === MINIGAMES_TAB && <MiniGamesPage />}
