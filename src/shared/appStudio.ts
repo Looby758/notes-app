@@ -491,3 +491,21 @@ export function shotsByFeature(shots: Shot[]): { feature: string; shots: Shot[];
     })
     .sort((a, b) => Date.parse(b.latest) - Date.parse(a.latest))
 }
+
+// ---------- Token permissions ----------
+
+/** The start of the message shown when GitHub says the token isn't allowed to do something. */
+export const TOKEN_NOT_ALLOWED = 'Your GitHub token isn’t allowed to'
+
+export const isTokenPermissionError = (message: string): boolean => message.includes(TOKEN_NOT_ALLOWED)
+
+/**
+ * GitHub's page for making a fine-grained token, filled in with what App Studio needs: Pull
+ * requests and Contents set to read and write (merging, closing, release notes), for the owner's
+ * repositories.
+ */
+export function newTokenUrl(owner?: string): string {
+  const q = new URLSearchParams({ name: 'Orbit App Studio', description: 'Merge, close and release from Orbit’s App Studio', pull_requests: 'write', contents: 'write', metadata: 'read' })
+  if (owner) q.set('target_name', owner)
+  return `https://github.com/settings/personal-access-tokens/new?${q.toString()}`
+}

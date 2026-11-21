@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boardKey, bumpVersion, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
+import { boardKey, isTokenPermissionError, newTokenUrl, TOKEN_NOT_ALLOWED, bumpVersion, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
 
 describe('githubRepo', () => {
   it('reads https and ssh remotes', () => {
@@ -240,5 +240,17 @@ describe('screenshots', () => {
     expect(data.claude).toEqual({ x: 'https://claude.ai/project/1' })
     expect(data.shots).toEqual([{ id: 's', app: 'x', feature: 'Other', picture: 'a.png', date: new Date(0).toISOString(), note: undefined, source: undefined }])
     expect(readBoard(null)).toEqual({ items: [], claude: {}, shots: [] })
+  })
+})
+
+describe('token permissions', () => {
+  it('links to a token with the right permissions', () => {
+    const url = new URL(newTokenUrl('Looby758'))
+    expect(url.pathname).toBe('/settings/personal-access-tokens/new')
+    expect(url.searchParams.get('pull_requests')).toBe('write')
+    expect(url.searchParams.get('contents')).toBe('write')
+    expect(url.searchParams.get('target_name')).toBe('Looby758')
+    expect(isTokenPermissionError(`${TOKEN_NOT_ALLOWED} merge pull requests on a/b.`)).toBe(true)
+    expect(isTokenPermissionError('GitHub said no (403).')).toBe(false)
   })
 })

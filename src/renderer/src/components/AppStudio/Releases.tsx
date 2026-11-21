@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ClipboardCopy, GitBranch, ExternalLink, Hammer, Loader2, RefreshCw, Rocket, Sparkles, Tag, Upload, Wand2 } from 'lucide-react'
-import { boardKey, bumpVersion, changelogSource, notesTarget, plainChangelog, timeAgo, VERSION_BUMPS, type Release, type VersionBump } from '@shared/appStudio'
+import { boardKey, bumpVersion, isTokenPermissionError, changelogSource, notesTarget, plainChangelog, timeAgo, VERSION_BUMPS, type Release, type VersionBump } from '@shared/appStudio'
 import { useTerminals, type TerminalProject } from '../../store/terminals'
 import { refreshApps, setSection, useAppStudio } from '../../store/appStudio'
 import { lastRelease, loadReleases, putRelease, setNotes, setReleasesApp, useAppReleases } from '../../store/appReleases'
 import { releaseApp, runProjectCommand, switchBranch } from '../../lib/terminal'
 import { notify } from '../../store/notify'
+import TokenProblem from './TokenProblem'
+import { errorMessage } from '../../lib/paths'
 
 /** Releases are read from GitHub again when you come back after this long. */
 const FRESH_MS = 2 * 60_000
@@ -219,6 +221,7 @@ function WhatsNew({ project, repo }: { project: TerminalProject; repo: string })
   const [aiReady, setAiReady] = useState(false)
   const [writing, setWriting] = useState(false)
   const [sending, setSending] = useState(false)
+  const [tokenProblem, setTokenProblem] = useState('')
   const merged = data?.merged ?? []
   const releases = data?.releases ?? []
   const last = lastRelease(releases)
@@ -255,8 +258,11 @@ function WhatsNew({ project, repo }: { project: TerminalProject; repo: string })
       const r = await window.api.appsSetReleaseNotes(repo, chosen, notes, `${project.name} ${chosen.replace(/^v/, '')}`)
       putRelease(repo, r)
       notify(r.draft ? `Put the notes on the ${r.tag} draft release.` : `Updated the notes on release ${r.tag}.`, 'info')
+      setTokenProblem('')
     } catch (err) {
-      notify(err)
+      const message = errorMessage(err)
+      if (isTokenPermissionError(message)) setTokenProblem(message)
+      else notify(err)
     } finally {
       setSending(false)
     }
@@ -335,6 +341,7 @@ function WhatsNew({ project, repo }: { project: TerminalProject; repo: string })
           </span>
         )}
       </div>
+      {tokenProblem && <TokenProblem message={tokenProblem} owner={repo.split('/')[0]} onDone={() => setTokenProblem('')} />}
     </section>
   )
 }

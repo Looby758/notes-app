@@ -2,7 +2,7 @@ import { app, ipcMain, net, safeStorage } from 'electron'
 import { execFile } from 'child_process'
 import { existsSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'path'
-import { copyFolderName, githubRepo, isGitHubImage, type AppInfo, type TestCopy, type GitHubStatus, type MergedPull, type PullRequest, type Release } from '@shared/appStudio'
+import { copyFolderName, githubRepo, isGitHubImage, TOKEN_NOT_ALLOWED, type AppInfo, type TestCopy, type GitHubStatus, type MergedPull, type PullRequest, type Release } from '@shared/appStudio'
 import { logError } from './log'
 import { TEST_COPY } from './testCopy'
 
@@ -61,7 +61,7 @@ class GitHubError extends Error {
   }
 }
 
-async function github<T>(path: string, init: { method?: string; body?: unknown; key?: string | null } = {}): Promise<T> {
+async function github<T>(path: string, init: { method?: string; body?: unknown; key?: string | null; doing?: string; needs?: string } = {}): Promise<T> {
   const key = init.key === undefined ? token() : init.key
   const headers: Record<string, string> = { Accept: 'application/vnd.github+json', 'User-Agent': 'Orbit', 'X-GitHub-Api-Version': '2022-11-28' }
   if (key) headers.Authorization = `Bearer ${key}`
@@ -78,6 +78,14 @@ async function github<T>(path: string, init: { method?: string; body?: unknown; 
       message = ((await res.json()) as { message?: string }).message ?? ''
     } catch {
       // No details.
+    }
+    // A fine-grained token without the permission (or without this repository) gets this.
+    if (res.status === 403 && /resource not accessible by (personal access token|integration)/i.test(message)) {
+      const repo = /^\/repos\/([^/]+\/[^/]+)/.exec(path)?.[1]
+      throw new GitHubError(
+        `${TOKEN_NOT_ALLOWED} ${init.doing ?? 'do that'}${repo ? ` on ${repo}` : ''}. It needs ${init.needs ?? 'Pull requests and Contents'} set to “Read and write”${repo ? `, with ${repo} in its repositories` : ''}. Make a new token with those and paste it into App Studio.`,
+        403
+      )
     }
     if (res.status === 401) throw new GitHubError('GitHub didn’t accept your token. Connect GitHub again in App Studio.', 401)
     if (res.status === 403 && /rate limit/i.test(message)) throw new GitHubError('GitHub says too many requests for now. Connect GitHub (or wait an hour) to see more.', 403)
@@ -325,8 +333,8 @@ async function setReleaseNotes(repo: string, tag: string, body: string, title: s
   const list = await github<ApiRelease[]>(`/repos/${repo}/releases?per_page=30`)
   const found = list.find((r) => r.tag_name === tag)
   const r = found
-    ? await github<ApiRelease>(`/repos/${repo}/releases/${found.id}`, { method: 'PATCH', body: { body } })
-    : await github<ApiRelease>(`/repos/${repo}/releases`, { method: 'POST', body: { tag_name: tag, name: title, body, draft: true } })
+    ? await github<ApiRelease>(`/repos/${repo}/releases/${found.id}`, { method: 'PATCH', body: { body }, doing: 'change releases', needs: 'Contents' })
+    : await github<ApiRelease>(`/repos/${repo}/releases`, { method: 'POST', body: { tag_name: tag, name: title, body, draft: true }, doing: 'make releases', needs: 'Contents' })
   return { tag: r.tag_name, name: r.name || r.tag_name, date: r.published_at ?? r.created_at, draft: r.draft, prerelease: r.prerelease, url: r.html_url, body: r.body ?? '' }
 }
 
@@ -408,7 +416,7 @@ export function setupAppStudio(): void {
     if (!validRepo(repo) || typeof number !== 'number') throw new Error('Not allowed')
     needToken()
     try {
-      await github(`/repos/${repo}/pulls/${number}/merge`, { method: 'PUT', body: { merge_method: 'merge' } })
+      await github(`/repos/${repo}/pulls/${number}/merge`, { method: 'PUT', body: { merge_method: 'merge' }, doing: 'merge pull requests', needs: 'Pull requests and Contents' })
     } catch (err) {
       logError('app studio merge', err)
       throw err
@@ -417,6 +425,6 @@ export function setupAppStudio(): void {
   ipcMain.handle('apps:close', async (_e, repo: unknown, number: unknown) => {
     if (!validRepo(repo) || typeof number !== 'number') throw new Error('Not allowed')
     needToken()
-    await github(`/repos/${repo}/pulls/${number}`, { method: 'PATCH', body: { state: 'closed' } })
+    await github(`/repos/${repo}/pulls/${number}`, { method: 'PATCH', body: { state: 'closed' }, doing: 'close pull requests', needs: 'Pull requests' })
   })
 }

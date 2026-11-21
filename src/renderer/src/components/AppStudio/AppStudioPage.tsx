@@ -20,7 +20,7 @@ import {
   Play,
   ChevronDown
 } from 'lucide-react'
-import { boardKey, pullKey, prSummary, timeAgo, type PullRequest, type TestCopy } from '@shared/appStudio'
+import { boardKey, isTokenPermissionError, newTokenUrl, pullKey, prSummary, timeAgo, type PullRequest, type TestCopy } from '@shared/appStudio'
 import { FILE_MANAGER } from '@shared/platform'
 import { addProject, removeProject, updateProject, useTerminals, type TerminalProject } from '../../store/terminals'
 import { appRepos, dropPull, makeCopy, refreshApps, refreshGithub, refreshPulls, removeCopy, setGithub, setSection, useAppStudio } from '../../store/appStudio'
@@ -31,6 +31,7 @@ import { linkPull, useAppBoard } from '../../store/appBoard'
 import Board from './Board'
 import Releases from './Releases'
 import Screenshots from './Screenshots'
+import TokenProblem from './TokenProblem'
 
 /** Pull requests are fetched again when you come back after this long. */
 const PULLS_FRESH_MS = 2 * 60_000
@@ -335,6 +336,7 @@ function PullCard({ pull, canAct }: { pull: PullRequest; canAct: boolean }) {
   const [confirm, setConfirm] = useState<'merge' | 'close' | null>(null)
   const [busy, setBusy] = useState(false)
   const [menu, setMenu] = useState(false)
+  const [tokenProblem, setTokenProblem] = useState('')
   const summary = prSummary(pull.body)
   const making = useAppStudio((s) => (project ? !!s.making[`${project.folder}|${pull.branch}`] : false))
   const hasCopy = useAppStudio((s) => (project ? !!s.copies[project.folder]?.some((c) => s.copyInfo[c.path]?.branch === pull.branch) : false))
@@ -364,7 +366,9 @@ function PullCard({ pull, canAct }: { pull: PullRequest; canAct: boolean }) {
       notify(what === 'merge' ? `Merged #${pull.number} into ${pull.base}.` : `Closed #${pull.number}.`, 'info')
       void refreshApps()
     } catch (err) {
-      notify(err)
+      const message = err instanceof Error ? err.message : String(err)
+      if (isTokenPermissionError(message)) setTokenProblem(message.replace(/^Error invoking remote method '[^']+': (\w*Error: )?/, ''))
+      else notify(err)
       setConfirm(null)
     } finally {
       setBusy(false)
@@ -394,6 +398,7 @@ function PullCard({ pull, canAct }: { pull: PullRequest; canAct: boolean }) {
           </span>
         )}
       </div>
+      {tokenProblem && <TokenProblem message={tokenProblem} owner={pull.repo.split('/')[0]} onDone={() => setTokenProblem('')} />}
       {project && <ForCard pull={pull} appKeys={[pull.repo, project.name, boardKey({ name: project.name, repo: pull.repo })]} />}
       {summary.length > 0 && (
         <ul className="appstudio-pull-summary">
@@ -508,7 +513,7 @@ function GitHubConnect() {
         <button className="btn btn-primary" type="submit" disabled={busy || !token.trim()}>
           {busy ? <Loader2 size={14} className="spin" /> : null} Connect
         </button>
-        <a className="link-button" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer">
+        <a className="link-button" href={newTokenUrl(appRepos(useAppStudio.getState().info)[0]?.split('/')[0])} target="_blank" rel="noreferrer">
           <ExternalLink size={13} /> Make a token
         </a>
       </form>
@@ -563,3 +568,4 @@ function ForCard({ pull, appKeys }: { pull: PullRequest; appKeys: string[] }) {
     </div>
   )
 }
+

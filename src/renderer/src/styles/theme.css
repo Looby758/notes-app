@@ -15742,3 +15742,20 @@ button.board-add-picture:hover {
 .shots-viewer-fields .text-input {
   flex: 1;
 }
+.appstudio-token-problem {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, #e5a50a 45%, transparent);
+  background: color-mix(in srgb, #e5a50a 12%, transparent);
+  font-size: 13px;
+}
+.appstudio-token-problem p {
+  margin: 0;
+  color: var(--text);
+}
+.appstudio-token-problem .btn {
+  text-decoration: none;
+}
