@@ -342,6 +342,7 @@ export const commands: Command[] = [
   },
   { id: 'episode.find', group: 'Navigation', title: 'Find everything from an episode (S4E9) or comic issue…', run: () => useUI.setState({ modal: 'episode' }) },
   { id: 'terminal.open', group: 'Navigation', title: 'Open terminal (command line in the notes folder)', shortcut: 'Ctrl+Alt+T', run: () => openSpecialTab(TERMINAL_TAB) },
+  { id: 'terminal.new', group: 'Navigation', title: 'New terminal (another command line, in the notes folder)', run: () => void import('./terminal').then((t) => t.newTerminal()) },
   { id: 'money.open', group: 'Navigation', title: 'Open money tracker', shortcut: 'Ctrl+Shift+B', run: () => openSpecialTab(MONEY_TAB) },
   { id: 'convert.open', group: 'Navigation', title: 'Convert files (photos, Word, audio…)', run: () => openSpecialTab(CONVERT_TAB) },
   { id: 'explorer.open', group: 'Navigation', title: 'Browse files on this computer (and Google Drive)', run: () => openSpecialTab(EXPLORER_TAB) },

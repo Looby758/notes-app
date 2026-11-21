@@ -7008,16 +7008,334 @@ body.theme-light .flashcard-grade.grade-easy span {
 }
 .terminal-page {
   min-height: 0;
-  padding: 8px 4px 4px 12px;
+  display: flex;
+  flex-direction: column;
   background: var(--bg);
+  overflow: hidden;
+}
+.terminal-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 0 10px;
+  min-height: 38px;
+}
+.terminal-chips {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.terminal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 4px 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-size: 12.5px;
+}
+.terminal-chip:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.terminal-chip.active {
+  background: var(--bg-raised);
+  border-color: var(--border);
+  color: var(--text-strong);
+}
+.terminal-chip-name {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.terminal-chip-rename {
+  width: 140px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+.terminal-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  flex-shrink: 0;
+}
+.terminal-dot.on {
+  background: #3fb950;
+  box-shadow: 0 0 0 2px rgba(63, 185, 80, 0.2);
+}
+.terminal-chip-errors {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #e5484d;
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+}
+.terminal-chip-close {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  opacity: 0;
+}
+.terminal-chip:hover .terminal-chip-close,
+.terminal-chip.active .terminal-chip-close {
+  opacity: 1;
+}
+.terminal-chip-close:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.terminal-actions {
+  display: flex;
+  gap: 2px;
+  padding-left: 6px;
+  border-left: 1px solid var(--border);
+}
+.terminal-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.terminal-host {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 8px 4px 4px 12px;
   overflow: hidden;
 }
 .terminal-screen {
   width: 100%;
   height: 100%;
 }
+.terminal-screen[hidden] {
+  display: none;
+}
 .terminal-screen .xterm-viewport {
   background: transparent !important;
+}
+.terminal-panel {
+  width: 270px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  border-left: 1px solid var(--border);
+  background: var(--bg-panel);
+  padding: 10px 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 13px;
+}
+.terminal-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.terminal-panel-empty p {
+  margin: 0 0 10px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.terminal-project {
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.terminal-project-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.terminal-project-name {
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.terminal-project-name-input {
+  flex: 1;
+  width: auto;
+  height: 28px;
+}
+.terminal-project-folder {
+  margin-top: -6px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.terminal-run-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.terminal-run-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.terminal-run-btn svg {
+  color: var(--accent);
+}
+.terminal-run-btn:hover,
+.terminal-run-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.terminal-fill {
+  display: flex;
+  gap: 6px;
+}
+.terminal-fill .text-input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+.terminal-fill .btn {
+  padding: 6px 12px;
+}
+.terminal-command-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.terminal-command-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.terminal-command-list code,
+.terminal-history code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.terminal-add-command .text-input {
+  width: 100%;
+}
+.terminal-hint {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+.terminal-project-edit-actions {
+  display: flex;
+  justify-content: space-between;
+}
+.terminal-history {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.terminal-history-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-faint);
+}
+.terminal-history-search:focus-within {
+  border-color: var(--accent);
+}
+.terminal-history-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+.terminal-history ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.terminal-history li {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.terminal-history li .icon-btn {
+  width: 22px;
+  height: 22px;
+  opacity: 0;
+}
+.terminal-history li:hover .icon-btn {
+  opacity: 1;
+}
+.terminal-history-run {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.terminal-history-run:hover {
+  background: var(--bg-hover);
+}
+/* Red dot on the Terminal tab when a command printed an error you haven't seen. */
+.tab-error-dot {
+  width: 7px;
+  height: 7px;
+  margin-left: 2px;
+  border-radius: 50%;
+  background: #e5484d;
+  flex-shrink: 0;
 }
 /* ---------- Web browser tab ---------- */
 
