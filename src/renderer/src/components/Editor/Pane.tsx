@@ -35,7 +35,6 @@ import {
   PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
-  DOWNLOADER_TAB,
   DOWNLOADS_TAB,
   STUDIO_TAB,
   CLIPS_TAB,
@@ -75,7 +74,6 @@ import GrokPage from '../Grok/GrokPage'
 import HomePage from '../Home/HomePage'
 import MoneyPage from '../Money/MoneyPage'
 import ConvertPage from '../Convert/ConvertPage'
-import VideoDownloaderPage from '../Downloader/VideoDownloaderPage'
 import DownloadsPage from '../Downloads/DownloadsPage'
 import MiniGamesPage from '../MiniGames/MiniGamesPage'
 import ComicsPage from '../Comics/ComicsPage'
@@ -228,7 +226,6 @@ export default function Pane({ pane }: { pane: string }) {
         {active === PUBLISHING_TAB && <PublishingPage />}
         {active === SCREENS_TAB && <ScreensPage />}
         {active === MIXER_TAB && <MixerPage />}
-        {active === DOWNLOADER_TAB && <VideoDownloaderPage />}
         {active === DOWNLOADS_TAB && <DownloadsPage />}
         {active === STUDIO_TAB && <StudioPage />}
         {active === CLIPS_TAB && <ClipsPage />}

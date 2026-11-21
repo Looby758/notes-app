@@ -6,6 +6,7 @@ import {
   ChevronDown,
   Cpu,
   ExternalLink,
+  FileInput,
   FileDown,
   Folder,
   Gamepad2,
@@ -22,7 +23,7 @@ import {
   X,
   Zap
 } from 'lucide-react'
-import type { LocalAiState, VideoDownload } from '@shared/types'
+import type { LocalAiState, VideoDownload, VideoDownloaderState } from '@shared/types'
 import type { WebDownload } from '@shared/browser'
 import { DOWNLOAD_QUALITIES, type DownloadQuality } from '@shared/videoDownload'
 import { localModelById } from '@shared/localAi'
@@ -44,10 +45,10 @@ import { usePrefs } from '../../store/prefs'
 import { notify } from '../../store/notify'
 import { showInFiles } from '../../store/filesReveal'
 import { openVaultVideo } from '../../store/videoPlayer'
-import { openFileTab } from '../../lib/editorController'
+import { insertIntoActiveNote, openFileTab } from '../../lib/editorController'
 import { openDownload } from '../Web/Downloads'
 import FolderPicker from '../Web/FolderPicker'
-import { SaveTo } from '../Downloader/VideoDownloaderPage'
+import { SaveTo, SetupBox } from './videoParts'
 
 /**
  * The download manager tab: paste links and they download a few at a time, in order. Each one can
@@ -179,6 +180,18 @@ function QueueItem({ d, state, first, last }: { d: DmItem; state: DmState; first
             <button className="icon-btn" title="Open (inside Orbit where it can)" onClick={() => openItem(d)} data-dm-open>
               <ExternalLink size={14} />
             </button>
+            {d.kind === 'video' && (
+              <button
+                className="icon-btn"
+                title="Put it in the note that's open"
+                onClick={() => {
+                  if (!insertIntoActiveNote(d.path!)) notify('Open a note in the other side first, then try again.', 'info')
+                }}
+                data-dm-insert
+              >
+                <FileInput size={14} />
+              </button>
+            )}
             <button
               className="icon-btn"
               title="Show in folder"
@@ -387,6 +400,7 @@ export default function DownloadsPage() {
   const [state, setState] = useState<DmState | null>(null)
   const [videos, setVideos] = useState<VideoDownload[]>([])
   const [ai, setAi] = useState<LocalAiState | null>(null)
+  const [setup, setSetup] = useState<VideoDownloaderState | null>(null)
   const [text, setText] = useState('')
   const [quality, setQuality] = useState<DownloadQuality>('1080')
   const [fileFolder, setFileFolder] = useState<string | null>(() => localStorage.getItem(FILE_FOLDER_KEY))
@@ -401,6 +415,8 @@ export default function DownloadsPage() {
     void window.api.downloadsState().then(setState)
     void window.api.videoDownloads().then(setVideos)
     void window.api.localAiState().then(setAi)
+    void window.api.videoDownloaderState().then(setSetup)
+    const d = window.api.onVideoDownloaderState(setSetup)
     const a = window.api.onDownloadsState(setState)
     const b = window.api.onVideoDownloads(setVideos)
     const c = window.api.onLocalAiState(setAi)
@@ -411,6 +427,7 @@ export default function DownloadsPage() {
       a()
       b()
       c()
+      d()
       clearInterval(t)
     }
   }, [])
@@ -461,7 +478,7 @@ export default function DownloadsPage() {
           <ArrowDownToLine size={18} /> Downloads
         </h2>
         <p className="convert-intro">
-          Paste links to files (or YouTube, TikTok… videos) and they download in order, {state.settings.atOnce === 1 ? 'one at a time' : `${state.settings.atOnce} at a time`}. Pause any of them and carry on later,
+          Paste links to files, or to videos on YouTube, X, Instagram, TikTok, Reddit, Twitch and more, and they download in order, {state.settings.atOnce === 1 ? 'one at a time' : `${state.settings.atOnce} at a time`}. Pause any of them and carry on later,
           even after closing Orbit, or leave big ones for the night.
         </p>
 
@@ -524,7 +541,7 @@ export default function DownloadsPage() {
             <div className="dm-video-row" data-dm-video-options>
               <Video size={14} />
               <span>
-                {videoLinks === links.length ? (videoLinks === 1 ? 'That’s a video page' : 'Those are video pages') : `${videoLinks} of those are video pages`}: the video downloader gets the video itself.
+                {videoLinks === links.length ? (videoLinks === 1 ? 'That’s a video page' : 'Those are video pages') : `${videoLinks} of those are video pages`}: Orbit saves the video itself, not the page.
               </span>
               <select className="select" value={quality} onChange={(e) => setQuality(e.target.value as DownloadQuality)}>
                 {DOWNLOAD_QUALITIES.map((q) => (
@@ -542,6 +559,7 @@ export default function DownloadsPage() {
               />
             </div>
           )}
+          {videoLinks > 0 && setup && <SetupBox setup={setup} onGet={() => void window.api.getVideoDownloader().then(setSetup).catch(notify)} />}
         </div>
 
         <div className={`dm-night ${state.night ? 'on' : ''}`} data-dm-night>

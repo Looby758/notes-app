@@ -48,7 +48,6 @@ import {
   Webcam,
   Zap,
   Headphones,
-  CloudDownload,
   History,
   Scissors,
   Bot,
@@ -96,7 +95,6 @@ import {
   PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
-  DOWNLOADER_TAB,
   DOWNLOADS_TAB,
   MONEY_TAB,
   PASSWORDS_TAB,
@@ -221,7 +219,6 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   snip: { icon: Scan, run: () => void startSnip() },
   explorer: { icon: HardDrive, run: () => openSpecialTab(EXPLORER_TAB) },
   convert: { icon: ArrowRightLeft, run: () => openSpecialTab(CONVERT_TAB) },
-  downloader: { icon: CloudDownload, run: () => openSpecialTab(DOWNLOADER_TAB) },
   downloads: { icon: ArrowDownToLine, run: () => openSpecialTab(DOWNLOADS_TAB) },
   'offline-ai': {
     icon: Cpu,
