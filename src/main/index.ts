@@ -47,6 +47,7 @@ import { setupSettingsHealth } from './settingsHealth'
 import { setupExport } from './exporter'
 import { setupConverter } from './converter'
 import { setupVideoDownloader } from './videoDownload'
+import { setupSoundFromLink } from './soundFromLink'
 import { setupDownloadManager } from './downloadManager'
 import { isAppPage, setupStudio } from './studio'
 import { applyReplayShortcut, clipResponse, setupClips } from './clips'
@@ -1072,6 +1073,7 @@ app.whenReady().then(async () => {
   safely('studio', setupStudio)
   safely('offline AI', setupLocalAi)
   safely('soundboard', setupSoundboard)
+  safely('soundboard from a link', setupSoundFromLink)
   safely('macros', setupMacros)
   safely('Discord voice', setupDiscord)
   safely('Discord voice pop-out', () => setupDiscordPopout(currentPrefs))

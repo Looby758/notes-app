@@ -873,6 +873,13 @@ export interface NotesApi {
   soundboardMove(id: string, to: number): Promise<SoundboardStatus>
   soundboardOpenLink(which: 'cable' | 'blackhole'): Promise<void>
   soundboardShowFolder(): Promise<void>
+  /** From a link: downloads a video's sound (YouTube, TikTok…) to pick a part from. `id` is the caller's own, to match progress to it. */
+  soundLinkFetch(id: string, link: string): Promise<{ title: string; bytes: Uint8Array; name: string }>
+  /** Cuts the picked part (seconds) of a fetched sound and adds it to the board as a button. */
+  soundLinkMake(id: string, start: number, end: number, name: string): Promise<{ status: SoundboardStatus; skipped: string[] }>
+  /** Stops a download, or throws away a fetched sound. */
+  soundLinkForget(id: string): Promise<void>
+  onSoundLinkProgress(callback: (id: string, done: number | null) => void): () => void
   /** A soundboard hotkey was pressed (anywhere, even in a game). */
   onSoundboardHotkey(callback: (action: SoundboardAction) => void): () => void
   onSoundboardChanged(callback: (status: SoundboardStatus) => void): () => void

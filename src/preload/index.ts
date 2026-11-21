@@ -386,6 +386,14 @@ const api: NotesApi = {
   soundboardMove: (id, to) => ipcRenderer.invoke('soundboard:move', id, to),
   soundboardOpenLink: (which) => ipcRenderer.invoke('soundboard:open-link', which),
   soundboardShowFolder: () => ipcRenderer.invoke('soundboard:show-folder'),
+  soundLinkFetch: (id, link) => ipcRenderer.invoke('soundLink:fetch', id, link),
+  soundLinkMake: (id, start, end, name) => ipcRenderer.invoke('soundLink:make', id, start, end, name),
+  soundLinkForget: (id) => ipcRenderer.invoke('soundLink:forget', id),
+  onSoundLinkProgress: (callback) => {
+    const handler = (_e: unknown, id: string, done: number | null): void => callback(id, done)
+    ipcRenderer.on('soundLink:progress', handler)
+    return () => ipcRenderer.removeListener('soundLink:progress', handler)
+  },
   onSoundboardHotkey: (callback) => {
     const handler = (_e: unknown, action: Parameters<typeof callback>[0]): void => callback(action)
     ipcRenderer.on('soundboard:hotkey', handler)
