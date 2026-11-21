@@ -2,7 +2,7 @@ import { app, BrowserWindow, desktopCapturer, globalShortcut, ipcMain, nativeIma
 import { spawn, type ChildProcess } from 'child_process'
 import { randomUUID } from 'crypto'
 import { createReadStream, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
-import { mkdir, readdir, readFile, rm, stat, writeFile } from 'fs/promises'
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'fs/promises'
 import { basename, dirname, extname, isAbsolute, join, resolve } from 'path'
 import { Readable } from 'stream'
 import { acceleratorLabel, SYSTEM_NAME } from '@shared/platform'
@@ -10,19 +10,32 @@ import {
   clipArgs,
   clipFileName,
   clipLength,
+  clipRelPath,
+  clipTitle,
+  cleanClipsMeta,
+  cleanFolderName,
   cleanWebhookUrl,
   concatList,
   DISCORD_LIMIT,
   discordPayload,
+  editedClipName,
+  folderForGame,
+  gameClipName,
   isClipFile,
   parseRange,
+  withFavourite,
+  withGameFolder,
+  withMovedClip,
+  withRenamedFolder,
   type ClipExport,
+  type ClipsMeta,
   type DiscordHook
 } from '@shared/clips'
 import type { ClipInfo } from '@shared/types'
 import { ffmpegPath } from './ffmpeg'
 import { parseTime } from './videoArgs'
 import { defaultRecordingsFolder, isAppPage } from './studio'
+import { runningGameNames } from './games'
 import { logError } from './log'
 
 /**
@@ -46,18 +59,49 @@ let clipsFolder = ''
 
 const folderOf = (folder: unknown): string => (typeof folder === 'string' && folder && isAbsolute(folder) ? resolve(folder) : defaultRecordingsFolder())
 
-/** A video in the recordings folder, or an error: nothing outside it is touched. */
+// ---------- game folders and stars (.orbit-clips.json in the recordings folder) ----------
+
+const metaFile = (dir: string): string => join(dir, '.orbit-clips.json')
+
+function readMeta(dir: string): ClipsMeta {
+  try {
+    return cleanClipsMeta(JSON.parse(readFileSync(metaFile(dir), 'utf8')))
+  } catch {
+    return cleanClipsMeta(null)
+  }
+}
+
+function writeMeta(dir: string, meta: ClipsMeta): void {
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(metaFile(dir), JSON.stringify(meta, null, 2))
+}
+
+/** "SkyBlock/clip.mp4" for a clip in a game folder, "clip.mp4" at the top. */
+function relOf(dir: string, full: string): string {
+  const parent = dirname(full)
+  return parent === dir ? basename(full) : `${basename(parent)}/${basename(full)}`
+}
+
+/**
+ * A video in the recordings folder (at its top, or in one of its game folders), or an error:
+ * nothing outside it is touched.
+ */
 function clipPath(folder: unknown, path: unknown): string {
   const dir = folderOf(folder)
   const full = typeof path === 'string' ? resolve(path) : ''
-  if (!full || dirname(full) !== dir || !isClipFile(basename(full)) || !existsSync(full)) throw new Error('That video isn’t in your recordings folder any more.')
+  const parent = full ? dirname(full) : ''
+  const inside = parent === dir || (dirname(parent) === dir && readMeta(dir).folders.includes(basename(parent)))
+  if (!full || !inside || !isClipFile(basename(full)) || !existsSync(full)) throw new Error('That video isn’t in your recordings folder any more.')
   return full
 }
 
-/** For vault://clips/<name>: a video in the folder the clip editor is showing. */
+/** For vault://clips/<name>: a video in the folder the clip editor is showing ("clip.mp4" or "SkyBlock/clip.mp4"). */
 export function clipFile(name: string): string | null {
-  if (!clipsFolder || !name || name.includes('/') || name.includes('\\') || !isClipFile(name)) return null
-  const full = join(clipsFolder, name)
+  const rel = clipsFolder ? clipRelPath(name) : null
+  if (!rel) return null
+  const parts = rel.split('/')
+  if (parts.length === 2 && !readMeta(clipsFolder).folders.includes(parts[0])) return null
+  const full = join(clipsFolder, ...parts)
   return existsSync(full) ? full : null
 }
 
@@ -159,9 +203,25 @@ const tempFolder = (): string => join(app.getPath('temp'), 'orbit-replay')
 async function saveReplay(folder: unknown, parts: Uint8Array[], ext: string, seconds: number, kind: 'replay' | 'call' = 'replay'): Promise<string> {
   if (!Array.isArray(parts) || !parts.length) throw new Error('There’s nothing recorded yet. Give it a few seconds.')
   const type = ext === 'webm' ? 'webm' : 'mp4'
-  const dir = folderOf(folder)
-  await mkdir(dir, { recursive: true })
-  const out = freeName(dir, clipFileName(kind === 'call' ? 'Call clip' : 'Replay', new Date(), type))
+  const top = folderOf(folder)
+  await mkdir(top, { recursive: true })
+  // A replay saved while a game is running goes in that game's folder: "SkyBlock/SkyBlock 21 Nov 23.10.mp4".
+  const game = kind === 'replay' ? gameNow() : null
+  let dir = top
+  let out: string
+  if (game) {
+    let meta = readMeta(top)
+    const sub = folderForGame(meta, game)
+    if (meta.games[game] !== sub) {
+      meta = withGameFolder(meta, game, sub)
+      writeMeta(top, meta)
+    }
+    dir = join(top, sub)
+    await mkdir(dir, { recursive: true })
+    out = freeName(dir, gameClipName(sub, new Date(), type))
+  } else {
+    out = freeName(dir, clipFileName(kind === 'call' ? 'Call clip' : 'Replay', new Date(), type))
+  }
   if (parts.length === 1) {
     // One piece is already a whole video.
     await writeFile(out, Buffer.from(parts[0]))
@@ -190,6 +250,15 @@ async function saveReplay(folder: unknown, parts: Uint8Array[], ext: string, sec
   return out
 }
 
+/** The game being played now (the first, if there are several), as the Games page knows it. */
+function gameNow(): string | null {
+  try {
+    return runningGameNames()[0] ?? null
+  } catch {
+    return null
+  }
+}
+
 const shown = new Set<Notification>()
 
 /** A system notification (you're probably in a game): click it to edit the clip. */
@@ -213,22 +282,68 @@ function tellSaved(path: string, seconds: number, kind: 'replay' | 'call'): void
 async function listClips(folder: unknown): Promise<ClipInfo[]> {
   const dir = folderOf(folder)
   clipsFolder = dir
-  let names: string[]
-  try {
-    names = await readdir(dir)
-  } catch {
-    return []
-  }
+  const meta = readMeta(dir)
+  const stars = new Set(meta.favourites)
   const clips: ClipInfo[] = []
-  for (const name of names.filter(isClipFile)) {
+  // The top of the recordings folder, then each game folder.
+  for (const sub of ['', ...meta.folders]) {
+    const at = sub ? join(dir, sub) : dir
+    let names: string[]
     try {
-      const s = await stat(join(dir, name))
-      if (s.isFile()) clips.push({ name, path: join(dir, name), size: s.size, modified: s.mtimeMs })
+      names = await readdir(at)
     } catch {
-      // Gone while listing.
+      continue
+    }
+    for (const name of names.filter(isClipFile)) {
+      try {
+        const s = await stat(join(at, name))
+        const rel = sub ? `${sub}/${name}` : name
+        if (s.isFile()) clips.push({ name, path: join(at, name), size: s.size, modified: s.mtimeMs, rel, folder: sub, title: clipTitle(name), favourite: stars.has(rel) })
+      } catch {
+        // Gone while listing.
+      }
     }
   }
-  return clips.sort((a, b) => b.modified - a.modified).slice(0, 300)
+  // Starred clips are never dropped off the end of a long list.
+  const sorted = clips.sort((a, b) => b.modified - a.modified)
+  return [...sorted.filter((c) => c.favourite), ...sorted.filter((c) => !c.favourite).slice(0, 500)].sort((a, b) => b.modified - a.modified)
+}
+
+function starClip(folder: unknown, path: unknown, on: boolean): void {
+  const dir = folderOf(folder)
+  const rel = relOf(dir, clipPath(folder, path))
+  writeMeta(dir, withFavourite(readMeta(dir), rel, on))
+}
+
+/** Moves a clip into a game folder ('' = the top), making the folder if it's new. */
+async function moveClip(folder: unknown, path: unknown, to: unknown): Promise<string> {
+  const dir = folderOf(folder)
+  const from = clipPath(folder, path)
+  const target = cleanFolderName(String(to ?? ''))
+  if (String(to ?? '').trim() && !target) throw new Error('That folder name can’t be used.')
+  let meta = readMeta(dir)
+  if (target && !meta.folders.includes(target)) meta = { ...meta, folders: [...meta.folders, target] }
+  const toDir = target ? join(dir, target) : dir
+  if (dirname(from) === toDir) return from
+  await mkdir(toDir, { recursive: true })
+  const out = freeName(toDir, basename(from))
+  await rename(from, out)
+  writeMeta(dir, withMovedClip(meta, relOf(dir, from), relOf(dir, out)))
+  return out
+}
+
+/** Renames a game folder; the game's next replays go to the new name, and its stars stay. */
+async function renameFolder(folder: unknown, from: unknown, to: unknown): Promise<void> {
+  const dir = folderOf(folder)
+  const meta = readMeta(dir)
+  const old = String(from ?? '')
+  const name = cleanFolderName(String(to ?? ''))
+  if (!meta.folders.includes(old)) throw new Error('That folder isn’t there any more.')
+  if (!name) throw new Error('Give the folder a name.')
+  if (name === old) return
+  if (meta.folders.includes(name) || (existsSync(join(dir, name)) && name.toLowerCase() !== old.toLowerCase())) throw new Error(`There’s already a folder called “${name}”.`)
+  if (existsSync(join(dir, old))) await rename(join(dir, old), join(dir, name))
+  writeMeta(dir, withRenamedFolder(meta, old, name))
 }
 
 async function exportClip(folder: unknown, req: ClipExport, onProgress: (done: number) => void): Promise<{ path: string; size: number }> {
@@ -236,7 +351,7 @@ async function exportClip(folder: unknown, req: ClipExport, onProgress: (done: n
   const dir = dirname(input)
   const work = join(tempFolder(), randomUUID())
   await mkdir(work, { recursive: true })
-  const out = freeName(dir, clipFileName('Clip', new Date(), 'mp4'))
+  const out = freeName(dir, editedClipName(basename(input)))
   try {
     let caption: string | null = null
     if (req.captionPng && req.captionPng.length) {
@@ -354,6 +469,22 @@ export function setupClips(h: Hooks): void {
     guard(e.sender)
     return listClips(folder)
   })
+  ipcMain.handle('clips:meta', (e, folder: string | null) => {
+    guard(e.sender)
+    return readMeta(folderOf(folder))
+  })
+  ipcMain.handle('clips:star', (e, folder: string | null, path: string, on: boolean) => {
+    guard(e.sender)
+    starClip(folder, path, on === true)
+  })
+  ipcMain.handle('clips:move', (e, folder: string | null, path: string, to: string) => {
+    guard(e.sender)
+    return moveClip(folder, path, to)
+  })
+  ipcMain.handle('clips:renameFolder', (e, folder: string | null, from: string, to: string) => {
+    guard(e.sender)
+    return renameFolder(folder, from, to)
+  })
   ipcMain.handle('clips:export', (e, folder: string | null, req: ClipExport) => {
     guard(e.sender)
     return exportClip(folder, req, (done) => !e.sender.isDestroyed() && e.sender.send('clips:progress', done))
@@ -365,7 +496,11 @@ export function setupClips(h: Hooks): void {
   })
   ipcMain.handle('clips:trash', async (e, folder: string | null, path: string) => {
     guard(e.sender)
-    await shell.trashItem(clipPath(folder, path))
+    const full = clipPath(folder, path)
+    await shell.trashItem(full)
+    const dir = folderOf(folder)
+    const meta = readMeta(dir)
+    if (meta.favourites.includes(relOf(dir, full))) writeMeta(dir, withFavourite(meta, relOf(dir, full), false))
   })
   ipcMain.handle('clips:reveal', (e, folder: string | null, path: string) => {
     guard(e.sender)

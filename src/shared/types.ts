@@ -555,6 +555,13 @@ export interface NotesApi {
   onClipsOpen(callback: (path: string) => void): () => void
   /** The videos in the recordings folder, newest first. */
   clipsList(folder: string | null): Promise<ClipInfo[]>
+  /** The game folders in the recordings folder, and which game goes in which. */
+  clipsMeta(folder: string | null): Promise<import('./clips').ClipsMeta>
+  clipsStar(folder: string | null, path: string, on: boolean): Promise<void>
+  /** Moves a clip into a game folder ('' for the top of the recordings folder); makes the folder if it's new. Resolves to its new path. */
+  clipsMove(folder: string | null, path: string, to: string): Promise<string>
+  /** Renames a game folder; that game's future replays go to the new name. */
+  clipsRenameFolder(folder: string | null, from: string, to: string): Promise<void>
   /** Makes a trimmed (and maybe captioned) copy; resolves to the new file. */
   clipsExport(folder: string | null, request: import('./clips').ClipExport): Promise<{ path: string; size: number }>
   clipsCancel(): Promise<void>
@@ -1530,6 +1537,14 @@ export interface ClipInfo {
   path: string
   size: number
   modified: number
+  /** Its place in the recordings folder: "file.mp4", or "SkyBlock/file.mp4" in a game's folder. */
+  rel: string
+  /** The game folder it's in ('' at the top of the recordings folder). */
+  folder: string
+  /** What the list calls it ("SkyBlock 21 Nov 23:10"). */
+  title: string
+  /** Starred. */
+  favourite: boolean
 }
 
 export interface FfmpegState {

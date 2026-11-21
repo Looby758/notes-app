@@ -62,6 +62,10 @@ const api: NotesApi = {
     return () => ipcRenderer.removeListener('clips:open', handler)
   },
   clipsList: (folder) => ipcRenderer.invoke('clips:list', folder),
+  clipsMeta: (folder) => ipcRenderer.invoke('clips:meta', folder),
+  clipsStar: (folder, path, on) => ipcRenderer.invoke('clips:star', folder, path, on),
+  clipsMove: (folder, path, to) => ipcRenderer.invoke('clips:move', folder, path, to),
+  clipsRenameFolder: (folder, from, to) => ipcRenderer.invoke('clips:renameFolder', folder, from, to),
   clipsExport: (folder, request) => ipcRenderer.invoke('clips:export', folder, request),
   clipsCancel: () => ipcRenderer.invoke('clips:cancel'),
   onClipsProgress: (callback) => {
