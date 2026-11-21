@@ -321,6 +321,12 @@ const api: NotesApi = {
   },
   cancelVideoDownload: (id) => ipcRenderer.invoke('vdl:cancel', id),
   forgetVideoDownload: (id) => ipcRenderer.invoke('vdl:forget', id),
+  downloadsState: () => ipcRenderer.invoke('dm:state'),
+  onDownloadsState: (callback) => on('dm:state', callback),
+  downloadsAdd: (request) => ipcRenderer.invoke('dm:add', request),
+  downloadsAct: (id, action) => ipcRenderer.invoke('dm:act', id, action),
+  downloadsAll: (action) => ipcRenderer.invoke('dm:all', action),
+  downloadsSettings: (patch) => ipcRenderer.invoke('dm:settings', patch),
   convertVideo: (request) => ipcRenderer.invoke('convert:video', request),
   cancelVideo: (id) => ipcRenderer.invoke('convert:video-cancel', id),
   onVideoProgress: (callback) => {

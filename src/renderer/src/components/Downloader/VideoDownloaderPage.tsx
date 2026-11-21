@@ -74,7 +74,7 @@ const folderLabel = (f: string): string => f || 'Top level of your notes'
  * "Save to": the folders in the notes folder, in a list inside Orbit (no system window). Typing a
  * name that isn't there offers to make it; the download makes the folder when it's saved.
  */
-function SaveTo({ folder, onPick }: { folder: string; onPick: (f: string) => void }) {
+export function SaveTo({ folder, onPick }: { folder: string; onPick: (f: string) => void }) {
   const tree = useVault((s) => s.tree)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')

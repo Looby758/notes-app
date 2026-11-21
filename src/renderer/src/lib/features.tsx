@@ -53,6 +53,7 @@ import {
   Scissors,
   Bot,
   Video,
+  ArrowDownToLine,
   type LucideIcon
 } from 'lucide-react'
 import { openGrokTab } from '../components/Grok/GrokPage'
@@ -96,6 +97,7 @@ import {
   SCREENS_TAB,
   MIXER_TAB,
   DOWNLOADER_TAB,
+  DOWNLOADS_TAB,
   MONEY_TAB,
   PASSWORDS_TAB,
   SETTINGS_TAB,
@@ -220,6 +222,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   explorer: { icon: HardDrive, run: () => openSpecialTab(EXPLORER_TAB) },
   convert: { icon: ArrowRightLeft, run: () => openSpecialTab(CONVERT_TAB) },
   downloader: { icon: CloudDownload, run: () => openSpecialTab(DOWNLOADER_TAB) },
+  downloads: { icon: ArrowDownToLine, run: () => openSpecialTab(DOWNLOADS_TAB) },
   'offline-ai': {
     icon: Cpu,
     run: () => {

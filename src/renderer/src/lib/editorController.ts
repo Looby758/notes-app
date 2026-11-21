@@ -92,6 +92,8 @@ export const SCREENS_TAB = 'screens:'
 export const MIXER_TAB = 'mixer:'
 /** Download a video from a link into the attachments folder (components/Downloader). */
 export const DOWNLOADER_TAB = 'downloader:'
+/** The download manager: a queue that pauses, carries on and can wait for the night (components/Downloads). */
+export const DOWNLOADS_TAB = 'downloads:'
 /** Scenes, webcam and screen recording (components/Studio). */
 export const STUDIO_TAB = 'studio:'
 /** Instant replay and the clip editor (components/Clips). */

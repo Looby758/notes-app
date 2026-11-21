@@ -36,6 +36,7 @@ import {
   SCREENS_TAB,
   MIXER_TAB,
   DOWNLOADER_TAB,
+  DOWNLOADS_TAB,
   STUDIO_TAB,
   CLIPS_TAB,
   VIDEOS_TAB,
@@ -75,6 +76,7 @@ import HomePage from '../Home/HomePage'
 import MoneyPage from '../Money/MoneyPage'
 import ConvertPage from '../Convert/ConvertPage'
 import VideoDownloaderPage from '../Downloader/VideoDownloaderPage'
+import DownloadsPage from '../Downloads/DownloadsPage'
 import MiniGamesPage from '../MiniGames/MiniGamesPage'
 import ComicsPage from '../Comics/ComicsPage'
 import WikiPage from '../Wiki/WikiPage'
@@ -227,6 +229,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === SCREENS_TAB && <ScreensPage />}
         {active === MIXER_TAB && <MixerPage />}
         {active === DOWNLOADER_TAB && <VideoDownloaderPage />}
+        {active === DOWNLOADS_TAB && <DownloadsPage />}
         {active === STUDIO_TAB && <StudioPage />}
         {active === CLIPS_TAB && <ClipsPage />}
         {active === VIDEOS_TAB && <VideosPage />}
