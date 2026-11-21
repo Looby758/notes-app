@@ -13,6 +13,7 @@ import type { LocalLibrary } from './localMusic'
 import type { MixerState } from './mixer'
 import type { MonitorAction, MonitorSaved, MonitorSetting, MonitorsStatus, MonitorTarget } from './monitors'
 import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
+import type { ClickerSettings, Macro, MacroHotkeys, MacroStatus } from './macros'
 import type { CallRecord, DiscordStatus, SavedPlace } from './discord'
 import type { WifiNetwork } from './wifi'
 import type { MusicAction, MusicDevice, MusicItem, MusicQueue, MusicSearchResults, MusicState, MusicStatus } from './spotify'
@@ -867,6 +868,24 @@ export interface NotesApi {
   /** A soundboard hotkey was pressed (anywhere, even in a game). */
   onSoundboardHotkey(callback: (action: SoundboardAction) => void): () => void
   onSoundboardChanged(callback: (status: SoundboardStatus) => void): () => void
+  // Macro recorder and auto-clicker (main/macros.ts; the timing is done by a helper process)
+  macrosGet(): Promise<MacroStatus>
+  /** Starts recording a new macro, or stops (and keeps it). */
+  macrosRecord(): Promise<MacroStatus>
+  macrosPlay(id: string): Promise<MacroStatus>
+  /** Stops recording, playing or the auto-clicker. Held keys and buttons are let go of. */
+  macrosStop(): Promise<MacroStatus>
+  macrosClicker(on: boolean): Promise<MacroStatus>
+  macrosUpdate(id: string, patch: Partial<Pick<Macro, 'name' | 'hotkey' | 'repeat' | 'times' | 'speed' | 'mouse'>>): Promise<MacroStatus>
+  macrosRemove(id: string): Promise<MacroStatus>
+  /** The macro the Play hotkey plays. */
+  macrosSetCurrent(id: string): Promise<MacroStatus>
+  macrosSettings(patch: { hotkeys?: Partial<MacroHotkeys>; clicker?: Partial<ClickerSettings>; skipLeadingWait?: boolean }): Promise<MacroStatus>
+  /** Clears the last error and play report. */
+  macrosDismiss(): Promise<void>
+  /** Where the pointer is now (for the auto-clicker's spot). */
+  macrosPointer(): Promise<{ x: number; y: number }>
+  onMacrosChanged(callback: (status: MacroStatus) => void): () => void
 
   // Discord voice controls (main/discord.ts, through Discord's official local RPC)
   discordGet(): Promise<DiscordStatus>

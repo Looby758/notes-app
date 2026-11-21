@@ -23,6 +23,7 @@ import {
   HardDrive,
   House,
   KeyRound,
+  Keyboard,
   Layers,
   Images,
   Clock,
@@ -81,6 +82,7 @@ import {
   CLIPS_TAB,
   VIDEOS_TAB,
   SOUNDBOARD_TAB,
+  MACROS_TAB,
   DISCORD_TAB,
   EMAIL_TAB,
   EXPLORER_TAB,
@@ -237,6 +239,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   soundboard: { icon: AudioLines, run: () => openSpecialTab(SOUNDBOARD_TAB) },
   'discord-voice': { icon: Headphones, run: () => openSpecialTab(DISCORD_TAB) },
   terminal: { icon: SquareTerminal, run: () => openSpecialTab(TERMINAL_TAB) },
+  macros: { icon: Keyboard, run: () => openSpecialTab(MACROS_TAB) },
   streamer: { icon: Eye, run: toggleStreamerMode, useActive: () => usePrefs((s) => s.prefs.streamerMode) },
   settings: { icon: Settings, run: () => openSpecialTab(SETTINGS_TAB) }
 }
