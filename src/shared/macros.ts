@@ -254,6 +254,21 @@ export function acceleratorCodes(accel: string): { key: string | null; mods: str
   return { key, mods }
 }
 
+/**
+ * A hotkey as the Windows helper watches for it: the key's number and which modifiers must be
+ * held (1 Ctrl, 2 Alt, 4 Shift, 8 Win), exactly.
+ */
+export function windowsHotkey(accel: string): { vk: number; mods: number } | null {
+  const parts = normalizeAccelerator(accel).split('+').filter(Boolean)
+  if (!parts.length) return null
+  const { key } = acceleratorCodes(accel)
+  const vk = key ? windowsKey(key)?.vk : undefined
+  if (vk === undefined) return null
+  const bits: Record<string, number> = { Control: 1, Alt: 2, Shift: 4, Super: 8 }
+  const mods = parts.slice(0, -1).reduce((m, p) => m | (bits[p] ?? 0), 0)
+  return { vk, mods }
+}
+
 // ---------- Keys on each computer ----------
 
 /** Windows key to press for a code (including "Vk<n>" for keys with no name). */

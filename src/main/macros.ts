@@ -17,6 +17,7 @@ import {
   macroView,
   playbackScript,
   tidyRecording,
+  windowsHotkey,
   winKeyFor,
   type Macro,
   type MacroActivity,
@@ -181,7 +182,7 @@ public static class OrbitMacro {
     try { SetProcessDpiAwarenessContext(new IntPtr(-4)); } catch { try { SetProcessDPIAware(); } catch { } }
     var w = new Thread(Writer); w.IsBackground = true; w.Start();
     // Compile the sending and timing code now, so the first event of the first play isn't late.
-    foreach (var name in new string[] { "Key", "Button", "MoveTo", "Mouse", "Send", "WaitUntil", "ReleaseAll", "OnRaw", "KbProc", "MsProc", "T" }) {
+    foreach (var name in new string[] { "Key", "Button", "MoveTo", "Mouse", "Send", "WaitUntil", "ReleaseAll", "OnRaw", "KbProc", "MsProc", "WatchProc", "ModBit", "T" }) {
       var m = typeof(OrbitMacro).GetMethod(name, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
       if (m != null) System.Runtime.CompilerServices.RuntimeHelpers.PrepareMethod(m.MethodHandle);
     }
@@ -193,10 +194,86 @@ public static class OrbitMacro {
     switch (p[0]) {
       case "rec": StartRecording(p.Length > 1 ? p[1] : ""); break;
       case "recstop": StopRecording(); break;
-      case "play": Play(line.Substring(5)); break;
-      case "click": Click(p); break;
+      // play <run> <path> / click <run> <args…>: the run number comes back on everything it says.
+      case "play": { int sp = line.IndexOf(' ', 5); Play(p[1], line.Substring(sp + 1)); break; }
+      case "click": { var q = new List<string>(p); q.RemoveAt(1); Click(p[1], q.ToArray()); break; }
       case "stop": StopWorker(); break;
+      case "keys": SetHotkeys(p.Length > 1 ? p[1] : ""); break;
     }
+  }
+
+  // ---------- Hotkeys ----------
+  // Watched here too (not only by Electron), because Windows' own hotkeys don't fire while a
+  // modifier is held down, and a macro holding Shift or Ctrl would then make Stop impossible.
+  // This looks at the real keyboard only: keys Orbit is pressing never count.
+  static volatile uint[] hkVk = new uint[0];
+  static volatile int[] hkMods = new int[0];
+  static int physMods;
+  static readonly HashSet<uint> hkSwallow = new HashSet<uint>();
+  static readonly HashSet<uint> physDown = new HashSet<uint>();
+  static readonly HookProc watchProc = WatchProc;
+  static Thread watchThread;
+
+  static void SetHotkeys(string list) {
+    var vks = new List<uint>(); var mods = new List<int>();
+    foreach (var item in list.Split(',')) {
+      var kv = item.Split(':'); uint vk; int m;
+      if (kv.Length == 2 && uint.TryParse(kv[0], out vk) && int.TryParse(kv[1], out m)) { vks.Add(vk); mods.Add(m); }
+    }
+    hkMods = mods.ToArray(); hkVk = vks.ToArray();
+    if (watchThread == null && vks.Count > 0) {
+      watchThread = new Thread(() => {
+        try {
+          IntPtr h = SetWindowsHookEx(13, watchProc, GetModuleHandle(null), 0);
+          if (h == IntPtr.Zero) Say("note hotkey watch " + Marshal.GetLastWin32Error());
+          MSG msg;
+          while (GetMessage(out msg, IntPtr.Zero, 0, 0) > 0) { TranslateMessage(ref msg); DispatchMessage(ref msg); }
+        } catch (Exception e) { Say("note hotkey watch " + e.Message); }
+      });
+      watchThread.IsBackground = true;
+      watchThread.Priority = ThreadPriority.Highest;
+      watchThread.Start();
+    }
+  }
+
+  static int ModBit(uint vk) {
+    if (vk == 0xA2 || vk == 0xA3 || vk == 0x11) return 1;
+    if (vk == 0xA4 || vk == 0xA5 || vk == 0x12) return 2;
+    if (vk == 0xA0 || vk == 0xA1 || vk == 0x10) return 4;
+    if (vk == 0x5B || vk == 0x5C) return 8;
+    return 0;
+  }
+
+  static IntPtr WatchProc(int code, IntPtr w, IntPtr l) {
+    if (code >= 0) {
+      var k = (KBDLL)Marshal.PtrToStructure(l, typeof(KBDLL));
+      if ((k.flags & 0x10) == 0) {
+        bool up = (k.flags & 0x80) != 0;
+        int bit = ModBit(k.vk);
+        if (bit != 0) {
+          // Both sides count: only clear the bit when neither is down.
+          if (up) physDown.Remove(k.vk); else physDown.Add(k.vk);
+          physMods = 0;
+          foreach (var d in physDown) physMods |= ModBit(d);
+        } else if (up) {
+          bool swallow = hkSwallow.Remove(k.vk);
+          physDown.Remove(k.vk);
+          if (swallow) return new IntPtr(1);
+        } else {
+          bool repeat = physDown.Contains(k.vk);
+          physDown.Add(k.vk);
+          uint[] vks = hkVk; int[] mods = hkMods;
+          for (int i = 0; i < vks.Length; i++) {
+            if (vks[i] == k.vk && mods[i] == physMods) {
+              if (!repeat) Say("hk " + i);
+              hkSwallow.Add(k.vk);
+              return new IntPtr(1);
+            }
+          }
+        }
+      }
+    }
+    return CallNextHookEx(IntPtr.Zero, code, w, l);
   }
 
   public static void Shutdown() { StopWorker(); if (recThread != null) StopRecording(); }
@@ -230,7 +307,15 @@ public static class OrbitMacro {
     ignore.Clear(); keysDown.Clear();
     foreach (var s in ignoreList.Split(',')) { uint v; if (uint.TryParse(s, out v)) ignore.Add(v); }
     var ready = new ManualResetEvent(false);
-    recThread = new Thread(() => {
+    recThread = new Thread(() => { try { Record(ready); } catch (Exception e) { Say("err " + e.Message); ready.Set(); } });
+    recThread.IsBackground = true;
+    recThread.Priority = ThreadPriority.Highest;
+    recThread.Start();
+    ready.WaitOne(3000);
+    Say("recording");
+  }
+
+  static void Record(ManualResetEvent ready) {
       recThreadId = GetCurrentThreadId();
       recStart = Stopwatch.GetTimestamp();
       POINT p; GetCursorPos(out p);
@@ -247,12 +332,6 @@ public static class OrbitMacro {
       if (msHook != IntPtr.Zero) UnhookWindowsHookEx(msHook);
       kbHook = IntPtr.Zero; msHook = IntPtr.Zero;
       if (sink != null) { try { sink.Close(); } catch { } sink = null; }
-    });
-    recThread.IsBackground = true;
-    recThread.Priority = ThreadPriority.Highest;
-    recThread.Start();
-    ready.WaitOne(3000);
-    Say("recording");
   }
 
   static void StopRecording() {
@@ -407,7 +486,8 @@ public static class OrbitMacro {
 
   static void StartWorker(ThreadStart run) {
     StopWorker();
-    worker = new Thread(run);
+    // Nothing that goes wrong in a run may take the helper down (keys could be left held).
+    worker = new Thread(() => { try { run(); } catch (Exception e) { Say("err " + e.Message); } });
     worker.IsBackground = true;
     worker.Priority = ThreadPriority.Highest;
     worker.Start();
@@ -415,7 +495,7 @@ public static class OrbitMacro {
 
   class Ev { public double t; public char op; public int dir; public int a, b, c; public double fx, fy; }
 
-  static void Play(string path) {
+  static void Play(string run, string path) {
     string[] lines = File.ReadAllLines(path);
     try { File.Delete(path); } catch { }
     string[] head = lines[0].Split(' ');
@@ -437,7 +517,7 @@ public static class OrbitMacro {
       double worst = 0, total = 0; long count = 0; bool stopped = false;
       try {
         for (int loop = 0; loops == 0 || loop < loops; loop++) {
-          Say("loop " + (loop + 1));
+          Say("loop " + run + " " + (loop + 1));
           double from = loop * len;
           foreach (var e in evs) {
             long target = start + (long)((from + e.t) * perMs);
@@ -461,12 +541,12 @@ public static class OrbitMacro {
           if ((loops == 0 || loop + 1 < loops) && !WaitUntil(start + (long)((from + len) * perMs))) { stopped = true; break; }
         }
       } finally { ReleaseAll(); timeEndPeriod(1); }
-      Say("played " + (stopped ? 1 : 0) + " " + count + " " + N(worst) + " " + N(count > 0 ? total / count : 0));
+      Say("played " + run + " " + (stopped ? 1 : 0) + " " + count + " " + N(worst) + " " + N(count > 0 ? total / count : 0));
     });
   }
 
   // click <b|k> <a> <b> <c> <interval> <hold> <count> <duration> <x|-> <y|->
-  static void Click(string[] p) {
+  static void Click(string run, string[] p) {
     bool isKey = p[1] == "k";
     int a = int.Parse(p[2]), b = int.Parse(p[3]), c = int.Parse(p[4]);
     double interval = double.Parse(p[5], CultureInfo.InvariantCulture), hold = double.Parse(p[6], CultureInfo.InvariantCulture);
@@ -495,10 +575,10 @@ public static class OrbitMacro {
           n++;
           if (!held) { stopped = true; break; }
           long now = Stopwatch.GetTimestamp();
-          if (now - told > 250 * perMs) { Say("clicks " + n); told = now; }
+          if (now - told > 250 * perMs) { Say("clicks " + run + " " + n); told = now; }
         }
       } finally { ReleaseAll(); timeEndPeriod(1); }
-      Say("clicked " + (stopped ? 1 : 0) + " " + n + " " + N(worst) + " " + N(n > 0 ? total / n : 0));
+      Say("clicked " + run + " " + (stopped ? 1 : 0) + " " + n + " " + N(worst) + " " + N(n > 0 ? total / n : 0));
     });
   }
 }
@@ -572,7 +652,7 @@ const MAC_PLAYER = String.raw`
 ObjC.import('Cocoa')
 ObjC.import('CoreGraphics')
 function run(argv) {
-  const mode = argv[0], arg = argv[1], stopFile = argv[2]
+  const mode = argv[0], arg = argv[1], run = argv[2], stopFile = argv[3]
   const out = $.NSFileHandle.fileHandleWithStandardOutput
   const say = (s) => out.writeData($(s + '\n').dataUsingEncoding($.NSUTF8StringEncoding))
   const fm = $.NSFileManager.defaultManager
@@ -635,7 +715,7 @@ function run(argv) {
     let worst = 0, total = 0, count = 0
     try {
       for (let loop = 0; loops === 0 || loop < loops; loop++) {
-        say('loop ' + (loop + 1))
+        say('loop ' + run + ' ' + (loop + 1))
         const from = loop * len
         for (const p of evs) {
           const target = start + from + Number(p[0])
@@ -656,7 +736,7 @@ function run(argv) {
         if ((loops === 0 || loop + 1 < loops) && !waitUntil(start + from + len)) break
       }
     } finally { releaseAll() }
-    say('played ' + (stopped ? 1 : 0) + ' ' + count + ' ' + fmt(worst) + ' ' + fmt(count ? total / count : 0))
+    say('played ' + run + ' ' + (stopped ? 1 : 0) + ' ' + count + ' ' + fmt(worst) + ' ' + fmt(count ? total / count : 0))
   } else {
     const p = arg.split(' ')
     const isKey = p[1] === 'k', a = Number(p[2])
@@ -680,10 +760,10 @@ function run(argv) {
         if (isKey) key(a, false, false); else button(a, false)
         n++
         if (!ok) break
-        if (now() - told > 250) { say('clicks ' + n); told = now() }
+        if (now() - told > 250) { say('clicks ' + run + ' ' + n); told = now() }
       }
     } finally { releaseAll() }
-    say('clicked ' + (stopped ? 1 : 0) + ' ' + n + ' ' + fmt(worst) + ' ' + fmt(n ? total / n : 0))
+    say('clicked ' + run + ' ' + (stopped ? 1 : 0) + ' ' + n + ' ' + fmt(worst) + ' ' + fmt(n ? total / n : 0))
   }
 }
 `
@@ -724,6 +804,8 @@ function winWrite(line: string): void {
       helperGone()
     })
     winHelper = child
+    // A new helper needs the hotkeys to watch (after a crash, say).
+    if (!line.startsWith('keys ')) queueMicrotask(applyHotkeys)
   }
   winHelper.stdin.write(line + '\n')
 }
@@ -868,8 +950,11 @@ function play(id: string): void {
   writeFileSync(file, script.join('\n'))
   const loops = macro.repeat === 'once' ? 1 : macro.repeat === 'times' ? macro.times : 0
   activity = { kind: 'playing', id, loop: 1, loops, since: Date.now() }
-  if (IS_MAC) macStart(MAC_PLAYER, ['play', file])
-  else winWrite(`play ${file}`)
+  const run = ++lastRun
+  currentRun = run
+  runMacro.set(run, id)
+  if (IS_MAC) macStart(MAC_PLAYER, ['play', file, String(run)])
+  else winWrite(`play ${run} ${file}`)
   broadcast()
 }
 
@@ -889,16 +974,26 @@ function startClicker(): void {
   stopAll()
   lastError = null
   activity = { kind: 'clicking', since: Date.now(), clicks: 0 }
-  if (IS_MAC) macStart(MAC_PLAYER, ['click', cmd])
-  else winWrite(cmd)
+  const run = ++lastRun
+  currentRun = run
+  if (IS_MAC) macStart(MAC_PLAYER, ['click', cmd, String(run)])
+  else winWrite(cmd.replace(/^click /, `click ${run} `))
   broadcast()
 }
 
-/** Stops playing or clicking (not recording). Held keys and buttons are let go of. */
+/**
+ * Stops playing or clicking (not recording). Held keys and buttons are let go of. The helper is
+ * always told, even if Orbit thinks nothing is playing, and the page shows "stopped" straight away:
+ * a stop must never depend on Orbit's idea of what's going on being right.
+ */
 function stopPlaying(): void {
-  if (activity.kind !== 'playing' && activity.kind !== 'clicking') return
   if (IS_MAC) macStop()
-  else winWrite('stop')
+  else if (winHelper) winWrite('stop')
+  currentRun = 0
+  if (activity.kind === 'playing' || activity.kind === 'clicking') {
+    activity = { kind: 'idle' }
+    broadcast()
+  }
 }
 
 function stopAll(): void {
@@ -906,7 +1001,10 @@ function stopAll(): void {
   else stopPlaying()
 }
 
-let playingId = ''
+/** Each play or auto-clicker run has a number, so word from an old run (one just stopped) never changes what the page shows for the new one. */
+let lastRun = 0
+let currentRun = 0
+const runMacro = new Map<number, string>()
 
 function onHelperLine(line: string): void {
   const [kind, ...rest] = line.split(' ')
@@ -933,33 +1031,46 @@ function onHelperLine(line: string): void {
       finishRecording(Number(rest[0]) || 0)
       break
     case 'loop':
-      if (activity.kind === 'playing') {
-        playingId = activity.id
-        activity = { ...activity, loop: Number(rest[0]) || 1 }
+      if (activity.kind === 'playing' && Number(rest[0]) === currentRun) {
+        activity = { ...activity, loop: Number(rest[1]) || 1 }
         broadcast()
       }
       break
     case 'clicks':
-      if (activity.kind === 'clicking') {
-        activity = { ...activity, clicks: Number(rest[0]) || 0 }
+      if (activity.kind === 'clicking' && Number(rest[0]) === currentRun) {
+        activity = { ...activity, clicks: Number(rest[1]) || 0 }
         broadcastSoon()
       }
       break
-    case 'played':
+    case 'played': {
+      const run = Number(rest[0])
       lastPlay = {
-        id: activity.kind === 'playing' ? activity.id : playingId,
-        stopped: rest[0] === '1',
-        events: Number(rest[1]) || 0,
-        worstLateMs: Number(rest[2]) || 0,
-        averageLateMs: Number(rest[3]) || 0
+        id: runMacro.get(run) ?? '',
+        stopped: rest[1] === '1',
+        events: Number(rest[2]) || 0,
+        worstLateMs: Number(rest[3]) || 0,
+        averageLateMs: Number(rest[4]) || 0
       }
-      if (activity.kind === 'playing') activity = { kind: 'idle' }
+      runMacro.delete(run)
+      if (run === currentRun) {
+        currentRun = 0
+        if (activity.kind === 'playing') activity = { kind: 'idle' }
+      }
       broadcast()
       break
+    }
     case 'clicked':
-      if (activity.kind === 'clicking') activity = { kind: 'idle' }
-      broadcast()
+      if (Number(rest[0]) === currentRun) {
+        currentRun = 0
+        if (activity.kind === 'clicking') activity = { kind: 'idle' }
+        broadcast()
+      }
       break
+    case 'hk': {
+      const action = watched[Number(rest[0])]
+      if (action) runHotkey(action)
+      break
+    }
     case 'err':
       lastError = rest.join(' ')
       broadcast()
@@ -977,23 +1088,29 @@ const registered = new Map<string, HotkeyAction>()
 /** Hotkeys only take keys once you've used macros (so F6, F9 and F10 aren't taken from other apps for nothing). */
 let used = false
 
+/** When each hotkey last did something: one press can arrive twice (from Windows and from Orbit's own watch), and a held key repeats. */
+const lastPress = new Map<string, number>()
+
 function runHotkey(action: HotkeyAction): void {
+  const key = errorKey(action)
+  const now = Date.now()
+  if (now - (lastPress.get(key) ?? 0) < 350) return
+  lastPress.set(key, now)
+  // While something plays, every macro hotkey stops it: the simplest thing to remember when you need it to stop.
+  if (activity.kind === 'playing' || activity.kind === 'clicking') {
+    stopPlaying()
+    return
+  }
   if (action.kind === 'record') {
     if (activity.kind === 'recording') stopRecording()
     else if (activity.kind === 'idle') startRecording()
     return
   }
+  if (activity.kind === 'recording') return
   if (action.kind === 'clicker') {
-    if (activity.kind === 'clicking') stopPlaying()
-    else if (activity.kind === 'idle' || activity.kind === 'playing') startClicker()
+    startClicker()
     return
   }
-  if (activity.kind === 'playing' || activity.kind === 'clicking') {
-    const same = activity.kind === 'playing' && (action.kind === 'play' || activity.id === action.id)
-    stopPlaying()
-    if (same || action.kind === 'play') return
-  }
-  if (activity.kind === 'recording') return
   const id = action.kind === 'macro' ? action.id : data.current
   if (id) play(id)
 }
@@ -1011,8 +1128,22 @@ function wantedHotkeys(): Map<string, HotkeyAction> {
   return out
 }
 
+/** The hotkeys the Windows helper watches for itself, by their place in the list it was sent. */
+let watched: HotkeyAction[] = []
+
 function applyHotkeys(): void {
   const wanted = wantedHotkeys()
+  if (!IS_MAC && SUPPORTED && (used || winHelper)) {
+    const list: string[] = []
+    watched = []
+    for (const [accel, action] of wanted) {
+      const k = windowsHotkey(accel)
+      if (!k) continue
+      list.push(`${k.vk}:${k.mods}`)
+      watched.push(action)
+    }
+    winWrite(`keys ${list.join(',')}`)
+  }
   for (const [accel] of registered) {
     if (!wanted.has(accel)) {
       globalShortcut.unregister(accel)

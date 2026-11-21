@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   acceleratorCodes,
   cleanMacros,
+  windowsHotkey,
   clickerCommand,
   clickerPlan,
   DEFAULT_CLICKER,
@@ -54,6 +55,15 @@ describe('keys from Windows and the Mac', () => {
     expect(keyLabel('ShiftLeft')).toBe('Left Shift')
     expect(keyLabel('Numpad5')).toBe('Num 5')
     expect(keyLabel('Space')).toBe('Space')
+  })
+})
+
+describe('hotkeys the Windows helper watches', () => {
+  it('gives the key number and exactly which modifiers', () => {
+    expect(windowsHotkey('F10')).toEqual({ vk: 0x79, mods: 0 })
+    expect(windowsHotkey('Control+Alt+1')).toEqual({ vk: 0x31, mods: 3 })
+    expect(windowsHotkey('Shift+num5')).toEqual({ vk: 0x65, mods: 4 })
+    expect(windowsHotkey('')).toBeNull()
   })
 })
 
