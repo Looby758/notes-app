@@ -59,6 +59,7 @@ import { watchReplay } from '../lib/replay'
 import { startFormatMenu } from '../lib/formatMenu'
 import { startDictionary } from '../lib/dictionary'
 import { EventDetails } from './Calendar/shared'
+import { CalendarOverlays } from './Calendar/edit'
 import Resizer from './Resizer'
 import UpdateToast from './UpdateToast'
 import { DownloadPrompt } from './Web/Downloads'
@@ -420,6 +421,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <LockDialog />
       <SendToPhone />
       <EventDetails />
+      <CalendarOverlays />
       <Pet />
       <UpdateToast />
       <DownloadPrompt />

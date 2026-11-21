@@ -5,7 +5,7 @@ import { refreshExternal } from '../../store/externalEvents'
 import { errorMessage } from '../../lib/paths'
 import { SYSTEM_NAME } from '@shared/platform'
 
-/** Settings → Calendar → "Google Calendar & calendar links". Everything here is read-only. */
+/** Settings → Calendar → "Google Calendar & calendar links". Google can be changed from Orbit; links are read-only. */
 export default function CalendarSources() {
   const [status, setStatus] = useState<CalendarSourcesStatus | null>(null)
   const [clientId, setClientId] = useState('')
@@ -47,11 +47,21 @@ export default function CalendarSources() {
       <section className="settings-group cal-sources" data-section="google">
         <h3>Google Calendar</h3>
         <p className="cal-sources-intro">
-          See your Google Calendar events next to your notes (read-only). Sign-in happens in your own browser; Notes only
-          gets permission to <em>read</em> your calendars (and your Google Sheets, so .gsheet files in your notes folder open
-          right in Orbit), and the sign-in is stored encrypted on this computer.
+          See your Google Calendar events next to your notes, and add, move and edit them from Orbit. Sign-in happens in your
+          own browser; Orbit gets permission to read your calendars and change their <em>events</em> (never the calendars
+          themselves or who they're shared with), and to read your Google Sheets so .gsheet files in your notes folder open
+          right in Orbit. The sign-in is stored encrypted on this computer.
         </p>
 
+        {g.connected && !g.canEdit && (
+          <div className="cal-edit-notice">
+            Orbit can only <em>read</em> this calendar so far. To add, move and edit Google events from Orbit, press{' '}
+            <button className="link-btn" disabled={!!busy} onClick={() => run('refresh', () => window.api.googleConnect())}>
+              Allow editing
+            </button>{' '}
+            and tick the calendar box on Google's page.
+          </div>
+        )}
         {g.connected ? (
           <div className="cal-connected">
             <span className="cal-connected-dot" />

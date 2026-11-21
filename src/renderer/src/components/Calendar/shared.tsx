@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { CalendarDays, CalendarPlus, Clock, ExternalLink, FileText, Flag } from 'lucide-react'
+import { CalendarDays, CalendarPlus, Clock, ExternalLink, FileText, Flag, Pencil, Repeat, Trash2 } from 'lucide-react'
 import Private, { usePrivateTitle } from '../Streamer/Private'
 import { itemsByDay, useNoteIndex } from '../../store/noteIndex'
 import { usePrefs } from '../../store/prefs'
@@ -14,12 +14,24 @@ import { allRecurring, occurrences } from '../../lib/moneyInsights'
 import { formatPounds } from '../../lib/money'
 import type { DatedItem } from '../../lib/schedule'
 import { EventWeather } from '../Weather/Weather'
+import { describeRepeat, repeatChoices, type RepeatRule } from '@shared/repeat'
+import { canEditGoogle, deleteGoogle, updateGoogle, type EventTarget } from '../../lib/calendarEdit'
+import { showEventMenu, startDayDrag, useWritableCalendars } from './edit'
 
-/** Calendar items by day, recomputed whenever any note changes. */
-export function useItemsByDay(): Map<string, DatedItem[]> {
+/**
+ * Calendar items by day, recomputed whenever any note changes. Repeating events are filled in
+ * between `from` and `to` (day keys) as well as the usual months around today.
+ */
+export function useItemsByDay(from?: string, to?: string): Map<string, DatedItem[]> {
   const version = useNoteIndex((s) => s.version)
   // `version` changes whenever the index changes.
-  return useMemo(() => itemsByDay(), [version])
+  return useMemo(() => {
+    if (!from || !to) return itemsByDay()
+    // Always cover the next year too, so the side panel and agenda keep working while you look far back.
+    const today = dayKey(new Date())
+    const year = dayKey(addDays(new Date(), 400))
+    return itemsByDay(from < today ? from : today, to > year ? to : year)
+  }, [version, from, to])
 }
 
 export const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -40,8 +52,19 @@ export function ItemRow({ item, compact = false }: { item: DatedItem; compact?: 
   const open = (): void => openNote(item.path, item.kind === 'daily' || item.kind === 'note' ? {} : { line: item.line })
   const isTask = item.done !== undefined
   const privateTitle = usePrivateTitle()
+  const movable = item.kind === 'event'
   return (
-    <div className={`cal-item ${item.kind} ${item.done ? 'done' : ''} ${compact ? 'compact' : ''}`} title={privateTitle(`${item.title}\n${item.path}`)}>
+    <div
+      className={`cal-item ${item.kind} ${item.done ? 'done' : ''} ${compact ? 'compact' : ''}`}
+      title={privateTitle(`${item.title}${item.repeat ? `\n🔁 ${describeRepeat(item.repeat)}` : ''}\n${item.path}`)}
+      draggable={movable}
+      onDragStart={movable ? (e) => startDayDrag(e, { local: item }) : undefined}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        showEventMenu(item, e.clientX, e.clientY)
+      }}
+    >
       {isTask ? (
         <input
           type="checkbox"
@@ -68,6 +91,7 @@ export function ItemRow({ item, compact = false }: { item: DatedItem; compact?: 
         {/* In small calendar cells only the start time fits next to the title. */}
         {item.start && <span className="cal-time">{compact ? displayTime(item.start) : timeLabel(item)}</span>}
         <span className="cal-title">{item.kind === 'daily' ? 'Daily note' : <Private>{item.title}</Private>}</span>
+        {item.repeat && <Repeat size={10} className="cal-repeat-icon" aria-label="Repeats" />}
         {item.kind === 'note' && item.due && !compact && <span className="cal-badge">due</span>}
       </button>
       {/* Small calendar cells have no room: the day's own forecast shows there instead. */}
@@ -177,8 +201,14 @@ export function ExternalRow({ item, compact = false }: { item: ExternalItem; com
   usePrefs((s) => s.prefs.timeFormat)
   const e = item.event
   const privateTitle = usePrivateTitle()
+  const movable = canEditGoogle(e)
   return (
-    <div className={`cal-item external ${compact ? 'compact' : ''}`} title={privateTitle(`${e.title}\n${e.calendarName}`)}>
+    <div
+      className={`cal-item external ${compact ? 'compact' : ''}`}
+      title={privateTitle(`${e.title}\n${e.calendarName}`)}
+      draggable={movable}
+      onDragStart={movable ? (ev) => startDayDrag(ev, { external: item }) : undefined}
+    >
       <span className="cal-ext-bar" style={{ background: e.color }} />
       <button
         className="cal-item-text"
@@ -239,8 +269,12 @@ export function showEventDetails(item: ExternalItem, x: number, y: number): void
 /** The card shown when you click a Google/link event. Mounted once by the Shell. */
 export function EventDetails() {
   const [details, set] = useState<Details | null>(null)
+  const [editing, setEditing] = useState(false)
   const card = useRef<HTMLDivElement>(null)
-  setDetails = set
+  setDetails = (d) => {
+    setEditing(false)
+    set(d)
+  }
   useEffect(() => {
     if (!details) return
     const close = (e: Event): void => {
@@ -257,6 +291,8 @@ export function EventDetails() {
   const { item, x, y } = details
   const e = item.event
   const date = fromDayKey(item.date)!
+  const editable = canEditGoogle(e)
+  const recurring = !!e.google?.recurring
   const when = item.allDay
     ? formatDate(date, 'dddd D MMMM') + ' · all day'
     : `${formatDate(date, 'dddd D MMMM')} · ${displayTime(item.start)}${item.end ? '–' + displayTime(item.end) : ''}`
@@ -264,48 +300,164 @@ export function EventDetails() {
     <div
       ref={card}
       className="event-card"
-      style={{ left: Math.min(x, window.innerWidth - 330), top: Math.min(y + 8, window.innerHeight - 220) }}
+      style={{ left: Math.min(x, window.innerWidth - 330), top: Math.min(y + 8, window.innerHeight - (editing ? 330 : 220)) }}
       role="dialog"
       aria-label={e.title}
     >
-      <div className="event-card-title">
-        <span className="cal-color" style={{ background: e.color }} />
-        {e.title}
-      </div>
-      <div className="event-card-line">{when}</div>
-      {e.location && <div className="event-card-line">📍 {e.location}</div>}
-      <div className="event-card-line faint">{e.calendarName} · read-only</div>
-      <div className="event-card-actions">
-        <button
-          className="btn"
-          onClick={async () => {
+      {editing ? (
+        <EditGoogleEvent
+          item={item}
+          onDone={() => {
+            setEditing(false)
             set(null)
-            await addEvent(date, e.title, item.allDay ? undefined : item.start, item.allDay ? undefined : item.end)
           }}
-          title="Copy this event into that day's daily note"
-        >
-          <CalendarPlus size={13} /> Add to daily note
-        </button>
-        {e.url && (
-          <button className="btn" onClick={() => window.open(e.url)}>
-            <ExternalLink size={13} /> Open in Google Calendar
-          </button>
-        )}
-      </div>
+          onCancel={() => setEditing(false)}
+        />
+      ) : (
+        <>
+          <div className="event-card-title">
+            <span className="cal-color" style={{ background: e.color }} />
+            {e.title}
+          </div>
+          <div className="event-card-line">{when}</div>
+          {e.location && <div className="event-card-line">📍 {e.location}</div>}
+          {recurring && <div className="event-card-line">🔁 Repeats</div>}
+          <div className="event-card-line faint">
+            {e.calendarName}
+            {editable ? '' : ' · read-only'}
+          </div>
+          <div className="event-card-actions">
+            {editable && (
+              <button className="btn" onClick={() => setEditing(true)} title={recurring ? 'Changes this day only' : undefined}>
+                <Pencil size={13} /> Edit
+              </button>
+            )}
+            {editable && (
+              <button
+                className="btn"
+                onClick={async () => {
+                  set(null)
+                  await deleteGoogle(e)
+                }}
+                title={recurring ? 'Deletes this day only' : 'Deletes it from Google Calendar'}
+              >
+                <Trash2 size={13} /> {recurring ? 'Delete this day' : 'Delete'}
+              </button>
+            )}
+            <button
+              className="btn"
+              onClick={async () => {
+                set(null)
+                await addEvent(date, e.title, item.allDay ? undefined : item.start, item.allDay ? undefined : item.end)
+              }}
+              title="Copy this event into that day's daily note"
+            >
+              <CalendarPlus size={13} /> Add to daily note
+            </button>
+            {e.url && (
+              <button className="btn" onClick={() => window.open(e.url)}>
+                <ExternalLink size={13} /> Open in Google Calendar
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }
 
-/** A small form to add an event to a day: title, and optional start/end times. */
+/** Changing a Google event's name, day, times and place, from its card. */
+function EditGoogleEvent({ item, onDone, onCancel }: { item: ExternalItem; onDone: () => void; onCancel: () => void }) {
+  const e = item.event
+  const [title, setTitle] = useState(e.title)
+  const [day, setDay] = useState(item.date)
+  const [start, setStart] = useState(item.allDay ? '' : (item.start ?? ''))
+  const [end, setEnd] = useState(item.allDay ? '' : (item.end ?? ''))
+  const [location, setLocation] = useState(e.location ?? '')
+  const [saving, setSaving] = useState(false)
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const valid = !!title.trim() && !!fromDayKey(day) && (!start || !end || end > start)
+
+  const save = async (ev: FormEvent): Promise<void> => {
+    ev.preventDefault()
+    if (!valid) return
+    setSaving(true)
+    const d = fromDayKey(day)!
+    let times: { allDay: boolean; start: string; end: string }
+    if (!start) {
+      // All day: keep how many days it lasts if it was all day already.
+      const span = item.allDay ? Math.max(1, Math.round((fromDayKey(e.end)!.getTime() - fromDayKey(e.start)!.getTime()) / 86_400_000)) : 1
+      const first = item.allDay ? dayKey(addDays(fromDayKey(e.start)!, Math.round((d.getTime() - fromDayKey(item.date)!.getTime()) / 86_400_000))) : day
+      times = { allDay: true, start: first, end: dayKey(addDays(fromDayKey(first)!, span)) }
+    } else {
+      const endTime = end || addHour(start)
+      // An end before the start (e.g. 23:00–01:00) runs into the next day.
+      const endDay = endTime > start ? day : dayKey(addDays(d, 1))
+      times = { allDay: false, start: `${day}T${start}:00`, end: `${endDay}T${endTime}:00` }
+    }
+    const ok = await updateGoogle(e, { title: title.trim(), location: location.trim(), timeZone: tz, ...times })
+    setSaving(false)
+    if (ok) onDone()
+  }
+
+  return (
+    <form className="event-edit" onSubmit={save} onKeyDown={(ev) => ev.key === 'Escape' && (ev.stopPropagation(), onCancel())}>
+      <input className="quick-add-title" value={title} onChange={(ev) => setTitle(ev.target.value)} aria-label="Event name" autoFocus />
+      <div className="quick-add-row">
+        <input type="date" value={day} onChange={(ev) => setDay(ev.target.value)} aria-label="Day" />
+      </div>
+      <div className="quick-add-row">
+        <input type="time" value={start} onChange={(ev) => setStart(ev.target.value)} aria-label="Start time" />
+        <span>to</span>
+        <input type="time" value={end} onChange={(ev) => setEnd(ev.target.value)} aria-label="End time" />
+        <span className="quick-add-hint">{start ? '' : 'All day'}</span>
+      </div>
+      <input className="quick-add-title" value={location} onChange={(ev) => setLocation(ev.target.value)} placeholder="Where (optional)" aria-label="Where" />
+      {e.google?.recurring && <div className="event-card-line faint">Changes this day only. Open it in Google Calendar to change every one.</div>}
+      <div className="event-card-actions">
+        <button type="button" className="btn" onClick={onCancel}>
+          Cancel
+        </button>
+        <button type="submit" className="btn btn-primary" disabled={!valid || saving}>
+          {saving ? 'Saving…' : 'Save to Google'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+const addHour = (t: string): string => {
+  const [h, m] = t.split(':').map(Number)
+  return `${String(Math.min(23, h + 1)).padStart(2, '0')}:${String(h + 1 > 23 ? 59 : m).padStart(2, '0')}`
+}
+
+export interface QuickAddExtra {
+  repeat?: RepeatRule
+  target?: EventTarget
+}
+
+const TARGET_KEY = 'orbit.calendar.addTo'
+function savedTarget(): string {
+  try {
+    return localStorage.getItem(TARGET_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+/** A small form to add an event to a day: title, optional start/end times, repeat, and where it goes. */
 export function QuickAdd({
   onSave,
   onCancel,
+  date,
   initialStart = '',
   initialEnd = '',
   autoFocus = true
 }: {
-  onSave: (title: string, start?: string, end?: string) => void
+  onSave: (title: string, start: string | undefined, end: string | undefined, extra: QuickAddExtra) => void
   onCancel: () => void
+  /** The day it's for (words the repeat choices, e.g. "Every Tuesday"). */
+  date: Date
   initialStart?: string
   initialEnd?: string
   autoFocus?: boolean
@@ -313,15 +465,22 @@ export function QuickAdd({
   const [title, setTitle] = useState('')
   const [start, setStart] = useState(initialStart)
   const [end, setEnd] = useState(initialEnd)
+  const [repeatIndex, setRepeatIndex] = useState(0)
+  const calendars = useWritableCalendars()
+  const [target, setTarget] = useState(savedTarget)
   const input = useRef<HTMLInputElement>(null)
+  const choices = useMemo(() => repeatChoices(dayKey(date)), [date])
   useEffect(() => {
     if (autoFocus) input.current?.focus()
   }, [autoFocus])
+  // A calendar that's gone (or can't be added to any more) falls back to your notes.
+  const google = calendars.find((c) => c.id === target)
 
   const submit = (e: FormEvent): void => {
     e.preventDefault()
     if (!title.trim()) return
-    onSave(title.trim(), start || undefined, start && end && end > start ? end : undefined)
+    const repeat = choices[repeatIndex]?.rule ?? undefined
+    onSave(title.trim(), start || undefined, start && end && end > start ? end : undefined, { repeat, target: google ? { google: google.id } : {} })
   }
 
   return (
@@ -341,6 +500,40 @@ export function QuickAdd({
         <span>to</span>
         <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} aria-label="End time" />
         <span className="quick-add-hint">{start ? '' : 'All day'}</span>
+      </div>
+      <div className="quick-add-row">
+        <Repeat size={13} className="quick-add-icon" />
+        <select value={repeatIndex} onChange={(e) => setRepeatIndex(Number(e.target.value))} aria-label="Repeat">
+          {choices.map((c, i) => (
+            <option key={c.label} value={i}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+        {calendars.length > 0 && (
+          <select
+            value={google ? google.id : ''}
+            onChange={(e) => {
+              setTarget(e.target.value)
+              try {
+                localStorage.setItem(TARGET_KEY, e.target.value)
+              } catch {
+                // only a convenience
+              }
+            }}
+            aria-label="Add to"
+            title="Where the event is saved"
+          >
+            <option value="">Orbit (daily note)</option>
+            {calendars.map((c) => (
+              <option key={c.id} value={c.id}>
+                Google: {c.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+      <div className="quick-add-row quick-add-buttons">
         <button type="button" className="btn" onClick={onCancel}>
           Cancel
         </button>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { appendUnderHeading, formatEventLine, insertEvent, parseDatedItems, parseEventText, toggleTaskAt } from './schedule'
+import { appendUnderHeading, findEventLine, formatEventBody, formatEventLine, insertEvent, parseDatedItems, parseEventText, removeLineAt, replaceEventAt, splitRepeat, toggleTaskAt } from './schedule'
 
 const opts = { dailyDate: '2026-10-26', scheduleHeading: 'Schedule', title: '2026-10-26' }
 
@@ -95,5 +95,38 @@ describe('toggleTaskAt', () => {
     expect(toggleTaskAt('a\n- [ ] b', 1)).toBe('a\n- [x] b')
     expect(toggleTaskAt('- [x] b', 0)).toBe('- [ ] b')
     expect(toggleTaskAt('- b', 0)).toBeNull()
+  })
+})
+
+describe('repeating events', () => {
+  it('reads the 🔁 rule off an event and keeps the title clean', () => {
+    const text = '## Schedule\n\n- 18:00-19:00 Football 🔁 every Tuesday\n- Rent 🔁 the 1st of every month\n- 10:00 Odd 🔁 now and then\n'
+    const items = parseDatedItems(text, 'Daily/2026-11-17.md', { ...opts, dailyDate: '2026-11-17' }).filter((i) => i.kind === 'event')
+    expect(items[0]).toMatchObject({ title: 'Football', start: '18:00', end: '19:00', repeat: { freq: 'week', interval: 1, weekdays: [2] } })
+    expect(items[1]).toMatchObject({ title: 'Rent', repeat: { freq: 'month', monthDay: 1 } })
+    // Not a rule: left as it was written.
+    expect(items[2].title).toBe('Odd 🔁 now and then')
+    expect(items[2].repeat).toBeUndefined()
+  })
+  it('splitRepeat', () => {
+    expect(splitRepeat('09:00 Standup 🔁 every weekday')).toEqual({ text: '09:00 Standup', repeat: { freq: 'week', interval: 1, weekdays: [1, 2, 3, 4, 5] } })
+    expect(splitRepeat('Plain')).toEqual({ text: 'Plain' })
+  })
+  it('writes event lines with their rule', () => {
+    expect(formatEventLine('Football', '18:00', '19:00', { freq: 'week', interval: 1, weekdays: [2] })).toBe('- 18:00-19:00 Football 🔁 every Tuesday')
+    expect(formatEventBody('Rent', undefined, undefined, { freq: 'month', interval: 1, monthDay: 1 })).toBe('Rent 🔁 every month on the 1st')
+  })
+})
+
+describe('finding and changing an event line', () => {
+  const text = '# Day\n\n## Schedule\n\n- [ ] 09:00-10:00 Gym\n- 18:00 Football 🔁 every Tuesday\n'
+  it('finds it where it was, or by its title and time if it moved', () => {
+    expect(findEventLine(text, { line: 4, title: 'Gym', start: '09:00' })).toBe(4)
+    expect(findEventLine(text, { line: 1, title: 'Football', start: '18:00' })).toBe(5)
+    expect(findEventLine(text, { line: 1, title: 'Football', start: '19:00' })).toBe(-1)
+  })
+  it('rewrites it keeping the tick box', () => {
+    expect(replaceEventAt(text, 4, '11:00-12:30 Gym').split('\n')[4]).toBe('- [ ] 11:00-12:30 Gym')
+    expect(removeLineAt(text, 4).split('\n')[4]).toBe('- 18:00 Football 🔁 every Tuesday')
   })
 })
