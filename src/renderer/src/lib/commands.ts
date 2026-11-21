@@ -369,6 +369,7 @@ export const commands: Command[] = [
   { id: 'macros.stop', group: 'Macros', title: 'Macros: stop playing or the auto-clicker', run: () => void window.api.macrosStop() },
   { id: 'studio.open', group: 'Navigation', title: 'Open the Studio (record your screen and webcam)', run: () => openSpecialTab(STUDIO_TAB) },
   { id: 'appstudio.open', group: 'Navigation', title: 'Open App Studio (your apps and their pull requests)', run: () => openSpecialTab(APPSTUDIO_TAB) },
+  { id: 'appstudio.bug', group: 'Tools', title: 'Report a bug in one of your apps (snip the screen, then Report bug)', run: () => void window.api.startSnip() },
   { id: 'clips.open', group: 'Navigation', title: 'Open clips (instant replay and the clip editor)', run: () => openSpecialTab(CLIPS_TAB) },
   { id: 'videos.idea', group: 'Navigation', title: 'Idea inbox for videos (jot down a video idea)', run: () => {
     focusIdeaBox()

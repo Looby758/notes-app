@@ -455,6 +455,12 @@ const api: NotesApi = {
   snipImage: () => ipcRenderer.invoke('snip:image'),
   snipRead: (png) => ipcRenderer.invoke('snip:read', png),
   snipClose: () => ipcRenderer.invoke('snip:close'),
+  snipReportBug: (png) => ipcRenderer.invoke('snip:bug', png),
+  onAppStudioBug: (callback) => {
+    const handler = (_e: unknown, png: Uint8Array): void => callback(png)
+    ipcRenderer.on('appstudio:bug', handler)
+    return () => ipcRenderer.removeListener('appstudio:bug', handler)
+  },
   snipSend: (action, text) => ipcRenderer.invoke('snip:send', action, text),
   onSnipText: (callback) => {
     const handler = (_e: unknown, action: 'note' | 'ask', text: string): void => callback(action, text)

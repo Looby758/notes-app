@@ -12,16 +12,20 @@ import {
   Rocket,
   SquareTerminal,
   Hammer,
+  Pencil,
+  Trash2,
   X,
   FlaskConical
 } from 'lucide-react'
 import { prSummary, timeAgo, type PullRequest } from '@shared/appStudio'
 import { FILE_MANAGER } from '@shared/platform'
-import { addProject, useTerminals, type TerminalProject } from '../../store/terminals'
+import { addProject, removeProject, updateProject, useTerminals, type TerminalProject } from '../../store/terminals'
 import { appRepos, dropPull, refreshApps, refreshGithub, refreshPulls, setGithub, setSection, useAppStudio } from '../../store/appStudio'
 import { getLatestAndRun, tryBranch } from '../../lib/terminal'
 import { openSpecialTab, TERMINAL_TAB } from '../../lib/editorController'
 import { notify } from '../../store/notify'
+import { useAppBoard } from '../../store/appBoard'
+import Board from './Board'
 
 /** Pull requests are fetched again when you come back after this long. */
 const PULLS_FRESH_MS = 2 * 60_000
@@ -35,6 +39,7 @@ export default function AppStudioPage() {
   const section = useAppStudio((s) => s.section)
   const pulls = useAppStudio((s) => s.pulls)
   const projects = useTerminals((s) => s.projects)
+  const openItems = useAppBoard((s) => s.items.filter((i) => i.column !== 'done').length)
 
   useEffect(() => {
     void refreshGithub()
@@ -70,11 +75,14 @@ export default function AppStudioPage() {
           <button className={section === 'apps' ? 'active' : ''} onClick={() => setSection('apps')}>
             My apps <span className="appstudio-count">{projects.length}</span>
           </button>
+          <button className={section === 'board' ? 'active' : ''} onClick={() => setSection('board')}>
+            Ideas &amp; bugs {openItems > 0 && <span className="appstudio-count">{openItems}</span>}
+          </button>
           <button className={section === 'pulls' ? 'active' : ''} onClick={() => setSection('pulls')}>
             Pull requests {pulls.length > 0 && <span className="appstudio-count accent">{pulls.length}</span>}
           </button>
         </nav>
-        {section === 'apps' ? <MyApps /> : <PullInbox />}
+        {section === 'apps' ? <MyApps /> : section === 'board' ? <Board /> : <PullInbox />}
       </div>
     </div>
   )
@@ -112,11 +120,46 @@ function AppCard({ project }: { project: TerminalProject }) {
   const open = (where: 'files' | 'vscode'): void => {
     window.api.terminalOpenIn(project.folder, where).catch((err) => notify(err))
   }
+  const [renaming, setRenaming] = useState(false)
+  const [removing, setRemoving] = useState(false)
   return (
     <section className="appstudio-card">
       <div className="appstudio-card-top">
-        <h3>{project.name}</h3>
+        {renaming ? (
+          <input
+            className="text-input appstudio-rename"
+            autoFocus
+            defaultValue={project.name}
+            onBlur={(e) => {
+              const name = e.currentTarget.value.trim()
+              if (name) updateProject(project.id, { name })
+              setRenaming(false)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur()
+              if (e.key === 'Escape') setRenaming(false)
+            }}
+          />
+        ) : (
+          <h3 onDoubleClick={() => setRenaming(true)} title="Double-click to rename">
+            {project.name}
+          </h3>
+        )}
         {info?.version && <span className="appstudio-chip">v{info.version}</span>}
+        <span className="appstudio-card-spacer" />
+        {!renaming && (
+          <button className="icon-btn" title="Rename" onClick={() => setRenaming(true)}>
+            <Pencil size={13} />
+          </button>
+        )}
+        <button
+          className={removing ? 'appstudio-remove confirm' : 'icon-btn'}
+          title={removing ? undefined : 'Remove from App Studio (the app’s folder and files stay as they are)'}
+          onClick={() => (removing ? removeProject(project.id) : setRemoving(true))}
+          onBlur={() => setRemoving(false)}
+        >
+          {removing ? 'Remove?' : <Trash2 size={13} />}
+        </button>
       </div>
       {info?.repo ? (
         <a className="appstudio-repo" href={`https://github.com/${info.repo}`} target="_blank" rel="noreferrer">
@@ -370,7 +413,8 @@ function TestCopyNote() {
       .then(setTest)
       .catch(() => undefined)
   }, [])
-  if (!test) return null
+  const noApps = useTerminals((s) => s.projects.length === 0)
+  if (!test || !noApps) return null
   return (
     <div className="appstudio-testcopy">
       This is Orbit’s <strong>test copy</strong>, with its own settings, so your apps aren’t here. Use App Studio in your normal Orbit to try and merge things, and use

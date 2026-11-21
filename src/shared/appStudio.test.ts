@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { githubRepo, looksLikeGitHubToken, prSummary, timeAgo, tryBranchCommand } from './appStudio'
+import { boardKey, claudePrompt, githubRepo, looksLikeGitHubToken, prSummary, readBoard, timeAgo, tryBranchCommand, type BoardItem } from './appStudio'
 
 describe('githubRepo', () => {
   it('reads https and ssh remotes', () => {
@@ -73,5 +73,44 @@ describe('looksLikeGitHubToken', () => {
     expect(looksLikeGitHubToken('ghp_' + 'a'.repeat(36))).toBe(true)
     expect(looksLikeGitHubToken('github_pat_' + 'A1_'.repeat(20))).toBe(true)
     expect(looksLikeGitHubToken('hello')).toBe(false)
+  })
+})
+
+describe('idea board', () => {
+  const item = (over: Partial<BoardItem>): BoardItem => ({
+    id: 'a',
+    app: 'me/eclipse',
+    kind: 'idea',
+    title: 'Dark mode',
+    details: '',
+    column: 'ideas',
+    pictures: [],
+    created: '2026-11-21T20:00:00Z',
+    updated: '2026-11-21T20:00:00Z',
+    ...over
+  })
+  it('reads saved boards and skips broken items', () => {
+    const json = JSON.stringify({ items: [item({}), { id: 'x' }, item({ id: 'b', column: 'nonsense' as never, kind: 'bug' })] })
+    const board = readBoard(json)
+    expect(board.items.map((i) => i.id)).toEqual(['a', 'b'])
+    expect(board.items[1].column).toBe('ideas')
+    expect(board.items[1].kind).toBe('bug')
+    expect(readBoard('not json').items).toEqual([])
+    expect(readBoard(null).items).toEqual([])
+  })
+  it('keys apps by repository, else name', () => {
+    expect(boardKey({ name: 'Eclipse', repo: 'me/eclipse' })).toBe('me/eclipse')
+    expect(boardKey({ name: 'Eclipse' })).toBe('Eclipse')
+  })
+  it('writes a prompt for one idea', () => {
+    const p = claudePrompt({ name: 'Eclipse', repo: 'me/eclipse' }, [item({ details: 'A toggle in settings.' })])
+    expect(p).toBe('Please add this to my app Eclipse (GitHub: me/eclipse).\n\nDark mode\nA toggle in settings.\n\nWhen it’s done, open a pull request.')
+  })
+  it('writes a prompt for bugs and ideas together, mentioning pictures', () => {
+    const p = claudePrompt({ name: 'Eclipse' }, [item({ kind: 'bug', title: 'Login button does nothing', pictures: ['a.png'] }), item({ id: 'b', title: 'Dark mode' })])
+    expect(p).toContain("I'd like some changes to my app Eclipse.")
+    expect(p).toContain('Bugs to fix:\n\n1. Login button does nothing\n   (A picture is attached for this.)')
+    expect(p).toContain('New features to add:\n\n2. Dark mode')
+    expect(p).toContain('I’ve attached a picture to show what I mean.')
   })
 })

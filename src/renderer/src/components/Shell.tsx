@@ -16,6 +16,10 @@ import { notify } from '../store/notify'
 import { useEditor, type SaveStatus } from '../store/editor'
 import { useNoteIndex } from '../store/noteIndex'
 import { setPrefs, usePrefs } from '../store/prefs'
+import { useTerminals } from '../store/terminals'
+import { setSection, useAppStudio } from '../store/appStudio'
+import { reportBugFromSnip } from '../store/appBoard'
+import { boardKey } from '@shared/appStudio'
 import { showSearch, toggleZen, useUI } from '../store/ui'
 import { countNotes, parentOf } from '../lib/paths'
 import { FILE_MANAGER, IS_MAC, showKeys } from '@shared/platform'
@@ -26,6 +30,7 @@ import {
   isNoteTab,
   openNote,
   openSpecialTab,
+  APPSTUDIO_TAB,
   openWebTab,
   activateTab,
   refreshEmbeds,
@@ -93,6 +98,7 @@ const STATUS_LABEL: Record<SaveStatus, string> = {
 }
 
 export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
+  useBugReports()
   const leftOpen = useUI((s) => s.leftOpen)
   const rightOpen = useUI((s) => s.rightOpen)
   const leftWidth = useUI((s) => s.leftWidth)
@@ -448,4 +454,20 @@ function TestCopyBadge() {
       Test copy
     </span>
   ) : null
+}
+
+/** Bugs reported from the screen snip ("Report bug") open on App Studio's board. */
+function useBugReports(): void {
+  useEffect(
+    () =>
+      window.api.onAppStudioBug((png) => {
+        const project = useTerminals.getState().projects[0]
+        const info = project ? useAppStudio.getState().info[project.folder] : undefined
+        void reportBugFromSnip(png, usePrefs.getState().prefs.attachmentFolder, project ? boardKey({ name: project.name, repo: info?.repo }) : null, () => {
+          openSpecialTab(APPSTUDIO_TAB)
+          setSection('board')
+        })
+      }),
+    []
+  )
 }

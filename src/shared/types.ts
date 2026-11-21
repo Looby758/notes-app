@@ -944,6 +944,10 @@ export interface NotesApi {
   /** Snip window: the text in part of the picture (read offline). */
   snipRead(png: Uint8Array): Promise<string>
   snipClose(): Promise<void>
+  /** The snip's "Report bug": this picture of the boxed part of the screen goes to App Studio as a new bug. */
+  snipReportBug(png: Uint8Array): Promise<void>
+  /** A bug reported from the screen snip, with its picture (App Studio opens it). */
+  onAppStudioBug(callback: (png: Uint8Array) => void): () => void
   /** Snip window: what to do with the text (closes the snip). */
   snipSend(action: 'copy' | 'note' | 'web' | 'translate' | 'ask', text: string): Promise<void>
   /** Main window: snipped text to save in today's note or ask the AI about. */

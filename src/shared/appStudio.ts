@@ -122,3 +122,101 @@ export function timeAgo(iso: string, now = Date.now()): string {
 export function looksLikeGitHubToken(token: string): boolean {
   return /^(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{40,})$/.test(token.trim())
 }
+
+// ---------- Idea board ----------
+
+export type BoardColumn = 'ideas' | 'building' | 'testing' | 'done'
+
+export const BOARD_COLUMNS: { id: BoardColumn; label: string }[] = [
+  { id: 'ideas', label: 'Ideas & bugs' },
+  { id: 'building', label: 'Building' },
+  { id: 'testing', label: 'Testing' },
+  { id: 'done', label: 'Done' }
+]
+
+/** An idea or a bug on an app's board. Kept in the notes folder (.notesapp/app-studio.json), so it's the same on every computer. */
+export interface BoardItem {
+  id: string
+  /** Which app: its GitHub repository ("owner/name") when it has one, else its name. */
+  app: string
+  kind: 'idea' | 'bug'
+  title: string
+  details: string
+  column: BoardColumn
+  /** Screenshots and sketches, as notes-folder paths. */
+  pictures: string[]
+  created: string
+  updated: string
+}
+
+export interface BoardData {
+  items: BoardItem[]
+}
+
+const COLUMN_IDS = new Set<string>(BOARD_COLUMNS.map((c) => c.id))
+
+/** Reads the saved board, leaving out anything that isn't a proper item. */
+export function readBoard(json: string | null): BoardData {
+  if (!json) return { items: [] }
+  try {
+    const raw = JSON.parse(json) as { items?: unknown }
+    const items = Array.isArray(raw.items) ? raw.items : []
+    return {
+      items: items
+        .filter((i): i is Record<string, unknown> => !!i && typeof i === 'object')
+        .filter((i) => typeof i.id === 'string' && typeof i.app === 'string' && typeof i.title === 'string')
+        .map((i) => ({
+          id: i.id as string,
+          app: i.app as string,
+          kind: i.kind === 'bug' ? 'bug' : 'idea',
+          title: i.title as string,
+          details: typeof i.details === 'string' ? i.details : '',
+          column: typeof i.column === 'string' && COLUMN_IDS.has(i.column) ? (i.column as BoardColumn) : 'ideas',
+          pictures: Array.isArray(i.pictures) ? i.pictures.filter((p): p is string => typeof p === 'string') : [],
+          created: typeof i.created === 'string' ? i.created : new Date(0).toISOString(),
+          updated: typeof i.updated === 'string' ? i.updated : typeof i.created === 'string' ? i.created : new Date(0).toISOString()
+        }))
+    }
+  } catch {
+    return { items: [] }
+  }
+}
+
+/** The key an app's board items are saved under: its repository if it's on GitHub, else its name. */
+export const boardKey = (app: { name: string; repo?: string }): string => app.repo ?? app.name
+
+/**
+ * A request for Claude Code made from one or more board items: what the app is, then each idea
+ * or bug with its details, and a note about any pictures (pasted in separately).
+ */
+export function claudePrompt(app: { name: string; repo?: string }, items: BoardItem[]): string {
+  const where = app.repo ? `my app ${app.name} (GitHub: ${app.repo})` : `my app ${app.name}`
+  const ideas = items.filter((i) => i.kind === 'idea')
+  const bugs = items.filter((i) => i.kind === 'bug')
+  const pictures = items.reduce((n, i) => n + i.pictures.length, 0)
+  const describe = (i: BoardItem, n: number): string => {
+    const lines = [`${items.length > 1 ? `${n}. ` : ''}${i.title.trim()}`]
+    const details = i.details.trim()
+    if (details) lines.push(...details.split('\n').map((l) => (items.length > 1 ? `   ${l}` : l)))
+    if (i.pictures.length) lines.push(`${items.length > 1 ? '   ' : ''}(${i.pictures.length === 1 ? 'A picture is' : `${i.pictures.length} pictures are`} attached for this.)`)
+    return lines.join('\n')
+  }
+  const parts: string[] = []
+  let n = 0
+  if (bugs.length && ideas.length) parts.push(`I'd like some changes to ${where}.`)
+  if (bugs.length) {
+    parts.push(
+      (ideas.length ? '' : `Please fix ${bugs.length === 1 ? 'this bug' : 'these bugs'} in ${where}.\n\n`) +
+        (ideas.length ? `Bugs to fix:\n\n` : '') +
+        bugs.map((b) => describe(b, ++n)).join('\n\n')
+    )
+  }
+  if (ideas.length) {
+    parts.push(
+      (bugs.length ? `New features to add:\n\n` : `Please add ${ideas.length === 1 ? 'this' : 'these'} to ${where}.\n\n`) + ideas.map((i) => describe(i, ++n)).join('\n\n')
+    )
+  }
+  if (pictures) parts.push(pictures === 1 ? 'I’ve attached a picture to show what I mean.' : `I’ve attached ${pictures} pictures to show what I mean.`)
+  parts.push('When it’s done, open a pull request.')
+  return parts.join('\n\n')
+}
