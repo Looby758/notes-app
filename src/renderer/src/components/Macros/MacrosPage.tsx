@@ -501,8 +501,8 @@ function Hotkeys({ status }: { status: MacroStatus }) {
         ))}
       </div>
       <label className="macro-check">
-        <input type="checkbox" checked={status.data.trimStart} onChange={(e) => void window.api.macrosSettings({ trimStart: e.target.checked })} />
-        Start a new macro at my first key or click (leave out the wait before it)
+        <input type="checkbox" checked={status.data.skipLeadingWait} onChange={(e) => void window.api.macrosSettings({ skipLeadingWait: e.target.checked })} />
+        Leave out the wait before my first key or click (off: every wait is kept, exactly)
       </label>
     </section>
   )

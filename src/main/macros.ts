@@ -537,8 +537,8 @@ public static class OrbitMacro {
             }
           }
           if (stopped) break;
-          // Wait out the rest of this go before the next one (the pause after your last input).
-          if ((loops == 0 || loop + 1 < loops) && !WaitUntil(start + (long)((from + len) * perMs))) { stopped = true; break; }
+          // Wait out the rest of this go, the pause after your last input included (it's part of the macro too).
+          if (!WaitUntil(start + (long)((from + len) * perMs))) { stopped = true; break; }
         }
       } finally { ReleaseAll(); timeEndPeriod(1); }
       Say("played " + run + " " + (stopped ? 1 : 0) + " " + count + " " + N(worst) + " " + N(count > 0 ? total / count : 0));
@@ -733,7 +733,7 @@ function run(argv) {
           }
         }
         if (stopped) break
-        if ((loops === 0 || loop + 1 < loops) && !waitUntil(start + from + len)) break
+        if (!waitUntil(start + from + len)) break
       }
     } finally { releaseAll() }
     say('played ' + run + ' ' + (stopped ? 1 : 0) + ' ' + count + ' ' + fmt(worst) + ' ' + fmt(count ? total / count : 0))
@@ -923,7 +923,7 @@ function finishRecording(stoppedAt: number): void {
     os: OS,
     stoppedAt,
     stopMods: acceleratorCodes(data.hotkeys.record).mods,
-    trimStart: data.trimStart
+    trimStart: data.skipLeadingWait
   })
   recLines = []
   const something = events.some((e) => e.k !== 'mm' || e.t > 0)
@@ -1297,7 +1297,7 @@ export function setupMacros(): void {
       }
     }
     if (patch.clicker && typeof patch.clicker === 'object') data = { ...data, clicker: cleanClicker({ ...data.clicker, ...(patch.clicker as object) }) }
-    if (typeof patch.trimStart === 'boolean') data = { ...data, trimStart: patch.trimStart }
+    if (typeof patch.skipLeadingWait === 'boolean') data = { ...data, skipLeadingWait: patch.skipLeadingWait }
     return changed()
   })
   ipcMain.handle('macros:dismiss', () => {

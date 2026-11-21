@@ -865,7 +865,7 @@ export interface NotesApi {
   macrosRemove(id: string): Promise<MacroStatus>
   /** The macro the Play hotkey plays. */
   macrosSetCurrent(id: string): Promise<MacroStatus>
-  macrosSettings(patch: { hotkeys?: Partial<MacroHotkeys>; clicker?: Partial<ClickerSettings>; trimStart?: boolean }): Promise<MacroStatus>
+  macrosSettings(patch: { hotkeys?: Partial<MacroHotkeys>; clicker?: Partial<ClickerSettings>; skipLeadingWait?: boolean }): Promise<MacroStatus>
   /** Clears the last error and play report. */
   macrosDismiss(): Promise<void>
   /** Where the pointer is now (for the auto-clicker's spot). */

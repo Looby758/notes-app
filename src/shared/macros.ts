@@ -102,8 +102,12 @@ export interface MacrosData {
   clicker: ClickerSettings
   /** The macro the Play hotkey plays. */
   current: string
-  /** Leave out the wait before your first key or click. */
-  trimStart: boolean
+  /**
+   * Leave out the wait before your first key or click. Off unless you turn it on: a macro keeps
+   * every wait, including the one at the start. (Saved under a new name, because the first
+   * version had it on by default.)
+   */
+  skipLeadingWait: boolean
 }
 
 export const DEFAULT_HOTKEYS: MacroHotkeys = { record: 'F9', play: 'F10', clicker: 'F6' }
@@ -127,7 +131,7 @@ export const MACRO_LIMIT = 300
 export const MAX_SPEED = 10
 export const MIN_SPEED = 0.1
 
-export const emptyMacros = (): MacrosData => ({ macros: [], hotkeys: { ...DEFAULT_HOTKEYS }, clicker: { ...DEFAULT_CLICKER }, current: '', trimStart: true })
+export const emptyMacros = (): MacrosData => ({ macros: [], hotkeys: { ...DEFAULT_HOTKEYS }, clicker: { ...DEFAULT_CLICKER }, current: '', skipLeadingWait: false })
 
 // ---------- Cleaning saved data ----------
 
@@ -224,7 +228,7 @@ export function cleanMacros(raw: unknown): MacrosData {
     hotkeys: { record: hk(h.record, DEFAULT_HOTKEYS.record), play: hk(h.play, DEFAULT_HOTKEYS.play), clicker: hk(h.clicker, DEFAULT_HOTKEYS.clicker) },
     clicker: cleanClicker(d.clicker),
     current: macros.some((m) => m.id === current) ? current : (macros[0]?.id ?? ''),
-    trimStart: d.trimStart !== false
+    skipLeadingWait: d.skipLeadingWait === true
   }
 }
 

@@ -132,6 +132,15 @@ describe('tidying a recording', () => {
   })
 })
 
+describe('waits are kept exactly', () => {
+  it('keeps the wait before the first click, between clicks and after the last one', () => {
+    const lines = ['p 0 10 10 0', 'bd 5000.25 0', 'bu 5080.5 0', 'bd 10080.5 0', 'bu 10150 0', 'h 13000']
+    const { events, length } = tidyRecording(lines, { os: 'win', stoppedAt: 0, stopMods: [], trimStart: false })
+    const script = playbackScript(macro(events, { length }), 'win')
+    expect(script).toEqual(['len 13000 loops 1', '0 M 10 10', '5000.25 B down 0', '5080.5 B up 0', '10080.5 B down 0', '10150 B up 0'])
+  })
+})
+
 describe('steps', () => {
   it('shows each key with how long it was held, and runs of movement', () => {
     const events: MacroEvent[] = [
@@ -245,5 +254,9 @@ describe('saved macros', () => {
     expect(data.clicker.what).toBe('key')
     expect(data.current).toBe('a')
     expect(cleanMacros(null).hotkeys.record).toBe('F9')
+    // Every wait is kept unless you ask; the first version's "on" (saved as trimStart) no longer counts.
+    expect(cleanMacros(null).skipLeadingWait).toBe(false)
+    expect(cleanMacros({ trimStart: true }).skipLeadingWait).toBe(false)
+    expect(cleanMacros({ skipLeadingWait: true }).skipLeadingWait).toBe(true)
   })
 })
