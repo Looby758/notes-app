@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, FolderOpen, Pencil, Pin, Play, Plus, RotateCcw, Search, Square, PanelRight, Trash2, X } from 'lucide-react'
-import { attachTerminal, closeTerminal, newTerminal, restartTerminal, runInActive, runProjectCommand, stopTerminal } from '../../lib/terminal'
+import { Check, CircleStop, FolderOpen, Pencil, Pin, Play, Plus, RotateCcw, Search, Square, PanelRight, Trash2, X } from 'lucide-react'
+import { attachTerminal, closeRunningApp, closeTerminal, newTerminal, restartTerminal, runInActive, runProjectCommand, stopTerminal } from '../../lib/terminal'
 import { addProject, forgetCommand, removeProject, setActiveTerminal, setPanel, updateProject, updateTerminal, useTerminals, type TerminalProject } from '../../store/terminals'
 import { commandBlank, commandLabel, fillCommand } from '@shared/terminalTools'
 import { notify } from '../../store/notify'
@@ -93,6 +93,9 @@ function TerminalBar() {
       </div>
       {current && (
         <div className="terminal-actions">
+          <button className="terminal-close-app" title="Close the app running here (same as Ctrl+C). The terminal stays open." disabled={!current.running} onClick={() => closeRunningApp(current.id)}>
+            <CircleStop size={13} /> Close app
+          </button>
           <button className="icon-btn" title="Stop (ends this command line and what's running in it)" disabled={!current.running} onClick={() => stopTerminal(current.id)}>
             <Square size={13} />
           </button>

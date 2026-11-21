@@ -7114,6 +7114,32 @@ body.theme-light .flashcard-grade.grade-easy span {
   padding-left: 6px;
   border-left: 1px solid var(--border);
 }
+.terminal-close-app {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  margin-right: 4px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.terminal-close-app svg {
+  color: #e5484d;
+}
+.terminal-close-app:hover:not(:disabled) {
+  border-color: #e5484d;
+  background: var(--bg-hover);
+}
+.terminal-close-app:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 .terminal-body {
   flex: 1;
   min-height: 0;

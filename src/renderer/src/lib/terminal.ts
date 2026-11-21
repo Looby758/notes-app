@@ -36,6 +36,8 @@ interface Session {
   folder: string | null
   /** A run button's command, typed once the command line is ready. */
   pending: string | null
+  /** When Close app was pressed (Windows then asks "Terminate batch job (Y/N)?", answered yes for you). */
+  closingAt: number
   /** Where the error check got to (moves with the text as old lines scroll away). */
   checked: IMarker | null
   typed: LineTracker
@@ -158,6 +160,10 @@ function listen(): void {
     const s = sessions.get(id)
     if (!s) return
     s.term.write(data, () => checkForErrors(s))
+    if (s.closingAt && Date.now() - s.closingAt < 3000 && /Terminate batch job \(Y\/N\)\?/i.test(data)) {
+      s.closingAt = 0
+      window.api.terminalInput(id, 'Y\r')
+    }
     if (s.pending) {
       const command = s.pending
       s.pending = null
@@ -252,7 +258,7 @@ function create(id: string): Session {
   const fit = new FitAddon()
   term.loadAddon(fit)
   applyLook(term)
-  const s: Session = { id, term, fit, el, running: false, folder: null, pending: takePending(id), checked: null, typed: new LineTracker(), cleanup: [] }
+  const s: Session = { id, term, fit, el, running: false, folder: null, pending: takePending(id), closingAt: 0, checked: null, typed: new LineTracker(), cleanup: [] }
   term.attachCustomKeyEventHandler((e) => handleKey(term, e))
   term.onData((data) => {
     if (s.running) {
@@ -363,6 +369,19 @@ export function focusTerminal(): void {
 export function newTerminal(folder: string | null = null, name?: string): void {
   addTerminal({ name: name ?? nextTerminalName(folder ? (folder.split(/[\\/]/).filter(Boolean).pop() ?? 'Terminal') : 'Terminal'), folder })
   openSpecialTab(TERMINAL_TAB)
+}
+
+/**
+ * Closes the app running in a terminal (a dev server, say), like pressing Ctrl+C: the terminal
+ * stays open, ready for the next command.
+ */
+export function closeRunningApp(id: string): void {
+  const s = sessions.get(id)
+  if (!s?.running) return
+  s.pending = null
+  s.closingAt = Date.now()
+  window.api.terminalInput(id, '\x03')
+  s.term.focus()
 }
 
 /** Ends a terminal's command line (and whatever is running in it); it stays in the list to restart. */
