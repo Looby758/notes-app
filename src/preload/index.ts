@@ -597,6 +597,7 @@ const api: NotesApi = {
   },
   terminalPickFolder: () => ipcRenderer.invoke('term:pickFolder'),
   terminalHome: () => ipcRenderer.invoke('term:home'),
+  terminalOpenIn: (folder, where) => ipcRenderer.invoke('term:openIn', folder, where),
   aiChat: (messages, engine) => ipcRenderer.invoke('ai:chat', messages, engine),
   aiLoadChats: () => ipcRenderer.invoke('ai:loadChats'),
   aiSaveChats: (chats) => ipcRenderer.invoke('ai:saveChats', chats),

@@ -174,3 +174,31 @@ export function addToHistory(history: string[], command: string, max = 300): str
   if (!c) return history
   return [c, ...history.filter((h) => h !== c)].slice(0, max)
 }
+
+/** Files that, when a pull changes them, mean `npm install` is needed. */
+const PACKAGE_FILES = ['package.json', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml']
+
+/**
+ * The "Get latest and run" button's command line: pull the latest code, install packages only if
+ * the pull changed them (or they've never been installed), then start the app. Each step only runs
+ * if the one before worked. Written for PowerShell on Windows, and for zsh/bash on a Mac.
+ */
+export function latestAndRunCommand(windows: boolean, run = 'npm run dev'): string {
+  const files = PACKAGE_FILES.join(' ')
+  if (windows) {
+    return (
+      `$before = git rev-parse HEAD; git pull; if ($LASTEXITCODE -eq 0) { ` +
+      `if (-not (Test-Path node_modules) -or (git diff --name-only $before HEAD -- ${files})) { npm install }; ` +
+      `if ($LASTEXITCODE -eq 0) { ${run} } }`
+    )
+  }
+  return (
+    `before=$(git rev-parse HEAD) && git pull && ` +
+    `{ if [ ! -d node_modules ] || ! git diff --quiet "$before" HEAD -- ${files}; then npm install; fi; } && ${run}`
+  )
+}
+
+/** The command a project's "Get latest and run" button starts the app with: its first one that keeps running. */
+export function runCommandOf(commands: string[]): string {
+  return commands.find((c) => keepsRunning(c) && !/\{[^{}]+\}/.test(c)) ?? 'npm run dev'
+}

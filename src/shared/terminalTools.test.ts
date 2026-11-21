@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LineTracker, addToHistory, commandBlank, commandLabel, fillCommand, findFiles, isErrorLine, keepsRunning, resolveFrom } from './terminalTools'
+import { LineTracker, addToHistory, commandBlank, commandLabel, fillCommand, findFiles, isErrorLine, keepsRunning, latestAndRunCommand, resolveFrom, runCommandOf } from './terminalTools'
 
 describe('isErrorLine', () => {
   it('spots errors from npm, git, TypeScript and test runners', () => {
@@ -98,5 +98,23 @@ describe('addToHistory', () => {
     expect(addToHistory(['a', 'b', 'c'], 'b')).toEqual(['b', 'a', 'c'])
     expect(addToHistory(['a'], '  ')).toEqual(['a'])
     expect(addToHistory(['a', 'b'], 'c', 2)).toEqual(['c', 'a'])
+  })
+})
+
+describe('get latest and run', () => {
+  it('pulls, installs only when packages changed, then runs', () => {
+    const mac = latestAndRunCommand(false)
+    expect(mac).toContain('git pull &&')
+    expect(mac).toContain('git diff --quiet "$before" HEAD -- package.json package-lock.json')
+    expect(mac.endsWith('&& npm run dev')).toBe(true)
+    const win = latestAndRunCommand(true, 'npm start')
+    expect(win).toContain('Test-Path node_modules')
+    expect(win).toContain('{ npm start }')
+    expect(win).not.toContain('&&')
+  })
+  it('picks the command that starts the app', () => {
+    expect(runCommandOf(['npm install', 'npm run dev', 'git pull'])).toBe('npm run dev')
+    expect(runCommandOf(['npm install', 'npm start'])).toBe('npm start')
+    expect(runCommandOf(['git pull'])).toBe('npm run dev')
   })
 })

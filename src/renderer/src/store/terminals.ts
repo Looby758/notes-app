@@ -37,6 +37,10 @@ interface TerminalsState {
   history: string[]
   /** Whether the Run panel (projects, saved commands, history) is showing. */
   panel: boolean
+  /** The terminal shown beside the active one (side by side), if any. */
+  split: string | null
+  /** Whether the find bar (Ctrl+F) is open. */
+  finding: boolean
 }
 
 const PROJECTS_KEY = 'terminal:projects'
@@ -62,18 +66,21 @@ function write(storage: Storage, key: string, value: unknown): void {
   }
 }
 
-const saved = read<{ terminals: TerminalInfo[]; active: string | null }>(sessionStorage, OPEN_KEY, { terminals: [], active: null })
+const saved = read<{ terminals: TerminalInfo[]; active: string | null; split?: string | null }>(sessionStorage, OPEN_KEY, { terminals: [], active: null })
 
 export const useTerminals = create<TerminalsState>(() => ({
   terminals: saved.terminals.map((t) => ({ ...t, errors: 0 })),
   active: saved.active,
   projects: read<TerminalProject[]>(localStorage, PROJECTS_KEY, []),
   history: read<string[]>(localStorage, HISTORY_KEY, []),
-  panel: read<boolean>(localStorage, PANEL_KEY, true)
+  panel: read<boolean>(localStorage, PANEL_KEY, true),
+  split: saved.split ?? null,
+  finding: false
 }))
 
 useTerminals.subscribe((s, prev) => {
-  if (s.terminals !== prev.terminals || s.active !== prev.active) write(sessionStorage, OPEN_KEY, { terminals: s.terminals, active: s.active })
+  if (s.terminals !== prev.terminals || s.active !== prev.active || s.split !== prev.split)
+    write(sessionStorage, OPEN_KEY, { terminals: s.terminals, active: s.active, split: s.split })
   if (s.projects !== prev.projects) write(localStorage, PROJECTS_KEY, s.projects)
   if (s.history !== prev.history) write(localStorage, HISTORY_KEY, s.history)
   if (s.panel !== prev.panel) write(localStorage, PANEL_KEY, s.panel)
@@ -97,7 +104,24 @@ export function addTerminal(info: Omit<TerminalInfo, 'id' | 'running' | 'errors'
 }
 
 export function setActiveTerminal(id: string): void {
-  useTerminals.setState((s) => ({ active: id, terminals: s.terminals.map((t) => (t.id === id && t.errors ? { ...t, errors: 0 } : t)) }))
+  useTerminals.setState((s) => ({
+    active: id,
+    // Side by side: picking the one on the other side swaps which is active, so both stay showing.
+    split: s.split === id ? s.active : s.split,
+    terminals: s.terminals.map((t) => (t.id === id && t.errors ? { ...t, errors: 0 } : t))
+  }))
+}
+
+/** The terminals showing: the active one, and the one beside it when side by side. */
+export const shownTerminals = (s: TerminalsState): string[] =>
+  [s.active, s.split].filter((id, i, all): id is string => !!id && all.indexOf(id) === i && s.terminals.some((t) => t.id === id))
+
+export function setSplit(split: string | null): void {
+  useTerminals.setState({ split })
+}
+
+export function setFinding(finding: boolean): void {
+  useTerminals.setState({ finding })
 }
 
 /** A name for a new plain terminal: "Terminal", then "Terminal 2"… */

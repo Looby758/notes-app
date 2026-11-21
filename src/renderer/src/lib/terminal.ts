@@ -1,17 +1,21 @@
 import { Terminal, type IDisposable, type IMarker, type ITheme } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { SearchAddon, type ISearchOptions } from '@xterm/addon-search'
 import '@xterm/xterm/css/xterm.css'
 import { useEditor } from '../store/editor'
 import { commandForKey, type Command } from './commands'
 import { openSpecialTab, TERMINAL_TAB } from './editorController'
 import { IS_MAC } from '@shared/platform'
-import { commandLabel, findFiles, isErrorLine, keepsRunning, LineTracker, resolveFrom } from '@shared/terminalTools'
+import { commandLabel, findFiles, isErrorLine, keepsRunning, latestAndRunCommand, LineTracker, resolveFrom, runCommandOf } from '@shared/terminalTools'
 import {
   addTerminal,
   getTerminal,
   nextTerminalName,
   rememberCommand,
   setActiveTerminal,
+  setFinding,
+  setSplit,
+  shownTerminals,
   updateTerminal,
   useTerminals,
   type TerminalProject
@@ -28,6 +32,7 @@ interface Session {
   id: string
   term: Terminal
   fit: FitAddon
+  search: SearchAddon
   /** What the terminal draws into; moved into whichever page is showing the tab. */
   el: HTMLDivElement
   /** False once the command line has ended; the next key press starts a new one. */
@@ -119,6 +124,13 @@ function handleKey(term: Terminal, e: KeyboardEvent): boolean {
   if (e.key === 'Escape') {
     e.stopPropagation()
     return true
+  }
+  // Ctrl+F (⌘F on a Mac): find in what this terminal printed.
+  if (e.code === 'KeyF' && !e.altKey && !e.shiftKey && (IS_MAC ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey)) {
+    e.preventDefault()
+    e.stopPropagation()
+    setFinding(true)
+    return false
   }
   if (IS_MAC) {
     // ⌘ is the app's; Control is the command line's (Control+C stops a command, and so on).
@@ -257,8 +269,14 @@ function create(id: string): Session {
   const term = new Terminal({ fontSize: 13, lineHeight: 1.2, cursorBlink: true, scrollback: 5000, allowProposedApi: true })
   const fit = new FitAddon()
   term.loadAddon(fit)
+  const search = new SearchAddon({ highlightLimit: 2000 })
+  term.loadAddon(search)
   applyLook(term)
-  const s: Session = { id, term, fit, el, running: false, folder: null, pending: takePending(id), closingAt: 0, checked: null, typed: new LineTracker(), cleanup: [] }
+  // Side by side: clicking into a terminal makes it the one the buttons act on.
+  el.addEventListener('mousedown', () => {
+    if (useTerminals.getState().active !== id) setActiveTerminal(id)
+  })
+  const s: Session = { id, term, fit, search, el, running: false, folder: null, pending: takePending(id), closingAt: 0, checked: null, typed: new LineTracker(), cleanup: [] }
   term.attachCustomKeyEventHandler((e) => handleKey(term, e))
   term.onData((data) => {
     if (s.running) {
@@ -310,7 +328,9 @@ useEditor.subscribe((state) => {
 
 /** Puts the screens in the page: makes any that are missing, removes closed ones, shows the active one. */
 function sync(host: HTMLElement): void {
-  const { terminals, active } = useTerminals.getState()
+  const state = useTerminals.getState()
+  const { terminals, active } = state
+  const shown = shownTerminals(state)
   for (const id of [...sessions.keys()]) if (!terminals.some((t) => t.id === id)) dispose(id)
   for (const t of terminals) {
     let s = sessions.get(t.id)
@@ -321,12 +341,26 @@ function sync(host: HTMLElement): void {
       s.term.open(s.el)
       void startShell(s)
     }
-    s.el.hidden = t.id !== active
+    s.el.hidden = !shown.includes(t.id)
+    // Side by side, they keep the order of the strip along the top.
+    s.el.style.order = String(terminals.indexOf(t))
+    s.el.classList.toggle('active', shown.length > 1 && t.id === active)
   }
+  // The right-hand one of two gets the line between them.
+  const right = shown.length > 1 ? [...shown].sort((a, b) => terminals.findIndex((t) => t.id === a) - terminals.findIndex((t) => t.id === b))[1] : null
+  for (const [id, s] of sessions) s.el.classList.toggle('right', id === right)
+  host.classList.toggle('split', shown.length > 1)
+  fitShown(host)
   const s = active ? sessions.get(active) : undefined
-  if (s && host.clientWidth > 0 && host.clientHeight > 0) {
-    s.fit.fit()
-    if (host.contains(document.activeElement) || !document.activeElement || document.activeElement === document.body) s.term.focus()
+  if (s && host.clientWidth > 0 && (host.contains(document.activeElement) || !document.activeElement || document.activeElement === document.body)) s.term.focus()
+}
+
+/** Fits the showing terminals to their space (not while hidden: a zero size would squash them). */
+function fitShown(host: HTMLElement): void {
+  if (host.clientWidth === 0 || host.clientHeight === 0) return
+  for (const id of shownTerminals(useTerminals.getState())) {
+    const s = sessions.get(id)
+    if (s && s.el.clientWidth > 0) s.fit.fit()
   }
 }
 
@@ -339,15 +373,13 @@ export function attachTerminal(host: HTMLElement): () => void {
   setActiveTerminal(state.active && state.terminals.some((t) => t.id === state.active) ? state.active : state.terminals[0].id)
   sync(host)
   const unsubscribe = useTerminals.subscribe((now, prev) => {
-    if (now.terminals === prev.terminals && now.active === prev.active) return
+    if (now.terminals === prev.terminals && now.active === prev.active && now.split === prev.split) return
+    // The find bar searches the active terminal: clear the highlights left in the one before.
+    if (now.active !== prev.active && prev.active) sessions.get(prev.active)?.search.clearDecorations()
     sync(host)
     if (now.active !== prev.active && now.active) sessions.get(now.active)?.term.focus()
   })
-  const refit = (): void => {
-    // Not while hidden: a zero size would squash the screen to almost nothing.
-    const s = sessions.get(useTerminals.getState().active ?? '')
-    if (s && host.clientWidth > 0 && host.clientHeight > 0) s.fit.fit()
-  }
+  const refit = (): void => fitShown(host)
   const sizes = new ResizeObserver(refit)
   sizes.observe(host)
   refit()
@@ -412,8 +444,106 @@ export function closeTerminal(id: string): void {
   const { terminals } = useTerminals.getState()
   const i = terminals.findIndex((t) => t.id === id)
   const rest = terminals.filter((t) => t.id !== id)
-  const active = useTerminals.getState().active === id ? (rest[Math.min(i, rest.length - 1)]?.id ?? null) : useTerminals.getState().active
-  useTerminals.setState({ terminals: rest, active })
+  const { active, split } = useTerminals.getState()
+  if (active === id && split) useTerminals.setState({ terminals: rest, active: split, split: null })
+  else useTerminals.setState({ terminals: rest, active: active === id ? (rest[Math.min(i, rest.length - 1)]?.id ?? null) : active, split: split === id ? null : split })
+}
+
+/** Shows two terminals side by side (the active one and the next, or a new one), or goes back to one. */
+export function toggleSideBySide(): void {
+  const { terminals, active, split } = useTerminals.getState()
+  if (split) return setSplit(null)
+  if (!active) return
+  const i = terminals.findIndex((t) => t.id === active)
+  const other = terminals[i + 1] ?? terminals[i - 1]
+  if (other) return setSplit(other.id)
+  const fresh = addTerminal({ name: nextTerminalName(), folder: getTerminal(active)?.folder ?? null })
+  useTerminals.setState({ active, split: fresh.id })
+}
+
+const findColours = (): ISearchOptions['decorations'] => {
+  const light = document.body.classList.contains('theme-light')
+  return {
+    matchBackground: light ? '#fff1a8' : '#5c4d12',
+    matchOverviewRuler: '#d4a72c',
+    activeMatchBackground: light ? '#ffb340' : '#c27c0e',
+    activeMatchColorOverviewRuler: '#ff9f0a'
+  }
+}
+
+/** Finds `query` in what the active terminal printed (`back`: the one before). False if it's not there. */
+export function findInTerminal(query: string, back = false, typing = false): boolean {
+  const s = sessions.get(useTerminals.getState().active ?? '')
+  if (!s) return false
+  if (!query) {
+    s.search.clearDecorations()
+    return false
+  }
+  const options: ISearchOptions = { incremental: typing && !back, decorations: findColours() }
+  return back ? s.search.findPrevious(query, options) : s.search.findNext(query, options)
+}
+
+/** Hears how many matches there are, and which one is picked, in the active terminal. */
+export function onFindResults(callback: (index: number, count: number) => void): () => void {
+  const subs: IDisposable[] = []
+  const watch = (): void => {
+    for (const d of subs.splice(0)) d.dispose()
+    const s = sessions.get(useTerminals.getState().active ?? '')
+    if (s) subs.push(s.search.onDidChangeResults(({ resultIndex, resultCount }) => callback(resultIndex, resultCount)))
+  }
+  watch()
+  const unsubscribe = useTerminals.subscribe((now, prev) => {
+    if (now.active !== prev.active) {
+      watch()
+      callback(-1, 0)
+    }
+  })
+  return () => {
+    unsubscribe()
+    for (const d of subs) d.dispose()
+  }
+}
+
+/** Closes the find bar: the highlights go and typing goes back to the terminal. */
+export function endFind(): void {
+  const s = sessions.get(useTerminals.getState().active ?? '')
+  s?.search.clearDecorations()
+  setFinding(false)
+  s?.term.focus()
+}
+
+/**
+ * The "Get latest and run" button: in the project's app terminal (made if needed, started fresh),
+ * pulls the latest code, installs packages only if they changed, then starts the app. Restart
+ * afterwards just starts the app again.
+ */
+export function getLatestAndRun(project: TerminalProject): void {
+  const run = runCommandOf(project.commands)
+  const line = latestAndRunCommand(!IS_MAC && /win/i.test(navigator.platform), run)
+  rememberCommand('git pull')
+  const existing = useTerminals.getState().terminals.find((t) => t.projectId === project.id && t.command === run)
+  if (existing) {
+    setActiveTerminal(existing.id)
+    openSpecialTab(TERMINAL_TAB)
+    const s = sessions.get(existing.id)
+    if (s) {
+      restartTerminal(existing.id)
+      s.pending = line
+    } else pendingFor.set(existing.id, line)
+    return
+  }
+  const t = addTerminal({
+    name: `${project.name} · ${commandLabel(run).replace(/^(npm|pnpm|yarn|bun) (run )?/, '')}`,
+    folder: project.folder,
+    projectId: project.id,
+    command: run
+  })
+  openSpecialTab(TERMINAL_TAB)
+  queueMicrotask(() => {
+    const s = sessions.get(t.id)
+    if (s) s.pending = line
+    else pendingFor.set(t.id, line)
+  })
 }
 
 /**

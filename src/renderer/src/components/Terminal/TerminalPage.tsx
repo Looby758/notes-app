@@ -1,7 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, CircleStop, FolderOpen, Pencil, Pin, Play, Plus, RotateCcw, Search, Square, PanelRight, Trash2, X } from 'lucide-react'
-import { attachTerminal, closeRunningApp, closeTerminal, newTerminal, restartTerminal, runInActive, runProjectCommand, stopTerminal } from '../../lib/terminal'
-import { addProject, forgetCommand, removeProject, setActiveTerminal, setPanel, updateProject, updateTerminal, useTerminals, type TerminalProject } from '../../store/terminals'
+import { ChevronDown, ChevronUp, Check, CircleStop, Code, Columns2, FolderOpen, Pencil, Pin, Play, Plus, Rocket, RotateCcw, Search, Square, PanelRight, Trash2, X } from 'lucide-react'
+import {
+  attachTerminal,
+  closeRunningApp,
+  closeTerminal,
+  endFind,
+  findInTerminal,
+  getLatestAndRun,
+  newTerminal,
+  onFindResults,
+  restartTerminal,
+  runInActive,
+  runProjectCommand,
+  stopTerminal,
+  toggleSideBySide
+} from '../../lib/terminal'
+import { addProject, forgetCommand, removeProject, setActiveTerminal, setFinding, setPanel, updateProject, updateTerminal, useTerminals, type TerminalProject } from '../../store/terminals'
+import { FILE_MANAGER } from '@shared/platform'
 import { commandBlank, commandLabel, fillCommand } from '@shared/terminalTools'
 import { notify } from '../../store/notify'
 
@@ -12,12 +27,16 @@ import { notify } from '../../store/notify'
 export default function TerminalPage() {
   const host = useRef<HTMLDivElement>(null)
   const panel = useTerminals((s) => s.panel)
+  const finding = useTerminals((s) => s.finding)
   useEffect(() => attachTerminal(host.current!), [])
   return (
     <div className="terminal-page">
       <TerminalBar />
       <div className="terminal-body">
-        <div ref={host} className="terminal-host" />
+        <div className="terminal-main">
+          <div ref={host} className="terminal-host" />
+          {finding && <FindBar />}
+        </div>
         {panel && <RunPanel />}
       </div>
     </div>
@@ -28,6 +47,7 @@ function TerminalBar() {
   const terminals = useTerminals((s) => s.terminals)
   const active = useTerminals((s) => s.active)
   const panel = useTerminals((s) => s.panel)
+  const split = useTerminals((s) => s.split)
   const [renaming, setRenaming] = useState<string | null>(null)
   const current = terminals.find((t) => t.id === active)
   return (
@@ -36,7 +56,7 @@ function TerminalBar() {
         {terminals.map((t) => (
           <div
             key={t.id}
-            className={`terminal-chip${t.id === active ? ' active' : ''}`}
+            className={`terminal-chip${t.id === active ? ' active' : t.id === split ? ' beside' : ''}`}
             onMouseDown={(e) => {
               if (e.button === 1) {
                 e.preventDefault()
@@ -104,6 +124,12 @@ function TerminalBar() {
           </button>
         </div>
       )}
+      <button className="icon-btn" title={`Find in this terminal (${IS_MAC_KEYS ? '⌘F' : 'Ctrl+F'})`} onClick={() => setFinding(true)}>
+        <Search size={14} />
+      </button>
+      <button className={`icon-btn${split ? ' active' : ''}`} title={split ? 'Back to one terminal' : 'Two terminals side by side'} onClick={toggleSideBySide}>
+        <Columns2 size={15} />
+      </button>
       <button className={`icon-btn${panel ? ' active' : ''}`} title={panel ? 'Hide the Run panel' : 'Show the Run panel (projects and past commands)'} onClick={() => setPanel(!panel)}>
         <PanelRight size={15} />
       </button>
@@ -193,6 +219,19 @@ function ProjectCard({ project }: { project: TerminalProject }) {
       <div className="terminal-project-folder" title={project.folder}>
         {shortFolder(project.folder)}
       </div>
+      {!editing && (
+        <div className="terminal-project-actions">
+          <button className="terminal-latest-btn" title={`Pulls the latest code, runs npm install if the packages changed, then starts ${project.name}`} onClick={() => getLatestAndRun(project)}>
+            <Rocket size={13} /> Get latest and run
+          </button>
+          <button className="icon-btn" title={`Open the folder in ${FILE_MANAGER}`} onClick={() => window.api.terminalOpenIn(project.folder, 'files').catch((err) => notify(err))}>
+            <FolderOpen size={14} />
+          </button>
+          <button className="icon-btn" title="Open in VS Code" onClick={() => window.api.terminalOpenIn(project.folder, 'vscode').catch((err) => notify(err))}>
+            <Code size={14} />
+          </button>
+        </div>
+      )}
       {editing ? (
         <>
           <ul className="terminal-command-list">
@@ -317,4 +356,62 @@ function History() {
 /** The end of a long folder path (the part that says which app it is). */
 function shortFolder(folder: string): string {
   return folder.length > 36 ? `…${folder.slice(-35)}` : folder
+}
+
+const IS_MAC_KEYS = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform)
+
+/** Find in what the active terminal printed: Enter for the next match, Shift+Enter for the one before. */
+function FindBar() {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<{ index: number; count: number } | null>(null)
+  const input = useRef<HTMLInputElement>(null)
+  useEffect(() => onFindResults((index, count) => setResults({ index, count })), [])
+  // Ctrl+F again while it's open: back to the box, with the words selected.
+  const finding = useTerminals((s) => s.finding)
+  useEffect(() => {
+    input.current?.focus()
+    input.current?.select()
+  }, [finding])
+  const go = (back: boolean): void => {
+    if (query) findInTerminal(query, back)
+  }
+  return (
+    <div className="terminal-find">
+      <Search size={13} />
+      <input
+        ref={input}
+        value={query}
+        placeholder="Find in terminal"
+        onChange={(e) => {
+          setQuery(e.target.value)
+          if (!e.target.value) setResults(null)
+          findInTerminal(e.target.value, false, true)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            go(e.shiftKey)
+          } else if (e.key === 'Escape') {
+            e.preventDefault()
+            e.stopPropagation()
+            endFind()
+          } else if (e.code === 'KeyF' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault()
+            e.stopPropagation()
+            e.currentTarget.select()
+          }
+        }}
+      />
+      <span className="terminal-find-count">{query && results ? (results.count ? `${results.index + 1} of ${results.count}${results.count >= 2000 ? '+' : ''}` : 'No matches') : ''}</span>
+      <button className="icon-btn" title="Previous (Shift+Enter)" onClick={() => go(true)}>
+        <ChevronUp size={14} />
+      </button>
+      <button className="icon-btn" title="Next (Enter)" onClick={() => go(false)}>
+        <ChevronDown size={14} />
+      </button>
+      <button className="icon-btn" title="Close (Esc)" onClick={endFind}>
+        <X size={14} />
+      </button>
+    </div>
+  )
 }

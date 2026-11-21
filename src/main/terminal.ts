@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, type WebContents } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell, type WebContents } from 'electron'
 import { accessSync, chmodSync, constants, statSync } from 'fs'
 import { homedir } from 'os'
 import { dirname, isAbsolute, join } from 'path'
@@ -150,5 +150,20 @@ export function setupTerminal(getFolder: () => string | null): void {
     return res.canceled ? null : (res.filePaths[0] ?? null)
   })
   ipcMain.handle('term:home', () => homedir())
+  // A project card's "Open in…" buttons: the folder in File Explorer / Finder, or in VS Code.
+  ipcMain.handle('term:openIn', async (_e, folder: unknown, where: unknown) => {
+    if (typeof folder !== 'string' || !isAbsolute(folder) || !statSync(folder, { throwIfNoEntry: false })?.isDirectory())
+      throw new Error('That project’s folder isn’t there any more.')
+    if (where === 'vscode') {
+      // VS Code's own link opens the folder in a VS Code window (an error if it isn't installed).
+      const path = folder.replace(/\\/g, '/')
+      await shell.openExternal(`vscode://file/${encodeURI(path.startsWith('/') ? path.slice(1) : path)}/`).catch(() => {
+        throw new Error('VS Code doesn’t seem to be installed.')
+      })
+      return
+    }
+    const error = await shell.openPath(folder)
+    if (error) throw new Error(error)
+  })
   app.on('will-quit', stopAll)
 }

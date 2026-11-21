@@ -1100,6 +1100,8 @@ export interface NotesApi {
   terminalPickFolder(): Promise<string | null>
   /** Your home folder (for paths starting with ~ in what a command prints). */
   terminalHome(): Promise<string>
+  /** Opens a project's folder in File Explorer / Finder, or in VS Code. */
+  terminalOpenIn(folder: string, where: 'files' | 'vscode'): Promise<void>
   /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */
   aiChat(messages: AiChatMessage[], engine?: AiEngine): Promise<AiReply>
   /** Saved chats, kept in the settings folder on this computer. */
