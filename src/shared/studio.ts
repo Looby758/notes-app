@@ -182,10 +182,10 @@ export function pickRecordingType(isSupported: (mime: string) => boolean): { mim
   return RECORDING_TYPES.find((t) => isSupported(t.mime)) ?? null
 }
 
-/** "Recording 2026-10-31 14-05-09.mp4" (no colons: Windows doesn't allow them). */
-export function recordingFileName(date: Date, ext: string): string {
+/** "Recording 2026-10-31 14-05-09.mp4", or "Voiceover …" for audio only (no colons: Windows doesn't allow them). */
+export function recordingFileName(date: Date, ext: string, prefix = 'Recording'): string {
   const p = (n: number): string => String(n).padStart(2, '0')
-  return `Recording ${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())} ${p(date.getHours())}-${p(date.getMinutes())}-${p(date.getSeconds())}.${ext}`
+  return `${prefix} ${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())} ${p(date.getHours())}-${p(date.getMinutes())}-${p(date.getSeconds())}.${ext}`
 }
 
 /** 0:07, 12:45, 1:02:03 */
