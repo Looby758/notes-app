@@ -12714,10 +12714,13 @@ body.reduce-motion .theme-loading-text {
   gap: 8px;
 }
 .dm-links {
+  display: block;
   width: 100%;
-  min-height: 58px;
   box-sizing: border-box;
-  resize: vertical;
+  height: auto;
+  padding: 6px 10px;
+  resize: none;
+  line-height: 20px;
   font-family: var(--font-mono, monospace);
   font-size: 12.5px;
 }
@@ -12758,6 +12761,13 @@ body.reduce-motion .theme-loading-text {
   background: var(--bg-panel);
   color: var(--text-muted);
   font-size: 12.5px;
+}
+.dm-video-row > span {
+  flex: 1 1 260px;
+  line-height: 1.5;
+}
+.dm-video-row > svg {
+  flex: none;
 }
 .dm-video-row .vdl-saveto {
   margin-top: 0;

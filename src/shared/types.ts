@@ -798,6 +798,11 @@ export interface NotesApi {
   downloadsAct(id: string, action: 'pause' | 'resume' | 'retry' | 'remove' | 'now' | 'tonight' | 'up' | 'down' | 'top'): Promise<void>
   downloadsAll(action: 'pause' | 'resume' | 'clear'): Promise<void>
   downloadsSettings(patch: Partial<import('./downloadManager').DmSettings>): Promise<import('./downloadManager').DmState>
+  /** What Steam is downloading or updating (read from its files), with a speed when it's going. */
+  steamDownloads(): Promise<(import('./games').SteamDownload & { speed?: number })[]>
+  /** Opens Steam's install window for a game (Steam asks which drive). */
+  steamInstall(appId: string): Promise<void>
+  steamOpenDownloads(): Promise<void>
 
   // Video player
   /** What's in a video (its tracks need the video helper, ffmpeg) and the subtitle files beside it. */

@@ -8,6 +8,7 @@ import {
   ExternalLink,
   FileDown,
   Folder,
+  Gamepad2,
   FolderOpen,
   Globe,
   Moon,
@@ -25,6 +26,7 @@ import type { LocalAiState, VideoDownload } from '@shared/types'
 import type { WebDownload } from '@shared/browser'
 import { DOWNLOAD_QUALITIES, type DownloadQuality } from '@shared/videoDownload'
 import { localModelById } from '@shared/localAi'
+import { steamAppIdFromLink, type SteamDownload } from '@shared/games'
 import {
   clockText,
   isVideoPage,
@@ -235,11 +237,32 @@ function Settings({ state }: { state: DmState }) {
 }
 
 /** The other downloads going on in Orbit, so everything downloading is in one place. */
+type SteamRow = SteamDownload & { speed?: number }
+
+/** Steam's own downloads, read from its files every few seconds while this page is open. */
+function useSteamDownloads(): SteamRow[] {
+  const [list, setList] = useState<SteamRow[]>([])
+  useEffect(() => {
+    let alive = true
+    const look = (): void => void window.api.steamDownloads().then((l) => alive && setList(l)).catch(() => undefined)
+    look()
+    const t = setInterval(look, 3000)
+    return () => {
+      alive = false
+      clearInterval(t)
+    }
+  }, [])
+  return list
+}
+
+const STEAM_STATE: Record<SteamDownload['state'], string> = { downloading: 'Downloading in Steam', paused: 'Paused in Steam', waiting: 'Waiting in Steam’s queue' }
+
 function Elsewhere({ videos, ai }: { videos: VideoDownload[]; ai: LocalAiState | null }) {
+  const steam = useSteamDownloads()
   const web = useBrowser((s) => s.downloads).filter((d) => d.state === 'downloading' || d.state === 'paused')
   const vids = videos.filter((v) => !v.manager && v.status === 'working')
   const aiBusy = ai && (ai.state === 'downloading' || (ai.state === 'missing' && ai.error?.startsWith('Download paused')))
-  if (!web.length && !vids.length && !aiBusy) return null
+  if (!web.length && !vids.length && !aiBusy && !steam.length) return null
 
   const laterTonight = (d: WebDownload): void => {
     const folder = d.path ? d.path.replace(/[\\/][^\\/]*$/, '') : undefined
@@ -284,6 +307,33 @@ function Elsewhere({ videos, ai }: { videos: VideoDownload[]; ai: LocalAiState |
             </li>
           )
         })}
+        {steam.map((g) => (
+          <li key={g.appId} className="convert-item" data-dm-steam={g.state}>
+            <Gamepad2 size={16} className="convert-kind" />
+            <div className="convert-name">
+              <span>{g.name}</span>
+              <small>
+                {[
+                  STEAM_STATE[g.state],
+                  g.total ? `${sizeText(g.downloaded)} of ${sizeText(g.total)}` : '',
+                  g.speed ? speedText(g.speed) : '',
+                  g.total && g.speed ? timeLeft(g.total - g.downloaded, g.speed) : ''
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </small>
+              <div className="vdl-progress">
+                <Bar value={g.total ? g.downloaded / g.total : g.state === 'downloading' ? null : 0} />
+                {g.total > 0 && <span className="vdl-percent">{Math.round((g.downloaded / g.total) * 100)}%</span>}
+              </div>
+            </div>
+            <div className="vdl-actions">
+              <button className="btn dm-small" title="Pause, reorder or schedule it in Steam's Downloads page" onClick={() => void window.api.steamOpenDownloads().catch(notify)}>
+                Open in Steam
+              </button>
+            </div>
+          </li>
+        ))}
         {vids.map((v) => (
           <li key={v.id} className="convert-item" data-dm-video>
             <Video size={16} className="convert-kind" />
@@ -365,12 +415,22 @@ export default function DownloadsPage() {
     }
   }, [])
 
-  const links = useMemo(() => parseLinks(text), [text])
+  // Steam store links go to Steam itself (a store page isn't a file to download).
+  const steamIds = useMemo(() => [...new Set(text.split(/\s+/).map(steamAppIdFromLink).filter((id): id is string => !!id))], [text])
+  const links = useMemo(() => parseLinks(text).filter((l) => !steamAppIdFromLink(l)), [text])
   const videoLinks = links.filter(isVideoPage).length
   const folder = fileFolder || state?.defaultFolder || ''
 
+  const installSteam = (): void => {
+    for (const id of steamIds) void window.api.steamInstall(id).catch(notify)
+    notify('Steam is asking where to install it. Once it starts, it shows here under Steam.', 'info')
+    if (!links.length) setText('')
+  }
+
   const add = (overnight: boolean): void => {
+    if (steamIds.length) installSteam()
     if (!links.length) {
+      if (steamIds.length) return
       notify('Paste a link first: the address of the file (or video) to download.')
       return
     }
@@ -409,7 +469,7 @@ export default function DownloadsPage() {
           <textarea
             ref={input}
             className="text-input dm-links"
-            rows={links.length > 1 ? 4 : 2}
+            rows={Math.min(6, Math.max(1, text.split('\n').length))}
             placeholder="Paste one or more links…"
             value={text}
             spellCheck={false}
@@ -447,10 +507,19 @@ export default function DownloadsPage() {
             <button className="btn" disabled={!links.length} onClick={() => add(true)} title={`Starts at ${clockText(state.settings.nightStart)}`} data-dm-add-tonight>
               <Moon size={13} /> Tonight
             </button>
-            <button className="btn btn-primary" disabled={!links.length} onClick={() => add(false)} data-dm-add>
+            <button className="btn btn-primary" disabled={!links.length && !steamIds.length} onClick={() => add(false)} data-dm-add>
               <ArrowDownToLine size={13} /> Download{links.length > 1 ? ` ${links.length}` : ''}
             </button>
           </div>
+          {steamIds.length > 0 && (
+            <div className="dm-video-row" data-dm-steam-options>
+              <Gamepad2 size={14} />
+              <span>
+                {steamIds.length === 1 ? 'That’s a Steam game' : `${steamIds.length} Steam games`}: Download opens Steam’s install window (Steam asks which drive), then its progress shows here. For
+                overnight, use Steam’s own <em>Settings → Downloads → Schedule auto-updates</em>, as Orbit can’t press Steam’s buttons.
+              </span>
+            </div>
+          )}
           {videoLinks > 0 && (
             <div className="dm-video-row" data-dm-video-options>
               <Video size={14} />

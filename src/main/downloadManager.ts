@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Notification, session } from 'electron'
+import { app, BrowserWindow, ipcMain, Notification, session, shell } from 'electron'
 import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { copyFile, mkdir, rename, rm, stat } from 'fs/promises'
 import { join } from 'path'
@@ -26,6 +26,8 @@ import {
 } from '@shared/downloadManager'
 import { defaultDownloadFolder } from './browserData'
 import { cancelVideoJob, onVideoJobs, startVideoJob } from './videoDownload'
+import { steamDownloads } from './games'
+import type { SteamDownload } from '@shared/games'
 import { logError } from './log'
 
 /**
@@ -398,11 +400,34 @@ function all(action: 'pause' | 'resume' | 'clear'): void {
   pump()
 }
 
+/** Steam's downloads, with a speed worked out from the last look. */
+const lastSteam = new Map<string, { at: number; bytes: number; speed?: number }>()
+async function steamNow(): Promise<(SteamDownload & { speed?: number })[]> {
+  const now = Date.now()
+  const list = await steamDownloads().catch(() => [])
+  return list.map((d) => {
+    const last = lastSteam.get(d.appId)
+    let speed = last?.speed
+    if (last && now - last.at > 500 && d.state === 'downloading') {
+      const got = d.downloaded - last.bytes
+      // Steam writes its manifest now and then, not every second: keep the last speed between writes.
+      if (got > 0) speed = (got * 1000) / (now - last.at)
+    }
+    if (d.state !== 'downloading') speed = undefined
+    if (!last || d.downloaded !== last.bytes || d.state !== 'downloading') lastSteam.set(d.appId, { at: now, bytes: d.downloaded, speed })
+    return { ...d, speed }
+  })
+}
+
 export function setupDownloadManager(): void {
   load()
   mkdirSync(partsDir(), { recursive: true })
   onVideoJobs(videoJobsChanged)
   ipcMain.handle('dm:state', () => state())
+  ipcMain.handle('dm:steam', () => steamNow())
+  // Steam asks which drive and confirms (Orbit can't press Steam's buttons for you).
+  ipcMain.handle('dm:steamInstall', (_e, appId: string) => (/^\d+$/.test(String(appId)) ? shell.openExternal(`steam://install/${appId}`) : undefined))
+  ipcMain.handle('dm:steamOpen', () => shell.openExternal('steam://open/downloads'))
   ipcMain.handle('dm:add', (_e, req: DmAddRequest) => add(req))
   ipcMain.handle('dm:act', (_e, id: string, action: Action) => act(String(id), action))
   ipcMain.handle('dm:all', (_e, action: 'pause' | 'resume' | 'clear') => all(action))
