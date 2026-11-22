@@ -387,6 +387,39 @@ export function releaseCommand(windows: boolean, bump: VersionBump, test = false
   return steps.reduceRight((rest, step) => `${step}; if ($LASTEXITCODE -eq 0) { ${rest} }`)
 }
 
+/**
+ * Rolling back: a new release (so apps that update themselves move to it) with an earlier
+ * release's code in it. Every file is put back as it was at `goodTag` (files added since are
+ * removed), the version is set to `newVersion`, and that's committed, tagged and pushed, which a
+ * release workflow builds like any other release. Nothing is deleted from git's history, so the
+ * newer work can be brought back later.
+ */
+export function rollbackCommand(windows: boolean, goodTag: string, newVersion: string): string {
+  if (!/^[\w.+-]{1,60}$/.test(goodTag) || !/^\d+\.\d+\.\d+$/.test(newVersion)) throw new Error('Not a version Orbit can roll back to.')
+  const steps = [
+    `git fetch --tags origin`,
+    `git restore --source=${goodTag} --staged --worktree -- .`,
+    `npm version ${newVersion} --no-git-tag-version --allow-same-version`,
+    `git add -A`,
+    `git commit -m "Roll back to ${goodTag} (released as v${newVersion})"`,
+    `git tag -a v${newVersion} -m "Release ${newVersion}"`,
+    `git push --follow-tags`
+  ]
+  if (!windows) return steps.join(' && ')
+  return steps.reduceRight((rest, step) => `${step}; if ($LASTEXITCODE -eq 0) { ${rest} }`)
+}
+
+/** The version a roll back is released as: one fix up from the newest version there is (package.json or a release). */
+export function rollbackVersion(current: string | undefined, releases: { tag: string }[]): string | null {
+  const versions = [current, ...releases.map((r) => r.tag)]
+    .map((v) => /^v?(\d+)\.(\d+)\.(\d+)$/.exec((v ?? '').trim()))
+    .filter((m): m is RegExpExecArray => !!m)
+    .map((m) => [Number(m[1]), Number(m[2]), Number(m[3])])
+  if (!versions.length) return null
+  const [a, b, c] = versions.sort((x, y) => y[0] - x[0] || y[1] - x[1] || y[2] - x[2])[0]
+  return `${a}.${b}.${c + 1}`
+}
+
 /** Switches to a branch and gets its latest, in the app's terminal. */
 export function switchBranchCommand(windows: boolean, branch: string): string {
   const b = /^[\w./@+-]+$/.test(branch) ? branch : `"${branch.replace(/"/g, '')}"`

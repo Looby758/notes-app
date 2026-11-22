@@ -351,6 +351,14 @@ async function setReleaseNotes(repo: string, tag: string, body: string, title: s
   return toRelease(r)
 }
 
+/** Marks a release as a pre-release (so it isn't the latest, and apps that update themselves skip it) or back again. */
+async function setPrerelease(repo: string, tag: string, prerelease: boolean): Promise<Release> {
+  const list = await github<ApiRelease[]>(`/repos/${repo}/releases?per_page=30`)
+  const found = list.find((r) => r.tag_name === tag)
+  if (!found) throw new Error(`GitHub has no release ${tag}.`)
+  return toRelease(await github<ApiRelease>(`/repos/${repo}/releases/${found.id}`, { method: 'PATCH', body: { prerelease, make_latest: prerelease ? 'false' : 'true' }, doing: 'change releases', needs: 'Contents' }))
+}
+
 /** Whether each pull request is still open, was merged, or was closed without merging. */
 async function pullStates(repo: string, numbers: number[]): Promise<Record<number, 'open' | 'merged' | 'closed'>> {
   const out: Record<number, 'open' | 'merged' | 'closed'> = {}
@@ -442,6 +450,11 @@ export function setupAppStudio(): void {
     if (!validRepo(repo) || typeof tag !== 'string' || !/^[\w.+-]{1,60}$/.test(tag)) throw new Error('Not allowed')
     needToken()
     return setReleaseNotes(repo, tag, String(body ?? '').slice(0, 100_000), String(title || tag).slice(0, 200))
+  })
+  ipcMain.handle('apps:setPrerelease', async (_e, repo: unknown, tag: unknown, prerelease: unknown) => {
+    if (!validRepo(repo) || typeof tag !== 'string' || !/^[\w.+-]{1,60}$/.test(tag)) throw new Error('Not allowed')
+    needToken()
+    return setPrerelease(repo, tag, !!prerelease)
   })
   ipcMain.handle('apps:copies', (_e, folder: unknown) => (validFolder(folder) ? copies(folder) : []))
   ipcMain.handle('apps:addCopy', (_e, folder: unknown, branch: unknown) => {

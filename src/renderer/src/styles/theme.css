@@ -17139,6 +17139,24 @@ button.board-add-picture:hover {
   overflow: auto;
   color: var(--text);
 }
+.release-rollback {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12.5px;
+}
+.release-rollback .btn {
+  padding: 3px 10px;
+  font-size: 12.5px;
+}
+.release-rollback-warn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #d29215;
+}
 .release-warning-btn {
   margin-left: auto;
   padding: 2px 10px;

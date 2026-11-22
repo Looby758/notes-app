@@ -1474,6 +1474,8 @@ export interface NotesApi {
   appsPullStates(repo: string, numbers: number[]): Promise<Record<number, 'open' | 'merged' | 'closed'>>
   /** Downloads a picture from a pull request's description. */
   appsFetchImage(url: string): Promise<{ bytes: Uint8Array; type: string }>
+  /** Marks a release as a pre-release, so it isn't the latest and apps that update themselves skip it (or back again). */
+  appsSetPrerelease(repo: string, tag: string, prerelease: boolean): Promise<Release>
   /** Checks an app's npm packages: newer versions, and known security problems (npm outdated and npm audit). */
   appsHealth(folder: string): Promise<HealthReport>
   appsMerge(repo: string, number: number): Promise<void>

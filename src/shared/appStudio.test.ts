@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseOutdated, parseAudit, severityCounts, healthLevel, healthLine, healthBoardItem, type HealthReport, addDownloadDay, countText, downloadsByPlatform, downloadsSince, isDownloadFile, platformOf, type DownloadHistory, boardKey, commitAllCommand, describeChange, stashCommand, isTokenPermissionError, newTokenUrl, TOKEN_NOT_ALLOWED, bumpVersion, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
+import { rollbackCommand, rollbackVersion, parseOutdated, parseAudit, severityCounts, healthLevel, healthLine, healthBoardItem, type HealthReport, addDownloadDay, countText, downloadsByPlatform, downloadsSince, isDownloadFile, platformOf, type DownloadHistory, boardKey, commitAllCommand, describeChange, stashCommand, isTokenPermissionError, newTokenUrl, TOKEN_NOT_ALLOWED, bumpVersion, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
 
 describe('githubRepo', () => {
   it('reads https and ssh remotes', () => {
@@ -364,5 +364,23 @@ describe('health check', () => {
     expect(card.title).toBe('Fix the security warnings and update packages')
     expect(card.details).toContain('- b (high): Bad')
     expect(card.details).toContain('- a 1.0.0 → 2.0.0')
+  })
+})
+
+describe('roll back', () => {
+  it('picks one fix up from the newest version', () => {
+    expect(rollbackVersion('1.13.0', [{ tag: 'v1.13.0' }, { tag: 'v1.12.1' }])).toBe('1.13.1')
+    expect(rollbackVersion('1.13.0', [{ tag: 'v1.13.2' }, { tag: 'v1.12.1' }])).toBe('1.13.3')
+    expect(rollbackVersion('1.9.0', [{ tag: 'v1.10.0' }])).toBe('1.10.1')
+    expect(rollbackVersion(undefined, [])).toBeNull()
+  })
+  it('puts the old code back and releases it as a new version', () => {
+    const mac = rollbackCommand(false, 'v1.12.1', '1.13.1')
+    expect(mac).toContain('git restore --source=v1.12.1 --staged --worktree -- .')
+    expect(mac).toContain('npm version 1.13.1 --no-git-tag-version')
+    expect(mac).toContain('git tag -a v1.13.1')
+    expect(mac.endsWith('git push --follow-tags')).toBe(true)
+    expect(rollbackCommand(true, 'v1.12.1', '1.13.1')).toMatch(/^git fetch --tags origin; if \(\$LASTEXITCODE -eq 0\) \{ git restore/)
+    expect(() => rollbackCommand(false, 'v1; rm -rf /', '1.13.1')).toThrow()
   })
 })

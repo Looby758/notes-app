@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ClipboardCopy, Download, GitBranch, ExternalLink, Hammer, Loader2, RefreshCw, Rocket, Sparkles, Tag, Upload, Wand2 } from 'lucide-react'
-import { boardKey, bumpVersion, countText, describeChange, downloadsByPlatform, downloadsSince, isTokenPermissionError, changelogSource, notesTarget, plainChangelog, timeAgo, VERSION_BUMPS, type Release, type VersionBump } from '@shared/appStudio'
+import { AlertTriangle, ClipboardCopy, Download, EyeOff, Eye, Undo2, GitBranch, ExternalLink, Hammer, Loader2, RefreshCw, Rocket, Sparkles, Tag, Upload, Wand2 } from 'lucide-react'
+import { boardKey, bumpVersion, rollbackVersion, countText, describeChange, downloadsByPlatform, downloadsSince, isTokenPermissionError, changelogSource, notesTarget, plainChangelog, timeAgo, VERSION_BUMPS, type Release, type VersionBump } from '@shared/appStudio'
 import { useTerminals, type TerminalProject } from '../../store/terminals'
 import { refreshApps, setSection, useAppStudio } from '../../store/appStudio'
 import { downloadDay, lastRelease, loadReleases, putRelease, setNotes, setReleasesApp, totalDownloads, useAppReleases } from '../../store/appReleases'
-import { commitChanges, releaseApp, runProjectCommand, stashChanges, switchBranch } from '../../lib/terminal'
+import { commitChanges, releaseApp, rollBack, runProjectCommand, stashChanges, switchBranch } from '../../lib/terminal'
 import { notify } from '../../store/notify'
 import TokenProblem from './TokenProblem'
 import { errorMessage } from '../../lib/paths'
@@ -92,14 +92,14 @@ function AppReleases({ project, repo }: { project: TerminalProject; repo?: strin
               <Loader2 size={13} className="spin" /> Checking GitHub…
             </p>
           )}
-          {data?.releases.map((r) => <ReleaseRow key={r.tag} release={r} />)}
+          {data?.releases.map((r) => <ReleaseRow key={r.tag} release={r} project={project} repo={repo} releases={data.releases} />)}
         </section>
       </div>
     </div>
   )
 }
 
-function ReleaseRow({ release }: { release: Release }) {
+function ReleaseRow({ release, project, repo, releases }: { release: Release; project: TerminalProject; repo?: string; releases: Release[] }) {
   return (
     <details className="release-row">
       <summary>
@@ -127,6 +127,7 @@ function ReleaseRow({ release }: { release: Release }) {
         </div>
       )}
       <div className="release-notes">{release.body.trim() || 'No notes.'}</div>
+      {repo && !release.draft && <RollBack release={release} project={project} repo={repo} releases={releases} />}
     </details>
   )
 }
@@ -181,6 +182,104 @@ function Downloads({ repo, releases }: { repo: string; releases: Release[] }) {
         ))}
       </div>
     </section>
+  )
+}
+
+/**
+ * Going back from a bad release. The newest one can be hidden from new downloads (marked as a
+ * pre-release, so GitHub's "latest" and apps that update themselves skip it). An earlier one can
+ * be released again as a new version, so everyone's app updates to it.
+ */
+function RollBack({ release, project, repo, releases }: { release: Release; project: TerminalProject; repo: string; releases: Release[] }) {
+  const info = useAppStudio((s) => s.info[project.folder])
+  const github = useAppStudio((s) => s.github)
+  const [confirm, setConfirm] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [tokenProblem, setTokenProblem] = useState('')
+  const published = releases.filter((r) => !r.draft && !r.prerelease)
+  const latest = published[0]
+  const isLatest = latest?.tag === release.tag
+  const newer = published.findIndex((r) => r.tag === release.tag) > 0
+  const next = rollbackVersion(info?.version, releases)
+  const dirty = (info?.changedFiles ?? 0) > 0
+  const main = info?.mainBranch ?? 'main'
+  const offMain = !!info?.branch && info.branch !== main
+
+  const hide = async (prerelease: boolean): Promise<void> => {
+    setBusy(true)
+    try {
+      putRelease(repo, await window.api.appsSetPrerelease(repo, release.tag, prerelease))
+      notify(prerelease ? `${release.name} is hidden. New downloads and updates get the release before it.` : `${release.name} is the latest release again.`, 'info')
+      setTokenProblem('')
+    } catch (err) {
+      const message = errorMessage(err)
+      if (isTokenPermissionError(message)) setTokenProblem(message)
+      else notify(err)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const goBack = (): void => {
+    if (!next) return
+    if (!confirm) {
+      setConfirm(true)
+      return
+    }
+    setConfirm(false)
+    rollBack(project, release.tag, next)
+    notify(`Releasing v${next} with ${release.name}’s code. GitHub builds it like any other release.`, 'info')
+    window.setTimeout(() => void refreshApps(), 8000)
+  }
+
+  if (release.prerelease) {
+    return (
+      <div className="release-rollback">
+        <span className="muted">A pre-release: new downloads and updates skip it.</span>
+        {github?.connected && (
+          <button className="btn" disabled={busy} onClick={() => void hide(false)}>
+            {busy ? <Loader2 size={13} className="spin" /> : <Eye size={13} />} Make it the latest again
+          </button>
+        )}
+      </div>
+    )
+  }
+  return (
+    <div className="release-rollback">
+      {isLatest && (
+        <>
+          <span className="muted">Something wrong with this release? Hide it so new downloads and updates get the one before it, then go back to an earlier release below.</span>
+          {github?.connected ? (
+            <button className="btn" disabled={busy || published.length < 2} title={published.length < 2 ? 'There’s no earlier release to fall back on' : 'Marks it as a pre-release on GitHub. You can undo this.'} onClick={() => void hide(true)}>
+              {busy ? <Loader2 size={13} className="spin" /> : <EyeOff size={13} />} Hide from new downloads
+            </button>
+          ) : (
+            <span className="muted">
+              <button className="link-button" onClick={() => setSection('pulls')}>
+                Connect GitHub
+              </button>{' '}
+              to hide it from here.
+            </span>
+          )}
+        </>
+      )}
+      {newer && next && (
+        <>
+          <span className="muted">
+            Go back to this version: Orbit puts {release.name}’s code back and releases it as v{next}, so everyone’s app updates to it. Nothing is lost; the newer work stays in git’s history.
+          </span>
+          {(dirty || offMain) && (
+            <span className="release-rollback-warn">
+              <AlertTriangle size={12} /> {dirty ? 'Commit or put away the changed files first (in Next release).' : `Switch to ${main} first (in Next release).`}
+            </span>
+          )}
+          <button className={`btn${confirm ? ' appstudio-confirm' : ''}`} disabled={dirty || offMain} onClick={goBack} onBlur={() => setConfirm(false)}>
+            <Undo2 size={13} /> {confirm ? `Release v${next} with ${release.name}’s code?` : `Go back to ${release.name}`}
+          </button>
+        </>
+      )}
+      {tokenProblem && <TokenProblem message={tokenProblem} owner={repo.split('/')[0]} onDone={() => setTokenProblem('')} />}
+    </div>
   )
 }
 
