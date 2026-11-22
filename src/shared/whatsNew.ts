@@ -12,6 +12,23 @@ export interface ReleaseNotes {
 /** Newest first. Add an entry with each release. */
 export const RELEASE_NOTES: readonly ReleaseNotes[] = [
   {
+    version: '1.13.2',
+    items: [
+      'Big file sender: send huge files to a friend with a code, or a Google Drive link',
+      'App Studio: download counts, health check, roll back, start a new app, bug reports',
+      'Mac: update in place, and stop asking "Open Anyway" every launch',
+      'Add four mini games, polish every game, and add sound effects',
+      'Remove the built-in YouTube mini window',
+      'Music: test that dipping covers crossfade, the equaliser and songs started mid-dip',
+      'Music: crossfade, equaliser, visualisers, listening stats, phone remote and full-screen player',
+      'Add a built-in task manager',
+      'Files: show free space on each drive',
+      'Downloads: show Epic Games Launcher downloads next to Steam\'s',
+      'Keep the Discord sign-in in Messages after Orbit restarts',
+      'SkyBlock: suggest each skill\'s Personal Compactor again'
+    ]
+  },
+  {
     version: '1.13.0',
     items: [
       'Music page: songs, albums and playlists in one place, with search (or search YouTube), a music folder setting, and tools to fix details, find covers and tidy duplicates.',
