@@ -10,7 +10,8 @@ import {
   setBudget,
   updateCategory,
   updateEntry,
-  useMoney
+  useMoney,
+  useMoneyView
 } from '../../store/money'
 import {
   addMonths,
@@ -42,17 +43,20 @@ import { readWorkbook } from '../../lib/sheets'
 import { statementFromPdf } from '../../lib/pdfStatement'
 import MoneyHomeCard from './MoneyHomeCard'
 import MoneyPlans, { AskMoney, ForecastCard } from './MoneyPlans'
+import { IousView, NetWorthView } from './MoneyAccounts'
 import EmptyArt from '../Motion/EmptyArt'
 import { refreshAiStatus, useAi } from '../../store/ai'
 import { errorMessage } from '../../lib/paths'
 
 addHomeCard({ id: 'money', order: 25, title: 'Spending this month', Card: MoneyHomeCard })
 
-type View = 'overview' | 'entries' | 'plans' | 'import' | 'budgets'
+type View = 'overview' | 'entries' | 'plans' | 'accounts' | 'ious' | 'import' | 'budgets'
 const VIEWS: [View, string][] = [
   ['overview', 'This month'],
   ['entries', 'Spending log'],
   ['plans', 'Goals & bills'],
+  ['accounts', 'Net worth'],
+  ['ious', 'IOUs'],
   ['import', 'Import statement'],
   ['budgets', 'Budgets & categories']
 ]
@@ -69,6 +73,12 @@ export default function MoneyPage() {
   const [view, setView] = useState<View>('overview')
   const [month, setMonth] = useState(() => monthOf(new Date()))
   const [editing, setEditing] = useState<MoneyEntry | null>(null)
+  // An IOU reminder (or the Home box) can ask for a part of the page.
+  const asked = useMoneyView((s) => s.view)
+  useEffect(() => {
+    if (asked && VIEWS.some(([id]) => id === asked)) setView(asked as View)
+    if (asked) useMoneyView.setState({ view: null })
+  }, [asked])
 
   return (
     <Private cover label="Your money is hidden for streamer mode">
@@ -95,6 +105,8 @@ export default function MoneyPage() {
           {view === 'overview' && <Overview month={month} setMonth={setMonth} showBudgets={() => setView('budgets')} />}
           {view === 'entries' && <Entries month={month} edit={setEditing} />}
           {view === 'plans' && <MoneyPlans />}
+          {view === 'accounts' && <NetWorthView />}
+          {view === 'ious' && <IousView />}
           {view === 'import' && <Import done={() => setView('entries')} />}
           {view === 'budgets' && <Budgets />}
         </div>

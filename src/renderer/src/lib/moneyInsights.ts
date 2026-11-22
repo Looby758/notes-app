@@ -1,4 +1,5 @@
 import { looksLikeSubscription, merchantKey, monthTotals, OTHER, type Balance, type MoneyData, type MoneyEntry, type RepeatInterval, type SavingsGoal } from './money'
+import { balanceNow } from './moneyAccounts'
 
 /**
  * Working things out from your money entries, all on your computer:
@@ -232,11 +233,8 @@ export function forecastMonth(entries: MoneyEntry[], recurring: Recurring[], tod
   const still = payDue - billsDue - everydayLeft
   if (balance) {
     // Your balance, plus anything logged after the day it was right on, then what's still to come.
-    const since = balance.date < today ? balance.date : today
-    const balanceNow = entries
-      .filter((e) => e.date > since && e.date <= today)
-      .reduce((sum, e) => sum + (e.income ? e.amount : -e.amount), balance.amount)
-    return { received, spent, billsDue, payDue, everydayLeft, endOfMonth: balanceNow + still, daysLeft, balanceNow }
+    const now = balanceNow(entries, balance, today)
+    return { received, spent, billsDue, payDue, everydayLeft, endOfMonth: now + still, daysLeft, balanceNow: now }
   }
   return { received, spent, billsDue, payDue, everydayLeft, endOfMonth: received - spent + still, daysLeft }
 }
