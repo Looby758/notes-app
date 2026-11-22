@@ -7,6 +7,7 @@ import {
   indexPacks,
   isoCube,
   pickTexture,
+  upscaleNearest,
   prismInstanceName,
   prismInstancesDir,
   mcItemOfNeu,
@@ -214,5 +215,20 @@ describe('launcher instances', () => {
     expect(prismInstancesDir('InstanceDir=mine\n', '/home/me/.local/share/PrismLauncher/')).toBe('/home/me/.local/share/PrismLauncher/mine')
     expect(prismInstanceName('InstanceType=OneSix\nname=SkyBlock 1.8.9\n')).toBe('SkyBlock 1.8.9')
     expect(prismInstanceName('')).toBe('')
+  })
+})
+
+describe('blowing up small textures', () => {
+  it('makes each pixel a square block, at least 128 wide, first frame only', () => {
+    const data = Uint8Array.from([1, 2, 3, 255, 9, 9, 9, 255, 0, 0, 0, 0, 7, 7, 7, 255, 5, 5, 5, 255, 6, 6, 6, 255, 5, 5, 5, 255, 6, 6, 6, 255])
+    const up = upscaleNearest({ width: 2, height: 4, data })
+    expect([up.width, up.height]).toEqual([128, 128])
+    const px = (x: number, y: number) => Array.from(up.data.slice((y * 128 + x) * 4, (y * 128 + x) * 4 + 4))
+    expect(px(0, 0)).toEqual([1, 2, 3, 255])
+    expect(px(63, 63)).toEqual([1, 2, 3, 255])
+    expect(px(64, 0)).toEqual([9, 9, 9, 255])
+    expect(px(127, 127)).toEqual([7, 7, 7, 255])
+    const big = { width: 256, height: 256, data: new Uint8Array(256 * 256 * 4) }
+    expect(upscaleNearest(big)).toBe(big)
   })
 })

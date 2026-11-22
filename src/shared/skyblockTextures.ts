@@ -477,3 +477,28 @@ export function prismInstancesDir(cfg: string, root: string): string {
 export function prismInstanceName(cfg: string): string {
   return /^name=(.*)$/m.exec(cfg)?.[1].trim() ?? ''
 }
+
+/**
+ * Blows a small texture up by a whole number (each pixel becomes a square block) until it's at least
+ * `min` wide, so the page can shrink it smoothly to any size without some pixels coming out bigger
+ * than others. Animated textures (tall strips) keep only their first frame.
+ */
+export function upscaleNearest(p: Pixels, min = 128): Pixels {
+  const w = p.width
+  const h = Math.min(p.height, p.width)
+  const k = Math.max(1, Math.ceil(min / Math.max(1, w)))
+  if (k === 1 && h === p.height) return p
+  const out = new Uint8Array(w * k * h * k * 4)
+  for (let y = 0; y < h * k; y++) {
+    const sy = Math.floor(y / k)
+    for (let x = 0; x < w * k; x++) {
+      const src = (sy * w + Math.floor(x / k)) * 4
+      const dst = (y * w * k + x) * 4
+      out[dst] = p.data[src]
+      out[dst + 1] = p.data[src + 1]
+      out[dst + 2] = p.data[src + 2]
+      out[dst + 3] = p.data[src + 3]
+    }
+  }
+  return { width: w * k, height: h * k, data: out }
+}

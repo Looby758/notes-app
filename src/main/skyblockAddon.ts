@@ -10,6 +10,7 @@ import {
   resolveHypixelModels,
   TEXTURE_PACKS,
   TEXTURES_BASE,
+  upscaleNearest,
   type SkyblockAddonState,
   type TextureMatcher
 } from '@shared/skyblockTextures'
@@ -146,6 +147,8 @@ async function install(packsIn: string[]): Promise<void> {
     const keep = [...all, CUSTOM_PACK, ...(wantHypixel ? [HYPIXEL_PACK] : [])]
     try {
       for (const d of readdirSync(addonPath('textures'))) if (!keep.includes(d)) rmSync(addonPath('textures', d), { recursive: true, force: true })
+      // Blown-up copies are made again as they're asked for.
+      rmSync(addonPath('big'), { recursive: true, force: true })
     } catch {
       // Nothing to tidy.
     }
@@ -285,6 +288,28 @@ function legacyHat(png: Buffer): Buffer {
   }
 }
 
+/**
+ * A texture blown up to at least 128 px with square pixels (kept in big/), so the page shrinks it
+ * smoothly instead of stretching 16 px by an uneven amount. Made again when the texture changes.
+ */
+function bigTexture(pack: string, name: string): string | null {
+  const src = addonPath('textures', pack, name)
+  const big = addonPath('big', pack, name)
+  try {
+    const at = statSync(src).mtimeMs
+    if (existsSync(big) && statSync(big).mtimeMs >= at) return big
+    const img = nativeImage.createFromPath(src)
+    if (img.isEmpty()) return src
+    const { width, height } = img.getSize()
+    const up = upscaleNearest({ width, height, data: new Uint8Array(img.toBitmap()) })
+    mkdirSync(addonPath('big', pack), { recursive: true })
+    writeFileSync(big, nativeImage.createFromBitmap(Buffer.from(up.data), { width: up.width, height: up.height }).toPNG())
+    return big
+  } catch {
+    return existsSync(src) ? src : null
+  }
+}
+
 function registerProtocol(): void {
   protocol.handle('sbtex', async (req) => {
     const notFound = (): Response => new Response('', { status: 404 })
@@ -297,7 +322,7 @@ function registerProtocol(): void {
     }
     const parts = decodeURIComponent(url.pathname).split('/').filter(Boolean)
     let file: string | null = null
-    if (url.host === 'tex' && parts.length === 2 && /^[a-z_+]+$/.test(parts[0]) && /^[\w-]+\.png$/.test(parts[1])) file = addonPath('textures', parts[0], parts[1])
+    if (url.host === 'tex' && parts.length === 2 && /^[a-z_+]+$/.test(parts[0]) && /^[\w-]+\.png$/.test(parts[1])) file = bigTexture(parts[0], parts[1])
     else if (url.host === 'skin' && parts.length === 1 && /^[0-9a-f]{20,80}$/i.test(parts[0])) file = await skinFile(parts[0].toLowerCase())
     if (!file || !existsSync(file)) return notFound()
     const res = await net.fetch(pathToFileURL(file).toString())

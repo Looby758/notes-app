@@ -128,6 +128,7 @@ export async function useVanillaPack(path: string): Promise<number> {
 export function clearVanillaPack(): void {
   rmSync(addonPath('textures', CUSTOM_PACK), { recursive: true, force: true })
   rmSync(addonPath('custom.json'), { force: true })
+  rmSync(addonPath('big', CUSTOM_PACK), { recursive: true, force: true })
   picturesChanged()
 }
 

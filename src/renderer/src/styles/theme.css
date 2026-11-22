@@ -18261,7 +18261,8 @@ button.board-add-picture:hover {
   /* Animated textures are tall strips of frames: show the first. */
   object-fit: cover;
   object-position: top;
-  image-rendering: pixelated;
+  /* Served blown up with square pixels (see bigTexture), so shrinking smoothly keeps every pixel the same size. */
+  image-rendering: auto;
   -webkit-user-drag: none;
 }
 .sb-pic-letters {
