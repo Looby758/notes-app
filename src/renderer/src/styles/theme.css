@@ -10692,12 +10692,12 @@ body.theme-light .sol-table {
   left: calc(var(--i) * var(--card-w) * 0.28);
 }
 .sol-card.fresh {
-  animation: sol-turn 0.22s ease-out;
+  animation: sol-turn 0.26s cubic-bezier(0.2, 0.8, 0.3, 1) calc(var(--k) * 70ms) backwards;
 }
 @keyframes sol-turn {
   from {
-    transform: translateX(calc(var(--card-w) * -0.9)) scaleX(0.2);
-    opacity: 0.4;
+    transform: translateX(calc(var(--card-w) * -1.25 - var(--i) * var(--card-w) * 0.28)) rotateY(90deg);
+    opacity: 0.6;
   }
 }
 .sol-card.lifted {
@@ -10903,90 +10903,232 @@ body.theme-light .sol-table {
   pointer-events: none;
 }
 .g2048-tile {
+  --slide: 0.14s;
   position: absolute;
   top: 0;
   left: 0;
+  width: calc((100% - 30px) / 4);
+  height: calc((100% - 30px) / 4);
+  transform: translate(calc(var(--c) * (100% + 10px)), calc(var(--r) * (100% + 10px)));
+  transition: transform var(--slide) cubic-bezier(0.22, 0.8, 0.3, 1);
+  z-index: 1;
+}
+.g2048-face {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: calc((100% - 30px) / 4);
-  height: calc((100% - 30px) / 4);
-  border-radius: 8px;
-  background: var(--bg-raised);
-  color: #fff;
+  width: 100%;
+  height: 100%;
+  border-radius: 9px;
+  background: var(--tile, var(--bg-raised));
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 45%, rgba(0, 0, 0, 0.06));
+  box-shadow:
+    inset 0 -4px 0 rgba(0, 0, 0, 0.14),
+    0 3px 8px rgba(0, 0, 0, 0.25);
+  color: var(--ink, #fff);
   font-size: clamp(20px, 5vw, 36px);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  transform: translate(calc(var(--c) * (100% + 10px)), calc(var(--r) * (100% + 10px)));
-  transition: transform 0.11s ease-in-out;
-  z-index: 1;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
 }
-.g2048-tile.wide {
+.g2048-tile.wide .g2048-face {
   font-size: clamp(16px, 4vw, 28px);
+}
+.g2048-tile.glow .g2048-face {
+  box-shadow:
+    inset 0 -4px 0 rgba(0, 0, 0, 0.14),
+    0 0 calc(var(--glow, 10px)) color-mix(in srgb, var(--tile) 70%, transparent),
+    0 3px 8px rgba(0, 0, 0, 0.25);
 }
 .g2048-tile.gone {
   z-index: 0;
 }
-.g2048-tile.merged {
-  z-index: 2;
-  animation: g2048-merge 0.22s ease-out 0.1s backwards;
+.g2048-tile.gone .g2048-face {
+  opacity: 0;
+  transition: opacity 0.06s linear var(--slide);
 }
-.g2048-tile.new {
-  animation: g2048-new 0.2s ease-out 0.12s backwards;
+.g2048-tile.merged {
+  z-index: 3;
+}
+.g2048-tile.merged .g2048-face {
+  animation: g2048-merge 0.34s cubic-bezier(0.3, 1.6, 0.5, 1) 0.1s backwards;
+}
+.g2048-tile.new .g2048-face {
+  animation: g2048-new 0.3s cubic-bezier(0.3, 1.5, 0.5, 1) 0.13s backwards;
 }
 @keyframes g2048-merge {
-  from {
-    transform: translate(calc(var(--c) * (100% + 10px)), calc(var(--r) * (100% + 10px))) scale(0.4);
-    opacity: 0;
+  0% {
+    transform: scale(0.6);
+    filter: brightness(1.6);
   }
-  55% {
-    transform: translate(calc(var(--c) * (100% + 10px)), calc(var(--r) * (100% + 10px))) scale(1.18);
-    opacity: 1;
+  45% {
+    transform: scale(1.24);
+    filter: brightness(1.35);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
   }
 }
 @keyframes g2048-new {
   from {
-    transform: translate(calc(var(--c) * (100% + 10px)), calc(var(--r) * (100% + 10px))) scale(0);
+    transform: scale(0) rotate(-12deg);
     opacity: 0;
   }
 }
-.g2048-board.bump-left {
-  animation: g2048-bump-x 0.22s ease-out;
-  --bump: -6px;
+/* Tiles squash a little in the direction they slid, then settle. */
+.g2048-tile.slid-left.p0 .g2048-face,
+.g2048-tile.slid-right.p0 .g2048-face {
+  animation: g2048-squash-x0 0.26s ease-out;
 }
-.g2048-board.bump-right {
-  animation: g2048-bump-x 0.22s ease-out;
-  --bump: 6px;
+.g2048-tile.slid-left.p1 .g2048-face,
+.g2048-tile.slid-right.p1 .g2048-face {
+  animation: g2048-squash-x1 0.26s ease-out;
 }
-.g2048-board.bump-up {
-  animation: g2048-bump-y 0.22s ease-out;
-  --bump: -6px;
+.g2048-tile.slid-up.p0 .g2048-face,
+.g2048-tile.slid-down.p0 .g2048-face {
+  animation: g2048-squash-y0 0.26s ease-out;
 }
-.g2048-board.bump-down {
-  animation: g2048-bump-y 0.22s ease-out;
-  --bump: 6px;
+.g2048-tile.slid-up.p1 .g2048-face,
+.g2048-tile.slid-down.p1 .g2048-face {
+  animation: g2048-squash-y1 0.26s ease-out;
 }
-@keyframes g2048-bump-x {
-  40% {
-    transform: translateX(var(--bump));
+@keyframes g2048-squash-x0 {
+  35% {
+    transform: scale(1.08, 0.92);
+  }
+  70% {
+    transform: scale(0.97, 1.03);
   }
 }
-@keyframes g2048-bump-y {
-  40% {
-    transform: translateY(var(--bump));
+@keyframes g2048-squash-x1 {
+  35% {
+    transform: scale(1.08, 0.92);
   }
+  70% {
+    transform: scale(0.97, 1.03);
+  }
+}
+@keyframes g2048-squash-y0 {
+  35% {
+    transform: scale(0.92, 1.08);
+  }
+  70% {
+    transform: scale(1.03, 0.97);
+  }
+}
+@keyframes g2048-squash-y1 {
+  35% {
+    transform: scale(0.92, 1.08);
+  }
+  70% {
+    transform: scale(1.03, 0.97);
+  }
+}
+/* A ring and sparks burst out of a join. */
+.g2048-ring {
+  position: absolute;
+  inset: -20%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--tile) 85%, white) 0%, color-mix(in srgb, var(--tile) 50%, transparent) 38%, transparent 68%);
+  animation: g2048-ring 0.5s ease-out 0.1s both;
+}
+@keyframes g2048-ring {
+  from {
+    transform: scale(0.5);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+.g2048-spark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 30%, var(--tile) 55%);
+  box-shadow: 0 0 10px 2px var(--tile);
+  animation: g2048-spark 0.6s cubic-bezier(0.1, 0.7, 0.3, 1) 0.1s both;
+}
+@keyframes g2048-spark {
+  from {
+    transform: rotate(var(--a)) translateY(-20px) scale(1.1);
+    opacity: 1;
+  }
+  to {
+    transform: rotate(var(--a)) translateY(-78px) scale(0.2);
+    opacity: 0;
+  }
+}
+/* A move that can't happen: the tiles lean that way and spring back. */
+.g2048-board.bump-left .g2048-face {
+  animation: g2048-lean-l 0.25s ease-out;
+}
+.g2048-board.bump-right .g2048-face {
+  animation: g2048-lean-r 0.25s ease-out;
+}
+.g2048-board.bump-up .g2048-face {
+  animation: g2048-lean-u 0.25s ease-out;
+}
+.g2048-board.bump-down .g2048-face {
+  animation: g2048-lean-d 0.25s ease-out;
+}
+@keyframes g2048-lean-l {
+  40% {
+    transform: translateX(-5px);
+  }
+}
+@keyframes g2048-lean-r {
+  40% {
+    transform: translateX(5px);
+  }
+}
+@keyframes g2048-lean-u {
+  40% {
+    transform: translateY(-5px);
+  }
+}
+@keyframes g2048-lean-d {
+  40% {
+    transform: translateY(5px);
+  }
+}
+.g2048-board.reached {
+  box-shadow: 0 0 28px rgba(237, 194, 46, 0.35);
 }
 @media (prefers-reduced-motion: reduce) {
   .g2048-tile {
     transition: none;
   }
-  .g2048-tile.merged,
-  .g2048-tile.new,
-  .g2048-board[class*='bump-'],
+  .g2048-tile .g2048-face,
+  .g2048-ring,
+  .g2048-spark,
   .g2048-gain {
-    animation: none;
+    animation: none !important;
+  }
+  .g2048-ring,
+  .g2048-spark {
+    display: none;
   }
 }
+.g2048-tile.t2 { --tile: #eee4da; --ink: #776e65; }
+.g2048-tile.t4 { --tile: #ede0c8; --ink: #776e65; }
+.g2048-tile.t8 { --tile: #f2b179; }
+.g2048-tile.t16 { --tile: #f59563; }
+.g2048-tile.t32 { --tile: #f67c5f; }
+.g2048-tile.t64 { --tile: #f65e3b; }
+.g2048-tile.t128 { --tile: #edcf72; --glow: 8px; }
+.g2048-tile.t256 { --tile: #edcc61; --glow: 12px; }
+.g2048-tile.t512 { --tile: #edc850; --glow: 16px; }
+.g2048-tile.t1024 { --tile: #edc53f; --glow: 20px; }
+.g2048-tile.t2048 { --tile: #edc22e; --glow: 28px; }
+.g2048-tile.tbig { --tile: #3c3a32; --glow: 14px; }
 .g2048-cell {
   display: flex;
   align-items: center;
@@ -10999,18 +11141,6 @@ body.theme-light .sol-table {
   font-variant-numeric: tabular-nums;
 }
 
-.g2048-tile.t2 { background: #eee4da; color: #776e65; }
-.g2048-tile.t4 { background: #ede0c8; color: #776e65; }
-.g2048-tile.t8 { background: #f2b179; }
-.g2048-tile.t16 { background: #f59563; }
-.g2048-tile.t32 { background: #f67c5f; }
-.g2048-tile.t64 { background: #f65e3b; }
-.g2048-tile.t128 { background: #edcf72; }
-.g2048-tile.t256 { background: #edcc61; }
-.g2048-tile.t512 { background: #edc850; }
-.g2048-tile.t1024 { background: #edc53f; }
-.g2048-tile.t2048 { background: #edc22e; box-shadow: 0 0 18px rgba(237, 194, 46, 0.6); }
-.g2048-tile.tbig { background: #3c3a32; }
 .g2048-result {
   z-index: 5;
   border-radius: 10px;

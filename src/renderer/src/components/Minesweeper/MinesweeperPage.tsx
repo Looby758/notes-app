@@ -65,12 +65,12 @@ export default function MinesweeperPage() {
     })
   }, [game.state, game.level, game.seconds])
 
-  // The clock starts with the first click and runs while the window is in front.
+  // The clock starts with the first click and keeps running even when you click away.
   const running = game.state === 'playing' && !!game.mine
   useEffect(() => {
     if (!running) return
     const tick = setInterval(() => {
-      if (document.hasFocus()) setGame((g) => (g.state === 'playing' ? { ...g, seconds: g.seconds + 1 } : g))
+      setGame((g) => (g.state === 'playing' ? { ...g, seconds: g.seconds + 1 } : g))
     }, 1000)
     return () => clearInterval(tick)
   }, [running])

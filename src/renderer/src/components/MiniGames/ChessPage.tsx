@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import { Bot, ChevronLeft, ChevronRight, ChevronsRight, Crown, Flag, Handshake, RefreshCw, RotateCcw, Trophy, Undo2, User, Users } from 'lucide-react'
 import {
   colorOf,
@@ -25,6 +25,7 @@ import { loadRecords, saveGame, type GameRecord } from '../../lib/gameStats'
 import { playSound } from '../../lib/sounds'
 import { formatTime } from '../../lib/sudoku'
 import GameStats from './GameStats'
+import { useGameKeys } from './useGameKeys'
 
 type Mode = 'computer' | 'friend'
 
@@ -129,6 +130,7 @@ export default function ChessPage() {
   /** The move that should slide into place (moves you dragged are already there). */
   const [slideAt, setSlideAt] = useState<number | null>(null)
   const boardEl = useRef<HTMLDivElement>(null)
+  const page = useRef<HTMLDivElement>(null)
   const moveList = useRef<HTMLOListElement>(null)
 
   const squares = game.squares ?? []
@@ -174,12 +176,12 @@ export default function ChessPage() {
     else if (list && live) list.scrollTop = list.scrollHeight
   }, [game.sans.length, viewing, live])
 
-  // The clock starts with the first move and runs while the window is in front.
+  // The clock starts with the first move and keeps running even when you click away.
   const running = game.fens.length > 1 && !game.end
   useEffect(() => {
     if (!running) return
     const tick = setInterval(() => {
-      if (document.hasFocus()) setGame((g) => (g.end ? g : { ...g, seconds: g.seconds + 1 }))
+      setGame((g) => (g.end ? g : { ...g, seconds: g.seconds + 1 }))
     }, 1000)
     return () => clearInterval(tick)
   }, [running])
@@ -343,6 +345,7 @@ export default function ChessPage() {
       setViewing(null)
     }
   }
+  useGameKeys(page, onKey)
 
   const order = [...Array(64).keys()]
   if (bottom === 'b') order.reverse()
@@ -404,7 +407,7 @@ export default function ChessPage() {
 
   return (
     <div className="sudoku-page chess-page" data-chess-page>
-      <div className="sudoku-inner chess-inner" onKeyDown={onKey}>
+      <div className="sudoku-inner chess-inner" ref={page}>
         <header className="sudoku-head">
           <h2>
             <Crown size={20} /> Chess

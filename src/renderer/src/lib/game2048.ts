@@ -97,6 +97,8 @@ export interface Tile {
   isNew?: boolean
   /** Slid into another tile and is about to disappear. */
   gone?: boolean
+  /** Moved to a new square this turn. */
+  slid?: boolean
 }
 
 let nextId = 1
@@ -129,7 +131,7 @@ export function slideTiles(tiles: Tile[], dir: Direction): { tiles: Tile[]; move
         i++
       } else {
         if (t.at !== to) moved = true
-        out.push({ id: t.id, value: t.value, at: to })
+        out.push({ id: t.id, value: t.value, at: to, ...(t.at !== to ? { slid: true } : {}) })
       }
       target++
     }

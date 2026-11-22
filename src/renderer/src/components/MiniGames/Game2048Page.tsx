@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import { Frown, RotateCcw, Trophy, Undo2 } from 'lucide-react'
 import { addTile, biggest, canMove, GOAL, newBoard, SIZE, slide, slideTiles, tileId, tilesOf, type Direction, type Tile } from '../../lib/game2048'
 import { loadRecords, saveGame, type GameRecord } from '../../lib/gameStats'
 import { formatTime } from '../../lib/sudoku'
 import GameStats from './GameStats'
+import { useGameKeys } from './useGameKeys'
 
 interface Game {
   board: number[]
@@ -48,6 +49,32 @@ const KEYS: Record<string, Direction> = {
   d: 'right'
 }
 
+/** Counts a number up to its new value over a moment, so the score rolls rather than jumps. */
+function useCountUp(value: number): number {
+  const [shown, setShown] = useState(value)
+  const from = useRef(value)
+  useEffect(() => {
+    const start = performance.now()
+    const begin = from.current
+    if (begin === value || value < begin) {
+      from.current = value
+      setShown(value)
+      return
+    }
+    let raf = 0
+    const step = (now: number): void => {
+      const t = Math.min(1, (now - start) / 350)
+      const v = Math.round(begin + (value - begin) * (1 - (1 - t) ** 3))
+      from.current = v
+      setShown(v)
+      if (t < 1) raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [value])
+  return shown
+}
+
 /** 2048: slide the tiles so matching numbers join, and try to make a 2048 tile. */
 export default function Game2048Page() {
   const [game, setGame] = useState<Game>(() => loadGame() ?? fresh())
@@ -57,7 +84,10 @@ export default function Game2048Page() {
   const [tiles, setTiles] = useState<Tile[]>(() => tilesOf(game.board))
   const [bump, setBump] = useState<Direction | null>(null)
   const [gain, setGain] = useState<{ n: number; key: number } | null>(null)
+  const [lastDir, setLastDir] = useState<Direction | null>(null)
+  const shownScore = useCountUp(game.score)
   const board = useRef<HTMLDivElement>(null)
+  const page = useRef<HTMLDivElement>(null)
   const swipe = useRef<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
@@ -79,12 +109,12 @@ export default function Game2048Page() {
     }
   }, [game.score, best])
 
-  // The clock starts with the first move and runs while the window is in front.
+  // The clock starts with the first move and keeps running even when you click away.
   const running = game.moves > 0 && !game.over
   useEffect(() => {
     if (!running) return
     const tick = setInterval(() => {
-      if (document.hasFocus()) setGame((g) => (g.over ? g : { ...g, seconds: g.seconds + 1 }))
+      setGame((g) => (g.over ? g : { ...g, seconds: g.seconds + 1 }))
     }, 1000)
     return () => clearInterval(tick)
   }, [running])
@@ -143,6 +173,7 @@ export default function Game2048Page() {
     setGame(ng)
     setTiles(ts)
     setBump(null)
+    setLastDir(dir)
     if (s.gained) setGain({ n: s.gained, key: ng.moves })
   }
 
@@ -185,6 +216,7 @@ export default function Game2048Page() {
       undo()
     }
   }
+  useGameKeys(page, onKey)
 
   // Swipe with the mouse or a touch screen.
   const onDown = (e: PointerEvent): void => {
@@ -202,7 +234,7 @@ export default function Game2048Page() {
 
   return (
     <div className="sudoku-page g2048-page" data-2048-page>
-      <div className="sudoku-inner g2048-inner" onKeyDown={onKey}>
+      <div className="sudoku-inner g2048-inner" ref={page}>
         <header className="sudoku-head">
           <h2>
             <span className="g2048-logo">2048</span>
@@ -210,7 +242,7 @@ export default function Game2048Page() {
           <div className="g2048-scores">
             <div>
               <span>Score</span>
-              <strong data-2048-score>{game.score}</strong>
+              <strong data-2048-score={game.score}>{shownScore}</strong>
               {gain && (
                 <em key={gain.key} className="g2048-gain">
                   +{gain.n}
@@ -245,7 +277,7 @@ export default function Game2048Page() {
 
         <div
           ref={board}
-          className={`g2048-board ${bump ? `bump-${bump}` : ''}`}
+          className={`g2048-board ${bump ? `bump-${bump}` : ''} ${game.reached ? 'reached' : ''}`}
           tabIndex={0}
           role="grid"
           aria-label="2048 board. Use the arrow keys to slide the tiles."
@@ -260,13 +292,31 @@ export default function Game2048Page() {
             {tiles.map((t) => (
               <div
                 key={t.id}
-                className={['g2048-tile', `t${t.value > 2048 ? 'big' : t.value}`, t.value >= 1024 ? 'wide' : '', t.merged ? 'merged' : '', t.isNew ? 'new' : '', t.gone ? 'gone' : '']
+                className={[
+                  'g2048-tile',
+                  `t${t.value > 2048 ? 'big' : t.value}`,
+                  t.value >= 1024 ? 'wide' : '',
+                  t.value >= 128 ? 'glow' : '',
+                  t.merged ? 'merged' : '',
+                  t.isNew ? 'new' : '',
+                  t.gone ? 'gone' : '',
+                  // Two names for the same squash, so it plays again on every move.
+                  t.slid && lastDir ? `slid-${lastDir} p${game.moves % 2}` : ''
+                ]
                   .filter(Boolean)
                   .join(' ')}
                 style={{ '--r': Math.floor(t.at / SIZE), '--c': t.at % SIZE } as CSSProperties}
                 data-tile={t.gone ? undefined : t.value}
               >
-                {t.value}
+                <div className="g2048-face">{t.value}</div>
+                {t.merged && (
+                  <>
+                    <span className="g2048-ring" />
+                    {[...Array(t.value >= 64 ? 10 : 6).keys()].map((i, _, all) => (
+                      <span key={i} className="g2048-spark" style={{ '--a': `${(360 / all.length) * i + 15}deg` } as CSSProperties} />
+                    ))}
+                  </>
+                )}
               </div>
             ))}
           </div>

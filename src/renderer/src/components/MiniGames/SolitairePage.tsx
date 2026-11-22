@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import { MousePointerClick, RotateCcw, Sparkles, Spade, Trophy } from 'lucide-react'
 import { bestMove, canFinish, deal, drawCards, finishStep, isRed, isWon, move, picked, rankName, SUITS, type Card, type Deal, type From, type To } from '../../lib/solitaire'
 import { loadRecords, saveGame, type GameRecord } from '../../lib/gameStats'
 import { formatTime } from '../../lib/sudoku'
 import GameStats from './GameStats'
+import { useGameKeys } from './useGameKeys'
 
 interface Game {
   deal: Deal
@@ -28,6 +29,8 @@ function loadGame(): Game | null {
 }
 
 const fresh = (draw: 1 | 3): Game => ({ deal: deal(draw), moves: 0, seconds: 0, counted: false })
+
+const cardKey = (c: Card): string => `${c.suit}-${c.rank}`
 
 const sameFrom = (a: From | null, b: From): boolean => JSON.stringify(a) === JSON.stringify(b)
 
@@ -86,6 +89,8 @@ export default function SolitairePage() {
   const [selected, setSelected] = useState<From | null>(null)
   const [finishing, setFinishing] = useState(false)
   const [drag, setDrag] = useState<Drag | null>(null)
+  /** The cards turned over by the last draw, which slide in from the stock. */
+  const [justDrawn, setJustDrawn] = useState<string[]>([])
   // Double-click to send a card home: off unless you turn it on.
   const [doubleClick, setDoubleClick] = useState(() => localStorage.getItem(DOUBLE_KEY) === '1')
   const lastClick = useRef<{ from: string; at: number } | null>(null)
@@ -111,12 +116,12 @@ export default function SolitairePage() {
   }, [doubleClick])
   useEffect(() => root.current?.focus(), [])
 
-  // The clock starts with the first move and runs while the window is in front.
+  // The clock starts with the first move and keeps running even when you click away.
   const running = game.moves > 0 && !won
   useEffect(() => {
     if (!running) return
     const tick = setInterval(() => {
-      if (document.hasFocus()) setGame((g) => (isWon(g.deal) ? g : { ...g, seconds: g.seconds + 1 }))
+      setGame((g) => (isWon(g.deal) ? g : { ...g, seconds: g.seconds + 1 }))
     }, 1000)
     return () => clearInterval(tick)
   }, [running])
@@ -147,6 +152,7 @@ export default function SolitairePage() {
     if (!next) return false
     setGame((g) => ({ ...g, deal: next, moves: g.moves + 1 }))
     setSelected(null)
+    setJustDrawn([])
     return true
   }
 
@@ -163,7 +169,12 @@ export default function SolitairePage() {
     root.current?.focus()
   }
 
-  const draw = (): void => void apply(drawCards(d))
+  const draw = (): void => {
+    const next = drawCards(d)
+    if (!apply(next) || !next || !d.stock.length) return
+    // Only the cards just turned over slide in; the rest stay put.
+    setJustDrawn(next.waste.slice(next.waste.length - (next.waste.length - d.waste.length)).map(cardKey))
+  }
 
   /** Clicking a card: pick it up, or drop what you're holding onto its pile. */
   const clickFrom = (from: From): void => {
@@ -238,6 +249,7 @@ export default function SolitairePage() {
     if (k === 'n') return void (e.preventDefault(), restart())
     if (k === 'escape') setSelected(null)
   }
+  useGameKeys(root, onKey)
 
   const isSel = (from: From): boolean => {
     if (!selected) return false
@@ -259,7 +271,9 @@ export default function SolitairePage() {
     return move(d, drag.from, to) ? 'drop-ok' : 'drop-no'
   }
 
-  const shownWaste = d.waste.slice(d.draw === 3 ? -3 : -1)
+  // The top one (or three, fanned) of the waste, with the card under them showing beneath.
+  const fan = d.waste.slice(d.draw === 3 ? -3 : -1)
+  const under = d.waste.length > fan.length ? d.waste[d.waste.length - fan.length - 1] : null
 
   const cardEl = (card: Card, from: From, style?: CSSProperties, extra = '') => (
     <div
@@ -276,7 +290,7 @@ export default function SolitairePage() {
 
   return (
     <div className="sudoku-page sol-page" data-solitaire-page>
-      <div className="sudoku-inner sol-inner" ref={root} tabIndex={-1} onKeyDown={onKey}>
+      <div className="sudoku-inner sol-inner" ref={root} tabIndex={-1}>
         <header className="sudoku-head">
           <h2>
             <Spade size={20} /> Solitaire
@@ -341,13 +355,16 @@ export default function SolitairePage() {
                 <RotateCcw size={22} />
               )}
             </button>
-            <div className={`sol-waste n${shownWaste.length}`}>
-              {shownWaste.map((card, i) => {
-                const top = i === shownWaste.length - 1
-                return top ? (
-                  cardEl(card, { pile: 'waste' }, { '--i': i } as CSSProperties, 'fresh')
+            <div className="sol-waste">
+              {[...(under ? [under] : []), ...fan].map((card) => {
+                const i = Math.max(0, fan.indexOf(card))
+                const k = justDrawn.indexOf(cardKey(card))
+                const style = { '--i': i, '--k': Math.max(0, k) } as CSSProperties
+                const extra = k >= 0 ? 'fresh' : ''
+                return card === fan[fan.length - 1] ? (
+                  cardEl(card, { pile: 'waste' }, style, extra)
                 ) : (
-                  <div key={`${card.suit}-${card.rank}`} className={`sol-card up still ${isRed(card.suit) ? 'red' : ''}`} style={{ '--i': i } as CSSProperties} aria-label={cardLabel(card)}>
+                  <div key={cardKey(card)} className={`sol-card up still ${isRed(card.suit) ? 'red' : ''} ${extra}`} style={style} aria-label={cardLabel(card)}>
                     <CardFace card={card} />
                   </div>
                 )
