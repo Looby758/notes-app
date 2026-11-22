@@ -8,8 +8,8 @@ import { useUI } from '../store/ui'
  * Screen snip, from inside the app (the system-wide shortcut and the taskbar go straight to
  * main/snip.ts). 'picture' copies the box as a picture, ready to paste anywhere.
  */
-export function startSnip(mode: 'text' | 'picture' = 'text'): Promise<void> {
-  return window.api.startSnip(mode)
+export function startSnip(mode: 'text' | 'picture' = 'text', delay?: number): Promise<void> {
+  return window.api.startSnip(mode, delay)
 }
 
 /** Main window: what to do with text that came back from a snip. */

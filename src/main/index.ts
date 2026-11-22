@@ -39,10 +39,10 @@ import { closePopout, setupPopout } from './popout'
 import { closeDiscordPopout, setupDiscordPopout } from './discordPopout'
 import { closeVideoWindow, setupVideoWindow } from './videoWindow'
 import { closeWebWindow, setupWebWindow } from './webWindow'
-import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
+import { applyCaptureShortcut, noteHiddenToTray, refreshTrayMenu, setTrayIcon, setupCapture, teardownCapture } from './capture'
 import { applySnipShortcut, openSnipFolder, setupSnip, startSnip } from './snip'
 import { setupSnipTaskbar } from './snipTaskbar'
-import { snipModeFromArgv } from '@shared/snipLaunch'
+import { snipDelayFromArgv, snipModeFromArgv } from '@shared/snipLaunch'
 import { applySongIdShortcut, setupSongId } from './songId'
 import { setupUpdater } from './updater'
 import { setupSettingsHealth } from './settingsHealth'
@@ -136,7 +136,7 @@ if (!app.requestSingleInstanceLock()) {
     // The taskbar's "Orbit Snip" or jump list: just snip, without bringing the window up.
     const snip = snipModeFromArgv(argv)
     if (snip) {
-      if (app.isReady()) void startSnip(snip)
+      if (app.isReady()) void startSnip(snip, snipDelayFromArgv(argv))
       return
     }
     showMain()
@@ -237,6 +237,8 @@ function appIconFile(prefs: Prefs): { id: string; file?: string } {
 /** Settings that live outside the app's windows: the capture shortcut, the app icon and starting at login. */
 function applySystemPrefs(prefs: Prefs): void {
   applyCaptureShortcut(prefs.captureShortcut)
+  // The tray's "Snip after a delay" lists your own delay too.
+  safely('tray menu', refreshTrayMenu)
   applySnipShortcut(prefs.snipShortcut)
   applySongIdShortcut(prefs.songIdShortcut)
   applyReplayShortcut(prefs.replayOn ? prefs.replayShortcut : '')
@@ -1099,11 +1101,11 @@ app.whenReady().then(async () => {
   safely('Orbit sync', () => setupOrbitSync({ root: () => vault?.root ?? null, enabled: () => currentPrefs().syncOrbit, window: () => mainWindow, parts: orbitParts(themesChanged) }))
   mainWindow = createWindow()
   // The extras: if one of them fails on some computer, the app itself still works.
-  safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: (as) => void startSnip(as), openSnips: () => void openSnipFolder() }))
+  safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: (as, delay) => void startSnip(as, delay), openSnips: () => void openSnipFolder() }))
   safely('screen snip', () => setupSnip({ getMain: () => mainWindow, showMain, prefs: currentPrefs }))
   safely('taskbar snip', setupSnipTaskbar)
   // Started from the taskbar's "Orbit Snip" (or its jump list) while Orbit wasn't running.
-  if (launchSnip) setTimeout(() => void startSnip(launchSnip), 300)
+  if (launchSnip) setTimeout(() => void startSnip(launchSnip, snipDelayFromArgv(process.argv)), 300)
   safely('what’s this song', () => setupSongId({ getMain: () => mainWindow }))
   safely('instant replay', () => setupClips({ getMain: () => mainWindow, showMain }))
   safely('screen controls', setupMonitors)

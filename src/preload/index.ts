@@ -490,7 +490,7 @@ const api: NotesApi = {
     return () => ipcRenderer.removeListener('discord:changed', handler)
   },
 
-  startSnip: (mode) => ipcRenderer.invoke('snip:start', mode),
+  startSnip: (mode, delay) => ipcRenderer.invoke('snip:start', mode, delay),
   snipCopyPicture: (png) => ipcRenderer.invoke('snip:copyPicture', png),
   snipTaskbar: () => ipcRenderer.invoke('snip:taskbar'),
   snipShowShortcut: () => ipcRenderer.invoke('snip:showShortcut'),

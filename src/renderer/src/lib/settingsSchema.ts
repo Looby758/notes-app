@@ -970,6 +970,17 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'snip screenshot ocr text grab copy translate hotkey'
   },
   {
+    key: 'snipDelay',
+    section: 'capture',
+    group: 'Screen snip',
+    type: 'slider',
+    ...RANGES.snipDelay,
+    format: (v) => (v ? `${v} s` : 'Off'),
+    label: 'Wait before a picture snip',
+    description: 'Counts down before the screen freezes, so you can hover over something first (open a menu, show a tooltip). Off snips straight away. The taskbar and tray menus also have Snip after 3, 5 or 10 seconds for one-offs.',
+    keywords: 'snip delay timer wait countdown seconds hover menu tooltip screenshot later'
+  },
+  {
     key: 'snipSave',
     section: 'capture',
     group: 'Screen snip',
