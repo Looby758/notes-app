@@ -1,6 +1,7 @@
 import { net, safeStorage } from 'electron'
 import { randomBytes } from 'crypto'
 import workerCode from '../../server/file-sender/worker.js?raw'
+import { logError } from './log'
 
 /**
  * Sets up the big file sender's intro server for you, on your own free Cloudflare account: you
@@ -13,12 +14,8 @@ import workerCode from '../../server/file-sender/worker.js?raw'
 const API = process.env.NOTES_CLOUDFLARE_API_URL ?? 'https://api.cloudflare.com/client/v4'
 export const SCRIPT_NAME = 'orbit-file-sender'
 
-/** Cloudflare's "create a token" page with Workers Scripts: Edit already ticked. */
-export const TOKEN_PAGE =
-  'https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=' +
-  encodeURIComponent(JSON.stringify([{ key: 'workers_scripts', type: 'edit' }])) +
-  '&accountId=*&zoneId=all&name=' +
-  encodeURIComponent('Orbit file sender')
+/** Cloudflare's API tokens page (the "Edit Cloudflare Workers" template is on it). */
+export const TOKEN_PAGE = 'https://dash.cloudflare.com/profile/api-tokens'
 
 interface CfReply<T> {
   success?: boolean
@@ -99,18 +96,18 @@ function upload(token: string, account: string, migrations: unknown): Promise<un
 /** Puts the server on Cloudflare. Different ways of saying "make the Room class", newest first. */
 async function deployWorker(token: string, account: string): Promise<void> {
   const tries: unknown[] = [{ new_tag: 'v1', new_sqlite_classes: ['Room'] }, { new_tag: 'v1', steps: [{ new_sqlite_classes: ['Room'] }] }, null]
-  let last: unknown
+  const errors: CfError[] = []
   for (const migrations of tries) {
     try {
       await upload(token, account, migrations)
       return
     } catch (err) {
-      last = err
-      // A key without the right permission won't get better by trying again.
-      if (err instanceof CfError && (err.status === 401 || err.status === 403)) break
+      errors.push(err instanceof CfError ? err : new CfError((err as Error).message, 0, []))
+      logError('file sender setup: upload', `${errors[errors.length - 1].status} ${errors[errors.length - 1].codes.join(',')} ${(err as Error).message}`)
     }
   }
-  throw last
+  // The most useful complaint: one that isn't just "not allowed", if there is one.
+  throw errors.find((e) => e.status !== 401 && e.status !== 403) ?? errors[0]
 }
 
 async function waitForHealth(address: string, ms: number): Promise<boolean> {
@@ -183,8 +180,11 @@ export async function setUpServer(
   } catch (err) {
     end(s, 'failed', 'Couldn’t put the server on Cloudflare.')
     const e = err as CfError
-    if (e.status === 401 || e.status === 403) throw new Error('The key isn’t allowed to make Workers. Make the key with the page Orbit opens (it ticks “Workers Scripts: Edit”).')
-    throw new Error(`Cloudflare said: ${e.message}`)
+    const said = `Cloudflare said: “${e.message}”${e.codes.length ? ` (code ${e.codes.join(', ')})` : ''}.`
+    if (e.status === 401 || e.status === 403) {
+      throw new Error(`${said} The key isn’t allowed to make Workers. Make a new key from the “Edit Cloudflare Workers” template (step 2), with your account picked under Account Resources.`)
+    }
+    throw new Error(said)
   }
   end(s, 'done', 'Intro server is on your account')
 

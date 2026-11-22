@@ -188,8 +188,8 @@ function SetupBox({ state, onDone }: { state: FileSendState; onDone: () => void 
             </div>
           </li>
           <li>
-            <b>Make a key for Orbit.</b> The page opens with the right setting (“Workers Scripts: Edit”) already ticked. Scroll to the bottom, press <b>Continue to summary</b>, then <b>Create Token</b>, then{' '}
-            <b>Copy</b>.
+            <b>Make a key for Orbit.</b> On the page that opens, press <b>Create Token</b>, then <b>Use template</b> next to <b>Edit Cloudflare Workers</b>. Under <b>Account Resources</b> pick your
+            account, and under <b>Zone Resources</b> pick <b>All zones</b>. Then press <b>Continue to summary</b>, <b>Create Token</b>, and <b>Copy</b>.
             <div>
               <button className="btn" onClick={() => void window.api.fileSendOpen('token')} data-fsend-token-page>
                 <ExternalLink size={13} /> Open the key page
