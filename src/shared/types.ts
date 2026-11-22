@@ -216,8 +216,8 @@ export interface UpdateStatus {
   percent?: number
   error?: string
   /**
-   * On a Mac, updates can only install themselves in apps signed with a paid Apple certificate, so
-   * Notes offers to open the download page instead.
+   * The update can't install itself (e.g. a Mac copy running from the disk image, or one macOS
+   * wouldn't let replace itself), so Orbit offers to open the download page instead.
    */
   manual?: boolean
   /** Why checking is off, e.g. "Updates are checked in the installed app only." */
@@ -790,7 +790,7 @@ export interface NotesApi {
   updateStatus(): Promise<UpdateStatus>
   /** Looks for a newer version now. */
   checkForUpdates(): Promise<UpdateStatus>
-  /** Restarts into a downloaded update (Windows), or opens the download page (Mac). */
+  /** Restarts into a downloaded update, or opens the download page when it can't install itself. */
   installUpdate(): Promise<void>
   /** What's new since this computer last opened Orbit (empty when nothing is). */
   whatsNewPending(): Promise<import('./whatsNew').ReleaseNotes[]>

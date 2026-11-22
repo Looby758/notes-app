@@ -13,14 +13,15 @@ Download the latest version from the [Releases page](https://github.com/Looby758
 1. Click **Done** (or **OK**).
 2. Open **System Settings → Privacy & Security**, scroll down to the message about Orbit, and click **Open Anyway**. Confirm with your password.
 
-You only need to do that once.
+You only need to do that once. (Or, instead of those steps, run `xattr -cr /Applications/Orbit.app` in Terminal once after dragging it in.) Once Orbit has opened, it removes macOS's "downloaded from the internet" mark from itself, so macOS doesn't ask again, and updates install themselves (below), so you never download it by hand again.
 
 ## Updates
 
 Orbit checks the Releases page every few hours (Settings → About shows the result and has *Check now*).
 
-- **Windows:** a new version downloads in the background; a card in the corner offers **Restart**, or it installs the next time you quit.
-- **Mac:** Orbit tells you a new version is out and opens its download page. Install it the same way as above. (Updating itself in place needs a paid Apple certificate.)
+A new version downloads in the background; a card in the corner offers **Restart**, or it installs the next time you quit.
+
+- **Mac:** Orbit isn't signed with a paid Apple certificate, so macOS's own updater won't install updates for it. Orbit does it itself: it downloads the zip for your kind of Mac, checks it against the checksum the release publishes, and swaps itself for the new copy as it quits. The first time, macOS may say Orbit was prevented from modifying apps: allow it under **System Settings → Privacy & Security → App Management** and check again. If Orbit can't replace itself (for example it's running from the disk image), it opens the download page instead. Because the app isn't signed with a certificate, macOS may ask again for permissions such as the microphone or Accessibility after an update.
 
 ## Syncing with Google Drive
 

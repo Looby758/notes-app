@@ -1,0 +1,77 @@
+# Checks, on one of GitHub's Macs, that an installed Orbit updates itself: builds the app, puts it
+# in Applications marked "downloaded from the internet", then builds a newer version (99.0.0) and
+# serves it from a local web server. The installed copy should find it, download it, swap itself
+# for it, reopen, and no longer carry the internet mark.
+name: Mac update check
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - src/main/updater.ts
+      - src/main/macUpdate.ts
+      - electron-builder.yml
+      - build/adhoc-sign.cjs
+      - .github/workflows/mac-update-check.yml
+
+jobs:
+  check:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      - name: Build and install the current version
+        run: |
+          npx electron-vite build
+          npx electron-builder --mac --arm64 --dir --publish never
+          sudo rm -rf /Applications/Orbit.app
+          ditto dist/mac-arm64/Orbit.app /Applications/Orbit.app
+          # As if it came from a browser download.
+          xattr -w com.apple.quarantine "0083;$(printf %x "$(date +%s)");Safari;" /Applications/Orbit.app
+          xattr -l /Applications/Orbit.app
+
+      - name: Build version 99.0.0 as the update
+        run: |
+          rm -rf dist
+          npm version 99.0.0 --no-git-tag-version
+          npx electron-vite build
+          npx electron-builder --mac zip --arm64 --publish never
+          ls -la dist
+          cat dist/latest-mac.yml
+
+      - name: Open the installed copy and wait for it to update itself
+        run: |
+          (cd dist && python3 -m http.server 8123 >/dev/null 2>&1 &)
+          mkdir -p results
+          NOTES_UPDATE_URL=http://127.0.0.1:8123 NOTES_UPDATE_TEST_INSTALL=1 \
+            /Applications/Orbit.app/Contents/MacOS/Orbit > results/first-run.log 2>&1 &
+          plist=/Applications/Orbit.app/Contents/Info.plist
+          for i in $(seq 1 120); do
+            v=$(plutil -extract CFBundleShortVersionString raw -o - "$plist" 2>/dev/null || echo '?')
+            echo "$(date +%T) installed version: $v"
+            [ "$v" = 99.0.0 ] && break
+            sleep 5
+          done
+          [ "$v" = 99.0.0 ] || { echo 'FAIL: the app did not update itself'; exit 1; }
+          echo 'PASS: Applications now has 99.0.0'
+          sleep 10
+          if pgrep -fl '/Applications/Orbit.app/Contents/MacOS/Orbit'; then echo 'PASS: it opened again'; else echo 'FAIL: it did not open again'; exit 1; fi
+          if xattr -p com.apple.quarantine /Applications/Orbit.app 2>/dev/null; then echo 'FAIL: still marked from the internet'; exit 1; fi
+          echo 'PASS: no "downloaded from the internet" mark'
+          codesign --verify --deep --strict /Applications/Orbit.app && echo 'PASS: signature intact'
+
+      - name: Logs
+        if: always()
+        run: |
+          cat results/first-run.log || true
+          ls -la ~/Library/Application\ Support/*/pending-update 2>/dev/null || true
+          cat ~/Library/Application\ Support/*/pending-update/last-install.txt 2>/dev/null || true
+          pkill -f /Applications/Orbit.app || true
