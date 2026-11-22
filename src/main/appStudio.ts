@@ -38,7 +38,7 @@ function save(s: Stored): void {
   renameSync(tmp, file())
 }
 
-function token(): string | null {
+export function token(): string | null {
   const s = load()
   if (!s.token || !safeStorage.isEncryptionAvailable()) return null
   try {
@@ -53,7 +53,7 @@ function status(): GitHubStatus {
   return { connected: !!s.token && token() !== null, login: s.login, canEncrypt: safeStorage.isEncryptionAvailable() }
 }
 
-class GitHubError extends Error {
+export class GitHubError extends Error {
   constructor(
     message: string,
     readonly status: number
@@ -62,7 +62,7 @@ class GitHubError extends Error {
   }
 }
 
-async function github<T>(path: string, init: { method?: string; body?: unknown; key?: string | null; doing?: string; needs?: string } = {}): Promise<T> {
+export async function github<T>(path: string, init: { method?: string; body?: unknown; key?: string | null; doing?: string; needs?: string } = {}): Promise<T> {
   const key = init.key === undefined ? token() : init.key
   const headers: Record<string, string> = { Accept: 'application/vnd.github+json', 'User-Agent': 'Orbit', 'X-GitHub-Api-Version': '2022-11-28' }
   if (key) headers.Authorization = `Bearer ${key}`
@@ -113,7 +113,7 @@ async function setToken(raw: string): Promise<GitHubStatus> {
 }
 
 /** Runs git in a folder; its output, or null if git failed. */
-function git(folder: string, args: string[]): Promise<string | null> {
+export function git(folder: string, args: string[]): Promise<string | null> {
   return new Promise((resolve) => {
     execFile('git', args, { cwd: folder, timeout: 10_000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 }, (err, stdout) => resolve(err ? null : stdout.trimEnd()))
   })
@@ -175,7 +175,7 @@ async function removeCopy(folder: string, path: string): Promise<void> {
   }
 }
 
-async function appInfo(folder: string): Promise<AppInfo> {
+export async function appInfo(folder: string): Promise<AppInfo> {
   if (!isAbsolute(folder) || !statSync(folder, { throwIfNoEntry: false })?.isDirectory()) return { ok: false, error: 'This app’s folder isn’t there any more.' }
   let version: string | undefined
   let buildScripts: string[] | undefined
@@ -247,7 +247,7 @@ interface ApiPull {
   changed_files?: number
 }
 
-const validRepo = (repo: unknown): repo is string => typeof repo === 'string' && /^[\w.-]+\/[\w.-]+$/.test(repo)
+export const validRepo = (repo: unknown): repo is string => typeof repo === 'string' && /^[\w.-]+\/[\w.-]+$/.test(repo)
 
 async function pulls(repos: string[]): Promise<{ pulls: PullRequest[]; errors: Record<string, string> }> {
   const out: PullRequest[] = []
@@ -506,7 +506,7 @@ async function createApp(req: NewApp): Promise<MadeApp> {
   }
 }
 
-function needToken(): void {
+export function needToken(): void {
   if (!token()) throw new Error('Connect GitHub in App Studio first, so Orbit can do that for you.')
 }
 
