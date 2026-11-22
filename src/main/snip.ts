@@ -1,13 +1,13 @@
-import { BrowserWindow, clipboard, desktopCapturer, globalShortcut, ipcMain, net, screen } from 'electron'
+import { BrowserWindow, clipboard, desktopCapturer, globalShortcut, ipcMain, nativeImage, net, screen } from 'electron'
 import { createHash } from 'crypto'
 import { existsSync, mkdirSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { hideCaptureWindow, loadRenderer } from './capture'
-import { ocrLangDir, readPrintedText } from './handwriting'
+import { detectScript, ocrLangDir, readPrintedText } from './handwriting'
 import { GameRunningError, localAiState, localComplete } from './localAi'
 import { logError } from './log'
-import { isTarget, OCR_LANGS, ocrLangByCode, ocrLangSetting, ocrLangUrl, onlineTranslateUrl, parseTranslation, tidyReading, TRANSLATE_SYSTEM, translatePrompt } from '@shared/translate'
-import type { SnipTranslation } from '@shared/types'
+import { isTarget, OCR_LANGS, ocrLangByCode, ocrLangSetting, ocrLangUrl, onlineTranslateUrl, parseTranslation, readerForScript, tidyReading, TRANSLATE_SYSTEM, translatePrompt } from '@shared/translate'
+import type { SnipReading, SnipTranslation } from '@shared/types'
 import { acceleratorLabel, IS_MAC, SYSTEM_NAME } from '@shared/platform'
 
 /**
@@ -156,6 +156,18 @@ async function translate(text: string, target: string): Promise<SnipTranslation>
   }
 }
 
+/** Spotting the alphabet works better on bigger letters, so a small snip is made twice the size for it. */
+function forDetecting(png: Uint8Array): Uint8Array {
+  try {
+    const img = nativeImage.createFromBuffer(Buffer.from(png))
+    const { width } = img.getSize()
+    if (!width || width >= 1600) return png
+    return new Uint8Array(img.resize({ width: width * 2, quality: 'best' }).toPNG())
+  } catch {
+    return png
+  }
+}
+
 function closeSnip(): void {
   win?.close()
 }
@@ -180,10 +192,19 @@ export function setupSnip(h: Hooks): void {
   ipcMain.handle('snip:start', () => startSnip())
   ipcMain.handle('snip:status', () => ({ shortcut: registered ? acceleratorLabel(registered) : '', error: shortcutError }))
   ipcMain.handle('snip:image', () => (shot ? { png: new Uint8Array(shot.png), scale: shot.scale } : null))
-  // `lang`: an extra language reader to use with English (only once it's downloaded).
-  ipcMain.handle('snip:read', async (_e, png: Uint8Array, lang?: string) => {
-    const code = ocrDownloaded(lang) ? lang : undefined
-    return tidyReading(await readPrintedText(png, ocrLangSetting(code)), code)
+  // `lang`: an extra language reader to use with English (only once it's downloaded), or 'auto'
+  // to spot the alphabet first and pick the reader for it.
+  ipcMain.handle('snip:read', async (_e, png: Uint8Array, lang?: string): Promise<SnipReading> => {
+    let code = ocrDownloaded(lang) ? lang : undefined
+    let detected: string | undefined
+    if (lang === 'auto') {
+      const pick = readerForScript(await detectScript(forDetecting(png)), OCR_LANGS.filter((l) => ocrDownloaded(l.code)).map((l) => l.code))
+      detected = pick.name || undefined
+      // Its reader isn't downloaded: the English reader would only read nonsense, so ask first.
+      if (pick.need.length) return { text: '', detected, need: pick.need }
+      code = pick.use || undefined
+    }
+    return { text: tidyReading(await readPrintedText(png, ocrLangSetting(code)), code), lang: code ?? '', detected }
   })
   ipcMain.handle('snip:ocrLangs', () => OCR_LANGS.filter((l) => ocrDownloaded(l.code)).map((l) => l.code))
   ipcMain.handle('snip:getOcrLang', (_e, code: string) => getOcrLang(String(code)))

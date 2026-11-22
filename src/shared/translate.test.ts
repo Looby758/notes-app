@@ -7,6 +7,7 @@ import {
   ocrLangUrl,
   onlineTranslateUrl,
   parseTranslation,
+  readerForScript,
   sameLanguage,
   tidyReading,
   TRANSLATE_MAX_CHARS,
@@ -90,5 +91,28 @@ describe('the prompt and the online fallback', () => {
   it('saves the text and its translation together', () => {
     expect(translationNote('こんにちは', 'Hello', 'Japanese', 'English')).toBe('Snipped (Japanese → English):\nこんにちは\n\nTranslation:\nHello')
     expect(translationNote('x', 'y', '', 'English')).toContain('Snipped (→ English)')
+  })
+})
+
+describe('readerForScript', () => {
+  it('uses a downloaded reader for the alphabet it spotted', () => {
+    expect(readerForScript('Japanese', ['jpn'])).toEqual({ use: 'jpn', need: [], name: 'Japanese' })
+    expect(readerForScript('Cyrillic', ['ukr'])).toEqual({ use: 'ukr', need: [], name: 'Russian or Ukrainian' })
+  })
+  it('asks for a reader when none of the right ones is downloaded', () => {
+    expect(readerForScript('Hangul', [])).toEqual({ use: '', need: ['kor'], name: 'Korean' })
+    expect(readerForScript('Han', ['rus'])).toEqual({ use: '', need: ['jpn', 'chi_sim', 'chi_tra'], name: 'Japanese or Chinese' })
+  })
+  it('reads kanji with whichever Chinese or Japanese reader you have', () => {
+    expect(readerForScript('Han', ['chi_tra']).use).toBe('chi_tra')
+    expect(readerForScript('Han', ['chi_sim', 'jpn']).use).toBe('jpn')
+  })
+  it('needs nothing extra for Latin letters or when it can’t tell', () => {
+    expect(readerForScript('Latin', ['jpn'])).toEqual({ use: '', need: [], name: 'Latin letters' })
+    expect(readerForScript(null, [])).toEqual({ use: '', need: [], name: '' })
+  })
+  it('only names readers that exist', () => {
+    for (const s of ['Japanese', 'Han', 'Hangul', 'Cyrillic', 'Greek', 'Arabic', 'Hebrew', 'Devanagari', 'Thai'])
+      for (const c of readerForScript(s, []).need) expect(OCR_LANGS.some((l) => l.code === c)).toBe(true)
   })
 })

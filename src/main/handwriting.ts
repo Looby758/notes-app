@@ -15,7 +15,7 @@ import { logError } from './log'
 // packages are unpacked next to it (electron-builder.yml) and loaded from there.
 const unpacked = (path: string): string => path.replace(/app\.asar([\\/])/, 'app.asar.unpacked$1')
 
-/** Where the extra language readers (screen snip → Translate) are downloaded to; see snipTranslate.ts. */
+/** Where the extra language readers (screen snip → Translate) are downloaded to; see snip.ts. */
 export const ocrLangDir = (): string => join(app.getPath('userData'), 'ocr-langs')
 
 const engPath = (): string => unpacked(join(dirname(require.resolve('@tesseract.js-data/eng/package.json')), '4.0.0_best_int'))
@@ -60,6 +60,46 @@ function worker(langs = 'eng'): Promise<Worker> {
     void done?.then((w) => w.terminate()).catch(() => {})
   }, 5 * 60_000)
   return loading
+}
+
+// Which alphabet a picture is in (Tesseract's "orientation and script" model, shipped with the
+// app, 4 MB), so the snip can pick a language reader by itself. Its own worker, as it needs
+// Tesseract's older engine.
+let osd: Promise<Worker> | null = null
+let osdIdle: ReturnType<typeof setTimeout> | undefined
+
+function osdWorker(): Promise<Worker> {
+  osd ??= createWorker('osd', OEM.TESSERACT_ONLY, {
+    workerPath: unpacked(require.resolve('tesseract.js/src/worker-script/node/index.js')),
+    langPath: unpacked(join(dirname(require.resolve('@tesseract.js-data/osd/package.json')), '4.0.0_best_int')),
+    gzip: true,
+    cacheMethod: 'none',
+    legacyCore: true,
+    legacyLang: true
+  }).catch((err) => {
+    osd = null
+    throw err
+  })
+  clearTimeout(osdIdle)
+  osdIdle = setTimeout(() => {
+    const done = osd
+    osd = null
+    void done?.then((w) => w.terminate()).catch(() => {})
+  }, 5 * 60_000)
+  return osd
+}
+
+/** The alphabet ("Latin", "Japanese", "Han", "Cyrillic"…) of the text in a picture, or null if it can't tell. */
+export async function detectScript(image: Uint8Array): Promise<string | null> {
+  try {
+    const w = await osdWorker()
+    const r = await Promise.race([w.detect(Buffer.from(image)), new Promise<never>((_, reject) => setTimeout(() => reject(new Error('took too long')), 20_000))])
+    return r.data.script || null
+  } catch (err) {
+    // "Too few characters" and the like: just not sure.
+    logError('snip script', err)
+    return null
+  }
 }
 
 // A worker that fails to start never answers, so don't wait for ever.

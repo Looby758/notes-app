@@ -80,6 +80,45 @@ export const OCR_LANGS: OcrLang[] = [
 
 export const ocrLangByCode = (code: unknown): OcrLang | undefined => OCR_LANGS.find((l) => l.code === code)
 
+/**
+ * "Detect automatically": which reader to use for the alphabet Tesseract spotted. `use` is the
+ * reader to read with ('' for the built-in English one); `need` is the readers that would do,
+ * best first, when none of them is downloaded yet. Latin letters need nothing extra: the offline
+ * AI works out which language they are when it translates.
+ */
+export function readerForScript(script: string | null, have: string[]): { use: string; need: string[]; name: string } {
+  const pick = (name: string, codes: string[]): { use: string; need: string[]; name: string } => {
+    const got = codes.find((c) => have.includes(c))
+    return got ? { use: got, need: [], name } : { use: '', need: codes, name }
+  }
+  switch (script) {
+    case 'Japanese':
+    case 'Hiragana':
+    case 'Katakana':
+      return pick('Japanese', ['jpn'])
+    // Kanji on their own look the same as Chinese, so a reader you already have wins.
+    case 'Han':
+      return pick('Japanese or Chinese', ['jpn', 'chi_sim', 'chi_tra'])
+    case 'Hangul':
+    case 'Korean':
+      return pick('Korean', ['kor'])
+    case 'Cyrillic':
+      return pick('Russian or Ukrainian', ['rus', 'ukr'])
+    case 'Greek':
+      return pick('Greek', ['ell'])
+    case 'Arabic':
+      return pick('Arabic', ['ara'])
+    case 'Hebrew':
+      return pick('Hebrew', ['heb'])
+    case 'Devanagari':
+      return pick('Hindi', ['hin'])
+    case 'Thai':
+      return pick('Thai', ['tha'])
+    default:
+      return { use: '', need: [], name: script === 'Latin' ? 'Latin letters' : '' }
+  }
+}
+
 /** Where a reader is downloaded from (jsDelivr's copy of the tesseract.js-data package, pinned to its version). */
 export const ocrLangUrl = (l: OcrLang): string => `https://cdn.jsdelivr.net/npm/@tesseract.js-data/${l.code}@1.0.0/4.0.0_best_int/${l.code}.traineddata.gz`
 

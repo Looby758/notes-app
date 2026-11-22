@@ -188,3 +188,6 @@ body.snip-window #root {
 .snip-problem .snip-actions {
   margin-top: 10px;
 }
+.snip-lang-get .snip-actions {
+  margin-top: 0;
+}

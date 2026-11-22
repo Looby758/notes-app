@@ -341,6 +341,18 @@ export interface AiReply {
 }
 
 /** The offline AI (src/main/localAi.ts): an optional download that runs on this computer's graphics card. */
+/**
+ * What the snip read. `lang`: the extra reader it used ('' for English only). `detected`: the
+ * alphabet it spotted (with "Detect automatically"). `need`: readers that would read it, when
+ * none is downloaded yet (then `text` is empty).
+ */
+export interface SnipReading {
+  text: string
+  lang?: string
+  detected?: string
+  need?: string[]
+}
+
 /** The screen snip's offline translation, or why there isn't one (`problem`). */
 export type SnipTranslation =
   | { from: string; text: string; problem?: undefined; error?: undefined }
@@ -946,8 +958,8 @@ export interface NotesApi {
   snipStatus(): Promise<{ shortcut: string; error?: string }>
   /** Snip window: the picture of the screen (PNG) and the screen's scale factor. */
   snipImage(): Promise<{ png: Uint8Array; scale: number } | null>
-  /** Snip window: the text in part of the picture (read offline), with an extra language reader if it's downloaded. */
-  snipRead(png: Uint8Array, lang?: string): Promise<string>
+  /** Snip window: the text in part of the picture (read offline), with an extra language reader if it's downloaded, or 'auto' to pick one. */
+  snipRead(png: Uint8Array, lang?: string): Promise<SnipReading>
   /** Snip window: which extra language readers are downloaded (codes from OCR_LANGS). */
   snipOcrLangs(): Promise<string[]>
   /** Snip window: downloads one extra language reader (a couple of MB, checked before it's used). */
