@@ -10522,6 +10522,131 @@ a.passwords-text:hover {
   font-size: 16px;
 }
 
+/* ---------- word search (shares the sudoku page's layout) ---------- */
+.wordsearch-inner {
+  max-width: 900px;
+}
+.wordsearch-page.twd .sudoku-head h2 svg,
+.wordsearch-page.twd .sudoku-level.active svg {
+  color: #e5484d;
+}
+.wordsearch-themes {
+  flex-wrap: wrap;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 0 14px;
+}
+.wordsearch-play {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 20px;
+}
+.wordsearch-board {
+  display: grid;
+  grid-template-columns: repeat(var(--ws-cols), var(--ws-cell));
+  grid-auto-rows: var(--ws-cell);
+  padding: 6px;
+  border: 2px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--bg-panel);
+  outline: none;
+  user-select: none;
+  touch-action: none;
+  cursor: pointer;
+}
+.wordsearch-board:focus-visible {
+  border-color: var(--accent);
+}
+.wordsearch-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--text-strong);
+  font-size: calc(var(--ws-cell) * 0.48);
+  font-weight: 600;
+  transition: background 0.12s;
+}
+.wordsearch-cell.found {
+  background: hsl(var(--ws-hue) 70% 50% / 0.32);
+}
+.wordsearch-cell.selected,
+.wordsearch-cell.anchor {
+  background: var(--accent);
+  color: #fff;
+}
+.wordsearch-cell.hinted {
+  animation: wordsearch-flash 0.5s ease-in-out 5 alternate;
+}
+@keyframes wordsearch-flash {
+  to {
+    background: #f5a524;
+    color: #1a1a1a;
+  }
+}
+.wordsearch-board.won .wordsearch-cell:not(.found) {
+  color: var(--text-faint);
+}
+.wordsearch-words {
+  flex: 1;
+  min-width: 180px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-panel);
+}
+.wordsearch-words h3 {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.wordsearch-words ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wordsearch-words li {
+  padding: 2px 6px;
+  border-radius: 5px;
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+.wordsearch-words li.found {
+  background: hsl(var(--ws-hue) 70% 50% / 0.22);
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+.wordsearch-message {
+  align-self: center;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+.wordsearch-message.found {
+  background: var(--text-strong);
+  color: var(--bg);
+}
+.wordsearch-message.miss {
+  background: var(--bg-hover);
+  color: var(--text-muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .wordsearch-cell.hinted {
+    animation: none;
+    background: #f5a524;
+    color: #1a1a1a;
+  }
+}
+
 /* ---------- wordle (shares the sudoku page's layout) ---------- */
 .wordle-page {
   --wordle-right: #3f9b57;
