@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { LocalAiState, MusicMiniCommand, MusicMiniState, NotesApi } from '@shared/types'
+import type { MusicData } from '@shared/musicLibrary'
 
 /** Listens for a message from the main process; returns the way to stop. */
 function on<T>(channel: string, callback: (value: T) => void): () => void {
@@ -612,6 +613,13 @@ const api: NotesApi = {
   musicMoveInPlaylist: (uri, from, to) => ipcRenderer.invoke('music:moveInPlaylist', uri, from, to),
   localMusicLibrary: (fresh) => ipcRenderer.invoke('localMusic:library', fresh),
   localMusicChooseFolder: () => ipcRenderer.invoke('localMusic:chooseFolder'),
+  musicDataGet: () => ipcRenderer.invoke('musicData:get'),
+  musicDataEdit: (edits) => ipcRenderer.invoke('musicData:edit', edits),
+  onMusicDataChanged: (callback) => {
+    const handler = (_e: unknown, data: MusicData): void => callback(data)
+    ipcRenderer.on('musicData:changed', handler)
+    return () => ipcRenderer.removeListener('musicData:changed', handler)
+  },
   openPopout: () => ipcRenderer.invoke('popout:open'),
   popoutSources: () => ipcRenderer.invoke('popout:sources'),
   popoutState: () => ipcRenderer.invoke('popout:state'),

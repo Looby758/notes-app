@@ -8,6 +8,7 @@ import {
   Laptop,
   Link2,
   ListMusic,
+  Maximize2,
   Music,
   NotebookPen,
   Pause,
@@ -47,7 +48,7 @@ import {
   useMusic
 } from '../../store/music'
 import { stopLocal } from '../../store/localMusic'
-import { openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
+import { MUSIC_TAB, openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
 import { errorMessage } from '../../lib/paths'
 import { ItemList } from './ItemList'
 import { Playlists } from './Playlists'
@@ -268,6 +269,9 @@ function Player() {
           </span>
           <button className={`icon-btn ${tab ? 'active' : ''}`} onClick={() => toggleTab(tab ?? (spotify && (status?.connected || !local) ? 'playlists' : 'local'))} title="Playlists, search and your music" data-music-browse>
             <ListMusic size={15} />
+          </button>
+          <button className="icon-btn" onClick={() => openSpecialTab(MUSIC_TAB)} title="Open the Music page: albums, artists, playlists and likes" data-music-open-page>
+            <Maximize2 size={13} />
           </button>
           <button className="icon-btn" onClick={() => setMusicOpen(false)} title="Hide the player (music keeps playing)">
             <X size={14} />

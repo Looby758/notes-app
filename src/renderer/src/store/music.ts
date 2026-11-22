@@ -3,10 +3,11 @@ import { nextRepeat, type MusicAction, type MusicState, type MusicStatus } from 
 import { errorMessage } from '../lib/paths'
 import { useUI } from './ui'
 import { usePrefs } from './prefs'
+import { startMusicData } from './musicData'
 import { songMarkdown, type SongTarget } from '@shared/songLinks'
 import { insertBlockIntoActiveNote } from '../lib/editorController'
 import { notify } from './notify'
-import { loadLocalLibrary, playLocal, useLocalMusic, playLocalPath, localNext, localPause, localPrevious, localRepeat, localSeek, localShuffle, localToggle, localVolume, stopLocal } from './localMusic'
+import { loadLocalLibrary, playLocal, resumeLastSession, useLocalMusic, playLocalPath, localNext, localPause, localPrevious, localRepeat, localSeek, localShuffle, localToggle, localVolume, stopLocal } from './localMusic'
 
 /** The music player in the corner: what's playing (asked for every couple of seconds while it's open). */
 
@@ -284,6 +285,9 @@ export function startMusic(): () => void {
     timer = setTimeout(tick, state?.source === 'account' ? 3000 : 1500)
   }
   if (spotifyOn()) void refreshMusicStatus().catch(() => undefined)
+  // Your own music only: the song you were on is ready to carry on from (paused).
+  else void resumeLastSession()
+  startMusicData()
   void tick()
   const stopMini = startMini()
   return () => {

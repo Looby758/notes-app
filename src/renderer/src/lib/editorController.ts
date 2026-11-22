@@ -90,6 +90,8 @@ export const COUNTDOWNS_TAB = 'countdowns:'
 export const PUBLISHING_TAB = 'publishing:'
 /** Monitor brightness, contrast and input (components/Screens). */
 export const SCREENS_TAB = 'screens:'
+/** Your own music as a full music app (components/Music/MusicPage). */
+export const MUSIC_TAB = 'music:'
 /** A volume for each app (components/Mixer). */
 export const MIXER_TAB = 'mixer:'
 /** The download manager: a queue that pauses, carries on and can wait for the night (components/Downloads). */

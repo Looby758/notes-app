@@ -14,6 +14,7 @@ import type { Sheet } from './sheet'
 import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
 import type { LocalLibrary } from './localMusic'
+import type { MusicData, MusicEdit } from './musicLibrary'
 import type { MixerState } from './mixer'
 import type { MonitorAction, MonitorSaved, MonitorSetting, MonitorsStatus, MonitorTarget } from './monitors'
 import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
@@ -1173,6 +1174,12 @@ export interface NotesApi {
   localMusicLibrary(fresh?: boolean): Promise<LocalLibrary>
   /** Asks which folder your music is in, then lists it. */
   localMusicChooseFolder(): Promise<LocalLibrary>
+  /** Playlists, liked songs, ratings and play counts for your own music (orbit-music.json in the music folder). */
+  musicDataGet(): Promise<MusicData>
+  /** Makes changes to it and saves them; returns it afterwards. */
+  musicDataEdit(edits: MusicEdit[]): Promise<MusicData>
+  /** It changed (here, in another window, or from the phone through Google Drive). */
+  onMusicDataChanged(callback: (data: MusicData) => void): () => void
   // Your playlists (`uri` is spotify:playlist:…; songs only for playlists you can edit)
   musicPlaylistSongs(uri: string): Promise<MusicItem[]>
   /** Makes a private playlist. */

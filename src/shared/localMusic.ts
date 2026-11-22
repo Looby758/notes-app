@@ -17,6 +17,8 @@ export interface LocalSong {
   durationMs: number
   /** The file has an album picture (served from vault://musicart/<path>). */
   art: boolean
+  /** When the file was last changed (roughly when it was added), for Recently added. */
+  added?: number
 }
 
 export interface LocalLibrary {

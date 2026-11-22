@@ -4,6 +4,8 @@ import { nextRepeat, type MusicRepeat, type MusicState } from '@shared/spotify'
 import { errorMessage } from '../lib/paths'
 import { unloadMedia } from '../lib/media'
 import { useMusic } from './music'
+import { queueMove, queuePlayNext, queueRemove } from '@shared/musicLibrary'
+import { recordPlay } from './musicData'
 
 /**
  * Playing your own music files, in the app itself (an <audio> element). While one is loaded the player
@@ -65,6 +67,15 @@ function player(): HTMLAudioElement {
     const { state, at } = useMusic.getState()
     if (state?.source === 'local' && Math.abs(state.positionMs + (Date.now() - at) - audio!.currentTime * 1000) > 400) publish()
   })
+  // A play counts after 30 seconds (or at the end of a shorter song), once per time it's started.
+  audio.addEventListener('timeupdate', () => {
+    if (counted || !audio || audio.currentTime < Math.min(30, (audio.duration || 60) - 1)) return
+    counted = true
+    const song = current()
+    if (song) recordPlay(song)
+  })
+  audio.addEventListener('timeupdate', saveResumeSoon)
+  audio.addEventListener('pause', saveResume)
   audio.addEventListener('ended', () => void songEnded())
   audio.addEventListener('error', () => {
     const song = current()
@@ -102,10 +113,14 @@ function publish(): void {
   }
 }
 
+/** Whether this play of the song has been counted yet. */
+let counted = false
+
 async function start(index: number): Promise<void> {
   const { queue } = useLocalMusic.getState()
   const song = queue[index]
   if (!song) return
+  counted = false
   useLocalMusic.setState({ index })
   const a = player()
   a.src = localSongUrl(song.path)
@@ -289,6 +304,115 @@ export function localDuck(level: number): void {
   if (!g) return
   g.duck.gain.cancelScheduledValues(g.ctx.currentTime)
   g.duck.gain.setTargetAtTime(next, g.ctx.currentTime, down ? 0.06 : 0.25)
+}
+
+// ---------- Changing Up next ----------
+
+/** After the queue changes: with shuffle off, the order you picked follows it. */
+function queueChanged(queue: LocalSong[], index: number): void {
+  useLocalMusic.setState({ queue, index })
+  if (!useLocalMusic.getState().shuffle) ordered = queue
+  saveResume()
+}
+
+/** Plays these songs straight after the one playing (or starts them if nothing's playing). */
+export async function playNext(songs: LocalSong[]): Promise<void> {
+  if (!songs.length) return
+  const { queue, index } = useLocalMusic.getState()
+  if (!useMusic.getState().local || !queue.length) return playLocal(songs, 0)
+  queueChanged(queuePlayNext(queue, index, songs), index)
+}
+
+/** Puts these songs at the end of Up next (or starts them if nothing's playing). */
+export async function addToQueue(songs: LocalSong[]): Promise<void> {
+  if (!songs.length) return
+  const { queue, index } = useLocalMusic.getState()
+  if (!useMusic.getState().local || !queue.length) return playLocal(songs, 0)
+  queueChanged([...queue, ...songs], index)
+}
+
+/** Moves a song in Up next (positions in the whole queue). */
+export function moveInQueue(from: number, to: number): void {
+  const { queue, index } = useLocalMusic.getState()
+  const next = queueMove(queue, index, from, to)
+  queueChanged(next.queue, next.index)
+}
+
+/** Takes a song out of Up next (a position in the whole queue). */
+export function removeFromQueue(at: number): void {
+  const { queue, index } = useLocalMusic.getState()
+  const next = queueRemove(queue, index, at)
+  queueChanged(next.queue, next.index)
+}
+
+/** Empties Up next, keeping the song playing. */
+export function clearUpNext(): void {
+  const { queue, index } = useLocalMusic.getState()
+  queueChanged(queue.slice(0, index + 1), index)
+}
+
+// ---------- Carrying on where you left off ----------
+
+const RESUME_KEY = 'orbit.musicResume'
+interface Resume {
+  queue: string[]
+  index: number
+  positionMs: number
+  shuffle: boolean
+}
+
+let resumeTimer: ReturnType<typeof setTimeout> | undefined
+function saveResumeSoon(): void {
+  if (resumeTimer) return
+  resumeTimer = setTimeout(() => {
+    resumeTimer = undefined
+    saveResume()
+  }, 5000)
+}
+
+function saveResume(): void {
+  const { queue, index, shuffle } = useLocalMusic.getState()
+  if (!queue.length || !useMusic.getState().local) return
+  try {
+    // Only the next few hundred songs, so the saved list stays small.
+    const from = Math.max(0, index - 50)
+    const value: Resume = { queue: queue.slice(from, index + 500).map((s) => s.path), index: index - from, positionMs: Math.round((audio?.currentTime ?? 0) * 1000), shuffle }
+    localStorage.setItem(RESUME_KEY, JSON.stringify(value))
+  } catch {
+    // Only a convenience.
+  }
+}
+
+let resumed = false
+/**
+ * Loads the song you were on when Orbit closed, paused at the same second, with the same Up next.
+ * Nothing plays until you press play. Only once, and only if nothing else has started.
+ */
+export async function resumeLastSession(): Promise<void> {
+  if (resumed) return
+  resumed = true
+  let saved: Resume | null = null
+  try {
+    saved = JSON.parse(localStorage.getItem(RESUME_KEY) ?? 'null')
+  } catch {
+    saved = null
+  }
+  if (!saved || !Array.isArray(saved.queue) || !saved.queue.length || useMusic.getState().local) return
+  if (!useLocalMusic.getState().library) await loadLocalLibrary()
+  const byPath = new Map((useLocalMusic.getState().library?.songs ?? []).map((s) => [s.path, s]))
+  const songs = saved.queue.map((p) => byPath.get(p)).filter((s): s is LocalSong => !!s)
+  const playing = byPath.get(saved.queue[saved.index] ?? '')
+  const index = playing ? songs.indexOf(playing) : -1
+  if (index < 0 || useMusic.getState().local) return
+  ordered = songs
+  useLocalMusic.setState({ queue: songs, index, shuffle: !!saved.shuffle })
+  const a = player()
+  counted = false
+  a.src = localSongUrl(playing!.path)
+  const at = Math.max(0, (saved.positionMs ?? 0) / 1000)
+  a.addEventListener('loadedmetadata', () => (a.currentTime = Math.min(at, Math.max(0, a.duration - 1))), { once: true })
+  useMusic.setState({ local: true, error: null })
+  publish()
 }
 
 /** Skips to a song further along the queue. */

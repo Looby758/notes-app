@@ -135,7 +135,7 @@ async function scan(): Promise<LocalLibrary> {
   } catch (err) {
     logError('saving local-music.json', err)
   }
-  return { folder, songs: sortSongs(songs.map(({ mtime: _m, size: _s, ...song }) => song)), truncated }
+  return { folder, songs: sortSongs(songs.map(({ mtime, size: _s, ...song }) => ({ ...song, added: Math.round(mtime) }))), truncated }
 }
 
 /** Your songs; `fresh` looks through the folder again even if it was read already this session. */
