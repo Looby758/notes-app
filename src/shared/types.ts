@@ -1009,8 +1009,18 @@ export interface NotesApi {
   /** Shows the "Orbit Snip" shortcut in File Explorer (right-click → Pin to taskbar). */
   snipShowShortcut(): Promise<void>
   snipStatus(): Promise<{ shortcut: string; error?: string }>
-  /** Snip window: the picture of the screen (PNG) and the screen's scale factor. */
-  snipImage(): Promise<{ png: Uint8Array; scale: number; mode: 'text' | 'picture' } | null>
+  /** Snip window: the picture of its monitor (raw BGRA pixels), the snip's kind and the screen's scale factor. */
+  snipImage(): Promise<{ bitmap: Uint8Array; width: number; height: number; scale: number; mode: 'text' | 'picture' } | null>
+  /** Snip window: this snip's picture is drawn, so show the window. */
+  snipDrawn(): Promise<void>
+  /** Snip window: shown and painted, so it can be seen (it's see-through until then, so there's no flash). */
+  snipPainted(): Promise<void>
+  /** Snip window: a new snip has a picture for this monitor. */
+  onSnipNew(callback: () => void): () => void
+  /** Snip window: it's on screen now (still see-through until snipPainted). */
+  onSnipVisible(callback: () => void): () => void
+  /** Snip window: the snip ended and this window was hidden, ready for the next one. */
+  onSnipReset(callback: () => void): () => void
   /** Snip window: the text in part of the picture (read offline), with an extra language reader if it's downloaded, or 'auto' to pick one. */
   snipRead(png: Uint8Array, lang?: string): Promise<SnipReading>
   /** Snip window: which extra language readers are downloaded (codes from OCR_LANGS). */

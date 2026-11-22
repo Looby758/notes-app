@@ -104,9 +104,11 @@ export function openCapture(): void {
   else reveal()
 }
 
-/** Hides the summon bar (e.g. before a screen snip, so it isn't in the picture). */
-export function hideCaptureWindow(): void {
-  captureWin?.hide()
+/** Hides the summon bar (e.g. before a screen snip, so it isn't in the picture). True if it was showing. */
+export function hideCaptureWindow(): boolean {
+  const showing = !!captureWin && !captureWin.isDestroyed() && captureWin.isVisible()
+  if (showing) captureWin!.hide()
+  return showing
 }
 
 /**

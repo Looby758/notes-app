@@ -1,4 +1,4 @@
-import { BrowserWindow, clipboard, desktopCapturer, globalShortcut, ipcMain, nativeImage, net, Notification, screen } from 'electron'
+import { app, BrowserWindow, clipboard, desktopCapturer, globalShortcut, ipcMain, nativeImage, net, Notification, screen } from 'electron'
 import { createHash } from 'crypto'
 import { existsSync, mkdirSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -30,9 +30,30 @@ import { acceleratorLabel, IS_MAC, SYSTEM_NAME } from '@shared/platform'
  * Tool: click, drag, paste anywhere.
  */
 
-/** One snip window per monitor, each over a still picture of its own monitor. */
+/** A still picture of one monitor, as raw pixels (no PNG to encode or decode, so it's quick). */
+interface Shot {
+  bitmap: Buffer
+  width: number
+  height: number
+  scale: number
+}
+
+/**
+ * Snip windows are made ahead of time, one per monitor, and kept hidden with their page loaded,
+ * so a snip only has to take the picture and show them: no window to make or page to load, and
+ * no black screen while it does. Each is shown only once its picture is drawn.
+ */
+const ready = new Map<number, BrowserWindow>()
+/** The monitor's size and place each ready window was made for (a window's own bounds can read a little differently). */
+const madeFor = new WeakMap<BrowserWindow, Electron.Rectangle>()
+/** Every snip window, by webContents id (what their calls come from). */
 const wins = new Map<number, BrowserWindow>()
-const shots = new Map<number, { png: Buffer; scale: number }>()
+/** This snip's picture for each window, by webContents id. */
+const shots = new Map<number, Shot>()
+/** The windows in the snip that's open now. */
+const active = new Set<BrowserWindow>()
+/** The monitor the pointer was on, whose window gets the keyboard. */
+let focusDisplay = -1
 let registered = ''
 /** What the open snip does with its box. */
 let mode: SnipMode = 'text'
@@ -44,9 +65,9 @@ interface Hooks {
 }
 let hooks: Hooks
 
-const openWins = (): BrowserWindow[] => [...wins.values()].filter((w) => !w.isDestroyed())
+const openWins = (): BrowserWindow[] => [...active].filter((w) => !w.isDestroyed())
 
-/** Opening one now (between pressing and the windows existing), so a second press doesn't open two sets. */
+/** Opening one now (between pressing and the windows showing), so a second press doesn't open two. */
 let starting = false
 
 export async function startSnip(as: SnipMode = 'text'): Promise<void> {
@@ -54,7 +75,7 @@ export async function startSnip(as: SnipMode = 'text'): Promise<void> {
   const under = screen.getDisplayNearestPoint(cursor)
   if (starting) return
   if (openWins().length) {
-    // Already snipping: the windows are one per webContents, so find the one on this monitor.
+    // Already snipping: focus the one on this monitor.
     const here = openWins().find((w) => {
       const b = w.getBounds()
       return cursor.x >= b.x && cursor.x < b.x + b.width && cursor.y >= b.y && cursor.y < b.y + b.height
@@ -70,14 +91,99 @@ export async function startSnip(as: SnipMode = 'text'): Promise<void> {
   }
 }
 
+const sameBounds = (a: Electron.Rectangle, b: Electron.Rectangle): boolean => a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height
+
+/** A hidden snip window for this monitor, with its page loading or loaded. */
+function windowFor(display: Electron.Display): BrowserWindow {
+  const have = ready.get(display.id)
+  if (have && !have.isDestroyed()) {
+    const was = madeFor.get(have)
+    if (was && sameBounds(was, display.bounds)) return have
+    have.destroy()
+  }
+  const w = new BrowserWindow({
+    ...display.bounds,
+    show: false,
+    frame: false,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    hasShadow: false,
+    enableLargerThanScreen: true,
+    alwaysOnTop: true,
+    backgroundColor: '#000000',
+    title: 'Screen snip',
+    ...(IS_MAC ? { type: 'panel' } : {}),
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      // Hidden between snips: it must still draw the next picture before it's shown.
+      backgroundThrottling: false
+    }
+  })
+  const contentsId = w.webContents.id
+  madeFor.set(w, { ...display.bounds })
+  ready.set(display.id, w)
+  wins.set(contentsId, w)
+  w.setAlwaysOnTop(true, 'screen-saver')
+  if (IS_MAC) w.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  w.setBounds(display.bounds)
+  w.on('closed', () => {
+    wins.delete(contentsId)
+    shots.delete(contentsId)
+    if (ready.get(display.id) === w) ready.delete(display.id)
+    const wasOpen = active.delete(w)
+    // Closed while snipping (Alt+F4): end the snip on every monitor.
+    if (wasOpen) endSnip()
+  })
+  // Its page stopped: make a fresh one next time.
+  w.webContents.on('render-process-gone', () => {
+    if (!w.isDestroyed()) w.destroy()
+  })
+  loadRenderer(w, 'snip')
+  return w
+}
+
+/** Makes (or puts right) the hidden snip windows: one per monitor, none for unplugged ones. */
+function warm(): void {
+  if (openWins().length || starting || closingDown) return
+  const displays = screen.getAllDisplays()
+  for (const [id, w] of ready) if (!displays.some((d) => d.id === id) && !w.isDestroyed()) w.destroy()
+  for (const d of displays) windowFor(d)
+}
+/** Orbit's last other window has closed: the hidden snip windows go too, so Orbit can quit. */
+let closingDown = false
+function closeWithLastWindow(): void {
+  const others = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed() && !wins.has(w.webContents.id))
+  if (others.length) return
+  closingDown = true
+  clearTimeout(warmTimer)
+  for (const w of [...wins.values()]) if (!w.isDestroyed()) w.destroy()
+}
+let warmTimer: NodeJS.Timeout | undefined
+const warmSoon = (ms = 1500): void => {
+  clearTimeout(warmTimer)
+  warmTimer = setTimeout(() => {
+    try {
+      warm()
+    } catch (err) {
+      logError('snip windows', err)
+    }
+  }, ms)
+}
+
 async function openSnip(as: SnipMode, under: Electron.Display): Promise<void> {
   mode = as
-  hideCaptureWindow()
+  // Give the summon bar, if it was up, a moment to leave the screen (otherwise no waiting).
+  if (hideCaptureWindow()) await new Promise((r) => setTimeout(r, 120))
   const displays = screen.getAllDisplays()
-  const pictures = new Map<number, { png: Buffer; scale: number }>()
+  const pictures = new Map<number, Shot>()
   try {
-    // Give a just-hidden window a moment to leave the screen.
-    await new Promise((r) => setTimeout(r, 120))
     // Big enough for the largest monitor at full resolution (each picture keeps its own shape).
     const thumbnailSize = {
       width: Math.max(...displays.map((d) => Math.round(d.size.width * d.scaleFactor))),
@@ -96,7 +202,7 @@ async function openSnip(as: SnipMode, under: Electron.Display): Promise<void> {
       const size = source.thumbnail.getSize()
       // A smaller monitor's picture may come back bigger than the monitor: bring it to size.
       const pic = size.width > width ? source.thumbnail.resize({ width, height, quality: 'best' }) : source.thumbnail
-      pictures.set(d.id, { png: pic.toPNG(), scale: d.scaleFactor })
+      pictures.set(d.id, { bitmap: pic.toBitmap(), ...pic.getSize(), scale: d.scaleFactor })
     }
     if (!pictures.size) throw new Error('no picture')
   } catch (err) {
@@ -113,54 +219,43 @@ async function openSnip(as: SnipMode, under: Electron.Display): Promise<void> {
     return
   }
 
+  focusDisplay = under.id
   for (const display of displays) {
     const picture = pictures.get(display.id)
     if (!picture) continue
-    const w = new BrowserWindow({
-      ...display.bounds,
-      show: false,
-      frame: false,
-      resizable: false,
-      movable: false,
-      minimizable: false,
-      maximizable: false,
-      fullscreenable: false,
-      skipTaskbar: true,
-      hasShadow: false,
-      enableLargerThanScreen: true,
-      alwaysOnTop: true,
-      backgroundColor: '#000000',
-      title: 'Screen snip',
-      ...(IS_MAC ? { type: 'panel' } : {}),
-      webPreferences: {
-        preload: join(__dirname, '../preload/index.js'),
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true
-      }
-    })
-    const contentsId = w.webContents.id
-    wins.set(contentsId, w)
-    shots.set(contentsId, picture)
-    w.setAlwaysOnTop(true, 'screen-saver')
-    if (IS_MAC) w.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+    const w = windowFor(display)
     w.setBounds(display.bounds)
-    w.on('closed', () => {
-      wins.delete(contentsId)
-      shots.delete(contentsId)
-      // Closing one (Esc, or done with it) closes the snip on every monitor.
-      closeSnip()
-    })
-    const isUnder = display.id === under.id
-    w.webContents.once('did-finish-load', () => {
-      if (w.isDestroyed()) return
-      if (isUnder) {
-        w.show()
-        w.focus()
-      } else w.showInactive()
-    })
-    loadRenderer(w, 'snip')
+    shots.set(w.webContents.id, picture)
+    active.add(w)
+    // A loaded page is told there's a new picture; one still loading asks for it as it starts.
+    if (!w.webContents.isLoading()) w.webContents.send('snip:new')
   }
+}
+
+/** A window's picture is drawn: show it (see-through for a moment, until it has painted on screen). */
+function showDrawn(w: BrowserWindow): void {
+  if (w.isDestroyed() || !active.has(w) || w.isVisible()) return
+  const display = [...ready.entries()].find(([, x]) => x === w)?.[0]
+  w.setOpacity(0)
+  if (display === focusDisplay) {
+    w.show()
+    w.focus()
+  } else w.showInactive()
+  w.webContents.send('snip:visible')
+  // In case the page doesn't say it has painted.
+  setTimeout(() => !w.isDestroyed() && w.setOpacity(1), 250)
+}
+
+/** Ends the snip: its windows are hidden and emptied, ready for the next one. */
+function endSnip(): void {
+  for (const w of openWins()) {
+    w.hide()
+    w.webContents.send('snip:reset')
+  }
+  active.clear()
+  shots.clear()
+  // A monitor added or moved while snipping.
+  warmSoon()
 }
 
 const ocrFile = (code: string): string => join(ocrLangDir(), `${code}.traineddata.gz`)
@@ -248,10 +343,6 @@ function copiedNote(image: Electron.NativeImage): void {
   }
 }
 
-function closeSnip(): void {
-  for (const w of openWins()) w.close()
-}
-
 /** (Re)registers the system-wide snip shortcut. */
 export function applySnipShortcut(accel: string): void {
   if (registered === accel) return
@@ -269,10 +360,21 @@ export function applySnipShortcut(accel: string): void {
 
 export function setupSnip(h: Hooks): void {
   hooks = h
+  // Ready a few seconds after Orbit starts, and again when monitors are plugged in, moved or changed.
+  warmSoon(4000)
+  // (A Mac app keeps running with no windows, so there they can stay.)
+  if (!IS_MAC) {
+    const watch = (win: BrowserWindow): void => void win.once('closed', () => setImmediate(closeWithLastWindow))
+    BrowserWindow.getAllWindows().forEach(watch)
+    app.on('browser-window-created', (_e, win) => watch(win))
+  }
+  screen.on('display-added', () => warmSoon())
+  screen.on('display-removed', () => warmSoon())
+  screen.on('display-metrics-changed', () => warmSoon())
   ipcMain.handle('snip:start', (_e, as?: SnipMode) => startSnip(as === 'picture' ? 'picture' : 'text'))
   // A picture snip's box (or the text snip's "Copy picture"): onto the clipboard, ready to paste anywhere.
   ipcMain.handle('snip:copyPicture', (_e, png: Uint8Array) => {
-    closeSnip()
+    endSnip()
     if (!(png instanceof Uint8Array) || png.length > 80 * 1024 * 1024) return
     const image = nativeImage.createFromBuffer(Buffer.from(png))
     if (image.isEmpty()) return
@@ -283,11 +385,21 @@ export function setupSnip(h: Hooks): void {
   // Each monitor's snip window gets the picture of its own monitor.
   ipcMain.handle('snip:image', (e) => {
     const shot = shots.get(e.sender.id)
-    return shot ? { png: new Uint8Array(shot.png), scale: shot.scale, mode } : null
+    return shot ? { bitmap: new Uint8Array(shot.bitmap.buffer, shot.bitmap.byteOffset, shot.bitmap.byteLength), width: shot.width, height: shot.height, scale: shot.scale, mode } : null
+  })
+  // Its picture is drawn (still hidden): show it.
+  ipcMain.handle('snip:drawn', (e) => {
+    const w = wins.get(e.sender.id)
+    if (w) showDrawn(w)
+  })
+  // …and it has painted on screen: now it can be seen.
+  ipcMain.handle('snip:painted', (e) => {
+    const w = wins.get(e.sender.id)
+    if (w && !w.isDestroyed() && active.has(w)) w.setOpacity(1)
   })
   // A box was started on one monitor: the others drop theirs, so there's only ever one.
   ipcMain.handle('snip:boxing', (e) => {
-    for (const [id, w] of wins) if (id !== e.sender.id && !w.isDestroyed()) w.webContents.send('snip:clear')
+    for (const w of openWins()) if (w.webContents.id !== e.sender.id) w.webContents.send('snip:clear')
     wins.get(e.sender.id)?.focus()
   })
   // `lang`: an extra language reader to use with English (only once it's downloaded), or 'auto'
@@ -307,10 +419,10 @@ export function setupSnip(h: Hooks): void {
   ipcMain.handle('snip:ocrLangs', () => OCR_LANGS.filter((l) => ocrDownloaded(l.code)).map((l) => l.code))
   ipcMain.handle('snip:getOcrLang', (_e, code: string) => getOcrLang(String(code)))
   ipcMain.handle('snip:translate', (_e, text: string, target: string) => translate(String(text ?? '').trim(), isTarget(target) ? target : 'English'))
-  ipcMain.handle('snip:close', () => closeSnip())
+  ipcMain.handle('snip:close', () => endSnip())
   // "Report bug": the boxed part of the screen goes to App Studio as a new bug, with this picture.
   ipcMain.handle('snip:bug', (_e, png: Uint8Array) => {
-    closeSnip()
+    endSnip()
     hooks.showMain()
     const main = hooks.getMain()
     if (main && !main.isDestroyed() && png instanceof Uint8Array && png.length < 40 * 1024 * 1024) main.webContents.send('appstudio:bug', png)
@@ -318,7 +430,7 @@ export function setupSnip(h: Hooks): void {
   // What to do with the text: done here so it works whether or not Orbit's window is open.
   ipcMain.handle('snip:send', (_e, action: 'copy' | 'note' | 'web' | 'translate-online' | 'ask' | 'setup-ai', text: string, target?: string) => {
     const t = String(text).slice(0, 20000)
-    closeSnip()
+    endSnip()
     if (action === 'copy') {
       clipboard.writeText(t)
       return

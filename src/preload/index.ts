@@ -484,6 +484,23 @@ const api: NotesApi = {
   snipTranslate: (text, target) => ipcRenderer.invoke('snip:translate', text, target),
   snipClose: () => ipcRenderer.invoke('snip:close'),
   snipBoxing: () => ipcRenderer.invoke('snip:boxing'),
+  snipDrawn: () => ipcRenderer.invoke('snip:drawn'),
+  snipPainted: () => ipcRenderer.invoke('snip:painted'),
+  onSnipNew: (callback) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('snip:new', handler)
+    return () => ipcRenderer.removeListener('snip:new', handler)
+  },
+  onSnipVisible: (callback) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('snip:visible', handler)
+    return () => ipcRenderer.removeListener('snip:visible', handler)
+  },
+  onSnipReset: (callback) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('snip:reset', handler)
+    return () => ipcRenderer.removeListener('snip:reset', handler)
+  },
   onSnipClear: (callback) => {
     const handler = (): void => callback()
     ipcRenderer.on('snip:clear', handler)
