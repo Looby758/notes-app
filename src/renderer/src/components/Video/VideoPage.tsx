@@ -230,6 +230,9 @@ function lastFrameDest(): Dest | null {
 /** 75.4 → "1:15.40": the time down to the frame, shown while stepping frame by frame. */
 const preciseTime = (t: number): string => `${formatTime(t)}.${String(Math.floor((t % 1) * 100)).padStart(2, '0')}`
 
+/** How many players have each video open (a closed one lets go of its file only when none do). */
+const openPlayers = new Map<string, number>()
+
 /** `offset`: where the stream's own clock starts in the video; `target`: where to jump to once it's loaded. */
 type Source = { mode: PlayMode; src: string; offset: number; target: number } | { mode: 'needs-helper' | 'broken' }
 
@@ -248,12 +251,14 @@ function firstSubtitles(info: VideoInfo): SubtitleChoice {
 function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
   const video = useRef<HTMLVideoElement | null>(null)
   // A video taken off the page is emptied, so the window stops reading its file straight away.
+  // Not at once: React's checks in a test copy (developer mode) take it off and put the same one
+  // straight back, and emptying it then left the player loading forever.
   const videoRef = useCallback((el: HTMLVideoElement | null) => {
     video.current = el
     return el
       ? () => {
           if (video.current === el) video.current = null
-          unloadMedia(el)
+          setTimeout(() => video.current !== el && !el.isConnected && unloadMedia(el), 0)
         }
       : undefined
   }, [])
@@ -361,7 +366,14 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
   useEffect(() => () => void window.api.stopVideoStream(session), [session])
   // Closing the player (or moving on to another video) lets go of this one, so it can be deleted or
   // moved without closing Orbit.
-  useEffect(() => () => void window.api.releaseVideo(path).catch(() => undefined), [path])
+  // (After a moment, and only if no player has it open again: see videoRef.)
+  useEffect(() => {
+    openPlayers.set(path, (openPlayers.get(path) ?? 0) + 1)
+    return () => {
+      openPlayers.set(path, (openPlayers.get(path) ?? 1) - 1)
+      setTimeout(() => !openPlayers.get(path) && void window.api.releaseVideo(path).catch(() => undefined), 0)
+    }
+  }, [path])
 
   /** The window couldn't play it this way: try the next. */
   const fail = (mode: PlayMode): void => {
