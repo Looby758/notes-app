@@ -2,7 +2,7 @@ import { app, ipcMain, net, safeStorage } from 'electron'
 import { execFile } from 'child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'path'
-import { copyFolderName, githubRepo, isDownloadFile, isGitHubImage, parseAudit, parseOutdated, TOKEN_NOT_ALLOWED, type HealthReport, type AppInfo, type TestCopy, type GitHubStatus, type MergedPull, type PullRequest, type Release } from '@shared/appStudio'
+import { copyFolderName, githubRepo, isDownloadFile, isGitHubImage, parseAudit, parseOutdated, TOKEN_NOT_ALLOWED, type HealthReport, type BugReport, type AppInfo, type TestCopy, type GitHubStatus, type MergedPull, type PullRequest, type Release } from '@shared/appStudio'
 import { appNameProblem, appSlug, starterFiles, STARTERS, type MadeApp, type NewApp } from '@shared/appStarters'
 import { logError } from './log'
 import { TEST_COPY } from './testCopy'
@@ -352,6 +352,36 @@ async function setReleaseNotes(repo: string, tag: string, body: string, title: s
   return toRelease(r)
 }
 
+interface ApiIssue {
+  number: number
+  title: string
+  body: string | null
+  user: { login: string } | null
+  html_url: string
+  created_at: string
+  labels: (string | { name?: string })[]
+  comments: number
+  pull_request?: unknown
+}
+
+/** The open issues on a repository (people's bug reports and ideas), leaving out pull requests. */
+async function issues(repo: string): Promise<BugReport[]> {
+  const list = await github<ApiIssue[]>(`/repos/${repo}/issues?state=open&per_page=40&sort=created&direction=desc`)
+  return list
+    .filter((i) => !i.pull_request)
+    .map((i) => ({
+      repo,
+      number: i.number,
+      title: i.title,
+      body: i.body ?? '',
+      author: i.user?.login ?? '',
+      url: i.html_url,
+      createdAt: i.created_at,
+      labels: i.labels.map((l) => (typeof l === 'string' ? l : (l.name ?? ''))).filter(Boolean),
+      comments: i.comments
+    }))
+}
+
 /** Marks a release as a pre-release (so it isn't the latest, and apps that update themselves skip it) or back again. */
 async function setPrerelease(repo: string, tag: string, prerelease: boolean): Promise<Release> {
   const list = await github<ApiRelease[]>(`/repos/${repo}/releases?per_page=30`)
@@ -507,6 +537,17 @@ export function setupAppStudio(): void {
     if (!validRepo(repo) || typeof tag !== 'string' || !/^[\w.+-]{1,60}$/.test(tag)) throw new Error('Not allowed')
     needToken()
     return setPrerelease(repo, tag, !!prerelease)
+  })
+  ipcMain.handle('apps:issues', (_e, repo: unknown) => {
+    if (!validRepo(repo)) throw new Error('Not allowed')
+    return issues(repo)
+  })
+  ipcMain.handle('apps:closeIssue', async (_e, repo: unknown, number: unknown, comment: unknown) => {
+    if (!validRepo(repo) || !Number.isInteger(number) || (number as number) < 1) throw new Error('Not allowed')
+    needToken()
+    const text = typeof comment === 'string' ? comment.trim().slice(0, 2000) : ''
+    if (text) await github(`/repos/${repo}/issues/${number}/comments`, { method: 'POST', body: { body: text }, doing: 'comment on issues', needs: 'Issues' })
+    await github(`/repos/${repo}/issues/${number}`, { method: 'PATCH', body: { state: 'closed', state_reason: 'completed' }, doing: 'close issues', needs: 'Issues' })
   })
   ipcMain.handle('apps:copies', (_e, folder: unknown) => (validFolder(folder) ? copies(folder) : []))
   ipcMain.handle('apps:addCopy', (_e, folder: unknown, branch: unknown) => {

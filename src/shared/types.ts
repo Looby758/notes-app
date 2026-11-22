@@ -1,5 +1,5 @@
 import type { MadeApp, NewApp } from './appStarters'
-import type { AppInfo, GitHubStatus, HealthReport, MergedPull, PullRequest, Release, TestCopy } from './appStudio'
+import type { AppInfo, BugReport, GitHubStatus, HealthReport, MergedPull, PullRequest, Release, TestCopy } from './appStudio'
 import type { DriveSpace, ExplorerEntry, ExplorerPlace, PasteMode, PcIndexStatus } from './explorer'
 import type { FileTagStore, TagColour } from './fileTags'
 import type { BinListing } from './recycleBin'
@@ -1479,6 +1479,10 @@ export interface NotesApi {
   appsSetPrerelease(repo: string, tag: string, prerelease: boolean): Promise<Release>
   /** Starts a new app from a starter: its folder, files, git repository and (if asked) GitHub repository. */
   appsCreateApp(req: NewApp): Promise<MadeApp>
+  /** The open issues on an app's repository: bug reports from people using it. */
+  appsIssues(repo: string): Promise<BugReport[]>
+  /** Closes an issue on GitHub, with a comment first if one is given. */
+  appsCloseIssue(repo: string, number: number, comment?: string): Promise<void>
   /** Checks an app's npm packages: newer versions, and known security problems (npm outdated and npm audit). */
   appsHealth(folder: string): Promise<HealthReport>
   appsMerge(repo: string, number: number): Promise<void>

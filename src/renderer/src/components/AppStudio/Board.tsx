@@ -26,6 +26,8 @@ import { useUI } from '../../store/ui'
 import { notify } from '../../store/notify'
 import { vaultUrl } from '../../lib/fileKinds'
 import { pictureAsPng } from '../../lib/boardPictures'
+import { closeReport, useAppReports } from '../../store/appReports'
+import Reports from './Reports'
 
 /** An app as the board sees it: its name, repository (if on GitHub) and the key its items are saved under. */
 interface BoardApp {
@@ -129,6 +131,7 @@ export default function Board() {
           <Camera size={14} /> Snip a bug
         </button>
       </div>
+      {loaded && <Reports app={app} />}
       {!loaded ? (
         <p className="appstudio-empty">Loading…</p>
       ) : (
@@ -264,6 +267,7 @@ function Card({ item, picked, onDrop, onCopy, onSend }: { item: BoardItem; picke
         </button>
       </div>
       {item.details && <p className="board-card-details">{item.details}</p>}
+      {item.issue && <ReportStatus item={item} />}
       {(item.pull || item.sentAt) && (
         <div className="board-card-status">
           {item.pull ? (
@@ -286,6 +290,46 @@ function Card({ item, picked, onDrop, onCopy, onSend }: { item: BoardItem; picke
         </div>
       )}
     </article>
+  )
+}
+
+/** A card made from someone's report: a link to it, and once the card is done, a button to tell them it's fixed (closing the report). */
+function ReportStatus({ item }: { item: BoardItem }) {
+  const [repo, num] = (item.issue ?? '').split('#')
+  const report = useAppReports((s) => s.byRepo[repo]?.reports.find((r) => r.number === Number(num)))
+  const connected = useAppStudio((s) => !!s.github?.connected)
+  const [busy, setBusy] = useState(false)
+  const tell = async (): Promise<void> => {
+    if (!report) return
+    setBusy(true)
+    try {
+      await closeReport(report, 'Thanks for reporting this! It’s fixed now, and the fix comes in the next update.')
+      notify(`Told ${report.author} it’s fixed and closed the report.`, 'info')
+    } catch (err) {
+      notify(err)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="board-card-status">
+      <a href={`https://github.com/${repo}/issues/${num}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title="The report this came from">
+        <Bug size={11} /> Report #{num}
+      </a>
+      {item.column === 'done' && report && connected && (
+        <button
+          className="link-button"
+          disabled={busy}
+          title="Comments on the report that it’s fixed and closes it"
+          onClick={(e) => {
+            e.stopPropagation()
+            void tell()
+          }}
+        >
+          {busy ? 'Telling them…' : 'Tell them it’s fixed'}
+        </button>
+      )}
+    </div>
   )
 }
 

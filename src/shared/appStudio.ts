@@ -161,6 +161,8 @@ export interface BoardItem {
   sentAt?: string
   /** The pull request Claude opened for it ("owner/name#12"), once matched. */
   pull?: string
+  /** The bug report (a GitHub issue, "owner/name#7") it came from. */
+  issue?: string
 }
 
 /** A screenshot of one of an app's features, for its gallery. */
@@ -227,7 +229,8 @@ export function readBoard(json: string | null): BoardData {
           created: typeof i.created === 'string' ? i.created : new Date(0).toISOString(),
           updated: typeof i.updated === 'string' ? i.updated : typeof i.created === 'string' ? i.created : new Date(0).toISOString(),
           sentAt: str(i.sentAt),
-          pull: str(i.pull)
+          pull: str(i.pull),
+          issue: str(i.issue)
         }))
     }
   } catch {
@@ -773,4 +776,66 @@ export function healthBoardItem(report: HealthReport): { title: string; details:
   lines.push('', 'Update what’s safe, fix the security warnings, and make sure the app still builds and its tests pass.')
   const title = report.security.length ? 'Fix the security warnings and update packages' : 'Update packages'
   return { title, details: lines.join('\n') }
+}
+
+// ---------- Bug reports from people using the app ----------
+
+/** A bug report: an open issue on the app's GitHub repository. */
+export interface BugReport {
+  repo: string
+  number: number
+  title: string
+  body: string
+  author: string
+  url: string
+  createdAt: string
+  labels: string[]
+  comments: number
+}
+
+/** Reports not on the board yet (and not hidden), newest first. */
+export function newReports(reports: BugReport[], items: { issue?: string }[], hidden: string[] = []): BugReport[] {
+  const known = new Set([...items.map((i) => i.issue).filter(Boolean), ...hidden])
+  return reports.filter((r) => !known.has(pullKey(r.repo, r.number))).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+}
+
+/** A report as a board card: its title, and its words with who sent it and where. Pictures in it are added separately. */
+export function reportCard(report: BugReport): { title: string; details: string; kind: 'idea' | 'bug' } {
+  const body = report.body
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/<img[^>]*>/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, 4000)
+  const idea = report.labels.some((l) => /enhancement|feature|idea|suggestion/i.test(l)) && !report.labels.some((l) => /bug/i.test(l))
+  return {
+    title: report.title.trim().slice(0, 200),
+    details: [body, `Reported by ${report.author} on GitHub: ${report.url}`].filter(Boolean).join('\n\n'),
+    kind: idea ? 'idea' : 'bug'
+  }
+}
+
+/**
+ * The link a "Report a bug" button opens: a new GitHub issue on the app's repository with the
+ * app's version and computer filled in, so the person only has to say what went wrong.
+ */
+export function bugReportUrl(repo: string, about: { app: string; version?: string; os?: string }): string {
+  const body = ['**What went wrong?**', '', '', '**What were you doing when it happened?**', '', '', '---', `${about.app}${about.version ? ` ${about.version}` : ''}${about.os ? ` on ${about.os}` : ''}`].join('\n')
+  const q = new URLSearchParams({ labels: 'bug', title: '', body })
+  return `https://github.com/${repo}/issues/new?${q.toString()}`
+}
+
+/** A board card asking Claude to add a "Report a bug" button to the app. */
+export function reportButtonCard(app: { name: string; repo: string }): { title: string; details: string } {
+  return {
+    title: 'Add a “Report a bug” button',
+    details: [
+      `Add a “Report a bug” button to ${app.name} (in its menu or settings, wherever fits best). It should open this link in the web browser, with the app’s real version and the computer’s system filled in where the example says:`,
+      '',
+      bugReportUrl(app.repo, { app: app.name, version: '1.2.3', os: 'Windows 11' }),
+      '',
+      'Build the link in code (URL-encode the body) rather than pasting it as it is. Reports land as GitHub issues, which App Studio shows on the board.'
+    ].join('\n')
+  }
 }

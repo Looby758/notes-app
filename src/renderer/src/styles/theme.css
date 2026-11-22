@@ -16397,6 +16397,99 @@ a.appstudio-repo:hover {
   padding: 7px 12px;
   margin-right: 6px;
 }
+.reports {
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 1.5);
+  background: var(--bg-panel);
+}
+.reports-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+.reports-head strong {
+  color: var(--text-strong);
+}
+.reports-error {
+  color: #e5484d;
+  font-size: 12px;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reports-body {
+  display: flex;
+  flex-direction: column;
+  padding: 0 14px 10px;
+}
+.report-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.report-row > svg {
+  margin-top: 3px;
+  flex: none;
+}
+.report-row .btn {
+  flex: none;
+  padding: 3px 10px;
+  font-size: 12.5px;
+}
+.report-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+}
+.report-title {
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.report-title:hover {
+  text-decoration: underline;
+}
+.report-text .muted svg {
+  vertical-align: -1px;
+}
+.report-body {
+  color: var(--text-muted);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: pre-line;
+}
+.board-card-status .link-button {
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.reports-empty {
+  margin: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.reports-empty .link-button svg {
+  vertical-align: -1px;
+}
 .appstudio-add-pair {
   display: flex;
   flex-direction: column;
@@ -17307,6 +17400,8 @@ button.board-add-picture:hover {
 /* App Studio: Send to Claude, test copies, pull request ↔ card, screenshots */
 .board-card-status {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
   margin-top: 6px;
   font-size: 11.5px;

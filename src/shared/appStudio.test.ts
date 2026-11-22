@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { rollbackCommand, rollbackVersion, parseOutdated, parseAudit, severityCounts, healthLevel, healthLine, healthBoardItem, type HealthReport, addDownloadDay, countText, downloadsByPlatform, downloadsSince, isDownloadFile, platformOf, type DownloadHistory, boardKey, commitAllCommand, describeChange, stashCommand, isTokenPermissionError, newTokenUrl, TOKEN_NOT_ALLOWED, bumpVersion, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
+import { bugReportUrl, newReports, reportButtonCard, reportCard, type BugReport, rollbackCommand, rollbackVersion, parseOutdated, parseAudit, severityCounts, healthLevel, healthLine, healthBoardItem, type HealthReport, addDownloadDay, countText, downloadsByPlatform, downloadsSince, isDownloadFile, platformOf, type DownloadHistory, boardKey, commitAllCommand, describeChange, stashCommand, isTokenPermissionError, newTokenUrl, TOKEN_NOT_ALLOWED, bumpVersion, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
 
 describe('githubRepo', () => {
   it('reads https and ssh remotes', () => {
@@ -382,5 +382,37 @@ describe('roll back', () => {
     expect(mac.endsWith('git push --follow-tags')).toBe(true)
     expect(rollbackCommand(true, 'v1.12.1', '1.13.1')).toMatch(/^git fetch --tags origin; if \(\$LASTEXITCODE -eq 0\) \{ git restore/)
     expect(() => rollbackCommand(false, 'v1; rm -rf /', '1.13.1')).toThrow()
+  })
+})
+
+describe('bug reports', () => {
+  const report = (n: number, extra: Partial<BugReport> = {}): BugReport => ({
+    repo: 'me/eclipse',
+    number: n,
+    title: `Report ${n}`,
+    body: '',
+    author: 'sam',
+    url: `https://github.com/me/eclipse/issues/${n}`,
+    createdAt: `2026-11-0${n}T10:00:00Z`,
+    labels: [],
+    comments: 0,
+    ...extra
+  })
+  it('lists the ones not on the board yet, newest first', () => {
+    const list = newReports([report(1), report(2), report(3)], [{ issue: 'me/eclipse#2' }, {}], ['me/eclipse#1'])
+    expect(list.map((r) => r.number)).toEqual([3])
+    expect(newReports([report(1), report(3)], []).map((r) => r.number)).toEqual([3, 1])
+  })
+  it('turns a report into a card', () => {
+    const card = reportCard(report(4, { title: ' Crashes on start ', body: '<!-- template -->\nIt crashes.\n\n![shot](https://x/y.png)\n\n\n\nEclipse 1.2', labels: ['bug'] }))
+    expect(card).toEqual({ title: 'Crashes on start', kind: 'bug', details: 'It crashes.\n\nEclipse 1.2\n\nReported by sam on GitHub: https://github.com/me/eclipse/issues/4' })
+    expect(reportCard(report(5, { labels: ['enhancement'] })).kind).toBe('idea')
+  })
+  it('makes a ready-filled report link', () => {
+    const url = new URL(bugReportUrl('me/eclipse', { app: 'Eclipse', version: '1.2.3', os: 'Windows 11' }))
+    expect(url.origin + url.pathname).toBe('https://github.com/me/eclipse/issues/new')
+    expect(url.searchParams.get('labels')).toBe('bug')
+    expect(url.searchParams.get('body')).toContain('Eclipse 1.2.3 on Windows 11')
+    expect(reportButtonCard({ name: 'Eclipse', repo: 'me/eclipse' }).details).toContain('https://github.com/me/eclipse/issues/new?')
   })
 })
