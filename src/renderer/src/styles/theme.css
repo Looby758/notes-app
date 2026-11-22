@@ -2448,6 +2448,9 @@ body.capture-window {
 }
 .cal-week-head,
 .cal-allday {
+  /* Leave room for the timeline's scroll bar so the day columns line up with it. */
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
   display: grid;
   grid-template-columns: 56px repeat(var(--cal-cols, 7), minmax(0, 1fr));
   border-bottom: 1px solid var(--border);
@@ -2496,6 +2499,7 @@ body.capture-window {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   display: grid;
   grid-template-columns: 56px repeat(var(--cal-cols, 7), minmax(0, 1fr));
 }
