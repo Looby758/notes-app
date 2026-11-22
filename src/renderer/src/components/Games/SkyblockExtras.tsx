@@ -40,54 +40,6 @@ const ago = (at: number): string => {
 
 const day = (at: number): string => new Date(at).toLocaleDateString([], { day: 'numeric', month: 'short' })
 
-// ---------- the drifting background ----------
-
-const WALL = [
-  'HYPERION',
-  'TERMINATOR',
-  'NECRON_HELMET',
-  'ASPECT_OF_THE_END',
-  'JUJU_SHORTBOW',
-  'GOLDEN_DRAGON;4',
-  'ENDER_DRAGON;4',
-  'DIVAN_DRILL',
-  'GIANTS_SWORD',
-  'WITHER_CLOAK',
-  'DAEDALUS_AXE',
-  'BONZO_STAFF',
-  'SUMMONING_RING',
-  'HEGEMONY_ARTIFACT',
-  'ENCHANTED_DIAMOND',
-  'BEE;4',
-  'MIDAS_SWORD',
-  'SPIRIT_SCEPTRE',
-  'SOUL_WHIP',
-  'FIRE_VEIL_WAND',
-  'GEMSTONE_GAUNTLET',
-  'NETHER_STAR',
-  'EMERALD',
-  'ENDER_PEARL'
-]
-
-/** A slow wall of item pictures behind the frosted panels, like Eclipse's posters. */
-export function DriftWall({ ids }: { ids?: string[] }) {
-  const list = ids && ids.length >= 12 ? ids : WALL
-  const rows = [0, 1, 2, 3, 4]
-  return (
-    <div className="sbx-wall" aria-hidden>
-      {rows.map((r) => (
-        <div key={r} className={`sbx-wall-row ${r % 2 ? 'back' : ''}`} style={{ '--d': `${90 + r * 17}s` } as CSSProperties}>
-          {[...list, ...list].map((id, i) => (
-            <span key={i} className="sbx-wall-tile">
-              <ItemPic id={list[(i + r * 5) % list.length] ?? id} size={56} />
-            </span>
-          ))}
-        </div>
-      ))}
-    </div>
-  )
-}
-
 // ---------- finding a player ----------
 
 /** Search by Minecraft name, with the players you've starred and looked up before. */

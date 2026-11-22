@@ -28,8 +28,9 @@ import { GAMES_TAB, openSpecialTab, SKYBLOCK_GOALS_TAB } from '../../lib/editorC
 import { errorMessage } from '../../lib/paths'
 import { HomeBox } from '../Home/HomePage'
 import type { SbFriend, SbProfilePage } from '@shared/skyblockMore'
-import SkyblockProfile, { setSkyblockZoom } from './SkyblockProfile'
-import { ComparePage, DriftWall, HelpersPage, PlayerSearch, ProgressPage, ShareCard } from './SkyblockExtras'
+import SkyblockProfile, { Banner, setSkyblockZoom } from './SkyblockProfile'
+import { ComparePage, HelpersPage, PlayerSearch, ProgressPage, ShareCard } from './SkyblockExtras'
+import { SkyScene } from './SkyblockScene'
 import SkyblockAddonCard from './SkyblockAddonCard'
 import { ItemPic, useSkyblockAddon } from './SkyblockPic'
 
@@ -89,6 +90,13 @@ const savedZoom = (): number => {
 }
 
 type Tab = 'profile' | 'progress' | 'goals' | 'helpers' | 'compare'
+
+const PAGE_BANNERS: Record<string, { icon: string; group: string; title: string; line: string }> = {
+  progress: { icon: 'EXP_BOTTLE', group: 'Over time', title: 'Progress', line: 'How your profile has grown, every time Orbit has read it.' },
+  goals: { icon: 'DIAMOND_PICKAXE', group: 'Planning', title: 'Goals', line: 'What you’re working towards, broken down to the last raw material.' },
+  helpers: { icon: 'WORKBENCH', group: 'Planning', title: 'Helpers', line: 'Your day’s to-do list, what you can craft now, Magical Power and minions.' },
+  compare: { icon: 'PAINTING', group: 'Others', title: 'Compare', line: 'Line yourself up against friends and anyone you look up.' }
+}
 
 const DOCK: { id: Tab; label: string; icon: string; mineOnly?: boolean }[] = [
   { id: 'profile', label: 'Profile', icon: 'NAME_TAG' },
@@ -221,7 +229,7 @@ export default function SkyblockGoalsPage() {
   if (!state.installed || addon.state !== 'ready')
     return (
       <div className="sbg-page sbx" data-skyblock-goals data-skyblock-addon-missing>
-        <DriftWall />
+        <SkyScene page="setup" />
         <div className="sbx-scroll">
           <div className="sbg-inner sbg-get">
             <div className="sbg-get-hero">
@@ -238,7 +246,6 @@ export default function SkyblockGoalsPage() {
   const page = other ?? mine
   const dock = DOCK.filter((d) => !other || !d.mineOnly)
   const shownTab: Tab = other && DOCK.find((d) => d.id === tab)?.mineOnly ? 'profile' : tab
-  const wallIds = page?.view.gear ? [...page.view.gear.armor, ...page.view.gear.equipment, ...page.view.gear.inventory].filter((i) => !!i).map((i) => i!.id) : undefined
 
   return (
     <div
@@ -256,7 +263,7 @@ export default function SkyblockGoalsPage() {
       }}
       data-skyblock-goals
     >
-      <DriftWall ids={wallIds} />
+      <SkyScene page={shownTab} />
       <div className="sbx-light" ref={light} aria-hidden />
       <div className="sbx-scroll">
         <div className="sbg-inner" style={{ zoom }}>
@@ -392,6 +399,21 @@ export default function SkyblockGoalsPage() {
                     <p>{state.ready ? 'Press Refresh to read your profile.' : 'Set up Hypixel on the Games page to see your profile, or look up any player above.'}</p>
                   </div>
                 ))}
+              {shownTab !== 'profile' && PAGE_BANNERS[shownTab] && (
+                <Banner
+                  {...PAGE_BANNERS[shownTab]}
+                  stats={
+                    shownTab === 'compare'
+                      ? [['Starred players', friends.length]]
+                      : shownTab === 'progress' && mine
+                        ? [
+                            ['SkyBlock level', mine.view.skyblockLevel.level],
+                            ['Skill average', mine.view.skillAverage?.toFixed(1) ?? null]
+                          ]
+                        : []
+                  }
+                />
+              )}
               {shownTab === 'progress' && (mine ? <ProgressPage page={mine} /> : <div className="sbg-empty">Your progress shows once Orbit has read your profile.</div>)}
               {shownTab === 'helpers' && <HelpersPage profileId={mine?.view.profileId ?? ''} view={mine?.view} />}
               {shownTab === 'compare' && <ComparePage mine={mine} other={other} friends={friends} setFriends={setFriends} open={(who) => void openPlayer(who)} />}

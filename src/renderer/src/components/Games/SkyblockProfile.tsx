@@ -8,6 +8,7 @@ import { groupStats, statBreakdown, type SbProfilePage, type StatGroup } from '@
 import { errorMessage } from '../../lib/paths'
 import { notify } from '../../store/notify'
 import { Head, ItemPic } from './SkyblockPic'
+import { setSkySection, SKY_THEMES } from './SkyblockScene'
 import { BestiaryClosest, DungeonPlanner, ForgePanel, GardenPlanner, MuseumPlanner, SlayerPlan, TreePanel } from './SkyblockPlanners'
 
 export const fmt = (n: number | null | undefined): string => (n === null || n === undefined ? '—' : Math.round(n).toLocaleString('en-GB'))
@@ -281,10 +282,10 @@ export function Ring({ progress, size = 64, children, maxed }: { progress: numbe
 }
 
 /** A card with a ring, a picture and a level: skills, slayers, classes, HotM… */
-export function LevelCard({ icon, name, l, sub, extra }: { icon: ReactNode; name: string; l: Level; sub?: ReactNode; extra?: ReactNode }) {
+export function LevelCard({ icon, name, l, sub, extra, tone }: { icon: ReactNode; name: string; l: Level; sub?: ReactNode; extra?: ReactNode; tone?: string }) {
   const maxed = l.level >= l.max
   return (
-    <div className={`sbp-lcard ${maxed ? 'maxed' : ''}`}>
+    <div className={`sbp-lcard ${maxed ? 'maxed' : ''}`} style={tone ? ({ '--tone': tone } as CSSProperties) : undefined}>
       <Ring progress={maxed ? 1 : l.progress} maxed={maxed}>
         {icon}
       </Ring>
@@ -391,6 +392,284 @@ const SECTIONS = [
 ] as const
 type Section = (typeof SECTIONS)[number][0]
 
+const NAV_GROUPS: [string, string[]][] = [
+  ['You', ['overview', 'networth', 'gear', 'inventories', 'accessories', 'pets', 'coop']],
+  ['Skills', ['collections', 'dungeons', 'slayer', 'mining', 'forest', 'bestiary', 'garden', 'fishing']],
+  ['World', ['crimson', 'rift', 'museum', 'stats']]
+]
+
+export const SKILL_COLORS: Record<string, string> = {
+  farming: '#d4e157',
+  mining: '#74c0fc',
+  combat: '#ff6b6b',
+  foraging: '#69db7c',
+  fishing: '#4dd4f7',
+  enchanting: '#da77f2',
+  alchemy: '#f783ac',
+  taming: '#ffa94d',
+  carpentry: '#e0a96d',
+  runecrafting: '#b197fc',
+  social: '#63e6be',
+  hunting: '#a9e34b'
+}
+export const SLAYER_COLORS: Record<string, string> = {
+  zombie: '#69db7c',
+  spider: '#ff6b6b',
+  wolf: '#e9ecef',
+  enderman: '#c084fc',
+  blaze: '#ff922b',
+  vampire: '#ff4d8d'
+}
+const CLASS_COLORS: Record<string, string> = { healer: '#ffd43b', mage: '#74c0fc', berserk: '#ff6b6b', archer: '#69db7c', tank: '#adb5bd' }
+
+/** A big header: a picture, a line about the page and its headline numbers. */
+export function Banner({ icon, group, title, line, stats = [] }: { icon: string; group: string; title: string; line?: string; stats?: [string, ReactNode][] }) {
+  return (
+    <div className="sbp-banner" data-sbp-banner={title}>
+      <div className="sbp-banner-pic">
+        <ItemPic id={icon} name={title} size={60} />
+      </div>
+      <div className="sbp-banner-text">
+        <small>{group}</small>
+        <h2>{title}</h2>
+        {line && <p>{line}</p>}
+      </div>
+      <div className="sbp-banner-stats">
+        {stats
+          .filter(([, val]) => val !== null && val !== undefined && val !== '')
+          .map(([label, val]) => (
+            <div key={label}>
+              <b>{val}</b>
+              <small>{label}</small>
+            </div>
+          ))}
+      </div>
+    </div>
+  )
+}
+
+/** The banner over each profile section. */
+function SectionBanner({ id, v }: { id: Section; v: SbProfileView }) {
+  const meta = SECTIONS.find(([k]) => k === id)
+  if (!meta) return null
+  const group = NAV_GROUPS.find(([, ids]) => ids.includes(id))?.[0] ?? ''
+  const { line, stats } = bannerInfo(id, v)
+  return <Banner icon={meta[2]} group={group} title={meta[1]} line={line} stats={stats} />
+}
+
+function bannerInfo(id: Section, v: SbProfileView): { line: string; stats: [string, ReactNode][] } {
+  const slayerXp = v.slayers.reduce((a, s) => a + s.level.xp, 0)
+  const mp = v.accessories ? (v.accessories.highestMagicalPower ?? v.accessories.magicalPower) : null
+  switch (id) {
+    case 'overview':
+      return {
+        line: `${v.profileName}${MODE_NAMES[v.mode] ? ` · ${MODE_NAMES[v.mode]}` : ''} · SkyBlock level ${v.skyblockLevel.level}`,
+        stats: [
+          ['Skill average', v.skillAverage === null ? null : v.skillAverage.toFixed(1)],
+          ['Catacombs', v.dungeons?.catacombs.level ?? null],
+          ['Slayer XP', shortNumber(slayerXp)],
+          ['Magical power', mp === null ? null : fmt(mp)]
+        ]
+      }
+    case 'networth':
+      return {
+        line: 'What everything you own is worth at Auction House and Bazaar prices.',
+        stats: [
+          ['Total', v.networth ? shortNumber(v.networth.total) : null],
+          ['Purse', shortNumber(v.purse ?? 0)],
+          ['Bank', v.bank === null ? null : shortNumber(v.bank)]
+        ]
+      }
+    case 'gear':
+      return {
+        line: 'Armour, equipment, wardrobe and loadouts. Click any piece to see it in full.',
+        stats: [
+          ['Wardrobe sets', v.gear?.wardrobe.filter((w) => w.pieces.some(Boolean)).length ?? null],
+          ['Equipment sets', v.gear?.equipmentSets.filter((w) => w.pieces.some(Boolean)).length ?? null],
+          ['Loadouts', v.gear?.loadouts.length ?? null]
+        ]
+      }
+    case 'inventories':
+      return {
+        line: 'Everything you’re carrying and storing.',
+        stats: [
+          ['Backpacks', v.gear?.backpacks.length ?? null],
+          ['Sack items', v.gear ? shortNumber(v.gear.sacks.reduce((a, x) => a + x.count, 0)) : null]
+        ]
+      }
+    case 'accessories':
+      return {
+        line: 'Your accessory bag, its Magical Power and what’s still missing.',
+        stats: [
+          ['Magical power', mp === null ? null : fmt(mp)],
+          ['Accessories', v.accessories?.items.length ?? null],
+          ['Missing', v.accessories?.missing.length ?? null]
+        ]
+      }
+    case 'pets': {
+      const active = v.pets.find((p) => p.active)
+      return {
+        line: active ? `Out now: level ${active.level.level} ${active.name}.` : 'Your pets, by rarity and level.',
+        stats: [
+          ['Pets', v.pets.length],
+          ['Maxed', v.pets.filter((p) => p.level.level >= p.level.max).length]
+        ]
+      }
+    }
+    case 'collections': {
+      const all = (v.collections ?? []).flatMap((g) => g.items)
+      return {
+        line: 'Every collection and the tier you’ve reached.',
+        stats: [
+          ['Maxed', `${all.filter((c) => c.tier >= c.maxTier).length}/${all.length}`],
+          ['Minions crafted', v.craftedMinions]
+        ]
+      }
+    }
+    case 'dungeons': {
+      const d = v.dungeons
+      return {
+        line: d?.selected ? `Playing ${d.selected}.` : 'The Catacombs.',
+        stats: [
+          ['Catacombs', d?.catacombs.level ?? null],
+          ['Class average', d && d.classes.length ? (d.classes.reduce((a, c) => a + c.level, 0) / d.classes.length).toFixed(1) : null],
+          ['Secrets', d?.secrets === null || d?.secrets === undefined ? null : fmt(d.secrets)],
+          ['Runs', d ? fmt(d.floors.reduce((a, f) => a + f.normal + f.master, 0)) : null]
+        ]
+      }
+    }
+    case 'slayer': {
+      const top = [...v.slayers].sort((a, b) => b.level.xp - a.level.xp)[0]
+      return {
+        line: top && top.level.xp ? `Your best is ${top.name}, level ${top.level.level}.` : 'Slayer bosses.',
+        stats: [
+          ['Total XP', shortNumber(slayerXp)],
+          ['Bosses killed', fmt(v.slayers.reduce((a, x) => a + x.kills.reduce((b, k) => b + k, 0), 0))]
+        ]
+      }
+    }
+    case 'mining':
+      return {
+        line: v.mining?.ability ? `Pickaxe ability: ${v.mining.ability}.` : 'The Dwarven Mines, Crystal Hollows and beyond.',
+        stats: [
+          ['HotM tier', v.mining?.hotm.level ?? null],
+          ['Powder', v.mining ? shortNumber(v.mining.powder.reduce((a, x) => a + x.available + x.spent, 0)) : null],
+          ['Commissions', v.mining?.commissions === null || v.mining?.commissions === undefined ? null : fmt(v.mining.commissions)]
+        ]
+      }
+    case 'forest':
+      return {
+        line: 'The Heart of the Forest and your whispers.',
+        stats: [
+          ['HotF tier', v.forest?.level.level ?? null],
+          ['Perks', v.forest?.tree ? `${v.forest.tree.bought}/${v.forest.tree.nodes.length}` : null]
+        ]
+      }
+    case 'bestiary': {
+      const mobs = v.bestiary.flatMap((i) => i.mobs)
+      return {
+        line: 'Every mob you’ve fought and how far into its bestiary you are.',
+        stats: [
+          ['Milestone', v.bestiaryMilestone],
+          ['Mobs', mobs.length],
+          ['Tiers', fmt(mobs.reduce((a, m) => a + m.tier, 0))]
+        ]
+      }
+    }
+    case 'garden':
+      return {
+        line: 'Crops, plots, the composter and your visitors.',
+        stats: [
+          ['Garden level', v.garden?.level.level ?? null],
+          ['Visitors served', v.garden ? fmt(v.garden.visitors) : null],
+          ['Plots', v.garden ? `${v.garden.plots}/24` : null]
+        ]
+      }
+    case 'fishing':
+      return {
+        line: 'Trophy fish from the Crimson Isle’s lava.',
+        stats: [
+          ['Caught', v.trophyFish ? fmt(v.trophyFish.total) : null],
+          ['Kinds', v.trophyFish?.fish.length ?? null]
+        ]
+      }
+    case 'crimson':
+      return {
+        line: v.crimson?.faction ? `With the ${v.crimson.faction}.` : 'The Crimson Isle.',
+        stats: [
+          ['Mage rep', v.crimson ? fmt(v.crimson.mage) : null],
+          ['Barbarian rep', v.crimson ? fmt(v.crimson.barbarian) : null],
+          ['Kuudra runs', v.crimson ? fmt(v.crimson.kuudra.reduce((a, k) => a + k.completions, 0)) : null]
+        ]
+      }
+    case 'rift':
+      return {
+        line: 'The Rift.',
+        stats: [
+          ['Enigma souls', v.rift?.enigmaSouls ?? null],
+          ['Timecharms', v.rift?.timecharms ?? null],
+          ['Motes', v.rift?.motes === null || v.rift?.motes === undefined ? null : shortNumber(v.rift.motes)]
+        ]
+      }
+    case 'museum':
+      return {
+        line: 'What you’ve donated and what’s left.',
+        stats: [
+          ['Donated', v.museum?.donated ?? null],
+          ['Value', v.museum?.value === null || v.museum?.value === undefined ? null : shortNumber(v.museum.value)]
+        ]
+      }
+    case 'coop':
+      return { line: 'Everyone on this profile.', stats: [['Members', v.coopMembers + 1]] }
+    case 'stats':
+      return { line: 'Everything else Hypixel counts.', stats: [['Stats', fmt(v.stats.length)]] }
+  }
+  return { line: '', stats: [] }
+}
+
+/** A spider chart of the main skills, each spoke as far out as its level. */
+function SkillRadar({ skills }: { skills: SbProfileView['skills'] }) {
+  const main = (skills ?? []).filter((s) => ['farming', 'mining', 'combat', 'foraging', 'fishing', 'enchanting', 'alchemy', 'taming'].includes(s.id))
+  if (main.length < 3) return null
+  const R = 100
+  const at = (i: number, r: number): [number, number] => {
+    const a = (Math.PI * 2 * i) / main.length - Math.PI / 2
+    return [Math.cos(a) * r, Math.sin(a) * r]
+  }
+  const pts = main.map((s, i) => at(i, R * Math.max(0.04, Math.min(1, (s.level + (s.level >= s.max ? 0 : s.progress)) / Math.max(1, s.max)))))
+  return (
+    <div className="sbp-radar">
+      <svg viewBox="-130 -130 260 260">
+        {[0.25, 0.5, 0.75, 1].map((f) => (
+          <polygon key={f} className="ring" points={main.map((_, i) => at(i, R * f).join(',')).join(' ')} />
+        ))}
+        {main.map((_, i) => {
+          const [x, y] = at(i, R)
+          return <line key={i} className="spoke" x1={0} y1={0} x2={x} y2={y} />
+        })}
+        <polygon className="shape" points={pts.map((p) => p.join(',')).join(' ')} />
+        {pts.map(([x, y], i) => (
+          <circle key={i} cx={x} cy={y} r={3.5} style={{ fill: SKILL_COLORS[main[i].id] }} />
+        ))}
+      </svg>
+      {main.map((s, i) => {
+        const [x, y] = at(i, R + 20)
+        return (
+          <span
+            key={s.id}
+            className="sbp-radar-label"
+            style={{ left: `${50 + (x / 260) * 100}%`, top: `${50 + (y / 260) * 100}%`, '--tone': SKILL_COLORS[s.id] } as CSSProperties}
+            title={`${s.name} ${s.level}`}
+          >
+            <ItemPic id={SKILL_ICONS[s.id]} name={s.name} size={20} />
+            <b>{s.level}</b>
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
 const SKILL_ICONS: Record<string, string> = {
   farming: 'GOLD_HOE',
   mining: 'STONE_PICKAXE',
@@ -439,6 +718,8 @@ export default function SkyblockProfile({ page, onChoose, onShare }: { page: SbP
   const [section, setSection] = useState<Section>('overview')
   const view = page.view
   const shown = SECTIONS.filter(([id]) => (id !== 'coop' || (view.coop?.length ?? 0) > 1) && (id !== 'forest' || !!view.forest))
+  useEffect(() => setSkySection(section), [section])
+  useEffect(() => () => setSkySection('overview'), [])
   return (
     <div className="sbp" data-sbp>
       <ItemTip />
@@ -446,15 +727,33 @@ export default function SkyblockProfile({ page, onChoose, onShare }: { page: SbP
       <Hero page={page} go={setSection} onChoose={onChoose} onShare={onShare} />
       <div className="sbp-layout">
         <nav className="sbp-nav">
-          {shown.map(([id, name, icon]) => (
-            <button key={id} className={section === id ? 'active' : ''} onClick={() => setSection(id)} data-sbp-section={id}>
-              <ItemPic id={icon} name={name} size={20} />
-              <span>{name}</span>
-            </button>
-          ))}
+          {NAV_GROUPS.map(([group, ids]) => {
+            const here = shown.filter(([id]) => ids.includes(id))
+            if (!here.length) return null
+            return (
+              <div key={group} className="sbp-nav-group">
+                <small>{group}</small>
+                {here.map(([id, name, icon]) => (
+                  <button
+                    key={id}
+                    className={section === id ? 'active' : ''}
+                    onClick={() => setSection(id)}
+                    data-sbp-section={id}
+                    style={{ '--tone': SKY_THEMES[id]?.accent } as CSSProperties}
+                  >
+                    <span className="sbp-nav-pic">
+                      <ItemPic id={icon} name={name} size={20} />
+                    </span>
+                    <span>{name}</span>
+                  </button>
+                ))}
+              </div>
+            )
+          })}
         </nav>
         <SectionGuard key={section}>
           <div className="sbp-body">
+            <SectionBanner id={section} v={view} />
             {section === 'overview' && <Overview v={view} go={setSection} />}
             {section === 'networth' && <NetworthSection v={view} />}
             {section === 'coop' && <Coop v={view} />}
@@ -750,19 +1049,68 @@ function Coop({ v }: { v: SbProfileView }) {
 
 function Overview({ v, go }: { v: SbProfileView; go: (s: Section) => void }) {
   const pet = v.pets.find((p) => p.active)
+  const topSlayer = Math.max(1, ...v.slayers.map((s) => s.level.max))
   return (
-    <div className="sbp-panels">
+    <div className="sbp-dash">
+      <Panel title="Skill shape" right={v.skillAverage !== null && <span className="sbp-badge">Average {v.skillAverage.toFixed(1)}</span>}>
+        {v.skills ? <SkillRadar skills={v.skills} /> : <Nothing what="Turn on the Skills API to see these." />}
+      </Panel>
       <Panel title="Skills" wide>
         {v.skills ? (
           <div className="sbp-lcards">
             {v.skills.map((s) => (
-              <LevelCard key={s.id} icon={<ItemPic id={SKILL_ICONS[s.id]} name={s.name} size={28} />} name={s.name} l={s} />
+              <LevelCard key={s.id} icon={<ItemPic id={SKILL_ICONS[s.id]} name={s.name} size={28} />} name={s.name} l={s} tone={SKILL_COLORS[s.id]} />
             ))}
           </div>
         ) : (
           <Nothing what="Turn on the Skills API to see these." />
         )}
       </Panel>
+      <Panel
+        title="Slayers"
+        right={
+          <button className="link-btn" onClick={() => go('slayer')}>
+            Planner
+          </button>
+        }
+      >
+        <div className="sbp-mini-bars">
+          {v.slayers.map((s) => (
+            <div key={s.id} style={{ '--tone': SLAYER_COLORS[s.id] } as CSSProperties} title={`${s.name}: ${fmt(s.level.xp)} XP`}>
+              <ItemPic id={SLAYER_ICONS[s.id]} name={s.name} size={22} />
+              <span className="sbp-mini-name">{s.name.split(' ')[0]}</span>
+              <span className="sbp-mini-track">
+                <i style={{ width: `${((s.level.level + (s.level.level >= s.level.max ? 0 : s.level.progress)) / topSlayer) * 100}%` }} />
+              </span>
+              <b>{s.level.level}</b>
+            </div>
+          ))}
+        </div>
+      </Panel>
+      {v.dungeons && (
+        <Panel
+          title="Catacombs"
+          right={
+            <button className="link-btn" onClick={() => go('dungeons')}>
+              Runs to go
+            </button>
+          }
+        >
+          <div className="sbp-dash-cata">
+            <Ring progress={v.dungeons.catacombs.progress} size={96} maxed={v.dungeons.catacombs.level >= v.dungeons.catacombs.max}>
+              <b className="sbp-dash-big">{v.dungeons.catacombs.level}</b>
+            </Ring>
+            <div className="sbp-dash-classes">
+              {v.dungeons.classes.map((c) => (
+                <span key={c.id} style={{ '--tone': CLASS_COLORS[c.id] } as CSSProperties} className={v.dungeons?.selected === c.name ? 'on' : ''}>
+                  <ItemPic id={CLASS_ICONS[c.id]} name={c.name} size={18} />
+                  {c.name} <b>{c.level}</b>
+                </span>
+              ))}
+            </div>
+          </div>
+        </Panel>
+      )}
       {v.gear && (
         <Panel
           title="Wearing"
@@ -794,21 +1142,6 @@ function Overview({ v, go }: { v: SbProfileView; go: (s: Section) => void }) {
           <PetCard p={pet} />
         </Panel>
       )}
-      <Panel
-        title="Slayers"
-        wide
-        right={
-          <button className="link-btn" onClick={() => go('slayer')}>
-            More
-          </button>
-        }
-      >
-        <div className="sbp-lcards">
-          {v.slayers.map((s) => (
-            <LevelCard key={s.id} icon={<ItemPic id={SLAYER_ICONS[s.id]} name={s.name} size={28} />} name={s.name} l={s.level} sub={`${fmt(s.level.xp)} XP`} />
-          ))}
-        </div>
-      </Panel>
       {v.essence.length > 0 && (
         <Panel title="Essence" wide>
           <div className="sbp-chips">
@@ -1470,6 +1803,7 @@ function Dungeons({ v }: { v: SbProfileView }) {
               icon={<ItemPic id={CLASS_ICONS[c.id]} name={c.name} size={28} />}
               name={c.name}
               l={c}
+              tone={CLASS_COLORS[c.id]}
               extra={d.selected === c.name ? <span className="sbg-tag">Selected</span> : undefined}
             />
           ))}
@@ -1511,13 +1845,22 @@ function Slayers({ v }: { v: SbProfileView }) {
       {v.slayers.map((s) => {
         const maxed = s.level.level >= s.level.max
         return (
-          <div key={s.id} className={`sbp-slayer ${maxed ? 'maxed' : ''}`}>
+          <div key={s.id} className={`sbp-slayer ${maxed ? 'maxed' : ''}`} style={{ '--tone': SLAYER_COLORS[s.id] } as CSSProperties}>
             <Ring progress={maxed ? 1 : s.level.progress} size={78} maxed={maxed}>
               <ItemPic id={SLAYER_ICONS[s.id]} name={s.name} size={40} />
             </Ring>
             <div>
               <span className="sbp-lcard-name">{s.name}</span>
               <b className="sbp-lcard-level">Level {s.level.level}</b>
+              <span className="sbp-pips" aria-hidden>
+                {Array.from({ length: s.level.max }, (_, i) => (
+                  <i
+                    key={i}
+                    className={i < s.level.level ? 'on' : i === s.level.level ? 'part' : ''}
+                    style={i === s.level.level ? ({ '--p': s.level.progress } as CSSProperties) : undefined}
+                  />
+                ))}
+              </span>
               <span className="faint">{maxed ? `Maxed · ${fmt(s.level.xp)} XP` : `${fmt(s.level.into)} / ${fmt(s.level.needed)} XP`}</span>
               <div className="sbp-kills">
                 {s.kills.map((k, i) => (

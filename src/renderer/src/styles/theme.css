@@ -21417,3 +21417,687 @@ button.sbp-coop-row:hover {
 .sbp-tile small.sbpl-plain {
   text-transform: none;
 }
+
+/* ======================================================================
+   SkyBlock rehaul: a sky over floating islands, coloured per section,
+   with banners, grouped navigation and cards that carry their own colour.
+   ====================================================================== */
+@property --sec {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #8fa8ff;
+}
+@property --sec-glow {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #ffb36b;
+}
+@property --sec-deep {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #1d1a4d;
+}
+@property --sky-a {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #0b1030;
+}
+@property --sky-b {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #1d1a4d;
+}
+@property --sky-c {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #5b3a8c;
+}
+@property --sky-glow {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #ffb36b;
+}
+@property --sky-rock {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #151433;
+}
+@property --sky-grass {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #5fd18b;
+}
+.sbg-page.sbx {
+  --sbx-hi: var(--sec);
+  --accent: var(--sec);
+  --accent-soft: color-mix(in srgb, var(--sec) 16%, transparent);
+  --accent-strong: color-mix(in srgb, var(--sec) 60%, white);
+  background: #05060f;
+  transition:
+    --sec 0.9s ease,
+    --sec-glow 0.9s ease,
+    --sec-deep 0.9s ease;
+}
+.sky {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: clip;
+  pointer-events: none;
+  contain: strict;
+  transition:
+    --sky-a 0.9s ease,
+    --sky-b 0.9s ease,
+    --sky-c 0.9s ease,
+    --sky-glow 0.9s ease,
+    --sky-rock 0.9s ease,
+    --sky-grass 0.9s ease;
+}
+.sky-grad {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, var(--sky-a) 0%, var(--sky-b) 52%, var(--sky-c) 100%);
+}
+.sky-sun {
+  position: absolute;
+  right: 12%;
+  top: 8%;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--sky-glow) 70%, white) 0%, color-mix(in srgb, var(--sky-glow) 35%, transparent) 9%, color-mix(in srgb, var(--sky-glow) 12%, transparent) 30%, transparent 62%);
+  opacity: 0.85;
+}
+.sky-stars {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: #fff;
+  opacity: var(--sky-stars, 0.5);
+  transition: opacity 0.9s ease;
+}
+.sky-islands {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.sky-island .sky-grass,
+.sky-island .sky-tree {
+  fill: var(--sky-grass);
+}
+.sky-island .sky-tree {
+  opacity: 0.85;
+}
+.sky-clouds {
+  position: absolute;
+  left: 0;
+  width: 200%;
+  will-change: transform;
+  animation: sky-drift 240s linear infinite;
+  background-repeat: repeat-x;
+}
+.sky-clouds.far {
+  top: 30%;
+  height: 160px;
+  opacity: 0.22;
+  background-image:
+    radial-gradient(ellipse 160px 34px at 120px 60px, #fff, transparent 70%),
+    radial-gradient(ellipse 220px 40px at 520px 90px, #fff, transparent 70%),
+    radial-gradient(ellipse 130px 26px at 860px 40px, #fff, transparent 70%),
+    radial-gradient(ellipse 260px 46px at 1250px 100px, #fff, transparent 70%);
+  background-size: 1600px 160px;
+}
+.sky-clouds.near {
+  bottom: 4%;
+  height: 220px;
+  opacity: 0.16;
+  animation-duration: 150s;
+  background-image:
+    radial-gradient(ellipse 300px 60px at 200px 120px, #fff, transparent 70%),
+    radial-gradient(ellipse 380px 70px at 900px 150px, #fff, transparent 70%),
+    radial-gradient(ellipse 240px 50px at 1400px 90px, #fff, transparent 70%);
+  background-size: 1800px 220px;
+}
+@keyframes sky-drift {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sky-clouds {
+    animation: none;
+  }
+}
+/* Darkens the middle a little so the panels read well over a bright sky. */
+.sky-fog {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(4, 5, 14, 0.55), rgba(4, 5, 14, 0.15) 30%, rgba(4, 5, 14, 0.15) 70%, rgba(4, 5, 14, 0.45)),
+    linear-gradient(180deg, rgba(4, 5, 14, 0.15), rgba(4, 5, 14, 0.35));
+}
+.sbx-light {
+  background: radial-gradient(circle, color-mix(in srgb, var(--sec) 10%, transparent), transparent 60%);
+}
+
+/* Panels pick up the section's colour. */
+.sbx .sbp-panel,
+.sbx .sbp-nav,
+.sbx .sbg-goal,
+.sbx .sbg-list,
+.sbx .sbg-empty,
+.sbx .sba-card,
+.sbx .sbg-warning {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--sec) 9%, rgba(255, 255, 255, 0.06)), rgba(255, 255, 255, 0.02) 45%), rgba(9, 10, 24, 0.78);
+  border-color: color-mix(in srgb, var(--sec) 18%, rgba(255, 255, 255, 0.1));
+}
+.sbx .sbp-panel {
+  position: relative;
+  overflow: hidden;
+}
+.sbx .sbp-panel::before {
+  content: '';
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  top: 0;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: linear-gradient(90deg, transparent, var(--sec), transparent);
+  opacity: 0.7;
+}
+.sbx .sbp-panel > header h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #fff;
+}
+.sbx .sbp-panel > header h4::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  background: var(--sec);
+  box-shadow: 0 0 10px var(--sec);
+}
+
+/* ---------- section banner ---------- */
+.sbp-banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 22px 26px;
+  margin-bottom: 14px;
+  border-radius: 22px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--sec) 35%, transparent);
+  background:
+    radial-gradient(500px 200px at 8% 50%, color-mix(in srgb, var(--sec) 35%, transparent), transparent 70%),
+    radial-gradient(400px 220px at 100% 0%, color-mix(in srgb, var(--sec-glow) 22%, transparent), transparent 70%),
+    linear-gradient(135deg, color-mix(in srgb, var(--sec-deep) 85%, black), rgba(8, 9, 22, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 18px 40px rgba(0, 0, 0, 0.35);
+  animation: sbx-rise 0.3s var(--ease);
+}
+.sbp-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 14px 14px;
+  mask-image: linear-gradient(90deg, transparent, black 60%);
+  pointer-events: none;
+}
+.sbp-banner-pic {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  border-radius: 26px;
+  background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--sec) 45%, transparent), color-mix(in srgb, var(--sec) 8%, transparent) 70%);
+  border: 1px solid color-mix(in srgb, var(--sec) 50%, transparent);
+  box-shadow:
+    0 0 40px color-mix(in srgb, var(--sec) 35%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transform: rotate(-4deg);
+}
+.sbp-banner-pic .sb-pic,
+.sbp-banner-pic .sb-head {
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5));
+  transform: rotate(4deg);
+}
+.sbp-banner-text {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  flex: 1;
+}
+.sbp-banner-text small {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--sec);
+}
+.sbp-banner-text h2 {
+  margin: 2px 0 4px;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #fff;
+  line-height: 1.05;
+}
+.sbp-banner-text p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13.5px;
+}
+.sbp-banner-stats {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.sbp-banner-stats > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 92px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.sbp-banner-stats b {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.sbp-banner-stats small {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+@media (max-width: 1100px) {
+  .sbp-banner {
+    flex-wrap: wrap;
+  }
+  .sbp-banner-stats {
+    justify-content: flex-start;
+    width: 100%;
+  }
+}
+
+/* ---------- grouped navigation ---------- */
+.sbx .sbp-nav {
+  padding: 10px 8px;
+  gap: 10px;
+}
+.sbp-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sbp-nav-group > small {
+  padding: 4px 10px 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+}
+.sbp-nav-group + .sbp-nav-group {
+  margin-top: 6px;
+}
+.sbx .sbp-nav button {
+  gap: 10px;
+  padding: 5px 8px;
+  border-radius: 12px;
+}
+.sbp-nav-pic {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--tone, #fff) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tone, #fff) 22%, transparent);
+  transition:
+    background 0.2s,
+    box-shadow 0.2s;
+}
+.sbx .sbp-nav button:hover .sbp-nav-pic {
+  background: color-mix(in srgb, var(--tone, #fff) 24%, transparent);
+}
+.sbx .sbp-nav button.active {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tone) 24%, transparent), transparent);
+  box-shadow: inset 3px 0 0 var(--tone);
+  color: #fff;
+  font-weight: 600;
+}
+.sbx .sbp-nav button.active .sbp-nav-pic {
+  background: color-mix(in srgb, var(--tone) 40%, transparent);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--tone) 55%, transparent);
+}
+
+/* ---------- cards with their own colour ---------- */
+.sbx .sbp-lcard {
+  --tone: var(--sec);
+  position: relative;
+  overflow: hidden;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border-color: color-mix(in srgb, var(--tone) 22%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--tone) 16%, transparent), rgba(255, 255, 255, 0.02) 65%);
+}
+.sbx .sbp-lcard::after {
+  content: '';
+  position: absolute;
+  right: -30px;
+  top: -30px;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--tone) 30%, transparent), transparent 70%);
+  pointer-events: none;
+}
+.sbx .sbp-lcard:hover {
+  border-color: color-mix(in srgb, var(--tone) 55%, transparent);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--tone) 18%, rgba(0, 0, 0, 0.3));
+}
+.sbx .sbp-lcard .sbp-ring .fill {
+  stroke: var(--tone);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--tone) 70%, transparent));
+}
+.sbx .sbp-lcard.maxed .sbp-ring .fill {
+  stroke: #fcc419;
+}
+.sbx .sbp-lcard .sbp-ring circle {
+  stroke-width: 5;
+}
+.sbx .sbp-lcard-level {
+  font-size: 24px;
+  font-weight: 800;
+}
+.sbx .sbp-lcard.maxed {
+  border-color: rgba(252, 196, 25, 0.5);
+  background: linear-gradient(135deg, rgba(252, 196, 25, 0.2), color-mix(in srgb, var(--tone) 8%, transparent) 60%);
+}
+.sbx .sbp-lcard.maxed .sbp-lcard-level {
+  background: linear-gradient(90deg, #fff3bf, #fcc419);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---------- overview dashboard ---------- */
+.sbp-dash {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.9fr) minmax(0, 1.6fr);
+  gap: 14px;
+  align-items: start;
+}
+.sbp-dash > .sbp-panel.wide {
+  grid-column: auto;
+}
+.sbp-dash > .sbp-panel:nth-child(n + 7) {
+  grid-column: 1 / -1;
+}
+.sbp-dash .sbp-lcards {
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+@media (max-width: 1100px) {
+  .sbp-dash {
+    grid-template-columns: 1fr;
+  }
+}
+.sbp-radar {
+  position: relative;
+  width: 100%;
+  max-width: 340px;
+  aspect-ratio: 1;
+  margin: 0 auto;
+}
+.sbp-radar svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.sbp-radar .ring {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.1);
+}
+.sbp-radar .spoke {
+  stroke: rgba(255, 255, 255, 0.08);
+}
+.sbp-radar .shape {
+  fill: color-mix(in srgb, var(--sec) 30%, transparent);
+  stroke: var(--sec);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--sec) 60%, transparent));
+}
+.sbp-radar-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px 2px 3px;
+  border-radius: 999px;
+  background: rgba(8, 9, 22, 0.85);
+  border: 1px solid color-mix(in srgb, var(--tone) 50%, transparent);
+  font-size: 12px;
+}
+.sbp-radar-label b {
+  color: var(--tone);
+}
+.sbp-mini-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sbp-mini-bars > div {
+  display: grid;
+  grid-template-columns: 24px 82px 1fr 26px;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.sbp-mini-name {
+  color: var(--text-muted);
+}
+.sbp-mini-track {
+  height: 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.sbp-mini-track i {
+  display: block;
+  height: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tone) 55%, transparent), var(--tone));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--tone) 60%, transparent);
+}
+.sbp-mini-bars b {
+  text-align: right;
+  color: var(--tone);
+  font-size: 15px;
+}
+.sbp-dash-cata {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.sbp-dash-cata .sbp-ring .fill {
+  stroke: var(--sec);
+}
+.sbp-dash-cata .sbp-ring circle {
+  stroke-width: 6;
+}
+.sbp-dash-big {
+  font-size: 30px;
+  font-weight: 800;
+  color: #fff;
+}
+.sbp-dash-classes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sbp-dash-classes > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px 3px 4px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--tone) 35%, transparent);
+  background: color-mix(in srgb, var(--tone) 10%, transparent);
+  font-size: 12px;
+}
+.sbp-dash-classes > span.on {
+  box-shadow: 0 0 0 1px var(--tone);
+}
+.sbp-dash-classes b {
+  color: var(--tone);
+}
+
+/* ---------- slayer bosses ---------- */
+.sbx .sbp-slayer {
+  --tone: var(--sec);
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--tone) 30%, transparent);
+  background:
+    radial-gradient(260px 200px at 0% 50%, color-mix(in srgb, var(--tone) 22%, transparent), transparent 70%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01)),
+    rgba(9, 10, 24, 0.8);
+}
+.sbx .sbp-slayer .sbp-ring .fill {
+  stroke: var(--tone);
+  filter: drop-shadow(0 0 6px var(--tone));
+}
+.sbx .sbp-slayer.maxed .sbp-ring .fill {
+  stroke: #fcc419;
+}
+.sbx .sbp-slayer .sbp-lcard-name {
+  color: var(--tone);
+  font-weight: 600;
+}
+.sbp-pips {
+  display: flex;
+  gap: 3px;
+  margin: 4px 0 2px;
+}
+.sbp-pips i {
+  width: 16px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.sbp-pips i.on {
+  background: var(--tone);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--tone) 60%, transparent);
+}
+.sbp-pips i.part {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tone) 60%, transparent) calc(var(--p) * 100%), rgba(255, 255, 255, 0.1) 0);
+}
+.sbx .sbpl-slayer-tiers > span {
+  background: rgba(0, 0, 0, 0.25);
+  border-color: color-mix(in srgb, var(--tone, var(--sec)) 25%, transparent);
+}
+.sbx .sbpl-slayer-tiers > span.hi {
+  border-color: var(--tone, var(--sec));
+  background: color-mix(in srgb, var(--tone, var(--sec)) 14%, transparent);
+}
+
+/* ---------- tiles, pets, chips ---------- */
+.sbx .sbp-tile {
+  border-radius: 14px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--tone, var(--sec)) 10%, transparent), rgba(255, 255, 255, 0.02));
+  border-color: color-mix(in srgb, var(--tone, var(--sec)) 16%, rgba(255, 255, 255, 0.08));
+}
+.sbx .sbp-tile:hover {
+  border-color: color-mix(in srgb, var(--tone, var(--sec)) 50%, transparent);
+}
+.sbx .sbp-tile-pic {
+  background: radial-gradient(circle, color-mix(in srgb, var(--tone, var(--sec)) 22%, transparent), transparent 70%);
+  border-radius: 12px;
+}
+.sbx .sbp-pet {
+  border-radius: 18px;
+  border-color: color-mix(in srgb, var(--rarity) 35%, transparent);
+  background:
+    radial-gradient(220px 140px at 0% 0%, color-mix(in srgb, var(--rarity) 24%, transparent), transparent 70%),
+    rgba(255, 255, 255, 0.03);
+}
+.sbx .sbp-pet .sbp-ring .fill {
+  stroke: var(--rarity);
+}
+.sbx .sbp-pet:hover {
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--rarity) 25%, transparent);
+}
+.sbx .sbp-chip {
+  border-color: color-mix(in srgb, var(--tone, var(--sec)) 25%, rgba(255, 255, 255, 0.08));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--tone, var(--sec)) 12%, transparent), rgba(255, 255, 255, 0.02));
+}
+.sbx .sbp-bar2 i {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--sec) 60%, transparent), var(--sec));
+}
+.sbx .sbp-floor {
+  border-radius: 16px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--sec) 12%, transparent), rgba(255, 255, 255, 0.02));
+  border-color: color-mix(in srgb, var(--sec) 20%, transparent);
+}
+.sbx .sbp-floor b {
+  color: #fff;
+}
+.sbx .sbpl-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--sec) 8%, transparent);
+}
+.sbx .sbpl-table td b {
+  color: var(--sec);
+}
+.sbx .sbx-tabs button.active {
+  background: color-mix(in srgb, var(--sec) 22%, transparent);
+  border-color: var(--sec);
+  color: #fff;
+}
+.sbx .sbx-top {
+  background: linear-gradient(120deg, color-mix(in srgb, var(--sec) 14%, rgba(255, 255, 255, 0.05)), rgba(255, 255, 255, 0.02)), rgba(9, 10, 24, 0.8);
+}
+.sbx .sbx-title {
+  background: linear-gradient(90deg, #fff 0%, var(--sec) 70%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.sky-island .sky-trunk {
+  fill: var(--sky-rock);
+}
+.sky-island .sky-tree circle {
+  fill: color-mix(in srgb, var(--sky-grass) 70%, black);
+}
+.sbp-dash {
+  grid-auto-flow: row dense;
+}
+.sbp-dash > .sbp-panel:nth-child(2) {
+  grid-row: span 3;
+}
