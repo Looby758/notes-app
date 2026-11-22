@@ -8,6 +8,7 @@ import { GameRunningError, localAiState, localComplete } from './localAi'
 import { logError } from './log'
 import { isTarget, OCR_LANGS, ocrLangByCode, ocrLangSetting, ocrLangUrl, onlineTranslateUrl, parseTranslation, readerForScript, tidyReading, TRANSLATE_SYSTEM, translatePrompt } from '@shared/translate'
 import type { SnipReading, SnipTranslation } from '@shared/types'
+import { matchSources } from '@shared/snipDisplays'
 import { acceleratorLabel, IS_MAC, SYSTEM_NAME } from '@shared/platform'
 
 /**
@@ -19,12 +20,14 @@ import { acceleratorLabel, IS_MAC, SYSTEM_NAME } from '@shared/platform'
  * there (or a game has it switched off), the snip says so and offers to set it up; Google
  * Translate is only used when you press its button.
  *
- * How: a picture of the screen under the pointer is taken first, then shown full screen in a
- * frameless window, so you're really drawing on a still picture of the screen.
+ * How: a picture of every monitor is taken first, then each is shown full screen in a frameless
+ * window on its own monitor, so you're really drawing on a still picture of the screen, on
+ * whichever monitor you like.
  */
 
-let win: BrowserWindow | null = null
-let shot: { png: Buffer; scale: number } | null = null
+/** One snip window per monitor, each over a still picture of its own monitor. */
+const wins = new Map<number, BrowserWindow>()
+const shots = new Map<number, { png: Buffer; scale: number }>()
 let registered = ''
 let shortcutError: string | undefined
 
@@ -34,22 +37,42 @@ interface Hooks {
 }
 let hooks: Hooks
 
+const openWins = (): BrowserWindow[] => [...wins.values()].filter((w) => !w.isDestroyed())
+
 export async function startSnip(): Promise<void> {
-  if (win && !win.isDestroyed()) {
-    win.focus()
+  const cursor = screen.getCursorScreenPoint()
+  const under = screen.getDisplayNearestPoint(cursor)
+  if (openWins().length) {
+    ;(wins.get(under.id) ?? openWins()[0])?.focus()
     return
   }
   hideCaptureWindow()
-  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
-  const { width, height } = display.size
-  const scale = display.scaleFactor
+  const displays = screen.getAllDisplays()
+  const pictures = new Map<number, { png: Buffer; scale: number }>()
   try {
     // Give a just-hidden window a moment to leave the screen.
     await new Promise((r) => setTimeout(r, 120))
-    const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: Math.round(width * scale), height: Math.round(height * scale) } })
-    const source = sources.find((s) => s.display_id === String(display.id)) ?? sources[0]
-    if (!source || source.thumbnail.isEmpty()) throw new Error('no picture')
-    shot = { png: source.thumbnail.toPNG(), scale }
+    // Big enough for the largest monitor at full resolution (each picture keeps its own shape).
+    const thumbnailSize = {
+      width: Math.max(...displays.map((d) => Math.round(d.size.width * d.scaleFactor))),
+      height: Math.max(...displays.map((d) => Math.round(d.size.height * d.scaleFactor)))
+    }
+    const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize })
+    const matched = matchSources(
+      displays.map((d) => d.id),
+      sources
+    )
+    for (const d of displays) {
+      const source = matched.get(d.id)
+      if (!source || source.thumbnail.isEmpty()) continue
+      const width = Math.round(d.size.width * d.scaleFactor)
+      const height = Math.round(d.size.height * d.scaleFactor)
+      const size = source.thumbnail.getSize()
+      // A smaller monitor's picture may come back bigger than the monitor: bring it to size.
+      const pic = size.width > width ? source.thumbnail.resize({ width, height, quality: 'best' }) : source.thumbnail
+      pictures.set(d.id, { png: pic.toPNG(), scale: d.scaleFactor })
+    }
+    if (!pictures.size) throw new Error('no picture')
   } catch (err) {
     logError('screen snip', err)
     hooks.showMain()
@@ -64,42 +87,54 @@ export async function startSnip(): Promise<void> {
     return
   }
 
-  win = new BrowserWindow({
-    ...display.bounds,
-    show: false,
-    frame: false,
-    resizable: false,
-    movable: false,
-    minimizable: false,
-    maximizable: false,
-    fullscreenable: false,
-    skipTaskbar: true,
-    hasShadow: false,
-    enableLargerThanScreen: true,
-    alwaysOnTop: true,
-    backgroundColor: '#000000',
-    title: 'Screen snip',
-    ...(IS_MAC ? { type: 'panel' } : {}),
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true
-    }
-  })
-  win.setAlwaysOnTop(true, 'screen-saver')
-  if (IS_MAC) win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
-  win.setBounds(display.bounds)
-  win.on('closed', () => {
-    win = null
-    shot = null
-  })
-  const w = win
-  w.webContents.once('did-finish-load', () => {
-    w.show()
-    w.focus()
-  })
-  loadRenderer(w, 'snip')
+  for (const display of displays) {
+    const picture = pictures.get(display.id)
+    if (!picture) continue
+    const w = new BrowserWindow({
+      ...display.bounds,
+      show: false,
+      frame: false,
+      resizable: false,
+      movable: false,
+      minimizable: false,
+      maximizable: false,
+      fullscreenable: false,
+      skipTaskbar: true,
+      hasShadow: false,
+      enableLargerThanScreen: true,
+      alwaysOnTop: true,
+      backgroundColor: '#000000',
+      title: 'Screen snip',
+      ...(IS_MAC ? { type: 'panel' } : {}),
+      webPreferences: {
+        preload: join(__dirname, '../preload/index.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true
+      }
+    })
+    const contentsId = w.webContents.id
+    wins.set(contentsId, w)
+    shots.set(contentsId, picture)
+    w.setAlwaysOnTop(true, 'screen-saver')
+    if (IS_MAC) w.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+    w.setBounds(display.bounds)
+    w.on('closed', () => {
+      wins.delete(contentsId)
+      shots.delete(contentsId)
+      // Closing one (Esc, or done with it) closes the snip on every monitor.
+      closeSnip()
+    })
+    const isUnder = display.id === under.id
+    w.webContents.once('did-finish-load', () => {
+      if (w.isDestroyed()) return
+      if (isUnder) {
+        w.show()
+        w.focus()
+      } else w.showInactive()
+    })
+    loadRenderer(w, 'snip')
+  }
 }
 
 const ocrFile = (code: string): string => join(ocrLangDir(), `${code}.traineddata.gz`)
@@ -169,7 +204,7 @@ function forDetecting(png: Uint8Array): Uint8Array {
 }
 
 function closeSnip(): void {
-  win?.close()
+  for (const w of openWins()) w.close()
 }
 
 /** (Re)registers the system-wide snip shortcut. */
@@ -191,7 +226,16 @@ export function setupSnip(h: Hooks): void {
   hooks = h
   ipcMain.handle('snip:start', () => startSnip())
   ipcMain.handle('snip:status', () => ({ shortcut: registered ? acceleratorLabel(registered) : '', error: shortcutError }))
-  ipcMain.handle('snip:image', () => (shot ? { png: new Uint8Array(shot.png), scale: shot.scale } : null))
+  // Each monitor's snip window gets the picture of its own monitor.
+  ipcMain.handle('snip:image', (e) => {
+    const shot = shots.get(e.sender.id)
+    return shot ? { png: new Uint8Array(shot.png), scale: shot.scale } : null
+  })
+  // A box was started on one monitor: the others drop theirs, so there's only ever one.
+  ipcMain.handle('snip:boxing', (e) => {
+    for (const [id, w] of wins) if (id !== e.sender.id && !w.isDestroyed()) w.webContents.send('snip:clear')
+    wins.get(e.sender.id)?.focus()
+  })
   // `lang`: an extra language reader to use with English (only once it's downloaded), or 'auto'
   // to spot the alphabet first and pick the reader for it.
   ipcMain.handle('snip:read', async (_e, png: Uint8Array, lang?: string): Promise<SnipReading> => {

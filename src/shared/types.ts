@@ -997,7 +997,7 @@ export interface NotesApi {
   openRobloxDownload(): Promise<void>
 
   // Screen snip (main/snip.ts)
-  /** Takes a picture of the screen under the pointer and opens the snip window over it. */
+  /** Takes a picture of every monitor and opens a snip window over each one. */
   startSnip(): Promise<void>
   snipStatus(): Promise<{ shortcut: string; error?: string }>
   /** Snip window: the picture of the screen (PNG) and the screen's scale factor. */
@@ -1011,6 +1011,10 @@ export interface NotesApi {
   /** Snip window: translates the text with the offline AI. Never goes online. */
   snipTranslate(text: string, target: string): Promise<SnipTranslation>
   snipClose(): Promise<void>
+  /** Snip window: a box was started here, so the snip windows on other monitors clear theirs. */
+  snipBoxing(): Promise<void>
+  /** Snip window: a box was started on another monitor, so clear this one's. */
+  onSnipClear(callback: () => void): () => void
   /** The snip's "Report bug": this picture of the boxed part of the screen goes to App Studio as a new bug. */
   snipReportBug(png: Uint8Array): Promise<void>
   /** A bug reported from the screen snip, with its picture (App Studio opens it). */
