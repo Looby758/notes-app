@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
 import { Frown, RotateCcw, Trophy, Undo2 } from 'lucide-react'
-import { addTile, biggest, canMove, GOAL, newBoard, slide, type Direction } from '../../lib/game2048'
+import { addTile, biggest, canMove, GOAL, newBoard, SIZE, slide, slideTiles, tileId, tilesOf, type Direction, type Tile } from '../../lib/game2048'
 import { loadRecords, saveGame, type GameRecord } from '../../lib/gameStats'
 import { formatTime } from '../../lib/sudoku'
 import GameStats from './GameStats'
@@ -54,6 +54,9 @@ export default function Game2048Page() {
   const [best, setBest] = useState<number>(() => Number(localStorage.getItem(BEST_KEY)) || 0)
   const [record, setRecord] = useState<GameRecord | undefined>(() => loadRecords()[STATS_ID])
   const [showWin, setShowWin] = useState(false)
+  const [tiles, setTiles] = useState<Tile[]>(() => tilesOf(game.board))
+  const [bump, setBump] = useState<Direction | null>(null)
+  const [gain, setGain] = useState<{ n: number; key: number } | null>(null)
   const board = useRef<HTMLDivElement>(null)
   const swipe = useRef<{ x: number; y: number } | null>(null)
 
@@ -99,32 +102,65 @@ export default function Game2048Page() {
     }
   }, [game.reached, game.over, game.counted, game.seconds])
 
+  // The latest game and tiles, so quick key presses each build on the one before.
+  const gameRef = useRef(game)
+  gameRef.current = game
+  const tilesRef = useRef(tiles)
+  tilesRef.current = tiles
+
+  // Tiles that slid into another one disappear once they've arrived.
+  useEffect(() => {
+    if (!tiles.some((t) => t.gone)) return
+    const t = setTimeout(() => setTiles((ts) => ts.filter((x) => !x.gone)), 130)
+    return () => clearTimeout(t)
+  }, [tiles])
+
   const go = (dir: Direction): void => {
-    setGame((g) => {
-      if (g.over) return g
-      const s = slide(g.board, dir)
-      if (!s.moved) return g
-      const { board: next, at } = addTile(s.board)
-      return {
-        ...g,
-        board: next,
-        score: g.score + s.gained,
-        moves: g.moves + 1,
-        reached: g.reached || biggest(next) >= GOAL,
-        over: !canMove(next),
-        before: { board: g.board, score: g.score },
-        fresh: [...s.joined, at]
-      }
-    })
+    const g = gameRef.current
+    if (g.over) return
+    const s = slide(g.board, dir)
+    if (!s.moved) {
+      // Nothing can move that way: a little nudge says so.
+      setBump(null)
+      requestAnimationFrame(() => setBump(dir))
+      return
+    }
+    const { board: next, at } = addTile(s.board)
+    const moved = slideTiles(tilesRef.current, dir).tiles
+    const ts = [...moved, { id: tileId(), value: next[at], at, isNew: true }]
+    const ng: Game = {
+      ...g,
+      board: next,
+      score: g.score + s.gained,
+      moves: g.moves + 1,
+      reached: g.reached || biggest(next) >= GOAL,
+      over: !canMove(next),
+      before: { board: g.board, score: g.score },
+      fresh: []
+    }
+    gameRef.current = ng
+    tilesRef.current = ts
+    setGame(ng)
+    setTiles(ts)
+    setBump(null)
+    if (s.gained) setGain({ n: s.gained, key: ng.moves })
   }
 
-  const undo = (): void => setGame((g) => (g.before && !g.over ? { ...g, board: g.before.board, score: g.before.score, before: null, fresh: [] } : g))
+  const undo = (): void => {
+    const g = gameRef.current
+    if (!g.before || g.over) return
+    setGame({ ...g, board: g.before.board, score: g.before.score, before: null, fresh: [] })
+    setTiles(tilesOf(g.before.board))
+  }
 
   const restart = (): void => {
     // Leaving a game you'd made a start on counts as a loss, like giving up.
     if (!game.counted && game.moves > 0) setRecord(saveGame(STATS_ID, false))
-    setGame(fresh())
+    const g = fresh()
+    setGame(g)
+    setTiles(tilesOf(g.board).map((t) => ({ ...t, isNew: true })))
     setShowWin(false)
+    setGain(null)
     board.current?.focus()
   }
 
@@ -175,6 +211,11 @@ export default function Game2048Page() {
             <div>
               <span>Score</span>
               <strong data-2048-score>{game.score}</strong>
+              {gain && (
+                <em key={gain.key} className="g2048-gain">
+                  +{gain.n}
+                </em>
+              )}
             </div>
             <div>
               <span>Best</span>
@@ -204,7 +245,7 @@ export default function Game2048Page() {
 
         <div
           ref={board}
-          className="g2048-board"
+          className={`g2048-board ${bump ? `bump-${bump}` : ''}`}
           tabIndex={0}
           role="grid"
           aria-label="2048 board. Use the arrow keys to slide the tiles."
@@ -212,15 +253,23 @@ export default function Game2048Page() {
           onPointerUp={onUp}
           data-2048-board
         >
-          {game.board.map((v, i) => (
-            <div
-              key={game.fresh.includes(i) ? `${i}-${game.moves}` : i}
-              className={`g2048-cell ${v ? `t${v > 2048 ? 'big' : v}` : ''} ${v >= 1024 ? 'wide' : ''} ${game.fresh.includes(i) ? 'pop' : ''}`}
-              data-tile={v || undefined}
-            >
-              {v || ''}
-            </div>
+          {game.board.map((_, i) => (
+            <div key={i} className="g2048-cell" />
           ))}
+          <div className="g2048-tiles">
+            {tiles.map((t) => (
+              <div
+                key={t.id}
+                className={['g2048-tile', `t${t.value > 2048 ? 'big' : t.value}`, t.value >= 1024 ? 'wide' : '', t.merged ? 'merged' : '', t.isNew ? 'new' : '', t.gone ? 'gone' : '']
+                  .filter(Boolean)
+                  .join(' ')}
+                style={{ '--r': Math.floor(t.at / SIZE), '--c': t.at % SIZE } as CSSProperties}
+                data-tile={t.gone ? undefined : t.value}
+              >
+                {t.value}
+              </div>
+            ))}
+          </div>
           {(game.over || showWin) && (
             <div className={`sudoku-won g2048-result ${game.over ? 'lost' : 'won'}`} data-2048-result>
               {game.over && !game.reached ? <Frown size={30} /> : <Trophy size={30} />}

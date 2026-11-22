@@ -84,3 +84,62 @@ export function newBoard(random: () => number = Math.random): number[] {
 export const canMove = (board: number[]): boolean => (['up', 'down', 'left', 'right'] as Direction[]).some((d) => slide(board, d).moved)
 
 export const biggest = (board: number[]): number => Math.max(...board)
+
+/** A tile on screen. Ids stay the same as a tile slides, so it can glide to its new square. */
+export interface Tile {
+  id: number
+  value: number
+  /** Square index, row by row. */
+  at: number
+  /** Just made by two tiles joining. */
+  merged?: boolean
+  /** Just appeared. */
+  isNew?: boolean
+  /** Slid into another tile and is about to disappear. */
+  gone?: boolean
+}
+
+let nextId = 1
+export const tileId = (): number => nextId++
+
+export function tilesOf(board: number[]): Tile[] {
+  return board.flatMap((value, at) => (value ? [{ id: tileId(), value, at }] : []))
+}
+
+/**
+ * Slides the tiles like `slide`, keeping track of where each one goes: tiles that join both glide to
+ * the same square (and are marked gone), and a new tile with the doubled number appears there.
+ */
+export function slideTiles(tiles: Tile[], dir: Direction): { tiles: Tile[]; moved: boolean } {
+  const live = tiles.filter((t) => !t.gone)
+  const byAt = new Map(live.map((t) => [t.at, t]))
+  const out: Tile[] = []
+  let moved = false
+  for (const squares of lines(dir)) {
+    const row = squares.map((sq) => byAt.get(sq)).filter((t): t is Tile => !!t)
+    let target = 0
+    for (let i = 0; i < row.length; i++) {
+      const t = row[i]
+      const n = row[i + 1]
+      const to = squares[target]
+      if (n && n.value === t.value) {
+        out.push({ id: t.id, value: t.value, at: to, gone: true }, { id: n.id, value: n.value, at: to, gone: true })
+        out.push({ id: tileId(), value: t.value * 2, at: to, merged: true })
+        moved = true
+        i++
+      } else {
+        if (t.at !== to) moved = true
+        out.push({ id: t.id, value: t.value, at: to })
+      }
+      target++
+    }
+  }
+  return { tiles: out, moved }
+}
+
+/** The board numbers the tiles stand for. */
+export function boardOf(tiles: Tile[]): number[] {
+  const b = new Array(SIZE * SIZE).fill(0)
+  for (const t of tiles) if (!t.gone) b[t.at] = t.value
+  return b
+}

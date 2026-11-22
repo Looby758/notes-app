@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addTile, canMove, newBoard, slide, slideLine } from './game2048'
+import { addTile, boardOf, canMove, newBoard, slide, slideLine, slideTiles, tileId, tilesOf } from './game2048'
 
 describe('2048', () => {
   it('slides and joins a line once per tile', () => {
@@ -36,5 +36,26 @@ describe('2048', () => {
     const { board, at } = addTile([2, 0, 4, 8], () => 0)
     expect(at).toBe(1)
     expect(board[1]).toBe(2)
+  })
+})
+
+describe('2048 tiles', () => {
+  it('track each tile and agree with the board slide', () => {
+    let seed = 7
+    const random = () => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296)
+    let board = newBoard(random)
+    let tiles = tilesOf(board)
+    const dirs = ['left', 'up', 'right', 'down'] as const
+    for (let i = 0; i < 300 && canMove(board); i++) {
+      const dir = dirs[Math.floor(random() * 4)]
+      const s = slide(board, dir)
+      const t = slideTiles(tiles, dir)
+      expect(t.moved).toBe(s.moved)
+      expect(boardOf(t.tiles)).toEqual(s.board)
+      if (!s.moved) continue
+      const added = addTile(s.board, random)
+      board = added.board
+      tiles = [...t.tiles.filter((x) => !x.gone), { id: tileId(), value: added.board[added.at], at: added.at, isNew: true }]
+    }
   })
 })
