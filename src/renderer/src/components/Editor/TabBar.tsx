@@ -118,7 +118,7 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === MINIGAMES_TAB) return 'Mini games'
   if (id === CLOCKS_TAB) return 'World clocks'
   if (id === COUNTDOWNS_TAB) return 'Countdowns'
-  if (id === SKYBLOCK_GOALS_TAB) return 'SkyBlock goals'
+  if (id === SKYBLOCK_GOALS_TAB) return 'SkyBlock'
   if (id === PUBLISHING_TAB) return 'Publishing'
   if (id === SCREENS_TAB) return 'Screens'
   if (id === MIXER_TAB) return 'Volume mixer'

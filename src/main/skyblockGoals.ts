@@ -15,11 +15,13 @@ import {
   profileData,
   readNbt,
   searchItems,
+  SB_DATA_VERSION,
   type SbData,
   type SbGoal,
   type SbProfileData
 } from '@shared/skyblockGoals'
 import type { SkyblockGoalsState, SkyblockItemHit } from '@shared/skyblockGoals'
+import { buildExtras, profileView, type SbProfileView } from '@shared/skyblockProfile'
 import { hypixel, KeyRejected, onSkyblockProfiles, skyblockAccount } from './skyblock'
 import { logError } from './log'
 
@@ -40,6 +42,10 @@ const MAX_GOALS = 40
 interface Stored {
   goals: SbGoal[]
   profile: SbProfileData | null
+  /** The profile page's view, and the last garden and museum answers (only the parts it uses). */
+  view?: SbProfileView | null
+  garden?: unknown
+  museum?: unknown
 }
 
 let stored: Stored | null = null
@@ -56,7 +62,7 @@ function load(): Stored {
   if (stored) return stored
   try {
     const raw = JSON.parse(readFileSync(goalsFile(), 'utf8'))
-    stored = { goals: Array.isArray(raw.goals) ? raw.goals : [], profile: raw.profile ?? null }
+    stored = { goals: Array.isArray(raw.goals) ? raw.goals : [], profile: raw.profile ?? null, view: raw.view ?? null, garden: raw.garden, museum: raw.museum }
   } catch {
     stored = { goals: [], profile: null }
   }
@@ -128,7 +134,7 @@ async function download(): Promise<void> {
     downloading = 'Reading recipes…'
     broadcast()
     const files: unknown[] = []
-    let leveling: unknown = null
+    const constants: Record<string, unknown> = {}
     const jobs: Promise<void>[] = []
     zip.forEach((path, entry) => {
       if (entry.dir) return
@@ -142,8 +148,18 @@ async function download(): Promise<void> {
             }
           })
         )
-      } else if (/(^|\/)constants\/leveling\.json$/.test(path)) {
-        jobs.push(entry.async('string').then((t) => void (leveling = JSON.parse(t))))
+      } else {
+        const m = /(^|\/)constants\/(leveling|pets|misc|bestiary|garden|fairy_souls|trophyfish)\.json$/.exec(path)
+        if (m)
+          jobs.push(
+            entry.async('string').then((t) => {
+              try {
+                constants[m[2]] = JSON.parse(t)
+              } catch {
+                // Leave that part out.
+              }
+            })
+          )
       }
     })
     await Promise.all(jobs)
@@ -155,9 +171,11 @@ async function download(): Promise<void> {
     } catch {
       // Keep the old tiers; recipes still work without them.
     }
-    const next: SbData = { at: Date.now(), items: buildItems(files), collections, ...buildLevels(leveling) }
+    const next: SbData = { at: Date.now(), version: SB_DATA_VERSION, items: buildItems(files), collections, ...buildLevels(constants.leveling), extras: buildExtras(constants, files) }
     writeJson(dataFile(), next)
     data = next
+    // A new item list can read more of the profile, so ask again.
+    void refreshProfile()
   } catch (err) {
     dataError = err instanceof Error ? err.message : String(err)
     logError('downloading the SkyBlock item list', err)
@@ -173,14 +191,32 @@ function countItems(b64: string): Record<string, number> {
   return countNbtItems(readNbt(gunzipSync(Buffer.from(b64, 'base64'))))
 }
 
+const decodeNbt = (b64: string): unknown => readNbt(gunzipSync(Buffer.from(b64, 'base64')))
+
 function takeProfiles(body: unknown): void {
   const acct = skyblockAccount()
+  const s = load()
   const p = profileData(body, acct.uuid, acct.profileId, Date.now(), countItems)
   if (!p) return
-  load().profile = p
+  s.profile = p
+  const d = getData()
+  if (d?.extras) {
+    try {
+      s.view = profileView(body, acct.uuid, acct.profileId, p.at, d, decodeNbt, { garden: s.garden, museum: s.museum })
+    } catch (err) {
+      logError('reading your SkyBlock profile', err)
+    }
+  }
   profileError = ''
   save()
   broadcast()
+}
+
+/** Only what the profile page reads from the museum answer (the donated items' own data is large). */
+function trimMuseum(body: unknown, uuid: string): unknown {
+  const me = (body as { members?: Record<string, { value?: unknown; items?: Record<string, unknown> }> })?.members?.[uuid.replace(/-/g, '').toLowerCase()]
+  if (!me) return { members: {} }
+  return { members: { [uuid.replace(/-/g, '').toLowerCase()]: { value: me.value, items: Object.fromEntries(Object.keys(me.items ?? {}).map((k) => [k, 1])) } } }
 }
 
 async function refreshProfile(): Promise<void> {
@@ -189,8 +225,18 @@ async function refreshProfile(): Promise<void> {
   refreshing = true
   broadcast()
   try {
-    takeProfiles(await hypixel(`/v2/skyblock/profiles?uuid=${acct.uuid}`, acct.key))
-    if (!load().profile) profileError = 'Hypixel has no SkyBlock profile for you yet.'
+    const body = await hypixel(`/v2/skyblock/profiles?uuid=${acct.uuid}`, acct.key)
+    takeProfiles(body)
+    const s = load()
+    if (!s.profile) profileError = 'Hypixel has no SkyBlock profile for you yet.'
+    // The garden and museum are asked for separately; a failure there doesn't stop the rest.
+    const pid = s.view?.profileId
+    if (pid) {
+      const [garden, museum] = await Promise.allSettled([hypixel(`/v2/skyblock/garden?profile=${pid}`, acct.key), hypixel(`/v2/skyblock/museum?profile=${pid}`, acct.key)])
+      if (garden.status === 'fulfilled') s.garden = garden.value
+      if (museum.status === 'fulfilled') s.museum = trimMuseum(museum.value, acct.uuid)
+      if (garden.status === 'fulfilled' || museum.status === 'fulfilled') takeProfiles(body)
+    }
   } catch (err) {
     profileError = err instanceof Error ? err.message : String(err)
     if (!(err instanceof KeyRejected)) logError('asking Hypixel for your SkyBlock items', err)
@@ -205,22 +251,24 @@ async function refreshProfile(): Promise<void> {
 export function setupSkyblockGoals(): void {
   // Every time the session summary asks Hypixel, the planner gets the same answer for free.
   onSkyblockProfiles((body) => {
-    if (load().goals.length) takeProfiles(body)
+    if (load().goals.length || load().view) takeProfiles(body)
   })
 
   // While you play, ask again now and then so the progress bars move.
   setInterval(() => {
     const acct = skyblockAccount()
     const p = load().profile
-    if (acct.playing && load().goals.length && (!p || Date.now() - p.at > PLAY_REFRESH - 5000)) void refreshProfile()
+    if (acct.playing && (load().goals.length || load().view) && (!p || Date.now() - p.at > PLAY_REFRESH - 5000)) void refreshProfile()
   }, Math.min(PLAY_REFRESH, 60_000))
 
   /** `page`: the Goals page is open, so fetch the item list if there isn't one (the Home box doesn't). */
   ipcMain.handle('skyblockGoals:state', (_e, page?: boolean) => {
     const d = getData()
-    if ((page || load().goals.length) && (!d || Date.now() - d.at > DATA_MAX_AGE) && !downloading && !dataError) void download()
+    if ((page || load().goals.length) && (!d || d.version !== SB_DATA_VERSION || Date.now() - d.at > DATA_MAX_AGE) && !downloading && !dataError) void download()
     return state()
   })
+  /** The profile page: everything about your profile (null until Orbit has asked Hypixel with the new item list). */
+  ipcMain.handle('skyblockProfile:view', () => load().view ?? null)
   ipcMain.handle('skyblockGoals:download', async () => {
     await download()
     return state()

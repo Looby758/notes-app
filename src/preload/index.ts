@@ -646,6 +646,7 @@ const api: NotesApi = {
   skyblockSetPersonalKey: (personal) => ipcRenderer.invoke('skyblock:setPersonalKey', personal),
   skyblockGoalsState: (page) => ipcRenderer.invoke('skyblockGoals:state', page),
   skyblockGoalsDownload: () => ipcRenderer.invoke('skyblockGoals:download'),
+  skyblockProfileView: () => ipcRenderer.invoke('skyblockProfile:view'),
   skyblockGoalsRefresh: () => ipcRenderer.invoke('skyblockGoals:refresh'),
   skyblockGoalsSearch: (query) => ipcRenderer.invoke('skyblockGoals:search', query),
   skyblockGoalsAdd: (id, amount) => ipcRenderer.invoke('skyblockGoals:add', id, amount),

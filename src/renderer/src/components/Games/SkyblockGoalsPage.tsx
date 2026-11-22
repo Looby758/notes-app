@@ -1,22 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Check, ChevronDown, ChevronRight, Download, HelpCircle, Lock, Pickaxe, Pin, PinOff, Plus, RefreshCw, Search, Target, Trash2 } from 'lucide-react'
-import {
-  API_SETTINGS_PATH,
-  describeHours,
-  MC_COLORS,
-  tagLabel,
-  type GoalPlan,
-  type PlanNode,
-  type SkyblockGoalsState,
-  type SkyblockItemHit
-} from '@shared/skyblockGoals'
+import { API_SETTINGS_PATH, describeHours, MC_COLORS, tagLabel, type GoalPlan, type PlanNode, type SkyblockGoalsState, type SkyblockItemHit } from '@shared/skyblockGoals'
 import { MODE_NAMES } from '@shared/skyblock'
 import { addHomeCard } from '../../lib/home'
 import { GAMES_TAB, openSpecialTab, SKYBLOCK_GOALS_TAB } from '../../lib/editorController'
 import { errorMessage } from '../../lib/paths'
 import { HomeBox } from '../Home/HomePage'
+import SkyblockProfile from './SkyblockProfile'
 
-addHomeCard({ id: 'skyblock-goals', order: 48, title: 'SkyBlock goals', Card: SkyblockGoalsHomeCard })
+addHomeCard({
+  id: 'skyblock-goals',
+  order: 48,
+  title: 'SkyBlock goals',
+  Card: SkyblockGoalsHomeCard
+})
 
 const clean = (err: unknown): string => errorMessage(err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
 const fmt = (n: number): string => Math.round(n).toLocaleString('en-GB')
@@ -58,6 +55,7 @@ export default function SkyblockGoalsPage() {
   const [state, setState] = useGoals(true)
   const [selected, setSelected] = useState<string | null>(null)
   const [view, setView] = useState<'tree' | 'raw' | 'blockers'>('tree')
+  const [page, setPage] = useState<'profile' | 'goals'>('profile')
   const [error, setError] = useState<string | null>(null)
 
   const run = useCallback(
@@ -81,7 +79,7 @@ export default function SkyblockGoalsPage() {
         <div className="sbg-head">
           <div>
             <h2>
-              <Target size={20} /> SkyBlock goals
+              <Target size={20} /> SkyBlock
             </h2>
             <p className="faint">
               {state.profile ? (
@@ -94,14 +92,35 @@ export default function SkyblockGoalsPage() {
               ) : (
                 'Set up Hypixel to see what you have'
               )}
-              {state.data && <> · item list from {new Date(state.data.at).toLocaleDateString([], { day: 'numeric', month: 'short' })}</>}
+              {state.data && (
+                <>
+                  {' '}
+                  · item list from{' '}
+                  {new Date(state.data.at).toLocaleDateString([], {
+                    day: 'numeric',
+                    month: 'short'
+                  })}
+                </>
+              )}
             </p>
           </div>
           <div className="sbg-head-actions">
-            <button className="btn" disabled={!state.ready || state.refreshing} onClick={() => run(() => window.api.skyblockGoalsRefresh())} title="Ask Hypixel what you have now" data-sbg-refresh>
+            <button
+              className="btn"
+              disabled={!state.ready || state.refreshing}
+              onClick={() => run(() => window.api.skyblockGoalsRefresh())}
+              title="Ask Hypixel what you have now"
+              data-sbg-refresh
+            >
               <RefreshCw size={13} className={state.refreshing ? 'spin' : ''} /> {state.refreshing ? 'Checking…' : 'Refresh'}
             </button>
-            <button className="btn" disabled={!!state.downloading} onClick={() => run(() => window.api.skyblockGoalsDownload())} title="Download the latest recipes from the NEU item repo" data-sbg-download>
+            <button
+              className="btn"
+              disabled={!!state.downloading}
+              onClick={() => run(() => window.api.skyblockGoalsDownload())}
+              title="Download the latest recipes from the NEU item repo"
+              data-sbg-download
+            >
               <Download size={13} /> Update recipes
             </button>
           </div>
@@ -155,43 +174,71 @@ export default function SkyblockGoalsPage() {
           </div>
         ) : (
           <>
-            <AddGoal onAdd={(id, amount) => run(() => window.api.skyblockGoalsAdd(id, amount)).then(() => setSelected(id))} />
-            {state.plans.length === 0 ? (
-              <div className="sbg-empty">
-                <Pickaxe size={22} />
-                <p>Search for something you want, like a Terminator or Aspect of the End, and add it as a goal.</p>
-              </div>
+            <div className="segmented sbg-pages">
+              <button className={page === 'profile' ? 'selected' : ''} onClick={() => setPage('profile')} data-sbg-page-profile>
+                Profile
+              </button>
+              <button className={page === 'goals' ? 'selected' : ''} onClick={() => setPage('goals')} data-sbg-page-goals>
+                Goals{state.plans.length ? ` (${state.plans.length})` : ''}
+              </button>
+            </div>
+            {page === 'profile' ? (
+              <SkyblockProfile />
             ) : (
-              <div className="sbg-body">
-                <ul className="sbg-list" data-sbg-list>
-                  {state.plans.map((p) => (
-                    <li key={p.goal.id} className={plan?.goal.id === p.goal.id ? 'active' : ''}>
-                      <button className="sbg-list-main" onClick={() => setSelected(p.goal.id)}>
-                        <span className="sbg-list-name" style={{ color: colorOf(p.color) }}>
-                          {p.goal.amount > 1 && <span className="faint">{p.goal.amount} × </span>}
-                          {p.name}
-                        </span>
-                        <span className="sbg-bar">
-                          <i style={{ width: `${Math.round(p.progress * 100)}%` }} />
-                        </span>
-                        <span className="faint sbg-list-meta">
-                          {Math.round(p.progress * 100)}% · {timeLeft(p) || 'No time estimate yet'}
-                          {p.blockers.some((b) => b.check.met === false) && (
-                            <>
-                              {' '}
-                              · <Lock size={10} /> {p.blockers.filter((b) => b.check.met === false).length}
-                            </>
-                          )}
-                        </span>
-                      </button>
-                      <button className="icon-btn" title={p.goal.pinned ? 'Unpin (hide from Home)' : 'Pin (show on Home)'} onClick={() => run(() => window.api.skyblockGoalsUpdate(p.goal.id, { pinned: !p.goal.pinned }))}>
-                        {p.goal.pinned ? <Pin size={13} className="sbg-pinned" /> : <PinOff size={13} />}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-                {plan && <GoalView plan={plan} view={view} setView={setView} run={run} hasProfile={!!state.profile} />}
-              </div>
+              <>
+                <AddGoal onAdd={(id, amount) => run(() => window.api.skyblockGoalsAdd(id, amount)).then(() => setSelected(id))} />
+                {state.plans.length === 0 ? (
+                  <div className="sbg-empty">
+                    <Pickaxe size={22} />
+                    <p>Search for something you want, like a Terminator or Aspect of the End, and add it as a goal.</p>
+                  </div>
+                ) : (
+                  <div className="sbg-body">
+                    <ul className="sbg-list" data-sbg-list>
+                      {state.plans.map((p) => (
+                        <li key={p.goal.id} className={plan?.goal.id === p.goal.id ? 'active' : ''}>
+                          <button className="sbg-list-main" onClick={() => setSelected(p.goal.id)}>
+                            <span className="sbg-list-name" style={{ color: colorOf(p.color) }}>
+                              {p.goal.amount > 1 && <span className="faint">{p.goal.amount} × </span>}
+                              {p.name}
+                            </span>
+                            <span className="sbg-bar">
+                              <i
+                                style={{
+                                  width: `${Math.round(p.progress * 100)}%`
+                                }}
+                              />
+                            </span>
+                            <span className="faint sbg-list-meta">
+                              {Math.round(p.progress * 100)}% · {timeLeft(p) || 'No time estimate yet'}
+                              {p.blockers.some((b) => b.check.met === false) && (
+                                <>
+                                  {' '}
+                                  · <Lock size={10} /> {p.blockers.filter((b) => b.check.met === false).length}
+                                </>
+                              )}
+                            </span>
+                          </button>
+                          <button
+                            className="icon-btn"
+                            title={p.goal.pinned ? 'Unpin (hide from Home)' : 'Pin (show on Home)'}
+                            onClick={() =>
+                              run(() =>
+                                window.api.skyblockGoalsUpdate(p.goal.id, {
+                                  pinned: !p.goal.pinned
+                                })
+                              )
+                            }
+                          >
+                            {p.goal.pinned ? <Pin size={13} className="sbg-pinned" /> : <PinOff size={13} />}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    {plan && <GoalView plan={plan} view={view} setView={setView} run={run} hasProfile={!!state.profile} />}
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
@@ -299,7 +346,20 @@ function GoalView({
         <div className="sbg-goal-actions">
           <label className="sbg-amount" title="How many you want">
             ×
-            <input type="number" min={1} defaultValue={plan.goal.amount} key={plan.goal.amount} onBlur={(e) => Number(e.target.value) !== plan.goal.amount && void run(() => window.api.skyblockGoalsUpdate(plan.goal.id, { amount: Number(e.target.value) }))} />
+            <input
+              type="number"
+              min={1}
+              defaultValue={plan.goal.amount}
+              key={plan.goal.amount}
+              onBlur={(e) =>
+                Number(e.target.value) !== plan.goal.amount &&
+                void run(() =>
+                  window.api.skyblockGoalsUpdate(plan.goal.id, {
+                    amount: Number(e.target.value)
+                  })
+                )
+              }
+            />
           </label>
           <button className="icon-btn" title="Remove this goal" onClick={() => run(() => window.api.skyblockGoalsRemove(plan.goal.id))} data-sbg-remove>
             <Trash2 size={13} />
@@ -415,8 +475,8 @@ function RawList({ plan }: { plan: GoalPlan }) {
         </button>
       )}
       <p className="faint sbg-note">
-        Shared materials are only counted once: anything used by a goal higher up the list isn’t counted again here. Rates come from your SkyBlock session
-        summaries, using only the sessions where that collection went up.
+        Shared materials are only counted once: anything used by a goal higher up the list isn’t counted again here. Rates come from your SkyBlock session summaries, using only the
+        sessions where that collection went up.
       </p>
     </div>
   )

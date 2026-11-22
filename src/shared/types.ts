@@ -9,6 +9,7 @@ import type { WikiSpoilerSettings } from './wikiSpoilers'
 import type { Prefs } from './prefs'
 import type { SkyblockStatus, SkyblockSummary } from './skyblock'
 import type { SkyblockGoalsState, SkyblockItemHit } from './skyblockGoals'
+import type { SbProfileView } from './skyblockProfile'
 import type { AutofillProfile, Bookmark, HistoryHit, ImportedLogin, SitePermission, SiteSettings, WebDownload } from './browser'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
@@ -1210,6 +1211,8 @@ export interface NotesApi {
   /** `page`: the Goals page is open, so the item list is downloaded if there isn't one yet. */
   skyblockGoalsState(page?: boolean): Promise<SkyblockGoalsState>
   skyblockGoalsDownload(): Promise<SkyblockGoalsState>
+  /** The SkyBlock profile page: levels, gear, accessories, pets, collections and the rest. */
+  skyblockProfileView(): Promise<SbProfileView | null>
   /** Asks Hypixel for what you own now. */
   skyblockGoalsRefresh(): Promise<SkyblockGoalsState>
   skyblockGoalsSearch(query: string): Promise<SkyblockItemHit[]>

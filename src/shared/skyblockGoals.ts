@@ -29,6 +29,8 @@ export interface SbItem {
 
 export interface SbCollectionInfo {
   name: string
+  /** Farming, Mining, Combat… */
+  group?: string
   /** How many you need to have collected for tier 1, 2, 3… */
   tiers: number[]
 }
@@ -43,7 +45,14 @@ export interface SbData {
   slayerXp: Record<string, number[]>
   /** XP for each HotM tier, one after another. */
   hotmXp: number[]
+  /** Bumped when the saved file needs rebuilding (new things read from the repo). */
+  version?: number
+  /** Everything the profile page needs from the repo (skyblockProfile.ts). */
+  extras?: import('./skyblockProfile').SbExtras
 }
+
+/** The recipe book's format; an older saved file is downloaded again. */
+export const SB_DATA_VERSION = 2
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
@@ -151,14 +160,15 @@ export function buildItems(files: unknown[]): Record<string, SbItem> {
 export function buildCollections(body: unknown): Record<string, SbCollectionInfo> {
   const out: Record<string, SbCollectionInfo> = {}
   const groups = isObj(body) && isObj(body.collections) ? body.collections : {}
-  for (const g of Object.values(groups)) {
+  for (const [groupId, g] of Object.entries(groups)) {
     if (!isObj(g) || !isObj(g.items)) continue
+    const group = typeof g.name === 'string' ? g.name : groupId
     for (const [id, item] of Object.entries(g.items)) {
       if (!isObj(item)) continue
       const tiers = (Array.isArray(item.tiers) ? item.tiers.filter(isObj) : [])
         .sort((a, b) => (num(a.tier) ?? 0) - (num(b.tier) ?? 0))
         .map((t) => num(t.amountRequired) ?? 0)
-      out[neuId(id)] = { name: typeof item.name === 'string' ? item.name : id, tiers }
+      out[neuId(id)] = { name: typeof item.name === 'string' ? item.name : id, group, tiers }
     }
   }
   return out
