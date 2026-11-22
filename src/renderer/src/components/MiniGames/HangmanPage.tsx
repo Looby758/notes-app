@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Flag, Lightbulb, RotateCcw, Skull, Trophy, Type } from 'lucide-react'
 import { HANGMAN_THEMES, hangmanClue, hangmanState, hangmanThemeOf, MAX_WRONG, pickHangmanWord, shownLetters, wrongGuesses, type HangmanTheme } from '../../lib/hangman'
 import { loadRecords, saveGame, type GameRecord } from '../../lib/gameStats'
-import { petCheer } from '../../lib/pet'
+import { celebrate } from '../../lib/celebrate'
 import GameStats from './GameStats'
 import { useGameKeys } from './useGameKeys'
+import { useChanged } from './useChanged'
 
 /** A round in progress (or just finished). */
 interface Game {
@@ -61,26 +62,26 @@ function Drawing({ wrong, walker, lost }: { wrong: number; walker: boolean; lost
   return (
     <svg className={`hangman-drawing ${walker ? 'walker' : ''} ${lost ? 'lost' : ''}`} viewBox="0 0 200 220" aria-label={`${wrong} of ${MAX_WRONG} wrong`}>
       <g className="hangman-gallows">
-        <line x1="20" y1="210" x2="140" y2="210" />
-        <line x1="50" y1="210" x2="50" y2="20" />
-        <line x1="50" y1="20" x2="130" y2="20" />
-        <line x1="50" y1="50" x2="80" y2="20" />
-        <line x1="130" y1="20" x2="130" y2="45" />
+        <line x1="20" y1="210" x2="140" y2="210" pathLength={1} />
+        <line x1="50" y1="210" x2="50" y2="20" pathLength={1} />
+        <line x1="50" y1="20" x2="130" y2="20" pathLength={1} />
+        <line x1="50" y1="50" x2="80" y2="20" pathLength={1} />
+        <line x1="130" y1="20" x2="130" y2="45" pathLength={1} />
       </g>
       <g className="hangman-man">
-        <circle className={show(1)} cx="130" cy="65" r="20" />
+        <circle className={show(1)} cx="130" cy="65" r="20" pathLength={1} />
         {walker && wrong >= 1 && (
           <g className="hangman-eyes">
             <circle cx="123" cy="62" r="3" />
             <circle cx="137" cy="62" r="3" />
           </g>
         )}
-        <line className={show(2)} x1="130" y1="85" x2="130" y2="145" />
+        <line className={show(2)} x1="130" y1="85" x2="130" y2="145" pathLength={1} />
         {/* A walker reaches out; a person's arms hang down. */}
-        <line className={show(3)} x1="130" y1="100" x2={walker ? 165 : 105} y2={walker ? 100 : 125} />
-        <line className={show(4)} x1="130" y1="100" x2={walker ? 168 : 155} y2={walker ? 110 : 125} />
-        <line className={show(5)} x1="130" y1="145" x2="108" y2="185" />
-        <line className={show(6)} x1="130" y1="145" x2="152" y2="185" />
+        <line className={show(3)} x1="130" y1="100" x2={walker ? 165 : 105} y2={walker ? 100 : 125} pathLength={1} />
+        <line className={show(4)} x1="130" y1="100" x2={walker ? 168 : 155} y2={walker ? 110 : 125} pathLength={1} />
+        <line className={show(5)} x1="130" y1="145" x2="108" y2="185" pathLength={1} />
+        <line className={show(6)} x1="130" y1="145" x2="152" y2="185" pathLength={1} />
       </g>
     </svg>
   )
@@ -106,7 +107,7 @@ export default function HangmanPage() {
     const rec = saveGame(statsId(game.theme), state === 'won')
     setRecords((r) => ({ ...r, [statsId(game.theme)]: rec }))
     setGame((g) => ({ ...g, counted: true }))
-    if (state === 'won') petCheer()
+    if (state === 'won') celebrate()
   }, [state, game.counted, game.theme])
 
   const guess = (letter: string): void => {
@@ -136,6 +137,7 @@ export default function HangmanPage() {
   })
 
   const letters = shownLetters(game.word, game.guessed)
+  const oops = useChanged([wrong.length], (now, before) => now > before).size > 0
   const left = MAX_WRONG - wrong.length
 
   return (
@@ -194,11 +196,13 @@ export default function HangmanPage() {
         </div>
 
         <div className="hangman-play">
-          <Drawing wrong={state === 'lost' ? MAX_WRONG : wrong.length} walker={twd} lost={state === 'lost'} />
+          <div className={`hangman-drawing-wrap ${oops ? 'oops' : ''}`} key={game.word}>
+            <Drawing wrong={state === 'lost' ? MAX_WRONG : wrong.length} walker={twd} lost={state === 'lost'} />
+          </div>
           <div className="hangman-side">
-            <div className="hangman-word" aria-label="The word so far" data-hangman-word>
+            <div className={`hangman-word ${state}`} aria-label="The word so far" data-hangman-word>
               {letters.map((l, i) => (
-                <span key={i} className={`hangman-letter ${l ? 'shown' : ''} ${!l && state === 'lost' ? 'missed' : ''}`}>
+                <span key={i} className={`hangman-letter ${l ? 'shown' : ''} ${!l && state === 'lost' ? 'missed' : ''}`} style={{ '--i': i } as CSSProperties}>
                   {(l ?? (state === 'lost' ? game.word[i] : '')).toUpperCase()}
                 </span>
               ))}

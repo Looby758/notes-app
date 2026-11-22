@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type Keyboard
 import { Bomb, Flag, RotateCcw, Trophy, X } from 'lucide-react'
 import { countsOf, isCleared, layMines, levelOf, LEVELS, neighbours, reveal, type Level } from '../../lib/minesweeper'
 import { formatTime } from '../../lib/sudoku'
+import { celebrate } from '../../lib/celebrate'
+import { useChanged } from '../MiniGames/useChanged'
 
 /** A game in progress. `mine` is null until the first click, so the first click is never a mine. */
 interface Game {
@@ -57,6 +59,7 @@ export default function MinesweeperPage() {
   // A new fastest time for this level?
   useEffect(() => {
     if (game.state !== 'won') return
+    celebrate()
     setBest((b) => {
       if (b[game.level] !== undefined && b[game.level]! <= game.seconds) return b
       const updated = { ...b, [game.level]: game.seconds }
@@ -77,6 +80,11 @@ export default function MinesweeperPage() {
 
   const counts = useMemo(() => (game.mine ? countsOf(game.mine, rows, cols) : null), [game.mine, rows, cols])
   const flagsLeft = mines - game.flags.filter(Boolean).length
+  // Squares that just opened ripple out from the one clicked; flags drop in.
+  const origin = useRef<number | null>(null)
+  const opened = useChanged(game.open)
+  const flagDropped = useChanged(game.flags, (now, before) => now && !before)
+  const distance = (a: number, b: number): number => Math.max(Math.abs(Math.floor(a / cols) - Math.floor(b / cols)), Math.abs((a % cols) - (b % cols)))
 
   const start = (level: Level): void => {
     setGame(newGame(level))
@@ -120,6 +128,7 @@ export default function MinesweeperPage() {
 
   const onCell = (i: number) => (e: MouseEvent): void => {
     setCursor(i)
+    origin.current = i
     if (e.type === 'contextmenu') {
       e.preventDefault()
       flag(i)
@@ -216,14 +225,23 @@ export default function MinesweeperPage() {
                 isOpen || showMine ? 'open' : '',
                 isOpen && !isMine && n ? `n${n}` : '',
                 i === game.boom ? 'boom' : '',
-                i === cursor ? 'cursor' : ''
+                i === cursor ? 'cursor' : '',
+                isOpen && opened.has(i) ? 'opened' : '',
+                flagDropped.has(i) ? 'flagged-now' : '',
+                showMine && game.boom !== null && i !== game.boom ? 'blast' : ''
               ]
+              const from = game.state === 'lost' && game.boom !== null ? game.boom : origin.current
+              const style = {
+                '--d': from === null ? 0 : Math.min(distance(i, from), 24),
+                '--rc': Math.floor(i / cols) + (i % cols)
+              } as CSSProperties
               return (
                 <button
                   key={i}
                   className={classes.filter(Boolean).join(' ')}
                   onClick={onCell(i)}
                   onContextMenu={onCell(i)}
+                  style={style}
                   tabIndex={-1}
                   aria-label={`Row ${Math.floor(i / cols) + 1}, column ${(i % cols) + 1}${isOpen ? (n ? `: ${n}` : ', clear') : flagged ? ', flagged' : ''}`}
                   data-cell={i}

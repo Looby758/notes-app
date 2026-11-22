@@ -3,8 +3,10 @@ import { MousePointerClick, RotateCcw, Sparkles, Spade, Trophy } from 'lucide-re
 import { bestMove, canFinish, deal, drawCards, finishStep, isRed, isWon, move, picked, rankName, SUITS, type Card, type Deal, type From, type To } from '../../lib/solitaire'
 import { loadRecords, saveGame, type GameRecord } from '../../lib/gameStats'
 import { formatTime } from '../../lib/sudoku'
+import { celebrate } from '../../lib/celebrate'
 import GameStats from './GameStats'
 import { useGameKeys } from './useGameKeys'
+import { useChanged } from './useChanged'
 
 interface Game {
   deal: Deal
@@ -98,6 +100,17 @@ export default function SolitairePage() {
   const table = useRef<HTMLDivElement>(null)
   const d = game.deal
   const won = isWon(d)
+  // A new deal flies out from the stock; a card landing on a foundation glows.
+  const [dealt, setDealt] = useState(0)
+  useEffect(() => {
+    if (!dealt) return
+    const t = setTimeout(() => setDealt(0), 1400)
+    return () => clearTimeout(t)
+  }, [dealt])
+  const landed = useChanged(
+    d.foundations.map((f) => f.length),
+    (now, before) => now > before
+  )
   const record = records[statsId(d.draw)]
 
   useEffect(() => {
@@ -129,6 +142,7 @@ export default function SolitairePage() {
   useEffect(() => {
     if (!won || game.counted) return
     saveGame(statsId(d.draw), true, game.seconds)
+    celebrate('big')
     setRecords(loadRecords())
     setGame((g) => ({ ...g, counted: true }))
   }, [won, game.counted, game.seconds, d.draw])
@@ -163,6 +177,7 @@ export default function SolitairePage() {
       setRecords(loadRecords())
     }
     setGame(fresh(draw))
+    setDealt(Date.now())
     setSelected(null)
     setFinishing(false)
     setDrag(null)
@@ -342,7 +357,7 @@ export default function SolitairePage() {
           </span>
         </div>
 
-        <div className={`sol-table ${drag?.moving ? 'dragging' : ''}`} ref={table} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => setDrag(null)} data-sol-table>
+        <div className={`sol-table ${drag?.moving ? 'dragging' : ''} ${dealt ? 'dealing' : ''} ${won ? 'won' : ''}`} ref={table} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => setDrag(null)} data-sol-table>
           <div className="sol-top">
             <button className={`sol-slot sol-stock ${d.stock.length ? 'has' : ''}`} onClick={draw} aria-label={d.stock.length ? `Stock, ${d.stock.length} cards` : 'Turn the waste back over'} data-sol-stock>
               {d.stock.length ? (
@@ -375,7 +390,7 @@ export default function SolitairePage() {
               const top = pile[pile.length - 1]
               const to: To = { pile: 'foundation', f }
               return (
-                <div key={f} className={`sol-slot sol-home ${dropState(to)}`} onClick={top ? undefined : () => clickEmpty(to)} data-sol-home={f}>
+                <div key={f} className={`sol-slot sol-home ${dropState(to)} ${landed.has(f) ? 'landed' : ''}`} style={{ '--f': f } as CSSProperties} onClick={top ? undefined : () => clickEmpty(to)} data-sol-home={f}>
                   <span className="sol-home-mark">A</span>
                   {pile.length > 1 && <div className={`sol-card up still ${isRed(pile[pile.length - 2].suit) ? 'red' : ''}`}>{<CardFace card={pile[pile.length - 2]} />}</div>}
                   {top && cardEl(top, { pile: 'foundation', f })}
@@ -392,7 +407,7 @@ export default function SolitairePage() {
             {d.tableau.map((pile, col) => {
               const to: To = { pile: 'tableau', col }
               return (
-                <div key={col} className={`sol-pile ${dropState(to)}`} onClick={(e) => e.target === e.currentTarget && clickEmpty(to)} data-sol-pile={col}>
+                <div key={col} className={`sol-pile ${dropState(to)}`} style={{ '--col': col } as CSSProperties} onClick={(e) => e.target === e.currentTarget && clickEmpty(to)} data-sol-pile={col}>
                   <span className="sol-slot sol-empty" onClick={() => clickEmpty(to)} />
                   {pile.map((card, index) => {
                     const downAbove = pile.slice(0, index).filter((c) => !c.up).length

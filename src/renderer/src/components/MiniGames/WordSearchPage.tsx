@@ -4,7 +4,7 @@ import { displayWord, makeWordSearch, sizeOf, snapLine, themeOf, walkingDeadSear
 import { WORD_SEARCH_THEMES, type WordSearchTheme } from '../../lib/wordSearchWords'
 import { loadRecords, saveGame, type GameRecord } from '../../lib/gameStats'
 import { formatTime } from '../../lib/sudoku'
-import { petCheer } from '../../lib/pet'
+import { celebrate } from '../../lib/celebrate'
 import GameStats from './GameStats'
 
 /** A puzzle in progress (or just finished). */
@@ -157,7 +157,7 @@ export default function WordSearchPage() {
       // A puzzle with hints still counts as a win, but not for the best time.
       const rec = saveGame(id, true, game.hints ? undefined : game.seconds)
       setRecords((r) => ({ ...r, [id]: rec }))
-      petCheer()
+      celebrate()
     }
   }
 
@@ -213,7 +213,16 @@ export default function WordSearchPage() {
 
   // Each square's colour: the most recently found word that covers it.
   const colour: (number | undefined)[] = new Array(grid * grid)
-  game.found.forEach((w, n) => puzzle.words.find((p) => p.word === w)?.cells.forEach((c) => (colour[c] = hueOf(n))))
+  // ...and its place in that word, so a found word lights up letter by letter.
+  const place: number[] = new Array(grid * grid).fill(0)
+  game.found.forEach((w, n) =>
+    puzzle.words
+      .find((p) => p.word === w)
+      ?.cells.forEach((c, k) => {
+        colour[c] = hueOf(n)
+        place[c] = k
+      })
+  )
   const selected = new Set(selection)
   const cellSize = grid <= 10 ? 40 : grid <= 13 ? 34 : 30
   const size = sizeOf(puzzle.size)
@@ -300,7 +309,7 @@ export default function WordSearchPage() {
                 <div
                   key={i}
                   className={`wordsearch-cell ${hue !== undefined ? 'found' : ''} ${selected.has(i) ? 'selected' : ''} ${anchor === i ? 'anchor' : ''} ${hinted === i ? 'hinted' : ''}`}
-                  style={hue !== undefined ? ({ '--ws-hue': hue } as CSSProperties) : undefined}
+                  style={{ ...(hue !== undefined ? { '--ws-hue': hue } : {}), '--k': place[i], '--rc': Math.floor(i / grid) + (i % grid) } as CSSProperties}
                   onPointerDown={(e) => onDown(e, i)}
                   role="gridcell"
                   data-cell={i}

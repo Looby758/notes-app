@@ -24,6 +24,7 @@ import { pieceSrc } from '../../lib/chessPieces'
 import { loadRecords, saveGame, type GameRecord } from '../../lib/gameStats'
 import { playSound } from '../../lib/sounds'
 import { formatTime } from '../../lib/sudoku'
+import { celebrate } from '../../lib/celebrate'
 import GameStats from './GameStats'
 import { useGameKeys } from './useGameKeys'
 
@@ -185,6 +186,14 @@ export default function ChessPage() {
     }, 1000)
     return () => clearInterval(tick)
   }, [running])
+
+  // Confetti for a checkmate you gave the computer, or for either side in a game between two people.
+  const cheered = useRef(game.end)
+  useEffect(() => {
+    if (game.end === cheered.current) return
+    cheered.current = game.end
+    if (game.end?.reason === 'checkmate' && (game.mode !== 'computer' || game.end.winner === game.you)) celebrate()
+  }, [game.end, game.mode, game.you])
 
   // Count games against the computer: only a win keeps the streak going.
   useEffect(() => {

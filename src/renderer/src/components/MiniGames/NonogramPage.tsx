@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, ty
 import { Grid2x2Check, Lightbulb, RotateCcw, Trophy, Undo2, X } from 'lucide-react'
 import { colOf, isNonoSolved, lineDone, makeNonogram, nonoLevelOf, NONO_LEVELS, rowOf, type Mark, type Nonogram, type NonoLevel } from '../../lib/nonogram'
 import { formatTime } from '../../lib/sudoku'
-import { petCheer } from '../../lib/pet'
+import { celebrate } from '../../lib/celebrate'
+import { useChanged } from './useChanged'
 
 /** A game in progress. */
 interface Game {
@@ -60,13 +61,14 @@ export default function NonogramPage() {
   const paint = useRef<Paint | null>(null)
   const board = useRef<HTMLDivElement>(null)
   const { rows, cols, clues, solution } = game.puzzle
+  const changed = useChanged(game.marks)
 
   useEffect(() => save(GAME_KEY, game), [game])
   useEffect(() => board.current?.focus(), [])
 
   const wasWon = useRef(game.won)
   useEffect(() => {
-    if (game.won && !wasWon.current) petCheer()
+    if (game.won && !wasWon.current) celebrate('big')
     wasWon.current = game.won
   }, [game.won])
 
@@ -281,7 +283,8 @@ export default function NonogramPage() {
                   c % 5 === 4 && c < cols - 1 ? 'edge-right' : '',
                   r % 5 === 4 && r < rows - 1 ? 'edge-bottom' : '',
                   i === cursor ? 'cursor' : '',
-                  r === curRow || c === curCol ? 'related' : ''
+                  r === curRow || c === curCol ? 'related' : '',
+                  changed.has(i) && m ? 'placed' : ''
                 ]
                 return (
                   <button
@@ -290,6 +293,7 @@ export default function NonogramPage() {
                     onPointerDown={onPointerDown(i)}
                     onPointerEnter={onPointerEnter(i)}
                     onContextMenu={(e) => e.preventDefault()}
+                    style={{ '--rc': r + c } as CSSProperties}
                     tabIndex={-1}
                     aria-label={`Row ${r + 1}, column ${c + 1}${m === 1 ? ', filled' : m === 2 ? ', crossed' : ''}`}
                     data-cell={i}

@@ -104,6 +104,10 @@ export interface StepEvents {
   broke: number
   lostLife: boolean
   levelUp: boolean
+  /** Bricks the ball hit this step (broken or just cracked), for sparks and points. */
+  hits: { x: number; y: number; row: number; broke: boolean; points: number }[]
+  /** The ball came off the paddle. */
+  paddle: boolean
 }
 
 /**
@@ -111,7 +115,7 @@ export interface StepEvents {
  * sub-steps keep a fast ball from going through a brick.
  */
 export function step(g: Breakout, dt: number, target: number): { game: Breakout; events: StepEvents } {
-  const events: StepEvents = { broke: 0, lostLife: false, levelUp: false }
+  const events: StepEvents = { broke: 0, lostLife: false, levelUp: false, hits: [], paddle: false }
   if (g.over) return { game: g, events }
   const paddle = clampPaddle(target)
   if (!g.launched) return { game: { ...g, paddle, ball: restingBall(paddle) }, events }
@@ -147,6 +151,7 @@ export function step(g: Breakout, dt: number, target: number): { game: Breakout;
       ball.vx = Math.sin(angle) * speed
       ball.vy = -Math.cos(angle) * speed
       ball.y = PADDLE_Y - BALL_R
+      events.paddle = true
     }
 
     // Bricks: bounce off the side the ball came in through.
@@ -161,8 +166,10 @@ export function step(g: Breakout, dt: number, target: number): { game: Breakout;
         ball.vy = ball.y < b.y + b.h / 2 ? -Math.abs(ball.vy) : Math.abs(ball.vy)
       }
       bricks = b.hits > 1 ? bricks.map((x, j) => (j === hit ? { ...x, hits: x.hits - 1 } : x)) : bricks.filter((_, j) => j !== hit)
-      score += b.hits > 1 ? 5 : 10 * g.level
+      const points = b.hits > 1 ? 5 : 10 * g.level
+      score += points
       if (b.hits === 1) events.broke++
+      events.hits.push({ x: b.x + b.w / 2, y: b.y + b.h / 2, row: b.row, broke: b.hits === 1, points })
     }
 
     // Missed it.

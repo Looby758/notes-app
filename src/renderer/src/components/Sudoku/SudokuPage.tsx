@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { Eraser, Grid3x3, Lightbulb, Pencil, RotateCcw, Trophy, Undo2 } from 'lucide-react'
 import {
   boxOf,
@@ -13,7 +13,8 @@ import {
   type Difficulty,
   type Grid
 } from '../../lib/sudoku'
-import { petCheer } from '../../lib/pet'
+import { celebrate } from '../../lib/celebrate'
+import { useChanged } from '../MiniGames/useChanged'
 
 /** A game in progress. `notes` holds the small pencil marks: bit n is set when n is pencilled in. */
 interface Game {
@@ -72,7 +73,7 @@ export default function SudokuPage() {
   // Solving it (not opening the page on a game that was already solved) gets a cheer from the pet.
   const wasWon = useRef(game.won)
   useEffect(() => {
-    if (game.won && !wasWon.current) petCheer()
+    if (game.won && !wasWon.current) celebrate('big')
     wasWon.current = game.won
   }, [game.won])
 
@@ -101,6 +102,27 @@ export default function SudokuPage() {
     game.grid.forEach((n, i) => n && n !== game.solution[i] && out.add(i))
     return out
   }, [game.grid, game.solution])
+
+  // Rows, columns and boxes that are full and right: a new one flashes.
+  const doneUnits = useMemo(() => {
+    const units: number[][] = []
+    for (let u = 0; u < 9; u++) {
+      units.push(game.grid.map((_, i) => i).filter((i) => rowOf(i) === u))
+      units.push(game.grid.map((_, i) => i).filter((i) => colOf(i) === u))
+      units.push(game.grid.map((_, i) => i).filter((i) => boxOf(i) === u))
+    }
+    return units.map((cells) => cells.every((i) => game.grid[i] && !wrong.has(i)))
+  }, [game.grid, wrong])
+  const placed = useChanged(game.grid)
+  const newlyDone = useChanged(doneUnits, (now, before) => now && !before)
+  const flash = new Map<number, number>()
+  for (const u of newlyDone) {
+    const kind = u % 3
+    const n = Math.floor(u / 3)
+    game.grid.forEach((_, i) => {
+      if ((kind === 0 ? rowOf(i) : kind === 1 ? colOf(i) : boxOf(i)) === n) flash.set(i, kind === 0 ? colOf(i) : kind === 1 ? rowOf(i) : (rowOf(i) % 3) * 3 + (colOf(i) % 3))
+    })
+  }
 
   const left = useMemo(() => {
     const counts = new Array(10).fill(9)
@@ -259,13 +281,16 @@ export default function SudokuPage() {
                 n && n === selNumber && i !== sel ? 'same' : '',
                 wrong.has(i) && !given ? 'wrong' : '',
                 colOf(i) % 3 === 2 && colOf(i) !== 8 ? 'edge-right' : '',
-                rowOf(i) % 3 === 2 && rowOf(i) !== 8 ? 'edge-bottom' : ''
+                rowOf(i) % 3 === 2 && rowOf(i) !== 8 ? 'edge-bottom' : '',
+                n && placed.has(i) ? 'placed' : '',
+                flash.has(i) && !game.won ? 'flash' : ''
               ]
               return (
                 <button
                   key={i}
                   className={classes.filter(Boolean).join(' ')}
                   onClick={() => setSelected(i)}
+                  style={{ '--rc': rowOf(i) + colOf(i), '--k': flash.get(i) ?? 0 } as CSSProperties}
                   tabIndex={-1}
                   aria-label={`Row ${rowOf(i) + 1}, column ${colOf(i) + 1}${n ? `: ${n}` : ', empty'}`}
                   data-cell={i}

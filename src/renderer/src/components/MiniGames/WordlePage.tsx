@@ -14,7 +14,7 @@ import {
   type WordleMode,
   type WordleStats
 } from '../../lib/wordle'
-import { petCheer } from '../../lib/pet'
+import { celebrate } from '../../lib/celebrate'
 
 /** A round in progress (or just finished). */
 interface Game {
@@ -131,7 +131,7 @@ export default function WordlePage() {
       save(STATS_KEY, updated)
       return updated
     })
-    if (won) petCheer()
+    if (won) celebrate()
   }
 
   const choose = (m: WordleMode, len: number): void => {
@@ -286,7 +286,8 @@ export default function WordlePage() {
               return (
                 <div
                   key={current ? `typing-${shake}` : r}
-                  className={`wordle-row ${current && shake ? 'shake' : ''} ${r === revealRow ? 'reveal' : ''}`}
+                  className={`wordle-row ${current && shake ? 'shake' : ''} ${r === revealRow ? 'reveal' : ''} ${r === revealRow && game.result === 'won' ? 'win' : ''} ${current ? 'current' : ''}`}
+                  style={{ '--wordle-len': length } as CSSProperties}
                   role="row"
                   data-wordle-row={r}
                 >

@@ -15,7 +15,7 @@ import {
   type Spot
 } from '../../lib/jigsaw'
 import { formatTime } from '../../lib/sudoku'
-import { petCheer } from '../../lib/pet'
+import { celebrate } from '../../lib/celebrate'
 
 /** A puzzle in progress. Positions are in the puzzle's units (the picture is BOARD_WIDTH wide). */
 interface Game {
@@ -159,7 +159,7 @@ export default function JigsawPage() {
 
   const wasWon = useRef(game?.won ?? false)
   useEffect(() => {
-    if (game?.won && !wasWon.current) petCheer()
+    if (game?.won && !wasWon.current) celebrate('big')
     wasWon.current = game?.won ?? false
   }, [game?.won])
 

@@ -18,7 +18,7 @@ import {
 } from '../../lib/blackjack'
 import { isRed, type Card } from '../../lib/solitaire'
 import { loadRecords, saveGame, type GameRecord } from '../../lib/gameStats'
-import { petCheer } from '../../lib/pet'
+import { celebrate } from '../../lib/celebrate'
 import { CardFace, cardLabel } from './SolitairePage'
 import GameStats from './GameStats'
 import { useGameKeys } from './useGameKeys'
@@ -90,7 +90,7 @@ export default function BlackjackPage() {
     if (next.phase === 'done' && round.phase !== 'done') {
       const net = netResult(next)
       if (net !== 0) setRecord(saveGame(STATS_ID, net > 0))
-      if (net > 0) petCheer()
+      if (net > 0) celebrate('small')
       if (next.bank > most) {
         setMost(next.bank)
         save(MOST_KEY, String(next.bank))
@@ -238,7 +238,7 @@ export default function BlackjackPage() {
                     </button>
                   </div>
                   <span className="bj-bet-now">
-                    Bet <strong data-blackjack-bet>{bet}</strong>
+                    Bet <strong key={bet} className="bj-bet-amount" data-blackjack-bet>{bet}</strong>
                   </span>
                   <button className="btn btn-primary" onClick={dealHand} disabled={bet <= 0} title="Deal (Enter)" data-blackjack-deal>
                     {round.phase === 'done' ? 'Deal again' : 'Deal'}
