@@ -369,6 +369,28 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
     setFailed((f) => (f.includes(mode) ? f : [...f, mode]))
   }
 
+  // A file played as it is that never gets going (stuck loading with no picture moving) is one the
+  // window can't really play, even though it didn't say so: try the next way (or ask for the helper).
+  const stalledSince = useRef<{ at: number; t: number } | null>(null)
+  useEffect(() => {
+    if (source?.mode !== 'direct' || !waiting) {
+      stalledSince.current = null
+      return
+    }
+    const timer = setInterval(() => {
+      const v = video.current
+      if (!v || v.ended || (v.paused && v.readyState >= 2) || skipTo.current !== null) return void (stalledSince.current = null)
+      const now = performance.now()
+      const s = stalledSince.current
+      if (!s || Math.abs(v.currentTime - s.t) > 0.25) return void (stalledSince.current = { at: now, t: v.currentTime })
+      if (now - s.at > 10_000) {
+        stalledSince.current = null
+        fail('direct')
+      }
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [source, waiting])
+
   // ---- remembering ----
   const save = (at = timeRef.current): void => remember(path, { at, duration: durationRef.current })
   useEffect(() => () => save(), [])
