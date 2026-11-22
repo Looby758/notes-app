@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
+import { Component, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { Plus, Search, X } from 'lucide-react'
 import { describeMinutes, MODE_NAMES, shortNumber } from '@shared/skyblock'
 import { MC_COLORS } from '@shared/skyblockGoals'
@@ -417,24 +417,26 @@ export default function SkyblockProfile() {
             </button>
           ))}
         </nav>
-        <div className="sbp-body" key={section}>
-          {section === 'overview' && <Overview v={view} go={setSection} />}
-          {section === 'gear' && <Gear v={view} />}
-          {section === 'inventories' && <Inventories v={view} />}
-          {section === 'accessories' && <Accessories v={view} />}
-          {section === 'pets' && <Pets v={view} />}
-          {section === 'collections' && <Collections v={view} />}
-          {section === 'dungeons' && <Dungeons v={view} />}
-          {section === 'slayer' && <Slayers v={view} />}
-          {section === 'mining' && <Mining v={view} />}
-          {section === 'bestiary' && <Bestiary v={view} />}
-          {section === 'garden' && <Garden v={view} />}
-          {section === 'fishing' && <TrophyFish v={view} />}
-          {section === 'crimson' && <Crimson v={view} />}
-          {section === 'rift' && <Rift v={view} />}
-          {section === 'museum' && <Museum v={view} />}
-          {section === 'stats' && <Stats v={view} />}
-        </div>
+        <SectionGuard key={section}>
+          <div className="sbp-body">
+            {section === 'overview' && <Overview v={view} go={setSection} />}
+            {section === 'gear' && <Gear v={view} />}
+            {section === 'inventories' && <Inventories v={view} />}
+            {section === 'accessories' && <Accessories v={view} />}
+            {section === 'pets' && <Pets v={view} />}
+            {section === 'collections' && <Collections v={view} />}
+            {section === 'dungeons' && <Dungeons v={view} />}
+            {section === 'slayer' && <Slayers v={view} />}
+            {section === 'mining' && <Mining v={view} />}
+            {section === 'bestiary' && <Bestiary v={view} />}
+            {section === 'garden' && <Garden v={view} />}
+            {section === 'fishing' && <TrophyFish v={view} />}
+            {section === 'crimson' && <Crimson v={view} />}
+            {section === 'rift' && <Rift v={view} />}
+            {section === 'museum' && <Museum v={view} />}
+            {section === 'stats' && <Stats v={view} />}
+          </div>
+        </SectionGuard>
       </div>
     </div>
   )
@@ -560,6 +562,21 @@ function Overview({ v, go }: { v: SbProfileView; go: (s: Section) => void }) {
 
 const TOOL_RE = /\b(SWORD|BOW|WAND|DUNGEON SWORD|DUNGEON BOW|LONGSWORD|PICKAXE|DRILL|GAUNTLET|AXE|HOE|SHOVEL|FISHING ROD|FISHING WEAPON)\b/
 
+/** Keeps one section's mistake (say, from profile data saved by an older Orbit) from blanking the whole app. */
+class SectionGuard extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError(): { failed: boolean } {
+    return { failed: true }
+  }
+  componentDidCatch(err: unknown): void {
+    console.error('SkyBlock profile section', err)
+  }
+  render(): ReactNode {
+    if (this.state.failed) return <Nothing what="This part of your profile couldn’t be shown. Press Refresh at the top to read your profile again." />
+    return this.props.children
+  }
+}
+
 type ItemSet = { slot: number; pieces: (SbViewItem | null)[] }
 const petKey = (uuid: string): string => uuid.replace(/-/g, '').toLowerCase()
 
@@ -589,7 +606,14 @@ function Gear({ v }: { v: SbProfileView }) {
   // What the character shows: an armour set, an equipment set, or both from a loadout.
   const [preview, setPreview] = useState<{ armor?: number | null; equip?: number | null; label: string } | null>(null)
   if (!v.gear) return <Nothing what="Turn on the Inventory API to see your gear." />
-  const g = v.gear
+  // Profiles saved by an older Orbit have no loadouts or equipment sets until the next Refresh.
+  const g = {
+    ...v.gear,
+    wardrobe: v.gear.wardrobe ?? [],
+    equipmentSets: v.gear.equipmentSets ?? [],
+    equipmentEquipped: v.gear.equipmentEquipped ?? null,
+    loadouts: v.gear.loadouts ?? []
+  }
   const tools = [...g.inventory, ...g.enderChest].filter((it): it is SbViewItem => !!it && TOOL_RE.test(plain(it.lore[it.lore.length - 1] ?? '')))
   const armorSet = (n: number | null | undefined): ItemSet | undefined => (n ? g.wardrobe.find((w) => w.slot === n) : undefined)
   const equipSet = (n: number | null | undefined): ItemSet | undefined => (n ? g.equipmentSets.find((w) => w.slot === n) : undefined)

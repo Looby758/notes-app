@@ -321,7 +321,16 @@ export function setupSkyblockGoals(): void {
     return state()
   })
   /** The profile page: everything about your profile (null until Orbit has asked Hypixel with the new item list). */
-  ipcMain.handle('skyblockProfile:view', () => load().view ?? null)
+  let staleAsked = false
+  ipcMain.handle('skyblockProfile:view', () => {
+    const view = load().view ?? null
+    // Saved by an Orbit from before loadouts: read the profile again so the wardrobe fills in.
+    if (view?.gear && !Array.isArray(view.gear.loadouts) && !staleAsked) {
+      staleAsked = true
+      void refreshProfile()
+    }
+    return view
+  })
   /** NEU item id → picture, for everything that isn't one of your own items. */
   ipcMain.handle('skyblockAddon:icons', () => neuItemIcons())
   ipcMain.handle('skyblockGoals:download', async () => {
