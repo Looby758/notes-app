@@ -139,4 +139,12 @@ describe('music dipping', () => {
     expect(sent).toEqual([0.3])
     expect(spotifyVolume).toBe(80)
   })
+
+  it('leaves Spotify alone when Spotify is turned off in Settings → Music', async () => {
+    prefs = { ...prefs, musicSpotify: false }
+    listener!(call(true))
+    await vi.advanceTimersByTimeAsync(600)
+    expect(sent).toEqual([0.3])
+    expect(spotifyVolume).toBe(80)
+  })
 })

@@ -8,6 +8,7 @@ import {
   Laptop,
   Link2,
   ListMusic,
+  Maximize2,
   Music,
   NotebookPen,
   Pause,
@@ -47,7 +48,7 @@ import {
   useMusic
 } from '../../store/music'
 import { stopLocal } from '../../store/localMusic'
-import { openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
+import { MUSIC_TAB, openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
 import { errorMessage } from '../../lib/paths'
 import { ItemList } from './ItemList'
 import { Playlists } from './Playlists'
@@ -65,6 +66,9 @@ import ThemePicture from '../Theme/ThemePicture'
 addHomeCard({ id: 'music', order: 35, title: 'Now playing', Card: MusicHomeCard })
 
 type Tab = 'playlists' | 'search' | 'queue' | 'recent' | 'local' | 'link' | 'devices' | 'sleep' | 'find'
+
+/** Tabs that only do anything with Spotify (hidden when it's turned off in Settings → Music). */
+const SPOTIFY_TABS: Tab[] = ['playlists', 'search', 'recent', 'link', 'devices']
 
 const backToSpotify = (): void => {
   stopLocal()
@@ -181,7 +185,10 @@ function Player() {
   const status = useMusic((s) => s.status)
   const local = useMusic((s) => s.local)
   const visualiser = usePrefs((s) => s.prefs.musicVisualiser)
-  const [tab, setTab] = useState<Tab | null>(null)
+  const spotify = usePrefs((s) => s.prefs.musicSpotify)
+  const [chosen, setTab] = useState<Tab | null>(null)
+  // With Spotify off, a Spotify-only tab (still open from before) shows your music instead.
+  const tab: Tab | null = !spotify && chosen && SPOTIFY_TABS.includes(chosen) ? 'local' : chosen
 
   const toggleTab = (t: Tab): void => setTab(tab === t ? null : t)
   // Ctrl+K or the system-wide shortcut asked for "What's this song?".
@@ -198,27 +205,35 @@ function Player() {
       {tab && (
         <div className="music-panel">
           <div className="music-tabs">
-            <button className={tab === 'playlists' ? 'active' : ''} onClick={() => setTab('playlists')}>
-              Playlists
-            </button>
-            <button className={tab === 'search' ? 'active' : ''} onClick={() => setTab('search')}>
-              Search
-            </button>
+            {spotify && (
+              <button className={tab === 'playlists' ? 'active' : ''} onClick={() => setTab('playlists')}>
+                Playlists
+              </button>
+            )}
+            {spotify && (
+              <button className={tab === 'search' ? 'active' : ''} onClick={() => setTab('search')}>
+                Search
+              </button>
+            )}
             <button className={tab === 'queue' ? 'active' : ''} onClick={() => setTab('queue')} data-music-tab="queue">
               Up next
             </button>
-            <button className={tab === 'recent' ? 'active' : ''} onClick={() => setTab('recent')} data-music-tab="recent">
-              Recent
-            </button>
+            {spotify && (
+              <button className={tab === 'recent' ? 'active' : ''} onClick={() => setTab('recent')} data-music-tab="recent">
+                Recent
+              </button>
+            )}
             <button className={tab === 'local' ? 'active' : ''} onClick={() => setTab('local')} data-music-tab="local">
               My music
             </button>
             <button className={tab === 'find' ? 'active' : ''} onClick={() => setTab('find')} title="What’s this song? Listen to a video, game or stream and find the song" data-music-tab="find">
               <Ear size={13} />
             </button>
-            <button className={tab === 'link' ? 'active' : ''} onClick={() => setTab('link')} title="Play a Spotify link">
-              <Link2 size={13} />
-            </button>
+            {spotify && (
+              <button className={tab === 'link' ? 'active' : ''} onClick={() => setTab('link')} title="Play a Spotify link">
+                <Link2 size={13} />
+              </button>
+            )}
           </div>
           {tab === 'find' ? (
             <SongFinder />
@@ -228,7 +243,7 @@ function Player() {
             <SleepTimer onPicked={() => setTab(null)} />
           ) : tab === 'local' ? (
             <LocalMusic />
-          ) : tab === 'queue' && local ? (
+          ) : tab === 'queue' && (local || !spotify) ? (
             <LocalUpNext />
           ) : !status?.connected ? (
             <NeedsAccount />
@@ -247,13 +262,16 @@ function Player() {
       )}
 
       <div className="music-main">
-        {state ? <NowPlaying state={state} /> : <div className="music-empty">Looking for Spotify…</div>}
+        {state ? <NowPlaying state={state} /> : <div className="music-empty">{spotify ? 'Looking for Spotify…' : 'Loading…'}</div>}
         <div className="music-side">
           <span className="icon-btn music-move" title="Drag to move the player (double-click to put it back in the corner)" data-music-move {...movable.grip}>
             <GripHorizontal size={14} />
           </span>
-          <button className={`icon-btn ${tab ? 'active' : ''}`} onClick={() => toggleTab(tab ?? (status?.connected || !local ? 'playlists' : 'local'))} title="Playlists, search and your music" data-music-browse>
+          <button className={`icon-btn ${tab ? 'active' : ''}`} onClick={() => toggleTab(tab ?? (spotify && (status?.connected || !local) ? 'playlists' : 'local'))} title="Playlists, search and your music" data-music-browse>
             <ListMusic size={15} />
+          </button>
+          <button className="icon-btn" onClick={() => openSpecialTab(MUSIC_TAB)} title="Open the Music page: albums, artists, playlists and likes" data-music-open-page>
+            <Maximize2 size={13} />
           </button>
           <button className="icon-btn" onClick={() => setMusicOpen(false)} title="Hide the player (music keeps playing)">
             <X size={14} />
@@ -269,6 +287,7 @@ function Player() {
 }
 
 function NowPlaying({ state }: { state: MusicState }) {
+  const spotify = usePrefs((s) => s.prefs.musicSpotify)
   if (state.hint === 'not-running') {
     return (
       <div className="music-empty">
@@ -318,9 +337,9 @@ function NowPlaying({ state }: { state: MusicState }) {
       <div className="music-art">{track?.art ? <img src={track.art} alt="" /> : <Music size={18} />}</div>
       <div className="music-text">
         <strong title={track?.name}>{track?.name ?? 'Nothing playing'}</strong>
-        <span title={track?.artist}>{track ? track.artist : 'Pick a playlist or search.'}</span>
+        <span title={track?.artist}>{track ? track.artist : spotify ? 'Pick a playlist or search.' : 'Press play to shuffle.'}</span>
       </div>
-      {track?.uri && <LikeButton uri={track.uri} />}
+      {spotify && track?.uri && <LikeButton uri={track.uri} />}
       <div className="music-controls">
         <button className="icon-btn" onClick={() => musicControl('previous')} title="Previous" data-music-previous>
           <SkipBack size={15} />
@@ -385,6 +404,7 @@ export function LikeButton({ uri }: { uri: string }) {
 /** Volume, shuffle and repeat, and where it's playing. */
 function Footer({ state, panel, onPanel }: { state: MusicState; panel: Tab | null; onPanel: (tab: Tab) => void }) {
   const connected = useMusic((s) => !!s.status?.connected)
+  const spotify = usePrefs((s) => s.prefs.musicSpotify)
   const miniOpen = useMusic((s) => s.miniOpen)
   const visualiser = usePrefs((s) => s.prefs.musicVisualiser)
   return (
@@ -425,7 +445,7 @@ function Footer({ state, panel, onPanel }: { state: MusicState; panel: Tab | nul
           <PictureInPicture2 size={13} />
         </button>
       </div>
-      {state.source === 'local' ? (
+      {!spotify ? null : state.source === 'local' ? (
         <button className="music-device" onClick={backToSpotify} title="Stop your music and go back to Spotify" data-music-back-to-spotify>
           <Music size={12} />
           <span>Spotify</span>

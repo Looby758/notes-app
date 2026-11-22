@@ -16,7 +16,7 @@ import RemindersSettings from './RemindersSettings'
 import NavEditor from '../Nav/NavEditor'
 import AiSettings from '../Ai/AiSettings'
 import OfflineAiSettings from '../Ai/OfflineAiSettings'
-import MusicSettings, { SongIdSettings } from '../Music/MusicSettings'
+import MusicSettings, { MusicFolderSetting, SongIdSettings } from '../Music/MusicSettings'
 import StudioSettings from '../Studio/LiveSetup'
 import ShareSettings from '../Share/ShareSettings'
 import { useUI } from '../../store/ui'
@@ -432,6 +432,7 @@ export default function SettingsPage() {
                   {section === 'capture' && <TaskbarSnip />}
                   {section === 'ai' && <OfflineAiSettings />}
                   {section === 'ai' && <AiSettings />}
+                  {section === 'music' && <MusicFolderSetting />}
                   {section === 'music' && <MusicSettings />}
                   {section === 'music' && <SongIdSettings />}
                   {section === 'studio' && <StudioSettings />}

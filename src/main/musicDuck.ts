@@ -45,7 +45,8 @@ async function dip(): Promise<void> {
   ducked = true
   const gen = ++generation
   if (prefs.duckOrbit) tellWindows(prefs.duckLevel)
-  if (!prefs.duckSpotify) return
+  // Spotify turned off in Settings → Music: its volume is left alone.
+  if (!prefs.duckSpotify || !prefs.musicSpotify) return
   try {
     // Already down (they started again while it was coming back up): stay where it was.
     const apps = (await mixerState()).apps

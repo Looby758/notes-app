@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { LocalAiState, MusicMiniCommand, MusicMiniState, NotesApi } from '@shared/types'
+import type { LocalAiState, MusicLinkProgress, MusicMiniCommand, MusicMiniLayout, MusicMiniState, NotesApi } from '@shared/types'
+import type { MusicData } from '@shared/musicLibrary'
+import type { LocalLibrary } from '@shared/localMusic'
 
 /** Listens for a message from the main process; returns the way to stop. */
 function on<T>(channel: string, callback: (value: T) => void): () => void {
@@ -612,6 +614,39 @@ const api: NotesApi = {
   musicMoveInPlaylist: (uri, from, to) => ipcRenderer.invoke('music:moveInPlaylist', uri, from, to),
   localMusicLibrary: (fresh) => ipcRenderer.invoke('localMusic:library', fresh),
   localMusicChooseFolder: () => ipcRenderer.invoke('localMusic:chooseFolder'),
+  localMusicDefaultFolder: () => ipcRenderer.invoke('localMusic:defaultFolder'),
+  onLocalMusicChanged: (callback) => {
+    const handler = (_e: unknown, library: LocalLibrary): void => callback(library)
+    ipcRenderer.on('localMusic:changed', handler)
+    return () => ipcRenderer.removeListener('localMusic:changed', handler)
+  },
+  musicTagsEdit: (changes) => ipcRenderer.invoke('musicTags:edit', changes),
+  musicTagsFillFromNames: (paths) => ipcRenderer.invoke('musicTags:fillFromNames', paths),
+  musicTagsSetCover: (paths, source) => ipcRenderer.invoke('musicTags:setCover', paths, source),
+  musicTagsFindCovers: (artist, album) => ipcRenderer.invoke('musicTags:findCovers', artist, album),
+  musicTagsChooseImage: () => ipcRenderer.invoke('musicTags:chooseImage'),
+  localMusicImport: (files) => ipcRenderer.invoke('localMusic:import', files),
+  localMusicChooseImport: () => ipcRenderer.invoke('localMusic:chooseImport'),
+  localMusicMove: (moves) => ipcRenderer.invoke('localMusic:move', moves),
+  localMusicTrash: (paths) => ipcRenderer.invoke('localMusic:trash', paths),
+  localMusicQuality: (paths) => ipcRenderer.invoke('localMusic:quality', paths),
+  musicLinkSave: (link, known) => ipcRenderer.invoke('musicLink:save', link, known),
+  musicLinkCancel: (id) => ipcRenderer.invoke('musicLink:cancel', id),
+  onMusicLinkProgress: (callback) => {
+    const handler = (_e: unknown, p: MusicLinkProgress): void => callback(p)
+    ipcRenderer.on('musicLink:progress', handler)
+    return () => ipcRenderer.removeListener('musicLink:progress', handler)
+  },
+  musicDataGet: () => ipcRenderer.invoke('musicData:get'),
+  songSearch: (query) => ipcRenderer.invoke('songSearch:search', query),
+  spotifyList: (link) => ipcRenderer.invoke('songSearch:spotifyList', link),
+  songYouTube: (artist, title) => ipcRenderer.invoke('songSearch:youtube', artist, title),
+  musicDataEdit: (edits) => ipcRenderer.invoke('musicData:edit', edits),
+  onMusicDataChanged: (callback) => {
+    const handler = (_e: unknown, data: MusicData): void => callback(data)
+    ipcRenderer.on('musicData:changed', handler)
+    return () => ipcRenderer.removeListener('musicData:changed', handler)
+  },
   openPopout: () => ipcRenderer.invoke('popout:open'),
   popoutSources: () => ipcRenderer.invoke('popout:sources'),
   popoutState: () => ipcRenderer.invoke('popout:state'),
@@ -646,6 +681,19 @@ const api: NotesApi = {
     const handler = (_e: unknown, command: MusicMiniCommand): void => callback(command)
     ipcRenderer.on('musicMini:command', handler)
     return () => ipcRenderer.removeListener('musicMini:command', handler)
+  },
+  musicMiniLayout: () => ipcRenderer.invoke('musicMini:layout'),
+  setMusicMiniLayout: (layout) => ipcRenderer.invoke('musicMini:setLayout', layout),
+  onMusicMiniLayout: (callback) => {
+    const handler = (_e: unknown, layout: MusicMiniLayout): void => callback(layout)
+    ipcRenderer.on('musicMini:layout', handler)
+    return () => ipcRenderer.removeListener('musicMini:layout', handler)
+  },
+  pushMusicMiniLevels: (levels) => ipcRenderer.send('musicMini:levels', levels),
+  onMusicMiniLevels: (callback) => {
+    const handler = (_e: unknown, levels: number[]): void => callback(levels)
+    ipcRenderer.on('musicMini:levels', handler)
+    return () => ipcRenderer.removeListener('musicMini:levels', handler)
   },
   musicTransfer: (deviceId) => ipcRenderer.invoke('music:transfer', deviceId),
   musicOpen: (what) => ipcRenderer.invoke('music:open', what),

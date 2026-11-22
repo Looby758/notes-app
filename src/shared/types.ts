@@ -16,7 +16,10 @@ import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
 import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
-import type { LocalLibrary } from './localMusic'
+import type { LocalLibrary, SongTagPatch } from './localMusic'
+import type { MusicData, MusicEdit } from './musicLibrary'
+import type { FoundTrack } from './songSearch'
+import type { SpotifyList } from './spotifyImport'
 import type { MixerState } from './mixer'
 import type { MonitorAction, MonitorSaved, MonitorSetting, MonitorsStatus, MonitorTarget } from './monitors'
 import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
@@ -57,6 +60,7 @@ export interface Settings {
   /** The floating mini music player: where it was left, and whether it was showing. */
   musicMiniWindow?: WindowBounds
   musicMiniOpen?: boolean
+  musicMiniLayout?: MusicMiniLayout
   /** The pop-out window (any app, floating on top): where it was left, and how see-through it was. */
   popoutWindow?: WindowBounds
   popoutOpacity?: number
@@ -175,10 +179,24 @@ export interface MusicMiniState {
   state: MusicState | null
   /** When `state` arrived (for the progress bar). */
   at: number
+  /** Your own music: the next few songs. */
+  upNext?: MusicMiniSong[]
 }
 
-/** A button pressed in the floating mini player, for the notes window to carry out. */
-export type MusicMiniCommand = { action: MusicAction } | { seek: number }
+export interface MusicMiniSong {
+  title: string
+  artist: string
+  art?: string
+}
+
+/** What the mini player shows under the song (each can be hidden). */
+export interface MusicMiniLayout {
+  visualiser: boolean
+  upNext: boolean
+}
+
+/** A button pressed in the floating mini player, for the notes window to carry out. `jump` plays the song that many places into Up next (0 is the next one). */
+export type MusicMiniCommand = { action: MusicAction } | { seek: number } | { jump: number }
 
 export interface CaptureStatus {
   /** e.g. "Win+Shift+N", or '' if none is set or it couldn't be registered. */
@@ -1177,10 +1195,57 @@ export interface NotesApi {
   /** Mini player → notes window. */
   sendMusicMiniCommand(command: MusicMiniCommand): void
   onMusicMiniCommand(callback: (command: MusicMiniCommand) => void): () => void
+  /** What the mini player shows under the song, and news of changes (both windows hear it). */
+  musicMiniLayout(): Promise<MusicMiniLayout>
+  setMusicMiniLayout(layout: MusicMiniLayout): Promise<void>
+  onMusicMiniLayout(callback: (layout: MusicMiniLayout) => void): () => void
+  /** The visualiser's bars (0–100 each), notes window → mini player. */
+  pushMusicMiniLevels(levels: number[]): void
+  onMusicMiniLevels(callback: (levels: number[]) => void): () => void
   /** Your own music files; `fresh` looks through the folder again. */
   localMusicLibrary(fresh?: boolean): Promise<LocalLibrary>
   /** Asks which folder your music is in, then lists it. */
   localMusicChooseFolder(): Promise<LocalLibrary>
+  /** Goes back to the computer's own Music folder. */
+  localMusicDefaultFolder(): Promise<LocalLibrary>
+  /** Songs were added, changed or removed in the music folder. */
+  onLocalMusicChanged(callback: (library: LocalLibrary) => void): () => void
+  /** Writes details into the songs (MP3s); each song gets its own changes. */
+  musicTagsEdit(changes: { path: string; patch: SongTagPatch }[]): Promise<MusicFileResult>
+  /** Fills empty details from the file names ("01 - Artist - Title.mp3"). */
+  musicTagsFillFromNames(paths: string[]): Promise<MusicFileResult>
+  /** Sets the cover of these songs from a picture file or an https link. */
+  musicTagsSetCover(paths: string[], source: { file?: string; url?: string }): Promise<MusicFileResult>
+  /** Covers found online for an album (Apple's free catalogue). */
+  musicTagsFindCovers(artist: string, album: string): Promise<{ url: string; album: string; artist: string }[]>
+  /** Asks for a picture file; null if cancelled. */
+  musicTagsChooseImage(): Promise<string | null>
+  /** Copies music files (full paths) into the music folder. */
+  localMusicImport(files: string[]): Promise<MusicImportResult>
+  /** Asks which music files to add, then copies them in; null if cancelled. */
+  localMusicChooseImport(): Promise<MusicImportResult | null>
+  /** Renames or moves songs inside the music folder. */
+  localMusicMove(moves: { from: string; to: string }[]): Promise<{ library: LocalLibrary; done: { from: string; to: string }[]; failed: string[] }>
+  /** Puts songs in the Recycle Bin / Bin. */
+  localMusicTrash(paths: string[]): Promise<LocalLibrary>
+  /** Each song's sound quality (kbps) and size, for choosing which copy to keep. */
+  localMusicQuality(paths: string[]): Promise<Record<string, { bitrate: number; size: number }>>
+  /** Downloads a link's sound as an MP3 into the music folder; returns the job's id (progress comes through onMusicLinkProgress). */
+  musicLinkSave(link: string, known?: FoundTrack): Promise<string>
+  musicLinkCancel(id: string): Promise<void>
+  onMusicLinkProgress(callback: (progress: MusicLinkProgress) => void): () => void
+  /** Any song (Apple's free iTunes Search), for the Music page's Search. */
+  songSearch(query: string): Promise<FoundTrack[]>
+  /** A public Spotify playlist or album's songs, from its link (no sign-in; the first 100). */
+  spotifyList(link: string): Promise<SpotifyList>
+  /** A song's YouTube video (`exact` false: YouTube's search for it instead). */
+  songYouTube(artist: string, title: string): Promise<{ url: string; exact: boolean }>
+  /** Playlists, liked songs, ratings and play counts for your own music (orbit-music.json in the music folder). */
+  musicDataGet(): Promise<MusicData>
+  /** Makes changes to it and saves them; returns it afterwards. */
+  musicDataEdit(edits: MusicEdit[]): Promise<MusicData>
+  /** It changed (here, in another window, or from the phone through Google Drive). */
+  onMusicDataChanged(callback: (data: MusicData) => void): () => void
   // Your playlists (`uri` is spotify:playlist:…; songs only for playlists you can edit)
   musicPlaylistSongs(uri: string): Promise<MusicItem[]>
   /** Makes a private playlist. */
@@ -1815,4 +1880,33 @@ export interface VideoConvertRequest {
   /** The caption bar as a PNG, exactly `gif.width` pixels wide. */
   captionPng?: Uint8Array
   captionHeight?: number
+}
+
+export interface MusicFileResult {
+  library: LocalLibrary
+  /** Songs that couldn't be changed, with why. */
+  failed: { path: string; why: string }[]
+}
+
+export interface MusicImportResult {
+  library: LocalLibrary
+  /** Where the new songs are in the music folder. */
+  added: string[]
+  /** Files that weren't music, or couldn't be copied. */
+  skipped: string[]
+}
+
+/** How "Save MP3 to my music" is getting on. */
+export interface MusicLinkProgress {
+  id: string
+  stage: 'downloading' | 'details' | 'done' | 'error' | 'cancelled'
+  /** 0–1 while known. */
+  done?: number | null
+  title?: string
+  artist?: string
+  /** Where the song is in the music folder (done). */
+  path?: string
+  /** Its details came from Apple's catalogue (done). */
+  matched?: boolean
+  error?: string
 }

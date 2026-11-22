@@ -658,6 +658,15 @@ export const SETTINGS: SettingDef[] = [
 
   // ---------- Music ----------
   {
+    key: 'musicSpotify',
+    section: 'music',
+    group: 'Player',
+    type: 'toggle',
+    label: 'Show Spotify features',
+    description: 'Turn off if you only play your own music files: the player hides Spotify’s playlists, search, recently played, links and devices, and Orbit stops checking Spotify.',
+    keywords: 'spotify hide remove off own music files mp3 local'
+  },
+  {
     key: 'musicSongPopup',
     section: 'music',
     group: 'Player',

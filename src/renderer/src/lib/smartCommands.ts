@@ -3,6 +3,8 @@ import { usePrefs } from '../store/prefs'
 import { notify } from '../store/notify'
 import { addEntry, addGoal, ensureMoney, useMoney } from '../store/money'
 import { musicControl, musicPlay, setMusicOpen } from '../store/music'
+import { loadLocalLibrary, playLocal, useLocalMusic } from '../store/localMusic'
+import { filterSongs } from '@shared/localMusic'
 import { useVault } from '../store/vault'
 import { askEverything } from '../store/ai'
 import { addIdea, ensureVideos } from '../store/videos'
@@ -71,6 +73,15 @@ export async function runSmart(a: SmartAction): Promise<string> {
       openSpecialTab(CONVERT_TAB)
       return `Converter set to ${a.format.toUpperCase()}`
     case 'play': {
+      if (!usePrefs.getState().prefs.musicSpotify) {
+        // Spotify turned off: look through your own music instead.
+        if (!useLocalMusic.getState().library) await loadLocalLibrary()
+        const songs = filterSongs(useLocalMusic.getState().library?.songs ?? [], a.query)
+        if (!songs.length) throw new Error(`Nothing in your music matches “${a.query}”.`)
+        setMusicOpen(true)
+        await playLocal(songs, 0)
+        return songs.length === 1 ? `Playing ${songs[0].title}` : `Playing ${songs.length} songs matching “${a.query}”`
+      }
       let results
       try {
         results = await window.api.musicSearch(a.query)
