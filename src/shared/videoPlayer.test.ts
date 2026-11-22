@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   cuesAt,
   formatTime,
+  frameName,
+  frameNoteText,
+  frameStep,
+  loopJump,
+  nextLoop,
   isVideoFile,
   matchingSubtitles,
   parseKeyframe,
@@ -58,7 +63,7 @@ describe('video player', () => {
     expect(p.container).toBe('matroska,webm')
     expect(p.duration).toBeCloseTo(6140.02)
     expect(p.start).toBeCloseTo(-0.023)
-    expect(p.video).toEqual({ codec: 'h264', width: 1920, height: 1080 })
+    expect(p.video).toEqual({ codec: 'h264', width: 1920, height: 1080, fps: 23.98 })
     expect(p.audio.map((a) => [a.stream, a.codec, a.language, a.title, a.channels, a.isDefault])).toEqual([
       [1, 'ac3', 'eng', 'Surround', '5.1', true],
       [2, 'aac', 'jpn', 'Japanese 2.0', 'stereo', false]
@@ -184,5 +189,66 @@ describe('video player', () => {
     expect(stepSpeed(3, 1)).toBe(3)
     expect(stepSpeed(0.25, -1)).toBe(0.25)
     expect(stepSpeed(1.1, -1)).toBe(1)
+  })
+})
+
+describe('frames a second', () => {
+  it('reads fps from the video line', () => {
+    expect(parseProbe(MKV)?.video?.fps).toBe(23.98)
+  })
+})
+
+describe('A-B loop', () => {
+  it('marks the start, then the end, then clears', () => {
+    const a = nextLoop(null, 10)
+    expect(a).toEqual({ a: 10, b: null })
+    const ab = nextLoop(a, 14.5)
+    expect(ab).toEqual({ a: 10, b: 14.5 })
+    expect(nextLoop(ab, 20)).toBeNull()
+  })
+  it('works when the end is marked before the start', () => {
+    expect(nextLoop({ a: 30, b: null }, 12)).toEqual({ a: 12, b: 30 })
+  })
+  it('starts again rather than making a loop of nothing', () => {
+    expect(nextLoop({ a: 5, b: null }, 5.05)).toEqual({ a: 5.05, b: null })
+  })
+  it('jumps back to A once B is reached', () => {
+    expect(loopJump({ a: 10, b: 15 }, 12)).toBeNull()
+    expect(loopJump({ a: 10, b: 15 }, 15)).toBe(10)
+    expect(loopJump({ a: 10, b: 15 }, 40)).toBe(10)
+    expect(loopJump({ a: 10, b: null }, 40)).toBeNull()
+    expect(loopJump(null, 40)).toBeNull()
+  })
+})
+
+describe('frame steps', () => {
+  it('moves one frame at the video\'s rate, aiming mid-frame', () => {
+    expect(frameStep(1, 1, 25, null)).toBeCloseTo(26.5 / 25)
+    expect(frameStep(1, -1, 25, null)).toBeCloseTo(24.5 / 25)
+  })
+  it('never lands on the same frame twice in a row', () => {
+    let t = 0
+    const seen = new Set<number>()
+    for (let i = 0; i < 50; i++) {
+      t = frameStep(t, 1, 23.976, null)
+      const frame = Math.floor(t * 23.976)
+      expect(seen.has(frame)).toBe(false)
+      seen.add(frame)
+    }
+  })
+  it('falls back to 30 fps and stays inside the video', () => {
+    expect(frameStep(0, 1, null, null)).toBeCloseTo(1.5 / 30)
+    expect(frameStep(0, -1, 30, null)).toBe(0)
+    expect(frameStep(59.99, 1, 30, 60)).toBeLessThan(60)
+  })
+})
+
+describe('grabbed frames', () => {
+  it('names the picture after the video and the time', () => {
+    expect(frameName('C:\\Videos\\My Film (2020).mkv', 3725.4)).toBe('My-Film-2020-1-02-05.png')
+    expect(frameName('/home/me/clip.mp4', 75)).toBe('clip-1-15.png')
+  })
+  it('makes a picture line for the note', () => {
+    expect(frameNoteText('/v/[Sub] Show 01.mkv', 75, 'attachments/x.png')).toBe('![Sub Show 01.mkv at 1:15](vault:attachments/x.png)')
   })
 })

@@ -3,7 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type
 import {
   ArrowLeft,
   AudioLines,
+  Camera,
   Captions,
+  ClipboardCopy,
   ChevronDown,
   ChevronUp,
   Download,
@@ -16,11 +18,14 @@ import {
   Pause,
   PictureInPicture2,
   Play,
+  Repeat,
   RotateCcw,
   RotateCw,
   SkipForward,
   SquareArrowDownLeft,
   SquareArrowOutUpRight,
+  StepBack,
+  StepForward,
   Volume2,
   VolumeX,
   X
@@ -30,9 +35,14 @@ import {
   SPEEDS,
   cuesAt,
   formatTime,
+  frameName,
+  frameNoteText,
+  frameStep,
   isSubtitleFile,
   isVideoFile,
+  loopJump,
   maybeNative,
+  nextLoop,
   parseSubtitles,
   playMode,
   resumePoint,
@@ -48,6 +58,12 @@ import { FILE_MANAGER } from '@shared/platform'
 import { notify } from '../../store/notify'
 import { IN_VIDEO_WINDOW, closeVideo, forgetVideo, moveQueued, openVideo, playNext, remember, unqueueVideo, useVideoPlayer, watchedOf, type SubtitleChoice } from '../../store/videoPlayer'
 import { unloadMedia } from '../../lib/media'
+import { DestPicker, type Dest } from '../CaptureApp'
+import { useDestLabel } from '../Comics/ComicExtras'
+import { saveCapture } from '../../lib/capture'
+import { errorMessage } from '../../lib/paths'
+import { usePrefs } from '../../store/prefs'
+import { useVault } from '../../store/vault'
 
 /**
  * The video player tab: plays any video on the computer (MKV, AVI, WMV… through the video helper,
@@ -201,6 +217,37 @@ function VideoList() {
 
 // ---------- the player ----------
 
+/** Where the last grabbed frame went, so the next one can go there too. */
+const FRAME_DEST_KEY = 'video:frameDest'
+function lastFrameDest(): Dest | null {
+  try {
+    return JSON.parse(localStorage.getItem(FRAME_DEST_KEY) ?? 'null') as Dest | null
+  } catch {
+    return null
+  }
+}
+
+/** 75.4 → "1:15.40": the time down to the frame, shown while stepping frame by frame. */
+const preciseTime = (t: number): string => `${formatTime(t)}.${String(Math.floor((t % 1) * 100)).padStart(2, '0')}`
+
+/** The picture on screen right now, as PNG bytes. */
+async function framePng(v: HTMLVideoElement): Promise<Uint8Array> {
+  if (!v.videoWidth || !v.videoHeight) throw new Error('There’s no picture to save yet.')
+  const canvas = document.createElement('canvas')
+  canvas.width = v.videoWidth
+  canvas.height = v.videoHeight
+  canvas.getContext('2d')!.drawImage(v, 0, 0)
+  const blob = await new Promise<Blob | null>((done) => {
+    try {
+      canvas.toBlob(done, 'image/png')
+    } catch {
+      done(null)
+    }
+  })
+  if (!blob) throw new Error('Couldn’t copy this frame.')
+  return new Uint8Array(await blob.arrayBuffer())
+}
+
 /** `offset`: where the stream's own clock starts in the video; `target`: where to jump to once it's loaded. */
 type Source = { mode: PlayMode; src: string; offset: number; target: number } | { mode: 'needs-helper' | 'broken' }
 
@@ -241,7 +288,12 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
   const [failed, setFailed] = useState<PlayMode[]>([])
   const [audio, setAudio] = useState(saved?.audio ?? 0)
   /** Where the next stream starts (live streams restart from here after a big jump). */
-  const [streamStart, setStreamStart] = useState(() => resumePoint(saved?.at, saved?.duration) ?? 0)
+  // Kept in an object so asking for the same spot again (looping back to A) still restarts the stream.
+  const [start, setStart] = useState(() => ({ at: resumePoint(saved?.at, saved?.duration) ?? 0 }))
+  const streamStart = start.at
+  const setStreamStart = (at: number): void => setStart({ at })
+  /** Counts the live streams started, so a restart from the same spot still gets a fresh address. */
+  const streamCount = useRef(0)
   const [source, setSource] = useState<Source | null>(null)
   const [time, setTime] = useState(streamStart)
   const [duration, setDuration] = useState<number | null>(saved?.duration ?? null)
@@ -257,6 +309,12 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
   const [resumed, setResumed] = useState<number | null>(() => resumePoint(saved?.at, saved?.duration))
   const [hintClosed, setHintClosed] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
+  /** The A-B loop: A marked (b null), or both marked and looping. */
+  const [loop, setLoop] = useState<{ a: number; b: number | null } | null>(null)
+  /** A frame grabbed and waiting to be put in a note. */
+  const [grab, setGrab] = useState<{ png: Uint8Array; at: number } | null>(null)
+  const destLabel = useDestLabel()
+  const attachmentFolder = usePrefs((s) => s.prefs.attachmentFolder)
 
   const [subtitles, setSubtitles] = useState<SubtitleChoice | null>(saved?.subtitles ?? null)
   const [extraFiles, setExtraFiles] = useState<string[]>(() => (saved?.subtitles?.kind === 'file' ? [saved.subtitles.path] : []))
@@ -309,14 +367,14 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
     if (mode === 'direct') return setSource({ mode, src: videoUrl(info.path), offset: 0, target: streamStart })
     setWaiting(true)
     void (async () => {
-      const start = mode === 'remux' ? await window.api.videoKeyframe(info.path, streamStart, probe?.start ?? 0).catch(() => streamStart) : streamStart
-      if (alive) setSource({ mode, offset: start, target: streamStart, src: videoStreamUrl(info.path, { mode, start, audio, session }) })
+      const from = mode === 'remux' ? await window.api.videoKeyframe(info.path, streamStart, probe?.start ?? 0).catch(() => streamStart) : streamStart
+      if (alive) setSource({ mode, offset: from, target: streamStart, src: `${videoStreamUrl(info.path, { mode, start: from, audio, session })}&n=${++streamCount.current}` })
     })()
     return () => {
       alive = false
     }
     // streamStart only matters for live streams (direct files seek by themselves).
-  }, [info, failed, audio, streamStart])
+  }, [info, failed, audio, start])
 
   useEffect(() => () => void window.api.stopVideoStream(session), [session])
   // Closing the player (or moving on to another video) lets go of this one, so it can be deleted or
@@ -392,6 +450,8 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
   // ---- moving around ----
   const skipTo = useRef<number | null>(null)
   const [skipping, setSkipping] = useState(false)
+  /** Stepping a frame in a live stream restarts it: once it gets there, it stays paused on that frame. */
+  const pauseOnArrive = useRef(false)
   const catchUp = (v: HTMLVideoElement): void => {
     const to = skipTo.current
     if (to === null) return
@@ -400,6 +460,10 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
     v.playbackRate = speedRef.current
     v.muted = useVideoPlayer.getState().muted
     setSkipping(false)
+    if (pauseOnArrive.current) {
+      pauseOnArrive.current = false
+      v.pause()
+    }
   }
   const pendingSeek = useRef<{ t: number; timer: ReturnType<typeof setTimeout> } | null>(null)
   const seek = (target: number): void => {
@@ -414,12 +478,16 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
       return
     }
     // In a live stream, a spot that's already loaded is jumped to; anything else restarts the stream there.
+    // Loaded isn't enough on its own: the window often can't jump around a live stream at all (it says
+    // only 0 is seekable) and would go back to the start, so it has to be seekable too.
     const rel = t - offset
-    for (let i = 0; i < v.buffered.length; i++) {
-      if (rel >= v.buffered.start(i) && rel <= v.buffered.end(i) - 0.5) {
-        v.currentTime = rel
-        return
-      }
+    const within = (r: TimeRanges, end = 0): boolean => {
+      for (let i = 0; i < r.length; i++) if (rel >= r.start(i) && rel <= r.end(i) - end) return true
+      return false
+    }
+    if (within(v.buffered, 0.5) && within(v.seekable)) {
+      v.currentTime = rel
+      return
     }
     // Quick key presses add up before the stream restarts once.
     if (pendingSeek.current) clearTimeout(pendingSeek.current.timer)
@@ -433,9 +501,91 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
   }
   const nudge = (by: number): void => seek((pendingSeek.current?.t ?? timeRef.current) + by)
 
+  // ---- A-B loop ----
+  // Checked every frame (timeupdate only comes a few times a second, which would overshoot B).
+  const seekRef = useRef(seek)
+  seekRef.current = seek
+  useEffect(() => {
+    if (!loop || loop.b === null || !playing) return
+    let raf = 0
+    const tick = (): void => {
+      const v = video.current
+      // Not while a jump is on its way (a live stream restarting), or the jump would keep restarting.
+      if (v && skipTo.current === null && !pendingSeek.current) {
+        const back = loopJump(loop, offset + v.currentTime)
+        if (back !== null) seekRef.current(back)
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [loop, playing, offset])
+
+  const pressLoop = (): void => {
+    const now = pendingSeek.current?.t ?? timeRef.current
+    const next = nextLoop(loop, now)
+    setLoop(next)
+    if (!next) show('Loop off')
+    else if (next.b === null) show(`Loop from ${formatTime(next.a)}: press again at the end`)
+    else show(`Looping ${formatTime(next.a)} – ${formatTime(next.b)}`)
+  }
+
+  // ---- one frame at a time ----
+  const stepFrame = (dir: 1 | -1): void => {
+    const v = video.current
+    if (!v) return
+    if (!v.paused) v.pause()
+    const arriving = skipTo.current !== null && source && 'target' in source ? source.target : null
+    const from = pendingSeek.current?.t ?? arriving ?? offset + v.currentTime
+    const to = frameStep(from, dir, info?.probe?.video?.fps, duration)
+    seek(to)
+    // A live stream that has to restart for this plays from the new spot by itself: stop it there.
+    if (live && (pendingSeek.current || skipTo.current !== null)) pauseOnArrive.current = true
+    show(preciseTime(to))
+  }
+
+  // ---- saving the frame on screen ----
+  const grabFrame = async (): Promise<void> => {
+    const v = video.current
+    if (!v) return
+    v.pause()
+    setMenu(null)
+    try {
+      setGrab({ png: await framePng(v), at: offset + v.currentTime })
+    } catch (err) {
+      notify(errorMessage(err))
+    }
+  }
+  const saveFrame = async (dest: Dest): Promise<void> => {
+    if (!grab) return
+    const { png, at } = grab
+    setGrab(null)
+    try {
+      localStorage.setItem(FRAME_DEST_KEY, JSON.stringify(dest))
+      const picture = await window.api.saveAttachment(attachmentFolder, frameName(path, at), png)
+      void useVault.getState().refresh().catch(() => undefined)
+      const r = await saveCapture({ text: frameNoteText(path, at, picture), target: dest })
+      if (!r.ok) throw new Error(r.error ?? 'Couldn’t save it.')
+      notify(`Frame saved in ${r.where ?? 'your note'}.`, 'info')
+    } catch (err) {
+      notify(errorMessage(err))
+    }
+  }
+  const copyFrame = async (): Promise<void> => {
+    if (!grab) return
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': new Blob([grab.png as BlobPart], { type: 'image/png' }) })])
+      setGrab(null)
+      show('Frame copied')
+    } catch (err) {
+      notify(errorMessage(err))
+    }
+  }
+
   const togglePlay = (): void => {
     const v = video.current
     if (!v) return
+    pauseOnArrive.current = false
     if (ended) seek(0)
     if (v.paused) void v.play().catch(() => undefined)
     else v.pause()
@@ -510,7 +660,7 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
     hideTimer.current = setTimeout(() => setControls(false), 2500)
   }
   useEffect(() => () => clearTimeout(hideTimer.current), [])
-  const showControls = controls || !playing || !!menu || scrub !== null
+  const showControls = controls || !playing || !!menu || !!grab || scrub !== null
 
   const onKeyDown = (e: KeyboardEvent): void => {
     if ((e.target as HTMLElement).closest('input, textarea, select')) return
@@ -532,8 +682,13 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
     else if (k === ']' || k === '>') changeSpeed(stepSpeed(speed, 1))
     else if (k === '[' || k === '<') changeSpeed(stepSpeed(speed, -1))
     else if (k === '\\') changeSpeed(1)
+    else if (k === ',') stepFrame(-1)
+    else if (k === '.') stepFrame(1)
+    else if (k === 'a' || k === 'A') pressLoop()
+    else if (k === 's' || k === 'S') void grabFrame()
     else if (k === 'Home') seek(0)
     else if (/^[0-9]$/.test(k) && duration) seek((Number(k) / 10) * duration)
+    else if (k === 'Escape' && grab) setGrab(null)
     else if (k === 'Escape' && menu) setMenu(null)
     else done = false
     if (done) {
@@ -636,6 +791,8 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
           key={source.src}
           className={skipping ? 'skipping' : ''}
           src={source.src}
+          // Shared like the file itself (see main/videoPlayer.ts), so "Save this frame" can copy the picture.
+          crossOrigin="anonymous"
           autoPlay
           onClick={() => (menu ? setMenu(null) : togglePlay())}
           onDoubleClick={toggleFullscreen}
@@ -671,9 +828,22 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
           onPlay={() => (setPlaying(true), setEnded(false), wake())}
           onPause={() => (setPlaying(false), save())}
           onWaiting={() => setWaiting(true)}
-          onPlaying={() => setWaiting(false)}
+          onPlaying={(e) => {
+            setWaiting(false)
+            // Restarted for a frame step, and already on the spot (no catching up needed).
+            if (pauseOnArrive.current && skipTo.current === null) {
+              pauseOnArrive.current = false
+              e.currentTarget.pause()
+            }
+          }}
           onCanPlay={() => setWaiting(false)}
           onEnded={() => {
+            // Looping a part that runs to the very end: back to A rather than stopping.
+            if (loop && loop.b !== null) {
+              seek(loop.a)
+              void video.current?.play().catch(() => undefined)
+              return
+            }
             setEnded(true)
             setPlaying(false)
             remember(path, { at: 0, duration })
@@ -782,6 +952,13 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
           >
             <div className="video-bar-track">
               <div className="video-bar-buffered" style={{ width: `${buffered * 100}%` }} />
+              {loop && duration ? (
+                <div
+                  className={`video-bar-loop ${loop.b === null ? 'start-only' : ''}`}
+                  style={{ left: `${(loop.a / duration) * 100}%`, width: loop.b === null ? undefined : `${((loop.b - loop.a) / duration) * 100}%` }}
+                  data-video-loop-range
+                />
+              ) : null}
               <div className="video-bar-played" style={{ width: `${duration ? Math.min(100, (shown / duration) * 100) : 0}%` }} />
             </div>
             {hover && duration && (
@@ -800,6 +977,12 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
             <button className="icon-btn" onClick={() => nudge(10)} title="Forward 10 seconds (L)">
               <RotateCw size={16} />
             </button>
+            <button className="icon-btn" onClick={() => stepFrame(-1)} title="Back one frame (,)" data-video-frame-back>
+              <StepBack size={16} />
+            </button>
+            <button className="icon-btn" onClick={() => stepFrame(1)} title="Forward one frame (.)" data-video-frame-forward>
+              <StepForward size={16} />
+            </button>
             <div className="video-volume">
               <button className="icon-btn" onClick={toggleMute} title="Mute (M)">
                 {muted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
@@ -811,6 +994,40 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
               {duration ? ` / ${formatTime(duration)}` : ''}
             </span>
             <span className="video-buttons-gap" />
+
+            <button
+              className={`icon-btn video-loop ${loop ? 'on' : ''}`}
+              onClick={pressLoop}
+              title={
+                !loop
+                  ? 'Loop a part (A): press at the start, then at the end'
+                  : loop.b === null
+                    ? `Loop from ${formatTime(loop.a)}: press again at the end (A)`
+                    : `Looping ${formatTime(loop.a)} – ${formatTime(loop.b)}. Press to stop (A)`
+              }
+              data-video-loop
+            >
+              <Repeat size={16} />
+              {loop && <span className="video-loop-badge">{loop.b === null ? 'A' : 'A-B'}</span>}
+            </button>
+            <div className="video-menu-wrap">
+              <button className={`icon-btn ${grab ? 'on' : ''}`} onClick={() => (grab ? setGrab(null) : void grabFrame())} title="Save this frame into a note (S)" data-video-grab>
+                <Camera size={16} />
+              </button>
+              {grab && (
+                <div className="video-grab" data-video-grab-panel>
+                  <div className="video-grab-head">
+                    <span>Save the frame at {preciseTime(grab.at)} into…</span>
+                    <button className="btn" onClick={() => void copyFrame()} title="Copy the picture instead" data-video-grab-copy>
+                      <ClipboardCopy size={13} /> Copy
+                    </button>
+                  </div>
+                  <div className="video-grab-picker">
+                    <DestPicker current={lastFrameDest()} label={destLabel} onPick={(d) => void saveFrame(d)} onClose={() => setGrab(null)} />
+                  </div>
+                </div>
+              )}
+            </div>
 
             {subsLoading && <Loader2 size={14} className="spin" />}
             <div className="video-menu-wrap">

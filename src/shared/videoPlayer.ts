@@ -53,7 +53,8 @@ export interface VideoProbe {
   duration: number | null
   /** When the file's clock starts (usually 0; often not for .ts recordings). */
   start: number
-  video: { codec: string; width: number; height: number } | null
+  /** `fps`: frames a second, when ffmpeg says (used to step one frame at a time). */
+  video: { codec: string; width: number; height: number; fps?: number | null } | null
   audio: AudioTrack[]
   subtitles: SubtitleTrack[]
 }
@@ -95,7 +96,13 @@ export function parseProbe(log: string): VideoProbe | null {
       // Album art and thumbnails show up as a one-picture "video".
       if (probe.video || /\(attached pic\)/.test(rest) || ['mjpeg', 'png', 'bmp'].includes(base.codec)) continue
       const size = /\b(\d{2,5})x(\d{2,5})\b/.exec(rest)
-      probe.video = { codec: base.codec, width: size ? Number(size[1]) : 0, height: size ? Number(size[2]) : 0 }
+      const fps = /, (\d+(?:\.\d+)?) fps\b/.exec(rest) ?? /, (\d+(?:\.\d+)?) tbr\b/.exec(rest)
+      probe.video = {
+        codec: base.codec,
+        width: size ? Number(size[1]) : 0,
+        height: size ? Number(size[2]) : 0,
+        fps: fps && Number(fps[1]) > 0 && Number(fps[1]) <= 300 ? Number(fps[1]) : null
+      }
     } else if (type === 'Audio') {
       const ch = /, (mono|stereo|\d+\.\d+(?:\([^)]*\))?|\d+ channels)\b/.exec(rest)
       probe.audio.push({ ...base, channels: ch ? ch[1].replace(/\(.*\)$/, '') : null })
@@ -366,6 +373,67 @@ export const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3]
 export function stepSpeed(speed: number, dir: 1 | -1): number {
   if (dir > 0) return SPEEDS.find((s) => s > speed + 0.001) ?? SPEEDS[SPEEDS.length - 1]
   return [...SPEEDS].reverse().find((s) => s < speed - 0.001) ?? SPEEDS[0]
+}
+
+// ---------- looping a part, stepping a frame, grabbing a frame ----------
+
+/** A part of the video played over and over (A to B, in seconds into the video). */
+export interface LoopRange {
+  a: number
+  b: number
+}
+
+/** Loops shorter than this would just stutter, so they aren't made. */
+export const MIN_LOOP = 0.2
+
+/**
+ * The next state of the A-B loop button after pressing it at `time`: the first press marks the
+ * start, the second the end (either order works), the third clears it.
+ */
+export function nextLoop(loop: { a: number; b: number | null } | null, time: number): { a: number; b: number | null } | null {
+  if (!loop) return { a: Math.max(0, time), b: null }
+  if (loop.b !== null) return null
+  const a = Math.min(loop.a, time)
+  const b = Math.max(loop.a, time)
+  // Pressed twice in the same spot: start again from here rather than make a loop of nothing.
+  if (b - a < MIN_LOOP) return { a: Math.max(0, time), b: null }
+  return { a, b }
+}
+
+/** Where to jump back to while looping, or null to carry on. */
+export function loopJump(loop: { a: number; b: number | null } | null, time: number): number | null {
+  if (!loop || loop.b === null) return null
+  return time >= loop.b ? loop.a : null
+}
+
+/** Frames a second when the file doesn't say (most videos are 24–30). */
+export const DEFAULT_FPS = 30
+
+/**
+ * Where one frame forward or back is. Aims for the middle of the next frame, so rounding in the
+ * window's clock never lands on the same frame twice.
+ */
+export function frameStep(time: number, dir: 1 | -1, fps: number | null | undefined, duration: number | null | undefined): number {
+  const rate = fps && fps > 0 ? fps : DEFAULT_FPS
+  const frame = Math.floor(time * rate + 1e-6)
+  let t = (frame + dir + 0.5) / rate
+  if (duration && duration > 0) t = Math.min(t, Math.max(0, duration - 0.5 / rate))
+  return Math.max(0, t)
+}
+
+/** "Film-name-1-02-05.png": a picture file name for a frame of `video` at `seconds`. */
+export function frameName(video: string, seconds: number): string {
+  const file = video.slice(Math.max(video.lastIndexOf('/'), video.lastIndexOf('\\')) + 1)
+  const stem = file.includes('.') ? file.slice(0, file.lastIndexOf('.')) : file
+  const clean = stem.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'video'
+  return `${clean}-${formatTime(seconds).replace(/:/g, '-')}.png`
+}
+
+/** The line put in a note for a grabbed frame: the picture, named after the video and the time. */
+export function frameNoteText(video: string, seconds: number, picture: string): string {
+  const file = video.slice(Math.max(video.lastIndexOf('/'), video.lastIndexOf('\\')) + 1)
+  const label = `${file.replace(/[[\]]/g, '')} at ${formatTime(seconds)}`
+  return `![${label}](vault:${picture})`
 }
 
 // ---------- addresses ----------

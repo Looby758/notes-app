@@ -146,7 +146,8 @@ onRelease(async (test) => {
 
 /**
  * The file itself, in pieces as the window asks for them (that's what lets it jump around a film).
- * Marked shareable with Orbit's own pages so a frame can be copied off it (Publishing's frame grabber).
+ * Marked shareable with Orbit's own pages so a frame can be copied off it (the player's "Save this
+ * frame" and Publishing's frame grabber).
  */
 export const fileResponse = (full: string, range: string | null): Response => serveFile(full, range, { 'Access-Control-Allow-Origin': '*' })
 
@@ -176,7 +177,8 @@ export async function videoResponse(url: URL, request: Request): Promise<Respons
   })
   child.on('error', (err) => logError('video stream', err))
   const body = Readable.toWeb(child.stdout) as unknown as ReadableStream<Uint8Array>
-  return new Response(body, { headers: { 'Content-Type': 'video/mp4', 'Cache-Control': 'no-store' } })
+  // Shareable with Orbit's own pages, like the file itself, so the player can grab a frame off it.
+  return new Response(body, { headers: { 'Content-Type': 'video/mp4', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' } })
 }
 
 function stopAll(): void {
