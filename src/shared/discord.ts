@@ -88,6 +88,10 @@ export interface CallRecord {
   end: number
   /** Everyone else who was in it at some point. */
   people: string[]
+  /** How long each of them was in it with you (ms), by name. Older calls don't have it. */
+  with?: Record<string, number>
+  /** The call note: things to say or remember, typed on the pop-out during the call. */
+  note?: string
 }
 
 export interface DiscordStatus {
@@ -415,9 +419,12 @@ export function callLength(ms: number): string {
 export const MIN_CALL_MS = 15_000
 export const CALLS_KEEP = 300
 
-/** Adds a finished call to the history (newest first); too-short ones are left out. */
+/** Call notes are kept to this many characters. */
+export const NOTE_MAX = 4000
+
+/** Adds a finished call to the history (newest first); too-short ones are left out, unless you wrote a note in them. */
 export function addCall(list: CallRecord[], call: CallRecord): CallRecord[] {
-  if (call.end - call.start < MIN_CALL_MS) return list
+  if (call.end - call.start < MIN_CALL_MS && !call.note?.trim()) return list
   return [call, ...list.filter((c) => c.id !== call.id)].slice(0, CALLS_KEEP)
 }
 
@@ -428,16 +435,138 @@ export function cleanCalls(raw: unknown): CallRecord[] {
   for (const c of raw) {
     if (!isObj(c) || typeof c.id !== 'string' || typeof c.channel !== 'string') continue
     if (typeof c.start !== 'number' || typeof c.end !== 'number' || !(c.end >= c.start)) continue
+    const together = cleanWith(c.with)
     out.push({
       id: c.id,
       channel: c.channel,
       server: typeof c.server === 'string' ? c.server : null,
       start: c.start,
       end: c.end,
-      people: Array.isArray(c.people) ? c.people.filter((p): p is string => typeof p === 'string').slice(0, 50) : []
+      people: Array.isArray(c.people) ? c.people.filter((p): p is string => typeof p === 'string').slice(0, 50) : [],
+      ...(together ? { with: together } : {}),
+      ...(typeof c.note === 'string' && c.note.trim() ? { note: c.note.slice(0, NOTE_MAX) } : {})
     })
   }
   return out.sort((a, b) => b.start - a.start).slice(0, CALLS_KEEP)
+}
+
+function cleanWith(raw: unknown): Record<string, number> | undefined {
+  if (!isObj(raw)) return undefined
+  const out: Record<string, number> = {}
+  for (const [name, ms] of Object.entries(raw)) if (typeof ms === 'number' && Number.isFinite(ms) && ms > 0) out[name] = ms
+  return Object.keys(out).length ? out : undefined
+}
+
+/** Sets (or, when empty, removes) one call's note. */
+export function setCallNote(list: CallRecord[], id: string, note: string): CallRecord[] {
+  const text = note.slice(0, NOTE_MAX)
+  return list.map((c) => {
+    if (c.id !== id) return c
+    const { note: _old, ...rest } = c
+    return text.trim() ? { ...rest, note: text } : rest
+  })
+}
+
+// ---------------------------------------------------------------------------------------------
+// Time with each person in a call (who's there, and since when)
+
+/** While a call is going: each person's time so far, and since when they've been in it (null when they've left). */
+export type Presence = Record<string, { ms: number; since: number | null }>
+
+/** Updates who's in the call now: newcomers start counting, people who left stop. */
+export function trackPresence(p: Presence, here: string[], now: number): Presence {
+  const out: Presence = {}
+  const set = new Set(here)
+  for (const [name, x] of Object.entries(p)) {
+    if (set.has(name)) out[name] = x.since === null ? { ms: x.ms, since: now } : x
+    else out[name] = x.since === null ? x : { ms: x.ms + Math.max(0, now - x.since), since: null }
+  }
+  for (const name of here) if (!out[name]) out[name] = { ms: 0, since: now }
+  return out
+}
+
+/** Each person's total time at the end of the call (ms). */
+export function presenceTotals(p: Presence, now: number): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const [name, x] of Object.entries(p)) out[name] = x.ms + (x.since === null ? 0 : Math.max(0, now - x.since))
+  return out
+}
+
+// ---------------------------------------------------------------------------------------------
+// Call stats: hours a week in calls, and who you call most
+
+export interface CallStats {
+  /** Time in calls this week (Monday to now) and last week (ms). */
+  thisWeek: number
+  lastWeek: number
+  /** The last `weeks` weeks, oldest first: each week's Monday (ms) and time in calls. */
+  weeks: { start: number; ms: number }[]
+  /** Average a week over those weeks (ms), counting from the first week with a call. */
+  average: number
+  /** Who you've been in calls with most, by time together, then by number of calls. */
+  people: { name: string; calls: number; ms: number }[]
+  /** Calls and time over the whole history. */
+  totalCalls: number
+  totalMs: number
+}
+
+/** Midnight on the Monday of the week `at` is in (local time). */
+export function weekStart(at: number): number {
+  const d = new Date(at)
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  return d.getTime()
+}
+
+/** The Monday `n` weeks before (or after) `monday`, kept at midnight across clock changes. */
+function addWeeks(monday: number, n: number): number {
+  const d = new Date(monday)
+  d.setDate(d.getDate() + 7 * n)
+  return d.getTime()
+}
+
+/** Totals for the stats view. A call that runs past midnight on Sunday counts in both weeks. */
+export function callStats(calls: CallRecord[], now: number, weeks = 8): CallStats {
+  const thisMonday = weekStart(now)
+  const starts = Array.from({ length: weeks }, (_, i) => addWeeks(thisMonday, i - weeks + 1))
+  const ms = starts.map(() => 0)
+  const people = new Map<string, { calls: number; ms: number }>()
+  let totalMs = 0
+  for (const c of calls) {
+    const len = Math.max(0, c.end - c.start)
+    totalMs += len
+    for (let i = 0; i < weeks; i++) {
+      const from = starts[i]
+      const to = i + 1 < weeks ? starts[i + 1] : addWeeks(thisMonday, 1)
+      ms[i] += Math.max(0, Math.min(c.end, to) - Math.max(c.start, from))
+    }
+    for (const name of c.people) {
+      const p = people.get(name) ?? { calls: 0, ms: 0 }
+      p.calls++
+      p.ms += Math.min(len, c.with?.[name] ?? len)
+      people.set(name, p)
+    }
+  }
+  const first = ms.findIndex((x) => x > 0)
+  const counted = first < 0 ? 0 : weeks - first
+  return {
+    thisWeek: ms[weeks - 1] ?? 0,
+    lastWeek: ms[weeks - 2] ?? 0,
+    weeks: starts.map((start, i) => ({ start, ms: ms[i] })),
+    average: counted ? ms.slice(first).reduce((a, b) => a + b, 0) / counted : 0,
+    people: [...people.entries()].map(([name, p]) => ({ name, ...p })).sort((a, b) => b.ms - a.ms || b.calls - a.calls || a.name.localeCompare(b.name)),
+    totalCalls: calls.length,
+    totalMs
+  }
+}
+
+/** Hours for the stats: "0 h", "45 min", "3.5 h", "12 h". */
+export function statHours(ms: number): string {
+  const min = Math.round(Math.max(0, ms) / 60_000)
+  if (min === 0) return '0 h'
+  if (min < 60) return `${min} min`
+  const h = min / 60
+  return `${h < 10 ? Math.round(h * 10) / 10 : Math.round(h)} h`
 }
 
 /** "Sam, Alex and 3 others" for the history list. */

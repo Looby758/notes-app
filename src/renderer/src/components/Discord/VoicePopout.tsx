@@ -1,6 +1,7 @@
 import './voicePopout.css'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
+  BarChart3,
   Clock,
   Gamepad2,
   Headphones,
@@ -13,18 +14,20 @@ import {
   Minus,
   MonitorPlay,
   Music2,
+  Pencil,
   PhoneOff,
   Radio,
   RefreshCw,
   Scissors,
   Square,
+  StickyNote,
   Trash2,
   Video,
   Volume2,
   VolumeX,
   X
 } from 'lucide-react'
-import { callClock, callLength, chatParts, memberState, peopleList, type CallRecord, type ChatMessage, type MentionName, type VoiceMember } from '@shared/discord'
+import { callClock, callLength, callStats, chatParts, memberState, NOTE_MAX, peopleList, statHours, type CallRecord, type ChatMessage, type MentionName, type VoiceMember } from '@shared/discord'
 import { ROBLOX_ICON, ROBLOX_ID, stripGames, type Game } from '@shared/games'
 import type { SoundClip } from '@shared/soundboard'
 import { cleanError, useDiscord, watchDiscord } from '../../store/discord'
@@ -35,12 +38,13 @@ import { CALL_CLIP_SECONDS, closeMic, micLevel, openMic, saveCallClip, startClip
  * remembers where it was left). Meant to sit on a second screen while you're in a call: who's in
  * it and who's talking, each person's volume (and muting them just for you), your own mute,
  * deafen, push-to-talk and leave, your mic level, the call timer, the channel's chat, Orbit's game
- * shortcuts, the soundboard, a 30-second call clip, and the call history.
+ * shortcuts, the soundboard, a 30-second call clip, a note for the call (saved with it in the
+ * history), the call history, and call stats.
  *
  * Everything goes through the same Discord connection as the Discord voice tab (main/discord.ts).
  */
 
-type Tab = 'chat' | 'sounds' | 'history'
+type Tab = 'chat' | 'note' | 'sounds' | 'history'
 const TAB_KEY = 'discordPopout.tab'
 const CLIP_KEY = 'discordPopout.clipBuffer'
 
@@ -102,7 +106,7 @@ export default function VoicePopout() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape' && !(e.target instanceof HTMLInputElement)) void window.api.minimizeDiscordPopout()
+      if (e.key === 'Escape' && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) void window.api.minimizeDiscordPopout()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -220,7 +224,7 @@ function NotInCall() {
         <h4 className="vp-head">
           <History size={13} /> Recent calls
         </h4>
-        <CallHistory />
+        <HistoryAndStats />
       </section>
     </>
   )
@@ -532,7 +536,7 @@ function GameStrip({ flash }: { flash: (t: string) => void }) {
 // Chat, soundboard and history
 
 function Tabs({ run }: { run: (f: () => Promise<unknown>) => Promise<void> }) {
-  const [tab, setTabState] = useState<Tab>(() => readKey(TAB_KEY, ['chat', 'sounds', 'history'] as const, 'chat'))
+  const [tab, setTabState] = useState<Tab>(() => readKey(TAB_KEY, ['chat', 'note', 'sounds', 'history'] as const, 'chat'))
   const setTab = (t: Tab): void => {
     setTabState(t)
     writeKey(TAB_KEY, t)
@@ -540,7 +544,8 @@ function Tabs({ run }: { run: (f: () => Promise<unknown>) => Promise<void> }) {
   const unread = useUnread(tab === 'chat')
   const tabs: { id: Tab; label: string; icon: ReactNode }[] = [
     { id: 'chat', label: unread ? `Chat (${unread})` : 'Chat', icon: <MessageSquare size={13} /> },
-    { id: 'sounds', label: 'Soundboard', icon: <Music2 size={13} /> },
+    { id: 'note', label: 'Note', icon: <StickyNote size={13} /> },
+    { id: 'sounds', label: 'Sounds', icon: <Music2 size={13} /> },
     { id: 'history', label: 'History', icon: <History size={13} /> }
   ]
   return (
@@ -553,8 +558,9 @@ function Tabs({ run }: { run: (f: () => Promise<unknown>) => Promise<void> }) {
         ))}
       </div>
       {tab === 'chat' && <Chat run={run} />}
+      {tab === 'note' && <CallNote />}
       {tab === 'sounds' && <Soundboard run={run} />}
-      {tab === 'history' && <CallHistory />}
+      {tab === 'history' && <HistoryAndStats />}
     </section>
   )
 }
@@ -688,7 +694,90 @@ function Soundboard({ run }: { run: (f: () => Promise<unknown>) => Promise<void>
   )
 }
 
-function CallHistory() {
+/**
+ * The call note: things to say or remember in this call. It's saved as you type (a moment after
+ * you stop), kept with the call when it ends, and shows under that call in the history.
+ */
+function CallNote() {
+  const channelId = useDiscord((s) => s.channel?.id ?? '')
+  const [text, setText] = useState('')
+  const [loaded, setLoaded] = useState(false)
+  const focused = useRef(false)
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const unsaved = useRef<string | null>(null)
+  const save = (): void => {
+    clearTimeout(timer.current)
+    if (unsaved.current === null) return
+    void window.api.discordSetNote(unsaved.current, channelId)
+    unsaved.current = null
+  }
+  useEffect(() => {
+    let live = true
+    void window.api.discordNote().then((t) => {
+      if (!live) return
+      setText(t)
+      setLoaded(true)
+    })
+    // A new call starts with an empty note; other changes (typed elsewhere) show unless you're typing here.
+    const off = window.api.onDiscordNote((t) => {
+      if (!focused.current || t === '') setText(t)
+    })
+    return () => {
+      live = false
+      off()
+    }
+  }, [channelId])
+  // Switching tab (or closing the window) keeps what was typed.
+  useEffect(() => save, [channelId])
+  return (
+    <div className="vp-note">
+      <textarea
+        className="vp-note-text"
+        value={text}
+        disabled={!loaded}
+        maxLength={NOTE_MAX}
+        placeholder={'Things to say or remember in this call…\n\nIt’s saved with the call, so it shows in History afterwards.'}
+        onFocus={() => (focused.current = true)}
+        onBlur={() => {
+          focused.current = false
+          save()
+        }}
+        onChange={(e) => {
+          setText(e.target.value)
+          unsaved.current = e.target.value
+          clearTimeout(timer.current)
+          timer.current = setTimeout(save, 400)
+        }}
+      />
+      <span className="vp-faint vp-note-hint">{text.trim() ? 'Saved with this call' : 'Only kept on this computer'}</span>
+    </div>
+  )
+}
+
+/** The History tab: the calls themselves, or the stats from them. */
+function HistoryAndStats() {
+  const [view, setViewState] = useState<'calls' | 'stats'>(() => readKey('discordPopout.historyView', ['calls', 'stats'] as const, 'calls'))
+  const setView = (v: 'calls' | 'stats'): void => {
+    setViewState(v)
+    writeKey('discordPopout.historyView', v)
+  }
+  return (
+    <div className="vp-history-wrap">
+      <div className="vp-switch" role="tablist">
+        <button role="tab" aria-selected={view === 'calls'} className={view === 'calls' ? 'on' : ''} onClick={() => setView('calls')}>
+          <History size={12} /> Calls
+        </button>
+        <button role="tab" aria-selected={view === 'stats'} className={view === 'stats' ? 'on' : ''} onClick={() => setView('stats')}>
+          <BarChart3 size={12} /> Stats
+        </button>
+      </div>
+      {view === 'calls' ? <CallHistory /> : <CallStatsView />}
+    </div>
+  )
+}
+
+/** The saved calls, kept up to date. */
+function useCalls(): [CallRecord[] | null, (c: CallRecord[]) => void] {
   const [calls, setCalls] = useState<CallRecord[] | null>(null)
   useEffect(() => {
     let live = true
@@ -699,29 +788,21 @@ function CallHistory() {
       off()
     }
   }, [])
+  return [calls, setCalls]
+}
+
+function CallHistory() {
+  const [calls, setCalls] = useCalls()
   if (!calls) return null
   if (!calls.length) return <p className="vp-faint vp-pad">Calls you’ve been in show here once they end. They’re kept only on this computer.</p>
   const clear = (): void => {
-    if (confirm('Clear the whole call history?')) void window.api.discordClearCalls().then(setCalls)
+    if (confirm('Clear the whole call history (and the notes in it)?')) void window.api.discordClearCalls().then(setCalls)
   }
   return (
     <div className="vp-history">
       <ul>
         {calls.map((c) => (
-          <li key={c.id} className="vp-call">
-            <div className="vp-call-top">
-              <b title={c.server ?? undefined}>{c.channel}</b>
-              <span className="vp-faint">{callLength(c.end - c.start)}</span>
-              <button className="icon-btn vp-call-remove" title="Remove from the history" onClick={() => void window.api.discordRemoveCall(c.id).then(setCalls)}>
-                <X size={12} />
-              </button>
-            </div>
-            <div className="vp-faint">
-              {new Date(c.start).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
-              {c.server ? ` · ${c.server}` : ''}
-            </div>
-            <div className="vp-call-people">With {peopleList(c.people)}</div>
-          </li>
+          <CallRow key={c.id} c={c} setCalls={setCalls} />
         ))}
       </ul>
       <button className="link-button vp-clear" onClick={clear}>
@@ -731,4 +812,134 @@ function CallHistory() {
   )
 }
 
-export { CallHistory }
+function CallRow({ c, setCalls }: { c: CallRecord; setCalls: (c: CallRecord[]) => void }) {
+  const [editing, setEditing] = useState<string | null>(null)
+  const [open, setOpen] = useState(false)
+  const saveNote = (): void => {
+    if (editing === null) return
+    void window.api.discordSetCallNote(c.id, editing).then(setCalls)
+    setEditing(null)
+  }
+  return (
+    <li className="vp-call">
+      <div className="vp-call-top">
+        <b title={c.server ?? undefined}>{c.channel}</b>
+        <span className="vp-faint">{callLength(c.end - c.start)}</span>
+        <button className="icon-btn vp-call-remove" title={c.note ? 'Change the note' : 'Add a note to this call'} onClick={() => setEditing(c.note ?? '')}>
+          <Pencil size={12} />
+        </button>
+        <button className="icon-btn vp-call-remove" title="Remove from the history" onClick={() => void window.api.discordRemoveCall(c.id).then(setCalls)}>
+          <X size={12} />
+        </button>
+      </div>
+      <div className="vp-faint">
+        {new Date(c.start).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
+        {c.server ? ` · ${c.server}` : ''}
+      </div>
+      <div className="vp-call-people">With {peopleList(c.people)}</div>
+      {editing !== null ? (
+        <div className="vp-call-edit">
+          <textarea
+            autoFocus
+            value={editing}
+            maxLength={NOTE_MAX}
+            placeholder="A note for this call"
+            onChange={(e) => setEditing(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.stopPropagation()
+                setEditing(null)
+              }
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) saveNote()
+            }}
+          />
+          <div className="vp-call-edit-buttons">
+            <button className="btn btn-primary" onClick={saveNote}>
+              Save
+            </button>
+            <button className="btn" onClick={() => setEditing(null)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        c.note && (
+          <button className={`vp-call-note${open ? ' open' : ''}`} title={open ? 'Show less' : 'Show the whole note'} onClick={() => setOpen(!open)}>
+            <StickyNote size={11} /> <span>{c.note}</span>
+          </button>
+        )
+      )}
+    </li>
+  )
+}
+
+/** Call stats: hours a week in calls (the last 8 weeks), and who you call most. */
+function CallStatsView({ wide = false }: { wide?: boolean }) {
+  const [calls] = useCalls()
+  const [now] = useState(() => Date.now())
+  const stats = useMemo(() => (calls ? callStats(calls, now) : null), [calls, now])
+  if (!stats) return null
+  if (!stats.totalCalls) return <p className="vp-faint vp-pad">Stats show here once you’ve finished a call or two.</p>
+  const top = Math.max(...stats.weeks.map((w) => w.ms), 1)
+  const people = stats.people.slice(0, wide ? 8 : 5)
+  const most = Math.max(...people.map((p) => p.ms), 1)
+  const change = stats.thisWeek - stats.lastWeek
+  const weekLabel = (start: number, i: number): string =>
+    i === stats.weeks.length - 1 ? 'This week' : i === stats.weeks.length - 2 ? 'Last week' : `w/c ${new Date(start).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`
+  return (
+    <div className={`vp-stats${wide ? ' wide' : ''}`}>
+      <div className="vp-stat-tiles">
+        <div className="vp-stat">
+          <span className="vp-stat-label">This week</span>
+          <b>{statHours(stats.thisWeek)}</b>
+          <span className="vp-faint">{stats.lastWeek || stats.thisWeek ? `${change >= 0 ? '+' : '−'}${statHours(Math.abs(change))} on last week` : 'No calls yet'}</span>
+        </div>
+        <div className="vp-stat">
+          <span className="vp-stat-label">Last week</span>
+          <b>{statHours(stats.lastWeek)}</b>
+        </div>
+        <div className="vp-stat">
+          <span className="vp-stat-label">Weekly average</span>
+          <b>{statHours(stats.average)}</b>
+        </div>
+      </div>
+
+      <h5 className="vp-stats-head">Hours in calls, last {stats.weeks.length} weeks</h5>
+      <div className="vp-weeks" role="img" aria-label={stats.weeks.map((w, i) => `${weekLabel(w.start, i)}: ${statHours(w.ms)}`).join(', ')}>
+        {stats.weeks.map((w, i) => (
+          <div key={w.start} className={`vp-week${i === stats.weeks.length - 1 ? ' now' : ''}`} title={`${weekLabel(w.start, i)}: ${statHours(w.ms)}`}>
+            <span className="vp-week-value">{w.ms ? statHours(w.ms) : ''}</span>
+            <div className="vp-week-track">
+              <div className="vp-week-bar" style={{ height: `${w.ms ? Math.max(3, (w.ms / top) * 100) : 0}%` }} />
+            </div>
+            <span className="vp-week-label">{i === stats.weeks.length - 1 ? 'Now' : new Date(w.start).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>
+          </div>
+        ))}
+      </div>
+
+      <h5 className="vp-stats-head">Who you call most</h5>
+      {people.length ? (
+        <ol className="vp-people">
+          {people.map((p) => (
+            <li key={p.name} title={`${p.name}: ${statHours(p.ms)} together in ${p.calls} call${p.calls === 1 ? '' : 's'}`}>
+              <span className="vp-person-name">{p.name}</span>
+              <span className="vp-person-track">
+                <span className="vp-person-bar" style={{ width: `${Math.max(2, (p.ms / most) * 100)}%` }} />
+              </span>
+              <span className="vp-person-value">
+                {statHours(p.ms)} · {p.calls} call{p.calls === 1 ? '' : 's'}
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="vp-faint">Only you so far.</p>
+      )}
+      <p className="vp-faint vp-stats-foot">
+        From {stats.totalCalls} call{stats.totalCalls === 1 ? '' : 's'} ({statHours(stats.totalMs)}) kept on this computer.
+      </p>
+    </div>
+  )
+}
+
+export { CallHistory, CallStatsView }
