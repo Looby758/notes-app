@@ -20,7 +20,7 @@ import { existsSync, statSync } from 'fs'
 import { readFile } from 'fs/promises'
 import * as fsp from 'fs/promises'
 import { basename, extname, isAbsolute, join, relative } from 'path'
-import type { AiAskTurn, AiExtraContext, AiChat, AiChatMessage, AiEngine, AiNote, AiSortRow, ConfirmOptions, EmailFolder, OutgoingEmail } from '@shared/types'
+import type { AiAskTurn, AiExtraContext, AiChat, AiChatMessage, AiEngine, AiNote, AiSortRow, ConfirmOptions, EmailFolder, GoogleEventInput, OutgoingEmail } from '@shared/types'
 import type { MusicAction } from '@shared/spotify'
 import { normalizePrefs, type Prefs } from '@shared/prefs'
 import { activeThemeId, getTheme } from '@shared/themes'
@@ -784,6 +784,9 @@ function registerIpc(): void {
   ipcMain.handle('cal:addFeed', (_e, name: string, url: string) => calendars.addFeed(name, url))
   ipcMain.handle('cal:removeFeed', (_e, id: string) => calendars.removeFeed(id))
   ipcMain.handle('cal:events', (_e, from: string, to: string) => calendars.fetchEvents(from, to))
+  ipcMain.handle('cal:create', (_e, calendarId: string, event: GoogleEventInput) => calendars.createEvent(calendarId, event))
+  ipcMain.handle('cal:update', (_e, calendarId: string, eventId: string, event: Partial<GoogleEventInput>) => calendars.updateEvent(calendarId, eventId, event))
+  ipcMain.handle('cal:delete', (_e, calendarId: string, eventId: string) => calendars.deleteEvent(calendarId, eventId))
   ipcMain.handle('email:status', () => email.status())
   ipcMain.handle('email:connect', () => email.connect())
   ipcMain.handle('email:list', (_e, folder: EmailFolder, query: string, next?: string) => email.list(folder, query, next))

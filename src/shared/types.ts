@@ -224,6 +224,23 @@ export interface CalEvent {
   location?: string
   /** "Open in Google Calendar" link, if there is one. */
   url?: string
+  /** Google events: which calendar and event they are, for changing them from Orbit. */
+  google?: { calendarId: string; eventId: string; editable: boolean; recurring: boolean; description?: string }
+}
+
+/** An event to make or change in Google Calendar. Times are local wall-clock times in `timeZone`. */
+export interface GoogleEventInput {
+  title: string
+  /** All day: the first day and the day after the last ("2026-11-21", "2026-11-22"). */
+  allDay: boolean
+  /** All day: a day key. Timed: "2026-11-21T09:00:00" (local, no offset). */
+  start: string
+  end: string
+  timeZone: string
+  location?: string
+  description?: string
+  /** RRULE / EXDATE lines for a repeating event (only when making one). */
+  recurrence?: string[]
 }
 
 export interface CalendarSourcesStatus {
@@ -235,7 +252,9 @@ export interface CalendarSourcesStatus {
     email?: string
     /** e.g. "Sign-in expired, connect again". */
     error?: string
-    calendars: { id: string; name: string; color: string; enabled: boolean }[]
+    calendars: { id: string; name: string; color: string; enabled: boolean; writable: boolean }[]
+    /** The sign-in lets Orbit add and change events (sign-ins from before 1.13 only read them). */
+    canEdit: boolean
   }
   feeds: { id: string; name: string; color: string; error?: string }[]
   /** False if the system can't encrypt the saved sign-in (then connecting is refused). */
@@ -977,6 +996,11 @@ export interface NotesApi {
   removeCalendarFeed(id: string): Promise<CalendarSourcesStatus>
   /** Events between two instants from every enabled calendar (cached ones if offline). */
   fetchCalendarEvents(from: string, to: string): Promise<{ events: CalEvent[]; errors: string[]; offline: boolean }>
+  /** Makes an event in one of your Google calendars. */
+  googleCreateEvent(calendarId: string, event: GoogleEventInput): Promise<void>
+  /** Changes a Google event (a repeating one's single day, when that's the one given). */
+  googleUpdateEvent(calendarId: string, eventId: string, event: Partial<GoogleEventInput>): Promise<void>
+  googleDeleteEvent(calendarId: string, eventId: string): Promise<void>
   // Email (Gmail, using the Google sign-in above)
   emailStatus(): Promise<GoogleAuthStatus>
   /** Signs in to Google in your browser, asking for email access too. */
