@@ -10885,7 +10885,7 @@ body.theme-light .sol-table {
   font-style: normal;
   font-weight: 800;
   pointer-events: none;
-  animation: g2048-gain 0.8s ease-out forwards;
+  animation: g2048-gain 1.1s ease-out forwards !important;
 }
 @keyframes g2048-gain {
   from {
@@ -10903,14 +10903,14 @@ body.theme-light .sol-table {
   pointer-events: none;
 }
 .g2048-tile {
-  --slide: 0.14s;
+  --slide: 0.24s;
   position: absolute;
   top: 0;
   left: 0;
   width: calc((100% - 30px) / 4);
   height: calc((100% - 30px) / 4);
   transform: translate(calc(var(--c) * (100% + 10px)), calc(var(--r) * (100% + 10px)));
-  transition: transform var(--slide) cubic-bezier(0.22, 0.8, 0.3, 1);
+  transition: transform var(--slide) cubic-bezier(0.25, 0.9, 0.3, 1) !important;
   z-index: 1;
 }
 .g2048-face {
@@ -10945,20 +10945,25 @@ body.theme-light .sol-table {
 }
 .g2048-tile.gone .g2048-face {
   opacity: 0;
-  transition: opacity 0.06s linear var(--slide);
+  transition: opacity 0.08s linear var(--slide) !important;
 }
 .g2048-tile.merged {
   z-index: 3;
 }
 .g2048-tile.merged .g2048-face {
-  animation: g2048-merge 0.34s cubic-bezier(0.3, 1.6, 0.5, 1) 0.1s backwards;
+  animation: g2048-merge 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) 0.2s backwards !important;
 }
 .g2048-tile.new .g2048-face {
-  animation: g2048-new 0.3s cubic-bezier(0.3, 1.5, 0.5, 1) 0.13s backwards;
+  animation: g2048-new 0.42s cubic-bezier(0.3, 1.5, 0.5, 1) 0.26s backwards !important;
 }
 @keyframes g2048-merge {
   0% {
-    transform: scale(0.6);
+    transform: scale(1);
+    opacity: 0;
+  }
+  1% {
+    transform: scale(1);
+    opacity: 1;
     filter: brightness(1.6);
   }
   45% {
@@ -10979,19 +10984,19 @@ body.theme-light .sol-table {
 /* Tiles squash a little in the direction they slid, then settle. */
 .g2048-tile.slid-left.p0 .g2048-face,
 .g2048-tile.slid-right.p0 .g2048-face {
-  animation: g2048-squash-x0 0.26s ease-out;
+  animation: g2048-squash-x0 0.42s ease-out !important;
 }
 .g2048-tile.slid-left.p1 .g2048-face,
 .g2048-tile.slid-right.p1 .g2048-face {
-  animation: g2048-squash-x1 0.26s ease-out;
+  animation: g2048-squash-x1 0.42s ease-out !important;
 }
 .g2048-tile.slid-up.p0 .g2048-face,
 .g2048-tile.slid-down.p0 .g2048-face {
-  animation: g2048-squash-y0 0.26s ease-out;
+  animation: g2048-squash-y0 0.42s ease-out !important;
 }
 .g2048-tile.slid-up.p1 .g2048-face,
 .g2048-tile.slid-down.p1 .g2048-face {
-  animation: g2048-squash-y1 0.26s ease-out;
+  animation: g2048-squash-y1 0.42s ease-out !important;
 }
 @keyframes g2048-squash-x0 {
   35% {
@@ -11032,11 +11037,14 @@ body.theme-light .sol-table {
   z-index: -1;
   border-radius: 50%;
   background: radial-gradient(circle, color-mix(in srgb, var(--tile) 85%, white) 0%, color-mix(in srgb, var(--tile) 50%, transparent) 38%, transparent 68%);
-  animation: g2048-ring 0.5s ease-out 0.1s both;
+  animation: g2048-ring 0.75s ease-out 0.2s both !important;
 }
 @keyframes g2048-ring {
-  from {
+  0% {
     transform: scale(0.5);
+    opacity: 0;
+  }
+  10% {
     opacity: 1;
   }
   to {
@@ -11054,11 +11062,14 @@ body.theme-light .sol-table {
   border-radius: 50%;
   background: radial-gradient(circle, #fff 0 30%, var(--tile) 55%);
   box-shadow: 0 0 10px 2px var(--tile);
-  animation: g2048-spark 0.6s cubic-bezier(0.1, 0.7, 0.3, 1) 0.1s both;
+  animation: g2048-spark 0.85s cubic-bezier(0.1, 0.7, 0.3, 1) 0.2s both !important;
 }
 @keyframes g2048-spark {
-  from {
+  0% {
     transform: rotate(var(--a)) translateY(-20px) scale(1.1);
+    opacity: 0;
+  }
+  8% {
     opacity: 1;
   }
   to {
@@ -11068,16 +11079,16 @@ body.theme-light .sol-table {
 }
 /* A move that can't happen: the tiles lean that way and spring back. */
 .g2048-board.bump-left .g2048-face {
-  animation: g2048-lean-l 0.25s ease-out;
+  animation: g2048-lean-l 0.36s ease-out !important;
 }
 .g2048-board.bump-right .g2048-face {
-  animation: g2048-lean-r 0.25s ease-out;
+  animation: g2048-lean-r 0.36s ease-out !important;
 }
 .g2048-board.bump-up .g2048-face {
-  animation: g2048-lean-u 0.25s ease-out;
+  animation: g2048-lean-u 0.36s ease-out !important;
 }
 .g2048-board.bump-down .g2048-face {
-  animation: g2048-lean-d 0.25s ease-out;
+  animation: g2048-lean-d 0.36s ease-out !important;
 }
 @keyframes g2048-lean-l {
   40% {
@@ -11101,21 +11112,6 @@ body.theme-light .sol-table {
 }
 .g2048-board.reached {
   box-shadow: 0 0 28px rgba(237, 194, 46, 0.35);
-}
-@media (prefers-reduced-motion: reduce) {
-  .g2048-tile {
-    transition: none;
-  }
-  .g2048-tile .g2048-face,
-  .g2048-ring,
-  .g2048-spark,
-  .g2048-gain {
-    animation: none !important;
-  }
-  .g2048-ring,
-  .g2048-spark {
-    display: none;
-  }
 }
 .g2048-tile.t2 { --tile: #eee4da; --ink: #776e65; }
 .g2048-tile.t4 { --tile: #ede0c8; --ink: #776e65; }

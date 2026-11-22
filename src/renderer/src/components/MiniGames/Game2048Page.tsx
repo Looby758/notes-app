@@ -63,7 +63,7 @@ function useCountUp(value: number): number {
     }
     let raf = 0
     const step = (now: number): void => {
-      const t = Math.min(1, (now - start) / 350)
+      const t = Math.min(1, (now - start) / 650)
       const v = Math.round(begin + (value - begin) * (1 - (1 - t) ** 3))
       from.current = v
       setShown(v)
@@ -141,7 +141,7 @@ export default function Game2048Page() {
   // Tiles that slid into another one disappear once they've arrived.
   useEffect(() => {
     if (!tiles.some((t) => t.gone)) return
-    const t = setTimeout(() => setTiles((ts) => ts.filter((x) => !x.gone)), 130)
+    const t = setTimeout(() => setTiles((ts) => ts.filter((x) => !x.gone)), 330)
     return () => clearTimeout(t)
   }, [tiles])
 
