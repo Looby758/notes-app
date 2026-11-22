@@ -111,6 +111,9 @@ function player(): HTMLAudioElement {
     const song = current()
     if (song) useMusic.setState({ error: `Couldn’t play “${song.title}”. The file may have moved, or it’s in a format this computer can’t play.` })
   })
+  // A friend was already talking when your first song started: it starts dipped too, rather than at
+  // full volume until they stop (otherwise the sound is only wired through the dip for the visualiser).
+  if (duckLevel !== 1) musicGraph()
   return audio
 }
 
