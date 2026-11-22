@@ -94,6 +94,8 @@ export const SCREENS_TAB = 'screens:'
 export const MUSIC_TAB = 'music:'
 /** A volume for each app (components/Mixer). */
 export const MIXER_TAB = 'mixer:'
+/** What's running, how much it uses, and ending it (components/TaskManager). */
+export const TASKS_TAB = 'tasks:'
 /** The download manager: a queue that pauses, carries on and can wait for the night (components/Downloads). */
 export const DOWNLOADS_TAB = 'downloads:'
 /** Scenes, webcam and screen recording (components/Studio). */

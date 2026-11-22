@@ -21,6 +21,7 @@ import type { MusicData, MusicEdit } from './musicLibrary'
 import type { FoundTrack } from './songSearch'
 import type { SpotifyList } from './spotifyImport'
 import type { MixerState } from './mixer'
+import type { EndResult, EndTarget, TaskSnapshot } from './taskManager'
 import type { MonitorAction, MonitorSaved, MonitorSetting, MonitorsStatus, MonitorTarget } from './monitors'
 import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
 import type { ClickerSettings, Macro, MacroHotkeys, MacroStatus } from './macros'
@@ -935,6 +936,13 @@ export interface NotesApi {
   /** Sets an app's volume (0 to 100); 'master' is the whole computer. False if it didn't take. */
   mixerVolume(id: string, volume: number): Promise<boolean>
   mixerMute(id: string, muted: boolean): Promise<boolean>
+  // Task manager (main/taskManager.ts): what's running, and ending it
+  /** Every program running, with its processes' CPU, memory and disk use, and the whole computer's. */
+  tasksGet(): Promise<TaskSnapshot>
+  /** Ends these processes (each is checked to still be the same program first). */
+  tasksEnd(targets: EndTarget[]): Promise<EndResult>
+  /** Shows a process's program file in File Explorer / Finder; false if its path isn't known. */
+  tasksReveal(pid: number): Promise<boolean>
   // Soundboard (main/soundboard.ts; the sound itself is played in lib/soundboard.ts)
   soundboardGet(): Promise<SoundboardStatus>
   /** Asks for sound files and adds a button for each. */
