@@ -1,4 +1,5 @@
 import { useEditor } from '../store/editor'
+import { searchWholePc } from '../store/filesReveal'
 import { focusIdeaBox } from '../store/videos'
 import { useVault } from '../store/vault'
 import { openExport, showRightView, showSearch, showSidebarView, toggleFocusMode, toggleMindMap, toggleZen, useUI } from '../store/ui'
@@ -353,14 +354,18 @@ export const commands: Command[] = [
   { id: 'convert.open', group: 'Navigation', title: 'Convert files (photos, Word, audio…)', run: () => openSpecialTab(CONVERT_TAB) },
   { id: 'pdf.open', group: 'Navigation', title: 'PDF editor (sign, fill in, merge, split, reorder pages)', run: () => openSpecialTab(PDF_EDITOR_TAB) },
   { id: 'explorer.open', group: 'Navigation', title: 'Browse files on this computer (and Google Drive)', run: () => openSpecialTab(EXPLORER_TAB) },
+  { id: 'explorer.searchPc', group: 'Navigation', title: 'Search the whole PC for a file or folder', run: () => searchWholePc() },
   { id: 'explorer.newTab', group: 'Navigation', title: 'New Files tab (another folder, to drag files between)', run: () => openExplorerTab() },
   { id: 'comics.open', group: 'Navigation', title: 'Read comics (your comic book shelf)', run: () => openSpecialTab(COMICS_TAB) },
   { id: 'wiki.open', group: 'Navigation', title: 'Wikis (downloaded Fandom wikis, read offline)', run: () => openSpecialTab(WIKI_TAB) },
-  { id: 'minigames.open', group: 'Navigation', title: 'Mini games (Sudoku, Minesweeper, Nonograms, Jigsaw, Wordle)', run: () => openMiniGames(null) },
+  { id: 'minigames.open', group: 'Navigation', title: 'Mini games (Sudoku, Minesweeper, Nonograms, Jigsaw, Wordle, Solitaire, 2048, Chess)', run: () => openMiniGames(null) },
   { id: 'sudoku.open', group: 'Navigation', title: 'Play sudoku (take a quick break)', run: () => openMiniGames('sudoku') },
   { id: 'nonogram.open', group: 'Navigation', title: 'Play nonograms (picture logic puzzles)', run: () => openMiniGames('nonogram') },
   { id: 'jigsaw.open', group: 'Navigation', title: 'Make a jigsaw from a photo', run: () => openMiniGames('jigsaw') },
   { id: 'wordle.open', group: 'Navigation', title: 'Play Wordle (any time, 2 to 8 letters, Walking Dead mode)', run: () => openMiniGames('wordle') },
+  { id: 'solitaire.open', group: 'Navigation', title: 'Play Solitaire (Klondike, draw 1 or 3)', run: () => openMiniGames('solitaire') },
+  { id: 'g2048.open', group: 'Navigation', title: 'Play 2048', run: () => openMiniGames('g2048') },
+  { id: 'chess.open', group: 'Navigation', title: 'Play chess (against the computer or a friend)', run: () => openMiniGames('chess') },
   { id: 'discord.open', group: 'Navigation', title: 'Discord voice (who’s in voice, mute, deafen)', run: () => openSpecialTab(DISCORD_TAB) },
   { id: 'discord.popout', group: 'Discord', title: 'Discord: pop out the voice call (its own window)', run: () => void window.api.openDiscordPopout() },
   { id: 'discord.mute', group: 'Discord', title: 'Discord: mute / unmute', run: () => void toggleDiscord('mute') },

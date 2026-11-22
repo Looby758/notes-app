@@ -1,5 +1,7 @@
 import type { AppInfo, GitHubStatus, MergedPull, PullRequest, Release, TestCopy } from './appStudio'
-import type { ExplorerEntry, ExplorerPlace, PasteMode } from './explorer'
+import type { ExplorerEntry, ExplorerPlace, PasteMode, PcIndexStatus } from './explorer'
+import type { FileTagStore, TagColour } from './fileTags'
+import type { BinListing } from './recycleBin'
 import type { ArchiveEntry } from './archive'
 import type { ComicOpened, ComicPreparing, ComicSettings, ComicShelf } from './comics'
 import type { WikiAnswer, WikiCheck, WikiHit, WikiInfo, WikiPageView, WikiPictureChoice, WikiSpoilerView } from './wiki'
@@ -225,6 +227,23 @@ export interface CalEvent {
   location?: string
   /** "Open in Google Calendar" link, if there is one. */
   url?: string
+  /** Google events: which calendar and event they are, for changing them from Orbit. */
+  google?: { calendarId: string; eventId: string; editable: boolean; recurring: boolean; description?: string }
+}
+
+/** An event to make or change in Google Calendar. Times are local wall-clock times in `timeZone`. */
+export interface GoogleEventInput {
+  title: string
+  /** All day: the first day and the day after the last ("2026-11-21", "2026-11-22"). */
+  allDay: boolean
+  /** All day: a day key. Timed: "2026-11-21T09:00:00" (local, no offset). */
+  start: string
+  end: string
+  timeZone: string
+  location?: string
+  description?: string
+  /** RRULE / EXDATE lines for a repeating event (only when making one). */
+  recurrence?: string[]
 }
 
 export interface CalendarSourcesStatus {
@@ -236,7 +255,9 @@ export interface CalendarSourcesStatus {
     email?: string
     /** e.g. "Sign-in expired, connect again". */
     error?: string
-    calendars: { id: string; name: string; color: string; enabled: boolean }[]
+    calendars: { id: string; name: string; color: string; enabled: boolean; writable: boolean }[]
+    /** The sign-in lets Orbit add and change events (sign-ins from before 1.13 only read them). */
+    canEdit: boolean
   }
   feeds: { id: string; name: string; color: string; error?: string }[]
   /** False if the system can't encrypt the saved sign-in (then connecting is refused). */
@@ -918,6 +939,12 @@ export interface NotesApi {
   discordCalls(): Promise<CallRecord[]>
   discordRemoveCall(id: string): Promise<CallRecord[]>
   discordClearCalls(): Promise<CallRecord[]>
+  /** The note for the call going on now (typed on the pop-out; saved with the call in the history). */
+  discordNote(): Promise<string>
+  discordSetNote(text: string, channelId: string): Promise<void>
+  /** Changes (or, with empty text, removes) a past call's note. */
+  discordSetCallNote(id: string, text: string): Promise<CallRecord[]>
+  onDiscordNote(callback: (text: string) => void): () => void
   onDiscordCalls(callback: (calls: CallRecord[]) => void): () => void
   /** The Discord voice pop-out (its own window, for a second screen): opens it or brings it back. */
   openDiscordPopout(): Promise<void>
@@ -978,6 +1005,11 @@ export interface NotesApi {
   removeCalendarFeed(id: string): Promise<CalendarSourcesStatus>
   /** Events between two instants from every enabled calendar (cached ones if offline). */
   fetchCalendarEvents(from: string, to: string): Promise<{ events: CalEvent[]; errors: string[]; offline: boolean }>
+  /** Makes an event in one of your Google calendars. */
+  googleCreateEvent(calendarId: string, event: GoogleEventInput): Promise<void>
+  /** Changes a Google event (a repeating one's single day, when that's the one given). */
+  googleUpdateEvent(calendarId: string, eventId: string, event: Partial<GoogleEventInput>): Promise<void>
+  googleDeleteEvent(calendarId: string, eventId: string): Promise<void>
   // Email (Gmail, using the Google sign-in above)
   emailStatus(): Promise<GoogleAuthStatus>
   /** Signs in to Google in your browser, asking for email access too. */
@@ -1356,6 +1388,37 @@ export interface NotesApi {
   explorerTrash(paths: string[]): Promise<string[]>
   /** Finds names under a folder and all its subfolders. */
   explorerSearch(dir: string, query: string, showHidden: boolean): Promise<ExplorerEntry[]>
+  /** Whole PC search: every file and folder on the computer whose name has each word, best first. */
+  explorerSearchPc(query: string, showHidden: boolean): Promise<{ entries: ExplorerEntry[]; status: PcIndexStatus; system: boolean }>
+  /** How Whole PC search's list of files is getting on (`everything`: the Everything app's helper is installed). */
+  explorerIndexStatus(): Promise<PcIndexStatus & { everything: boolean; wanted: boolean }>
+  onExplorerIndexStatus(callback: (status: PcIndexStatus) => void): () => void
+  /** The folders shown now: their total sizes come in through onExplorerFolderSize (`fresh`: count again). */
+  explorerFolderSizes(paths: string[], fresh?: boolean): Promise<void>
+  /** A folder's size (`complete` false while still counting); null when it couldn't be read. */
+  onExplorerFolderSize(callback: (e: { path: string; size: { bytes: number; files: number; folders: number; complete: boolean; counting?: boolean } | null }) => void): () => void
+  /** Walks the drives again now. */
+  explorerReindex(): Promise<void>
+  /** Everything with this colour tag (that's still there). */
+  explorerTagged(colour: TagColour): Promise<ExplorerEntry[]>
+  // The Recycle Bin / Bin (Files tab)
+  binList(): Promise<BinListing>
+  /** Puts items back where they came from; returns where each went. */
+  binRestore(ids: string[]): Promise<string[]>
+  /** Deletes for good; returns how many. */
+  binDelete(ids: string[]): Promise<number>
+  binEmpty(): Promise<number>
+  /** The system's own Recycle Bin / Bin window. */
+  binOpenSystem(): Promise<void>
+  /** Mac: Privacy & Security → Full Disk Access, so Orbit can look in the Bin. */
+  binMacPrivacy(): Promise<void>
+  // Colour tags and favourite folders (Files tab)
+  tagsGet(): Promise<FileTagStore>
+  tagsSet(paths: string[], colour: TagColour, on: boolean): Promise<void>
+  /** Names a colour ("School"); an empty name goes back to the colour's own. */
+  tagsLabel(colour: TagColour, label: string): Promise<void>
+  tagsFavourites(paths: string[]): Promise<void>
+  onTagsChanged(callback: (store: FileTagStore) => void): () => void
   // Comic book reader
   comicsShelf(): Promise<ComicShelf>
   /** Adds comic files (asks which, when no paths are given). */

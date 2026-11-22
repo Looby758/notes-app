@@ -425,6 +425,14 @@ const api: NotesApi = {
   discordCalls: () => ipcRenderer.invoke('discord:calls'),
   discordRemoveCall: (id) => ipcRenderer.invoke('discord:remove-call', id),
   discordClearCalls: () => ipcRenderer.invoke('discord:clear-calls'),
+  discordNote: () => ipcRenderer.invoke('discord:note'),
+  discordSetNote: (text, channelId) => ipcRenderer.invoke('discord:set-note', text, channelId),
+  discordSetCallNote: (id, text) => ipcRenderer.invoke('discord:set-call-note', id, text),
+  onDiscordNote: (callback) => {
+    const handler = (_e: Electron.IpcRendererEvent, text: string): void => callback(text)
+    ipcRenderer.on('discord:note-changed', handler)
+    return () => ipcRenderer.removeListener('discord:note-changed', handler)
+  },
   onDiscordCalls: (callback) => {
     const handler = (_e: Electron.IpcRendererEvent, calls: Parameters<typeof callback>[0]): void => callback(calls)
     ipcRenderer.on('discord:calls-changed', handler)
@@ -498,6 +506,9 @@ const api: NotesApi = {
   addCalendarFeed: (name, url) => ipcRenderer.invoke('cal:addFeed', name, url),
   removeCalendarFeed: (id) => ipcRenderer.invoke('cal:removeFeed', id),
   fetchCalendarEvents: (from, to) => ipcRenderer.invoke('cal:events', from, to),
+  googleCreateEvent: (calendarId, event) => ipcRenderer.invoke('cal:create', calendarId, event),
+  googleUpdateEvent: (calendarId, eventId, event) => ipcRenderer.invoke('cal:update', calendarId, eventId, event),
+  googleDeleteEvent: (calendarId, eventId) => ipcRenderer.invoke('cal:delete', calendarId, eventId),
   emailStatus: () => ipcRenderer.invoke('email:status'),
   emailConnect: () => ipcRenderer.invoke('email:connect'),
   emailList: (folder, query, next) => ipcRenderer.invoke('email:list', folder, query, next),
@@ -778,6 +789,36 @@ const api: NotesApi = {
   explorerPaste: (paths, dir, mode) => ipcRenderer.invoke('explorer:paste', paths, dir, mode),
   explorerTrash: (paths) => ipcRenderer.invoke('explorer:trash', paths),
   explorerSearch: (dir, query, showHidden) => ipcRenderer.invoke('explorer:search', dir, query, showHidden),
+  explorerSearchPc: (query, showHidden) => ipcRenderer.invoke('explorer:searchPc', query, showHidden),
+  explorerIndexStatus: () => ipcRenderer.invoke('explorer:indexStatus'),
+  onExplorerIndexStatus: (callback) => {
+    const handler = (_e: unknown, status: Parameters<typeof callback>[0]): void => callback(status)
+    ipcRenderer.on('explorer:indexStatus', handler)
+    return () => ipcRenderer.removeListener('explorer:indexStatus', handler)
+  },
+  explorerFolderSizes: (paths, fresh) => ipcRenderer.invoke('explorer:folderSizes', paths, fresh),
+  onExplorerFolderSize: (callback) => {
+    const handler = (_e: unknown, ev: Parameters<typeof callback>[0]): void => callback(ev)
+    ipcRenderer.on('explorer:folderSize', handler)
+    return () => ipcRenderer.removeListener('explorer:folderSize', handler)
+  },
+  explorerReindex: () => ipcRenderer.invoke('explorer:reindex'),
+  explorerTagged: (colour) => ipcRenderer.invoke('explorer:tagged', colour),
+  binList: () => ipcRenderer.invoke('bin:list'),
+  binRestore: (ids) => ipcRenderer.invoke('bin:restore', ids),
+  binDelete: (ids) => ipcRenderer.invoke('bin:delete', ids),
+  binEmpty: () => ipcRenderer.invoke('bin:empty'),
+  binOpenSystem: () => ipcRenderer.invoke('bin:openSystem'),
+  binMacPrivacy: () => ipcRenderer.invoke('bin:macPrivacy'),
+  tagsGet: () => ipcRenderer.invoke('tags:get'),
+  tagsSet: (paths, colour, on) => ipcRenderer.invoke('tags:set', paths, colour, on),
+  tagsLabel: (colour, label) => ipcRenderer.invoke('tags:label', colour, label),
+  tagsFavourites: (paths) => ipcRenderer.invoke('tags:favourites', paths),
+  onTagsChanged: (callback) => {
+    const handler = (_e: unknown, store: Parameters<typeof callback>[0]): void => callback(store)
+    ipcRenderer.on('tags:changed', handler)
+    return () => ipcRenderer.removeListener('tags:changed', handler)
+  },
   explorerToVault: (paths, folder) => ipcRenderer.invoke('explorer:toVault', paths, folder),
   explorerStartDrag: (paths) => ipcRenderer.send('explorer:startDrag', paths),
   explorerArchiveList: (path, password) => ipcRenderer.invoke('explorer:archiveList', path, password),

@@ -167,7 +167,7 @@ export default function JigsawPage() {
   useEffect(() => {
     if (!playing) return
     const tick = setInterval(() => {
-      if (document.hasFocus()) setGame((g) => (g && !g.won ? { ...g, seconds: g.seconds + 1 } : g))
+      setGame((g) => (g && !g.won ? { ...g, seconds: g.seconds + 1 } : g))
     }, 1000)
     return () => clearInterval(tick)
   }, [playing])

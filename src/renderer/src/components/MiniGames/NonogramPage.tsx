@@ -83,7 +83,7 @@ export default function NonogramPage() {
   useEffect(() => {
     if (game.won) return
     const tick = setInterval(() => {
-      if (document.hasFocus()) setGame((g) => (g.won ? g : { ...g, seconds: g.seconds + 1 }))
+      setGame((g) => (g.won ? g : { ...g, seconds: g.seconds + 1 }))
     }, 1000)
     return () => clearInterval(tick)
   }, [game.won])
