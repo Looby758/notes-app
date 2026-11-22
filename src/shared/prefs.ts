@@ -34,6 +34,8 @@ export interface Prefs {
   gameAnimatedCovers: 'always' | 'hover' | 'off'
   /** Which app icon design to use (taskbar / Dock / window). */
   appIcon: string
+  /** Spotify's parts of the music player (playlists, search, your account…). Off hides them all and only your own music files are used. */
+  musicSpotify: boolean
   /** A pop-up with the song's name and picture when the music player moves on to a new song. */
   musicSongPopup: boolean
   /** Moving bars in the music player while your own music files play. */
@@ -276,6 +278,7 @@ export const DEFAULT_PREFS: Prefs = {
   gameLaunchAnimation: true,
   gameAnimatedCovers: 'always',
   appIcon: 'default',
+  musicSpotify: true,
   musicSongPopup: true,
   musicVisualiser: true,
   interfaceSounds: true,

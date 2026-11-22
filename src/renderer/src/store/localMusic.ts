@@ -134,7 +134,7 @@ export async function playLocal(songs: LocalSong[], index: number | 'shuffle'): 
   ordered = songs
   // Spotify stops so the two don't play over each other.
   const spotify = useMusic.getState()
-  if (!spotify.local && spotify.state?.playing) void window.api.musicControl('pause').catch(() => undefined)
+  if (!spotify.local && spotify.state?.playing && spotify.state.source !== 'none') void window.api.musicControl('pause').catch(() => undefined)
   if (index === 'shuffle') {
     useLocalMusic.setState({ shuffle: true, queue: shuffled(songs) })
     return start(0)

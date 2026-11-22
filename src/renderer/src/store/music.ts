@@ -2,10 +2,11 @@ import { create } from 'zustand'
 import { nextRepeat, type MusicAction, type MusicState, type MusicStatus } from '@shared/spotify'
 import { errorMessage } from '../lib/paths'
 import { useUI } from './ui'
+import { usePrefs } from './prefs'
 import { songMarkdown, type SongTarget } from '@shared/songLinks'
 import { insertBlockIntoActiveNote } from '../lib/editorController'
 import { notify } from './notify'
-import { playLocalPath, localNext, localPause, localPrevious, localRepeat, localSeek, localShuffle, localToggle, localVolume, stopLocal } from './localMusic'
+import { loadLocalLibrary, playLocal, useLocalMusic, playLocalPath, localNext, localPause, localPrevious, localRepeat, localSeek, localShuffle, localToggle, localVolume, stopLocal } from './localMusic'
 
 /** The music player in the corner: what's playing (asked for every couple of seconds while it's open). */
 
@@ -60,6 +61,12 @@ export function watchMusic(): () => void {
   }
 }
 
+/** Spotify's parts of the player are on (Settings → Music → Show Spotify features). */
+export const spotifyOn = (): boolean => usePrefs.getState().prefs.musicSpotify
+
+/** What the player shows with Spotify turned off and none of your own music playing. */
+const IDLE: MusicState = { source: 'none', playing: false, positionMs: 0 }
+
 export const toggleMusic = (): void => setMusicOpen(!useMusic.getState().open)
 
 export const openMusicSettings = (): void => useUI.setState({ settingsSection: 'music' })
@@ -73,6 +80,10 @@ export async function refreshMusicStatus(): Promise<MusicStatus> {
 let asking = false
 export async function refreshMusic(): Promise<void> {
   if (asking || useMusic.getState().local) return
+  if (!spotifyOn()) {
+    if (useMusic.getState().state !== IDLE) useMusic.setState({ state: IDLE, at: Date.now(), liked: null })
+    return
+  }
   asking = true
   try {
     const state = await window.api.musicNowPlaying()
@@ -90,7 +101,7 @@ export async function refreshMusic(): Promise<void> {
 /** Asks once per song whether it's liked. */
 async function checkLiked(uri: string | undefined): Promise<void> {
   const { liked, status } = useMusic.getState()
-  if (!uri || liked?.uri === uri || !status?.connected) return
+  if (!uri || liked?.uri === uri || !status?.connected || !spotifyOn()) return
   useMusic.setState({ liked: { uri, liked: false } })
   try {
     const yes = await window.api.musicIsLiked(uri)
@@ -141,6 +152,7 @@ export function musicControl(action: MusicAction): Promise<boolean> {
       }
     )
   }
+  if (!spotifyOn()) return playOwnMusic(action)
   // Show the change straight away.
   if (action === 'pause' && state?.track) {
     useMusic.setState({ state: { ...state, playing: false, positionMs: currentPosition(state, at) }, at: Date.now() })
@@ -156,12 +168,31 @@ export function musicControl(action: MusicAction): Promise<boolean> {
   return run(() => window.api.musicControl(action))
 }
 
+/** With Spotify off and nothing of yours playing: Play shuffles your music, the other buttons do nothing. */
+async function playOwnMusic(action: MusicAction): Promise<boolean> {
+  if (action !== 'toggle') return false
+  try {
+    if (!useLocalMusic.getState().library) await loadLocalLibrary()
+    const songs = useLocalMusic.getState().library?.songs ?? []
+    if (!songs.length) {
+      useMusic.setState({ error: 'Choose your music folder under My music first.' })
+      return false
+    }
+    await playLocal(songs, 'shuffle')
+    return true
+  } catch (err) {
+    useMusic.setState({ error: errorMessage(err) })
+    return false
+  }
+}
+
 export function musicSeek(ms: number): Promise<boolean> {
   const { state, local } = useMusic.getState()
   if (local) {
     localSeek(ms)
     return Promise.resolve(true)
   }
+  if (!spotifyOn()) return Promise.resolve(false)
   if (state) useMusic.setState({ state: { ...state, positionMs: ms }, at: Date.now() })
   return run(() => window.api.musicSeek(ms))
 }
@@ -183,6 +214,7 @@ export function musicSetVolume(percent: number): Promise<boolean> {
     localVolume(percent)
     return Promise.resolve(true)
   }
+  if (!spotifyOn()) return Promise.resolve(false)
   if (state) useMusic.setState({ state: { ...state, volume: percent } })
   return run(() => window.api.musicSetVolume(percent))
 }
@@ -251,7 +283,7 @@ export function startMusic(): () => void {
     // The Mac app answers instantly; your account is asked a little less often.
     timer = setTimeout(tick, state?.source === 'account' ? 3000 : 1500)
   }
-  void refreshMusicStatus().catch(() => undefined)
+  if (spotifyOn()) void refreshMusicStatus().catch(() => undefined)
   void tick()
   const stopMini = startMini()
   return () => {
@@ -297,6 +329,10 @@ function startMini(): () => void {
 export async function playSongTarget(target: SongTarget): Promise<void> {
   setMusicOpen(true)
   if (target.kind === 'spotify') {
+    if (!spotifyOn()) {
+      useMusic.setState({ error: 'Spotify is turned off in Settings → Music.' })
+      return
+    }
     await musicPlay(target.uri)
     return
   }

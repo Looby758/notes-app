@@ -5,6 +5,7 @@ import type { MusicItem } from '@shared/spotify'
 import { songMarkdown } from '@shared/songLinks'
 import { findSong, forgetFoundSong, setListenSource, useSongId } from '../../store/songId'
 import { musicPlay, openMusicSettings, useMusic } from '../../store/music'
+import { usePrefs } from '../../store/prefs'
 import { notify } from '../../store/notify'
 import { desktopListenSupported } from '../../lib/songListen'
 import { insertBlockIntoActiveNote, openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
@@ -133,8 +134,10 @@ function ListenButton() {
 }
 
 function FoundCard({ song }: { song: FoundSong }) {
-  const connected = useMusic((s) => !!s.status?.connected)
-  const uri = song.spotifyUri
+  const spotify = usePrefs((s) => s.prefs.musicSpotify)
+  const connected = useMusic((s) => !!s.status?.connected) && spotify
+  // With Spotify off, its link and buttons are left out; the song's own page still links to every music app.
+  const uri = spotify ? song.spotifyUri : undefined
   const toNote = (): void => {
     const md = uri ? songMarkdown(song.title, song.artist, uri, song.art) : null
     const text = md ?? `🎵 ${song.title} · ${song.artist}${song.link ? ` (${song.link})` : ''}`
@@ -167,7 +170,7 @@ function FoundCard({ song }: { song: FoundSong }) {
           </button>
         )}
       </div>
-      {!connected && uri && (
+      {spotify && !connected && uri && (
         <p className="music-panel-note">
           <button
             className="link-btn"
@@ -181,7 +184,7 @@ function FoundCard({ song }: { song: FoundSong }) {
           to play it and add it to a playlist.
         </p>
       )}
-      {!uri && <p className="music-panel-note">Spotify doesn’t seem to have this one, so it can’t go in a playlist. The link above has it on other music apps.</p>}
+      {spotify && !uri && <p className="music-panel-note">Spotify doesn’t seem to have this one, so it can’t go in a playlist. The link above has it on other music apps.</p>}
     </div>
   )
 }

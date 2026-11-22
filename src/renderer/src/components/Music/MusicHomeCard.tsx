@@ -2,13 +2,16 @@ import { useEffect, useState } from 'react'
 import { Music, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from 'lucide-react'
 import { currentPosition, musicControl, musicSeek, setMusicOpen, useMusic, watchMusic } from '../../store/music'
 import { HomeBox } from '../Home/HomePage'
+import { usePrefs } from '../../store/prefs'
 import { LikeButton, VolumeSlider } from './MusicPlayer'
 
 /** The Home page's "Now playing" box: nothing until there's music to control (Spotify on this Mac or your account, or your own songs). */
 export default function MusicHomeCard() {
   const status = useMusic((s) => s.status)
   const local = useMusic((s) => s.local)
-  const usable = local || (!!status && (status.appControl || status.connected))
+  const spotify = usePrefs((s) => s.prefs.musicSpotify)
+  // With Spotify off it's always there for your own music (Play shuffles it).
+  const usable = local || !spotify || (!!status && (status.appControl || status.connected))
   useEffect(() => (usable ? watchMusic() : undefined), [usable])
   if (!usable) return null
   return (
@@ -29,7 +32,8 @@ export default function MusicHomeCard() {
 function Playing() {
   const state = useMusic((s) => s.state)
   const error = useMusic((s) => s.error)
-  if (!state) return <p className="home-empty">Looking for Spotify…</p>
+  const spotify = usePrefs((s) => s.prefs.musicSpotify)
+  if (!state) return <p className="home-empty">{spotify ? 'Looking for Spotify…' : 'Loading…'}</p>
   if (state.hint === 'not-running' || state.hint === 'no-device') {
     return (
       <div className="music-home-empty">
@@ -56,9 +60,15 @@ function Playing() {
     return (
       <div className="music-home-empty">
         <span>Nothing playing.</span>
-        <button className="btn" onClick={() => setMusicOpen(true)}>
-          Pick a playlist
-        </button>
+        {spotify ? (
+          <button className="btn" onClick={() => setMusicOpen(true)}>
+            Pick a playlist
+          </button>
+        ) : (
+          <button className="btn" onClick={() => void musicControl('toggle')} data-music-home-shuffle>
+            <Shuffle size={13} /> Shuffle my music
+          </button>
+        )}
       </div>
     )
   }
@@ -70,7 +80,7 @@ function Playing() {
           <strong title={track.name}>{track.name}</strong>
           <span title={track.artist}>{track.artist}</span>
         </div>
-        {track.uri && <LikeButton uri={track.uri} />}
+        {spotify && track.uri && <LikeButton uri={track.uri} />}
         <div className="music-controls">
           <button className="icon-btn" onClick={() => musicControl('previous')} title="Previous">
             <SkipBack size={15} />

@@ -10,6 +10,7 @@ import { IS_MAC, SYSTEM_NAME } from '@shared/platform'
 /** Settings → Music: what the player can do straight away, and connecting your Spotify account. */
 export default function MusicSettings() {
   const status = useMusic((s) => s.status)
+  const spotify = usePrefs((s) => s.prefs.musicSpotify)
   const [clientId, setClientId] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -40,7 +41,7 @@ export default function MusicSettings() {
       setMusicOpen(true)
     })
 
-  if (!status) return null
+  if (!status || !spotify) return null
   const open = (url: string) => () => window.open(url)
   return (
     <section className="settings-group cal-sources" data-section="music">
