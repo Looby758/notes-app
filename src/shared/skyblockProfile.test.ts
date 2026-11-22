@@ -19,7 +19,11 @@ const itemFiles = [
   acc('SPEED_TALISMAN', 'COMMON'),
   acc('SPEED_RING', 'UNCOMMON'),
   acc('BAT_TALISMAN', 'RARE'),
-  acc('IGNORED_ONE', 'COMMON')
+  acc('IGNORED_ONE', 'COMMON'),
+  // Hypixel has a Personal Compactor for each skill now; the old one-size one is a legacy item.
+  acc('PERSONAL_COMPACTOR_COMBAT_4000', 'RARE'),
+  acc('PERSONAL_COMPACTOR_FARMING_4000', 'RARE'),
+  { internalname: 'PERSONAL_COMPACTOR_4000', lore: ['§8Legacy Item', '§l§9RARE ACCESSORY'] }
 ]
 const data: SbData = {
   at: 1,
@@ -89,7 +93,7 @@ describe('profileView', () => {
     expect(v.gear?.armor.map((a) => a?.id ?? null)).toEqual(['HAT', null, null, 'BOOTS'])
     // The ring covers the talisman, so only the ring and the bat count; the artifact is missing, the speed family's lowest is missing.
     expect(v.accessories?.magicalPower).toBe(5 + 8)
-    expect(v.accessories?.missing.map((m) => m.id)).toEqual(['SPEED_TALISMAN', 'ZOMBIE_ARTIFACT'])
+    expect(v.accessories?.missing.map((m) => m.id)).toEqual(['SPEED_TALISMAN', 'PERSONAL_COMPACTOR_COMBAT_4000', 'PERSONAL_COMPACTOR_FARMING_4000', 'ZOMBIE_ARTIFACT'])
     expect(v.pets[0]).toMatchObject({ name: 'Bee', active: true, level: { level: 3 } })
     expect(v.collections?.[0]).toMatchObject({ group: 'Farming', items: [{ id: 'WHEAT', count: 60, tier: 1, next: 100 }] })
     expect(v.minions).toEqual([
