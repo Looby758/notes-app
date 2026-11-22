@@ -772,6 +772,12 @@ const api: NotesApi = {
     ipcRenderer.on('explorer:indexStatus', handler)
     return () => ipcRenderer.removeListener('explorer:indexStatus', handler)
   },
+  explorerFolderSizes: (paths, fresh) => ipcRenderer.invoke('explorer:folderSizes', paths, fresh),
+  onExplorerFolderSize: (callback) => {
+    const handler = (_e: unknown, ev: Parameters<typeof callback>[0]): void => callback(ev)
+    ipcRenderer.on('explorer:folderSize', handler)
+    return () => ipcRenderer.removeListener('explorer:folderSize', handler)
+  },
   explorerReindex: () => ipcRenderer.invoke('explorer:reindex'),
   explorerTagged: (colour) => ipcRenderer.invoke('explorer:tagged', colour),
   tagsGet: () => ipcRenderer.invoke('tags:get'),

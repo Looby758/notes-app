@@ -15964,3 +15964,6 @@ button.board-add-picture:hover {
 .menu .tag-picker .tag-swatch:hover {
   background: var(--tag);
 }
+.explorer-size-counting {
+  opacity: 0.6;
+}

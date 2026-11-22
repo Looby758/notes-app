@@ -1343,6 +1343,10 @@ export interface NotesApi {
   /** How Whole PC search's list of files is getting on (`everything`: the Everything app's helper is installed). */
   explorerIndexStatus(): Promise<PcIndexStatus & { everything: boolean; wanted: boolean }>
   onExplorerIndexStatus(callback: (status: PcIndexStatus) => void): () => void
+  /** The folders shown now: their total sizes come in through onExplorerFolderSize (`fresh`: count again). */
+  explorerFolderSizes(paths: string[], fresh?: boolean): Promise<void>
+  /** A folder's size (`complete` false while still counting); null when it couldn't be read. */
+  onExplorerFolderSize(callback: (e: { path: string; size: { bytes: number; files: number; folders: number; complete: boolean; counting?: boolean } | null }) => void): () => void
   /** Walks the drives again now. */
   explorerReindex(): Promise<void>
   /** Everything with this colour tag (that's still there). */

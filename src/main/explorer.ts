@@ -30,6 +30,14 @@ import { hold } from './undoBin'
 import fileIndexWorker from './fileIndex/fileIndexWorker?modulePath'
 import { fileIndexStatus, hasEverything, rebuildFileIndex, searchIndex, startFileIndex, stopFileIndex, systemSearch, touchedFiles, type IndexStatus } from './fileIndex'
 import { copyTags, moveTags, setupFileTags, taggedPaths } from './fileTags'
+import folderSizeWorker from './folderSize/folderSizeWorker?modulePath'
+import { folderSizesChanged, setupFolderSizes, wantFolderSizes } from './folderSize'
+
+/** Orbit changed something in these folders: Whole PC search and folder sizes catch up. */
+function changed(dirs: string[]): void {
+  touchedFiles(dirs)
+  folderSizesChanged(dirs)
+}
 
 /**
  * The file explorer tab's side of things: the places to start from, folder listings, text
@@ -202,7 +210,7 @@ async function create(dir: string, name: string, kind: 'folder' | 'file'): Promi
   const path = join(dir, uniqueName(checkName(name), await namesIn(dir), kind === 'folder'))
   if (kind === 'folder') await mkdir(path)
   else await writeFile(path, '', { flag: 'wx' })
-  touchedFiles([dir])
+  changed([dir])
   return path
 }
 
@@ -214,7 +222,7 @@ async function renameItem(path: string, name: string): Promise<string> {
   await releaseFiles(path)
   await rename(path, next)
   moveTags(path, next)
-  touchedFiles([dirname(path)])
+  changed([dirname(path)])
   return next
 }
 
@@ -247,7 +255,7 @@ async function paste(paths: string[], dir: string, mode: PasteMode): Promise<{ f
     else copyTags(from, to)
     done.push({ from, to })
   }
-  touchedFiles([dir, ...(mode === 'move' ? done.map((d) => dirname(d.from)) : [])])
+  changed([dir, ...(mode === 'move' ? done.map((d) => dirname(d.from)) : [])])
   return done
 }
 
@@ -392,7 +400,7 @@ export function setupExplorer(vaultRoot: () => string | null): void {
       await hold(p)
       done.push(p)
     }
-    touchedFiles(done.map((p) => dirname(p)))
+    changed(done.map((p) => dirname(p)))
     return done
   })
   // Dropped from the explorer (or File Explorer / Finder) onto a folder in the sidebar's notes tree:
@@ -429,4 +437,6 @@ export function setupExplorer(vaultRoot: () => string | null): void {
   ipcMain.handle('explorer:reindex', () => rebuildFileIndex())
   ipcMain.handle('explorer:tagged', (_e, colour: string) => entriesOf(vaultRoot(), taggedPaths(colour)))
   setupFileTags()
+  setupFolderSizes(folderSizeWorker)
+  ipcMain.handle('explorer:folderSizes', (_e, paths: unknown, fresh: unknown) => wantFolderSizes(checkPaths(paths ?? []), !!fresh))
 }

@@ -36,6 +36,8 @@ asarUnpack:
   - out/main/**/sevenZipWorker*.js
   # Whole PC search's worker thread, which keeps the list of every file (Files tab).
   - out/main/**/fileIndexWorker*.js
+  # The Files tab's folder sizes are added up in a worker thread too.
+  - out/main/**/folderSizeWorker*.js
 win:
   target:
     - target: nsis

@@ -58,6 +58,7 @@ import {
   nameProblem,
   parentPath,
   describeCount,
+  describeFolderSize,
   previewKind,
   PC_SEARCH_LIMIT,
   SEARCH_LIMIT,
@@ -134,6 +135,10 @@ const rememberedFor = (tab: string): Remembered => {
   return r
 }
 
+type FolderSize = { bytes: number; files: number; folders: number; complete: boolean; counting?: boolean }
+/** Folder sizes as they come in (shared by every Files tab); null when the folder couldn't be read. */
+const folderSizeCache = new Map<string, FolderSize | null>()
+
 /** Cut or copied items, shared by every explorer tab while the app is open. */
 let clip: { paths: string[]; mode: PasteMode } | null = null
 
@@ -199,6 +204,10 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
   const [indexStatus, setIndexStatus] = useState<(PcIndexStatus & { everything?: boolean; wanted?: boolean }) | null>(null)
   const [systemToo, setSystemToo] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
+  /** Folders' total sizes, added up in the background (main/folderSize). */
+  const [folderSizes, setFolderSizes] = useState<ReadonlyMap<string, FolderSize | null>>(() => new Map(folderSizeCache))
+  /** The next size request counts again rather than using remembered sizes (Refresh). */
+  const recount = useRef(false)
   const [dir, setDir] = useState<string | null>(mine.dir)
   const [entries, setEntries] = useState<ExplorerEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -246,6 +255,15 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
   }, [])
 
   useEffect(loadFileTags, [])
+
+  useEffect(
+    () =>
+      window.api.onExplorerFolderSize(({ path, size }) => {
+        folderSizeCache.set(path, size)
+        setFolderSizes((old) => new Map(old).set(path, size))
+      }),
+    []
+  )
 
   // Ctrl+K → "Search the whole PC": the search box, looking everywhere.
   useEffect(
@@ -379,25 +397,49 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
   const searching = deep && !!query.trim() && !tagView
   /** Whole PC results come best match first; sorting by name would bury the one you're after. */
   const ranked = searching && scope === 'pc' && sort === 'name'
+  // Biggest first puts the biggest folders first too, once they've been added up.
+  const sizesForSort = useMemo(() => {
+    if (sort !== 'size') return undefined
+    const m = new Map<string, number>()
+    for (const [p, s] of folderSizes) if (s) m.set(p, s.bytes)
+    return m
+  }, [sort, folderSizes])
   const shown = useMemo(
     () =>
       tagView
-        ? sortEntries(filterEntries(tagged ?? [], query, true), sort)
+        ? sortEntries(filterEntries(tagged ?? [], query, true), sort, sizesForSort)
         : searching
           ? ranked
             ? results ?? []
-            : sortEntries(results ?? [], sort)
+            : sortEntries(results ?? [], sort, sizesForSort)
           : entries
-            ? sortEntries(filterEntries(entries, query, showHidden), sort)
+            ? sortEntries(filterEntries(entries, query, showHidden), sort, sizesForSort)
             : [],
-    [tagView, tagged, searching, ranked, results, entries, query, showHidden, sort]
+    [tagView, tagged, searching, ranked, results, entries, query, showHidden, sort, sizesForSort]
   )
   /** Search results and tag lists are from all over: each row says where it is. */
   const scattered = searching || !!tagView
   const visible = shown.slice(0, MAX_SHOWN)
+
+  // The folders on show get their sizes added up, the first ones first; leaving stops the rest.
+  const shownDirs = visible.filter((e) => e.isDir).map((e) => e.path)
+  const shownDirsKey = shownDirs.join('\n')
+  useEffect(() => {
+    const fresh = recount.current
+    recount.current = false
+    window.api.explorerFolderSizes(shownDirs, fresh).catch(() => undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shownDirsKey, reload])
+  // Leaving the Files tab stops any counting.
+  useEffect(() => () => void window.api.explorerFolderSizes([]).catch(() => undefined), [])
   const current = shown.find((e) => e.path === selected) ?? null
   const pickedEntries = shown.filter((e) => picked.has(e.path))
   const refresh = (): void => setReload((n) => n + 1)
+  /** Refresh (F5, the button): folder sizes are counted again too. */
+  const refreshAll = (): void => {
+    recount.current = true
+    refresh()
+  }
   useUndoChanges('explorer', refresh)
   useUndoChanges('files', refresh)
 
@@ -644,7 +686,7 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
       return n === 0 ? clearTags(targets()) : toggleTag(targets(), TAG_COLOURS[n - 1])
     }
     if (e.key === 'F2' && current) return void (stop(), setRenaming(current.path))
-    if (e.key === 'F5') return void (stop(), refresh())
+    if (e.key === 'F5') return void (stop(), refreshAll())
     if (e.key === 'Delete' || (e.key === 'Backspace' && e.metaKey)) return void (stop(), remove(targets()))
     if (e.key === 'Escape' && picked.size) return void (stop(), pickOnly(null))
     if ((e.key === 'ArrowLeft' && e.altKey) || (e.key === 'Backspace' && !query)) {
@@ -795,7 +837,7 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
           { label: 'Open this folder beside', icon: <Columns2 size={14} />, onClick: () => openExplorerTab(dir, { beside: true }) }
         ]
       : []),
-    { label: 'Refresh', icon: <RefreshCw size={14} />, onClick: refresh },
+    { label: 'Refresh', icon: <RefreshCw size={14} />, onClick: refreshAll },
     ...(dir ? [{ label: pins.includes(dir) ? 'Remove this folder from favourites' : 'Add this folder to favourites', icon: <Star size={14} />, onClick: () => togglePin(dir) }] : []),
     ...(dir ? [{ label: `Open in ${FILE_MANAGER}`, icon: <FolderSearch size={14} />, onClick: () => window.api.explorerOpen(dir).catch(notify) }] : [])
   ]
@@ -1035,7 +1077,7 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
             <button className="icon-btn" onClick={() => setShowHidden(!showHidden)} title={showHidden ? 'Hide hidden files' : 'Show hidden files'}>
               {showHidden ? <Eye size={15} /> : <EyeOff size={15} />}
             </button>
-            <button className="icon-btn" onClick={refresh} title="Refresh (F5)">
+            <button className="icon-btn" onClick={refreshAll} title="Refresh (F5)">
               <RefreshCw size={15} />
             </button>
             <div className="explorer-views">
@@ -1125,7 +1167,7 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
                 {view === 'list' && (
                   <>
                     <span className="explorer-date">{describeModified(entry.modified)}</span>
-                    <span className="explorer-size">{entry.isDir ? '' : describeBytes(entry.size)}</span>
+                    <span className="explorer-size">{entry.isDir ? <FolderSizeText size={folderSizes.get(entry.path)} /> : describeBytes(entry.size)}</span>
                   </>
                 )}
               </div>
@@ -1137,7 +1179,7 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
           {scope === 'pc' && !tagView && <IndexFooter status={indexStatus} system={systemToo} />}
         </section>
 
-        <Preview entry={picked.size > 1 ? null : current} count={picked.size} tags={tags} onTag={(e, c) => toggleTag([e], c)} onClearTags={(e) => clearTags([e])} onOpen={open} onRename={(e) => setRenaming(e.path)} onDelete={(e) => void remove([e])} onExtract={extract} />
+        <Preview entry={picked.size > 1 ? null : current} count={picked.size} folderSize={current?.isDir ? folderSizes.get(current.path) : undefined} tags={tags} onTag={(e, c) => toggleTag([e], c)} onClearTags={(e) => clearTags([e])} onOpen={open} onRename={(e) => setRenaming(e.path)} onDelete={(e) => void remove([e])} onExtract={extract} />
       </div>
       {naming && <TagNameDialog colour={naming} store={tags} onClose={() => setNaming(null)} />}
       {compressing && (
@@ -1202,8 +1244,10 @@ function Preview({
   onExtract,
   tags,
   onTag,
-  onClearTags
+  onClearTags,
+  folderSize
 }: {
+  folderSize?: FolderSize | null
   entry: ExplorerEntry | null
   count: number
   tags: FileTagStore
@@ -1281,11 +1325,22 @@ function Preview({
       )}
       <h3 title={entry.name}>{entry.name}</h3>
       <dl>
-        {!entry.isDir && (
+        {!entry.isDir ? (
           <>
             <dt>Size</dt>
             <dd>{describeBytes(entry.size)}</dd>
           </>
+        ) : (
+          folderSize !== null && (
+            <>
+              <dt>Size</dt>
+              <dd data-explorer-folder-size>
+                {!folderSize
+                  ? 'Adding it up…'
+                  : `${folderSize.counting ? `${describeBytes(folderSize.bytes)} so far` : describeFolderSize(folderSize)} · ${folderSize.files.toLocaleString()} file${folderSize.files === 1 ? '' : 's'}${folderSize.folders ? `, ${folderSize.folders.toLocaleString()} folder${folderSize.folders === 1 ? '' : 's'}` : ''}`}
+              </dd>
+            </>
+          )
         )}
         <dt>Changed</dt>
         <dd>{new Date(entry.modified).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</dd>
@@ -1427,4 +1482,12 @@ function IndexFooter({ status, system }: { status: (PcIndexStatus & { everything
       )}
     </div>
   )
+}
+
+/** A folder's size in the size column: "…" while it's being added up, then the total. */
+function FolderSizeText({ size }: { size: FolderSize | null | undefined }) {
+  if (size === null) return null
+  if (!size) return <span className="explorer-size-counting" title="Adding up everything inside…">…</span>
+  if (size.counting) return <span className="explorer-size-counting" title="Still adding it up">{describeBytes(size.bytes)}…</span>
+  return <span title={`${size.files.toLocaleString()} files in ${size.folders.toLocaleString()} folders${size.complete ? '' : '. Some of it is private to the system, so it’s at least this big.'}`}>{describeFolderSize(size)}</span>
 }

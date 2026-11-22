@@ -6,6 +6,7 @@ import { uniqueName } from '@shared/explorer'
 import { releaseFiles } from './fileLocks'
 import { moveTags } from './fileTags'
 import { touchedFiles } from './fileIndex'
+import { folderSizesChanged } from './folderSize'
 
 /**
  * Orbit's own short-term bin, so deleting can be undone with Ctrl+Z.
@@ -236,6 +237,7 @@ export function setupUndoBin(vaultRoot: () => string | null): void {
       }
       moveTags(now, target)
       touchedFiles([dirname(now), dir])
+      folderSizesChanged([dirname(now), dir])
       done.push({ from: now, to: target })
     }
     return done

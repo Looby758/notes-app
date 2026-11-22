@@ -64,12 +64,13 @@ export function isHiddenName(name: string): boolean {
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
 
-/** Folders first, then by the chosen column (newest and biggest first). */
-export function sortEntries(entries: ExplorerEntry[], by: ExplorerSort): ExplorerEntry[] {
+/** Folders first, then by the chosen column (newest and biggest first). `folderSizes`: folders' sizes once they've been added up. */
+export function sortEntries(entries: ExplorerEntry[], by: ExplorerSort, folderSizes?: ReadonlyMap<string, number>): ExplorerEntry[] {
+  const sizeOf = (e: ExplorerEntry): number => (e.isDir ? (folderSizes?.get(e.path) ?? -1) : e.size)
   return [...entries].sort((a, b) => {
     if (a.isDir !== b.isDir) return a.isDir ? -1 : 1
     if (by === 'modified' && a.modified !== b.modified) return b.modified - a.modified
-    if (by === 'size' && !a.isDir && a.size !== b.size) return b.size - a.size
+    if (by === 'size' && sizeOf(a) !== sizeOf(b)) return sizeOf(b) - sizeOf(a)
     return collator.compare(a.name, b.name)
   })
 }
@@ -170,6 +171,9 @@ export function whereIn(path: string, from: string): string {
 
 /** Searching subfolders stops after this many matches. */
 export const SEARCH_LIMIT = 500
+
+/** A folder's size as the Files tab shows it: "1.2 GB", or "1.2 GB+" when part of it couldn't be read. */
+export const describeFolderSize = (size: { bytes: number; complete: boolean }): string => `${describeBytes(size.bytes)}${size.complete ? '' : '+'}`
 
 /** Whole PC search shows at most this many (each one is looked up for its size and date). */
 export const PC_SEARCH_LIMIT = 300
