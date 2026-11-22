@@ -1,5 +1,5 @@
 import type { AppInfo, GitHubStatus, MergedPull, PullRequest, Release, TestCopy } from './appStudio'
-import type { ExplorerEntry, ExplorerPlace, PasteMode, PcIndexStatus } from './explorer'
+import type { DriveSpace, ExplorerEntry, ExplorerPlace, PasteMode, PcIndexStatus } from './explorer'
 import type { FileTagStore, TagColour } from './fileTags'
 import type { BinListing } from './recycleBin'
 import type { ArchiveEntry } from './archive'
@@ -1590,6 +1590,8 @@ export interface NotesApi {
 
   // File explorer tab (full paths on this computer)
   explorerPlaces(): Promise<ExplorerPlace[]>
+  /** How full each drive in the Drives list is, by its path (null when it couldn't be read). */
+  explorerDriveSpace(): Promise<Record<string, DriveSpace | null>>
   explorerList(dir: string): Promise<ExplorerEntry[]>
   /** The start of a text file, for its preview. */
   explorerReadText(path: string): Promise<string>

@@ -221,3 +221,54 @@ export function describeCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} million`
   return n.toLocaleString('en-GB')
 }
+
+/** How full a drive is, from the system (main/explorer.ts reads it with statfs). */
+export interface DriveSpace {
+  /** The drive's size in bytes. */
+  total: number
+  /** Bytes still free for this user. */
+  free: number
+}
+
+/** A drive's space from Node's statfs: blocks × block size, with the blocks this user may still fill as free. Null when it makes no sense (an empty or odd volume). */
+export function driveSpaceFromStatfs(s: { bsize: number | bigint; blocks: number | bigint; bavail: number | bigint }): DriveSpace | null {
+  const bsize = Number(s.bsize)
+  const total = Number(s.blocks) * bsize
+  const free = Number(s.bavail) * bsize
+  if (!Number.isFinite(total) || !Number.isFinite(free) || total <= 0 || free < 0) return null
+  return { total, free: Math.min(free, total) }
+}
+
+/**
+ * A drive's size the way the computer's own file manager writes it: File Explorer counts in
+ * 1024s ("476 GB" for a 512 GB drive), Finder in 1000s. Whole numbers from 100 up, one decimal below.
+ */
+export function describeDriveBytes(bytes: number, binary: boolean): string {
+  const k = binary ? 1024 : 1000
+  const units = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB']
+  let n = Math.max(0, bytes)
+  let i = 0
+  while (n >= k && i < units.length - 1) {
+    n /= k
+    i++
+  }
+  if (i === 0) return `${Math.round(n)} bytes`
+  const shown = n >= 100 ? Math.round(n).toString() : (Math.round(n * 10) / 10).toString()
+  return `${shown} ${units[i]}`
+}
+
+/** Under a tenth of the drive free, its bar turns red (as File Explorer's does). */
+export const isDriveLow = (space: DriveSpace): boolean => space.free < space.total * 0.1
+
+/** What the Drives list shows under a drive: how full the bar is, "120 GB free of 476 GB", and the longer hover text. */
+export function describeDriveSpace(space: DriveSpace, binary: boolean): { usedPercent: number; low: boolean; text: string; title: string } {
+  const used = Math.max(0, space.total - space.free)
+  const usedPercent = space.total > 0 ? Math.min(100, Math.max(0, (used / space.total) * 100)) : 0
+  const fmt = (b: number): string => describeDriveBytes(b, binary)
+  return {
+    usedPercent,
+    low: isDriveLow(space),
+    text: `${fmt(space.free)} free of ${fmt(space.total)}`,
+    title: `${fmt(used)} used · ${fmt(space.free)} free · ${fmt(space.total)} in all (${Math.round(usedPercent)}% full)`
+  }
+}

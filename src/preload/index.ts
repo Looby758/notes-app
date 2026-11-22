@@ -925,6 +925,7 @@ const api: NotesApi = {
   pickAttachment: (folder, imagesOnly) => ipcRenderer.invoke('fs:pickAttachment', folder, imagesOnly),
   attachFromComputer: (folder, source) => ipcRenderer.invoke('fs:attachFromComputer', folder, source),
   explorerPlaces: () => ipcRenderer.invoke('explorer:places'),
+  explorerDriveSpace: () => ipcRenderer.invoke('explorer:driveSpace'),
   explorerList: (dir) => ipcRenderer.invoke('explorer:list', dir),
   explorerReadText: (path) => ipcRenderer.invoke('explorer:readText', path),
   explorerOpen: (path, ask) => ipcRenderer.invoke('explorer:open', path, ask),
