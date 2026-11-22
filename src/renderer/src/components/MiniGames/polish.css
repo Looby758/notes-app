@@ -521,6 +521,15 @@ body.theme-light .minigames-glow::after {
 }
 
 /* ---------- Sudoku ---------- */
+/* Clicking a square focuses it, and typing a number then turns on the browser's focus ring. The
+   squares next to it paint over three sides of that ring, leaving a stray accent line along the top.
+   The selected square already shows where you are, so the squares never draw a ring. */
+.minigames-page .sudoku-cell:focus-visible,
+.minigames-page .mines-cell:focus-visible,
+.minigames-page .nono-cell:focus-visible,
+.minigames-page .wordsearch-cell:focus-visible {
+  outline: none;
+}
 .minigames-page .sudoku-board {
   border-color: var(--game-line);
   border-radius: 14px;
