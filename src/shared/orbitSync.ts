@@ -25,7 +25,7 @@ export const ORBIT_PARTS: { id: OrbitPart; label: string }[] = [
 ]
 
 /** Settings that belong to one computer (its screen, its startup), so each keeps its own. */
-export const DEVICE_PREFS: readonly (keyof Prefs)[] = ['zoom', 'launchAtStartup', 'closeToTray', 'syncOrbit']
+export const DEVICE_PREFS: readonly (keyof Prefs)[] = ['zoom', 'launchAtStartup', 'closeToTray', 'syncOrbit', 'snipFolder']
 
 /** The Home page's layout, synced (and asked about) separately from the rest of Settings. */
 export const HOME_PREFS: readonly (keyof Prefs)[] = ['homeOnStart', 'homeOrder', 'homeHidden', 'worldClocks', 'countdowns', 'weatherHome']

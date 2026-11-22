@@ -1013,11 +1013,37 @@ export interface NotesApi {
   openRobloxDownload(): Promise<void>
 
   // Screen snip (main/snip.ts)
-  /** Takes a picture of every monitor and opens a snip window over each one. */
-  startSnip(): Promise<void>
+  /**
+   * Takes a picture of every monitor and opens a snip window over each one. 'picture' copies the
+   * box as a picture as soon as you let go; 'text' (the default) reads the text in it.
+   */
+  startSnip(mode?: 'text' | 'picture'): Promise<void>
+  /** Snip window: this picture goes on the clipboard (closes the snip). */
+  snipCopyPicture(png: Uint8Array): Promise<void>
+  /** Windows: whether the taskbar snip is there ("Orbit Snip" in the Start menu, and the jump list). */
+  snipTaskbar(): Promise<{ available: boolean; shortcut: boolean }>
+  /** Shows the "Orbit Snip" shortcut in File Explorer (right-click → Pin to taskbar). */
+  snipShowShortcut(): Promise<void>
+  /** Where picture snips are saved (the folder you picked, or Pictures/Screenshots), and the last one saved. */
+  snipSaveInfo(): Promise<{ save: boolean; folder: string; custom: boolean; last: string | null }>
+  /** Asks for a folder to save snips in. Null if you cancelled. */
+  snipPickFolder(): Promise<string | null>
+  snipOpenFolder(): Promise<void>
+  /** Shows the last saved snip in File Explorer / Finder. */
+  snipShowLast(): Promise<void>
   snipStatus(): Promise<{ shortcut: string; error?: string }>
-  /** Snip window: the picture of the screen (PNG) and the screen's scale factor. */
-  snipImage(): Promise<{ png: Uint8Array; scale: number } | null>
+  /** Snip window: the picture of its monitor (raw BGRA pixels), the snip's kind and the screen's scale factor. */
+  snipImage(): Promise<{ bitmap: Uint8Array; width: number; height: number; scale: number; mode: 'text' | 'picture'; saveTo?: string } | null>
+  /** Snip window: this snip's picture is drawn, so show the window. */
+  snipDrawn(): Promise<void>
+  /** Snip window: shown and painted, so it can be seen (it's see-through until then, so there's no flash). */
+  snipPainted(): Promise<void>
+  /** Snip window: a new snip has a picture for this monitor. */
+  onSnipNew(callback: () => void): () => void
+  /** Snip window: it's on screen now (still see-through until snipPainted). */
+  onSnipVisible(callback: () => void): () => void
+  /** Snip window: the snip ended and this window was hidden, ready for the next one. */
+  onSnipReset(callback: () => void): () => void
   /** Snip window: the text in part of the picture (read offline), with an extra language reader if it's downloaded, or 'auto' to pick one. */
   snipRead(png: Uint8Array, lang?: string): Promise<SnipReading>
   /** Snip window: which extra language readers are downloaded (codes from OCR_LANGS). */

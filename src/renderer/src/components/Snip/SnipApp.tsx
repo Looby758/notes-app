@@ -1,6 +1,6 @@
 import './snip.css'
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
-import { ArrowLeft, Bug, Cloud, Copy, Cpu, Download, FilePlus, Globe, Languages, Loader2, RotateCcw, Settings, Sparkles, X } from 'lucide-react'
+import { ArrowLeft, Bug, Cloud, Copy, Cpu, Download, FilePlus, Globe, Image as ImageIcon, Languages, Loader2, RotateCcw, Settings, Sparkles, X } from 'lucide-react'
 import type { SnipReading, SnipTranslation } from '@shared/types'
 import { DEFAULT_TARGET, isTarget, megabytes, OCR_LANGS, ocrLangByCode, sameLanguage, TRANSLATE_TARGETS, translationNote } from '@shared/translate'
 
@@ -34,6 +34,13 @@ const recall = (key: string): string => {
   }
 }
 const LANG_KEY = 'orbit.snip.readAs'
+
+/** The last two parts of a folder ("Pictures\Screenshots"), short enough for the hint. */
+const shortFolder = (folder: string): string => {
+  const parts = folder.split(/[\\/]+/).filter(Boolean)
+  const sep = folder.includes('\\') ? '\\' : '/'
+  return parts.length > 2 ? parts.slice(-2).join(sep) : folder
+}
 const TARGET_KEY = 'orbit.snip.translateTo'
 
 type Translation = { state: 'working' } | ({ state: 'done' } & SnipTranslation)
@@ -47,16 +54,22 @@ type Translation = { state: 'working' } | ({ state: 'done' } & SnipTranslation)
  * pick it under "Text is in"), and the reader is a small download made only
  * when you press its button. Google Translate is a separate button, shown only when the offline
  * AI can't do it, and says that it sends the text online.
+ *
+ * A picture snip (from the taskbar or the tray) skips all that: let go of the box and that part of
+ * the screen is copied as a picture, ready to paste anywhere.
  */
 export default function SnipApp() {
-  const [image, setImage] = useState<{ url: string; scale: number } | null>(null)
+  const [image, setImage] = useState<{ scale: number } | null>(null)
+  const [mode, setMode] = useState<'text' | 'picture'>('text')
+  /** Picture snip: the folder it's saved in too (none if saving is off). */
+  const [saveTo, setSaveTo] = useState<string | undefined>()
   const [start, setStart] = useState<{ x: number; y: number } | null>(null)
   const [box, setBox] = useState<Box | null>(null)
   const [done, setDone] = useState(false)
   const [text, setText] = useState<string | null>(null)
   const [reading, setReading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const img = useRef<HTMLImageElement>(null)
+  const img = useRef<HTMLCanvasElement>(null)
   // 'auto' (spot the alphabet), '' (English and other Latin letters) or a reader's code.
   const [lang, setLang] = useState(() => {
     const saved = recall(LANG_KEY)
@@ -75,22 +88,7 @@ export default function SnipApp() {
   }, [])
 
   useEffect(() => {
-    window.api.snipImage().then((shot) => {
-      if (!shot) {
-        void window.api.snipClose()
-        return
-      }
-      // A data: address (the page's security rules don't allow blob: pictures).
-      const reader = new FileReader()
-      reader.onload = () => setImage({ url: String(reader.result), scale: shot.scale })
-      reader.readAsDataURL(new Blob([shot.png as BlobPart], { type: 'image/png' }))
-    })
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') void window.api.snipClose()
-    }
-    window.addEventListener('keydown', onKey)
-    // A box started on another monitor: this one lets go of its own.
-    const offClear = window.api.onSnipClear(() => {
+    const letGo = (): void => {
       setStart(null)
       setBox(null)
       setDone(false)
@@ -98,9 +96,55 @@ export default function SnipApp() {
       setError(null)
       setFound(null)
       setTranslation(null)
+    }
+    /**
+     * This window is made ahead of time and kept hidden between snips. A snip hands it the
+     * picture as raw pixels, which are drawn straight onto the canvas (nothing to decode), and
+     * only then is the window shown, so the screen just freezes: no black flash.
+     */
+    const load = async (): Promise<void> => {
+      const shot = await window.api.snipImage()
+      const canvas = img.current
+      if (!shot || !canvas) return
+      letGo()
+      setMode(shot.mode === 'picture' ? 'picture' : 'text')
+      setSaveTo(shot.saveTo)
+      canvas.width = shot.width
+      canvas.height = shot.height
+      const pixels = new ImageData(shot.width, shot.height)
+      // BGRA (how the screen picture comes) to RGBA, four bytes at a time.
+      const raw = shot.bitmap.byteOffset % 4 ? shot.bitmap.slice() : shot.bitmap
+      const from = new Uint32Array(raw.buffer, raw.byteOffset, shot.width * shot.height)
+      const to = new Uint32Array(pixels.data.buffer)
+      for (let i = 0; i < from.length; i++) {
+        const p = from[i]
+        to[i] = 0xff000000 | ((p & 0xff) << 16) | (p & 0xff00) | ((p >>> 16) & 0xff)
+      }
+      canvas.getContext('2d')!.putImageData(pixels, 0, 0)
+      setImage({ scale: shot.scale })
+      void window.api.snipDrawn()
+    }
+    void load()
+    const offNew = window.api.onSnipNew(() => void load())
+    // Shown (still see-through): once it has painted a frame, it can be seen.
+    const offVisible = window.api.onSnipVisible(() => requestAnimationFrame(() => requestAnimationFrame(() => void window.api.snipPainted())))
+    // The snip ended and this window was hidden: empty it, ready for the next one.
+    const offReset = window.api.onSnipReset(() => {
+      letGo()
+      setImage(null)
+      if (img.current) img.current.width = img.current.height = 0
     })
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') void window.api.snipClose()
+    }
+    window.addEventListener('keydown', onKey)
+    // A box started on another monitor: this one lets go of its own.
+    const offClear = window.api.onSnipClear(letGo)
     return () => {
       window.removeEventListener('keydown', onKey)
+      offNew()
+      offVisible()
+      offReset()
       offClear()
     }
   }, [])
@@ -117,8 +161,8 @@ export default function SnipApp() {
     setTranslation(null)
     setFound(null)
     // The picture is at the screen's full resolution; the window is in screen points.
-    const sx = el.naturalWidth / el.clientWidth
-    const sy = el.naturalHeight / el.clientHeight
+    const sx = el.width / el.clientWidth
+    const sy = el.height / el.clientHeight
     // Small text reads better a bit bigger.
     const up = b.h * sy < 60 ? 2 : 1
     const canvas = document.createElement('canvas')
@@ -144,7 +188,32 @@ export default function SnipApp() {
 
   const point = (e: MouseEvent): { x: number; y: number } => ({ x: e.clientX, y: e.clientY })
 
+  /** The boxed part of the screen, as it is (full resolution, not made bigger), as a PNG. */
+  const boxPicture = async (b: Box): Promise<Uint8Array | null> => {
+    const el = img.current
+    if (!el) return null
+    const sx = el.width / el.clientWidth
+    const sy = el.height / el.clientHeight
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(b.w * sx))
+    canvas.height = Math.max(1, Math.round(b.h * sy))
+    canvas.getContext('2d')!.drawImage(el, b.x * sx, b.y * sy, b.w * sx, b.h * sy, 0, 0, canvas.width, canvas.height)
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'))
+    return blob ? new Uint8Array(await blob.arrayBuffer()) : null
+  }
+
+  const copyPicture = async (b: Box): Promise<void> => {
+    const png = await boxPicture(b)
+    if (png) await window.api.snipCopyPicture(png)
+    else void window.api.snipClose()
+  }
+
   const onDown = (e: MouseEvent): void => {
+    // A picture snip: right-click cancels, like the Windows Snipping Tool.
+    if (e.button === 2 && mode === 'picture' && !start) {
+      void window.api.snipClose()
+      return
+    }
     if (e.button !== 0) return
     if ((e.target as Element).closest('.snip-panel')) return
     setStart(point(e))
@@ -162,6 +231,16 @@ export default function SnipApp() {
     if (!start) return
     const b = norm(start, point(e))
     setStart(null)
+    if (mode === 'picture') {
+      // Just a click (no box): start again.
+      if (b.w < 4 || b.h < 4) {
+        setBox(null)
+        return
+      }
+      setBox(b)
+      void copyPicture(b)
+      return
+    }
     setBox(b)
     setDone(true)
     void read(b)
@@ -169,16 +248,9 @@ export default function SnipApp() {
 
   /** "Report bug": the boxed part of the screen, as it is (not made bigger), goes to App Studio. */
   const reportBug = async (): Promise<void> => {
-    const el = img.current
-    if (!el || !box) return
-    const sx = el.naturalWidth / el.clientWidth
-    const sy = el.naturalHeight / el.clientHeight
-    const canvas = document.createElement('canvas')
-    canvas.width = Math.max(1, Math.round(box.w * sx))
-    canvas.height = Math.max(1, Math.round(box.h * sy))
-    canvas.getContext('2d')!.drawImage(el, box.x * sx, box.y * sy, box.w * sx, box.h * sy, 0, 0, canvas.width, canvas.height)
-    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'))
-    if (blob) await window.api.snipReportBug(new Uint8Array(await blob.arrayBuffer()))
+    if (!box) return
+    const png = await boxPicture(box)
+    if (png) await window.api.snipReportBug(png)
   }
 
   const send = (action: 'copy' | 'note' | 'web' | 'ask'): void => {
@@ -369,14 +441,36 @@ export default function SnipApp() {
   }
 
   return (
-    <div className="snip" onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} data-snip>
-      {image && <img ref={img} className="snip-shot" src={image.url} alt="" draggable={false} />}
+    <div className="snip" onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onContextMenu={(e) => e.preventDefault()} data-snip data-snip-mode={mode}>
+      <canvas ref={img} className="snip-shot" />
       {box ? (
         <div className="snip-box" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} />
       ) : (
         <div className="snip-dim" />
       )}
-      {!box && image && <div className="snip-hint">Drag a box round the text you want · Esc to cancel</div>}
+      {!box && image && (
+        <div className="snip-hint" data-snip-hint>
+          {mode === 'picture' ? (
+            <>
+              Drag a box round anything to copy it
+              {saveTo && (
+                <>
+                  {' '}
+                  · Saved in <span className="snip-hint-folder" data-snip-save-to>{shortFolder(saveTo)}</span>
+                </>
+              )}{' '}
+              · Esc to cancel
+            </>
+          ) : (
+            'Drag a box round the text you want · Esc to cancel'
+          )}
+        </div>
+      )}
+      {box && mode === 'picture' && box.w >= 4 && box.h >= 4 && (
+        <div className="snip-size" style={{ left: box.x, top: box.y > 30 ? box.y - 26 : box.y + box.h + 6 }} data-snip-size>
+          {Math.round(box.w * (image?.scale ?? 1))} × {Math.round(box.h * (image?.scale ?? 1))}
+        </div>
+      )}
       {done && box && box.w >= 6 && (
         <div className="snip-panel" style={panelStyle} onMouseDown={(e) => e.stopPropagation()} data-snip-panel>
           {reading ? (
@@ -415,6 +509,9 @@ export default function SnipApp() {
               {readAs}
             </>
           )}
+          <button className="btn snip-copy-picture" onClick={() => box && void copyPicture(box)} title="Copy this part of the screen as a picture, to paste anywhere" data-snip-copy-picture>
+            <ImageIcon size={13} /> Copy picture
+          </button>
           <button className="btn snip-bug" onClick={() => void reportBug()} title="Send this part of the screen to App Studio as a bug in one of your apps" data-snip-bug>
             <Bug size={13} /> Report bug
           </button>

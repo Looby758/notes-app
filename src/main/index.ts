@@ -40,7 +40,9 @@ import { closeDiscordPopout, setupDiscordPopout } from './discordPopout'
 import { closeVideoWindow, setupVideoWindow } from './videoWindow'
 import { closeWebWindow, setupWebWindow } from './webWindow'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
-import { applySnipShortcut, setupSnip, startSnip } from './snip'
+import { applySnipShortcut, openSnipFolder, setupSnip, startSnip } from './snip'
+import { setupSnipTaskbar } from './snipTaskbar'
+import { snipModeFromArgv } from '@shared/snipLaunch'
 import { applySongIdShortcut, setupSongId } from './songId'
 import { setupUpdater } from './updater'
 import { setupSettingsHealth } from './settingsHealth'
@@ -131,6 +133,12 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   // "Open in Orbit" from File Explorer while Orbit is running starts a second copy, which hands the file over here.
   app.on('second-instance', (_e, argv) => {
+    // The taskbar's "Orbit Snip" or jump list: just snip, without bringing the window up.
+    const snip = snipModeFromArgv(argv)
+    if (snip) {
+      if (app.isReady()) void startSnip(snip)
+      return
+    }
     showMain()
     pathsFromArgv(argv).forEach(openInOrbit)
     // A link clicked in another app while Orbit is the default browser.
@@ -155,6 +163,9 @@ app.on('open-file', (e, path) => {
 app.on('activate', () => {
   if (app.isReady()) showMain()
 })
+
+/** Started by the taskbar's "Orbit Snip" or jump list: which snip to open once Orbit is up. */
+const launchSnip = snipModeFromArgv(process.argv)
 
 function showMain(): void {
   if (!app.isReady()) return
@@ -499,8 +510,9 @@ function createWindow(): BrowserWindow {
     }
   })
 
-  // Started at login: stay in the tray / menu bar until you open it.
-  const startHidden = startedAtLogin() && prefs.closeToTray
+  // Started at login: stay in the tray / menu bar until you open it. Started by the taskbar's
+  // "Orbit Snip": just the snip (the first window is the one; later ones were opened on purpose).
+  const startHidden = (startedAtLogin() && prefs.closeToTray) || (!mainWindow && !!launchSnip)
   let shown = false
   const reveal = (): void => {
     if (shown || win.isDestroyed()) return
@@ -1110,8 +1122,11 @@ app.whenReady().then(async () => {
   safely('Orbit sync', () => setupOrbitSync({ root: () => vault?.root ?? null, enabled: () => currentPrefs().syncOrbit, window: () => mainWindow, parts: orbitParts(themesChanged) }))
   mainWindow = createWindow()
   // The extras: if one of them fails on some computer, the app itself still works.
-  safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: () => void startSnip() }))
-  safely('screen snip', () => setupSnip({ getMain: () => mainWindow, showMain }))
+  safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: (as) => void startSnip(as), openSnips: () => void openSnipFolder() }))
+  safely('screen snip', () => setupSnip({ getMain: () => mainWindow, showMain, prefs: currentPrefs }))
+  safely('taskbar snip', setupSnipTaskbar)
+  // Started from the taskbar's "Orbit Snip" (or its jump list) while Orbit wasn't running.
+  if (launchSnip) setTimeout(() => void startSnip(launchSnip), 300)
   safely('what’s this song', () => setupSongId({ getMain: () => mainWindow }))
   safely('instant replay', () => setupClips({ getMain: () => mainWindow, showMain }))
   safely('screen controls', setupMonitors)
