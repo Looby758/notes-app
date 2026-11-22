@@ -472,6 +472,10 @@ export function soundLevels(): (() => Float32Array) | null {
   if (!analyser) return null
   const data = new Uint8Array(analyser.frequencyBinCount)
   const out = new Float32Array(BARS)
+  // Each bar's own quiet and loud levels lately, so it moves with the beat rather than only when the
+  // whole song gets louder or quieter (a song that's loud all the way through still dances).
+  const low = new Float32Array(BARS).fill(1)
+  const high = new Float32Array(BARS)
   // Spread the bars over the notes we hear most of (the top of the range is mostly empty).
   const usable = Math.floor(data.length * 0.72)
   return () => {
@@ -481,10 +485,23 @@ export function soundLevels(): (() => Float32Array) | null {
       const to = Math.max(from + 1, Math.floor(((i + 1) / BARS) ** 1.6 * usable))
       let sum = 0
       for (let j = from; j < to; j++) sum += data[j]
-      out[i] = sum / (to - from) / 255
+      out[i] = beatLevel(sum / (to - from) / 255, i, low, high)
     }
     return out
   }
+}
+
+/**
+ * One bar's height (0–1) from its raw level: mostly where it sits between that bar's recent quiet
+ * and loud (which follow the song over a few seconds), with a little of the raw level so quiet
+ * parts still look quieter. Updates `low` and `high` for bar `i`.
+ */
+export function beatLevel(raw: number, i: number, low: Float32Array, high: Float32Array): number {
+  low[i] = raw < low[i] ? raw : low[i] + (raw - low[i]) * 0.015
+  high[i] = raw > high[i] ? raw : high[i] - (high[i] - raw) * 0.02
+  const span = Math.max(0.1, high[i] - low[i])
+  const moving = Math.min(1, Math.max(0, (raw - low[i]) / span))
+  return raw < 0.02 ? 0 : Math.min(1, moving ** 1.3 * 0.8 + raw * 0.2)
 }
 
 /** The sound of your own music (after the equaliser), for the visualiser. */
@@ -494,8 +511,11 @@ export function localAnalyser(): AnalyserNode | null {
   const g = makeGraph()
   if (!g) return null
   analyser = g.ctx.createAnalyser()
-  analyser.fftSize = 256
-  analyser.smoothingTimeConstant = 0.78
+  analyser.fftSize = 512
+  // Less smoothing here, so each beat shows (the visualiser smooths the fall itself).
+  analyser.smoothingTimeConstant = 0.55
+  analyser.minDecibels = -85
+  analyser.maxDecibels = -20
   g.preamp.connect(analyser)
   return analyser
 }
