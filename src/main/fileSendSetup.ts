@@ -182,7 +182,7 @@ export async function setUpServer(
     const e = err as CfError
     const said = `Cloudflare said: “${e.message}”${e.codes.length ? ` (code ${e.codes.join(', ')})` : ''}.`
     if (e.status === 401 || e.status === 403) {
-      throw new Error(`${said} The key isn’t allowed to make Workers. Make a new key from the “Edit Cloudflare Workers” template (step 2), with your account picked under Account Resources.`)
+      throw new Error(`${said} The key isn’t allowed to make Workers. Make a new key with the “Edit Cloudflare Workers” policy (step 2), with your account picked.`)
     }
     throw new Error(said)
   }
