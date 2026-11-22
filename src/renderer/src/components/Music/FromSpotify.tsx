@@ -77,6 +77,8 @@ export default function FromSpotify({ songs, setPlaylistView }: { songs: LocalSo
   const [pasted, setPasted] = useState('')
   const [showPaste, setShowPaste] = useState(false)
   const [showLikedHelp, setShowLikedHelp] = useState(false)
+  /** Spotify turned down reading Liked Songs (an old connection without permission). */
+  const [likedRefused, setLikedRefused] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<'missing' | 'all' | 'have'>('missing')
@@ -115,14 +117,16 @@ export default function FromSpotify({ songs, setPlaylistView }: { songs: LocalSo
     }
   }
   const fromLiked = async (): Promise<void> => {
-    if (!status?.connected) return setShowLikedHelp(!showLikedHelp)
+    if (!status?.connected || status.needsReconnect || likedRefused) return setShowLikedHelp(!showLikedHelp)
     setBusy(true)
     setError(null)
     try {
       const items = await window.api.musicPlaylistSongs(LIKED_SONGS_URI)
       setList({ name: 'Liked Songs (Spotify)', tracks: items.map((it) => ({ title: it.name, artists: it.detail.split(/\s*,\s*/).filter(Boolean), durationMs: 0 })) })
-    } catch (err) {
-      setError(clean(err))
+    } catch {
+      // Usually a 403: Spotify won't share Liked Songs with this connection. Exportify still works.
+      setLikedRefused(true)
+      setShowLikedHelp(true)
     } finally {
       setBusy(false)
     }
@@ -231,9 +235,15 @@ export default function FromSpotify({ songs, setPlaylistView }: { songs: LocalSo
         </div>
         {showLikedHelp && (
           <div className="mp-spotify-help" data-mp-liked-help>
-            <p>
-              <strong>Liked Songs is private</strong>, so it has no link Orbit can read. The easy way:
-            </p>
+            {likedRefused ? (
+              <p>
+                <strong>Spotify wouldn’t share your Liked Songs with Orbit</strong> (your Spotify connection doesn’t have permission for them). The easy way round it:
+              </p>
+            ) : (
+              <p>
+                <strong>Liked Songs is private</strong>, so it has no link Orbit can read. The easy way:
+              </p>
+            )}
             <ol>
               <li>
                 Open{' '}
