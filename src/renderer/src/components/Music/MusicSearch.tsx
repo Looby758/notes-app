@@ -42,7 +42,9 @@ async function copyYouTube(t: FoundTrack): Promise<void> {
 
 async function openYouTube(t: FoundTrack): Promise<void> {
   try {
-    window.open((await youtubeLink(t)).url)
+    const { url, exact } = await youtubeLink(t)
+    if (!exact) notify(`Couldn’t find the exact video, so opened YouTube’s search for “${t.title}”.`, 'info')
+    window.open(url)
   } catch (err) {
     notify(errorMessage(err))
   }
@@ -58,6 +60,7 @@ export default function MusicSearch({ songs }: { songs: LocalSong[] }) {
   const [menu, setMenu] = useState<{ x: number; y: number; track: FoundTrack } | null>(null)
   const [sampling, setSampling] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
+  const [looking, setLooking] = useState<string | null>(null)
   const input = useRef<HTMLInputElement>(null)
   useEffect(() => input.current?.focus(), [])
 
@@ -107,22 +110,39 @@ export default function MusicSearch({ songs }: { songs: LocalSong[] }) {
     if (useMusic.getState().state?.playing) localPause()
     sample = new Audio(t.preview)
     sample.volume = 0.8
+    const mine = sample
     sample.addEventListener('ended', () => setSampling(null))
-    void sample.play().catch((err) => notify(errorMessage(err)))
+    void sample.play().catch((err) => {
+      if (sample !== mine) return
+      stopSample()
+      notify(err instanceof DOMException && err.name === 'AbortError' ? 'The sample stopped.' : 'That sample wouldn’t play. Try another song.')
+    })
     setSampling(t.id)
   }
 
+  // Finding the video takes a moment the first time, so the button says so meanwhile.
+  const withLookup = async (t: FoundTrack, job: () => Promise<void>): Promise<void> => {
+    if (!videoLinks.has(t.id)) setLooking(t.id)
+    try {
+      await job()
+    } finally {
+      setLooking((l) => (l === t.id ? null : l))
+    }
+  }
   const copy = async (t: FoundTrack): Promise<void> => {
-    await copyYouTube(t)
+    await withLookup(t, () => copyYouTube(t))
     setCopied(t.id)
     setTimeout(() => setCopied((c) => (c === t.id ? null : c)), 1500)
   }
+  const open = (t: FoundTrack): Promise<void> => withLookup(t, () => openYouTube(t))
+  // Looked up as soon as you point at the button, so a click opens it straight away.
+  const prefetch = (t: FoundTrack): void => void youtubeLink(t).catch(() => undefined)
 
   const menuItems = (t: FoundTrack): MenuItem[] => {
     const own = mine.get(songKey(t.artist, t.title))
     const items: MenuItem[] = [
       { label: 'Copy YouTube link', icon: <Copy size={14} />, onClick: () => void copy(t) },
-      { label: 'Open on YouTube', icon: <Youtube size={14} />, onClick: () => void openYouTube(t) },
+      { label: 'Open on YouTube', icon: <Youtube size={14} />, onClick: () => void open(t) },
       { label: 'Copy song name', icon: <Copy size={14} />, onClick: () => void navigator.clipboard.writeText(`${t.artist} – ${t.title}`) }
     ]
     if (t.preview) items.unshift({ label: sampling === t.id ? 'Stop the sample' : 'Play a 30-second sample', icon: <Play size={14} />, onClick: () => playSample(t) })
@@ -144,7 +164,7 @@ export default function MusicSearch({ songs }: { songs: LocalSong[] }) {
           )}
         </label>
         <p className="mp-search-note">
-          <Globe size={12} /> Searches every song (Apple’s free music catalogue). Right-click a song to copy its YouTube link.
+          <Globe size={12} /> Searches every song (Apple’s free music catalogue). Click YouTube to watch a song’s video, or right-click it to copy the link.
         </p>
       </div>
       {error && <p className="mp-empty">{error}</p>}
@@ -188,8 +208,20 @@ export default function MusicSearch({ songs }: { songs: LocalSong[] }) {
                       {sampling === t.id ? <Pause size={14} /> : <Play size={14} />}
                     </button>
                   )}
-                  <button className="icon-btn mp-yt" onClick={() => void openYouTube(t)} onContextMenu={(e) => (e.preventDefault(), e.stopPropagation(), void copy(t))} title="Open on YouTube (right-click to copy the link)" data-mp-yt>
-                    {copied === t.id ? <Check size={15} /> : <Youtube size={15} />}
+                  <button
+                    className={`icon-btn mp-yt ${looking === t.id ? 'busy' : ''}`}
+                    onClick={() => void open(t)}
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      void copy(t)
+                    }}
+                    onMouseEnter={() => prefetch(t)}
+                    title="Click to open the video on YouTube. Right-click to copy its link."
+                    data-mp-yt
+                  >
+                    {copied === t.id ? <Check size={14} /> : <Youtube size={14} />}
+                    <span className="mp-yt-label">{copied === t.id ? 'Copied' : looking === t.id ? 'Finding…' : 'YouTube'}</span>
                   </button>
                 </span>
                 <span className="mp-col-time">{t.durationMs ? formatTime(t.durationMs) : ''}</span>

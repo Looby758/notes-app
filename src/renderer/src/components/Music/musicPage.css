@@ -885,6 +885,25 @@ body.motion-off .mp-eq i {
 .mp-found .mp-tr {
   grid-template-columns: 36px minmax(0, 4fr) minmax(0, 3fr) auto 56px;
 }
+.mp-found {
+  container-type: inline-size;
+}
+/* A narrow page: no album column, and the YouTube button is just its icon. */
+@media (max-width: 1250px) {
+  .mp-found .mp-tr {
+    grid-template-columns: 36px minmax(0, 1fr) auto 56px;
+  }
+}
+@container (max-width: 620px) {
+  .mp-found .mp-yt-label {
+    display: none;
+  }
+  .mp-found .icon-btn.mp-yt {
+    padding: 0;
+    width: 30px;
+    justify-content: center;
+  }
+}
 .mp-found-actions {
   display: flex;
   align-items: center;
@@ -898,8 +917,24 @@ body.motion-off .mp-eq i {
 .mp-found-actions .icon-btn.mp-on {
   color: var(--accent);
 }
-.mp-yt:hover {
-  color: #ff3d3d;
+.icon-btn.mp-yt {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: auto;
+  padding: 0 10px;
+  border-radius: 15px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.icon-btn.mp-yt:hover {
+  background: color-mix(in srgb, #ff3d3d 16%, transparent);
+  color: #ff5a5a;
+}
+.icon-btn.mp-yt.busy {
+  opacity: 0.6;
+  cursor: progress;
 }
 .mp-chip {
   display: inline-flex;
