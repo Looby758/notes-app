@@ -1,6 +1,6 @@
 import { CalendarDays, FilePlus, FolderPlus, FolderTree, GitCompare, Hash, LayoutDashboard, Search } from 'lucide-react'
 import { useVault } from '../../store/vault'
-import { useNotify } from '../../store/notify'
+import { dismissNotify, useNotify } from '../../store/notify'
 import { showSidebarView, useUI, type SidebarView } from '../../store/ui'
 import FileTree from './FileTree'
 import StarredSection from './StarredSection'
@@ -26,6 +26,7 @@ export default function Sidebar() {
   const view = useUI((s) => s.sidebarView)
   const error = useNotify((s) => s.message)
   const kind = useNotify((s) => s.kind)
+  const action = useNotify((s) => s.action)
   const { newNote, newFolder } = useVault.getState()
 
   return (
@@ -70,7 +71,22 @@ export default function Sidebar() {
       {view === 'search' && <SearchPane />}
       {view === 'tags' && <TagsPane />}
       {view !== 'tags' && <BulkBar />}
-      {error && <div className={`toast ${kind}`}>{error}</div>}
+      {error && (
+        <div className={`toast ${kind}${action ? ' with-action' : ''}`}>
+          <span>{error}</span>
+          {action && (
+            <button
+              className="toast-action"
+              onClick={() => {
+                dismissNotify()
+                action.run()
+              }}
+            >
+              {action.label}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

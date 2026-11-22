@@ -3036,6 +3036,32 @@ body.dragging-note .starred-empty {
   border-color: var(--border-strong);
   color: var(--text);
 }
+.toast.with-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.toast.with-action > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.toast-action {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.toast-action:hover {
+  background: var(--bg-hover);
+}
 
 .tab.pinned {
   max-width: 140px;

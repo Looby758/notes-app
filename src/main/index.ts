@@ -73,7 +73,7 @@ import { setupVideoPlayer, videoResponse } from './videoPlayer'
 import { releaseFiles, serveFile } from './fileLocks'
 import { comicResponse, setupComics, shareProgress as shareComicProgress } from './comics'
 import { setupWiki, shareWikiProgress, wikiImageResponse } from './wiki'
-import { IS_MAC, TRASH_NAME } from '@shared/platform'
+import { IS_MAC } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
 import { dictionaryMenu, setupDictionary } from './dictionary'
@@ -951,22 +951,12 @@ function registerIpc(): void {
     await openOutside(e.sender, full, !!ask)
   })
 
-  // Several at once: one question, then each to the Bin. Returns the ones moved.
-  ipcMain.handle('fs:trashMany', async (event, paths: string[]) => {
+  // Several at once, straight into Orbit's undo bin (no question: Ctrl+Z or the toast's Undo brings
+  // them back, and they go on to the Recycle Bin / Bin afterwards). Returns the ones moved.
+  ipcMain.handle('fs:trashMany', async (_event, paths: string[]) => {
     const v = currentVault()
     const items = paths.filter(Boolean)
     if (items.length === 0) return []
-    const win = BrowserWindow.fromWebContents(event.sender)!
-    const { response } = await dialog.showMessageBox(win, {
-      type: 'warning',
-      buttons: [`Move to ${TRASH_NAME}`, 'Cancel'],
-      defaultId: 0,
-      cancelId: 1,
-      noLink: true,
-      message: `Delete ${items.length} items?`,
-      detail: `They'll be moved to the ${TRASH_NAME}:\n${items.slice(0, 8).map((p) => basename(p).replace(/\.md$/i, '')).join('\n')}${items.length > 8 ? `\n…and ${items.length - 8} more` : ''}`
-    })
-    if (response !== 0) return []
     const done: string[] = []
     for (const p of items) {
       try {
@@ -979,24 +969,11 @@ function registerIpc(): void {
     return done
   })
 
-  ipcMain.handle('fs:trash', async (event, path: string) => {
+  // No question either: it can be undone (and it ends up in the Recycle Bin / Bin anyway).
+  ipcMain.handle('fs:trash', async (_event, path: string) => {
     const v = currentVault()
     if (!path) throw new Error('The notes folder itself cannot be deleted here.')
     const full = v.abs(path)
-    const isFolder = statSync(full).isDirectory()
-    const win = BrowserWindow.fromWebContents(event.sender)!
-    const { response } = await dialog.showMessageBox(win, {
-      type: 'warning',
-      buttons: [`Move to ${TRASH_NAME}`, 'Cancel'],
-      defaultId: 0,
-      cancelId: 1,
-      noLink: true,
-      message: `Delete "${basename(full).replace(/\.md$/i, '')}"?`,
-      detail: isFolder
-        ? `The folder and everything in it will be moved to the ${TRASH_NAME}.`
-        : `The note will be moved to the ${TRASH_NAME}.`
-    })
-    if (response !== 0) return false
     await hold(full)
     return true
   })

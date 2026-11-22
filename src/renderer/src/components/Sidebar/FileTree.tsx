@@ -173,7 +173,7 @@ export default function FileTree() {
         { label: 'Set a property…', icon: <ListPlus size={15} />, onClick: bulk('property') },
         { label: 'Export…', icon: <FileDown size={15} />, onClick: () => openExport('', true, picked) },
         'separator',
-        { label: `Delete ${picked.length} items…`, icon: <Trash2 size={15} />, danger: true, onClick: () => trashMany(picked) }
+        { label: `Delete ${picked.length} items`, icon: <Trash2 size={15} />, danger: true, onClick: () => trashMany(picked) }
       ]
     }
     const open: MenuItem[] =
