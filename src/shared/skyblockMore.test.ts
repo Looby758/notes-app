@@ -281,3 +281,31 @@ describe('item ids', () => {
     expect(modernVanilla('hypixel_skyblock:item/foo', {}, {})).toBeNull()
   })
 })
+
+describe('misc stats', () => {
+  it('groups stats and turns numbered repeats into one table', async () => {
+    const { groupStats } = await import('./skyblockMore')
+    const g = groupStats([
+      { key: 'highest_damage', value: 5 },
+      { key: 'candy_collected.green_candy', value: 2944 },
+      { key: 'candy_collected.spooky_festival_222.green_candy', value: 21 },
+      { key: 'candy_collected.spooky_festival_222.total', value: 36 },
+      { key: 'candy_collected.spooky_festival_222.purple_candy', value: 15 },
+      { key: 'candy_collected.spooky_festival_276.green_candy', value: 3 },
+      { key: 'candy_collected.spooky_festival_276.total', value: 4 }
+    ])
+    expect(g.map((x) => x.name)).toEqual(['General', 'Candy Collected'])
+    const candy = g[1]
+    expect(candy.rows).toEqual([{ key: 'candy_collected.green_candy', label: 'Green Candy', value: 2944 }])
+    expect(candy.series).toEqual([
+      {
+        name: 'Spooky Festival',
+        columns: ['Green Candy', 'Purple Candy', 'Total'],
+        rows: [
+          { label: '276', values: [3, null, 4] },
+          { label: '222', values: [21, 15, 36] }
+        ]
+      }
+    ])
+  })
+})

@@ -767,3 +767,71 @@ export function friendSummary(v: SbProfileView): NonNullable<SbFriend['summary']
     magicalPower: v.accessories?.magicalPower ?? null
   }
 }
+
+// ---------- misc stats ----------
+
+export interface StatSeries {
+  /** "Spooky Festival". */
+  name: string
+  /** "Green Candy", "Purple Candy", "Total". */
+  columns: string[]
+  /** Newest first: "222" → its values in column order. */
+  rows: { label: string; values: (number | null)[] }[]
+}
+
+export interface StatGroup {
+  id: string
+  name: string
+  rows: { key: string; label: string; value: number }[]
+  series: StatSeries[]
+}
+
+const statName = (s: string): string =>
+  s
+    .replace(/[._]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+
+/**
+ * Hypixel's player_stats sorted into groups ("candy_collected.green_candy" → Candy Collected: Green
+ * Candy), with numbered repeats such as "spooky_festival_222.green_candy" made into one table (a row
+ * per festival) instead of a line for each.
+ */
+export function groupStats(stats: readonly { key: string; value: number }[]): StatGroup[] {
+  const groups = new Map<string, StatGroup>()
+  const seriesOf = new Map<string, { name: string; columns: string[]; rows: Map<number, Map<string, number>> }>()
+  for (const s of stats) {
+    const dot = s.key.indexOf('.')
+    const id = dot < 0 ? 'general' : s.key.slice(0, dot)
+    const rest = dot < 0 ? s.key : s.key.slice(dot + 1)
+    let g = groups.get(id)
+    if (!g) groups.set(id, (g = { id, name: id === 'general' ? 'General' : statName(id), rows: [], series: [] }))
+    const m = /^(.+?)_(\d+)\.(.+)$/.exec(rest)
+    if (m) {
+      const sk = `${id}|${m[1]}`
+      let ser = seriesOf.get(sk)
+      if (!ser) seriesOf.set(sk, (ser = { name: statName(m[1]), columns: [], rows: new Map() }))
+      const col = statName(m[3])
+      if (!ser.columns.includes(col)) ser.columns.push(col)
+      const n = Number(m[2])
+      if (!ser.rows.has(n)) ser.rows.set(n, new Map())
+      ser.rows.get(n)!.set(col, s.value)
+    } else g.rows.push({ key: s.key, label: statName(rest), value: s.value })
+  }
+  for (const [sk, ser] of seriesOf) {
+    const g = groups.get(sk.split('|')[0])!
+    // "Total" last, the rest in the order they came.
+    const columns = [...ser.columns.filter((c) => c !== 'Total'), ...ser.columns.filter((c) => c === 'Total')]
+    g.series.push({
+      name: ser.name,
+      columns,
+      rows: [...ser.rows.entries()].sort((a, b) => b[0] - a[0]).map(([n, vals]) => ({ label: String(n), values: columns.map((c) => vals.get(c) ?? null) }))
+    })
+  }
+  const out = [...groups.values()]
+  for (const g of out) g.rows.sort((a, b) => a.label.localeCompare(b.label))
+  return out.sort(
+    (a, b) => Number(b.id === 'general') - Number(a.id === 'general') || b.rows.length + b.series.length * 3 - (a.rows.length + a.series.length * 3) || a.name.localeCompare(b.name)
+  )
+}

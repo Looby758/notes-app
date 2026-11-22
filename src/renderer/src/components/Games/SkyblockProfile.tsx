@@ -4,7 +4,7 @@ import { ChevronDown, Plus, Search, Share2, Star, X } from 'lucide-react'
 import { describeMinutes, MODE_NAMES, shortNumber } from '@shared/skyblock'
 import { MC_COLORS } from '@shared/skyblockGoals'
 import type { Level, SbPet, SbProfileView, SbViewItem } from '@shared/skyblockProfile'
-import { statBreakdown, type SbProfilePage } from '@shared/skyblockMore'
+import { groupStats, statBreakdown, type SbProfilePage, type StatGroup } from '@shared/skyblockMore'
 import { errorMessage } from '../../lib/paths'
 import { notify } from '../../store/notify'
 import { Head, ItemPic } from './SkyblockPic'
@@ -527,7 +527,7 @@ function Hero({ page, go, onChoose, onShare }: { page: SbProfilePage; go: (s: Se
                           data-sbp-choice={c.name}
                         >
                           <b>{c.name}</b>
-                          {c.mode && <span className={`sbp-badge mode-${c.mode}`}>{MODE_NAMES[c.mode] ?? c.mode}</span>}
+                          {c.mode && <span className={`sbp-badge mode-${c.mode}`}>{c.mode === 'ironman' && '♲ '}{MODE_NAMES[c.mode] ?? c.mode}</span>}
                           <span className="faint">
                             Level {c.level}
                             {c.members > 1 ? ` · co-op of ${c.members}` : ''}
@@ -539,7 +539,7 @@ function Hero({ page, go, onChoose, onShare }: { page: SbProfilePage; go: (s: Se
                   </>
                 )}
               </span>
-              {v.mode && <span className={`sbp-badge mode-${v.mode}`}>{MODE_NAMES[v.mode] ?? v.mode}</span>}
+              {v.mode && <span className={`sbp-badge mode-${v.mode}`}>{v.mode === 'ironman' && '♲ '}{MODE_NAMES[v.mode] ?? v.mode}</span>}
               {v.coopMembers > 1 && (
                 <button className="sbp-badge sbp-badge-btn" onClick={() => go('coop')}>
                   Co-op of {v.coopMembers}
@@ -1781,26 +1781,112 @@ function Museum({ v }: { v: SbProfileView }) {
   )
 }
 
+const statValue = (key: string, value: number): string => (/time|_ms$/.test(key) && value > 60_000 ? describeMinutes(value / 60_000) : fmt(value))
+
 function Stats({ v }: { v: SbProfileView }) {
   const [q, setQ] = useState('')
-  const list = useMemo(() => v.stats.filter((s) => !q || s.key.toLowerCase().includes(q.toLowerCase().replace(/\s+/g, '_'))), [v.stats, q])
+  const groups = useMemo(() => groupStats(v.stats), [v.stats])
+  const list = useMemo(() => (q ? v.stats.filter((s) => s.key.toLowerCase().includes(q.toLowerCase().trim().replace(/\s+/g, '_'))) : []), [v.stats, q])
   const nice = (k: string): string => k.replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
   return (
-    <div>
+    <div className="sbp-stats">
       <div className="games-search sbp-filter">
         <Search size={14} />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Find in ${v.stats.length} stats`} spellCheck={false} />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Find in ${v.stats.length} stats`} spellCheck={false} data-sbp-stats-search />
       </div>
-      <table className="sbp-table">
-        <tbody>
-          {list.slice(0, 400).map((s) => (
-            <tr key={s.key}>
-              <td>{nice(s.key)}</td>
-              <td className="num">{/time|_ms$/.test(s.key) && s.value > 60_000 ? describeMinutes(s.value / 60_000) : fmt(s.value)}</td>
-            </tr>
+      {q ? (
+        <table className="sbp-table">
+          <tbody>
+            {list.slice(0, 400).map((s) => (
+              <tr key={s.key}>
+                <td>{nice(s.key)}</td>
+                <td className="num">{statValue(s.key, s.value)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <div className="sbp-panels">
+          {groups.map((g) => (
+            <StatGroupPanel key={g.id} g={g} />
           ))}
-        </tbody>
-      </table>
+        </div>
+      )}
     </div>
+  )
+}
+
+/** One group of stats: its lines (the first dozen until you ask for more) and any per-festival tables. */
+function StatGroupPanel({ g }: { g: StatGroup }) {
+  const [all, setAll] = useState(false)
+  const [allRows, setAllRows] = useState<Record<string, boolean>>({})
+  const rows = all ? g.rows : g.rows.slice(0, 12)
+  const wide = g.series.length > 0 || g.rows.length > 12
+  return (
+    <Panel title={g.name} wide={wide} right={<span className="faint">{g.rows.length + g.series.reduce((a, s) => a + s.rows.length, 0)}</span>}>
+      {rows.length > 0 && (
+        <div className={`sbp-stat-lines ${wide ? 'cols' : ''}`} data-sbp-stat-group={g.id}>
+          {rows.map((r) => (
+            <div key={r.key} className="sbp-stat-line">
+              <span>{r.label}</span>
+              <b>{statValue(r.key, r.value)}</b>
+            </div>
+          ))}
+        </div>
+      )}
+      {g.rows.length > 12 && (
+        <button className="link-btn" onClick={() => setAll(!all)}>
+          {all ? 'Show fewer' : `Show all ${g.rows.length}`}
+        </button>
+      )}
+      {g.series.map((ser) => {
+        const open = allRows[ser.name]
+        const shown = open ? ser.rows : ser.rows.slice(0, 5)
+        const totalCol = ser.columns.indexOf('Total')
+        const best = totalCol >= 0 ? ser.rows.reduce<(typeof ser.rows)[number] | null>((b, r) => ((r.values[totalCol] ?? 0) > (b?.values[totalCol] ?? -1) ? r : b), null) : null
+        return (
+          <div key={ser.name} className="sbp-series" data-sbp-series={ser.name}>
+            <h5>
+              {ser.name} <span className="faint">· {ser.rows.length} times</span>
+              {best && (
+                <span className="faint">
+                  {' '}
+                  · best was {ser.name} {best.label} with {fmt(best.values[totalCol] ?? 0)}
+                </span>
+              )}
+            </h5>
+            <table className="sbp-table sbp-series-table">
+              <thead>
+                <tr>
+                  <th>{ser.name}</th>
+                  {ser.columns.map((c) => (
+                    <th key={c} className="num">
+                      {c}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((r) => (
+                  <tr key={r.label} className={r === best ? 'best' : ''}>
+                    <td>{r.label}</td>
+                    {r.values.map((x, i) => (
+                      <td key={i} className="num">
+                        {x === null ? '—' : fmt(x)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {ser.rows.length > 5 && (
+              <button className="link-btn" onClick={() => setAllRows({ ...allRows, [ser.name]: !open })}>
+                {open ? 'Show the latest 5' : `Show all ${ser.rows.length}`}
+              </button>
+            )}
+          </div>
+        )
+      })}
+    </Panel>
   )
 }

@@ -825,7 +825,34 @@ export function drawCard(p: SbProfilePage): HTMLCanvasElement {
   g.fillText(p.player.name || v.player?.name || 'Player', 250, 160)
   g.fillStyle = 'rgba(255,255,255,0.65)'
   g.font = font(26, 500)
-  g.fillText(`${v.profileName}${MODE_NAMES[v.mode] ? ` · ${MODE_NAMES[v.mode]}` : ''}${v.coopMembers > 1 ? ` · co-op of ${v.coopMembers}` : ''}`, 252, 204)
+  let sx = 252
+  const sub = (text: string): void => {
+    g.fillStyle = 'rgba(255,255,255,0.65)'
+    g.font = font(26, 500)
+    g.fillText(text, sx, 204)
+    sx += g.measureText(text).width
+  }
+  sub(v.profileName)
+  const modeName = MODE_NAMES[v.mode]
+  if (modeName) {
+    // A pill so the game mode stands out, with Hypixel's ♲ for ironman.
+    const iron = v.mode === 'ironman'
+    const label = iron ? `♲ ${modeName}` : modeName
+    g.font = `700 22px Inter, "Segoe UI", "Segoe UI Symbol", "Noto Sans Symbols 2", "DejaVu Sans", system-ui, sans-serif`
+    const w = g.measureText(label).width + 28
+    const x = sx + 14
+    g.beginPath()
+    g.roundRect(x, 178, w, 36, 18)
+    g.fillStyle = iron ? 'rgba(200,205,215,0.22)' : 'rgba(143,227,255,0.16)'
+    g.fill()
+    g.lineWidth = 2
+    g.strokeStyle = iron ? 'rgba(220,225,235,0.75)' : 'rgba(143,227,255,0.6)'
+    g.stroke()
+    g.fillStyle = '#ffffff'
+    g.fillText(label, x + 14, 204)
+    sx = x + w - 2
+  }
+  if (v.coopMembers > 1) sub(` · co-op of ${v.coopMembers}`)
   const stats: [string, string][] = [
     ['Networth', v.networth ? shortNumber(v.networth.total) : '—'],
     ['Skill average', v.skillAverage === null ? '—' : v.skillAverage.toFixed(1)],

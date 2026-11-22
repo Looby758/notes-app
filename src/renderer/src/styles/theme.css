@@ -21074,3 +21074,45 @@ button.sbp-coop-row:hover {
   content-visibility: auto;
   contain-intrinsic-size: auto 52px;
 }
+.sbp-stats > .sbp-filter {
+  margin-bottom: 14px;
+}
+.sbp-stat-lines {
+  display: grid;
+  gap: 2px 24px;
+}
+.sbp-stat-lines.cols {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+.sbp-stat-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.sbp-stat-line span {
+  color: var(--text-muted);
+}
+.sbp-series {
+  margin-top: 14px;
+}
+.sbp-series h5 {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+.sbp-series-table tr.best td {
+  color: var(--accent);
+  font-weight: 600;
+}
+.sbp-series-table th {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-align: left;
+  padding: 4px 8px;
+}
+.sbp-series-table th.num {
+  text-align: right;
+}
