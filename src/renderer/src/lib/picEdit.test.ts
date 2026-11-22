@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  addPoint,
   arrowHead,
   clampRect,
   clampWidth,
@@ -7,12 +8,17 @@ import {
   folderOf,
   isChanged,
   MAX_SIDE,
+  markSizes,
   newEdit,
+  nextStep,
   outputSize,
+  pathSpan,
   rectFrom,
   saveType,
   shaftEnd,
-  widthForHeight
+  shapeBox,
+  widthForHeight,
+  type Mark
 } from './picEdit'
 
 describe('picture editor', () => {
@@ -67,5 +73,38 @@ describe('picture editor', () => {
     const edit = newEdit(10, 10)
     expect(isChanged(edit)).toBe(false)
     expect(isChanged({ ...edit, marks: [{ kind: 'blur', x: 0, y: 0, w: 5, h: 5 }] })).toBe(true)
+  })
+
+  it('numbers steps one past the biggest, so undo takes the number back', () => {
+    const step = (n: number): Mark => ({ kind: 'step', x: 0, y: 0, n, color: '#fff', size: 10 })
+    expect(nextStep([])).toBe(1)
+    expect(nextStep([step(1), { kind: 'blur', x: 0, y: 0, w: 5, h: 5 }, step(2)])).toBe(3)
+    expect(nextStep([step(3), step(1)])).toBe(4)
+  })
+
+  it('makes a square (round circle) with Shift, growing the way you dragged', () => {
+    expect(shapeBox(10, 10, 50, 30)).toEqual({ x: 10, y: 10, w: 40, h: 20 })
+    expect(shapeBox(10, 10, 50, 30, true)).toEqual({ x: 10, y: 10, w: 40, h: 40 })
+    expect(shapeBox(100, 100, 80, 40, true)).toEqual({ x: 40, y: 40, w: 60, h: 60 })
+  })
+
+  it('skips pen points that are too close together', () => {
+    const one = addPoint([], [0, 0], 2)
+    expect(one).toEqual([[0, 0]])
+    expect(addPoint(one, [1, 1], 2)).toBe(one)
+    expect(addPoint(one, [3, 0], 2)).toEqual([[0, 0], [3, 0]])
+  })
+
+  it('measures how far a drawn line reaches', () => {
+    expect(pathSpan([])).toBe(0)
+    expect(pathSpan([[5, 5]])).toBe(0)
+    expect(pathSpan([[0, 0], [3, 1], [3, 4]])).toBe(5)
+  })
+
+  it('scales highlighter and step sizes with the picture', () => {
+    const small = markSizes({ width: 800, height: 600 })
+    const big = markSizes({ width: 4000, height: 3000 })
+    expect(small.step[1]).toBeLessThan(big.step[1])
+    expect(small.highlight[0]).toBeLessThan(small.highlight[2])
   })
 })

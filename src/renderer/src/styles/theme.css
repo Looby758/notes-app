@@ -6695,6 +6695,15 @@ body.theme-light .flashcard-grade.grade-easy span {
 .pic-canvas.tool-text {
   cursor: text;
 }
+.pic-step-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font: 700 9px/1 system-ui, sans-serif;
+}
 .pic-hint {
   color: var(--text-faint);
   font-size: 12px;
