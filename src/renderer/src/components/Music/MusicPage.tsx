@@ -33,9 +33,10 @@ import {
   Wand2,
   FilePlus2,
   Sparkle,
-  Download
+  Download,
+  ListChecks
 } from 'lucide-react'
-import { filterSongs, localArtUrl, type LocalSong } from '@shared/localMusic'
+import { filterSongs, localArtUrl, plainText, type LocalSong } from '@shared/localMusic'
 import { formatTime } from '@shared/spotify'
 import {
   albumsOf,
@@ -81,6 +82,7 @@ import {
 import ContextMenu, { type MenuItem } from '../ContextMenu'
 import { VolumeSlider } from './MusicPlayer'
 import MusicSearch from './MusicSearch'
+import FromSpotify from './FromSpotify'
 import { droppedPicture, DuplicatesView, hasPicture, MusicDialogs, openMusicDialog, TagMenu } from './MusicTools'
 import { deleteSongs, fillFromNames, importSongs, setCover } from '../../store/musicFiles'
 import SaveMp3 from './SaveMp3'
@@ -95,6 +97,7 @@ import { notify } from '../../store/notify'
 
 type View =
   | { kind: 'search' }
+  | { kind: 'spotify' }
   | { kind: 'songs' }
   | { kind: 'albums' }
   | { kind: 'album'; key: string }
@@ -260,6 +263,7 @@ function Sidebar({ view, setView, folder, loading, onSaveLink, linkOpen }: { vie
     <nav className="mp-sidebar">
       <div className="mp-nav-group">
         {item({ kind: 'search' }, <Search size={16} />, 'Search')}
+        {item({ kind: 'spotify' }, <ListChecks size={16} />, 'From Spotify')}
         {item({ kind: 'songs' }, <Music size={16} />, 'Songs')}
         {item({ kind: 'albums' }, <Disc3 size={16} />, 'Albums')}
         {item({ kind: 'artists' }, <Mic2 size={16} />, 'Artists')}
@@ -393,6 +397,8 @@ function ViewContent({ view, setView, songs, folder }: { view: View; setView: (v
   switch (view.kind) {
     case 'search':
       return <MusicSearch songs={songs} />
+    case 'spotify':
+      return <FromSpotify songs={songs} setPlaylistView={(id) => setView({ kind: 'playlist', id })} />
     case 'albums':
       return (
         <CardGrid
@@ -472,7 +478,7 @@ interface Card {
 function CardGrid({ title, cards, round }: { title: string; cards: Card[]; round?: boolean }) {
   const [query, setQuery] = useState('')
   const q = query.trim().toLowerCase()
-  const shown = q ? cards.filter((c) => `${c.title} ${c.sub}`.toLowerCase().includes(q)) : cards
+  const shown = q ? cards.filter((c) => plainText(`${c.title} ${c.sub}`).includes(plainText(q))) : cards
   return (
     <div className="mp-scroll">
       <div className="mp-grid-head">

@@ -61,6 +61,8 @@ export const youtubeWatchUrl = (id: string): string => `https://www.youtube.com/
 
 const fold = (s: string): string =>
   s
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/\(.*?\)|\[.*?\]/g, '')
     .replace(/^the\s+/, '')
@@ -122,6 +124,8 @@ export function catalogueMatch(found: FoundTrack[], videoTitle: string): FoundTr
     if (!sameSong(t, titleOnly)) continue
     const where = `${t.artist} ${t.album}`.toLowerCase()
     const score = hints.filter((w) => where.includes(w)).length
+    // Most of the other words have to be there: "The Walking Dead: The Ones Who Live" isn't "The Walking Dead: Dead City".
+    if (score < Math.ceil(hints.length * 0.6)) continue
     if (score > bestScore) {
       best = t
       bestScore = score

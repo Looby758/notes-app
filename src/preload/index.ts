@@ -639,6 +639,7 @@ const api: NotesApi = {
   },
   musicDataGet: () => ipcRenderer.invoke('musicData:get'),
   songSearch: (query) => ipcRenderer.invoke('songSearch:search', query),
+  spotifyList: (link) => ipcRenderer.invoke('songSearch:spotifyList', link),
   songYouTube: (artist, title) => ipcRenderer.invoke('songSearch:youtube', artist, title),
   musicDataEdit: (edits) => ipcRenderer.invoke('musicData:edit', edits),
   onMusicDataChanged: (callback) => {

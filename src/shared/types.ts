@@ -16,6 +16,7 @@ import type { WeatherPlace, WeatherState } from './weather'
 import type { LocalLibrary, SongTagPatch } from './localMusic'
 import type { MusicData, MusicEdit } from './musicLibrary'
 import type { FoundTrack } from './songSearch'
+import type { SpotifyList } from './spotifyImport'
 import type { MixerState } from './mixer'
 import type { MonitorAction, MonitorSaved, MonitorSetting, MonitorsStatus, MonitorTarget } from './monitors'
 import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
@@ -1205,6 +1206,8 @@ export interface NotesApi {
   onMusicLinkProgress(callback: (progress: MusicLinkProgress) => void): () => void
   /** Any song (Apple's free iTunes Search), for the Music page's Search. */
   songSearch(query: string): Promise<FoundTrack[]>
+  /** A public Spotify playlist or album's songs, from its link (no sign-in; the first 100). */
+  spotifyList(link: string): Promise<SpotifyList>
   /** A song's YouTube video (`exact` false: YouTube's search for it instead). */
   songYouTube(artist: string, title: string): Promise<{ url: string; exact: boolean }>
   /** Playlists, liked songs, ratings and play counts for your own music (orbit-music.json in the music folder). */

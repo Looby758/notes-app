@@ -1,6 +1,7 @@
 import { ipcMain, net } from 'electron'
 import { firstVideoId, itunesSearchUrl, parseItunes, youtubeQuery, youtubeWatchUrl, type FoundTrack } from '@shared/songSearch'
 import { youTubeSearchUrl } from '@shared/youtube'
+import { parseSpotifyEmbed, parseSpotifyLink, spotifyEmbedUrl, type SpotifyList } from '@shared/spotifyImport'
 import { logError } from './log'
 
 /**
@@ -46,5 +47,24 @@ async function youtube(artist: string, title: string): Promise<{ url: string; ex
 
 export function setupSongSearch(): void {
   ipcMain.handle('songSearch:search', (_e, query: string) => search(String(query ?? '')))
+  ipcMain.handle('songSearch:spotifyList', (_e, link: string) => spotifyList(String(link ?? '')))
   ipcMain.handle('songSearch:youtube', (_e, artist: string, title: string) => youtube(String(artist ?? ''), String(title ?? '')))
+}
+
+/** A public Spotify playlist or album, from its embed page (no sign-in; the first 100 songs). */
+async function spotifyList(link: string): Promise<SpotifyList> {
+  const parsed = parseSpotifyLink(link)
+  if (!parsed) throw new Error('That isn’t a Spotify playlist or album link. In Spotify: Share → Copy link.')
+  let res: Response
+  try {
+    res = await net.fetch(spotifyEmbedUrl(parsed), { headers: { 'User-Agent': BROWSER_AGENT, 'Accept-Language': 'en' } })
+  } catch (err) {
+    logError('reading a Spotify playlist', err)
+    throw new Error('Couldn’t reach Spotify. Check you’re online, then try again.')
+  }
+  if (res.status === 404) throw new Error('Spotify says that playlist doesn’t exist, or it’s private.')
+  if (!res.ok) throw new Error(`Spotify didn’t answer (${res.status}). Try again in a moment.`)
+  const list = parseSpotifyEmbed(await res.text())
+  if (!list) throw new Error('Couldn’t read that playlist. If it’s private, make it public in Spotify for a moment, or paste its songs instead.')
+  return list
 }

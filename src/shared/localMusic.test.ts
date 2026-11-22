@@ -58,3 +58,11 @@ describe('tidying and duplicates', () => {
     expect(safeName('a<b>c. ')).toBe('abc')
   })
 })
+
+describe('accents', () => {
+  it('finds songs without typing the accents', () => {
+    const songs = [{ path: 'd.mp3', title: 'DÁKITI', artist: 'Bad Bunny & Jhayco', album: '', track: 0, durationMs: 0, art: false }]
+    expect(filterSongs(songs, 'dakiti')).toHaveLength(1)
+    expect(filterSongs(songs, 'Dákiti bad')).toHaveLength(1)
+  })
+})

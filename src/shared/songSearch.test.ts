@@ -60,6 +60,12 @@ describe('matching a video to the catalogue', () => {
     expect(catalogueMatch(found, 'Someone Else - No One Left To Love')).toBeNull()
   })
 
+  it('needs most of the other words, not just some', () => {
+    const tv = [t('Ian Hultquist', 'Main Titles', 'The Walking Dead: Dead City (Original Television Series Soundtrack)')]
+    expect(catalogueMatch(tv, 'The Walking Dead: The Ones Who Live OST - Main Titles')).toBeNull()
+    expect(catalogueMatch(tv, 'The Walking Dead: Dead City - Main Titles')?.artist).toBe('Ian Hultquist')
+  })
+
   it('picks nothing rather than a guess', () => {
     expect(catalogueMatch(found, 'No One Left To Love')).toBeNull()
     expect(catalogueMatch(found, 'John Duff - No One Left To Love')?.album).toBe('No One Left To Love - Single')

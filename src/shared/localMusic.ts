@@ -78,12 +78,19 @@ export function sortSongs(songs: LocalSong[]): LocalSong[] {
   )
 }
 
+/** Lower case without accents, so "dakiti" finds "DÁKITI" and "beyonce" finds "Beyoncé". */
+export const plainText = (s: string): string =>
+  s
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+
 /** Songs whose title, artist or album (or anything `extra` adds, like your tags) has every word you typed. */
 export function filterSongs(songs: LocalSong[], query: string, extra?: (s: LocalSong) => string): LocalSong[] {
-  const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+  const words = plainText(query).split(/\s+/).filter(Boolean)
   if (!words.length) return songs
   return songs.filter((s) => {
-    const text = `${s.title} ${s.artist} ${s.album} ${s.genre ?? ''} ${extra?.(s) ?? ''}`.toLowerCase()
+    const text = plainText(`${s.title} ${s.artist} ${s.album} ${s.genre ?? ''} ${extra?.(s) ?? ''}`)
     return words.every((w) => text.includes(w))
   })
 }
@@ -130,8 +137,7 @@ export function tidyMoves(songs: LocalSong[], layout: TidyLayout): { from: strin
 }
 
 const foldKey = (s: string): string =>
-  s
-    .toLowerCase()
+  plainText(s)
     .replace(/\(.*?\)|\[.*?\]/g, '')
     .replace(/^the\s+/, '')
     .replace(/[^a-z0-9]+/g, '')

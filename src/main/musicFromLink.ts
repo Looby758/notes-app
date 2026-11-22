@@ -4,9 +4,10 @@ import { copyFile, rename, rm } from 'fs/promises'
 import { extname, join, relative, sep } from 'path'
 import type NodeID3 from 'node-id3'
 import { safeName } from '@shared/localMusic'
-import { catalogueMatch, itunesSearchUrl, parseItunes, songFromVideoTitle, type FoundTrack } from '@shared/songSearch'
+import { catalogueMatch, itunesSearchUrl, parseItunes, sameSong, songFromVideoTitle, type FoundTrack } from '@shared/songSearch'
 import type { MusicLinkProgress } from '@shared/types'
 import { downloadSoundTo } from './videoDownload'
+import { youTubeVideoId } from '@shared/youtube'
 import { musicFolder, refreshLibrary } from './localMusic'
 import { freeName, imageFrom, writeTags } from './musicTags'
 import { logError } from './log'
@@ -33,6 +34,16 @@ async function lookUp(videoTitle: string, want: { artist: string; title: string 
   }
 }
 
+async function lookUpKnown(known: FoundTrack): Promise<FoundTrack | null> {
+  try {
+    const res = await net.fetch(itunesSearchUrl(`${known.artist} ${known.title}`, 15))
+    if (!res.ok) return null
+    return parseItunes(await res.json()).find((t) => sameSong(t, known)) ?? null
+  } catch {
+    return null
+  }
+}
+
 async function save(sender: WebContents, id: string, link: string, known: FoundTrack | null): Promise<void> {
   const tell = (p: Omit<MusicLinkProgress, 'id'>): void => {
     if (!sender.isDestroyed()) sender.send('musicLink:progress', { id, ...p })
@@ -50,7 +61,8 @@ async function save(sender: WebContents, id: string, link: string, known: FoundT
     tell({ stage: 'details', done: null, title: videoTitle })
     const guess = songFromVideoTitle(videoTitle)
     // Saved from Search: the song you picked there is the one. Otherwise, look it up.
-    const found = known ?? (await lookUp(videoTitle, guess))
+    // A song known only by its name and artist (from a Spotify list): its album and cover are looked up.
+    const found = known?.album ? known : known ? ((await lookUpKnown(known)) ?? known) : await lookUp(videoTitle, guess)
     const song = {
       title: found?.title ?? guess.title,
       artist: found?.artist ?? guess.artist,
@@ -61,10 +73,14 @@ async function save(sender: WebContents, id: string, link: string, known: FoundT
     const ext = extname(file).toLowerCase() || '.mp3'
     if (ext === '.mp3') {
       const tags: NodeID3.Tags = { title: song.title, artist: song.artist, album: song.album, year: song.year, genre: song.genre }
-      if (found?.art) {
+      // The catalogue's cover, or else the video's own picture (on YouTube Music that's the album cover).
+      const videoId = youTubeVideoId(link)
+      const pictures = found?.art ? [found.art.replace('/300x300bb.', '/600x600bb.')] : videoId ? [`https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`, `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`] : []
+      for (const url of pictures) {
         try {
-          const { data, mime } = await imageFrom({ url: found.art.replace('/300x300bb.', '/600x600bb.') })
+          const { data, mime } = await imageFrom({ url })
           tags.image = { mime, type: { id: 3, name: 'front cover' }, description: 'Cover', imageBuffer: data }
+          break
         } catch (err) {
           logError('getting a downloaded song’s cover', err)
         }
