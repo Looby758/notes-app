@@ -12,6 +12,27 @@ export interface ReleaseNotes {
 /** Newest first. Add an entry with each release. */
 export const RELEASE_NOTES: readonly ReleaseNotes[] = [
   {
+    version: '1.13.0',
+    items: [
+      'Music page: songs, albums and playlists in one place, with search (or search YouTube), a music folder setting, and tools to fix details, find covers and tidy duplicates.',
+      'Calendar: repeating events, drag to move or resize, a Day view, and edit Google events from Orbit.',
+      'Files: search the whole PC, colour tags, favourites, folder sizes and the Recycle Bin.',
+      'Money: accounts and your net worth over time, and IOUs with reminders when you split a bill.',
+      'Mini games: Solitaire, 2048 and Chess, with win streaks and best times.',
+      'Discord: write call notes on the pop-out, and see call stats.',
+      'Clips sorted by game, soundboard sounds from a link, and music dips while friends talk.',
+      'SkyBlock: profiles (yours or anyone’s) with networth, progress and compare, an ironman goal planner, and a summary card when Minecraft closes.',
+      'Key remapper: remap any key, everywhere or just in one game.',
+      'World clocks: add friends and see if it’s a good time to message them.',
+      'Screen snip: translate offline, snip after a countdown, snip from the Windows taskbar, and snip a bug on any monitor.',
+      'Picture editor: boxes, circles, highlighter, numbered steps and a pen.',
+      'Video player: A-B loop, step frame by frame, and save a frame into a note.',
+      'Delete notes and folders straight away, with an Undo button instead of an “Are you sure?” box.',
+      'App Studio: bug pictures are sent to Claude too.',
+      'Fix: Google sign-in no longer says “This browser or app may not be secure”.'
+    ]
+  },
+  {
     version: '1.12.1',
     items: [
       'App Studio: a home for the apps you make with Claude. See each app’s branch, last change and open pull requests, and get the latest and run it in one click.',
