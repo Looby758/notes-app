@@ -1,3 +1,4 @@
+import type { MadeApp, NewApp } from './appStarters'
 import type { AppInfo, GitHubStatus, HealthReport, MergedPull, PullRequest, Release, TestCopy } from './appStudio'
 import type { DriveSpace, ExplorerEntry, ExplorerPlace, PasteMode, PcIndexStatus } from './explorer'
 import type { FileTagStore, TagColour } from './fileTags'
@@ -1476,6 +1477,8 @@ export interface NotesApi {
   appsFetchImage(url: string): Promise<{ bytes: Uint8Array; type: string }>
   /** Marks a release as a pre-release, so it isn't the latest and apps that update themselves skip it (or back again). */
   appsSetPrerelease(repo: string, tag: string, prerelease: boolean): Promise<Release>
+  /** Starts a new app from a starter: its folder, files, git repository and (if asked) GitHub repository. */
+  appsCreateApp(req: NewApp): Promise<MadeApp>
   /** Checks an app's npm packages: newer versions, and known security problems (npm outdated and npm audit). */
   appsHealth(folder: string): Promise<HealthReport>
   appsMerge(repo: string, number: number): Promise<void>

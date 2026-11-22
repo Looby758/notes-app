@@ -1,8 +1,9 @@
 import { app, ipcMain, net, safeStorage } from 'electron'
 import { execFile } from 'child_process'
-import { existsSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'path'
 import { copyFolderName, githubRepo, isDownloadFile, isGitHubImage, parseAudit, parseOutdated, TOKEN_NOT_ALLOWED, type HealthReport, type AppInfo, type TestCopy, type GitHubStatus, type MergedPull, type PullRequest, type Release } from '@shared/appStudio'
+import { appNameProblem, appSlug, starterFiles, STARTERS, type MadeApp, type NewApp } from '@shared/appStarters'
 import { logError } from './log'
 import { TEST_COPY } from './testCopy'
 
@@ -424,6 +425,57 @@ async function health(folder: string): Promise<HealthReport> {
   return { checkedAt: new Date().toISOString(), outdated: parseOutdated(outdated.out), security: parseAudit(audit.out), problems }
 }
 
+/**
+ * Starts a new app: a folder named after it with the starter's files, a git repository with them
+ * committed, and (if asked, and GitHub is connected) a GitHub repository set as its origin. The
+ * first push runs in the app's terminal afterwards, with your own git sign-in.
+ */
+async function createApp(req: NewApp): Promise<MadeApp> {
+  const problem = appNameProblem(req.name)
+  if (problem) throw new Error(problem)
+  if (!validFolder(req.parent)) throw new Error('Pick a folder to put it in.')
+  const slug = appSlug(req.name)
+  const folder = join(req.parent, slug)
+  if (existsSync(folder)) throw new Error(`There’s already a folder called ${slug} in there. Pick another name or folder.`)
+  const files = starterFiles(req.starter, req.name.trim(), req.what)
+  mkdirSync(folder)
+  for (const [path, text] of Object.entries(files)) {
+    const full = resolve(folder, path)
+    if (!inside(folder, full)) continue
+    mkdirSync(dirname(full), { recursive: true })
+    writeFileSync(full, text)
+  }
+  const init = await gitLong(folder, ['init', '-b', 'main'])
+  if (!init.ok) {
+    // Git before 2.28 has no -b.
+    const old = await gitLong(folder, ['init'])
+    if (!old.ok) throw new Error(/ENOENT|not recognized|not found/i.test(old.err) ? 'The app was made, but git isn’t installed on this computer, so it isn’t a git repository yet.' : `The app was made, but git couldn’t start a repository: ${old.err.split('\n').pop()}`)
+    await gitLong(folder, ['checkout', '-b', 'main'])
+  }
+  await gitLong(folder, ['add', '-A'])
+  const commit = await gitLong(folder, ['commit', '-m', `Start ${req.name.trim()}`])
+  if (!commit.ok) {
+    const why = /user\.(name|email)|identity/i.test(commit.err) ? 'git doesn’t know your name and email yet (git config --global user.name and user.email)' : commit.err.split('\n').pop()
+    throw new Error(`The app was made in ${folder}, but git couldn’t save the first version: ${why}.`)
+  }
+  if (!req.github) return { folder }
+  if (!token()) return { folder, githubError: 'GitHub isn’t connected in App Studio, so no repository was made.' }
+  try {
+    const firstLine = req.what.trim().split('\n')[0].slice(0, 300)
+    const made = await github<{ full_name: string; clone_url: string }>('/user/repos', {
+      method: 'POST',
+      body: { name: slug, private: req.github === 'private', description: firstLine || undefined, auto_init: false },
+      doing: 'make repositories',
+      needs: 'Administration'
+    })
+    await gitLong(folder, ['remote', 'add', 'origin', made.clone_url])
+    return { folder, repo: made.full_name }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { folder, githubError: /name already exists/i.test(message) ? `You already have a repository called ${slug} on GitHub.` : message }
+  }
+}
+
 function needToken(): void {
   if (!token()) throw new Error('Connect GitHub in App Studio first, so Orbit can do that for you.')
 }
@@ -468,6 +520,11 @@ export function setupAppStudio(): void {
   ipcMain.handle('apps:pullStates', (_e, repo: unknown, numbers: unknown) => {
     if (!validRepo(repo) || !Array.isArray(numbers)) throw new Error('Not allowed')
     return pullStates(repo, numbers.filter((n): n is number => Number.isInteger(n) && n > 0))
+  })
+  ipcMain.handle('apps:createApp', (_e, req: unknown) => {
+    const r = (req ?? {}) as Partial<NewApp>
+    if (typeof r.parent !== 'string' || typeof r.name !== 'string' || !STARTERS.some((s) => s.id === r.starter)) throw new Error('Not allowed')
+    return createApp({ parent: r.parent, name: r.name.slice(0, 80), starter: r.starter as NewApp['starter'], what: String(r.what ?? '').slice(0, 5000), github: r.github === 'private' || r.github === 'public' ? r.github : null })
   })
   ipcMain.handle('apps:health', (_e, folder: unknown) => {
     if (!validFolder(folder)) throw new Error('This app’s folder isn’t there any more.')

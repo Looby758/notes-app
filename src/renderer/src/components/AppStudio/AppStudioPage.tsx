@@ -18,7 +18,8 @@ import {
   FlaskConical,
   Copy as CopyIcon,
   Play,
-  ChevronDown
+  ChevronDown,
+  Sparkles
 } from 'lucide-react'
 import { boardKey, isTokenPermissionError, newTokenUrl, pullKey, prSummary, timeAgo, type PullRequest, type TestCopy } from '@shared/appStudio'
 import { FILE_MANAGER } from '@shared/platform'
@@ -33,6 +34,7 @@ import Releases from './Releases'
 import Screenshots from './Screenshots'
 import TokenProblem from './TokenProblem'
 import Health from './Health'
+import NewApp from './NewApp'
 
 /** Pull requests are fetched again when you come back after this long. */
 const PULLS_FRESH_MS = 2 * 60_000
@@ -112,16 +114,25 @@ async function addApp(): Promise<void> {
 
 function MyApps() {
   const projects = useTerminals((s) => s.projects)
+  const [starting, setStarting] = useState(false)
   return (
     <div className="appstudio-grid">
       {projects.map((p) => (
         <AppCard key={p.id} project={p} />
       ))}
-      <button className="appstudio-add" onClick={() => void addApp()}>
-        <Plus size={18} />
-        <strong>Add an app</strong>
-        <span>Pick the folder of an app you’re making, like Eclipse or Orbit.</span>
-      </button>
+      <div className="appstudio-add-pair">
+        <button className="appstudio-add" onClick={() => setStarting(true)}>
+          <Sparkles size={18} />
+          <strong>Start a new app</strong>
+          <span>From a starter: a desktop app, website or game, with its GitHub repository and board set up.</span>
+        </button>
+        <button className="appstudio-add" onClick={() => void addApp()}>
+          <Plus size={18} />
+          <strong>Add an app</strong>
+          <span>Pick the folder of an app you’re making, like Eclipse or Orbit.</span>
+        </button>
+      </div>
+      {starting && <NewApp close={() => setStarting(false)} />}
     </div>
   )
 }

@@ -825,6 +825,7 @@ const api: NotesApi = {
   appsPullStates: (repo, numbers) => ipcRenderer.invoke('apps:pullStates', repo, numbers),
   appsFetchImage: (url) => ipcRenderer.invoke('apps:fetchImage', url),
   appsSetPrerelease: (repo, tag, prerelease) => ipcRenderer.invoke('apps:setPrerelease', repo, tag, prerelease),
+  appsCreateApp: (req) => ipcRenderer.invoke('apps:createApp', req),
   appsHealth: (folder) => ipcRenderer.invoke('apps:health', folder),
   appsMerge: (repo, number) => ipcRenderer.invoke('apps:merge', repo, number),
   appsClose: (repo, number) => ipcRenderer.invoke('apps:close', repo, number),
