@@ -880,6 +880,10 @@ export interface NotesApi {
   /** Opens Steam's install window for a game (Steam asks which drive). */
   steamInstall(appId: string): Promise<void>
   steamOpenDownloads(): Promise<void>
+  /** What the Epic Games Launcher is installing or updating (measured from the game's folder), with a speed when it's going. */
+  epicDownloads(): Promise<(import('./games').EpicDownload & { speed?: number })[]>
+  /** Opens the Epic Games Launcher, where its downloads are paused and reordered. */
+  epicOpenDownloads(): Promise<void>
 
   // Video player
   /** What's in a video (its tracks need the video helper, ffmpeg) and the subtitle files beside it. */
