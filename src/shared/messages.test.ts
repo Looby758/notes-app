@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { badgeText, isMessagesUrl, unreadFromTitle } from './messages'
+import { badgeText, isMessagesUrl, unreadFromTitle, windowSizedToPage } from './messages'
 
 describe('unreadFromTitle', () => {
   it('reads WhatsApp’s count', () => {
@@ -40,5 +40,16 @@ describe('badgeText', () => {
     expect(badgeText(0)).toBe('')
     expect(badgeText(7)).toBe('7')
     expect(badgeText(150)).toBe('99+')
+  })
+})
+
+describe('windowSizedToPage', () => {
+  it('makes the outer size the page size, so Discord does not think its developer tools are open', () => {
+    const win = { innerWidth: 900, innerHeight: 700, outerWidth: 1400, outerHeight: 760 } as unknown as Window
+    windowSizedToPage(win)
+    expect(win.outerWidth - win.innerWidth).toBe(0)
+    expect(win.outerHeight - win.innerHeight).toBe(0)
+    ;(win as unknown as { innerWidth: number }).innerWidth = 500
+    expect(win.outerWidth).toBe(500)
   })
 })
