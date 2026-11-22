@@ -236,7 +236,7 @@ export async function downloadItemList(signal?: AbortSignal): Promise<void> {
           })
         )
       } else {
-        const m = /(^|\/)constants\/(leveling|pets|misc|bestiary|garden|fairy_souls|trophyfish)\.json$/.exec(path)
+        const m = /(^|\/)constants\/(leveling|pets|misc|bestiary|garden|fairy_souls|trophyfish|museum|hotmlayout|hotflayout)\.json$/.exec(path)
         if (m)
           jobs.push(
             entry.async('string').then((t) => {

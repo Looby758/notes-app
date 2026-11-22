@@ -97,7 +97,7 @@ describe('profileView', () => {
       { id: 'WHEAT', name: 'Wheat Minion', tiers: [1, 2, 3], highest: 3 }
     ])
     expect(v.craftedMinions).toBe(4)
-    expect(v.bestiary).toEqual([{ island: 'Hub', mobs: [{ name: 'Zombie', kills: 25, tier: 2, maxTier: 2 }] }])
+    expect(v.bestiary).toEqual([{ island: 'Hub', mobs: [{ name: 'Zombie', kills: 25, tier: 2, maxTier: 2, next: null, from: 20 }] }])
     expect(v.garden?.level.level).toBe(3)
     expect(v.garden?.crops[0]).toMatchObject({ id: 'WHEAT', milestone: { level: 1 } })
     expect(v.essence).toEqual([{ id: 'Wither', amount: 5 }])

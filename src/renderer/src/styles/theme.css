@@ -21116,3 +21116,304 @@ button.sbp-coop-row:hover {
 .sbp-series-table th.num {
   text-align: right;
 }
+
+/* ---------- SkyBlock planners (museum, slayer, dungeons, trees, garden, bestiary, daily) ---------- */
+.sbpl-cats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+}
+.sbpl-cat {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sbpl-cat > .sbp-bar2 {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+.sbpl-cat.active,
+.sbpl-cat:hover {
+  border-color: var(--sbx-hi, var(--accent));
+}
+.sbpl-filters .sbg-tag {
+  border: 0;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 3px 10px;
+}
+.sbpl-filters .sbg-tag.on {
+  background: rgba(81, 207, 102, 0.2);
+  color: #8ce99a;
+}
+.sbpl-have {
+  font-size: 10.5px;
+  color: #8ce99a;
+}
+.sbpl-more {
+  margin-top: 10px;
+}
+.sbpl-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+.sbpl-slayer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+.sbpl-slayer-tiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sbpl-slayer-tiers > span {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 62px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-hover);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  line-height: 1.25;
+}
+.sbpl-slayer-tiers > span.hi {
+  border-color: var(--sbx-hi, var(--accent));
+}
+.sbpl-table-wrap {
+  overflow-x: auto;
+}
+.sbpl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.sbpl-table th,
+.sbpl-table td {
+  padding: 6px 10px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.sbpl-table th:first-child,
+.sbpl-table td:first-child {
+  text-align: left;
+}
+.sbpl-table th {
+  font-weight: 600;
+  color: var(--text-muted);
+  vertical-align: bottom;
+}
+.sbpl-table th small {
+  display: block;
+  font-weight: 400;
+}
+.sbpl-table tr.master td:first-child {
+  color: #ff8787;
+}
+.sbpl-tree-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: flex-start;
+}
+.sbpl-tree {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.18);
+}
+.sbpl-gap {
+  width: 46px;
+  height: 46px;
+}
+.sbpl-node {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    transform 0.12s,
+    border-color 0.12s;
+}
+.sbpl-node.ability {
+  border-radius: 50%;
+}
+.sbpl-node.on {
+  color: #fff;
+  border-color: color-mix(in srgb, var(--tone) 60%, transparent);
+  background: color-mix(in srgb, var(--tone) 22%, var(--bg-raised));
+}
+.sbpl-node.max {
+  border-color: #fcc419;
+  background: color-mix(in srgb, #fcc419 22%, var(--bg-raised));
+}
+.sbpl-node.selected {
+  box-shadow: 0 0 0 2px #fcc419;
+}
+.sbpl-node.off {
+  opacity: 0.5;
+}
+.sbpl-node:hover,
+.sbpl-node.picked {
+  transform: scale(1.08);
+  border-color: var(--sbx-hi, var(--accent));
+}
+.sbpl-node-info {
+  flex: 1 1 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 240px;
+}
+.sbpl-node-info h5 {
+  margin: 0;
+  font-size: 16px;
+}
+.sbpl-lore {
+  font-size: 12.5px;
+  line-height: 1.45;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(10, 8, 24, 0.85);
+  border: 1px solid rgba(120, 60, 220, 0.5);
+  width: 100%;
+  box-sizing: border-box;
+}
+.sbpl-plots {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
+  max-width: 300px;
+}
+.sbpl-plot {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  border: 1px dashed var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.sbpl-plot.on {
+  border-style: solid;
+  border-color: rgba(81, 207, 102, 0.55);
+  background: rgba(81, 207, 102, 0.16);
+  color: #b2f2bb;
+}
+.sbpl-plot.barn {
+  border-style: solid;
+  background: rgba(255, 146, 43, 0.18);
+  border-color: rgba(255, 146, 43, 0.5);
+  color: #ffc078;
+}
+.sbx-row.sbpl-comp {
+  grid-template-columns: minmax(160px, 1.2fr) minmax(60px, 0.8fr) minmax(0, 1.4fr);
+}
+.sbpl-next {
+  font-size: 11.5px;
+}
+.sbpl-rarities {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px 16px;
+}
+.sbpl-rarity {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.sbpl-visitors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 12px;
+  font-size: 12.5px;
+}
+.sbpl-daily {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sbpl-task {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+}
+.sbpl-task .sbx-row-name {
+  flex: 1;
+}
+.sbpl-task.done .sbx-row-name b {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+.sbpl-task.done {
+  opacity: 0.7;
+}
+.sbpl-task.hidden {
+  opacity: 0.4;
+}
+.sbpl-check {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+  color: #0b0d1c;
+  cursor: pointer;
+  padding: 0;
+}
+.sbpl-task.done .sbpl-check {
+  background: #69db7c;
+  border-color: #69db7c;
+}
+.sbpl-check:disabled {
+  cursor: default;
+}
+.sbpl-add {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.sbpl-add input {
+  flex: 1;
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: inherit;
+}
+.sbp-tile small.sbpl-plain {
+  text-transform: none;
+}

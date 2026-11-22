@@ -8,6 +8,7 @@ import { groupStats, statBreakdown, type SbProfilePage, type StatGroup } from '@
 import { errorMessage } from '../../lib/paths'
 import { notify } from '../../store/notify'
 import { Head, ItemPic } from './SkyblockPic'
+import { BestiaryClosest, DungeonPlanner, ForgePanel, GardenPlanner, MuseumPlanner, SlayerPlan, TreePanel } from './SkyblockPlanners'
 
 export const fmt = (n: number | null | undefined): string => (n === null || n === undefined ? '—' : Math.round(n).toLocaleString('en-GB'))
 const clean = (err: unknown): string => errorMessage(err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
@@ -378,6 +379,7 @@ const SECTIONS = [
   ['dungeons', 'Dungeons', 'ESSENCE_WITHER'],
   ['slayer', 'Slayer', 'REVENANT_FLESH'],
   ['mining', 'Mining', 'DIAMOND_PICKAXE'],
+  ['forest', 'Foraging', 'SAPLING'],
   ['bestiary', 'Bestiary', 'ROTTEN_FLESH'],
   ['garden', 'Garden', 'GOLD_HOE'],
   ['fishing', 'Trophy fish', 'MAGMA_FISH'],
@@ -436,7 +438,7 @@ export function levelColor(l: number): string {
 export default function SkyblockProfile({ page, onChoose, onShare }: { page: SbProfilePage; onChoose: (profileId: string) => void; onShare: () => void }) {
   const [section, setSection] = useState<Section>('overview')
   const view = page.view
-  const shown = SECTIONS.filter(([id]) => id !== 'coop' || (view.coop?.length ?? 0) > 1)
+  const shown = SECTIONS.filter(([id]) => (id !== 'coop' || (view.coop?.length ?? 0) > 1) && (id !== 'forest' || !!view.forest))
   return (
     <div className="sbp" data-sbp>
       <ItemTip />
@@ -464,6 +466,7 @@ export default function SkyblockProfile({ page, onChoose, onShare }: { page: SbP
             {section === 'dungeons' && <Dungeons v={view} />}
             {section === 'slayer' && <Slayers v={view} />}
             {section === 'mining' && <Mining v={view} />}
+            {section === 'forest' && <Forest v={view} />}
             {section === 'bestiary' && <Bestiary v={view} />}
             {section === 'garden' && <Garden v={view} />}
             {section === 'fishing' && <TrophyFish v={view} />}
@@ -527,7 +530,12 @@ function Hero({ page, go, onChoose, onShare }: { page: SbProfilePage; go: (s: Se
                           data-sbp-choice={c.name}
                         >
                           <b>{c.name}</b>
-                          {c.mode && <span className={`sbp-badge mode-${c.mode}`}>{c.mode === 'ironman' && '♲ '}{MODE_NAMES[c.mode] ?? c.mode}</span>}
+                          {c.mode && (
+                            <span className={`sbp-badge mode-${c.mode}`}>
+                              {c.mode === 'ironman' && '♲ '}
+                              {MODE_NAMES[c.mode] ?? c.mode}
+                            </span>
+                          )}
                           <span className="faint">
                             Level {c.level}
                             {c.members > 1 ? ` · co-op of ${c.members}` : ''}
@@ -539,7 +547,12 @@ function Hero({ page, go, onChoose, onShare }: { page: SbProfilePage; go: (s: Se
                   </>
                 )}
               </span>
-              {v.mode && <span className={`sbp-badge mode-${v.mode}`}>{v.mode === 'ironman' && '♲ '}{MODE_NAMES[v.mode] ?? v.mode}</span>}
+              {v.mode && (
+                <span className={`sbp-badge mode-${v.mode}`}>
+                  {v.mode === 'ironman' && '♲ '}
+                  {MODE_NAMES[v.mode] ?? v.mode}
+                </span>
+              )}
               {v.coopMembers > 1 && (
                 <button className="sbp-badge sbp-badge-btn" onClick={() => go('coop')}>
                   Co-op of {v.coopMembers}
@@ -1466,6 +1479,7 @@ function Dungeons({ v }: { v: SbProfileView }) {
           <Chip label="Class average" value={avg === null ? '—' : avg.toFixed(1)} />
         </div>
       </Panel>
+      <DungeonPlanner v={v} />
       <Panel title="Floors" wide>
         <div className="sbp-floors">
           {d.floors.map((f) => (
@@ -1512,6 +1526,7 @@ function Slayers({ v }: { v: SbProfileView }) {
                   </span>
                 ))}
               </div>
+              <SlayerPlan s={s} />
             </div>
           </div>
         )
@@ -1545,6 +1560,8 @@ function Mining({ v }: { v: SbProfileView }) {
           ))}
         </div>
       </Panel>
+      {m.tree && <TreePanel tree={m.tree} title="Heart of the Mountain" powders={m.powder} />}
+      <ForgePanel v={v} />
       {m.crystals.length > 0 && (
         <Panel title="Crystals" wide>
           <div className="sbp-tiles">
@@ -1562,6 +1579,35 @@ function Mining({ v }: { v: SbProfileView }) {
   )
 }
 
+function Forest({ v }: { v: SbProfileView }) {
+  const f = v.forest
+  if (!f) return <Nothing what="No Heart of the Forest yet." />
+  return (
+    <div className="sbp-panels">
+      <Panel title="Heart of the Forest">
+        <LevelCard icon={<ItemPic id="SAPLING" size={28} />} name="HotF tier" l={f.level} />
+        <div className="sbp-chips">{f.ability && <Chip label="Ability" value={f.ability} />}</div>
+      </Panel>
+      <Panel title="Whispers">
+        {f.whispers.length ? (
+          <div className="sbp-powders">
+            {f.whispers.map((p) => (
+              <div key={p.kind} className="sbp-powder" style={{ '--tone': p.kind.startsWith('Forest') ? '#8ce99a' : '#ffd43b' } as CSSProperties}>
+                <span>{p.kind}</span>
+                <b>{shortNumber(p.available)}</b>
+                <small className="faint">{shortNumber(p.available + p.spent)} total</small>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <Nothing what="Hypixel didn’t send your whispers." />
+        )}
+      </Panel>
+      {f.tree && <TreePanel tree={f.tree} title="Heart of the Forest" powders={f.whispers} />}
+    </div>
+  )
+}
+
 function Bestiary({ v }: { v: SbProfileView }) {
   const [open, setOpen] = useState<string | null>(v.bestiary[0]?.island ?? null)
   if (!v.bestiary.length) return <Nothing what="No bestiary kills yet." />
@@ -1572,6 +1618,7 @@ function Bestiary({ v }: { v: SbProfileView }) {
           <Chip label="Bestiary milestone" value={v.bestiaryMilestone} icon={<ItemPic id="BOOK" size={22} />} />
         </div>
       )}
+      <BestiaryClosest v={v} />
       <div className="sbp-accordion">
         {v.bestiary.map((i) => {
           const tiers = i.mobs.reduce((a, m) => a + m.tier, 0)
@@ -1657,7 +1704,8 @@ function Garden({ v }: { v: SbProfileView }) {
               })}
             </div>
           </Panel>
-          {g.upgrades.length > 0 && (
+          <GardenPlanner v={v} />
+          {!g.plan && g.upgrades.length > 0 && (
             <Panel title="Crop upgrades" wide>
               <div className="sbp-chips">
                 {g.upgrades.map((u) => (
@@ -1767,17 +1815,20 @@ function Museum({ v }: { v: SbProfileView }) {
   if (!m) return <Nothing what="Hypixel hasn’t been asked about the museum yet: press Refresh." />
   const list = m.items.filter((i) => !q || i.name.toLowerCase().includes(q.toLowerCase()))
   return (
-    <Panel title={`Museum · ${m.donated} donated`} wide right={m.value !== null && <span className="sbp-badge">Value {shortNumber(m.value)}</span>}>
-      <div className="games-search sbp-filter">
-        <Search size={14} />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a donation" spellCheck={false} />
-      </div>
-      <div className="sbp-tiles">
-        {list.map((i) => (
-          <Tile key={i.id} id={i.id} name={i.name} />
-        ))}
-      </div>
-    </Panel>
+    <div className="sbp-panels">
+      <MuseumPlanner v={v} />
+      <Panel title={`Donated · ${m.donated}`} wide right={m.value !== null && <span className="sbp-badge">Value {shortNumber(m.value)}</span>}>
+        <div className="games-search sbp-filter">
+          <Search size={14} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a donation" spellCheck={false} />
+        </div>
+        <div className="sbp-tiles">
+          {list.map((i) => (
+            <Tile key={i.id} id={i.id} name={i.name} />
+          ))}
+        </div>
+      </Panel>
+    </div>
   )
 }
 

@@ -10,6 +10,27 @@
 
 import { neuId, prettyId, stripColors, type SbData } from './skyblockGoals'
 import type { ItemIcon } from './skyblockTextures'
+import {
+  bestiaryClosest,
+  dungeonPlan,
+  forgeSlots,
+  gardenPlan,
+  museumPlan,
+  plannerExtras,
+  slayerPlan,
+  treeSource,
+  treeView,
+  whispersOf,
+  type DungeonPlan,
+  type ForgeSlot,
+  type GardenPlan,
+  type MuseumPlan,
+  type PlannerExtras,
+  type SlayerPlan,
+  type TreeView
+} from './skyblockPlanners'
+
+export { bestiaryClosest }
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
@@ -49,6 +70,8 @@ export interface SbExtras {
   fairySoulsMax: number
   /** Trophy fish ids. */
   trophyFish: string[]
+  /** Museum, tree layouts, garden costs… for the planners (skyblockPlanners.ts). */
+  planners?: PlannerExtras
 }
 
 const RARITIES = ['COMMON', 'UNCOMMON', 'RARE', 'EPIC', 'LEGENDARY', 'MYTHIC', 'DIVINE', 'SPECIAL', 'VERY SPECIAL']
@@ -135,7 +158,8 @@ export function buildExtras(c: Record<string, unknown>, itemFiles: unknown[]): S
     gardenXp: nums(garden.garden_exp),
     cropMilestones,
     fairySoulsMax: num(fairy['Max Souls']) ?? 0,
-    trophyFish: Object.keys(obj(c.trophyfish))
+    trophyFish: Object.keys(obj(c.trophyfish)),
+    planners: plannerExtras(c)
   }
 }
 
@@ -262,6 +286,25 @@ export interface SbPet {
   uuid?: string
 }
 
+/** Every item id you have anywhere the profile shows (for the museum's "you have it" marks). */
+function ownedIds(gear: SbProfileView['gear']): Set<string> {
+  const ids = new Set<string>()
+  if (!gear) return ids
+  const lists = [
+    gear.armor,
+    gear.equipment,
+    gear.inventory,
+    gear.enderChest,
+    gear.vault,
+    ...gear.wardrobe.map((w) => w.pieces),
+    ...gear.equipmentSets.map((w) => w.pieces),
+    ...gear.backpacks.map((b) => b.items),
+    ...gear.bags.map((b) => b.items)
+  ]
+  for (const l of lists) for (const i of l) if (i?.id) ids.add(i.id)
+  return ids
+}
+
 export interface SbLoadout {
   slot: number
   name: string
@@ -290,7 +333,7 @@ export interface SbProfileView {
   skills: SkillLine[] | null
   /** Average of the main skills (no runecrafting, social, carpentry). */
   skillAverage: number | null
-  slayers: { id: string; name: string; level: Level; kills: number[] }[]
+  slayers: { id: string; name: string; level: Level; kills: number[]; plan: SlayerPlan | null }[]
   dungeons: {
     catacombs: Level
     classes: SkillLine[]
@@ -303,6 +346,7 @@ export interface SbProfileView {
       fastest: number | null
       bestScore: number | null
     }[]
+    plan: DungeonPlan | null
   } | null
   mining: {
     hotm: Level
@@ -310,7 +354,17 @@ export interface SbProfileView {
     ability: string
     commissions: number | null
     crystals: { id: string; state: string; found: number }[]
+    tree: TreeView | null
   } | null
+  /** Heart of the Forest. */
+  forest: {
+    level: Level
+    whispers: { kind: string; available: number; spent: number }[]
+    ability: string
+    tree: TreeView | null
+  } | null
+  /** What's in the Forge. */
+  forge: ForgeSlot[]
   gear: {
     armor: (SbViewItem | null)[]
     equipment: (SbViewItem | null)[]
@@ -356,7 +410,7 @@ export interface SbProfileView {
   craftedMinions: number
   bestiary: {
     island: string
-    mobs: { name: string; kills: number; tier: number; maxTier: number }[]
+    mobs: { name: string; kills: number; tier: number; maxTier: number; next: number | null; from: number }[]
   }[]
   bestiaryMilestone: number | null
   garden: {
@@ -366,6 +420,7 @@ export interface SbProfileView {
     plots: number
     crops: { id: string; name: string; collected: number; milestone: Level }[]
     upgrades: { id: string; level: number }[]
+    plan: GardenPlan | null
   } | null
   jacob: {
     medals: Record<string, number>
@@ -402,6 +457,7 @@ export interface SbProfileView {
     value: number | null
     donated: number
     items: { id: string; name: string }[]
+    plan: MuseumPlan | null
   } | null
   /** Every other number in player_stats, flattened ("kills.zealot_enderman"). */
   stats: { key: string; value: number }[]
@@ -525,7 +581,8 @@ export function profileView(
       id,
       name: SLAYER_NAMES[id],
       level: levelOfTotals(num(b.xp) ?? 0, data.slayerXp[id] ?? []),
-      kills
+      kills,
+      plan: x.planners ? slayerPlan(id, num(b.xp) ?? 0, data.slayerXp[id] ?? [], x.planners) : null
     }
   })
 
@@ -552,13 +609,27 @@ export function profileView(
     name: title(id),
     ...levelOf(num(obj(v).experience) ?? 0, x.catacombsXp, 50)
   }))
+  const cataLevel = levelOf(num(cata.experience) ?? 0, x.catacombsXp, 50)
+  const selectedClass = classes.find((c) => c.id === dg.selected_dungeon_class) ?? null
+  let bestNormal = -1
+  let bestMaster = 0
+  for (let f = 0; f <= 7; f++) {
+    if ((num(obj(cata.tier_completions)[f]) ?? 0) > 0) bestNormal = f
+    if (f > 0 && (num(obj(master.tier_completions)[f]) ?? 0) > 0) bestMaster = f
+  }
   const dungeons = isObj(me.dungeons)
     ? {
-        catacombs: levelOf(num(cata.experience) ?? 0, x.catacombsXp, 50),
+        catacombs: cataLevel,
         classes,
         selected: typeof dg.selected_dungeon_class === 'string' ? title(dg.selected_dungeon_class) : '',
         secrets: num(dg.secrets),
-        floors
+        floors,
+        plan: dungeonPlan(
+          { xp: cataLevel.xp, level: cataLevel.level },
+          selectedClass ? { id: selectedClass.id, name: selectedClass.name, xp: selectedClass.xp, level: selectedClass.level } : null,
+          x.catacombsXp,
+          { normal: bestNormal, master: bestMaster }
+        )
       }
     : null
 
@@ -569,24 +640,46 @@ export function profileView(
     state: title(String(obj(v).state ?? '').toLowerCase()),
     found: num(obj(v).total_found) ?? 0
   }))
-  const mining = isObj(me.mining_core)
-    ? {
-        hotm: (() => {
-          const l = levelOf(num(mc.experience) ?? 0, data.hotmXp.slice(1), 9)
-          return { ...l, level: l.level + 1, max: 10 }
-        })(),
-        powder: ['mithril', 'gemstone', 'glacite']
-          .map((k) => ({
-            kind: title(k),
-            available: num(mc[`powder_${k}`]) ?? 0,
-            spent: num(mc[`powder_spent_${k}`]) ?? 0
-          }))
-          .filter((p) => p.available || p.spent),
-        ability: typeof mc.selected_pickaxe_ability === 'string' ? title(mc.selected_pickaxe_ability) : '',
-        commissions: num(obj(me.objectives).completed_commissions) ?? num(obj(obj(me.objectives).tutorial).completed_commissions),
-        crystals
-      }
-    : null
+  const hotmSrc = treeSource(me, 'mining')
+  const mining =
+    isObj(me.mining_core) || hotmSrc
+      ? {
+          hotm: (() => {
+            const l = levelOf(hotmSrc?.xp ?? num(mc.experience) ?? 0, data.hotmXp.slice(1), 9)
+            return { ...l, level: l.level + 1, max: 10 }
+          })(),
+          powder: ['mithril', 'gemstone', 'glacite']
+            .map((k) => ({
+              kind: title(k),
+              available: num(mc[`powder_${k}`]) ?? 0,
+              spent: num(mc[`powder_spent_${k}`]) ?? 0
+            }))
+            .filter((p) => p.available || p.spent),
+          ability: typeof mc.selected_pickaxe_ability === 'string' ? title(mc.selected_pickaxe_ability) : '',
+          commissions: num(obj(me.objectives).completed_commissions) ?? num(obj(obj(me.objectives).tutorial).completed_commissions),
+          crystals,
+          tree: hotmSrc && x.planners ? treeView('mining', x.planners.hotm, hotmSrc.nodes, hotmSrc.ability, num(hotmSrc.nodes.special_0) ?? 0) : null
+        }
+      : null
+
+  // Heart of the Forest
+  const hotfSrc = treeSource(me, 'foraging')
+  const forest =
+    hotfSrc && x.planners
+      ? {
+          level: (() => {
+            const l = levelOf(hotfSrc.xp ?? 0, x.planners.hotfXp.slice(1), Math.max(0, x.planners.hotfXp.length - 1))
+            return { ...l, level: l.level + 1, max: l.max + 1 }
+          })(),
+          whispers: whispersOf(me),
+          ability: hotfSrc.ability ? title(hotfSrc.ability) : '',
+          tree: treeView('foraging', x.planners.hotf, hotfSrc.nodes, hotfSrc.ability)
+        }
+      : null
+
+  // The Forge
+  const quickForgeLevel = mining?.tree?.nodes.find((n) => n.id === 'quick_forge')?.level ?? num(obj(mc.nodes).forge_time) ?? 0
+  const forge = forgeSlots(me, (id) => data.items[id]?.forge?.seconds || null, quickForgeLevel)
 
   // Gear
   const inv = isObj(me.inventory) ? me.inventory : null
@@ -823,11 +916,14 @@ export function profileView(
         .map((mob) => {
           const k = mob.ids.reduce((a, id) => a + (num(kills[id]) ?? 0), 0)
           const brackets = (x.bestiaryBrackets[String(mob.bracket)] ?? []).filter((t) => t <= mob.cap)
+          const tier = brackets.filter((t) => k >= t).length
           return {
             name: mob.name,
             kills: k,
-            tier: brackets.filter((t) => k >= t).length,
-            maxTier: brackets.length
+            tier,
+            maxTier: brackets.length,
+            next: brackets[tier] ?? null,
+            from: brackets[tier - 1] ?? 0
           }
         })
         .filter((m) => m.kills > 0)
@@ -851,7 +947,8 @@ export function profileView(
           collected: num(n) ?? 0,
           milestone: levelOf(num(n) ?? 0, x.cropMilestones[CROP_KEYS[id] ?? id] ?? [])
         })),
-        upgrades: Object.entries(obj(gd.crop_upgrade_levels)).map(([id, n]) => ({ id: itemName(neuId(id)), level: num(n) ?? 0 }))
+        upgrades: Object.entries(obj(gd.crop_upgrade_levels)).map(([id, n]) => ({ id: itemName(neuId(id)), level: num(n) ?? 0 })),
+        plan: x.planners ? gardenPlan(gd, me, x.planners.garden) : null
       }
     : null
 
@@ -936,7 +1033,8 @@ export function profileView(
           donated: Object.keys(obj(mm.items)).length,
           items: Object.keys(obj(mm.items))
             .map((id) => ({ id, name: itemName(id) }))
-            .sort((a, b) => a.name.localeCompare(b.name))
+            .sort((a, b) => a.name.localeCompare(b.name)),
+          plan: x.planners ? museumPlan(Object.keys(obj(mm.items)), x.planners.museum, ownedIds(gear), (id) => stripColors(itemName(id))) : null
         }
       : null
   if (extra.museum !== undefined && !isObj(mm.items)) hidden.push('Museum API is off (or nothing’s donated yet).')
@@ -984,6 +1082,8 @@ export function profileView(
     slayers,
     dungeons,
     mining,
+    forest,
+    forge,
     gear,
     accessories,
     pets,

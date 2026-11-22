@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { CalendarDays, Check, HelpCircle, Lock, Copy, Download, Hammer, Loader2, RefreshCw, Search, Star, Trash2, TrendingUp, X } from 'lucide-react'
+import { CalendarDays, Check, HelpCircle, ListChecks, Lock, Copy, Download, Hammer, Loader2, RefreshCw, Search, Star, Trash2, TrendingUp, X } from 'lucide-react'
 import { MODE_NAMES, shortNumber } from '@shared/skyblock'
 import {
   describeSbDate,
@@ -22,6 +22,8 @@ import { notify } from '../../store/notify'
 import { HomeBox } from '../Home/HomePage'
 import { Bar, Chip, fmt, levelColor, Nothing, Panel, rarityColor, Ring } from './SkyblockProfile'
 import { Head, ItemPic, useNeuIcons } from './SkyblockPic'
+import { DailyChecklist } from './SkyblockPlanners'
+import type { SbProfileView } from '@shared/skyblockProfile'
 
 /**
  * The SkyBlock page's other pages: Progress (graphs, since last time, milestones), Helpers (ironman:
@@ -365,9 +367,23 @@ const fmtLv = (n: number): string => (Number.isInteger(n) ? fmt(n) : n.toFixed(1
 type Helpers = { craftable: Craftable[]; mp: MpStep[]; minions: MinionStep[] }
 
 /** What you can make now, the cheapest Magical Power, and your next minion tiers. */
-export function HelpersPage({ profileId }: { profileId: string }) {
+export function HelpersPage({ profileId, view }: { profileId: string; view?: SbProfileView }) {
   const [h, setH] = useState<Helpers | null | undefined>(undefined)
-  const [tab, setTab] = useState<'craft' | 'mp' | 'minions'>('craft')
+  const [tab, setTab] = useState<'daily' | 'craft' | 'mp' | 'minions'>(() => {
+    try {
+      return (localStorage.getItem('orbit-skyblock-helper') as 'daily' | null) ?? 'craft'
+    } catch {
+      return 'craft'
+    }
+  })
+  const pickTab = (t: 'daily' | 'craft' | 'mp' | 'minions'): void => {
+    setTab(t)
+    try {
+      localStorage.setItem('orbit-skyblock-helper', t)
+    } catch {
+      // Just not remembered.
+    }
+  }
   useEffect(() => {
     let live = true
     setH(undefined)
@@ -387,6 +403,31 @@ export function HelpersPage({ profileId }: { profileId: string }) {
       notify(cleanErr(err))
     }
   }
+  const tabs = (
+    <div className="sbx-tabs">
+      {view && (
+        <button className={tab === 'daily' ? 'active' : ''} onClick={() => pickTab('daily')} data-sbx-helper="daily">
+          <ListChecks size={14} /> Daily checklist
+        </button>
+      )}
+      <button className={tab === 'craft' ? 'active' : ''} onClick={() => pickTab('craft')} data-sbx-helper="craft">
+        <Hammer size={14} /> Craftable now{h ? ` (${h.craftable.length})` : ''}
+      </button>
+      <button className={tab === 'mp' ? 'active' : ''} onClick={() => pickTab('mp')} data-sbx-helper="mp">
+        <ItemPic id="HEGEMONY_ARTIFACT" size={18} /> Magical Power planner
+      </button>
+      <button className={tab === 'minions' ? 'active' : ''} onClick={() => pickTab('minions')} data-sbx-helper="minions">
+        <ItemPic id="COBBLESTONE_GENERATOR_1" size={18} /> Minion helper
+      </button>
+    </div>
+  )
+  if (tab === 'daily' && view)
+    return (
+      <div className="sbx-helpers" data-sbx-helpers>
+        {tabs}
+        <DailyChecklist v={view} />
+      </div>
+    )
   if (h === undefined)
     return (
       <p className="faint sbx-loading">
@@ -396,17 +437,7 @@ export function HelpersPage({ profileId }: { profileId: string }) {
   if (!h) return <Nothing what="The helpers need your profile and the item list. Press Refresh at the top." />
   return (
     <div className="sbx-helpers" data-sbx-helpers>
-      <div className="sbx-tabs">
-        <button className={tab === 'craft' ? 'active' : ''} onClick={() => setTab('craft')} data-sbx-helper="craft">
-          <Hammer size={14} /> Craftable now ({h.craftable.length})
-        </button>
-        <button className={tab === 'mp' ? 'active' : ''} onClick={() => setTab('mp')} data-sbx-helper="mp">
-          <ItemPic id="HEGEMONY_ARTIFACT" size={18} /> Magical Power planner
-        </button>
-        <button className={tab === 'minions' ? 'active' : ''} onClick={() => setTab('minions')} data-sbx-helper="minions">
-          <ItemPic id="COBBLESTONE_GENERATOR_1" size={18} /> Minion helper
-        </button>
-      </div>
+      {tabs}
       {tab === 'craft' && (
         <Panel title="You have everything to make these" wide>
           {h.craftable.length ? (

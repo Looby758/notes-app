@@ -393,7 +393,7 @@ export default function SkyblockGoalsPage() {
                   </div>
                 ))}
               {shownTab === 'progress' && (mine ? <ProgressPage page={mine} /> : <div className="sbg-empty">Your progress shows once Orbit has read your profile.</div>)}
-              {shownTab === 'helpers' && <HelpersPage profileId={mine?.view.profileId ?? ''} />}
+              {shownTab === 'helpers' && <HelpersPage profileId={mine?.view.profileId ?? ''} view={mine?.view} />}
               {shownTab === 'compare' && <ComparePage mine={mine} other={other} friends={friends} setFriends={setFriends} open={(who) => void openPlayer(who)} />}
               {shownTab === 'goals' && (
                 <>

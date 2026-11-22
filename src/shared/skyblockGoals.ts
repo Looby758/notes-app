@@ -52,7 +52,7 @@ export interface SbData {
 }
 
 /** The recipe book's format; an older saved file is downloaded again. */
-export const SB_DATA_VERSION = 4
+export const SB_DATA_VERSION = 6
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
