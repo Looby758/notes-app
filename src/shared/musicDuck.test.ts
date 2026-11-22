@@ -32,6 +32,10 @@ describe('who is talking', () => {
     expect(friendsTalking(status([member('me'), member('loud', { speaking: true, localMute: true })]))).toBe(false)
     expect(friendsTalking(status([]))).toBe(false)
   })
+  it('dips for you too when that is on', () => {
+    expect(friendsTalking(status([member('me', { speaking: true }), member('sam')]), true)).toBe(true)
+    expect(friendsTalking(status([member('me', { speaking: true })], true), true)).toBe(false)
+  })
   it('not while deafened or out of a call', () => {
     expect(friendsTalking(status([member('sam', { speaking: true })], true))).toBe(false)
     expect(friendsTalking({ me: null, deaf: false, channel: null })).toBe(false)

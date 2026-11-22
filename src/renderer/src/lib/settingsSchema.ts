@@ -911,7 +911,7 @@ export const SETTINGS: SettingDef[] = [
     section: 'studio',
     group: 'Discord voice',
     type: 'toggle',
-    label: 'Turn music down while friends talk',
+    label: 'Turn music down while people talk',
     description: 'In a Discord call, your music dips while someone else is speaking and comes back up a moment after they stop. Needs Discord connected in Orbit.',
     keywords: 'duck ducking dip lower music volume spotify discord talk speaking friends mixer auto'
   },
@@ -924,6 +924,15 @@ export const SETTINGS: SettingDef[] = [
     format: pct,
     label: 'Music volume while they talk',
     keywords: 'duck dip level how quiet'
+  },
+  {
+    key: 'duckWhenITalk',
+    section: 'studio',
+    group: 'Discord voice',
+    type: 'toggle',
+    label: 'Dip it when I talk too',
+    description: 'Not only while friends talk: also while Discord is sending your voice.',
+    keywords: 'duck dip my voice me talking speaking'
   },
   {
     key: 'duckSpotify',

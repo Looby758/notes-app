@@ -114,6 +114,24 @@ describe('music dipping', () => {
     expect(spotifyVolume).toBe(80)
   })
 
+  it('dips when you talk, unless that is turned off', async () => {
+    const meTalking = (on: boolean): DiscordStatus =>
+      ({ me: { id: 'me', name: 'Me' }, deaf: false, channel: { id: 'c', name: 'General', server: null, joinedAt: 0, members: [member('me', on), member('sam', false)] } }) as unknown as DiscordStatus
+    listener!(meTalking(true))
+    await vi.advanceTimersByTimeAsync(600)
+    expect(spotifyVolume).toBe(24)
+    listener!(meTalking(false))
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(spotifyVolume).toBe(80)
+
+    prefs = { ...prefs, duckWhenITalk: false }
+    sent.length = 0
+    listener!(meTalking(true))
+    await vi.advanceTimersByTimeAsync(600)
+    expect(sent).toEqual([])
+    expect(spotifyVolume).toBe(80)
+  })
+
   it('leaves Spotify alone when only Orbit’s music is picked', async () => {
     prefs = { ...prefs, duckSpotify: false }
     listener!(call(true))

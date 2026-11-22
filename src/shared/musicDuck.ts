@@ -14,12 +14,14 @@ export const DUCK_DOWN_MS = 250
 export const DUCK_UP_MS = 900
 
 /**
- * Whether someone other than you is talking in your call. Bots are left out (a music bot isn't
- * someone talking), so are people you've muted for yourself, and nothing dips while you're deafened.
+ * Whether someone is talking in your call: a friend, or you too when `includeMe` (Discord only says
+ * you're speaking when it's actually sending your voice, so not while you're muted). Bots are left
+ * out (a music bot isn't someone talking), so are people you've muted for yourself, and nothing
+ * dips while you're deafened.
  */
-export function friendsTalking(status: Pick<DiscordStatus, 'me' | 'channel' | 'deaf'>): boolean {
+export function friendsTalking(status: Pick<DiscordStatus, 'me' | 'channel' | 'deaf'>, includeMe = false): boolean {
   if (!status.channel || status.deaf) return false
-  return status.channel.members.some((m) => m.speaking && !m.bot && m.id !== status.me?.id && !m.localMute)
+  return status.channel.members.some((m) => m.speaking && !m.bot && !m.localMute && (includeMe || m.id !== status.me?.id))
 }
 
 /** Spotify's slider in the volume mixer: "Spotify" on Windows, mac:spotify on a Mac. */

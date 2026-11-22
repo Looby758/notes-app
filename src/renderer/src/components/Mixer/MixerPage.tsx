@@ -155,18 +155,22 @@ function DuckCard() {
   const level = usePrefs((s) => s.prefs.duckLevel)
   const spotify = usePrefs((s) => s.prefs.duckSpotify)
   const orbit = usePrefs((s) => s.prefs.duckOrbit)
+  const me = usePrefs((s) => s.prefs.duckWhenITalk)
   return (
     <section className="mixer-card mixer-duck" data-mixer-duck>
       <label className="mixer-duck-main">
         <input type="checkbox" checked={on} onChange={(e) => setPrefs({ duckMusic: e.target.checked })} />
         <MessagesSquare size={15} />
         <span>
-          <strong>Turn music down while friends talk</strong>
-          <em>In a Discord call, music dips while someone else speaks and comes back up a moment after. Needs Discord connected in Orbit.</em>
+          <strong>Turn music down while people talk</strong>
+          <em>In a Discord call, music dips while someone speaks and comes back up a moment after. Needs Discord connected in Orbit.</em>
         </span>
       </label>
       {on && (
         <div className="mixer-duck-options">
+          <label>
+            <input type="checkbox" checked={me} onChange={(e) => setPrefs({ duckWhenITalk: e.target.checked })} /> When I talk too
+          </label>
           <label>
             <input type="checkbox" checked={spotify} onChange={(e) => setPrefs({ duckSpotify: e.target.checked })} /> Spotify
           </label>

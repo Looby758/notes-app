@@ -216,6 +216,8 @@ export interface Prefs {
   duckMusic: boolean
   /** How loud the music goes while they talk, as a fraction of its normal volume (0.1–0.8). */
   duckLevel: number
+  /** Dip it while you talk too, not only friends. */
+  duckWhenITalk: boolean
   /** Which music: Spotify (its own app) and Orbit's own music player. */
   duckSpotify: boolean
   duckOrbit: boolean
@@ -362,6 +364,7 @@ export const DEFAULT_PREFS: Prefs = {
   discordPopoutPrompt: true,
   duckMusic: true,
   duckLevel: 0.3,
+  duckWhenITalk: true,
   duckSpotify: true,
   duckOrbit: true,
   closeToTray: true,

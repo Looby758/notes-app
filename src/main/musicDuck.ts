@@ -7,8 +7,8 @@ import { mixerSet, mixerState } from './mixer'
 import { logError } from './log'
 
 /**
- * Music dipping (shared/musicDuck.ts): while a friend talks in your Discord call, your music goes
- * down, and back up a moment after they stop.
+ * Music dipping (shared/musicDuck.ts): while a friend (or you, if that's on) talks in your Discord
+ * call, your music goes down, and back up a moment after they stop.
  *
  * - Orbit's own music: the window turns its player down smoothly (store/localMusic.ts), told by
  *   'music:duck' with the level (1 = normal).
@@ -91,7 +91,7 @@ function clearRelease(): void {
 /** Discord changed (someone started or stopped talking, you joined or left). */
 function onStatus(status: DiscordStatus): void {
   const on = getPrefs().duckMusic && (getPrefs().duckSpotify || getPrefs().duckOrbit)
-  const talking = on && friendsTalking(status)
+  const talking = on && friendsTalking(status, getPrefs().duckWhenITalk)
   if (talking) {
     clearRelease()
     if (!ducked) void dip()
