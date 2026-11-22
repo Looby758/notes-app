@@ -12,7 +12,15 @@ const constants = {
   trophyfish: { BLOBFISH: [1] }
 }
 const acc = (id: string, rarity: string): unknown => ({ internalname: id, lore: ['', `§l${rarity} ACCESSORY`] })
-const itemFiles = [acc('ZOMBIE_TALISMAN', 'COMMON'), acc('ZOMBIE_RING', 'UNCOMMON'), acc('ZOMBIE_ARTIFACT', 'RARE'), acc('SPEED_TALISMAN', 'COMMON'), acc('SPEED_RING', 'UNCOMMON'), acc('BAT_TALISMAN', 'RARE'), acc('IGNORED_ONE', 'COMMON')]
+const itemFiles = [
+  acc('ZOMBIE_TALISMAN', 'COMMON'),
+  acc('ZOMBIE_RING', 'UNCOMMON'),
+  acc('ZOMBIE_ARTIFACT', 'RARE'),
+  acc('SPEED_TALISMAN', 'COMMON'),
+  acc('SPEED_RING', 'UNCOMMON'),
+  acc('BAT_TALISMAN', 'RARE'),
+  acc('IGNORED_ONE', 'COMMON')
+]
 const data: SbData = {
   at: 1,
   items: {},
@@ -47,7 +55,11 @@ describe('levels', () => {
 
 describe('profileView', () => {
   const nbtOf = (list: unknown[]): string => JSON.stringify({ i: list })
-  const slot = (id: string, name: string, rarity: string, kind = 'ACCESSORY'): unknown => ({ Count: 1, id: 'minecraft:stone', tag: { ExtraAttributes: { id }, display: { Name: name, Lore: ['', `§l${rarity} ${kind}`] } } })
+  const slot = (id: string, name: string, rarity: string, kind = 'ACCESSORY'): unknown => ({
+    Count: 1,
+    id: 'minecraft:stone',
+    tag: { ExtraAttributes: { id }, display: { Name: name, Lore: ['', `§l${rarity} ${kind}`] } }
+  })
   const decode = (s: string): unknown => JSON.parse(s)
   const me = {
     player_data: { experience: { SKILL_FARMING: 175, SKILL_COMBAT: 50 }, crafted_generators: ['WHEAT_1', 'WHEAT_3'] },
@@ -63,7 +75,11 @@ describe('profileView', () => {
     bestiary: { kills: { zombie_1: 15, zombie_5: 10 } },
     pets_data: { pets: [{ type: 'BEE', tier: 'RARE', exp: 250, active: true }] }
   }
-  const body = { profiles: [{ profile_id: 'p', cute_name: 'Mango', game_mode: 'ironman', selected: true, members: { abc: me, other: { player_data: { crafted_generators: ['WHEAT_2', 'SNOW_1'] } } } }] }
+  const body = {
+    profiles: [
+      { profile_id: 'p', cute_name: 'Mango', game_mode: 'ironman', selected: true, members: { abc: me, other: { player_data: { crafted_generators: ['WHEAT_2', 'SNOW_1'] } } } }
+    ]
+  }
 
   it('reads levels, gear, accessories, pets, collections, minions and bestiary', () => {
     const v = profileView(body, 'abc', '', 1, data, decode, { garden: { garden: { garden_experience: 140, resources_collected: { WHEAT: 40 } } } })!
@@ -95,6 +111,21 @@ describe('profileView', () => {
     expect(v.hidden.join(' ')).toMatch(/Inventory API/)
     expect(v.hidden.join(' ')).toMatch(/Collections API/)
     expect(v.gear).toBeNull()
+  })
+
+  it('puts the set you’re wearing back in its wardrobe slot', () => {
+    const page = Array(36).fill(null)
+    page[1] = slot('OTHER_HAT', '§fOther Hat', 'COMMON', 'HELMET') // slot 2, helmet row
+    const wearing = { ...me, inventory: { ...me.inventory, wardrobe_equipped_slot: 1, wardrobe_contents: { data: nbtOf(page) } } }
+    const v = profileView({ profiles: [{ profile_id: 'p', members: { abc: wearing } }] }, 'abc', '', 1, data, decode)!
+    expect(v.gear?.wardrobe.map((w) => [w.slot, w.pieces.map((p) => p?.id ?? null)])).toEqual([
+      [1, ['HAT', null, null, 'BOOTS']],
+      [2, ['OTHER_HAT', null, null, null]]
+    ])
+    expect(v.gear?.wardrobeEquipped).toBe(1)
+    // Only the worn set, nothing else in the wardrobe.
+    const only = { ...me, inventory: { ...me.inventory, wardrobe_equipped_slot: 3, wardrobe_contents: { data: nbtOf(Array(36).fill(null)) } } }
+    expect(profileView({ profiles: [{ profile_id: 'p', members: { abc: only } }] }, 'abc', '', 1, data, decode)!.gear?.wardrobe.map((w) => w.slot)).toEqual([3])
   })
 
   it('keeps empty slots so wardrobe and grids line up', () => {

@@ -605,6 +605,12 @@ export function profileView(
       .filter((s) => s.count > 0)
       .sort((a, b) => b.count - a.count)
     const armor = decodeAll(inv.inv_armor, decode, extra.iconOf).reverse()
+    // The set you're wearing isn't in the wardrobe's data (its slot is empty while it's on you), so it's put back in its slot.
+    const equipped = num(inv.wardrobe_equipped_slot)
+    if (equipped && equipped > 0 && armor.some(Boolean) && !wardrobe.some((w) => w.slot === equipped)) {
+      wardrobe.push({ slot: equipped, pieces: [0, 1, 2, 3].map((i) => armor[i] ?? null) })
+      wardrobe.sort((a, b) => a.slot - b.slot)
+    }
     gear = {
       armor,
       equipment: decodeAll(inv.equipment_contents, decode, extra.iconOf),
