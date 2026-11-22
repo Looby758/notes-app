@@ -67,11 +67,23 @@ jobs:
           if xattr -p com.apple.quarantine /Applications/Orbit.app 2>/dev/null; then echo 'FAIL: still marked from the internet'; exit 1; fi
           echo 'PASS: no "downloaded from the internet" mark'
           codesign --verify --deep --strict /Applications/Orbit.app && echo 'PASS: signature intact'
+          # The new version tidies away the downloaded update when it starts up properly.
+          for i in $(seq 1 24); do
+            ls ~/Library/Application\ Support/*/pending-update/last-install.txt >/dev/null 2>&1 || break
+            sleep 5
+          done
+          if ls ~/Library/Application\ Support/*/pending-update/last-install.txt 2>/dev/null; then
+            echo 'FAIL: the new version did not finish starting up'; exit 1
+          fi
+          echo 'PASS: the new version started up and cleaned up the download'
 
       - name: Logs
         if: always()
         run: |
           cat results/first-run.log || true
+          ls -d ~/Library/Application\ Support/*/ || true
+          pgrep -fl Orbit || true
+          log show --last 3m --predicate 'process == "Orbit"' --style compact 2>/dev/null | tail -40 || true
           ls -la ~/Library/Application\ Support/*/pending-update 2>/dev/null || true
           cat ~/Library/Application\ Support/*/pending-update/last-install.txt 2>/dev/null || true
           pkill -f /Applications/Orbit.app || true
