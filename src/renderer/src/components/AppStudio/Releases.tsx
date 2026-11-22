@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ClipboardCopy, GitBranch, ExternalLink, Hammer, Loader2, RefreshCw, Rocket, Sparkles, Tag, Upload, Wand2 } from 'lucide-react'
-import { boardKey, bumpVersion, describeChange, isTokenPermissionError, changelogSource, notesTarget, plainChangelog, timeAgo, VERSION_BUMPS, type Release, type VersionBump } from '@shared/appStudio'
+import { AlertTriangle, ClipboardCopy, Download, EyeOff, Eye, Undo2, GitBranch, ExternalLink, Hammer, Loader2, RefreshCw, Rocket, Sparkles, Tag, Upload, Wand2 } from 'lucide-react'
+import { boardKey, bumpVersion, rollbackVersion, countText, describeChange, downloadsByPlatform, downloadsSince, isTokenPermissionError, changelogSource, notesTarget, plainChangelog, timeAgo, VERSION_BUMPS, type Release, type VersionBump } from '@shared/appStudio'
 import { useTerminals, type TerminalProject } from '../../store/terminals'
 import { refreshApps, setSection, useAppStudio } from '../../store/appStudio'
-import { lastRelease, loadReleases, putRelease, setNotes, setReleasesApp, useAppReleases } from '../../store/appReleases'
-import { commitChanges, releaseApp, runProjectCommand, stashChanges, switchBranch } from '../../lib/terminal'
+import { downloadDay, lastRelease, loadReleases, putRelease, setNotes, setReleasesApp, totalDownloads, useAppReleases } from '../../store/appReleases'
+import { commitChanges, releaseApp, rollBack, runProjectCommand, stashChanges, switchBranch } from '../../lib/terminal'
 import { notify } from '../../store/notify'
 import TokenProblem from './TokenProblem'
 import { errorMessage } from '../../lib/paths'
@@ -72,31 +72,34 @@ function AppReleases({ project, repo }: { project: TerminalProject; repo?: strin
           </section>
         )}
       </div>
-      <section className="appstudio-card releases-list">
-        <div className="appstudio-card-top">
-          <h3>Releases</h3>
-          <span className="board-spacer" />
-          {repo && (
-            <button className="icon-btn" title="Check GitHub again" onClick={() => void loadReleases(repo)} disabled={loading}>
-              {loading ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />}
-            </button>
+      <div className="releases-side">
+        {repo && data && !data.error && <Downloads repo={repo} releases={data.releases} />}
+        <section className="appstudio-card releases-list">
+          <div className="appstudio-card-top">
+            <h3>Releases</h3>
+            <span className="board-spacer" />
+            {repo && (
+              <button className="icon-btn" title="Check GitHub again" onClick={() => void loadReleases(repo)} disabled={loading}>
+                {loading ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />}
+              </button>
+            )}
+          </div>
+          {!repo && <p className="muted">Releases are read from GitHub, and this app’s folder isn’t on GitHub.</p>}
+          {data?.error && <div className="appstudio-error">{data.error}</div>}
+          {repo && data && !data.error && !data.releases.length && <p className="muted">No releases on GitHub yet.</p>}
+          {repo && !data && loading && (
+            <p className="muted">
+              <Loader2 size={13} className="spin" /> Checking GitHub…
+            </p>
           )}
-        </div>
-        {!repo && <p className="muted">Releases are read from GitHub, and this app’s folder isn’t on GitHub.</p>}
-        {data?.error && <div className="appstudio-error">{data.error}</div>}
-        {repo && data && !data.error && !data.releases.length && <p className="muted">No releases on GitHub yet.</p>}
-        {repo && !data && loading && (
-          <p className="muted">
-            <Loader2 size={13} className="spin" /> Checking GitHub…
-          </p>
-        )}
-        {data?.releases.map((r) => <ReleaseRow key={r.tag} release={r} />)}
-      </section>
+          {data?.releases.map((r) => <ReleaseRow key={r.tag} release={r} project={project} repo={repo} releases={data.releases} />)}
+        </section>
+      </div>
     </div>
   )
 }
 
-function ReleaseRow({ release }: { release: Release }) {
+function ReleaseRow({ release, project, repo, releases }: { release: Release; project: TerminalProject; repo?: string; releases: Release[] }) {
   return (
     <details className="release-row">
       <summary>
@@ -105,12 +108,178 @@ function ReleaseRow({ release }: { release: Release }) {
         {release.draft && <span className="appstudio-chip muted">Draft</span>}
         {release.prerelease && <span className="appstudio-chip muted">Pre-release</span>}
         <span className="muted">{timeAgo(release.date)}</span>
+        {!release.draft && !!release.files?.length && (
+          <span className="release-downloads" title={`Downloaded ${(release.downloads ?? 0).toLocaleString('en-GB')} times`}>
+            <Download size={11} /> {countText(release.downloads ?? 0)}
+          </span>
+        )}
         <a className="link-button" href={release.url} target="_blank" rel="noreferrer" title="Open on GitHub" onClick={(e) => e.stopPropagation()}>
           <ExternalLink size={12} />
         </a>
       </summary>
+      {!release.draft && !!release.files?.length && (
+        <div className="release-platforms">
+          {downloadsByPlatform(release.files).map((p) => (
+            <span key={p.platform} className="appstudio-chip muted">
+              {p.platform} {countText(p.downloads)}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="release-notes">{release.body.trim() || 'No notes.'}</div>
+      {repo && !release.draft && <RollBack release={release} project={project} repo={repo} releases={releases} />}
     </details>
+  )
+}
+
+/**
+ * How many times the app has been downloaded: the total, the last week and month (from the totals
+ * Orbit notes each day you look), and a bar for each recent release. GitHub counts every download
+ * of an installer, so updates the app installs by itself count too.
+ */
+function Downloads({ repo, releases }: { repo: string; releases: Release[] }) {
+  const history = useAppReleases((s) => s.history[repo])
+  const published = releases.filter((r) => !r.draft && r.files?.length)
+  if (!published.length) return null
+  const day = downloadDay()
+  const week = downloadsSince(history ?? [], 7, day)
+  const month = downloadsSince(history ?? [], 30, day)
+  const bars = published.slice(0, 12).reverse()
+  const most = Math.max(1, ...bars.map((r) => r.downloads ?? 0))
+  const latest = published[0]
+  const waiting = 'Orbit notes the total each day you open Releases, so this fills in after a while'
+  return (
+    <section className="appstudio-card release-stats">
+      <div className="appstudio-card-top">
+        <Download size={16} />
+        <h3>Downloads</h3>
+      </div>
+      <div className="release-stat-row">
+        <div>
+          <strong>{countText(totalDownloads(published))}</strong>
+          <span className="muted">in all</span>
+        </div>
+        <div>
+          <strong>{countText(latest.downloads ?? 0)}</strong>
+          <span className="muted">of {latest.name}</span>
+        </div>
+        <div title={week === null ? waiting : undefined}>
+          <strong>{week === null ? '–' : countText(week)}</strong>
+          <span className="muted">this week</span>
+        </div>
+        <div title={month === null ? waiting : undefined}>
+          <strong>{month === null ? '–' : countText(month)}</strong>
+          <span className="muted">this month</span>
+        </div>
+      </div>
+      <div className="release-bars" role="img" aria-label="Downloads of each release">
+        {bars.map((r) => (
+          <div key={r.tag} className="release-bar" title={`${r.name}: ${(r.downloads ?? 0).toLocaleString('en-GB')} downloads`}>
+            <span className="release-bar-count">{countText(r.downloads ?? 0)}</span>
+            <span className="release-bar-fill" style={{ height: `${Math.max(2, ((r.downloads ?? 0) / most) * 75)}%` }} />
+            <span className="release-bar-tag">{r.tag.replace(/^v/, '')}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/**
+ * Going back from a bad release. The newest one can be hidden from new downloads (marked as a
+ * pre-release, so GitHub's "latest" and apps that update themselves skip it). An earlier one can
+ * be released again as a new version, so everyone's app updates to it.
+ */
+function RollBack({ release, project, repo, releases }: { release: Release; project: TerminalProject; repo: string; releases: Release[] }) {
+  const info = useAppStudio((s) => s.info[project.folder])
+  const github = useAppStudio((s) => s.github)
+  const [confirm, setConfirm] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [tokenProblem, setTokenProblem] = useState('')
+  const published = releases.filter((r) => !r.draft && !r.prerelease)
+  const latest = published[0]
+  const isLatest = latest?.tag === release.tag
+  const newer = published.findIndex((r) => r.tag === release.tag) > 0
+  const next = rollbackVersion(info?.version, releases)
+  const dirty = (info?.changedFiles ?? 0) > 0
+  const main = info?.mainBranch ?? 'main'
+  const offMain = !!info?.branch && info.branch !== main
+
+  const hide = async (prerelease: boolean): Promise<void> => {
+    setBusy(true)
+    try {
+      putRelease(repo, await window.api.appsSetPrerelease(repo, release.tag, prerelease))
+      notify(prerelease ? `${release.name} is hidden. New downloads and updates get the release before it.` : `${release.name} is the latest release again.`, 'info')
+      setTokenProblem('')
+    } catch (err) {
+      const message = errorMessage(err)
+      if (isTokenPermissionError(message)) setTokenProblem(message)
+      else notify(err)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const goBack = (): void => {
+    if (!next) return
+    if (!confirm) {
+      setConfirm(true)
+      return
+    }
+    setConfirm(false)
+    rollBack(project, release.tag, next)
+    notify(`Releasing v${next} with ${release.name}’s code. GitHub builds it like any other release.`, 'info')
+    window.setTimeout(() => void refreshApps(), 8000)
+  }
+
+  if (release.prerelease) {
+    return (
+      <div className="release-rollback">
+        <span className="muted">A pre-release: new downloads and updates skip it.</span>
+        {github?.connected && (
+          <button className="btn" disabled={busy} onClick={() => void hide(false)}>
+            {busy ? <Loader2 size={13} className="spin" /> : <Eye size={13} />} Make it the latest again
+          </button>
+        )}
+      </div>
+    )
+  }
+  return (
+    <div className="release-rollback">
+      {isLatest && (
+        <>
+          <span className="muted">Something wrong with this release? Hide it so new downloads and updates get the one before it, then go back to an earlier release below.</span>
+          {github?.connected ? (
+            <button className="btn" disabled={busy || published.length < 2} title={published.length < 2 ? 'There’s no earlier release to fall back on' : 'Marks it as a pre-release on GitHub. You can undo this.'} onClick={() => void hide(true)}>
+              {busy ? <Loader2 size={13} className="spin" /> : <EyeOff size={13} />} Hide from new downloads
+            </button>
+          ) : (
+            <span className="muted">
+              <button className="link-button" onClick={() => setSection('pulls')}>
+                Connect GitHub
+              </button>{' '}
+              to hide it from here.
+            </span>
+          )}
+        </>
+      )}
+      {newer && next && (
+        <>
+          <span className="muted">
+            Go back to this version: Orbit puts {release.name}’s code back and releases it as v{next}, so everyone’s app updates to it. Nothing is lost; the newer work stays in git’s history.
+          </span>
+          {(dirty || offMain) && (
+            <span className="release-rollback-warn">
+              <AlertTriangle size={12} /> {dirty ? 'Commit or put away the changed files first (in Next release).' : `Switch to ${main} first (in Next release).`}
+            </span>
+          )}
+          <button className={`btn${confirm ? ' appstudio-confirm' : ''}`} disabled={dirty || offMain} onClick={goBack} onBlur={() => setConfirm(false)}>
+            <Undo2 size={13} /> {confirm ? `Release v${next} with ${release.name}’s code?` : `Go back to ${release.name}`}
+          </button>
+        </>
+      )}
+      {tokenProblem && <TokenProblem message={tokenProblem} owner={repo.split('/')[0]} onDone={() => setTokenProblem('')} />}
+    </div>
   )
 }
 

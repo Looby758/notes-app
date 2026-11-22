@@ -60,11 +60,13 @@ import {
   parentPath,
   describeCount,
   describeFolderSize,
+  describeDriveSpace,
   previewKind,
   PC_SEARCH_LIMIT,
   SEARCH_LIMIT,
   sortEntries,
   whereIn,
+  type DriveSpace,
   type ExplorerEntry,
   type ExplorerPlace,
   type ExplorerSort,
@@ -75,7 +77,7 @@ import type { BinItem, BinListing } from '@shared/recycleBin'
 import { sharedTags, TAG_COLOURS, TAG_DEFAULT_NAMES, TAG_HEX, tagCounts, tagName, type FileTagStore, type TagColour } from '@shared/fileTags'
 import { loadFileTags, moveFavourite, toggleFavourite, useFileTags } from '../../store/fileTags'
 import { useFilesPcSearch } from '../../store/filesReveal'
-import { FILE_MANAGER, TRASH_NAME } from '@shared/platform'
+import { FILE_MANAGER, IS_MAC, TRASH_NAME } from '@shared/platform'
 import { computerPaths, dragFilesOut, getDrag, getTreeDrag, setDrag, setTreeDrag } from '../../lib/dnd'
 import { recordUndo, undoChanged, useUndoChanges } from '../../lib/undo'
 import { explorerStartDirs, openExplorerTab, openFileTab, openNote, EXPLORER_TAB } from '../../lib/editorController'
@@ -198,6 +200,8 @@ async function recordDeleted(paths: string[]): Promise<void> {
 export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFocus?: boolean; tab?: string }) {
   const mine = rememberedFor(tab)
   const [places, setPlaces] = useState<ExplorerPlace[]>([])
+  /** How full each drive is, by its path (read again on Refresh, after file changes, on coming back to Orbit and each minute). */
+  const [driveSpace, setDriveSpace] = useState<Record<string, DriveSpace | null>>({})
   const tags = useFileTags()
   const pins = tags.favourites
   /** Showing everything with this colour tag, from all over the computer. */
@@ -456,6 +460,19 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
     window.api.explorerFolderSizes(shownDirs, fresh).catch(() => undefined)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shownDirsKey, reload])
+  // How full the drives are: again on Refresh and after each change here, on coming back to the window, and once a minute.
+  useEffect(() => {
+    let live = true
+    const read = (): void => void window.api.explorerDriveSpace().then((s) => live && setDriveSpace(s)).catch(() => undefined)
+    read()
+    const timer = setInterval(read, 60_000)
+    window.addEventListener('focus', read)
+    return () => {
+      live = false
+      clearInterval(timer)
+      window.removeEventListener('focus', read)
+    }
+  }, [reload, places])
   // Leaving the Files tab stops any counting.
   useEffect(() => () => void window.api.explorerFolderSizes([]).catch(() => undefined), [])
   const current = shown.find((e) => e.path === selected) ?? null
@@ -1006,7 +1023,7 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
       {...dropProps(path)}
     >
       <Icon size={15} />
-      <span>{label}</span>
+      {kind === 'drive' && driveSpace[path] ? <DriveLabel label={label} space={driveSpace[path]!} /> : <span>{label}</span>}
     </button>
   )
 
@@ -1695,4 +1712,19 @@ function FolderSizeText({ size }: { size: FolderSize | null | undefined }) {
   if (!size) return <span className="explorer-size-counting" title="Adding up everything inside…">…</span>
   if (size.counting) return <span className="explorer-size-counting" title="Still adding it up">{describeBytes(size.bytes)}…</span>
   return <span title={`${size.files.toLocaleString()} files in ${size.folders.toLocaleString()} folders${size.complete ? '' : '. Some of it is private to the system, so it’s at least this big.'}`}>{describeFolderSize(size)}</span>
+}
+
+/** A drive in the Drives list: its name, a bar of how full it is (red when nearly full) and "120 GB free of 476 GB". */
+function DriveLabel({ label, space }: { label: string; space: DriveSpace }) {
+  // File Explorer counts in 1024s and Finder in 1000s: match the one this computer uses.
+  const d = describeDriveSpace(space, !IS_MAC)
+  return (
+    <span className="explorer-drive" title={d.title} data-explorer-drive-space>
+      <span className="explorer-drive-name">{label}</span>
+      <span className={`explorer-drive-bar ${d.low ? 'low' : ''}`} role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(d.usedPercent)} aria-label={`${label}: ${d.text}`}>
+        <span style={{ width: `${d.usedPercent}%` }} />
+      </span>
+      <span className="explorer-drive-free">{d.text}</span>
+    </span>
+  )
 }

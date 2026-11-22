@@ -76,6 +76,15 @@ export function startItem(app: string, kind: BoardItem['kind'], pictures: string
   useAppBoard.setState({ app, editing: { id: newId(), app, kind, title: '', details: '', column: 'ideas', pictures, created: t, updated: t } })
 }
 
+/** Puts a finished idea or bug straight on the board (a health check's card, a report from someone using the app). */
+export function addItem(app: string, kind: BoardItem['kind'], title: string, details: string, extra: Partial<BoardItem> = {}): BoardItem {
+  const t = now()
+  const item: BoardItem = { id: newId(), app, kind, title: title.trim(), details: details.trimEnd(), column: 'ideas', pictures: [], created: t, updated: t, ...extra }
+  useAppBoard.setState((s) => ({ items: [...s.items, item] }))
+  persist()
+  return item
+}
+
 export function editItem(item: BoardItem): void {
   useAppBoard.setState({ editing: { ...item } })
 }

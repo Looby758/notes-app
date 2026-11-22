@@ -1,0 +1,13 @@
+# The big file sender's intro server, on Cloudflare's free plan. See README.md here.
+name = "orbit-file-sender"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+# Free-plan Durable Objects have to be the SQLite kind (this one keeps nothing in it).
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]

@@ -1,6 +1,7 @@
 import { useSyncExternalStore, type ComponentType } from 'react'
 import type { Prefs } from '@shared/prefs'
 import {
+  Send,
   Ear,
   ArrowRightLeft,
   FilePen,
@@ -35,7 +36,7 @@ import {
   MessagesSquare,
   Monitor,
   SlidersVertical,
-  MonitorPlay,
+  Activity,
   MonitorUp,
   MousePointerClick,
   Moon,
@@ -84,6 +85,7 @@ import {
   COMICS_TAB,
   WIKI_TAB,
   CONVERT_TAB,
+  FILESENDER_TAB,
   PDF_EDITOR_TAB,
   STUDIO_TAB,
   APPSTUDIO_TAB,
@@ -109,6 +111,7 @@ import {
   PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
+  TASKS_TAB,
   MUSIC_TAB,
   DOWNLOADS_TAB,
   MONEY_TAB,
@@ -199,6 +202,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   publishing: { icon: Upload, run: () => openSpecialTab(PUBLISHING_TAB) },
   screens: { icon: Monitor, run: () => openSpecialTab(SCREENS_TAB) },
   mixer: { icon: SlidersVertical, run: () => openSpecialTab(MIXER_TAB) },
+  tasks: { icon: Activity, run: () => openSpecialTab(TASKS_TAB) },
   screenshots: { icon: Images, run: () => openSpecialTab(SCREENSHOTS_TAB) },
   timeline: { icon: Clock, run: () => openSpecialTab(TIMELINE_TAB) },
   flashcards: { icon: Layers, run: () => openSpecialTab(FLASHCARDS_TAB), badge: () => <FeatureBadge id="flashcards" /> },
@@ -230,7 +234,6 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   video: { icon: Film, run: () => openSpecialTab(VIDEO_TAB) },
   comics: { icon: LibraryBig, run: () => openSpecialTab(COMICS_TAB) },
   wiki: { icon: Library, run: () => openSpecialTab(WIKI_TAB) },
-  youtube: { icon: MonitorPlay, run: () => void window.api.openYouTube() },
   games: { icon: Gamepad2, run: () => openSpecialTab(GAMES_TAB) },
   'skyblock-goals': { icon: Target, run: () => openSpecialTab(SKYBLOCK_GOALS_TAB) },
   'mini-games': { icon: Joystick, run: () => openMiniGames(null) },
@@ -238,6 +241,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   'snip-picture': { icon: Crop, run: () => void startSnip('picture') },
   explorer: { icon: HardDrive, run: () => openSpecialTab(EXPLORER_TAB) },
   convert: { icon: ArrowRightLeft, run: () => openSpecialTab(CONVERT_TAB) },
+  filesender: { icon: Send, run: () => openSpecialTab(FILESENDER_TAB) },
   'pdf-editor': { icon: FilePen, run: () => openSpecialTab(PDF_EDITOR_TAB) },
   downloads: { icon: ArrowDownToLine, run: () => openSpecialTab(DOWNLOADS_TAB) },
   'offline-ai': {

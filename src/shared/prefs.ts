@@ -2,6 +2,7 @@ import { allThemes } from './themes'
 import { IS_MAC } from './platform'
 import { cleanClocks, type WorldClock } from './worldClock'
 import { cleanCountdowns, type Countdown } from './countdown'
+import { cleanEq, CROSSFADE_MAX, DEFAULT_EQ, VISUALISER_STYLES, type MusicEq, type VisualiserStyle } from './musicSound'
 
 /**
  * Everything you can customise in Settings. Stored in settings.json under "prefs", which you can
@@ -40,6 +41,12 @@ export interface Prefs {
   musicSongPopup: boolean
   /** Moving bars in the music player while your own music files play. */
   musicVisualiser: boolean
+  /** What the visualiser looks like (shared/musicSound.ts). */
+  musicVisualiserStyle: VisualiserStyle
+  /** Seconds each song fades into the next one (your own music); 0 is off. */
+  musicCrossfade: number
+  /** The equaliser for your own music. */
+  musicEq: MusicEq
   /** Soft clicks and whooshes as you use the app (lib/sounds.ts). */
   interfaceSounds: boolean
   /** How loud they are, 0 to 1. */
@@ -283,6 +290,9 @@ export const DEFAULT_PREFS: Prefs = {
   musicSpotify: true,
   musicSongPopup: true,
   musicVisualiser: true,
+  musicVisualiserStyle: 'bars',
+  musicCrossfade: 0,
+  musicEq: DEFAULT_EQ,
   interfaceSounds: true,
   interfaceSoundsVolume: 0.5,
   screensaver: true,
@@ -421,7 +431,8 @@ export const RANGES = {
   replaySeconds: { min: 10, max: 120, step: 5 },
   snipDelay: { min: 0, max: 30, step: 1 },
   duckLevel: { min: 0.1, max: 0.8, step: 0.05 },
-  scriptWpm: { min: 80, max: 250, step: 5 }
+  scriptWpm: { min: 80, max: 250, step: 5 },
+  musicCrossfade: { min: 0, max: CROSSFADE_MAX, step: 1 }
 } as const
 
 const CHOICES = {
@@ -443,7 +454,8 @@ const CHOICES = {
   songIdShortcut: IS_MAC ? ['Control+Alt+W', 'Control+Shift+W', 'Alt+Shift+W', ''] : ['Alt+Shift+W', 'Control+Alt+W', 'Super+Shift+W', ''],
   // F-keys too: they work in games, where Alt or Ctrl combinations may do something else.
   replayShortcut: IS_MAC ? ['Control+Alt+R', 'Control+Shift+R', 'F9', 'F10', ''] : ['Alt+Shift+R', 'Control+Shift+R', 'Alt+F9', 'F9', 'F10', ''],
-  replayQuality: ['720p30', '1080p30', '1080p60']
+  replayQuality: ['720p30', '1080p30', '1080p60'],
+  musicVisualiserStyle: VISUALISER_STYLES.map((v) => v.id)
 } as const
 
 /** Shortcuts offered for saving an instant replay (system-wide). */
@@ -553,6 +565,8 @@ export function normalizePrefs(raw: unknown): Prefs {
   out.homeHidden = cleanIds(input.homeHidden)
   out.worldClocks = cleanClocks(input.worldClocks)
   out.countdowns = cleanCountdowns(input.countdowns)
+  out.musicEq = cleanEq(input.musicEq)
+  out.musicCrossfade = Math.round(out.musicCrossfade)
   for (const k of ['topbarFeatures', 'dockFeatures', 'radialFeatures', 'phoneDeck'] as const) {
     out[k] = input[k] === undefined ? [...DEFAULT_PREFS[k]] : renameFeatures(cleanIds(input[k]))
   }

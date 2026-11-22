@@ -13,14 +13,15 @@ Download the latest version from the [Releases page](https://github.com/Looby758
 1. Click **Done** (or **OK**).
 2. Open **System Settings → Privacy & Security**, scroll down to the message about Orbit, and click **Open Anyway**. Confirm with your password.
 
-You only need to do that once.
+You only need to do that once. (Or, instead of those steps, run `xattr -cr /Applications/Orbit.app` in Terminal once after dragging it in.) Once Orbit has opened, it removes macOS's "downloaded from the internet" mark from itself, so macOS doesn't ask again, and updates install themselves (below), so you never download it by hand again.
 
 ## Updates
 
 Orbit checks the Releases page every few hours (Settings → About shows the result and has *Check now*).
 
-- **Windows:** a new version downloads in the background; a card in the corner offers **Restart**, or it installs the next time you quit.
-- **Mac:** Orbit tells you a new version is out and opens its download page. Install it the same way as above. (Updating itself in place needs a paid Apple certificate.)
+A new version downloads in the background; a card in the corner offers **Restart**, or it installs the next time you quit.
+
+- **Mac:** Orbit isn't signed with a paid Apple certificate, so macOS's own updater won't install updates for it. Orbit does it itself: it downloads the zip for your kind of Mac, checks it against the checksum the release publishes, and swaps itself for the new copy as it quits. The first time, macOS may say Orbit was prevented from modifying apps: allow it under **System Settings → Privacy & Security → App Management** and check again. If Orbit can't replace itself (for example it's running from the disk image), it opens the download page instead. Because the app isn't signed with a paid certificate, macOS sees each new version as a different app: the first time a new version opens, the Keychain asks for your Mac password so Orbit can read its saved sign-ins (type it and press **Always Allow**), and permissions such as the microphone or Accessibility may need allowing again.
 
 ## Syncing with Google Drive
 
@@ -160,7 +161,7 @@ Press the phone button at the top (or Ctrl+K → *Phone: connect your phone*) an
 
 - **Send**: photos, videos and files go into the note you have open (or the attachments folder).
 - **Clipboard**: see what's copied on the computer and copy it to the phone, or paste something on the phone and send it to the computer's clipboard.
-- **Remote**: play/pause and skip music, and control the YouTube mini window (±10 seconds, play/pause, next).
+- **Remote**: play/pause and skip music.
 - **Touchpad**: drag to move the pointer, tap to click, two fingers to right-click or scroll, and type on the computer from the phone's keyboard. On a Mac, allow Notes under System Settings → Privacy & Security → Accessibility the first time.
 - **Talk**: tap the microphone on the phone's keyboard and talk; the words appear in the open note as you speak.
 - **Scan**: take a photo of a page, drag the corners onto it, and it's straightened and cleaned up into the open note. **Add receipt to Money** reads the shop, total and date and adds it as spending.
@@ -180,6 +181,18 @@ Use one mouse and keyboard on a Windows PC and a Mac side by side, both running 
 - **Ctrl works as ⌘ on the Mac** (so Ctrl+C, Ctrl+V and Ctrl+Z work the same on both); you can turn this off in the Mac's Orbit settings.
 - On a Mac, allow Orbit under System Settings → Privacy & Security → **Accessibility** so the PC's mouse can work there, and allow it on the local network when asked. Windows asks once whether Orbit may accept connections: allow it on private networks.
 - Everything goes straight between the two computers over your Wi-Fi, encrypted with keys only they know (what you type is passwords too). Nothing goes through the internet.
+## Big file sender
+
+Send huge files or whole folders (a game folder, a long recording) to a friend's computer anywhere, with no size limit. Open **Big file sender** (Ctrl+K → "Big file sender"), drop the files on **Send**, and you get a code like `4821-tiger-piano-river`. Your friend types it under **Get** in their Orbit, sees who it's from and how big it is, and presses **Accept** (it saves in Downloads, or wherever they choose).
+
+- The files go straight from your computer to theirs (over your home network if you're on the same Wi-Fi). If a router or school Wi-Fi blocks that, they go through a relay instead. Either way they're locked end to end: only the computer with the code can open them.
+- If the connection drops, it carries on where it stopped. If Orbit closes part-way, press **Carry on** on both computers.
+- Your computer won't go to sleep while it's sending. Orbit checks there's enough space first, and warns your friend if the send includes programs (.exe and so on).
+- A code works once. Your friend has a day to type it in; once they accept, it takes as long as it needs. If someone types a wrong code three times, that code stops working.
+- **Google Drive link**, for a friend without Orbit: Orbit uploads to your Google Drive and gives you a normal link (anyone with it can download). It's taken off your Drive after 7 days, or press ✕ to remove it sooner. It uses the Google sign-in from Settings → Calendar; also switch on the **Google Drive API** in the same Google Cloud project. Free Drive space is 15 GB.
+
+Sending with a code needs a small free "intro server" that introduces the two computers (it never sees the files). Orbit sets it up for you on a free Cloudflare account: open Big file sender and follow **Set up sending with a code** (only one of you needs to; the other pastes the address it gives). To do it by hand instead, see [server/file-sender/README.md](server/file-sender/README.md).
+
 ## Files tab: Whole PC search, colour tags and favourites
 
 **Whole PC search.** In the Files tab, pick **Whole PC** next to the search box (or Ctrl+K → "Search the whole PC") and results show as you type, from every drive, like the Everything app. Orbit keeps a list of every file *name* (never what's in the files) in `file-index.json.gz` in the settings folder. The first time, it takes a minute or two to walk the drives in the background; after that the saved list answers straight away at launch, files you make, rename or delete show up within a couple of seconds, and the drives are walked again quietly at each launch to catch anything missed while Orbit was closed. System folders and app clutter are left out (Windows, ProgramData, AppData, `~/Library`, `node_modules`, caches and dot folders). On a Mac the list covers your home folder, Applications and other drives, and Spotlight's results are added in too. On Windows, if you have [Everything](https://www.voidtools.com/) with its command-line helper `es.exe` installed in its folder, its results are added in as well. **Subfolders** search uses the same list when it can, so it's instant too. Turn it off in **Settings → Files → Whole PC search**.
@@ -258,7 +271,6 @@ Orbit never makes notes for you: you choose what goes where. Where you're up to 
 - **Web browser tab** (Ctrl+Shift+I, or the globe at the top) — browse the web beside a note in split view. Pages run walled off from your notes and the app. More in [Web browser](#web-browser) below.
 - **PDF editor** (*PDF editor* in Ctrl+K or All features, or **Edit PDF** on a PDF in Files or the notes folder) — sign, fill in, join, split and reorder PDFs on your own computer. **Sign** by drawing with the mouse, touchpad or a pen, or by typing your name in a handwriting font; tick *Remember it* and next time *Sign* puts it straight on the page. Drag it where it goes and pull its corner to resize it. **Fill in forms** by typing straight into the boxes on the page (or in the list beside it); *Lock the answers when saving* makes them part of the page so they can't be changed. PDFs without boxes can still be filled in with **Text** and **Date**. **Merge** by adding more PDFs (or dropping them in), then drag the pages into order; turn, copy or take out pages, and Ctrl+Z undoes. **Split** into single pages, every few pages, or just the pages you type (`1-3, 5`), or pick pages and *Save as a PDF*. PDFs with a password open once you type it, and the copy you save doesn't need it. Your original PDFs are never changed: Save makes a new file.
 - **Video player** (*Video player* in Ctrl+K or All features, or open a video from Files or the notes folder) — plays any video on your computer: MP4, MKV, AVI, WMV, MOV, FLV, TS and more. MP4s and most MKVs play straight away; for the rest (and for MKVs with Dolby/DTS sound, a choice of sound tracks, or their own subtitles) the player uses ffmpeg, the same free one-time download (about 25 MB) as Convert files and the Studio. Those are converted as they play, nothing is saved, and only the sound is converted when the picture can play as it is. **Subtitles**: a subtitle file beside the video with the same name (`Film.srt`, `Film.en.srt`) is used automatically, or pick one (SRT, VTT, ASS/SSA), drop one on the video, or choose one of the video's own tracks; the **Timing** buttons fix subtitles that are early or late. **Speed** from 0.25× to 3× (`[` and `]`). Every video **carries on where you stopped** and remembers its sound track, subtitles and speed; the player's first page lists them under *Carry on watching*. Keys: Space or K play/pause, ← → 5 seconds, J L 10 seconds, ↑ ↓ volume, M mute, F full screen, C subtitles on/off, 0–9 jump to 0–90%.
-- **YouTube mini window** (Ctrl+Alt+Y, or the screen-with-a-play-button at the top) — YouTube in a small window that floats over everything (other apps too), so a video keeps playing in the corner while you work. Drag it by its top bar and resize it from the edges. Search or paste a link at the top; on a video it shows just the video (the square button switches back to the whole page), and the pin button stops it floating on top. You're signed in to YouTube if you are in the web tabs. Watching a YouTube video in a web tab? Its play button carries it on in the mini window from where you were. Closing the window remembers the video and the spot, so it picks up there next time.
 - **Random note**, **related notes** (under Backlinks, with the reason), and **on this day** (notes from this date in past months and years, in the calendar panel).
 - **Banners and icons** — give a note a banner image or colour and an emoji icon, shown above the title and in the file list.
 - **App icon** — pick from several designs (including green) in Settings → Appearance. On Windows it also goes on the Start menu, desktop and pinned taskbar shortcuts.
@@ -328,7 +340,6 @@ All of these can be changed in **Settings → Shortcuts**. On a Mac, Ctrl is **�
 | Ctrl+Shift+D | Today's daily note |
 | Ctrl+Shift+C | Calendar |
 | Ctrl+Shift+G | Graph |
-| Ctrl+Alt+Y | YouTube mini window |
 | Ctrl+Shift+P | Export the current note |
 | Ctrl+Alt+\\ / Ctrl+Alt+- | Split right / split down |
 | Ctrl+Alt+→ / Ctrl+Alt+← | Next / previous pane |

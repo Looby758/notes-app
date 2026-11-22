@@ -17,7 +17,6 @@ import {
   Globe,
   Languages,
   Loader2,
-  MonitorPlay,
   MoreHorizontal,
   RotateCw,
   Search,
@@ -362,8 +361,8 @@ export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidde
 
   // ---------- page tools ----------
 
-  // The video on the page (any website, not just YouTube) carries on in the mini window from where
-  // it's got to, and stops here.
+  // The video on the page (any website, not just YouTube): where it's got to, so a popped-out
+  // window carries on from there.
   const videoId = youTubeVideoId(url)
   const findVideo = async (): Promise<{ seconds?: number; url?: string } | null> => {
     try {
@@ -372,14 +371,6 @@ export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidde
       // The page isn't ready: a YouTube video starts from the beginning.
       return null
     }
-  }
-  const popOut = async (): Promise<void> => {
-    const found = await findVideo()
-    const seconds = Number(found?.seconds) || 0
-    if (videoId) void window.api.openYouTube(youTubeWatchUrl(videoId, seconds))
-    else if (found?.url) void window.api.openYouTube(found.url)
-    else if (found) void window.api.openYouTube(url, seconds)
-    else notify('There’s no video on this page to pop out.', 'info')
   }
 
   /** Save to Inbox: what's selected on the page, or (with nothing selected, or `whole`) the page. */
@@ -603,11 +594,6 @@ export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidde
         {busyDownloads > 0 && (
           <button type="button" className="icon-btn active web-downloading" title={`${busyDownloads} downloading`} onClick={() => setPanel('downloads')}>
             <Download size={14} />
-          </button>
-        )}
-        {/^https?:/i.test(url) && (
-          <button type="button" className="icon-btn" title="Pop the video out into the mini window (floats over everything)" onClick={() => void popOut()}>
-            <MonitorPlay size={14} />
           </button>
         )}
         {/^https?:/i.test(url) && !isPrivate && (

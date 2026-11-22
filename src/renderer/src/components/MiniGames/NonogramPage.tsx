@@ -2,7 +2,14 @@ import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, ty
 import { Grid2x2Check, Lightbulb, RotateCcw, Trophy, Undo2, X } from 'lucide-react'
 import { colOf, isNonoSolved, lineDone, makeNonogram, nonoLevelOf, NONO_LEVELS, rowOf, type Mark, type Nonogram, type NonoLevel } from '../../lib/nonogram'
 import { formatTime } from '../../lib/sudoku'
-import { petCheer } from '../../lib/pet'
+import { celebrate } from '../../lib/celebrate'
+import { playSound, scaleNote } from '../../lib/gameSound'
+import { useChanged } from './useChanged'
+import { useBoardZoom, ZoomControls } from './useBoardZoom'
+
+const ZOOM_KEY = 'notesapp.nonogram.zoom'
+/** Clue numbers are this big next to a square. */
+const CLUE_SCALE = 0.42
 
 /** A game in progress. */
 interface Game {
@@ -60,13 +67,22 @@ export default function NonogramPage() {
   const paint = useRef<Paint | null>(null)
   const board = useRef<HTMLDivElement>(null)
   const { rows, cols, clues, solution } = game.puzzle
+  const changed = useChanged(game.marks)
+
+  // Filling a square plucks a note (higher further right), a cross ticks, and clearing one brushes it away.
+  useEffect(() => {
+    if (!changed.size || changed.size > 3 || game.won) return
+    const [i] = changed
+    const m = game.marks[i]
+    playSound(m === 1 ? 'place' : m === 2 ? 'tap' : 'erase', m === 1 ? scaleNote(i % cols) : undefined)
+  }, [game.marks])
 
   useEffect(() => save(GAME_KEY, game), [game])
   useEffect(() => board.current?.focus(), [])
 
   const wasWon = useRef(game.won)
   useEffect(() => {
-    if (game.won && !wasWon.current) petCheer()
+    if (game.won && !wasWon.current) celebrate('big')
     wasWon.current = game.won
   }, [game.won])
 
@@ -155,6 +171,7 @@ export default function NonogramPage() {
   }
 
   const onKey = (e: KeyboardEvent): void => {
+    if (z.onKey(e)) return
     const mod = e.ctrlKey || e.metaKey
     if (mod && e.key.toLowerCase() === 'z') return void (e.preventDefault(), undo())
     if (mod || e.altKey) return
@@ -176,9 +193,19 @@ export default function NonogramPage() {
 
   const curRow = cursor === null ? -1 : Math.floor(cursor / cols)
   const curCol = cursor === null ? -1 : cursor % cols
-  const size = cols > 10 ? 26 : cols > 5 ? 32 : 44
   const longestCol = Math.max(1, ...clues.cols.map((c) => c.length))
   const longestRow = Math.max(1, ...clues.rows.map((c) => c.length))
+  // Zoom, like Minesweeper. The clue numbers grow with the squares, so they count towards the fit.
+  const z = useBoardZoom({
+    storageKey: ZOOM_KEY,
+    across: cols + longestRow * 1.4 * CLUE_SCALE,
+    down: rows + longestCol * 1.25 * CLUE_SCALE,
+    extraW: 26,
+    extraH: 22,
+    normal: cols > 10 ? 26 : cols > 5 ? 32 : 44,
+    fitMax: 64
+  })
+  const size = z.size
 
   return (
     <div className="sudoku-page nono-page" data-nonogram-page>
@@ -226,13 +253,14 @@ export default function NonogramPage() {
             <button className="sudoku-tool" onClick={hint} disabled={game.won} title="Put one square right (H)">
               <Lightbulb size={15} /> Hint
             </button>
+            <ZoomControls z={z} />
             <button className="sudoku-tool" onClick={() => start(game.level)} title="Start a new puzzle (N)">
               <RotateCcw size={15} /> New
             </button>
           </span>
         </div>
 
-        <div className="mines-wrap">
+        <div ref={z.wrap} className="mines-wrap" onWheel={z.onWheel}>
           <div
             ref={board}
             className={`nono-board ${game.won ? 'won' : ''}`}
@@ -243,6 +271,7 @@ export default function NonogramPage() {
             style={
               {
                 '--nono-size': `${size}px`,
+                fontSize: `${Math.round(Math.max(12, Math.min(24, size * CLUE_SCALE)))}px`,
                 gridTemplateColumns: `auto repeat(${cols}, var(--nono-size))`,
                 gridTemplateRows: `auto repeat(${rows}, var(--nono-size))`
               } as CSSProperties
@@ -281,7 +310,8 @@ export default function NonogramPage() {
                   c % 5 === 4 && c < cols - 1 ? 'edge-right' : '',
                   r % 5 === 4 && r < rows - 1 ? 'edge-bottom' : '',
                   i === cursor ? 'cursor' : '',
-                  r === curRow || c === curCol ? 'related' : ''
+                  r === curRow || c === curCol ? 'related' : '',
+                  changed.has(i) && m ? 'placed' : ''
                 ]
                 return (
                   <button
@@ -290,6 +320,7 @@ export default function NonogramPage() {
                     onPointerDown={onPointerDown(i)}
                     onPointerEnter={onPointerEnter(i)}
                     onContextMenu={(e) => e.preventDefault()}
+                    style={{ '--rc': r + c } as CSSProperties}
                     tabIndex={-1}
                     aria-label={`Row ${r + 1}, column ${c + 1}${m === 1 ? ', filled' : m === 2 ? ', crossed' : ''}`}
                     data-cell={i}
@@ -318,7 +349,7 @@ export default function NonogramPage() {
         <p className="sudoku-help">
           The numbers by each row and column are the runs of filled squares in it, in order, with at least one empty square between runs. Fill squares
           to match every clue and a picture appears. Right-click (or X) puts a cross on a square you know is empty. Drag to fill or cross several at once.
-          A clue fades once its line matches.
+          A clue fades once its line matches. Zoom with the buttons, + and −, or Ctrl + scroll.
         </p>
       </div>
     </div>

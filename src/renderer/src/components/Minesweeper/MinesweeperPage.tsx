@@ -2,6 +2,10 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type Keyboard
 import { Bomb, Flag, RotateCcw, Trophy, X } from 'lucide-react'
 import { countsOf, isCleared, layMines, levelOf, LEVELS, neighbours, reveal, type Level } from '../../lib/minesweeper'
 import { formatTime } from '../../lib/sudoku'
+import { celebrate } from '../../lib/celebrate'
+import { useChanged } from '../MiniGames/useChanged'
+import { playSound } from '../../lib/gameSound'
+import { useBoardZoom, ZoomControls } from '../MiniGames/useBoardZoom'
 
 /** A game in progress. `mine` is null until the first click, so the first click is never a mine. */
 interface Game {
@@ -18,6 +22,10 @@ interface Game {
 // The game and best times live on this computer only (not in the notes folder): it's just for fun.
 const GAME_KEY = 'notesapp.minesweeper.game'
 const BEST_KEY = 'notesapp.minesweeper.best'
+const ZOOM_KEY = 'notesapp.minesweeper.zoom'
+
+const NORMAL_SIZE = 30
+const GAP = 2
 
 function load<T>(key: string): T | null {
   try {
@@ -51,12 +59,17 @@ export default function MinesweeperPage() {
   const board = useRef<HTMLDivElement>(null)
   const { rows, cols, mines } = levelOf(game.level)
 
+  // Zoom: squares as big as fit the page, or a size you pick (remembered).
+  const z = useBoardZoom({ storageKey: ZOOM_KEY, across: cols, down: rows, extraW: 16 + GAP * (cols - 1), extraH: 16 + GAP * (rows - 1), normal: NORMAL_SIZE })
+  const size = z.size
+
   useEffect(() => save(GAME_KEY, game), [game])
   useEffect(() => board.current?.focus(), [])
 
   // A new fastest time for this level?
   useEffect(() => {
     if (game.state !== 'won') return
+    celebrate()
     setBest((b) => {
       if (b[game.level] !== undefined && b[game.level]! <= game.seconds) return b
       const updated = { ...b, [game.level]: game.seconds }
@@ -77,6 +90,27 @@ export default function MinesweeperPage() {
 
   const counts = useMemo(() => (game.mine ? countsOf(game.mine, rows, cols) : null), [game.mine, rows, cols])
   const flagsLeft = mines - game.flags.filter(Boolean).length
+  // Squares that just opened ripple out from the one clicked; flags drop in.
+  const origin = useRef<number | null>(null)
+  const opened = useChanged(game.open)
+  const flagDropped = useChanged(game.flags, (now, before) => now && !before)
+  const unflagged = useChanged(game.flags, (now, before) => !now && before)
+
+  // Sounds: squares crackle open (more of them for a big opening), flags knock in, mines go off.
+  useEffect(() => {
+    if (game.state === 'lost' && game.boom !== null) {
+      playSound('boom')
+      playSound('lose', undefined, 0.9)
+      return
+    }
+    if (opened.size) {
+      const n = Math.min(6, Math.ceil(opened.size / 5))
+      for (let k = 0; k < n; k++) playSound('open', undefined, k * 0.045)
+    } else if (flagDropped.size) playSound('flag')
+    else if (unflagged.size) playSound('tap')
+  }, [game.open, game.flags, game.state])
+
+  const distance = (a: number, b: number): number => Math.max(Math.abs(Math.floor(a / cols) - Math.floor(b / cols)), Math.abs((a % cols) - (b % cols)))
 
   const start = (level: Level): void => {
     setGame(newGame(level))
@@ -120,6 +154,7 @@ export default function MinesweeperPage() {
 
   const onCell = (i: number) => (e: MouseEvent): void => {
     setCursor(i)
+    origin.current = i
     if (e.type === 'contextmenu') {
       e.preventDefault()
       flag(i)
@@ -128,6 +163,7 @@ export default function MinesweeperPage() {
   }
 
   const onKey = (e: KeyboardEvent): void => {
+    if (z.onKey(e)) return
     if (e.ctrlKey || e.metaKey || e.altKey) return
     const moves: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }
     if (moves[e.key]) {
@@ -188,17 +224,18 @@ export default function MinesweeperPage() {
             >
               <Flag size={15} /> Flag mode {flagMode ? 'on' : 'off'}
             </button>
+            <ZoomControls z={z} />
             <button className="sudoku-tool" onClick={() => start(game.level)} title="Start a new game (N)">
               <RotateCcw size={15} /> New
             </button>
           </span>
         </div>
 
-        <div className="mines-wrap">
+        <div ref={z.wrap} className="mines-wrap" onWheel={z.onWheel}>
           <div
             ref={board}
             className={`mines-board ${game.state}`}
-            style={{ '--mine-size': cols > 20 ? '24px' : '30px', gridTemplateColumns: `repeat(${cols}, var(--mine-size))` } as CSSProperties}
+            style={{ '--mine-size': `${size}px`, gridTemplateColumns: `repeat(${cols}, var(--mine-size))` } as CSSProperties}
             tabIndex={0}
             role="grid"
             aria-label="Minesweeper board"
@@ -216,24 +253,33 @@ export default function MinesweeperPage() {
                 isOpen || showMine ? 'open' : '',
                 isOpen && !isMine && n ? `n${n}` : '',
                 i === game.boom ? 'boom' : '',
-                i === cursor ? 'cursor' : ''
+                i === cursor ? 'cursor' : '',
+                isOpen && opened.has(i) ? 'opened' : '',
+                flagDropped.has(i) ? 'flagged-now' : '',
+                showMine && game.boom !== null && i !== game.boom ? 'blast' : ''
               ]
+              const from = game.state === 'lost' && game.boom !== null ? game.boom : origin.current
+              const style = {
+                '--d': from === null ? 0 : Math.min(distance(i, from), 24),
+                '--rc': Math.floor(i / cols) + (i % cols)
+              } as CSSProperties
               return (
                 <button
                   key={i}
                   className={classes.filter(Boolean).join(' ')}
                   onClick={onCell(i)}
                   onContextMenu={onCell(i)}
+                  style={style}
                   tabIndex={-1}
                   aria-label={`Row ${Math.floor(i / cols) + 1}, column ${(i % cols) + 1}${isOpen ? (n ? `: ${n}` : ', clear') : flagged ? ', flagged' : ''}`}
                   data-cell={i}
                 >
                   {wrongFlag ? (
-                    <X size={14} />
+                    <X size={Math.round(size * 0.48)} />
                   ) : flagged ? (
-                    <Flag size={13} className="mines-flag" />
+                    <Flag size={Math.round(size * 0.45)} className="mines-flag" />
                   ) : showMine ? (
-                    <Bomb size={14} />
+                    <Bomb size={Math.round(size * 0.48)} />
                   ) : isOpen && n ? (
                     n
                   ) : null}
@@ -259,7 +305,7 @@ export default function MinesweeperPage() {
 
         <p className="sudoku-help">
           Open every square that isn't a mine. A number tells you how many mines touch that square. Right-click (or F) to flag a mine, and click a number
-          once its mines are flagged to open the squares around it. Your first click is always safe.
+          once its mines are flagged to open the squares around it. Your first click is always safe. Zoom with the buttons, + and −, or Ctrl + scroll.
         </p>
       </div>
     </div>

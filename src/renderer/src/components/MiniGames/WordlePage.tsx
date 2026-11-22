@@ -14,7 +14,8 @@ import {
   type WordleMode,
   type WordleStats
 } from '../../lib/wordle'
-import { petCheer } from '../../lib/pet'
+import { celebrate } from '../../lib/celebrate'
+import { playSound, scaleNote } from '../../lib/gameSound'
 
 /** A round in progress (or just finished). */
 interface Game {
@@ -131,7 +132,10 @@ export default function WordlePage() {
       save(STATS_KEY, updated)
       return updated
     })
-    if (won) petCheer()
+    // Cheer once the tiles have turned over, not before.
+    const after = next.guesses.length && next.result ? length * 120 + 450 : 0
+    if (won) setTimeout(() => celebrate(), after)
+    else playSound('lose', undefined, after / 1000)
   }
 
   const choose = (m: WordleMode, len: number): void => {
@@ -166,11 +170,13 @@ export default function WordlePage() {
 
   const type = (letter: string): void => {
     if (game.result || game.typing.length >= length) return
+    playSound('type')
     update({ ...game, typing: game.typing + letter })
   }
 
   const erase = (all = false): void => {
     if (game.result || !game.typing) return
+    playSound('erase')
     update({ ...game, typing: all ? '' : game.typing.slice(0, -1) })
   }
 
@@ -179,6 +185,7 @@ export default function WordlePage() {
     if (game.typing.length < length) {
       setMessage(`Type ${length} letters`)
       setShake((n) => n + 1)
+      playSound('wrong')
       return
     }
     const guesses = [...game.guesses, game.typing]
@@ -186,6 +193,10 @@ export default function WordlePage() {
     const next: Game = { ...game, guesses, typing: '', result: won ? 'won' : guesses.length >= tries ? 'lost' : null }
     setRevealRow(guesses.length - 1)
     setMessage(null)
+    // Each tile flips with a tick; greens ring high and yellows lower, climbing along the row.
+    markGuess(game.typing, game.answer).forEach((m, c) =>
+      playSound('flip', m === 'right' ? scaleNote(5 + c) : m === 'close' ? scaleNote(c) : undefined, c * 0.12 + 0.2)
+    )
     if (next.result) finish(next, won)
     else update(next)
   }
@@ -286,7 +297,8 @@ export default function WordlePage() {
               return (
                 <div
                   key={current ? `typing-${shake}` : r}
-                  className={`wordle-row ${current && shake ? 'shake' : ''} ${r === revealRow ? 'reveal' : ''}`}
+                  className={`wordle-row ${current && shake ? 'shake' : ''} ${r === revealRow ? 'reveal' : ''} ${r === revealRow && game.result === 'won' ? 'win' : ''} ${current ? 'current' : ''}`}
+                  style={{ '--wordle-len': length } as CSSProperties}
                   role="row"
                   data-wordle-row={r}
                 >

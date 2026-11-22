@@ -72,6 +72,8 @@ export const EMAIL_TAB = 'email:'
 export const HOME_TAB = 'home:'
 export const MONEY_TAB = 'money:'
 export const CONVERT_TAB = 'convert:'
+/** Send huge files to a friend with a code, or a Google Drive link (components/FileSender). */
+export const FILESENDER_TAB = 'filesender:'
 export const COMICS_TAB = 'comics:'
 /** Sign, merge, split, reorder and fill in PDFs (components/PdfEditor); what's open is in store/pdfEditor. */
 export const PDF_EDITOR_TAB = 'pdf-editor:'
@@ -94,6 +96,8 @@ export const SCREENS_TAB = 'screens:'
 export const MUSIC_TAB = 'music:'
 /** A volume for each app (components/Mixer). */
 export const MIXER_TAB = 'mixer:'
+/** What's running, how much it uses, and ending it (components/TaskManager). */
+export const TASKS_TAB = 'tasks:'
 /** The download manager: a queue that pauses, carries on and can wait for the night (components/Downloads). */
 export const DOWNLOADS_TAB = 'downloads:'
 /** Scenes, webcam and screen recording (components/Studio). */

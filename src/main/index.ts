@@ -35,6 +35,7 @@ import * as emailAsk from './emailAsk'
 import * as spotify from './spotify'
 import * as localMusic from './localMusic'
 import { setupMusicData } from './musicData'
+import { setupMusicRemote } from './musicRemote'
 import { setupSongSearch } from './songSearch'
 import { setupMusicTags } from './musicTags'
 import { setupMusicFromLink } from './musicFromLink'
@@ -55,6 +56,7 @@ import { setupConverter } from './converter'
 import { setupVideoDownloader } from './videoDownload'
 import { setupSoundFromLink } from './soundFromLink'
 import { setupDownloadManager } from './downloadManager'
+import { setupFileSend } from './fileSend'
 import { isAppPage, setupStudio } from './studio'
 import { applyReplayShortcut, clipResponse, setupClips } from './clips'
 import { setupLocalAi } from './localAi'
@@ -66,6 +68,7 @@ import { setupOrbitSync, syncOrbitSoon, type PartHandler } from './orbitSync'
 import { cleanPrefsPart, prefsPart } from '@shared/orbitSync'
 import { setupMonitors, teardownMonitors } from './monitors'
 import { setupMixer, teardownMixer } from './mixer'
+import { setupTaskManager, teardownTaskManager } from './taskManager'
 import { applyDuckPrefs, setupMusicDuck } from './musicDuck'
 import { setupLive } from './live'
 import { explorerFile, setFileIndexOn, setupExplorer } from './explorer'
@@ -93,7 +96,6 @@ import { setupWeather } from './weather'
 import { releaseMessages, saveMessages, setupBrowser } from './browser'
 import { openInOtherBrowser, openLinksFromArgv, setupDefaultBrowser } from './defaultBrowser'
 import { setupOperaImport } from './operaImport'
-import { closeYouTube, setupYouTube } from './youtube'
 import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
 import { setupAppStudio } from './appStudio'
@@ -586,9 +588,8 @@ function createWindow(): BrowserWindow {
     const maximized = win.isMaximized()
     const b = maximized ? win.getNormalBounds() : win.getBounds()
     saveSettings({ window: { ...b, maximized } })
-    // The notes window is really closing: the YouTube mini window goes with it.
+    // The notes window is really closing: its other windows go with it.
     if (win === mainWindow) {
-      closeYouTube()
       closeMusicMini()
       closePopout()
       closeDiscordPopout()
@@ -1083,13 +1084,14 @@ app.whenReady().then(async () => {
     })
   )
   safely('Opera GX import', setupOperaImport)
-  safely('YouTube mini window', () => setupYouTube(currentPrefs))
   safely('Music mini player', () => setupMusicMini(currentPrefs, () => mainWindow))
+  safely('music phone remote', setupMusicRemote)
   safely('pop-out window', () => setupPopout(currentPrefs))
   safely('export', setupExport)
   safely('converter', setupConverter)
   safely('video downloader', () => setupVideoDownloader(() => vault))
   safely('download manager', setupDownloadManager)
+  safely('big file sender', setupFileSend)
   safely('studio', setupStudio)
   safely('offline AI', setupLocalAi)
   safely('soundboard', setupSoundboard)
@@ -1123,6 +1125,7 @@ app.whenReady().then(async () => {
   safely('instant replay', () => setupClips({ getMain: () => mainWindow, showMain }))
   safely('screen controls', setupMonitors)
   safely('volume mixer', setupMixer)
+  safely('task manager', setupTaskManager)
   safely('music dipping', () => setupMusicDuck(currentPrefs))
   // A password copied from the vault isn't passed to the other computer.
   safely('mouse sharing', () => setupMouseShare(() => mainWindow, (text) => text === copiedSecret))
@@ -1159,6 +1162,7 @@ app.on('will-quit', () => {
   safely('Discord voice', teardownDiscord)
   safely('screen controls', teardownMonitors)
   safely('volume mixer', teardownMixer)
+  safely('task manager', teardownTaskManager)
   safely('macros', teardownMacros)
   safely('key remapper', teardownKeyRemap)
   clearSecret()

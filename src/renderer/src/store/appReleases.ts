@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { MergedPull, Release } from '@shared/appStudio'
+import { addDownloadDay, type DownloadHistory, type MergedPull, type Release } from '@shared/appStudio'
 import { errorMessage } from '../lib/paths'
 
 /**
@@ -21,9 +21,42 @@ interface AppReleasesState {
   loading: Record<string, boolean>
   /** Notes being written, by repository. */
   notes: Record<string, string>
+  /** Each app's total downloads, noted once a day (kept on this computer), by repository. */
+  history: Record<string, DownloadHistory>
 }
 
-export const useAppReleases = create<AppReleasesState>(() => ({ app: null, byRepo: {}, loading: {}, notes: {} }))
+const HISTORY_KEY = 'appstudio:downloads'
+function readHistory(): Record<string, DownloadHistory> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '{}') as unknown
+    return raw && typeof raw === 'object' ? (raw as Record<string, DownloadHistory>) : {}
+  } catch {
+    return {}
+  }
+}
+
+export const useAppReleases = create<AppReleasesState>(() => ({ app: null, byRepo: {}, loading: {}, notes: {}, history: readHistory() }))
+
+/** All of an app's downloads: every published release added up. */
+export const totalDownloads = (releases: Release[]): number => releases.filter((r) => !r.draft).reduce((n, r) => n + (r.downloads ?? 0), 0)
+
+/** Today on this computer, "2026-11-22". */
+export function downloadDay(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function noteDownloads(repo: string, releases: Release[]): void {
+  if (!releases.some((r) => r.files?.length)) return
+  const { history } = useAppReleases.getState()
+  const next = { ...history, [repo]: addDownloadDay(history[repo] ?? [], downloadDay(), totalDownloads(releases)) }
+  useAppReleases.setState({ history: next })
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(next))
+  } catch {
+    // Only the week and month totals miss out.
+  }
+}
 
 export const setReleasesApp = (app: string): void => useAppReleases.setState({ app })
 
@@ -42,6 +75,7 @@ export async function loadReleases(repo: string): Promise<void> {
     const releases = await window.api.appsReleases(repo)
     const merged = await window.api.appsMerged(repo, lastRelease(releases)?.date)
     next = { releases, merged, at: Date.now() }
+    noteDownloads(repo, releases)
   } catch (err) {
     next = { releases: [], merged: [], error: errorMessage(err), at: Date.now() }
   }

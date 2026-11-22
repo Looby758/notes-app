@@ -27,6 +27,7 @@ import {
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
+  FILESENDER_TAB,
   PDF_EDITOR_TAB,
   COMICS_TAB,
   WIKI_TAB,
@@ -37,6 +38,7 @@ import {
   PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
+  TASKS_TAB,
   MUSIC_TAB,
   DOWNLOADS_TAB,
   STUDIO_TAB,
@@ -82,6 +84,7 @@ import ChatSitePage from '../ChatSite/ChatSite'
 import HomePage from '../Home/HomePage'
 import MoneyPage from '../Money/MoneyPage'
 import ConvertPage from '../Convert/ConvertPage'
+import FileSenderPage from '../FileSender/FileSenderPage'
 import DownloadsPage from '../Downloads/DownloadsPage'
 import PdfEditorPage from '../PdfEditor/PdfEditorPage'
 import MiniGamesPage from '../MiniGames/MiniGamesPage'
@@ -93,6 +96,7 @@ import SkyblockGoalsPage from '../Games/SkyblockGoalsPage'
 import PublishingPage from '../Publishing/PublishingPage'
 import ScreensPage from '../Screens/ScreensPage'
 import MixerPage from '../Mixer/MixerPage'
+import TaskManagerPage from '../TaskManager/TaskManagerPage'
 import MusicPage from '../Music/MusicPage'
 import StudioPage from '../Studio/StudioPage'
 import AppStudioPage from '../AppStudio/AppStudioPage'
@@ -233,6 +237,7 @@ export default function Pane({ pane }: { pane: string }) {
         {(active === HOME_TAB || !active) && <HomePage />}
         {active === MONEY_TAB && <MoneyPage />}
         {active === CONVERT_TAB && <ConvertPage />}
+        {active === FILESENDER_TAB && <FileSenderPage />}
         {active === PDF_EDITOR_TAB && <PdfEditorPage />}
         {active === COMICS_TAB && <ComicsPage />}
         {active === WIKI_TAB && <WikiPage />}
@@ -243,6 +248,7 @@ export default function Pane({ pane }: { pane: string }) {
         {active === PUBLISHING_TAB && <PublishingPage />}
         {active === SCREENS_TAB && <ScreensPage />}
         {active === MIXER_TAB && <MixerPage />}
+        {active === TASKS_TAB && <TaskManagerPage />}
         {active === MUSIC_TAB && <MusicPage />}
         {active === DOWNLOADS_TAB && <DownloadsPage />}
         {active === STUDIO_TAB && <StudioPage />}

@@ -1,8 +1,9 @@
 import { app, ipcMain, net, safeStorage } from 'electron'
 import { execFile } from 'child_process'
-import { existsSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'path'
-import { copyFolderName, githubRepo, isGitHubImage, TOKEN_NOT_ALLOWED, type AppInfo, type TestCopy, type GitHubStatus, type MergedPull, type PullRequest, type Release } from '@shared/appStudio'
+import { copyFolderName, githubRepo, isDownloadFile, isGitHubImage, parseAudit, parseOutdated, TOKEN_NOT_ALLOWED, type HealthReport, type BugReport, type AppInfo, type TestCopy, type GitHubStatus, type MergedPull, type PullRequest, type Release } from '@shared/appStudio'
+import { appNameProblem, appSlug, starterFiles, STARTERS, type MadeApp, type NewApp } from '@shared/appStarters'
 import { logError } from './log'
 import { TEST_COPY } from './testCopy'
 
@@ -294,19 +295,27 @@ interface ApiRelease {
   html_url: string
   created_at: string
   published_at: string | null
+  assets?: { name: string; download_count: number }[]
 }
 
-async function releases(repo: string): Promise<Release[]> {
-  const list = await github<ApiRelease[]>(`/repos/${repo}/releases?per_page=20`)
-  return list.map((r) => ({
+function toRelease(r: ApiRelease): Release {
+  const files = (r.assets ?? []).filter((a) => isDownloadFile(a.name)).map((a) => ({ name: a.name, downloads: a.download_count ?? 0 }))
+  return {
     tag: r.tag_name,
     name: r.name || r.tag_name,
     date: r.published_at ?? r.created_at,
     draft: r.draft,
     prerelease: r.prerelease,
     url: r.html_url,
-    body: r.body ?? ''
-  }))
+    body: r.body ?? '',
+    downloads: files.reduce((n, f) => n + f.downloads, 0),
+    files
+  }
+}
+
+async function releases(repo: string): Promise<Release[]> {
+  const list = await github<ApiRelease[]>(`/repos/${repo}/releases?per_page=30`)
+  return list.map(toRelease)
 }
 
 interface ApiClosedPull extends ApiPull {
@@ -340,7 +349,45 @@ async function setReleaseNotes(repo: string, tag: string, body: string, title: s
   const r = found
     ? await github<ApiRelease>(`/repos/${repo}/releases/${found.id}`, { method: 'PATCH', body: { body }, doing: 'change releases', needs: 'Contents' })
     : await github<ApiRelease>(`/repos/${repo}/releases`, { method: 'POST', body: { tag_name: tag, name: title, body, draft: true }, doing: 'make releases', needs: 'Contents' })
-  return { tag: r.tag_name, name: r.name || r.tag_name, date: r.published_at ?? r.created_at, draft: r.draft, prerelease: r.prerelease, url: r.html_url, body: r.body ?? '' }
+  return toRelease(r)
+}
+
+interface ApiIssue {
+  number: number
+  title: string
+  body: string | null
+  user: { login: string } | null
+  html_url: string
+  created_at: string
+  labels: (string | { name?: string })[]
+  comments: number
+  pull_request?: unknown
+}
+
+/** The open issues on a repository (people's bug reports and ideas), leaving out pull requests. */
+async function issues(repo: string): Promise<BugReport[]> {
+  const list = await github<ApiIssue[]>(`/repos/${repo}/issues?state=open&per_page=40&sort=created&direction=desc`)
+  return list
+    .filter((i) => !i.pull_request)
+    .map((i) => ({
+      repo,
+      number: i.number,
+      title: i.title,
+      body: i.body ?? '',
+      author: i.user?.login ?? '',
+      url: i.html_url,
+      createdAt: i.created_at,
+      labels: i.labels.map((l) => (typeof l === 'string' ? l : (l.name ?? ''))).filter(Boolean),
+      comments: i.comments
+    }))
+}
+
+/** Marks a release as a pre-release (so it isn't the latest, and apps that update themselves skip it) or back again. */
+async function setPrerelease(repo: string, tag: string, prerelease: boolean): Promise<Release> {
+  const list = await github<ApiRelease[]>(`/repos/${repo}/releases?per_page=30`)
+  const found = list.find((r) => r.tag_name === tag)
+  if (!found) throw new Error(`GitHub has no release ${tag}.`)
+  return toRelease(await github<ApiRelease>(`/repos/${repo}/releases/${found.id}`, { method: 'PATCH', body: { prerelease, make_latest: prerelease ? 'false' : 'true' }, doing: 'change releases', needs: 'Contents' }))
 }
 
 /** Whether each pull request is still open, was merged, or was closed without merging. */
@@ -376,6 +423,89 @@ async function fetchImage(url: string): Promise<{ bytes: Uint8Array; type: strin
   return { bytes, type }
 }
 
+/** Runs npm in a folder; its output either way (npm outdated and npm audit exit with 1 when they find something). */
+function npm(folder: string, args: string[]): Promise<{ out: string; err: string; missing: boolean }> {
+  return new Promise((done) => {
+    execFile(
+      process.platform === 'win32' ? 'npm.cmd' : 'npm',
+      args,
+      // npm.cmd only runs through the shell on Windows; the arguments are fixed, never typed in.
+      { cwd: folder, timeout: 120_000, windowsHide: true, maxBuffer: 16 * 1024 * 1024, shell: process.platform === 'win32' },
+      (err, stdout, stderr) => {
+        const missing = !!err && ((err as NodeJS.ErrnoException).code === 'ENOENT' || /not recognized|not found/i.test(String(stderr)))
+        done({ out: String(stdout ?? ''), err: String(stderr || ''), missing: missing && !String(stdout ?? '').trim() })
+      }
+    )
+  })
+}
+
+/** Checks an app's packages: which have newer versions, and which have known security problems. */
+async function health(folder: string): Promise<HealthReport> {
+  if (!existsSync(join(folder, 'package.json'))) throw new Error('This app has no package.json, so there are no npm packages to check.')
+  const problems: string[] = []
+  const hasLock = existsSync(join(folder, 'package-lock.json'))
+  const [outdated, audit] = await Promise.all([
+    npm(folder, ['outdated', '--json', '--long']),
+    hasLock ? npm(folder, ['audit', '--json']) : Promise.resolve({ out: '', err: '', missing: false })
+  ])
+  if (outdated.missing) throw new Error('npm isn’t installed on this computer (it comes with Node.js).')
+  if (!hasLock) problems.push('There’s no package-lock.json, so npm can’t check for security problems. Run npm install once to make one.')
+  else if (!audit.out.trim()) problems.push(`npm couldn’t check for security problems${/ENOTFOUND|ETIMEDOUT|network/i.test(audit.err) ? ' (no internet?)' : ''}.`)
+  if (!existsSync(join(folder, 'node_modules'))) problems.push('The packages aren’t installed yet (no node_modules), so “now” shows as not installed.')
+  return { checkedAt: new Date().toISOString(), outdated: parseOutdated(outdated.out), security: parseAudit(audit.out), problems }
+}
+
+/**
+ * Starts a new app: a folder named after it with the starter's files, a git repository with them
+ * committed, and (if asked, and GitHub is connected) a GitHub repository set as its origin. The
+ * first push runs in the app's terminal afterwards, with your own git sign-in.
+ */
+async function createApp(req: NewApp): Promise<MadeApp> {
+  const problem = appNameProblem(req.name)
+  if (problem) throw new Error(problem)
+  if (!validFolder(req.parent)) throw new Error('Pick a folder to put it in.')
+  const slug = appSlug(req.name)
+  const folder = join(req.parent, slug)
+  if (existsSync(folder)) throw new Error(`There’s already a folder called ${slug} in there. Pick another name or folder.`)
+  const files = starterFiles(req.starter, req.name.trim(), req.what)
+  mkdirSync(folder)
+  for (const [path, text] of Object.entries(files)) {
+    const full = resolve(folder, path)
+    if (!inside(folder, full)) continue
+    mkdirSync(dirname(full), { recursive: true })
+    writeFileSync(full, text)
+  }
+  const init = await gitLong(folder, ['init', '-b', 'main'])
+  if (!init.ok) {
+    // Git before 2.28 has no -b.
+    const old = await gitLong(folder, ['init'])
+    if (!old.ok) throw new Error(/ENOENT|not recognized|not found/i.test(old.err) ? 'The app was made, but git isn’t installed on this computer, so it isn’t a git repository yet.' : `The app was made, but git couldn’t start a repository: ${old.err.split('\n').pop()}`)
+    await gitLong(folder, ['checkout', '-b', 'main'])
+  }
+  await gitLong(folder, ['add', '-A'])
+  const commit = await gitLong(folder, ['commit', '-m', `Start ${req.name.trim()}`])
+  if (!commit.ok) {
+    const why = /user\.(name|email)|identity/i.test(commit.err) ? 'git doesn’t know your name and email yet (git config --global user.name and user.email)' : commit.err.split('\n').pop()
+    throw new Error(`The app was made in ${folder}, but git couldn’t save the first version: ${why}.`)
+  }
+  if (!req.github) return { folder }
+  if (!token()) return { folder, githubError: 'GitHub isn’t connected in App Studio, so no repository was made.' }
+  try {
+    const firstLine = req.what.trim().split('\n')[0].slice(0, 300)
+    const made = await github<{ full_name: string; clone_url: string }>('/user/repos', {
+      method: 'POST',
+      body: { name: slug, private: req.github === 'private', description: firstLine || undefined, auto_init: false },
+      doing: 'make repositories',
+      needs: 'Administration'
+    })
+    await gitLong(folder, ['remote', 'add', 'origin', made.clone_url])
+    return { folder, repo: made.full_name }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { folder, githubError: /name already exists/i.test(message) ? `You already have a repository called ${slug} on GitHub.` : message }
+  }
+}
+
 function needToken(): void {
   if (!token()) throw new Error('Connect GitHub in App Studio first, so Orbit can do that for you.')
 }
@@ -403,6 +533,22 @@ export function setupAppStudio(): void {
     needToken()
     return setReleaseNotes(repo, tag, String(body ?? '').slice(0, 100_000), String(title || tag).slice(0, 200))
   })
+  ipcMain.handle('apps:setPrerelease', async (_e, repo: unknown, tag: unknown, prerelease: unknown) => {
+    if (!validRepo(repo) || typeof tag !== 'string' || !/^[\w.+-]{1,60}$/.test(tag)) throw new Error('Not allowed')
+    needToken()
+    return setPrerelease(repo, tag, !!prerelease)
+  })
+  ipcMain.handle('apps:issues', (_e, repo: unknown) => {
+    if (!validRepo(repo)) throw new Error('Not allowed')
+    return issues(repo)
+  })
+  ipcMain.handle('apps:closeIssue', async (_e, repo: unknown, number: unknown, comment: unknown) => {
+    if (!validRepo(repo) || !Number.isInteger(number) || (number as number) < 1) throw new Error('Not allowed')
+    needToken()
+    const text = typeof comment === 'string' ? comment.trim().slice(0, 2000) : ''
+    if (text) await github(`/repos/${repo}/issues/${number}/comments`, { method: 'POST', body: { body: text }, doing: 'comment on issues', needs: 'Issues' })
+    await github(`/repos/${repo}/issues/${number}`, { method: 'PATCH', body: { state: 'closed', state_reason: 'completed' }, doing: 'close issues', needs: 'Issues' })
+  })
   ipcMain.handle('apps:copies', (_e, folder: unknown) => (validFolder(folder) ? copies(folder) : []))
   ipcMain.handle('apps:addCopy', (_e, folder: unknown, branch: unknown) => {
     if (!validFolder(folder) || typeof branch !== 'string' || !/^[\w./@+-]{1,200}$/.test(branch) || branch.startsWith('-')) throw new Error('Not allowed')
@@ -415,6 +561,15 @@ export function setupAppStudio(): void {
   ipcMain.handle('apps:pullStates', (_e, repo: unknown, numbers: unknown) => {
     if (!validRepo(repo) || !Array.isArray(numbers)) throw new Error('Not allowed')
     return pullStates(repo, numbers.filter((n): n is number => Number.isInteger(n) && n > 0))
+  })
+  ipcMain.handle('apps:createApp', (_e, req: unknown) => {
+    const r = (req ?? {}) as Partial<NewApp>
+    if (typeof r.parent !== 'string' || typeof r.name !== 'string' || !STARTERS.some((s) => s.id === r.starter)) throw new Error('Not allowed')
+    return createApp({ parent: r.parent, name: r.name.slice(0, 80), starter: r.starter as NewApp['starter'], what: String(r.what ?? '').slice(0, 5000), github: r.github === 'private' || r.github === 'public' ? r.github : null })
+  })
+  ipcMain.handle('apps:health', (_e, folder: unknown) => {
+    if (!validFolder(folder)) throw new Error('This app’s folder isn’t there any more.')
+    return health(folder)
   })
   ipcMain.handle('apps:fetchImage', (_e, url: unknown) => fetchImage(String(url)))
   ipcMain.handle('apps:merge', async (_e, repo: unknown, number: unknown) => {

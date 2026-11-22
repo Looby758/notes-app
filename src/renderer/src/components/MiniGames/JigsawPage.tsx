@@ -15,7 +15,8 @@ import {
   type Spot
 } from '../../lib/jigsaw'
 import { formatTime } from '../../lib/sudoku'
-import { petCheer } from '../../lib/pet'
+import { celebrate } from '../../lib/celebrate'
+import { playSound } from '../../lib/gameSound'
 
 /** A puzzle in progress. Positions are in the puzzle's units (the picture is BOARD_WIDTH wide). */
 interface Game {
@@ -159,7 +160,7 @@ export default function JigsawPage() {
 
   const wasWon = useRef(game?.won ?? false)
   useEffect(() => {
-    if (game?.won && !wasWon.current) petCheer()
+    if (game?.won && !wasWon.current) celebrate('big')
     wasWon.current = game?.won ?? false
   }, [game?.won])
 
@@ -186,6 +187,25 @@ export default function JigsawPage() {
       setError('Orbit couldn’t open that picture. Try a JPG or PNG.')
     }
   }
+
+  // Ctrl+V (or Cmd+V) pastes a copied picture, here or on the empty menu.
+  const chooseRef = useRef(choose)
+  chooseRef.current = choose
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent): void => {
+      const t = e.target as HTMLElement | null
+      if (t?.closest('input, textarea, [contenteditable="true"]')) return
+      const file = [...(e.clipboardData?.items ?? [])].find((i) => i.kind === 'file' && i.type.startsWith('image/'))?.getAsFile()
+      if (!file) {
+        if (e.clipboardData?.types.includes('Files')) setError('That isn’t a picture. Copy a photo (JPG, PNG, WebP…) and paste again.')
+        return
+      }
+      e.preventDefault()
+      void chooseRef.current(file)
+    }
+    document.addEventListener('paste', onPaste)
+    return () => document.removeEventListener('paste', onPaste)
+  }, [])
 
   const restart = (n: PieceCount): void => {
     setCount(n)
@@ -223,6 +243,7 @@ export default function JigsawPage() {
     svg.current?.setPointerCapture(e.pointerId)
     const at = toWorld(e.clientX, e.clientY)
     drag.current = { index, dx: at.x - g.spots[index].x, dy: at.y - g.spots[index].y, pointer: e.pointerId }
+    playSound('pickup')
     // The piece you pick up comes to the top.
     setGame((g) => (g ? { ...g, order: [...g.order.filter((j) => j !== index), index] } : g))
   }, [])
@@ -242,6 +263,10 @@ export default function JigsawPage() {
     const d = drag.current
     if (!d || d.pointer !== e.pointerId) return
     drag.current = null
+    const g0 = current.current
+    const home0 = shapes[d.index]?.home
+    if (g0 && dims && home0 && snapsHome(g0.spots[d.index], home0, dims.pw, dims.ph)) playSound('snap')
+    else playSound('slide')
     setGame((g) => {
       if (!g || !dims) return g
       const home = shapes[d.index]?.home
@@ -317,7 +342,7 @@ export default function JigsawPage() {
           <div className="jig-empty" data-jigsaw-empty>
             <ImagePlus size={36} />
             <strong>Make a jigsaw from a photo</strong>
-            <span>Choose a picture from your computer, or drop one here. It’s cut into {count} pieces.</span>
+            <span>Choose a picture from your computer, drop one here, or paste one with Ctrl+V. It’s cut into {count} pieces.</span>
             <button className="btn btn-primary" onClick={() => fileInput.current?.click()} data-jigsaw-choose>
               Choose a picture
             </button>
@@ -387,7 +412,7 @@ export default function JigsawPage() {
             </div>
             <p className="sudoku-help">
               Drag each piece onto the board. It clicks into place when it’s close to the right spot. Peek shows the picture faintly to help, and you can
-              drop a different picture anywhere on this page to start a new puzzle.
+              drop or paste (Ctrl+V) a different picture to start a new puzzle.
             </p>
           </>
         )}

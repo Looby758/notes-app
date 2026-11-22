@@ -1,5 +1,6 @@
-import type { AppInfo, GitHubStatus, MergedPull, PullRequest, Release, TestCopy } from './appStudio'
-import type { ExplorerEntry, ExplorerPlace, PasteMode, PcIndexStatus } from './explorer'
+import type { MadeApp, NewApp } from './appStarters'
+import type { AppInfo, BugReport, GitHubStatus, HealthReport, MergedPull, PullRequest, Release, TestCopy } from './appStudio'
+import type { DriveSpace, ExplorerEntry, ExplorerPlace, PasteMode, PcIndexStatus } from './explorer'
 import type { FileTagStore, TagColour } from './fileTags'
 import type { BinListing } from './recycleBin'
 import type { ArchiveEntry } from './archive'
@@ -21,6 +22,7 @@ import type { MusicData, MusicEdit } from './musicLibrary'
 import type { FoundTrack } from './songSearch'
 import type { SpotifyList } from './spotifyImport'
 import type { MixerState } from './mixer'
+import type { EndResult, EndTarget, TaskSnapshot } from './taskManager'
 import type { MonitorAction, MonitorSaved, MonitorSetting, MonitorsStatus, MonitorTarget } from './monitors'
 import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
 import type { ClickerSettings, Macro, MacroHotkeys, MacroStatus } from './macros'
@@ -52,11 +54,6 @@ export interface Settings {
   toldAboutTray?: boolean
   /** Mac: you chose not to be asked again about moving Notes into Applications. */
   keepOutsideApplications?: boolean
-  /** The YouTube mini window: where it was left, what was playing, and how it was set. */
-  youtubeWindow?: WindowBounds
-  youtubeUrl?: string
-  youtubePinned?: boolean
-  youtubeVideoOnly?: boolean
   /** The floating mini music player: where it was left, and whether it was showing. */
   musicMiniWindow?: WindowBounds
   musicMiniOpen?: boolean
@@ -73,6 +70,10 @@ export interface Settings {
   /** The paired phone's link (its token, and the port it was on), so the phone reconnects by itself. */
   phoneToken?: string
   phonePort?: number
+  /** The music phone remote: whether it's on, and its link's token (so a phone that has it keeps working). */
+  musicRemote?: boolean
+  musicRemoteToken?: string
+  musicRemotePort?: number
   /** One mouse, two computers: whether it's on, the paired computer, and how it's set up. */
   mouseShare?: ShareSaved
   /** Screens between the two computers: which of this computer's screens goes on the other one ('' = worked out). */
@@ -195,8 +196,8 @@ export interface MusicMiniLayout {
   upNext: boolean
 }
 
-/** A button pressed in the floating mini player, for the notes window to carry out. `jump` plays the song that many places into Up next (0 is the next one). */
-export type MusicMiniCommand = { action: MusicAction } | { seek: number } | { jump: number }
+/** A button pressed in the floating mini player, for the notes window to carry out. `jump` plays the song that many places into Up next (0 is the next one); `volume` is 0–100 (from the phone remote). */
+export type MusicMiniCommand = { action: MusicAction } | { seek: number } | { jump: number } | { volume: number }
 
 export interface CaptureStatus {
   /** e.g. "Win+Shift+N", or '' if none is set or it couldn't be registered. */
@@ -216,8 +217,8 @@ export interface UpdateStatus {
   percent?: number
   error?: string
   /**
-   * On a Mac, updates can only install themselves in apps signed with a paid Apple certificate, so
-   * Notes offers to open the download page instead.
+   * The update can't install itself (e.g. a Mac copy running from the disk image, or one macOS
+   * wouldn't let replace itself), so Orbit offers to open the download page instead.
    */
   manual?: boolean
   /** Why checking is off, e.g. "Updates are checked in the installed app only." */
@@ -464,14 +465,6 @@ export interface AiChat {
   messages: AiChatMessage[]
 }
 
-export interface YouTubeState {
-  url: string
-  /** Where to start a video popped out from another website, in seconds. */
-  startAt?: number
-  pinned: boolean
-  videoOnly: boolean
-}
-
 /** Something shared with a phone over the local Wi-Fi: `url` goes in the QR code. */
 export interface PhoneShare {
   token: string
@@ -480,6 +473,15 @@ export interface PhoneShare {
 }
 
 /** The paired phone's QR address, and how many phones have its page open now. */
+export interface MusicRemoteStatus {
+  on: boolean
+  /** The address to open on the phone (and put in the QR code). */
+  url: string | null
+  /** Phones with the remote open now. */
+  connected: number
+  error?: string
+}
+
 export interface PhonePairing {
   url: string
   connected: number
@@ -779,24 +781,6 @@ export interface NotesApi {
   /** The mouse's back (-1) or forward (1) button was pressed in a web page (by its web contents id). */
   onWebMouseNav(callback: (contentsId: number, dir: 1 | -1) => void): () => void
 
-  // The YouTube mini window
-  /**
-   * Opens the floating YouTube window (or brings it back), playing `url` if given: a YouTube link,
-   * or any web page with a video on it, played from `seconds` in.
-   */
-  openYouTube(url?: string, seconds?: number): Promise<void>
-  /** In the mini window: what to show first, and how you left it set. */
-  youTubeState(): Promise<YouTubeState>
-  /** In the mini window: the page showing now, so it carries on there next time. */
-  rememberYouTube(url: string): Promise<void>
-  /** In the mini window: float over other windows, or not. */
-  pinYouTube(on: boolean): Promise<void>
-  /** In the mini window: show only the video on a video's page, or the whole YouTube page. */
-  setYouTubeVideoOnly(on: boolean): Promise<void>
-  minimizeYouTube(): Promise<void>
-  closeYouTube(): Promise<void>
-  /** In the mini window: play this page (opened from the notes window). */
-  onYouTubeLoad(callback: (url: string, seconds: number) => void): () => void
   /**
    * Opens a web page in a window of its own, which can go full screen on another screen while Orbit
    * carries on; its video starts `seconds` in.
@@ -807,7 +791,7 @@ export interface NotesApi {
   updateStatus(): Promise<UpdateStatus>
   /** Looks for a newer version now. */
   checkForUpdates(): Promise<UpdateStatus>
-  /** Restarts into a downloaded update (Windows), or opens the download page (Mac). */
+  /** Restarts into a downloaded update, or opens the download page when it can't install itself. */
   installUpdate(): Promise<void>
   /** What's new since this computer last opened Orbit (empty when nothing is). */
   whatsNewPending(): Promise<import('./whatsNew').ReleaseNotes[]>
@@ -880,6 +864,10 @@ export interface NotesApi {
   /** Opens Steam's install window for a game (Steam asks which drive). */
   steamInstall(appId: string): Promise<void>
   steamOpenDownloads(): Promise<void>
+  /** What the Epic Games Launcher is installing or updating (measured from the game's folder), with a speed when it's going. */
+  epicDownloads(): Promise<(import('./games').EpicDownload & { speed?: number })[]>
+  /** Opens the Epic Games Launcher, where its downloads are paused and reordered. */
+  epicOpenDownloads(): Promise<void>
 
   // Video player
   /** What's in a video (its tracks need the video helper, ffmpeg) and the subtitle files beside it. */
@@ -931,6 +919,13 @@ export interface NotesApi {
   /** Sets an app's volume (0 to 100); 'master' is the whole computer. False if it didn't take. */
   mixerVolume(id: string, volume: number): Promise<boolean>
   mixerMute(id: string, muted: boolean): Promise<boolean>
+  // Task manager (main/taskManager.ts): what's running, and ending it
+  /** Every program running, with its processes' CPU, memory and disk use, and the whole computer's. */
+  tasksGet(): Promise<TaskSnapshot>
+  /** Ends these processes (each is checked to still be the same program first). */
+  tasksEnd(targets: EndTarget[]): Promise<EndResult>
+  /** Shows a process's program file in File Explorer / Finder; false if its path isn't known. */
+  tasksReveal(pid: number): Promise<boolean>
   // Soundboard (main/soundboard.ts; the sound itself is played in lib/soundboard.ts)
   soundboardGet(): Promise<SoundboardStatus>
   /** Asks for sound files and adds a button for each. */
@@ -1197,6 +1192,12 @@ export interface NotesApi {
   onMusicMiniCommand(callback: (command: MusicMiniCommand) => void): () => void
   /** What the mini player shows under the song, and news of changes (both windows hear it). */
   musicMiniLayout(): Promise<MusicMiniLayout>
+  /** The music phone remote (main/musicRemote.ts): whether it's on and its address; `fresh` makes a new address (the old one stops working). */
+  musicRemoteStatus(): Promise<MusicRemoteStatus>
+  setMusicRemote(on: boolean, fresh?: boolean): Promise<MusicRemoteStatus>
+  /** A song's lyrics (from a .lrc/.txt file next to it, or inside it), and saving them next to it. */
+  localMusicLyrics(path: string): Promise<{ text: string; source: 'lrc' | 'txt' | 'tag' } | null>
+  localMusicSaveLyrics(path: string, text: string): Promise<void>
   setMusicMiniLayout(layout: MusicMiniLayout): Promise<void>
   onMusicMiniLayout(callback: (layout: MusicMiniLayout) => void): () => void
   /** The visualiser's bars (0–100 each), notes window → mini player. */
@@ -1443,6 +1444,16 @@ export interface NotesApi {
   appsPullStates(repo: string, numbers: number[]): Promise<Record<number, 'open' | 'merged' | 'closed'>>
   /** Downloads a picture from a pull request's description. */
   appsFetchImage(url: string): Promise<{ bytes: Uint8Array; type: string }>
+  /** Marks a release as a pre-release, so it isn't the latest and apps that update themselves skip it (or back again). */
+  appsSetPrerelease(repo: string, tag: string, prerelease: boolean): Promise<Release>
+  /** Starts a new app from a starter: its folder, files, git repository and (if asked) GitHub repository. */
+  appsCreateApp(req: NewApp): Promise<MadeApp>
+  /** The open issues on an app's repository: bug reports from people using it. */
+  appsIssues(repo: string): Promise<BugReport[]>
+  /** Closes an issue on GitHub, with a comment first if one is given. */
+  appsCloseIssue(repo: string, number: number, comment?: string): Promise<void>
+  /** Checks an app's npm packages: newer versions, and known security problems (npm outdated and npm audit). */
+  appsHealth(folder: string): Promise<HealthReport>
   appsMerge(repo: string, number: number): Promise<void>
   appsClose(repo: string, number: number): Promise<void>
   /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */
@@ -1545,6 +1556,37 @@ export interface NotesApi {
   dropTargets(): Promise<DropTarget[]>
   onDropTargets(callback: (targets: DropTarget[]) => void): () => void
   dropSend(target: DropTarget['id'], paths: string[]): Promise<string>
+  /** Big file sender (main/fileSend.ts): sends with a code, and Google Drive links. */
+  fileSendState(): Promise<import('./fileSend').FileSendState>
+  onFileSendState(callback: (state: import('./fileSend').FileSendState) => void): () => void
+  fileSendSetServer(address: string): Promise<{ relay: boolean }>
+  /** Puts the intro server on your Cloudflare account with a key you made there. */
+  fileSendSetUp(token: string): Promise<{ relay: boolean; relayNote?: string }>
+  fileSendRelayOn(keyId?: string, apiToken?: string): Promise<void>
+  fileSendOpen(page: 'signup' | 'token' | 'turn' | 'workers'): Promise<void>
+  fileSendPick(kind: 'files' | 'folder'): Promise<string[]>
+  fileSendStart(paths: string[]): Promise<import('./fileSend').Transfer>
+  fileSendReceive(code: string): Promise<import('./fileSend').Transfer>
+  /** Accept a receive; `chooseFolder` asks where first (otherwise Downloads). Resolves where to start. */
+  fileSendAccept(id: string, chooseFolder: boolean): Promise<import('./fileSend').Position>
+  fileSendCancel(id: string): Promise<void>
+  fileSendForget(id: string): Promise<void>
+  fileSendResume(id: string): Promise<void>
+  fileSendReveal(id: string): Promise<void>
+  fileSendDrive(paths: string[]): Promise<import('./fileSend').DriveShare>
+  fileSendDriveConnect(): Promise<void>
+  fileSendDriveRemove(id: string): Promise<void>
+  fileSendDriveForget(id: string): Promise<void>
+  /** The WebRTC side of the big file sender (renderer lib/fileSendEngine.ts). */
+  onFileSendEvent(callback: (event: { id: string; kind: 'peer' | 'signal' | 'gone' | 'stop'; ice?: RTCIceServer[]; signal?: import('./fileSend').FsSignal }) => void): () => void
+  fileSendSignal(id: string, signal: import('./fileSend').FsSignal): Promise<void>
+  fileSendUpdate(id: string, patch: { status?: import('./fileSend').TransferStatus; route?: import('./fileSend').Route; done?: number; error?: string }): Promise<void>
+  fileSendManifest(id: string): Promise<import('./fileSend').Manifest | null>
+  fileSendGotManifest(id: string, manifest: unknown): Promise<import('./fileSend').Position | null>
+  fileSendStarted(id: string, pos: unknown): Promise<import('./fileSend').Position | null>
+  fileSendDeclined(id: string): Promise<void>
+  fileSendRead(id: string, index: number, offset: number, length: number): Promise<Uint8Array>
+  fileSendWrite(id: string, data: Uint8Array): Promise<{ done: number; finished: boolean }>
   /** The phone webcam (Windows): turn it on/off, its status and settings, and a live preview of the phone's frames. */
   camStatus(): Promise<CamStatus>
   camOn(): Promise<CamStatus>
@@ -1586,6 +1628,8 @@ export interface NotesApi {
 
   // File explorer tab (full paths on this computer)
   explorerPlaces(): Promise<ExplorerPlace[]>
+  /** How full each drive in the Drives list is, by its path (null when it couldn't be read). */
+  explorerDriveSpace(): Promise<Record<string, DriveSpace | null>>
   explorerList(dir: string): Promise<ExplorerEntry[]>
   /** The start of a text file, for its preview. */
   explorerReadText(path: string): Promise<string>
