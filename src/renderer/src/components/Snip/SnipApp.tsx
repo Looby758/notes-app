@@ -39,7 +39,7 @@ const TARGET_KEY = 'orbit.snip.translateTo'
 type Translation = { state: 'working' } | ({ state: 'done' } & SnipTranslation)
 
 /**
- * The screen snip window (#snip): a still picture of your screen, full screen. Drag a box round
+ * The screen snip window (#snip): a still picture of your screen, full screen (one per monitor). Drag a box round
  * some text; Orbit reads it and offers to copy it, save it, search, translate or ask the AI.
  *
  * Translate happens right here, on the offline AI, so the text never leaves the computer. Text
@@ -89,8 +89,19 @@ export default function SnipApp() {
       if (e.key === 'Escape') void window.api.snipClose()
     }
     window.addEventListener('keydown', onKey)
+    // A box started on another monitor: this one lets go of its own.
+    const offClear = window.api.onSnipClear(() => {
+      setStart(null)
+      setBox(null)
+      setDone(false)
+      setText(null)
+      setError(null)
+      setFound(null)
+      setTranslation(null)
+    })
     return () => {
       window.removeEventListener('keydown', onKey)
+      offClear()
     }
   }, [])
 
@@ -138,6 +149,7 @@ export default function SnipApp() {
     if ((e.target as Element).closest('.snip-panel')) return
     setStart(point(e))
     setBox({ x: e.clientX, y: e.clientY, w: 0, h: 0 })
+    void window.api.snipBoxing()
     setDone(false)
     setText(null)
     setError(null)

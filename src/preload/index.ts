@@ -480,6 +480,12 @@ const api: NotesApi = {
   snipGetOcrLang: (code) => ipcRenderer.invoke('snip:getOcrLang', code),
   snipTranslate: (text, target) => ipcRenderer.invoke('snip:translate', text, target),
   snipClose: () => ipcRenderer.invoke('snip:close'),
+  snipBoxing: () => ipcRenderer.invoke('snip:boxing'),
+  onSnipClear: (callback) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('snip:clear', handler)
+    return () => ipcRenderer.removeListener('snip:clear', handler)
+  },
   snipReportBug: (png) => ipcRenderer.invoke('snip:bug', png),
   onAppStudioBug: (callback) => {
     const handler = (_e: unknown, png: Uint8Array): void => callback(png)
