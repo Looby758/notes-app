@@ -153,7 +153,7 @@ export default function MusicSearch({ songs }: { songs: LocalSong[] }) {
             const { url, exact } = await youtubeLink(t)
             if (!exact) return notify(`Couldn’t find the video for “${t.title}”, so it can’t be saved.`)
             notify(`Saving “${t.title}” to your music…`, 'info')
-            await saveMp3(url)
+            await saveMp3(url, t)
           })
       },
       { label: 'Copy song name', icon: <Copy size={14} />, onClick: () => void navigator.clipboard.writeText(`${t.artist} – ${t.title}`) }

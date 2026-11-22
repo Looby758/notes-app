@@ -63,6 +63,8 @@ export type MusicEdit =
   | { kind: 'tag'; paths: string[]; tag: string; on: boolean }
   /** Files that moved (tidying, finding a missing song, keeping one of two copies): old path → new path. */
   | { kind: 'renamePaths'; map: Record<string, string> }
+  /** Songs deleted from your music: out of every playlist, and their likes, ratings, plays and tags. */
+  | { kind: 'forgetSongs'; paths: string[] }
 
 /** A tag as it's kept: trimmed, lower case, one space between words. */
 export const cleanTag = (tag: string): string => tag.trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 40)
@@ -179,6 +181,17 @@ export function applyMusicEdit(data: MusicData, edit: MusicEdit): MusicData {
     }
     case 'renamePaths':
       return renamePaths(d, edit.map)
+    case 'forgetSongs': {
+      const gone = new Set(edit.paths)
+      const keep = <T,>(rec: Record<string, T>): Record<string, T> => Object.fromEntries(Object.entries(rec).filter(([p]) => !gone.has(p)))
+      d.playlists = data.playlists.map((p) => (p.songs.some((s) => gone.has(s)) ? { ...p, songs: p.songs.filter((s) => !gone.has(s)) } : p))
+      d.liked = keep(data.liked)
+      d.ratings = keep(data.ratings)
+      d.stats = keep(data.stats)
+      d.tags = keep(d.tags)
+      d.history = data.history.filter((h) => !gone.has(h.path))
+      break
+    }
   }
   return d
 }

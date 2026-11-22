@@ -82,7 +82,7 @@ import ContextMenu, { type MenuItem } from '../ContextMenu'
 import { VolumeSlider } from './MusicPlayer'
 import MusicSearch from './MusicSearch'
 import { droppedPicture, DuplicatesView, hasPicture, MusicDialogs, openMusicDialog, TagMenu } from './MusicTools'
-import { fillFromNames, importSongs, setCover } from '../../store/musicFiles'
+import { deleteSongs, fillFromNames, importSongs, setCover } from '../../store/musicFiles'
 import SaveMp3 from './SaveMp3'
 import { onMusicLinkDone } from '../../store/musicLink'
 import { notify } from '../../store/notify'
@@ -776,6 +776,7 @@ function SongTable({ rows, setView, folder, sort, onSort, showTrack, playlist }:
       const positions = selectedRows.map((r) => r.position).filter((p): p is number => p !== undefined)
       items.push({ label: 'Remove from this playlist', icon: <X size={14} />, danger: true, onClick: () => void removeFromPlaylist(playlist.id, positions) })
     }
+    items.push({ label: one ? 'Delete from my music…' : `Delete ${list.length} songs from my music…`, icon: <Trash2 size={14} />, danger: true, onClick: () => void deleteSongs(list) })
     if (one) {
       items.push('separator')
       if (one.album) {
@@ -808,7 +809,15 @@ function SongTable({ rows, setView, folder, sort, onSort, showTrack, playlist }:
   }
 
   return (
-    <div className={`mp-table ${showTrack ? 'with-track' : ''}`} data-mp-table onKeyDown={(e) => e.key === 'Enter' && anchor !== null && play(anchor)} tabIndex={-1}>
+    <div className={`mp-table ${showTrack ? 'with-track' : ''}`} data-mp-table onKeyDown={(e) => {
+        if (e.key === 'Enter' && anchor !== null) play(anchor)
+        if (e.key === 'Delete' && selectedSongs.length) {
+          e.preventDefault()
+          // In a playlist, Delete takes songs out of the playlist; elsewhere it deletes them (after asking).
+          if (playlist) void removeFromPlaylist(playlist.id, selectedRows.map((r) => r.position).filter((p): p is number => p !== undefined))
+          else void deleteSongs(selectedSongs)
+        }
+      }} tabIndex={-1}>
       <div className="mp-tr mp-thead">
         <span className="mp-th mp-num">#</span>
         {header('title', 'Title')}

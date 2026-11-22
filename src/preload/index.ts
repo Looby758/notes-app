@@ -630,7 +630,7 @@ const api: NotesApi = {
   localMusicMove: (moves) => ipcRenderer.invoke('localMusic:move', moves),
   localMusicTrash: (paths) => ipcRenderer.invoke('localMusic:trash', paths),
   localMusicQuality: (paths) => ipcRenderer.invoke('localMusic:quality', paths),
-  musicLinkSave: (link) => ipcRenderer.invoke('musicLink:save', link),
+  musicLinkSave: (link, known) => ipcRenderer.invoke('musicLink:save', link, known),
   musicLinkCancel: (id) => ipcRenderer.invoke('musicLink:cancel', id),
   onMusicLinkProgress: (callback) => {
     const handler = (_e: unknown, p: MusicLinkProgress): void => callback(p)

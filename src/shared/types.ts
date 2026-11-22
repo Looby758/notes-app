@@ -1200,7 +1200,7 @@ export interface NotesApi {
   /** Each song's sound quality (kbps) and size, for choosing which copy to keep. */
   localMusicQuality(paths: string[]): Promise<Record<string, { bitrate: number; size: number }>>
   /** Downloads a link's sound as an MP3 into the music folder; returns the job's id (progress comes through onMusicLinkProgress). */
-  musicLinkSave(link: string): Promise<string>
+  musicLinkSave(link: string, known?: FoundTrack): Promise<string>
   musicLinkCancel(id: string): Promise<void>
   onMusicLinkProgress(callback: (progress: MusicLinkProgress) => void): () => void
   /** Any song (Apple's free iTunes Search), for the Music page's Search. */

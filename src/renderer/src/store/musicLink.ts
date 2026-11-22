@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { MusicLinkProgress } from '@shared/types'
+import type { FoundTrack } from '@shared/songSearch'
 import { errorMessage } from '../lib/paths'
 
 /** "Save MP3 to my music" downloads in this window, newest first. */
@@ -28,12 +29,13 @@ function listen(): void {
   })
 }
 
-export async function saveMp3(link: string): Promise<string | null> {
+/** `known`: the song it is (picked in Search), so its details and cover are used as they are. */
+export async function saveMp3(link: string, known?: FoundTrack): Promise<string | null> {
   listen()
   const clean = link.trim()
   if (!clean) return null
   try {
-    const id = await window.api.musicLinkSave(clean)
+    const id = await window.api.musicLinkSave(clean, known)
     useMusicLinks.setState((s) => ({ jobs: [{ id, link: clean, stage: 'downloading' as const, done: null }, ...s.jobs.filter((j) => j.id !== id)].slice(0, 8) }))
     return id
   } catch (err) {

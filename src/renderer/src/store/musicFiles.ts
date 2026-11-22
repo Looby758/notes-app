@@ -3,7 +3,7 @@ import type { MusicFileResult } from '@shared/types'
 import { errorMessage } from '../lib/paths'
 import { recordUndo } from '../lib/undo'
 import { applyLibrary } from './localMusic'
-import { movePaths } from './musicData'
+import { forgetSongs, movePaths } from './musicData'
 import { notify } from './notify'
 
 /**
@@ -141,4 +141,27 @@ export async function keepOne(keep: LocalSong, others: LocalSong[]): Promise<boo
 export async function relink(oldPath: string, song: LocalSong): Promise<void> {
   await movePaths({ [oldPath]: song.path })
   notify(`Found it: “${song.title}”.`, 'info')
+}
+
+/** Deletes songs from your music: the files go in the Recycle Bin, and out of your playlists. */
+export async function deleteSongs(songs: LocalSong[]): Promise<boolean> {
+  if (!songs.length) return false
+  try {
+    const one = songs.length === 1 ? songs[0] : null
+    const ok = await window.api.confirm({
+      message: one ? `Delete “${one.title}” from your music?` : `Delete ${songs.length} songs from your music?`,
+      detail: 'The files go in the Recycle Bin (you can get them back from there), and they’re taken out of your playlists.',
+      ok: 'Delete',
+      type: 'warning'
+    })
+    if (!ok) return false
+    const paths = songs.map((s) => s.path)
+    applyLibrary(await window.api.localMusicTrash(paths))
+    await forgetSongs(paths)
+    notify(one ? `Deleted “${one.title}”. It’s in the Recycle Bin.` : `Deleted ${songs.length} songs. They’re in the Recycle Bin.`, 'info')
+    return true
+  } catch (err) {
+    notify(clean(err))
+    return false
+  }
 }

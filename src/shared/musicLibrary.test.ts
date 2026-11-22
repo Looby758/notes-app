@@ -95,6 +95,21 @@ describe('tags and moved files', () => {
   })
 })
 
+describe('deleted songs', () => {
+  it('are forgotten everywhere', () => {
+    let d = applyMusicEdit(emptyMusicData(), { kind: 'createPlaylist', id: 'p', name: 'P', songs: ['a', 'b', 'a'], at: 1 })
+    d = applyMusicEdit(d, { kind: 'like', paths: ['a', 'b'], liked: true, at: 2 })
+    d = applyMusicEdit(d, { kind: 'played', path: 'a', at: 3 })
+    d = applyMusicEdit(d, { kind: 'tag', paths: ['a'], tag: 'gym', on: true })
+    d = applyMusicEdit(d, { kind: 'forgetSongs', paths: ['a'] })
+    expect(d.playlists[0].songs).toEqual(['b'])
+    expect(d.liked).toEqual({ b: 2 })
+    expect(d.stats).toEqual({})
+    expect(d.tags).toEqual({})
+    expect(d.history).toEqual([])
+  })
+})
+
 describe('normalizeMusicData', () => {
   it('keeps good parts of a damaged file', () => {
     const d = normalizeMusicData({ playlists: [{ id: 'p', name: 'Ok', songs: ['a', 3] }, { name: 'no id' }], liked: { a: 1, b: 'x' }, ratings: { a: 9, b: 3 }, stats: { a: { plays: 2 } }, history: [{ path: 'a', at: 1 }, 'junk'] })

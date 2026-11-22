@@ -33,7 +33,7 @@ async function lookUp(videoTitle: string, want: { artist: string; title: string 
   }
 }
 
-async function save(sender: WebContents, id: string, link: string): Promise<void> {
+async function save(sender: WebContents, id: string, link: string, known: FoundTrack | null): Promise<void> {
   const tell = (p: Omit<MusicLinkProgress, 'id'>): void => {
     if (!sender.isDestroyed()) sender.send('musicLink:progress', { id, ...p })
   }
@@ -49,7 +49,8 @@ async function save(sender: WebContents, id: string, link: string): Promise<void
 
     tell({ stage: 'details', done: null, title: videoTitle })
     const guess = songFromVideoTitle(videoTitle)
-    const found = await lookUp(videoTitle, guess)
+    // Saved from Search: the song you picked there is the one. Otherwise, look it up.
+    const found = known ?? (await lookUp(videoTitle, guess))
     const song = {
       title: found?.title ?? guess.title,
       artist: found?.artist ?? guess.artist,
@@ -89,10 +90,19 @@ async function save(sender: WebContents, id: string, link: string): Promise<void
   }
 }
 
+/** The song picked in Search, checked over (it comes from the window). */
+function knownSong(t: unknown): FoundTrack | null {
+  const r = t as Partial<FoundTrack> | null
+  if (!r || typeof r.title !== 'string' || !r.title.trim()) return null
+  const text = (v: unknown): string => (typeof v === 'string' ? v.slice(0, 300) : '')
+  const art = text(r.art)
+  return { id: text(r.id), title: text(r.title), artist: text(r.artist), album: text(r.album), year: text(r.year), genre: text(r.genre), durationMs: 0, art: art.startsWith('https://') ? art : undefined }
+}
+
 export function setupMusicFromLink(): void {
-  ipcMain.handle('musicLink:save', (e, link: string) => {
+  ipcMain.handle('musicLink:save', (e, link: string, known?: FoundTrack) => {
     const id = randomUUID()
-    void save(e.sender, id, String(link ?? ''))
+    void save(e.sender, id, String(link ?? ''), knownSong(known))
     return id
   })
   ipcMain.handle('musicLink:cancel', (_e, id: string) => cancels.get(String(id))?.())

@@ -150,3 +150,6 @@ export function tagSongs(songs: LocalSong[], tag: string, on: boolean): Promise<
 
 /** Songs that moved: everything about them (playlists, likes, plays, tags) follows. Not undoable by itself. */
 export const movePaths = (map: Record<string, string>): Promise<boolean> => (Object.keys(map).length ? edit([{ kind: 'renamePaths', map }]) : Promise.resolve(true))
+
+/** Deleted songs: out of playlists, likes, ratings, plays and tags. */
+export const forgetSongs = (paths: string[]): Promise<boolean> => edit([{ kind: 'forgetSongs', paths }])
