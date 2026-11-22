@@ -10,11 +10,24 @@ interface ComicsState {
 // The comic you were reading opens again next time.
 const READING_KEY = 'comics:reading'
 
-export const useComics = create<ComicsState>(() => ({ reading: localStorage.getItem(READING_KEY) }))
+// Read safely: tests import this store (through the editor) where there is no localStorage.
+function loadReading(): string | null {
+  try {
+    return localStorage.getItem(READING_KEY)
+  } catch {
+    return null
+  }
+}
+
+export const useComics = create<ComicsState>(() => ({ reading: loadReading() }))
 
 export function readComic(id: string | null): void {
-  if (id) localStorage.setItem(READING_KEY, id)
-  else localStorage.removeItem(READING_KEY)
+  try {
+    if (id) localStorage.setItem(READING_KEY, id)
+    else localStorage.removeItem(READING_KEY)
+  } catch {
+    // Not saved: the comic still opens, it just won't reopen next time.
+  }
   useComics.setState({ reading: id })
 }
 
