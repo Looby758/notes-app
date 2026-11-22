@@ -3,6 +3,7 @@ import { Grid2x2Check, Lightbulb, RotateCcw, Trophy, Undo2, X } from 'lucide-rea
 import { colOf, isNonoSolved, lineDone, makeNonogram, nonoLevelOf, NONO_LEVELS, rowOf, type Mark, type Nonogram, type NonoLevel } from '../../lib/nonogram'
 import { formatTime } from '../../lib/sudoku'
 import { celebrate } from '../../lib/celebrate'
+import { playSound, scaleNote } from '../../lib/gameSound'
 import { useChanged } from './useChanged'
 
 /** A game in progress. */
@@ -62,6 +63,14 @@ export default function NonogramPage() {
   const board = useRef<HTMLDivElement>(null)
   const { rows, cols, clues, solution } = game.puzzle
   const changed = useChanged(game.marks)
+
+  // Filling a square plucks a note (higher further right), a cross ticks, and clearing one brushes it away.
+  useEffect(() => {
+    if (!changed.size || changed.size > 3 || game.won) return
+    const [i] = changed
+    const m = game.marks[i]
+    playSound(m === 1 ? 'place' : m === 2 ? 'tap' : 'erase', m === 1 ? scaleNote(i % cols) : undefined)
+  }, [game.marks])
 
   useEffect(() => save(GAME_KEY, game), [game])
   useEffect(() => board.current?.focus(), [])

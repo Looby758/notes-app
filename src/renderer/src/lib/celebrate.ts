@@ -4,6 +4,7 @@
  * little one (a hand of Blackjack, a Breakout level).
  */
 import { petCheer } from './pet'
+import { playSound } from './gameSound'
 
 export const CELEBRATE = 'minigames:celebrate'
 
@@ -11,5 +12,6 @@ export type CelebrationSize = 'small' | 'win' | 'big'
 
 export function celebrate(size: CelebrationSize = 'win'): void {
   petCheer()
+  playSound(size === 'big' ? 'bigWin' : size === 'small' ? 'right' : 'win')
   window.dispatchEvent(new CustomEvent<CelebrationSize>(CELEBRATE, { detail: size }))
 }

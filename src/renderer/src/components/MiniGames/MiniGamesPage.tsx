@@ -16,6 +16,7 @@ import ChessPage from './ChessPage'
 import { playMiniGame, useMiniGames, type MiniGameId } from '../../store/miniGames'
 import { loadRecords, type GameRecord } from '../../lib/gameStats'
 import Confetti from './Confetti'
+import SoundControl from './SoundControl'
 import './polish.css'
 
 export type MiniGameGroup = 'Puzzles' | 'Words' | 'Cards' | 'Arcade and board'
@@ -94,6 +95,7 @@ export default function MiniGamesPage() {
           <button className="minigames-back" onClick={() => playMiniGame(null)} data-minigames-back>
             <ChevronLeft size={15} /> All games
           </button>
+          <SoundControl />
         </div>
         <Game key={playing} />
         <Confetti />

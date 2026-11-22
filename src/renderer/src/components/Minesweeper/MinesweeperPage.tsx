@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react'
-import { Bomb, Flag, RotateCcw, Trophy, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type WheelEvent } from 'react'
+import { Bomb, Flag, RotateCcw, Trophy, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { countsOf, isCleared, layMines, levelOf, LEVELS, neighbours, reveal, type Level } from '../../lib/minesweeper'
 import { formatTime } from '../../lib/sudoku'
 import { celebrate } from '../../lib/celebrate'
 import { useChanged } from '../MiniGames/useChanged'
+import { playSound } from '../../lib/gameSound'
 
 /** A game in progress. `mine` is null until the first click, so the first click is never a mine. */
 interface Game {
@@ -20,6 +21,15 @@ interface Game {
 // The game and best times live on this computer only (not in the notes folder): it's just for fun.
 const GAME_KEY = 'notesapp.minesweeper.game'
 const BEST_KEY = 'notesapp.minesweeper.best'
+const ZOOM_KEY = 'notesapp.minesweeper.zoom'
+
+/** Square sizes you can zoom between, in pixels. 'fit' makes the board fill the space it has. */
+type Zoom = number | 'fit'
+const MIN_SIZE = 18
+const MAX_SIZE = 72
+const ZOOM_STEP = 6
+const NORMAL_SIZE = 30
+const GAP = 2
 
 function load<T>(key: string): T | null {
   try {
@@ -51,7 +61,54 @@ export default function MinesweeperPage() {
   const [cursor, setCursor] = useState<number | null>(null)
   const [flagMode, setFlagMode] = useState(false)
   const board = useRef<HTMLDivElement>(null)
+  const wrap = useRef<HTMLDivElement>(null)
   const { rows, cols, mines } = levelOf(game.level)
+
+  // Zoom: squares as big as fit the page, or a size you pick (remembered).
+  const [zoom, setZoomState] = useState<Zoom>(() => {
+    const z = load<Zoom>(ZOOM_KEY)
+    return typeof z === 'number' && z >= MIN_SIZE && z <= MAX_SIZE ? z : 'fit'
+  })
+  const [room, setRoom] = useState({ w: 0, h: 0 })
+  useEffect(() => {
+    const el = wrap.current
+    if (!el) return
+    const measure = (): void => setRoom({ w: el.clientWidth, h: window.innerHeight - el.getBoundingClientRect().top + (el.closest('.sudoku-page')?.scrollTop ?? 0) })
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    window.addEventListener('resize', measure)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [])
+  // The board's frame (padding and border) takes 16px.
+  const fitW = Math.floor((room.w - 16 - GAP * (cols - 1)) / cols)
+  const fitH = Math.floor((room.h - 90 - GAP * (rows - 1)) / rows)
+  const fitSize = room.w ? Math.max(22, Math.min(52, fitW, Math.max(fitH, 26))) : NORMAL_SIZE
+  const size = zoom === 'fit' ? fitSize : zoom
+  const setZoom = (z: Zoom): void => {
+    const next = z === 'fit' ? z : Math.max(MIN_SIZE, Math.min(MAX_SIZE, Math.round(z)))
+    setZoomState(next)
+    save(ZOOM_KEY, next)
+  }
+  const zoomBy = (steps: number): void => setZoom(size + steps * ZOOM_STEP)
+  const onWheel = (e: WheelEvent): void => {
+    if (!e.ctrlKey && !e.metaKey) return
+    e.preventDefault()
+    zoomBy(e.deltaY < 0 ? 1 : -1)
+  }
+  // Ctrl + wheel would otherwise zoom the whole window, so it's caught before the browser sees it.
+  useEffect(() => {
+    const el = wrap.current
+    if (!el) return
+    const stop = (e: globalThis.WheelEvent): void => {
+      if (e.ctrlKey || e.metaKey) e.preventDefault()
+    }
+    el.addEventListener('wheel', stop, { passive: false })
+    return () => el.removeEventListener('wheel', stop)
+  }, [])
 
   useEffect(() => save(GAME_KEY, game), [game])
   useEffect(() => board.current?.focus(), [])
@@ -84,6 +141,22 @@ export default function MinesweeperPage() {
   const origin = useRef<number | null>(null)
   const opened = useChanged(game.open)
   const flagDropped = useChanged(game.flags, (now, before) => now && !before)
+  const unflagged = useChanged(game.flags, (now, before) => !now && before)
+
+  // Sounds: squares crackle open (more of them for a big opening), flags knock in, mines go off.
+  useEffect(() => {
+    if (game.state === 'lost' && game.boom !== null) {
+      playSound('boom')
+      playSound('lose', undefined, 0.9)
+      return
+    }
+    if (opened.size) {
+      const n = Math.min(6, Math.ceil(opened.size / 5))
+      for (let k = 0; k < n; k++) playSound('open', undefined, k * 0.045)
+    } else if (flagDropped.size) playSound('flag')
+    else if (unflagged.size) playSound('tap')
+  }, [game.open, game.flags, game.state])
+
   const distance = (a: number, b: number): number => Math.max(Math.abs(Math.floor(a / cols) - Math.floor(b / cols)), Math.abs((a % cols) - (b % cols)))
 
   const start = (level: Level): void => {
@@ -137,7 +210,14 @@ export default function MinesweeperPage() {
   }
 
   const onKey = (e: KeyboardEvent): void => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+' || e.key === '-' || e.key === '0')) {
+      e.preventDefault()
+      if (e.key === '0') setZoom('fit')
+      else zoomBy(e.key === '-' ? -1 : 1)
+      return
+    }
     if (e.ctrlKey || e.metaKey || e.altKey) return
+    if (e.key === '+' || e.key === '=' || e.key === '-') return void (e.preventDefault(), zoomBy(e.key === '-' ? -1 : 1))
     const moves: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }
     if (moves[e.key]) {
       e.preventDefault()
@@ -197,17 +277,33 @@ export default function MinesweeperPage() {
             >
               <Flag size={15} /> Flag mode {flagMode ? 'on' : 'off'}
             </button>
+            <span className="mines-zoom" role="group" aria-label="Zoom">
+              <button className="sudoku-tool" onClick={() => zoomBy(-1)} disabled={size <= MIN_SIZE} title="Smaller squares (−, or Ctrl + scroll)" data-mines-zoom-out>
+                <ZoomOut size={15} />
+              </button>
+              <button
+                className={`sudoku-tool mines-zoom-level ${zoom === 'fit' ? 'active' : ''}`}
+                onClick={() => setZoom('fit')}
+                title={zoom === 'fit' ? 'The board fills the space it has' : 'Back to fitting the page (Ctrl + 0)'}
+                data-mines-zoom-fit
+              >
+                {zoom === 'fit' ? 'Fit' : `${Math.round((size / NORMAL_SIZE) * 100)}%`}
+              </button>
+              <button className="sudoku-tool" onClick={() => zoomBy(1)} disabled={size >= MAX_SIZE} title="Bigger squares (+, or Ctrl + scroll)" data-mines-zoom-in>
+                <ZoomIn size={15} />
+              </button>
+            </span>
             <button className="sudoku-tool" onClick={() => start(game.level)} title="Start a new game (N)">
               <RotateCcw size={15} /> New
             </button>
           </span>
         </div>
 
-        <div className="mines-wrap">
+        <div ref={wrap} className="mines-wrap" onWheel={onWheel}>
           <div
             ref={board}
             className={`mines-board ${game.state}`}
-            style={{ '--mine-size': cols > 20 ? '24px' : '30px', gridTemplateColumns: `repeat(${cols}, var(--mine-size))` } as CSSProperties}
+            style={{ '--mine-size': `${size}px`, gridTemplateColumns: `repeat(${cols}, var(--mine-size))` } as CSSProperties}
             tabIndex={0}
             role="grid"
             aria-label="Minesweeper board"
@@ -247,11 +343,11 @@ export default function MinesweeperPage() {
                   data-cell={i}
                 >
                   {wrongFlag ? (
-                    <X size={14} />
+                    <X size={Math.round(size * 0.48)} />
                   ) : flagged ? (
-                    <Flag size={13} className="mines-flag" />
+                    <Flag size={Math.round(size * 0.45)} className="mines-flag" />
                   ) : showMine ? (
-                    <Bomb size={14} />
+                    <Bomb size={Math.round(size * 0.48)} />
                   ) : isOpen && n ? (
                     n
                   ) : null}
@@ -277,7 +373,7 @@ export default function MinesweeperPage() {
 
         <p className="sudoku-help">
           Open every square that isn't a mine. A number tells you how many mines touch that square. Right-click (or F) to flag a mine, and click a number
-          once its mines are flagged to open the squares around it. Your first click is always safe.
+          once its mines are flagged to open the squares around it. Your first click is always safe. Zoom with the buttons, + and −, or Ctrl + scroll.
         </p>
       </div>
     </div>

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import { BrickWall, ChartColumn, Heart, Pause, Play, RotateCcw } from 'lucide-react'
-import { BALL_R, FIELD_H, FIELD_W, launch, LIVES, newBreakout, PADDLE_H, PADDLE_W, PADDLE_Y, step, type Breakout, type StepEvents } from '../../lib/breakout'
+import { BALL_R, FIELD_H, FIELD_W, launch, LIVES, newBreakout, PADDLE_H, PADDLE_W, PADDLE_Y, step, type Ball, type Breakout, type StepEvents } from '../../lib/breakout'
 import { celebrate } from '../../lib/celebrate'
+import { playSound } from '../../lib/gameSound'
 import { useGameKeys } from './useGameKeys'
 import { motionLevel } from '../../lib/motion'
 
@@ -38,6 +39,16 @@ const ROW_COLOURS = ['#e5484d', '#f76b15', '#f5a524', '#46a758', '#12a594', '#3e
 const KEY_SPEED = 520
 
 /** Breakout: bounce the ball to break all the bricks, level after level. */
+/** The sounds for one step: bricks ring by row, tough ones crack, the paddle thumps, walls tick. */
+function sounds(g: Breakout, e: StepEvents, before: Ball): void {
+  for (const h of e.hits.slice(0, 2)) playSound(h.broke ? 'brick' : 'crack', h.row)
+  if (e.paddle) playSound('paddle')
+  if (e.levelUp) playSound('levelUp')
+  else if (e.lostLife) playSound(g.over ? 'lose' : 'lifeLost')
+  else if (!e.hits.length && !e.paddle && g.launched && (Math.sign(before.vx) !== Math.sign(g.ball.vx) || Math.sign(before.vy) !== Math.sign(g.ball.vy)))
+    playSound('wall')
+}
+
 export default function BreakoutPage() {
   const [game, setGame] = useState<Breakout>(() => newBreakout())
   const [paused, setPaused] = useState(false)
@@ -64,12 +75,14 @@ export default function BreakoutPage() {
         if (s.keys.left) s.target -= KEY_SPEED * dt
         if (s.keys.right) s.target += KEY_SPEED * dt
         s.target = Math.max(PADDLE_W / 2, Math.min(FIELD_W - PADDLE_W / 2, s.target))
+        const before = s.game.ball
         const { game: next, events } = step(s.game, dt, s.target)
         if (next !== s.game) {
           s.game = next
           setGame(next)
         }
         react(fx.current, events, next)
+        sounds(next, events, before)
         if (events.levelUp) celebrate('small')
       }
       tickFx(fx.current, s.paused || s.game.over ? 0 : dt, s.game)
@@ -96,7 +109,10 @@ export default function BreakoutPage() {
     const s = state.current
     if (s.game.over) return restart()
     if (s.paused) return setPaused(false)
-    if (!s.game.launched) setGame(launch(s.game))
+    if (!s.game.launched) {
+      playSound('launch')
+      setGame(launch(s.game))
+    }
   }
 
   const restart = (): void => {

@@ -3,6 +3,7 @@ import { Flag, Lightbulb, RotateCcw, Skull, Trophy, Type } from 'lucide-react'
 import { HANGMAN_THEMES, hangmanClue, hangmanState, hangmanThemeOf, MAX_WRONG, pickHangmanWord, shownLetters, wrongGuesses, type HangmanTheme } from '../../lib/hangman'
 import { loadRecords, saveGame, type GameRecord } from '../../lib/gameStats'
 import { celebrate } from '../../lib/celebrate'
+import { playSound } from '../../lib/gameSound'
 import GameStats from './GameStats'
 import { useGameKeys } from './useGameKeys'
 import { useChanged } from './useChanged'
@@ -108,10 +109,12 @@ export default function HangmanPage() {
     setRecords((r) => ({ ...r, [statsId(game.theme)]: rec }))
     setGame((g) => ({ ...g, counted: true }))
     if (state === 'won') celebrate()
+    else playSound('lose', undefined, 0.25)
   }, [state, game.counted, game.theme])
 
   const guess = (letter: string): void => {
     if (state !== 'playing' || game.guessed.includes(letter)) return
+    playSound(game.word.includes(letter) ? 'right' : 'wrong')
     setGame((g) => ({ ...g, guessed: [...g.guessed, letter] }))
   }
 
@@ -122,6 +125,7 @@ export default function HangmanPage() {
       setRecords((r) => ({ ...r, [statsId(game.theme)]: rec }))
     }
     setGame(newGame(themeId))
+    playSound('tap')
     page.current?.focus()
   }
 
@@ -179,7 +183,10 @@ export default function HangmanPage() {
                 {hangmanClue(game.theme, game.word)}
               </span>
             ) : (
-              <button className="sudoku-tool" onClick={() => setGame((g) => ({ ...g, clue: true }))} title="Show what kind of word it is" data-hangman-show-clue>
+              <button className="sudoku-tool" onClick={() => {
+                  setGame((g) => ({ ...g, clue: true }))
+                  playSound('select')
+                }} title="Show what kind of word it is" data-hangman-show-clue>
                 <Lightbulb size={15} /> Clue
               </button>
             )}

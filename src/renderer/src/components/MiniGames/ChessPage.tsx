@@ -22,7 +22,7 @@ import {
 } from '../../lib/chess'
 import { pieceSrc } from '../../lib/chessPieces'
 import { loadRecords, saveGame, type GameRecord } from '../../lib/gameStats'
-import { playSound } from '../../lib/sounds'
+import { playSound } from '../../lib/gameSound'
 import { formatTime } from '../../lib/sudoku'
 import { celebrate } from '../../lib/celebrate'
 import GameStats from './GameStats'
@@ -192,7 +192,10 @@ export default function ChessPage() {
   useEffect(() => {
     if (game.end === cheered.current) return
     cheered.current = game.end
-    if (game.end?.reason === 'checkmate' && (game.mode !== 'computer' || game.end.winner === game.you)) celebrate()
+    if (!game.end) return
+    if (game.end.reason === 'checkmate' && (game.mode !== 'computer' || game.end.winner === game.you)) celebrate()
+    else if (game.mode === 'computer' && game.end.winner && game.end.winner !== game.you) playSound('lose', undefined, 0.2)
+    else if (!game.end.winner) playSound('push', undefined, 0.2)
   }, [game.end, game.mode, game.you])
 
   // Count games against the computer: only a win keeps the streak going.
@@ -218,7 +221,8 @@ export default function ChessPage() {
     setSelected(null)
     setPromo(null)
     setViewing(null)
-    playSound(m.captured ? 'capture' : 'piece')
+    playSound(m.captured ? 'capture' : 'move')
+    if (!end && inCheck(next)) playSound('check', undefined, 0.08)
   }
 
   // The computer's turn: think after a short pause so its move doesn't appear instantly.

@@ -241,6 +241,74 @@ body.theme-light .minigames-glow::after {
   background: transparent;
 }
 
+/* Sound effects: a speaker button and a slider that opens out on hover. */
+.minigames-page .minigames-bar {
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  z-index: 2;
+}
+.minigames-sound {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px;
+  border-radius: 999px;
+  transition: background 0.2s;
+}
+.minigames-sound:hover,
+.minigames-sound:focus-within {
+  background: color-mix(in srgb, var(--game, var(--accent)) 10%, var(--bg-raised));
+}
+.minigames-sound-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    transform 0.2s var(--m-spring);
+}
+.minigames-sound.on .minigames-sound-btn {
+  color: var(--game, var(--accent));
+}
+.minigames-sound-btn:hover {
+  transform: scale(calc(1 + 0.1 * var(--m-move)));
+}
+.minigames-sound input[type='range'] {
+  width: 0;
+  opacity: 0;
+  height: 4px;
+  margin: 0;
+  appearance: none;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--game, var(--accent)) calc(var(--v) * 100%), var(--border-strong) 0);
+  cursor: pointer;
+  transition:
+    width calc(0.25s * var(--m-time)) var(--m-ease-out),
+    opacity 0.2s,
+    margin 0.25s;
+}
+.minigames-sound:hover input[type='range'],
+.minigames-sound:focus-within input[type='range'] {
+  width: 90px;
+  opacity: 1;
+  margin: 0 10px 0 2px;
+}
+.minigames-sound input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
 /* Everything in a game rises in, one part after another. */
 .minigames-page.playing .sudoku-inner > * {
   animation: mg-rise calc(0.45s * var(--m-time)) var(--m-ease-out) backwards;
@@ -489,15 +557,21 @@ body.theme-light .minigames-glow::after {
   box-shadow: inset 0 0 0 2px var(--game);
   color: #fff;
 }
+/* Only the number moves, never the square: scaling a square smeared its borders onto the next one. */
+.minigames-page .sudoku-num {
+  display: inline-block;
+}
 .minigames-page .sudoku-cell.wrong {
   color: #ff6b6b;
+}
+.minigames-page .sudoku-cell.wrong .sudoku-num {
   animation: mg-shake 0.35s ease-in-out;
 }
-.minigames-page .sudoku-cell.placed {
-  animation: mg-num-in calc(0.35s * var(--m-time)) var(--m-spring) calc(var(--rc) * 12ms) backwards;
+.minigames-page .sudoku-cell.placed .sudoku-num {
+  animation: mg-num-in calc(0.35s * var(--m-time)) var(--m-spring) backwards;
 }
-.minigames-page .sudoku-cell.wrong.placed {
-  animation: mg-shake 0.35s ease-in-out;
+.minigames-page .sudoku-board.fresh .sudoku-cell.placed .sudoku-num {
+  animation-delay: calc(var(--rc) * 12ms);
 }
 @keyframes mg-num-in {
   from {
@@ -521,7 +595,6 @@ body.theme-light .minigames-glow::after {
   0% {
     background: color-mix(in srgb, var(--game) 70%, white);
     color: #fff;
-    transform: scale(calc(1 + 0.12 * var(--m-move)));
   }
   100% {
     background: transparent;
@@ -538,7 +611,6 @@ body.theme-light .minigames-glow::after {
   35% {
     background: color-mix(in srgb, var(--game) 55%, transparent);
     color: #fff;
-    transform: scale(calc(1 + 0.1 * var(--m-move)));
   }
   100% {
     background: transparent;
@@ -578,6 +650,27 @@ body.theme-light .minigames-glow::after {
 }
 
 /* ---------- Minesweeper ---------- */
+.minigames-page .mines-inner {
+  max-width: 1500px;
+}
+.minigames-page .mines-wrap {
+  display: flex;
+  overflow: auto;
+}
+.minigames-page .mines-board {
+  margin: 0 auto;
+  transition: box-shadow 0.3s;
+}
+.mines-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.mines-zoom .mines-zoom-level {
+  min-width: 52px;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
 .minigames-page .mines-board {
   border-color: var(--game-line);
   border-radius: 14px;

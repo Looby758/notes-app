@@ -15,6 +15,7 @@ import {
 } from '../../lib/sudoku'
 import { celebrate } from '../../lib/celebrate'
 import { useChanged } from '../MiniGames/useChanged'
+import { playSound, scaleNote } from '../../lib/gameSound'
 
 /** A game in progress. `notes` holds the small pencil marks: bit n is set when n is pencilled in. */
 interface Game {
@@ -123,6 +124,17 @@ export default function SudokuPage() {
       if ((kind === 0 ? rowOf(i) : kind === 1 ? colOf(i) : boxOf(i)) === n) flash.set(i, kind === 0 ? colOf(i) : kind === 1 ? rowOf(i) : (rowOf(i) % 3) * 3 + (colOf(i) % 3))
     })
   }
+
+  // Each number goes in with a note of its own; a mistake buzzes and a finished row, column or box chimes.
+  useEffect(() => {
+    if (placed.size !== 1) return
+    const [i] = placed
+    const n = game.grid[i]
+    if (!n) playSound('erase')
+    else if (wrong.has(i)) playSound('wrong')
+    else if (newlyDone.size && !game.won) playSound('unit')
+    else if (!game.won) playSound('place', scaleNote(n - 1))
+  }, [game.grid])
 
   const left = useMemo(() => {
     const counts = new Array(10).fill(9)
@@ -264,7 +276,7 @@ export default function SudokuPage() {
         <div className="sudoku-play">
           <div
             ref={board}
-            className={`sudoku-board ${game.won ? 'won' : ''}`}
+            className={`sudoku-board ${game.won ? 'won' : ''} ${placed.size > 1 ? 'fresh' : ''}`}
             tabIndex={0}
             role="grid"
             aria-label="Sudoku grid"
@@ -289,14 +301,17 @@ export default function SudokuPage() {
                 <button
                   key={i}
                   className={classes.filter(Boolean).join(' ')}
-                  onClick={() => setSelected(i)}
+                  onClick={() => {
+                    setSelected(i)
+                    playSound('select')
+                  }}
                   style={{ '--rc': rowOf(i) + colOf(i), '--k': flash.get(i) ?? 0 } as CSSProperties}
                   tabIndex={-1}
                   aria-label={`Row ${rowOf(i) + 1}, column ${colOf(i) + 1}${n ? `: ${n}` : ', empty'}`}
                   data-cell={i}
                 >
                   {n ? (
-                    n
+                    <span className="sudoku-num">{n}</span>
                   ) : game.notes[i] ? (
                     <span className="sudoku-notes">
                       {NUMBERS.map((m) => (

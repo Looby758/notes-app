@@ -4,6 +4,7 @@ import { addTile, biggest, canMove, GOAL, newBoard, SIZE, slide, slideTiles, til
 import { loadRecords, saveGame, type GameRecord } from '../../lib/gameStats'
 import { formatTime } from '../../lib/sudoku'
 import { celebrate } from '../../lib/celebrate'
+import { playSound } from '../../lib/gameSound'
 import GameStats from './GameStats'
 import { useGameKeys } from './useGameKeys'
 
@@ -161,6 +162,7 @@ export default function Game2048Page() {
       // Nothing can move that way: a little nudge says so.
       setBump(null)
       requestAnimationFrame(() => setBump(dir))
+      playSound('wall')
       return
     }
     const { board: next, at } = addTile(s.board)
@@ -186,12 +188,21 @@ export default function Game2048Page() {
     const joins = moved.filter((t) => t.merged).length
     if (joins >= 2) setCombo({ n: joins, key: ng.moves })
     const top = biggest(next)
-    if (top > biggest(g.board) && top >= 128) setMilestone({ value: top, key: ng.moves })
+    const milestoneHit = top > biggest(g.board) && top >= 128
+    if (milestoneHit) setMilestone({ value: top, key: ng.moves })
+    // Each join rings at a pitch that climbs with the tile's value; plain slides just whoosh.
+    const joined = moved.filter((t) => t.merged).map((t) => t.value)
+    if (joined.length) playSound('merge', Math.max(...joined))
+    else playSound('slide')
+    if (joins >= 2) playSound('combo', joins - 1, 0.07)
+    if (milestoneHit && top < GOAL) playSound('unit', undefined, 0.12)
+    if (ng.over && !ng.reached) playSound('lose', undefined, 0.3)
   }
 
   const undo = (): void => {
     const g = gameRef.current
     if (!g.before || g.over) return
+    playSound('erase')
     setGame({ ...g, board: g.before.board, score: g.before.score, before: null, fresh: [] })
     setTiles(tilesOf(g.before.board))
   }
@@ -203,6 +214,7 @@ export default function Game2048Page() {
     setGame(g)
     setTiles(tilesOf(g.board).map((t) => ({ ...t, isNew: true })))
     setShowWin(false)
+    playSound('deal')
     setGain(null)
     setCombo(null)
     setMilestone(null)

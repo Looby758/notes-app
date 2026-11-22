@@ -19,6 +19,7 @@ import {
 import { isRed, type Card } from '../../lib/solitaire'
 import { loadRecords, saveGame, type GameRecord } from '../../lib/gameStats'
 import { celebrate } from '../../lib/celebrate'
+import { playSound } from '../../lib/gameSound'
 import { CardFace, cardLabel } from './SolitairePage'
 import GameStats from './GameStats'
 import { useGameKeys } from './useGameKeys'
@@ -87,10 +88,19 @@ export default function BlackjackPage() {
   /** Moves the table on, and counts the hand once it's over. */
   const play = (next: Round): void => {
     if (next === round) return
+    // A card for every one that came out of the shoe, a little apart, and chips for a bigger bet.
+    const dealt = round.shoe.length - next.shoe.length
+    for (let k = 0; k < Math.min(dealt, 8); k++) playSound('deal', undefined, k * 0.13)
+    const staked = next.hands.reduce((n, h) => n + h.bet, 0) - (round.phase === 'playing' ? round.hands.reduce((n, h) => n + h.bet, 0) : 0)
+    if (staked > 0 && round.phase === 'playing') playSound('chip')
     if (next.phase === 'done' && round.phase !== 'done') {
       const net = netResult(next)
+      const after = Math.min(dealt, 8) * 0.13 + 0.15
+      if (next.dealer.length) playSound('flip', undefined, 0.1)
       if (net !== 0) setRecord(saveGame(STATS_ID, net > 0))
-      if (net > 0) celebrate('small')
+      if (net > 0) setTimeout(() => celebrate('small'), after * 1000)
+      else if (net < 0) playSound('lose', undefined, after)
+      else playSound('push', undefined, after)
       if (next.bank > most) {
         setMost(next.bank)
         save(MOST_KEY, String(next.bank))
@@ -104,11 +114,15 @@ export default function BlackjackPage() {
   const broke = betting && round.bank < CHIPS[0]
   const bet = Math.min(round.bet, round.bank)
 
-  const setBet = (n: number): void => setRound((r) => ({ ...r, bet: Math.max(0, Math.min(n, r.bank)) }))
+  const setBet = (n: number): void => {
+    playSound(n > 0 ? 'chip' : 'erase')
+    setRound((r) => ({ ...r, bet: Math.max(0, Math.min(n, r.bank)) }))
+  }
   const dealHand = (): void => {
     if (betting && bet > 0) play(deal(round, bet))
   }
   const resetChips = (): void => {
+    for (let k = 0; k < 4; k++) playSound('chip', undefined, k * 0.06)
     setRound(newTable())
     page.current?.focus()
   }

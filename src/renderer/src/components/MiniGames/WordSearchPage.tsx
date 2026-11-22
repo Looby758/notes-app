@@ -5,6 +5,7 @@ import { WORD_SEARCH_THEMES, type WordSearchTheme } from '../../lib/wordSearchWo
 import { loadRecords, saveGame, type GameRecord } from '../../lib/gameStats'
 import { formatTime } from '../../lib/sudoku'
 import { celebrate } from '../../lib/celebrate'
+import { playSound, scaleNote } from '../../lib/gameSound'
 import GameStats from './GameStats'
 
 /** A puzzle in progress (or just finished). */
@@ -127,12 +128,20 @@ export default function WordSearchPage() {
       setRecords((r) => ({ ...r, [id]: rec }))
     }
     setGame(newGame(themeId, size))
+    playSound('deal')
     setSelection([])
     setAnchor(null)
     setHinted(null)
     setMessage(null)
     board.current?.focus()
   }
+
+  // Dragging along the letters plays a rising scale, one note a letter.
+  const lastLength = useRef(0)
+  useEffect(() => {
+    if (selection.length > lastLength.current && selection.length > 0) playSound('place', scaleNote(selection.length - 1))
+    lastLength.current = selection.length
+  }, [selection.length])
 
   /** Checks a line of squares against the hidden words. */
   const check = (cells: number[]): void => {
@@ -141,10 +150,12 @@ export default function WordSearchPage() {
     const hit = wordAt(puzzle, cells, game.found)
     if (!hit) {
       setMessage({ text: 'Not one of the words', tone: 'miss' })
+      playSound('wrong')
       return
     }
     if (game.found.includes(hit.word)) {
       setMessage({ text: `Already found ${displayWord(hit.word)}`, tone: 'miss' })
+      playSound('tap')
       return
     }
     const found = [...game.found, hit.word]
@@ -152,6 +163,7 @@ export default function WordSearchPage() {
     const kind = twd ? walkingDeadSearchKind(hit.word) : null
     setMessage({ text: `${displayWord(hit.word)}${kind ? `: ${kind}` : ''}`, tone: 'found' })
     setGame((g) => ({ ...g, found, won, counted: g.counted || won }))
+    if (!won) playSound('found')
     if (won) {
       const id = statsId(puzzle)
       // A puzzle with hints still counts as a win, but not for the best time.
@@ -206,6 +218,7 @@ export default function WordSearchPage() {
     if (!left.length || game.won) return
     const pick = left[Math.floor(Math.random() * left.length)]
     setHinted(pick.cells[0])
+    playSound('select')
     setMessage({ text: hideList ? 'A word starts at the flashing letter' : `${displayWord(pick.word)} starts at the flashing letter`, tone: 'found' })
     setGame((g) => ({ ...g, hints: g.hints + 1 }))
     board.current?.focus()

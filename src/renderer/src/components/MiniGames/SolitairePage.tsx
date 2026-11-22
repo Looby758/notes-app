@@ -4,6 +4,7 @@ import { bestMove, canFinish, deal, drawCards, finishStep, isRed, isWon, move, p
 import { loadRecords, saveGame, type GameRecord } from '../../lib/gameStats'
 import { formatTime } from '../../lib/sudoku'
 import { celebrate } from '../../lib/celebrate'
+import { playSound, scaleNote } from '../../lib/gameSound'
 import GameStats from './GameStats'
 import { useGameKeys } from './useGameKeys'
 import { useChanged } from './useChanged'
@@ -147,6 +148,20 @@ export default function SolitairePage() {
     setGame((g) => ({ ...g, counted: true }))
   }, [won, game.counted, game.seconds, d.draw])
 
+  // Sounds for each change to the table: cards slap down, a card turning over flips, and a card
+  // going home rings a note that climbs as the foundations fill.
+  const prevDeal = useRef(d)
+  useEffect(() => {
+    const before = prevDeal.current
+    prevDeal.current = d
+    if (before === d) return
+    const home = (x: Deal): number => x.foundations.reduce((n, f) => n + f.length, 0)
+    const faceUp = (x: Deal): number => x.tableau.reduce((n, col) => n + col.filter((c) => c.up).length, 0)
+    if (home(d) > home(before)) playSound('place', scaleNote(Math.min(home(d), 30) - 1 + 2))
+    else playSound('deal')
+    if (faceUp(d) > faceUp(before) && home(d) >= home(before) && d.stock.length === before.stock.length) playSound('flip', undefined, 0.08)
+  }, [d])
+
   // Play the rest home, one card at a time.
   useEffect(() => {
     if (!finishing) return
@@ -176,8 +191,11 @@ export default function SolitairePage() {
       saveGame(statsId(d.draw), false)
       setRecords(loadRecords())
     }
-    setGame(fresh(draw))
+    const next = fresh(draw)
+    prevDeal.current = next.deal
+    setGame(next)
     setDealt(Date.now())
+    for (let k = 0; k < 7; k++) playSound('deal', undefined, k * 0.09)
     setSelected(null)
     setFinishing(false)
     setDrag(null)
@@ -242,7 +260,7 @@ export default function SolitairePage() {
     setDrag(null)
     if (g.moving) {
       // Let go over a pile: the cards go there if they're allowed to, otherwise they go back.
-      if (g.over) apply(move(d, g.from, g.over))
+      if (g.over && !apply(move(d, g.from, g.over))) playSound('wrong')
       return
     }
     // A press without moving is a click (and two quick ones are a double-click, if that's on).
