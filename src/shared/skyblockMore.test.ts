@@ -264,3 +264,20 @@ describe('profiles', () => {
     ])
   })
 })
+
+describe('item ids', () => {
+  it('turns rune sack ids into NEU ones', async () => {
+    const { neuId } = await import('./skyblockGoals')
+    expect(neuId('RUNE_MUSIC_1')).toBe('MUSIC_RUNE;1')
+    expect(neuId('RUNE_ZOMBIE_SLAYER_3')).toBe('ZOMBIE_SLAYER_RUNE;3')
+    expect(neuId('INK_SACK:4')).toBe('INK_SACK-4')
+  })
+
+  it('draws new-style vanilla models as the old item', async () => {
+    const { modernVanilla } = await import('./skyblockTextures')
+    expect(modernVanilla('minecraft:music_disc_chirp', {}, {})).toEqual({ id: 'record_chirp', damage: 0 })
+    expect(modernVanilla('minecraft:crafter', {}, {})).toEqual({ id: 'dropper', damage: 0 })
+    expect(modernVanilla('minecraft:player_head', {}, {})).toBeNull()
+    expect(modernVanilla('hypixel_skyblock:item/foo', {}, {})).toBeNull()
+  })
+})

@@ -115,6 +115,9 @@ export default function SkyblockGoalsPage() {
   const [friends, setFriends] = useState<SbFriend[]>([])
   const [share, setShare] = useState(false)
   const root = useRef<HTMLDivElement>(null)
+  const light = useRef<HTMLDivElement>(null)
+  const mouse = useRef({ x: 0, y: 0 })
+  const lightFrame = useRef(0)
   const addon = useSkyblockAddon()
   const [zoom, setZoom] = useState(savedZoom)
   const [zoomShown, setZoomShown] = useState(false)
@@ -242,16 +245,19 @@ export default function SkyblockGoalsPage() {
       className="sbg-page sbx"
       ref={root}
       onMouseMove={(e) => {
-        const r = root.current?.getBoundingClientRect()
-        if (r) {
-          root.current!.style.setProperty('--mx', `${e.clientX - r.left}px`)
-          root.current!.style.setProperty('--my', `${e.clientY - r.top}px`)
-        }
+        // Only the light moves (on the compositor, once a frame), so nothing else is laid out again.
+        mouse.current = { x: e.clientX, y: e.clientY }
+        if (!lightFrame.current)
+          lightFrame.current = requestAnimationFrame(() => {
+            lightFrame.current = 0
+            const r = root.current?.getBoundingClientRect()
+            if (r && light.current) light.current.style.transform = `translate(${mouse.current.x - r.left - 520}px, ${mouse.current.y - r.top - 520}px)`
+          })
       }}
       data-skyblock-goals
     >
       <DriftWall ids={wallIds} />
-      <div className="sbx-light" aria-hidden />
+      <div className="sbx-light" ref={light} aria-hidden />
       <div className="sbx-scroll">
         <div className="sbg-inner" style={{ zoom }}>
           <header className="sbx-top">

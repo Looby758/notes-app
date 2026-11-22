@@ -52,7 +52,7 @@ export interface SbData {
 }
 
 /** The recipe book's format; an older saved file is downloaded again. */
-export const SB_DATA_VERSION = 3
+export const SB_DATA_VERSION = 4
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
@@ -61,7 +61,11 @@ const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFi
 export const stripColors = (s: string): string => s.replace(/§./g, '').trim()
 
 /** Hypixel writes "LOG:2" where NEU writes "LOG-2". */
-export const neuId = (id: string): string => id.replace(/:/g, '-')
+/** Hypixel's id → NEU's: "INK_SACK:4" → "INK_SACK-4", and rune sack ids "RUNE_MUSIC_1" → "MUSIC_RUNE;1". */
+export const neuId = (id: string): string => {
+  const rune = /^RUNE_([A-Z_]+)_(\d)$/.exec(id)
+  return rune ? `${rune[1]}_RUNE;${rune[2]}` : id.replace(/:/g, '-')
+}
 
 /** "ENDER_PEARL:4" → ['ENDER_PEARL', 4]. */
 export function parsePair(s: unknown): Pair | null {

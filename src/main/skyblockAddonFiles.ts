@@ -1,7 +1,19 @@
 import { app } from 'electron'
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { iconOf, iconOfNbt, indexPacks, mcItemOfNeu, minecraftItem, skinFromTag, type ItemIcon, type McItem, type TextureIndex, type TexturePack } from '@shared/skyblockTextures'
+import {
+  iconOf,
+  iconOfNbt,
+  indexPacks,
+  mcItemOfNeu,
+  minecraftItem,
+  modernVanilla,
+  skinFromTag,
+  type ItemIcon,
+  type McItem,
+  type TextureIndex,
+  type TexturePack
+} from '@shared/skyblockTextures'
 
 /**
  * Where the SkyBlock add-on's files live, whether it's installed, and item pictures worked out from
@@ -175,6 +187,8 @@ export function slotIcon(slot: Record<string, unknown>): ItemIcon | undefined {
   const tag = (slot.tag && typeof slot.tag === 'object' ? slot.tag : {}) as Record<string, unknown>
   const extra = tag.ExtraAttributes && typeof tag.ExtraAttributes === 'object' ? (tag.ExtraAttributes as Record<string, unknown>) : {}
   const model = typeof tag.ItemModel === 'string' ? tag.ItemModel : typeof extra.id === 'string' ? modelOf(extra.id) : undefined
-  const icon = iconOfNbt(id, damage, tag, skinFromTag(tag), idx, model)
+  // Hypixel still sends 1.8 items, so new-style ones (vinyls, compactors) arrive as paper.
+  const plain = id === 'paper' ? modernVanilla(model, ids, damages) : null
+  const icon = iconOfNbt(plain?.id ?? id, plain?.damage ?? damage, tag, skinFromTag(tag), idx, model)
   return icon.tex || icon.skin ? icon : undefined
 }

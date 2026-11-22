@@ -19873,6 +19873,7 @@ button.board-add-picture:hover {
   position: absolute;
   inset: -40px;
   overflow: clip;
+  contain: strict;
   z-index: 0;
   display: flex;
   flex-direction: column;
@@ -19881,13 +19882,19 @@ button.board-add-picture:hover {
   opacity: 0.3;
   transform: rotate(-8deg) scale(1.15);
   pointer-events: none;
-  mask-image: radial-gradient(ellipse at center, #000 30%, transparent 85%);
-  filter: saturate(0.8);
+}
+/* Fades the wall's edges (a plain overlay: masks and filters on moving layers are slow). */
+.sbx-wall::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 35%, #040309 88%);
 }
 .sbx-wall-row {
   display: flex;
   gap: 26px;
   width: max-content;
+  will-change: transform;
   animation: sbx-drift var(--d, 100s) linear infinite;
 }
 .sbx-wall-row.back {
@@ -19918,10 +19925,15 @@ button.board-add-picture:hover {
 }
 .sbx-light {
   position: absolute;
-  inset: 0;
+  left: 0;
+  top: 0;
+  width: 1040px;
+  height: 1040px;
   z-index: 1;
   pointer-events: none;
-  background: radial-gradient(520px circle at var(--mx) var(--my), rgba(143, 227, 255, 0.08), transparent 60%);
+  will-change: transform;
+  transform: translate(-2000px, -2000px);
+  background: radial-gradient(circle, rgba(143, 227, 255, 0.08), transparent 60%);
 }
 .sbx .sbg-inner {
   max-width: 1240px;
@@ -20148,11 +20160,11 @@ button.board-add-picture:hover {
 .sbx .sbg-empty,
 .sbx .sba-card,
 .sbx .sbg-warning {
-  background: var(--sbx-pane), var(--sbx-sheet);
+  /* No backdrop blur here: blurring dozens of panels over a moving background is what made it lag. */
+  background: var(--sbx-pane), rgba(12, 13, 30, 0.72);
   border: 1px solid var(--sbx-line);
   border-radius: 18px;
-  backdrop-filter: var(--sbx-blur);
-  box-shadow: var(--sbx-rim), 0 12px 40px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--sbx-rim), 0 12px 32px rgba(0, 0, 0, 0.3);
 }
 .sbx .sbp-panel h4 {
   font-weight: 700;
@@ -21052,4 +21064,13 @@ button.sbp-coop-row:hover {
 }
 .sbx-row.locked {
   border-color: rgba(255, 143, 163, 0.3);
+}
+
+/* Long grids only draw what's on screen. */
+.sbx .sbp-tile,
+.sbx .sbp-grid > *,
+.sbx .sbx-row,
+.sbx .sbp-nw-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 52px;
 }

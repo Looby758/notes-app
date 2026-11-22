@@ -218,7 +218,10 @@ export function viewItems(root: unknown, iconOf?: SlotIconOf): (SbViewItem | nul
     const tag = slot.tag
     const extra = obj(tag.ExtraAttributes)
     const display = obj(tag.display)
-    const id = typeof extra.id === 'string' ? neuId(extra.id) : ''
+    let id = typeof extra.id === 'string' ? neuId(extra.id) : ''
+    // Runes are all "RUNE" to Hypixel; NEU names them by kind and level ("MUSIC_RUNE;1").
+    const rune = (id === 'RUNE' || id === 'UNIQUE_RUNE') && isObj(extra.runes) ? Object.entries(extra.runes)[0] : undefined
+    if (rune && typeof rune[1] === 'number') id = `${rune[0]}_RUNE;${rune[1]}`
     const name = typeof display.Name === 'string' ? display.Name : id ? prettyId(id) : ''
     if (!id && !name) return null
     const lore = Array.isArray(display.Lore) ? display.Lore.map(String) : []

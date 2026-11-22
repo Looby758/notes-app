@@ -237,6 +237,63 @@ export function minecraftItem(raw: string | number, damage: number, ids: Record<
   return { id, damage: damage || 0 }
 }
 
+/** 1.20+ items with no 1.8 version, drawn as the closest old item instead. */
+const MODERN_STAND_INS: Record<string, string> = {
+  crafter: 'dropper',
+  trial_key: 'tripwire_hook',
+  ominous_trial_key: 'tripwire_hook',
+  copper_ingot: 'brick',
+  amethyst_shard: 'prismarine_crystals',
+  echo_shard: 'prismarine_shard',
+  recovery_compass: 'compass',
+  bundle: 'leather',
+  spyglass: 'stick',
+  goat_horn: 'bone',
+  brush: 'feather',
+  disc_fragment_5: 'record_11',
+  music_disc_creator: 'record_11',
+  music_disc_relic: 'record_far',
+  music_disc_pigstep: 'record_cat',
+  music_disc_otherside: 'record_mellohi',
+  honeycomb: 'gold_nugget',
+  honeycomb_block: 'glowstone',
+  honey_bottle: 'glass_bottle',
+  stripped_mangrove_log: 'log',
+  cactus_flower: 'red_flower',
+  white_banner: 'banner:15',
+  black_banner: 'banner:0',
+  horn_coral: 'yellow_flower',
+  fire_coral: 'red_flower',
+  seagrass: 'tallgrass:1',
+  kelp: 'tallgrass:1',
+  big_dripleaf: 'waterlily',
+  weeping_vines: 'vine',
+  turtle_egg: 'egg',
+  nautilus_shell: 'prismarine_shard',
+  tadpole_bucket: 'water_bucket',
+  bone_block: 'bone',
+  orange_candle: 'torch',
+  mangrove_hanging_sign: 'sign',
+  yellow_bundle: 'leather',
+  beetroot_seeds: 'pumpkin_seeds',
+  beetroot_soup: 'mushroom_stew',
+  ghast_spawn_egg: 'spawn_egg:56',
+  mooshroom_spawn_egg: 'spawn_egg:96',
+  frog_spawn_egg: 'spawn_egg:92'
+}
+
+/**
+ * The 1.8 item to draw for a new-style vanilla model ("minecraft:music_disc_chirp" → record_chirp),
+ * for SkyBlock items NEU lists as paper with a plain Minecraft model. Null for player heads and
+ * Hypixel's own models.
+ */
+export function modernVanilla(model: string | undefined, ids: Record<string, string>, vanillaDamages: Record<string, string>): { id: string; damage: number } | null {
+  if (!model?.startsWith('minecraft:') || model === 'minecraft:player_head') return null
+  let name = model.slice('minecraft:'.length).replace(/^item\//, '')
+  name = MODERN_STAND_INS[name] ?? name.replace(/^music_disc_/, 'record_')
+  return minecraftItem(name, 0, ids, vanillaDamages)
+}
+
 /** The skin texture id from a player head's NBT (SkullOwner.Properties.textures[0].Value), or ''. */
 export function skinFromValue(value: string): string {
   try {
@@ -294,12 +351,14 @@ export function mcItemOfNeu(file: unknown, ids: Record<string, string>, vanillaD
   const nbt = typeof file.nbttag === 'string' ? file.nbttag : ''
   const x = /ExtraAttributes:\{[^]*?\bid:\\?"([^"\\]+)\\?"/.exec(nbt)?.[1]
   // Items NEU now lists as paper with a 1.21 model were heads in 1.8, which is what the packs match.
+  const model = /ItemModel:\\?"([a-z0-9_.:/-]+)\\?"/.exec(nbt)?.[1]
   const modern = id === 'paper' && /ItemModel:/.test(nbt)
-  const out: McItem = modern ? { i: 'skull', d: 3, p: 1 } : { i: id, d: damage }
+  // A plain Minecraft model (a music disc, a crafter) is drawn as that Minecraft item, not as paper.
+  const plain = modern ? modernVanilla(model, ids, vanillaDamages) : null
+  const out: McItem = plain ? { i: plain.id, d: plain.damage } : modern ? { i: 'skull', d: 3, p: 1 } : { i: id, d: damage }
   const skin = nbt ? skinFromSnbt(nbt) : ''
   if (skin) out.s = skin
   if (x) out.x = x
-  const model = /ItemModel:\\?"([a-z0-9_.:/-]+)\\?"/.exec(nbt)?.[1]
   if (model) out.m = model
   if (typeof file.displayname === 'string') out.name = file.displayname
   if (Array.isArray(file.lore)) out.lore = file.lore.map(String)
