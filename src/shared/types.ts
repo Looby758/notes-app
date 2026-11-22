@@ -1,5 +1,7 @@
 import type { AppInfo, GitHubStatus, MergedPull, PullRequest, Release, TestCopy } from './appStudio'
-import type { ExplorerEntry, ExplorerPlace, PasteMode } from './explorer'
+import type { ExplorerEntry, ExplorerPlace, PasteMode, PcIndexStatus } from './explorer'
+import type { FileTagStore, TagColour } from './fileTags'
+import type { BinListing } from './recycleBin'
 import type { ArchiveEntry } from './archive'
 import type { ComicOpened, ComicPreparing, ComicSettings, ComicShelf } from './comics'
 import type { WikiAnswer, WikiCheck, WikiHit, WikiInfo, WikiPageView, WikiPictureChoice, WikiSpoilerView } from './wiki'
@@ -1367,6 +1369,37 @@ export interface NotesApi {
   explorerTrash(paths: string[]): Promise<string[]>
   /** Finds names under a folder and all its subfolders. */
   explorerSearch(dir: string, query: string, showHidden: boolean): Promise<ExplorerEntry[]>
+  /** Whole PC search: every file and folder on the computer whose name has each word, best first. */
+  explorerSearchPc(query: string, showHidden: boolean): Promise<{ entries: ExplorerEntry[]; status: PcIndexStatus; system: boolean }>
+  /** How Whole PC search's list of files is getting on (`everything`: the Everything app's helper is installed). */
+  explorerIndexStatus(): Promise<PcIndexStatus & { everything: boolean; wanted: boolean }>
+  onExplorerIndexStatus(callback: (status: PcIndexStatus) => void): () => void
+  /** The folders shown now: their total sizes come in through onExplorerFolderSize (`fresh`: count again). */
+  explorerFolderSizes(paths: string[], fresh?: boolean): Promise<void>
+  /** A folder's size (`complete` false while still counting); null when it couldn't be read. */
+  onExplorerFolderSize(callback: (e: { path: string; size: { bytes: number; files: number; folders: number; complete: boolean; counting?: boolean } | null }) => void): () => void
+  /** Walks the drives again now. */
+  explorerReindex(): Promise<void>
+  /** Everything with this colour tag (that's still there). */
+  explorerTagged(colour: TagColour): Promise<ExplorerEntry[]>
+  // The Recycle Bin / Bin (Files tab)
+  binList(): Promise<BinListing>
+  /** Puts items back where they came from; returns where each went. */
+  binRestore(ids: string[]): Promise<string[]>
+  /** Deletes for good; returns how many. */
+  binDelete(ids: string[]): Promise<number>
+  binEmpty(): Promise<number>
+  /** The system's own Recycle Bin / Bin window. */
+  binOpenSystem(): Promise<void>
+  /** Mac: Privacy & Security → Full Disk Access, so Orbit can look in the Bin. */
+  binMacPrivacy(): Promise<void>
+  // Colour tags and favourite folders (Files tab)
+  tagsGet(): Promise<FileTagStore>
+  tagsSet(paths: string[], colour: TagColour, on: boolean): Promise<void>
+  /** Names a colour ("School"); an empty name goes back to the colour's own. */
+  tagsLabel(colour: TagColour, label: string): Promise<void>
+  tagsFavourites(paths: string[]): Promise<void>
+  onTagsChanged(callback: (store: FileTagStore) => void): () => void
   // Comic book reader
   comicsShelf(): Promise<ComicShelf>
   /** Adds comic files (asks which, when no paths are given). */

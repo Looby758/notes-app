@@ -1,4 +1,5 @@
 import { useEditor } from '../store/editor'
+import { searchWholePc } from '../store/filesReveal'
 import { focusIdeaBox } from '../store/videos'
 import { useVault } from '../store/vault'
 import { openExport, showRightView, showSearch, showSidebarView, toggleFocusMode, toggleMindMap, toggleZen, useUI } from '../store/ui'
@@ -353,6 +354,7 @@ export const commands: Command[] = [
   { id: 'convert.open', group: 'Navigation', title: 'Convert files (photos, Word, audio…)', run: () => openSpecialTab(CONVERT_TAB) },
   { id: 'pdf.open', group: 'Navigation', title: 'PDF editor (sign, fill in, merge, split, reorder pages)', run: () => openSpecialTab(PDF_EDITOR_TAB) },
   { id: 'explorer.open', group: 'Navigation', title: 'Browse files on this computer (and Google Drive)', run: () => openSpecialTab(EXPLORER_TAB) },
+  { id: 'explorer.searchPc', group: 'Navigation', title: 'Search the whole PC for a file or folder', run: () => searchWholePc() },
   { id: 'explorer.newTab', group: 'Navigation', title: 'New Files tab (another folder, to drag files between)', run: () => openExplorerTab() },
   { id: 'comics.open', group: 'Navigation', title: 'Read comics (your comic book shelf)', run: () => openSpecialTab(COMICS_TAB) },
   { id: 'wiki.open', group: 'Navigation', title: 'Wikis (downloaded Fandom wikis, read offline)', run: () => openSpecialTab(WIKI_TAB) },

@@ -776,6 +776,36 @@ const api: NotesApi = {
   explorerPaste: (paths, dir, mode) => ipcRenderer.invoke('explorer:paste', paths, dir, mode),
   explorerTrash: (paths) => ipcRenderer.invoke('explorer:trash', paths),
   explorerSearch: (dir, query, showHidden) => ipcRenderer.invoke('explorer:search', dir, query, showHidden),
+  explorerSearchPc: (query, showHidden) => ipcRenderer.invoke('explorer:searchPc', query, showHidden),
+  explorerIndexStatus: () => ipcRenderer.invoke('explorer:indexStatus'),
+  onExplorerIndexStatus: (callback) => {
+    const handler = (_e: unknown, status: Parameters<typeof callback>[0]): void => callback(status)
+    ipcRenderer.on('explorer:indexStatus', handler)
+    return () => ipcRenderer.removeListener('explorer:indexStatus', handler)
+  },
+  explorerFolderSizes: (paths, fresh) => ipcRenderer.invoke('explorer:folderSizes', paths, fresh),
+  onExplorerFolderSize: (callback) => {
+    const handler = (_e: unknown, ev: Parameters<typeof callback>[0]): void => callback(ev)
+    ipcRenderer.on('explorer:folderSize', handler)
+    return () => ipcRenderer.removeListener('explorer:folderSize', handler)
+  },
+  explorerReindex: () => ipcRenderer.invoke('explorer:reindex'),
+  explorerTagged: (colour) => ipcRenderer.invoke('explorer:tagged', colour),
+  binList: () => ipcRenderer.invoke('bin:list'),
+  binRestore: (ids) => ipcRenderer.invoke('bin:restore', ids),
+  binDelete: (ids) => ipcRenderer.invoke('bin:delete', ids),
+  binEmpty: () => ipcRenderer.invoke('bin:empty'),
+  binOpenSystem: () => ipcRenderer.invoke('bin:openSystem'),
+  binMacPrivacy: () => ipcRenderer.invoke('bin:macPrivacy'),
+  tagsGet: () => ipcRenderer.invoke('tags:get'),
+  tagsSet: (paths, colour, on) => ipcRenderer.invoke('tags:set', paths, colour, on),
+  tagsLabel: (colour, label) => ipcRenderer.invoke('tags:label', colour, label),
+  tagsFavourites: (paths) => ipcRenderer.invoke('tags:favourites', paths),
+  onTagsChanged: (callback) => {
+    const handler = (_e: unknown, store: Parameters<typeof callback>[0]): void => callback(store)
+    ipcRenderer.on('tags:changed', handler)
+    return () => ipcRenderer.removeListener('tags:changed', handler)
+  },
   explorerToVault: (paths, folder) => ipcRenderer.invoke('explorer:toVault', paths, folder),
   explorerStartDrag: (paths) => ipcRenderer.send('explorer:startDrag', paths),
   explorerArchiveList: (path, password) => ipcRenderer.invoke('explorer:archiveList', path, password),

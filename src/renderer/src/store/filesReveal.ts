@@ -8,3 +8,11 @@ export function showInFiles(path: string): void {
   useFilesReveal.setState({ path })
   openSpecialTab(EXPLORER_TAB)
 }
+
+/** Asks the Files tab to search the whole PC (Ctrl+K → "Search the whole PC"): bumped each time. */
+export const useFilesPcSearch = create<{ asked: number }>(() => ({ asked: 0 }))
+
+export function searchWholePc(): void {
+  useFilesPcSearch.setState((s) => ({ asked: s.asked + 1 }))
+  openSpecialTab(EXPLORER_TAB)
+}

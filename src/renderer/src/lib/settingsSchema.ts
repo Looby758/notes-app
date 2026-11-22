@@ -618,6 +618,15 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'attachments images audio pdf files hide show tree'
   },
   {
+    key: 'filesWholePcSearch',
+    section: 'files',
+    group: 'Files tab',
+    type: 'toggle',
+    label: 'Whole PC search',
+    description: 'Orbit keeps a list of the name of every file on this computer (not what’s in them), so searching the whole PC in the Files tab shows results as you type. The list is made in the background and kept up to date as files change. Turning this off deletes nothing but stops the list being kept.',
+    keywords: 'search everything whole pc computer find file index spotlight instant'
+  },
+  {
     key: 'randomIncludeDaily',
     section: 'files',
     group: 'Random note',

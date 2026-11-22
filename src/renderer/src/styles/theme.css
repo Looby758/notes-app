@@ -17210,3 +17210,210 @@ button.board-add-picture:hover {
   padding: 0;
   text-align: left;
 }
+
+/* ---------- Files: Whole PC search, colour tags and favourites ---------- */
+.tag-dot {
+  display: inline-block;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--bg) 60%, transparent);
+}
+.explorer-tags {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+.explorer-tags .tag-dot + .tag-dot {
+  margin-left: -3px;
+}
+.explorer-list.grid .explorer-tags {
+  margin-top: -2px;
+}
+.explorer-place.tag {
+  height: 26px;
+}
+.explorer-place.tag small {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.explorer-place.tag.unused {
+  color: var(--text-faint);
+}
+.explorer-place.tag.unused .tag-dot {
+  opacity: 0.55;
+}
+.explorer-place.pinned svg {
+  color: var(--tag, var(--accent));
+  fill: color-mix(in srgb, var(--tag, var(--accent)) 30%, transparent);
+}
+.explorer-group-hint {
+  padding: 2px 10px 0;
+  color: var(--text-faint);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+.explorer-star.on {
+  color: #f5c542;
+}
+.explorer-scope {
+  display: flex;
+  flex: none;
+  padding: 2px;
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--bg-panel);
+}
+.explorer-scope button {
+  padding: 3px 8px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: 11.5px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 140ms var(--ease), color 140ms var(--ease);
+}
+.explorer-scope button:hover {
+  color: var(--text);
+}
+.explorer-scope button.on {
+  background: var(--bg-raised);
+  color: var(--accent);
+}
+.explorer-search.pc {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+.explorer-index {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border-top: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: 11.5px;
+}
+.explorer-index span {
+  flex: 1;
+  min-width: 0;
+}
+.explorer-index .link-btn {
+  font-size: 11.5px;
+}
+.explorer-tag-title {
+  gap: 8px;
+  color: var(--text-faint);
+  font-size: 12.5px;
+}
+.explorer-tag-title strong {
+  color: var(--text-strong);
+  font-size: 13px;
+}
+.explorer-tag-title span:not(.tag-dot) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tag-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+}
+.tag-picker.small {
+  padding: 0;
+}
+.tag-picker-label {
+  margin-right: 4px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.tag-swatch {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: var(--tag);
+  cursor: pointer;
+  transition: transform 120ms var(--ease), box-shadow 120ms var(--ease);
+}
+.tag-swatch:hover {
+  transform: scale(1.15);
+}
+.tag-swatch.on {
+  box-shadow: 0 0 0 2px var(--bg-raised), 0 0 0 3.5px var(--tag);
+}
+.tag-clear {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.tag-clear:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.explorer-tag-dialog input {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+.explorer-tag-dialog h3 .tag-dot {
+  width: 12px;
+  height: 12px;
+}
+.menu .tag-picker .tag-swatch {
+  width: 16px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--tag);
+}
+.menu .tag-picker .tag-clear {
+  width: 18px;
+  padding: 0;
+  border-radius: 50%;
+}
+.menu .tag-picker .tag-swatch:hover {
+  background: var(--tag);
+}
+.explorer-size-counting {
+  opacity: 0.6;
+}
+.explorer-bin-title .btn {
+  height: 26px;
+  padding: 0 9px;
+  color: var(--text);
+  font-size: 12px;
+}
+.explorer-bin-title .btn.danger:not(:disabled) {
+  color: #f08a8a;
+}
+.explorer-bin-title > span {
+  flex: 1 0 auto;
+  overflow: visible;
+}
+.explorer-place.bin.drop {
+  background: color-mix(in srgb, #f08a8a 18%, transparent);
+  color: #f08a8a;
+}
+.explorer-bin-blocked {
+  max-width: 420px;
+  line-height: 1.5;
+  text-align: center;
+}
+.explorer-bin-title > svg {
+  flex: none;
+}

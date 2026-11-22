@@ -235,6 +235,9 @@ export interface Prefs {
   /** Ctrl+K: if no built-in pattern understands a sentence, offer to ask the AI (never sent without asking). */
   smartCommandsAi: boolean
 
+  /** Whole PC search in the Files tab: Orbit keeps a list of every file name on the computer, so results show as you type. */
+  filesWholePcSearch: boolean
+
   /** Shortcut overrides by command id: a shortcut like "Ctrl+Shift+K", or null for none. */
   shortcuts: Record<string, string | null>
 }
@@ -365,6 +368,7 @@ export const DEFAULT_PREFS: Prefs = {
   radialMiddleClick: true,
   radialFeatures: ['today', 'new-note', 'calendar', 'money', 'music', 'email', 'snip', 'ask'],
   smartCommandsAi: true,
+  filesWholePcSearch: true,
   phoneDeck: ['play-pause', 'next-song', 'previous-song', 'today', 'new-note', 'snip', 'streamer', 'lock-all', 'zen', 'money', 'calendar', 'messages'],
 
   shortcuts: {}
