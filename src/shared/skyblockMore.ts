@@ -1,4 +1,4 @@
-import { collectionTier, planGoals, stripColors, type SbData, type SbProfileData } from './skyblockGoals'
+import { checkRequirement, collectionTier, parseRequirements, planGoals, stripColors, type RequirementCheck, type SbData, type SbProfileData } from './skyblockGoals'
 import type { SbProfileView, SbViewItem } from './skyblockProfile'
 
 /**
@@ -410,10 +410,12 @@ export interface MinionStep {
   ready: boolean
   /** The materials for the next tier, with what you have. */
   needs: { id: string; name: string; need: number; have: number }[]
+  /** What else the next tier needs (a collection tier, Crimson Isle reputation), checked against your profile. */
+  requires: RequirementCheck[]
 }
 
 /** Each minion's highest tier, and what the next one costs against what you have, best first. */
-export function minionHelper(v: SbProfileView, data: SbData, owned: Record<string, number>): MinionStep[] {
+export function minionHelper(v: SbProfileView, data: SbData, owned: Record<string, number>, profile: SbProfileData | null = null): MinionStep[] {
   const crafted = new Map(v.minions.map((m) => [m.id, m.highest]))
   const types = new Map<string, number>()
   for (const id of Object.keys(data.items)) {
@@ -432,7 +434,10 @@ export function minionHelper(v: SbProfileView, data: SbData, owned: Record<strin
     const total = needs.reduce((a, n) => a + n.need, 0)
     const have = needs.reduce((a, n) => a + n.have, 0)
     const name = (data.items[`${type}_GENERATOR_1`]?.name ?? cap(type.toLowerCase())).replace(/\s+[IVX]+$/, '')
-    out.push({ type, name, tier, maxTier, next: nextId, progress: total ? have / total : 0, ready: !!recipe && have >= total && total > 0, needs })
+    const reqText = nextId ? data.items[nextId]?.req : undefined
+    const requires = reqText ? parseRequirements(reqText, data.collections).map((r) => checkRequirement(r, data, profile)) : []
+    const blocked = requires.some((r) => r.met === false)
+    out.push({ type, name, tier, maxTier, next: nextId, progress: total ? have / total : 0, ready: !!recipe && have >= total && total > 0 && !blocked, needs, requires })
   }
   out.sort(
     (a, b) =>

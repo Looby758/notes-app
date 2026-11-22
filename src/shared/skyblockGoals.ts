@@ -52,7 +52,7 @@ export interface SbData {
 }
 
 /** The recipe book's format; an older saved file is downloaded again. */
-export const SB_DATA_VERSION = 2
+export const SB_DATA_VERSION = 3
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
@@ -119,7 +119,13 @@ export function buildItems(files: unknown[]): Record<string, SbItem> {
         if (inputs.length) item.forge = { inputs, count: num(r.count) ?? 1, seconds: num(r.duration) ?? 0 }
       }
     }
-    const req = typeof f.crafttext === 'string' ? f.crafttext.replace(/^Requires:?\s*/i, '').trim() : ''
+    const reqs = [typeof f.crafttext === 'string' ? f.crafttext.replace(/^Requires:?\s*/i, '').trim() : '']
+    // Crimson Isle minions also need faction reputation ("❣ Requires 3,000 Barbarian Reputation.").
+    for (const line of Array.isArray(f.lore) ? f.lore : []) {
+      const m = /Requires ([\d,]+ (?:Mage|Barbarian) Reputation)/i.exec(stripColors(String(line)))
+      if (m) reqs.push(m[1])
+    }
+    const req = reqs.filter(Boolean).join(' & ')
     if (req) item.req = req
     items[id] = item
   }
@@ -232,6 +238,7 @@ export type Requirement =
   | { kind: 'slayer'; boss: string; name: string; level: number }
   | { kind: 'hotm'; level: number }
   | { kind: 'skill'; skill: string; level: number }
+  | { kind: 'reputation'; faction: 'mages' | 'barbarians'; name: string; amount: number }
   | { kind: 'other'; text: string }
 
 const SLAYER_NAMES: Record<string, string> = {
@@ -244,11 +251,17 @@ const SKILLS = ['farming', 'mining', 'combat', 'foraging', 'fishing', 'enchantin
 export function parseRequirements(text: string, collections: Record<string, SbCollectionInfo>): Requirement[] {
   const byName = new Map(Object.entries(collections).map(([id, c]) => [c.name.toLowerCase(), id]))
   return text
-    .split(/\s*&\s*|\s*,\s*|\s+and\s+/i)
+    // Commas split requirements, but not the one in "3,000".
+    .split(/\s*&\s*|\s*,(?!\d{3})\s*|\s+and\s+/i)
     .map((t) => t.trim())
     .filter(Boolean)
     .map((t): Requirement => {
-      let m = /^(?:HotM|Heart of the Mountain)(?: Tier)? (\d+)$/i.exec(t)
+      let m = /^([\d,]+) (Mage|Barbarian) Reputation$/i.exec(t)
+      if (m) {
+        const mage = m[2].toLowerCase() === 'mage'
+        return { kind: 'reputation', faction: mage ? 'mages' : 'barbarians', name: mage ? 'Mage' : 'Barbarian', amount: Number(m[1].replace(/,/g, '')) }
+      }
+      m = /^(?:HotM|Heart of the Mountain)(?: Tier)? (\d+)$/i.exec(t)
       if (m) return { kind: 'hotm', level: Number(m[1]) }
       m = /^(\w+) Slayer (\d+|[IVX]+)$/i.exec(t)
       if (m && SLAYER_NAMES[m[1].toLowerCase()]) return { kind: 'slayer', boss: SLAYER_NAMES[m[1].toLowerCase()], name: `${m[1]} Slayer`, level: Number(m[2]) || fromRoman(m[2]) || 0 }
@@ -277,6 +290,8 @@ export interface SbProfileData {
   skills: Record<string, number> | null
   slayer: Record<string, number> | null
   hotmXp: number | null
+  /** Crimson Isle faction reputation, when Orbit can see it. */
+  reputation?: { mages: number; barbarians: number } | null
   /** Plain sentences: an API setting that's off, so some of your stuff can't be seen. */
   hidden: string[]
 }
@@ -354,6 +369,8 @@ export function profileData(
     for (const [k, v] of Object.entries(me.slayer.slayer_bosses)) slayer[k] = (isObj(v) ? num(v.xp) : null) ?? 0
   }
   const hotmXp = isObj(me.mining_core) ? num(me.mining_core.experience) : null
+  const nether = isObj(me.nether_island_player_data) ? me.nether_island_player_data : null
+  const reputation = nether ? { mages: num(nether.mages_reputation) ?? 0, barbarians: num(nether.barbarians_reputation) ?? 0 } : null
   return {
     at,
     profileName: String(profile.cute_name ?? 'Profile'),
@@ -364,6 +381,7 @@ export function profileData(
     skills,
     slayer,
     hotmXp,
+    reputation,
     hidden
   }
 }
@@ -592,6 +610,13 @@ export function checkRequirement(req: Requirement, data: SbData, p: SbProfileDat
       const level = levelFromSteps(xp, data.skillXp)
       if (level >= req.level) return { req, label, met: true, detail: `You're level ${level}.` }
       return { req, label, met: false, detail: `You're level ${level}, ${fmt(xpForLevel(req.level, data.skillXp) - xp)} XP to go.` }
+    }
+    case 'reputation': {
+      const label = `${fmt(req.amount)} ${req.name} reputation`
+      if (!p?.reputation) return { req, label, met: null, detail: p ? 'Orbit can’t see your Crimson Isle reputation.' : 'Refresh to check this.' }
+      const have = p.reputation[req.faction]
+      if (have >= req.amount) return { req, label, met: true, detail: `You have ${fmt(have)}.` }
+      return { req, label, met: false, detail: `You have ${fmt(have)}, ${fmt(req.amount - have)} to go. Earn it from ${req.name === 'Mage' ? 'Mage' : 'Barbarian'} quests on the Crimson Isle.` }
     }
     default:
       return { req, label: req.text, met: null, detail: 'Orbit can’t check this one, so check it in game.' }

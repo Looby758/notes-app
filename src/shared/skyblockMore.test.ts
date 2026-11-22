@@ -20,7 +20,7 @@ import {
   upcomingEvents,
   type SbSnapshot
 } from './skyblockMore'
-import type { SbData } from './skyblockGoals'
+import type { SbData, SbProfileData } from './skyblockGoals'
 import type { SbProfileView, SbViewItem } from './skyblockProfile'
 
 const item = (id: string, name: string, count = 1, lore: string[] = []): SbViewItem => ({ id, name, count, lore, rarity: 'RARE', stars: 0, recomb: false }) as unknown as SbViewItem
@@ -174,6 +174,42 @@ describe('helpers', () => {
     expect(m).toMatchObject({ type: 'COBBLESTONE', tier: 2, maxTier: 3, next: 'COBBLESTONE_GENERATOR_3', ready: false, progress: 0.5 })
     expect(m.needs).toEqual([{ id: 'COBBLESTONE', name: 'Cobblestone', need: 128, have: 64 }])
     expect(minionHelper(view(), data, { COBBLESTONE: 500 })[0].ready).toBe(true)
+  })
+})
+
+describe('minion requirements', () => {
+  const data = {
+    at: 1,
+    collections: { RED_SAND: { name: 'Red Sand', group: 'Mining', tiers: [100, 500] } },
+    items: {
+      RED_SAND_GENERATOR_1: { id: 'RED_SAND_GENERATOR_1', name: 'Red Sand Minion I', color: '9' },
+      RED_SAND_GENERATOR_2: {
+        id: 'RED_SAND_GENERATOR_2',
+        name: 'Red Sand Minion II',
+        color: '9',
+        req: 'Red Sand I & 3,000 Barbarian Reputation',
+        craft: {
+          inputs: [
+            ['RED_SAND', 10],
+            ['RED_SAND_GENERATOR_1', 1]
+          ],
+          count: 1
+        }
+      }
+    }
+  } as unknown as SbData
+  const v = view({ minions: [{ id: 'RED_SAND', highest: 1 }] })
+  const profile = (rep: number) => ({ collections: { RED_SAND: 200 }, unlockedTiers: { RED_SAND: 1 }, reputation: { mages: 0, barbarians: rep } }) as unknown as SbProfileData
+
+  it('locks the next tier until you have the reputation', () => {
+    const [m] = minionHelper(v, data, { RED_SAND: 50 }, profile(1200))
+    expect(m.ready).toBe(false)
+    expect(m.requires.map((r) => [r.label, r.met])).toEqual([
+      ['Red Sand I collection', true],
+      ['3,000 Barbarian reputation', false]
+    ])
+    expect(m.requires[1].detail).toContain('1,800 to go')
+    expect(minionHelper(v, data, { RED_SAND: 50 }, profile(3500))[0].ready).toBe(true)
   })
 })
 

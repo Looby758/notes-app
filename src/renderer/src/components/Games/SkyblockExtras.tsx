@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { CalendarDays, Check, Copy, Download, Hammer, Loader2, RefreshCw, Search, Star, Trash2, TrendingUp, X } from 'lucide-react'
+import { CalendarDays, Check, HelpCircle, Lock, Copy, Download, Hammer, Loader2, RefreshCw, Search, Star, Trash2, TrendingUp, X } from 'lucide-react'
 import { MODE_NAMES, shortNumber } from '@shared/skyblock'
 import {
   describeSbDate,
@@ -480,19 +480,24 @@ function Minions({ list, add }: { list: MinionStep[]; add: (id: string, name: st
       {shown.length ? (
         <div className="sbx-rows">
           {shown.map((m) => (
-            <div key={m.type} className={`sbx-row ${m.ready ? 'ready' : ''}`} data-sbx-minion={m.type}>
+            <div key={m.type} className={`sbx-row ${m.ready ? 'ready' : (m.requires ?? []).some((r) => r.met === false) ? 'locked' : ''}`} data-sbx-minion={m.type}>
               <ItemPic id={m.next ?? `${m.type}_GENERATOR_${m.maxTier}`} name={m.name} size={32} />
               <span className="sbx-row-name">
                 <b>{m.name}</b>
                 <small className="faint">
                   {m.next ? `Tier ${m.tier} → ${m.tier + 1}` : `All ${m.maxTier} tiers`}
-                  {m.ready ? ' · ready to craft' : ''}
+                  {m.ready ? ' · ready to craft' : (m.requires ?? []).some((r) => r.met === false) ? ' · locked' : ''}
                 </small>
               </span>
               <span className="sbx-needs">
                 {m.needs.map((n) => (
                   <span key={n.id} className={n.have >= n.need ? 'ok' : ''} title={n.name}>
                     <ItemPic id={n.id} name={n.name} size={18} /> {shortNumber(n.have)}/{shortNumber(n.need)}
+                  </span>
+                ))}
+                {(m.requires ?? []).map((r) => (
+                  <span key={r.label} className={`sbx-req ${r.met === true ? 'ok' : r.met === false ? 'no' : 'unknown'}`} title={r.detail} data-sbx-req={r.label}>
+                    {r.met === true ? <Check size={12} /> : r.met === false ? <Lock size={12} /> : <HelpCircle size={12} />} {r.label}
                   </span>
                 ))}
               </span>

@@ -21036,3 +21036,20 @@ button.sbp-coop-row:hover {
   pointer-events: none;
   animation: sbx-rise 0.15s var(--ease);
 }
+.sbx-needs .sbx-req {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+.sbx-needs .sbx-req.ok {
+  color: var(--sbx-hi, var(--accent));
+  border-color: rgba(143, 227, 255, 0.35);
+}
+.sbx-needs .sbx-req.no {
+  color: #ff8fa3;
+  border-color: rgba(255, 143, 163, 0.4);
+  background: rgba(255, 143, 163, 0.08);
+}
+.sbx-row.locked {
+  border-color: rgba(255, 143, 163, 0.3);
+}

@@ -89,6 +89,8 @@ export function buildExtras(c: Record<string, unknown>, itemFiles: unknown[]): S
     const display = stripColors(String(f.displayname ?? ''))
     // Hypixel's leftover test items aren't real accessories.
     if (/please ignore|^test\b/i.test(display)) continue
+    // Legacy items (like the old Personal Compactor 4000) can't be had any more.
+    if (f.lore.some((l) => /Legacy Item/i.test(stripColors(String(l))))) continue
     if (/\b(ACCESSORY|HATCESSORY)\b/.test(last) && !f.internalname.includes(';'))
       accessories.push({
         id: f.internalname,
@@ -724,6 +726,13 @@ export function profileView(
         upgrade: Object.values(x.accessoryUpgrades).some((ups) => ups.includes(a.id))
       }))
       .sort((a, b) => RARITIES.indexOf(a.rarity) - RARITIES.indexOf(b.rarity) || a.name.localeCompare(b.name))
+    // The skill compactors (Combat, Farming…) are one accessory for this: suggest one, and none once you have any.
+    const compactor = /^PERSONAL_COMPACTOR_[A-Z]+_\d+$/
+    const haveCompactor = [...owned].some((id) => id.startsWith('PERSONAL_COMPACTOR'))
+    let compactorShown = false
+    for (let i = missing.length - 1; i >= 0; i--)
+      if (compactor.test(missing[i].id) && (haveCompactor || missing.slice(0, i).some((m) => compactor.test(m.id)))) missing.splice(i, 1)
+    for (const m of missing) if (compactor.test(m.id) && !compactorShown) ((compactorShown = true), (m.name = 'Personal Compactor'))
     const abs = obj(me.accessory_bag_storage)
     accessories = {
       items,

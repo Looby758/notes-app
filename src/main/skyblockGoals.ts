@@ -581,7 +581,7 @@ export function setupSkyblockGoals(): void {
     return {
       craftable: craftableNow(d, s.profile.owned),
       mp: mpPlanner(s.view, d, s.profile, rates),
-      minions: minionHelper(s.view, d, s.profile.owned)
+      minions: minionHelper(s.view, d, s.profile.owned, s.profile)
     }
   })
   /** The SkyBlock date, what's on next, and the mayor. */
