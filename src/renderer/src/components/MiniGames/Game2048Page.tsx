@@ -3,6 +3,8 @@ import { Frown, RotateCcw, Trophy, Undo2 } from 'lucide-react'
 import { addTile, biggest, canMove, GOAL, newBoard, SIZE, slide, slideTiles, tileId, tilesOf, type Direction, type Tile } from '../../lib/game2048'
 import { loadRecords, saveGame, type GameRecord } from '../../lib/gameStats'
 import { formatTime } from '../../lib/sudoku'
+import { celebrate } from '../../lib/celebrate'
+import { playSound } from '../../lib/gameSound'
 import GameStats from './GameStats'
 import { useGameKeys } from './useGameKeys'
 
@@ -85,6 +87,11 @@ export default function Game2048Page() {
   const [bump, setBump] = useState<Direction | null>(null)
   const [gain, setGain] = useState<{ n: number; key: number } | null>(null)
   const [lastDir, setLastDir] = useState<Direction | null>(null)
+  // Show-off moments: several joins in one move, a new biggest tile, beating your best.
+  const [combo, setCombo] = useState<{ n: number; key: number } | null>(null)
+  const [milestone, setMilestone] = useState<{ value: number; key: number } | null>(null)
+  const [newBest, setNewBest] = useState(false)
+  const bestAtStart = useRef(best)
   const shownScore = useCountUp(game.score)
   const board = useRef<HTMLDivElement>(null)
   const page = useRef<HTMLDivElement>(null)
@@ -101,6 +108,7 @@ export default function Game2048Page() {
 
   useEffect(() => {
     if (game.score <= best) return
+    if (bestAtStart.current > 0 && !newBest) setNewBest(true)
     setBest(game.score)
     try {
       localStorage.setItem(BEST_KEY, String(game.score))
@@ -125,6 +133,7 @@ export default function Game2048Page() {
     if (game.reached) {
       setRecord(saveGame(STATS_ID, true, game.seconds))
       setShowWin(true)
+      celebrate('big')
       setGame((g) => ({ ...g, counted: true }))
     } else if (game.over) {
       setRecord(saveGame(STATS_ID, false))
@@ -153,6 +162,7 @@ export default function Game2048Page() {
       // Nothing can move that way: a little nudge says so.
       setBump(null)
       requestAnimationFrame(() => setBump(dir))
+      playSound('wall')
       return
     }
     const { board: next, at } = addTile(s.board)
@@ -175,11 +185,24 @@ export default function Game2048Page() {
     setBump(null)
     setLastDir(dir)
     if (s.gained) setGain({ n: s.gained, key: ng.moves })
+    const joins = moved.filter((t) => t.merged).length
+    if (joins >= 2) setCombo({ n: joins, key: ng.moves })
+    const top = biggest(next)
+    const milestoneHit = top > biggest(g.board) && top >= 128
+    if (milestoneHit) setMilestone({ value: top, key: ng.moves })
+    // Each join rings at a pitch that climbs with the tile's value; plain slides just whoosh.
+    const joined = moved.filter((t) => t.merged).map((t) => t.value)
+    if (joined.length) playSound('merge', Math.max(...joined))
+    else playSound('slide')
+    if (joins >= 2) playSound('combo', joins - 1, 0.07)
+    if (milestoneHit && top < GOAL) playSound('unit', undefined, 0.12)
+    if (ng.over && !ng.reached) playSound('lose', undefined, 0.3)
   }
 
   const undo = (): void => {
     const g = gameRef.current
     if (!g.before || g.over) return
+    playSound('erase')
     setGame({ ...g, board: g.before.board, score: g.before.score, before: null, fresh: [] })
     setTiles(tilesOf(g.before.board))
   }
@@ -191,7 +214,12 @@ export default function Game2048Page() {
     setGame(g)
     setTiles(tilesOf(g.board).map((t) => ({ ...t, isNew: true })))
     setShowWin(false)
+    playSound('deal')
     setGain(null)
+    setCombo(null)
+    setMilestone(null)
+    setNewBest(false)
+    bestAtStart.current = best
     board.current?.focus()
   }
 
@@ -249,8 +277,8 @@ export default function Game2048Page() {
                 </em>
               )}
             </div>
-            <div>
-              <span>Best</span>
+            <div className={newBest ? 'beaten' : ''}>
+              <span>{newBest ? 'New best!' : 'Best'}</span>
               <strong>{best}</strong>
             </div>
           </div>
@@ -320,6 +348,16 @@ export default function Game2048Page() {
               </div>
             ))}
           </div>
+          {combo && (
+            <div key={`c${combo.key}`} className="g2048-combo" aria-hidden="true">
+              Combo ×{combo.n}
+            </div>
+          )}
+          {milestone && (
+            <div key={`m${milestone.key}`} className={`g2048-milestone t${milestone.value > 2048 ? 'big' : milestone.value}`} aria-hidden="true">
+              {milestone.value}
+            </div>
+          )}
           {(game.over || showWin) && (
             <div className={`sudoku-won g2048-result ${game.over ? 'lost' : 'won'}`} data-2048-result>
               {game.over && !game.reached ? <Frown size={30} /> : <Trophy size={30} />}

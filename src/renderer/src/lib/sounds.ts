@@ -1,12 +1,13 @@
 import { usePrefs } from '../store/prefs'
 import { useUI } from '../store/ui'
+import { soundSettings } from './gameSound'
 
 /**
  * Soft interface sounds: a click for buttons, a whoosh when panels and dialogs slide in or out,
  * a tick for ticking a task. They're made with Web Audio (no sound files), stay quiet, and turn
  * off with Settings → Appearance → Interface sounds.
  */
-export type Sound = 'click' | 'tick' | 'whooshIn' | 'whooshOut' | 'piece' | 'capture'
+export type Sound = 'click' | 'tick' | 'whooshIn' | 'whooshOut'
 
 let ctx: AudioContext | null = null
 let noise: AudioBuffer | null = null
@@ -48,25 +49,6 @@ function blip(ac: AudioContext, out: AudioNode, from: number, to: number, ms: nu
   osc.stop(t + ms / 1000 + 0.02)
 }
 
-/** A short wooden knock, like a chess piece set down (louder and lower for a capture). */
-function knock(ac: AudioContext, out: AudioNode, heavy: boolean): void {
-  const t = ac.currentTime
-  const src = ac.createBufferSource()
-  src.buffer = whiteNoise(ac)
-  const filter = ac.createBiquadFilter()
-  filter.type = 'bandpass'
-  filter.frequency.value = heavy ? 700 : 1100
-  filter.Q.value = 3
-  const gain = ac.createGain()
-  gain.gain.setValueAtTime(0, t)
-  gain.gain.linearRampToValueAtTime(heavy ? 0.9 : 0.6, t + 0.002)
-  gain.gain.exponentialRampToValueAtTime(0.0001, t + (heavy ? 0.12 : 0.07))
-  src.connect(filter).connect(gain).connect(out)
-  src.start(t)
-  src.stop(t + 0.15)
-  blip(ac, out, heavy ? 260 : 380, heavy ? 140 : 220, heavy ? 90 : 60, heavy ? 0.2 : 0.12)
-}
-
 /** Filtered noise swept up (in) or down (out), timed like the app's slide animations. */
 function whoosh(ac: AudioContext, out: AudioNode, rising: boolean, level: number): void {
   const t = ac.currentTime
@@ -101,7 +83,6 @@ export function playSound(sound: Sound): void {
   out.connect(ac.destination)
   if (sound === 'click') blip(ac, out, 1400, 700, 45, 0.12)
   else if (sound === 'tick') blip(ac, out, 900, 1500, 90, 0.16)
-  else if (sound === 'piece' || sound === 'capture') knock(ac, out, sound === 'capture')
   else whoosh(ac, out, sound === 'whooshIn', 0.22)
 }
 
@@ -113,7 +94,8 @@ export function startInterfaceSounds(): void {
     'click',
     (e) => {
       const el = (e.target as Element | null)?.closest?.(CLICKABLE)
-      if (el && !(el as HTMLButtonElement).disabled) playSound('click')
+      // Mini games make their own sounds (with their own on/off switch), so they don't click as well.
+      if (el && !(el as HTMLButtonElement).disabled && !(soundSettings().on && el.closest('.minigames-page.playing'))) playSound('click')
     },
     true
   )
