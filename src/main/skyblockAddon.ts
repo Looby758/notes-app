@@ -2,7 +2,18 @@ import { BrowserWindow, ipcMain, nativeImage, net, protocol } from 'electron'
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
-import { DEFAULT_PACKS, TEXTURE_PACKS, TEXTURES_BASE, type SkyblockAddonState, type TextureMatcher } from '@shared/skyblockTextures'
+import {
+  DEFAULT_PACKS,
+  HYPIXEL_PACK,
+  hypixelFileName,
+  resolveHypixelModels,
+  TEXTURE_PACKS,
+  TEXTURES_BASE,
+  type SkyblockAddonState,
+  type TextureMatcher
+} from '@shared/skyblockTextures'
+import { createHash } from 'crypto'
+import JSZip from 'jszip'
 import { addonDir, addonManifest, addonPath, iconsVersion, onAddonChanged, readJson, setAddonManifest, skyblockAddonReady } from './skyblockAddonFiles'
 import { downloadItemList } from './skyblockGoals'
 import { logError } from './log'
@@ -19,6 +30,7 @@ export const SKYBLOCK_TEX_SCHEME = { scheme: 'sbtex', privileges: { standard: tr
 
 const BASE = process.env.NOTES_SKYBLOCK_ASSETS_URL ?? TEXTURES_BASE
 const SKINS = process.env.NOTES_SKIN_URL ?? 'https://textures.minecraft.net/texture'
+const HYPIXEL = process.env.NOTES_HYPIXEL_URL ?? 'https://api.hypixel.net'
 const PARALLEL = 16
 const KNOWN = new Set(TEXTURE_PACKS.map((p) => p.id))
 
@@ -54,10 +66,10 @@ function state(): SkyblockAddonState {
   return { state: 'ready', packs: m.packs, stage: '', progress: 1, mb: sizeCache.mb, error: lastError, iconsVersion }
 }
 
-async function fetchOk(url: string, signal: AbortSignal, tries = 3): Promise<Buffer | null> {
+async function fetchOk(url: string, signal: AbortSignal, tries = 3, timeout = 30_000): Promise<Buffer | null> {
   for (let i = 0; i < tries; i++) {
     try {
-      const res = await net.fetch(url, { signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]) })
+      const res = await net.fetch(url, { signal: AbortSignal.any([signal, AbortSignal.timeout(timeout)]) })
       if (res.status === 404) return null
       if (res.ok) return Buffer.from(await res.arrayBuffer())
     } catch {
@@ -96,7 +108,10 @@ async function install(packsIn: string[]): Promise<void> {
   }
   try {
     mkdirSync(addonDir(), { recursive: true })
-    const all = [...packs, 'vanilla']
+    // Hypixel's own pack comes from Hypixel, the rest from skyblock-assets.
+    const wantHypixel = packs.includes(HYPIXEL_PACK)
+    const all = [...packs.filter((p) => p !== HYPIXEL_PACK), 'vanilla']
+    const texEnd = wantHypixel ? 0.8 : 1
     for (const f of ['data/minecraft_ids.json', 'data/vanilla_damages.json', ...all.map((p) => `matchers/${p}.json`)]) {
       if (!(await save(f, signal))) throw new Error(`GitHub doesn’t have ${f} any more. Orbit needs an update for the SkyBlock pictures.`)
     }
@@ -119,14 +134,16 @@ async function install(packsIn: string[]): Promise<void> {
         await save(f, signal, true)
         done++
         if (done % 25 === 0 || done === files.length)
-          step(`Downloading pictures… ${done.toLocaleString('en-GB')} of ${files.length.toLocaleString('en-GB')}`, 0.15 + 0.85 * (done / files.length))
+          step(`Downloading pictures… ${done.toLocaleString('en-GB')} of ${files.length.toLocaleString('en-GB')}`, 0.15 + (texEnd - 0.15) * (done / files.length))
       }
     }
     await Promise.all(Array.from({ length: PARALLEL }, worker))
+    if (wantHypixel) await installHypixelPack(signal, (stage, f) => step(stage, texEnd + (1 - texEnd) * f))
 
     // Packs you no longer use are deleted.
+    const keep = wantHypixel ? [...all, HYPIXEL_PACK] : all
     try {
-      for (const d of readdirSync(addonPath('textures'))) if (!all.includes(d)) rmSync(addonPath('textures', d), { recursive: true, force: true })
+      for (const d of readdirSync(addonPath('textures'))) if (!keep.includes(d)) rmSync(addonPath('textures', d), { recursive: true, force: true })
     } catch {
       // Nothing to tidy.
     }
@@ -139,6 +156,76 @@ async function install(packsIn: string[]): Promise<void> {
     installing = null
     broadcast()
   }
+}
+
+/**
+ * Hypixel's own SkyBlock pack, from Hypixel's resources API (the same zip the game loads). Only the
+ * item pictures are kept: each item model's texture, saved flat under textures/hypixel/, and a list
+ * of item model → picture in matchers/hypixel.json. Skipped when the version on disk is current.
+ */
+async function installHypixelPack(signal: AbortSignal, step: (stage: string, fraction: number) => void): Promise<void> {
+  step('Asking Hypixel for its SkyBlock pack…', 0)
+  let list: unknown
+  try {
+    const res = await net.fetch(`${HYPIXEL}/v2/resources/packs`, { signal: AbortSignal.any([signal, AbortSignal.timeout(20_000)]) })
+    if (!res.ok) throw new Error(String(res.status))
+    list = await res.json()
+  } catch {
+    if (signal.aborted) throw new Error('Stopped.')
+    throw new Error('Couldn’t reach Hypixel to get its SkyBlock pack. Try again, or untick “Hypixel (official)”.')
+  }
+  const pack = ((list as { packs?: { id?: string; versions?: { packFormat?: number; hash?: string; url?: string }[] }[] })?.packs ?? []).find((p) => p.id === 'SkyBlock')
+  const version = [...(pack?.versions ?? [])].filter((v) => typeof v.url === 'string' && /^https?:\/\//.test(v.url)).sort((a, b) => (b.packFormat ?? 0) - (a.packFormat ?? 0))[0]
+  if (!version?.url) throw new Error('Hypixel didn’t list a SkyBlock pack to download. Untick “Hypixel (official)” for now.')
+  const current = readJson<{ hash?: string; models?: Record<string, string> }>(addonPath('matchers', `${HYPIXEL_PACK}.json`), {})
+  if (current.hash && current.hash === version.hash && current.models && existsSync(addonPath('textures', HYPIXEL_PACK))) return
+
+  step('Downloading Hypixel’s SkyBlock pack…', 0.05)
+  const body = await fetchOk(version.url, signal, 3, 180_000)
+  if (!body) throw new Error('Hypixel’s SkyBlock pack has moved. Try again later, or untick “Hypixel (official)”.')
+  if (version.hash && createHash('sha1').update(body).digest('hex') !== version.hash.toLowerCase())
+    throw new Error('Hypixel’s SkyBlock pack didn’t download properly (its checksum is wrong). Try again.')
+
+  step('Reading Hypixel’s SkyBlock pack…', 0.6)
+  const zip = await JSZip.loadAsync(body)
+  const items: Record<string, Record<string, unknown>> = {}
+  const models: Record<string, Record<string, unknown>> = {}
+  const textures = new Map<string, JSZip.JSZipObject>()
+  const jobs: Promise<void>[] = []
+  zip.forEach((path, entry) => {
+    if (entry.dir) return
+    const m = /^(?:[^/]+\/)?assets\/hypixel_skyblock\/(items|models|textures)\/(.+)\.(json|png)$/.exec(path)
+    if (!m) return
+    if (m[1] === 'textures' && m[3] === 'png') textures.set(m[2], entry)
+    else if (m[3] === 'json' && m[1] !== 'textures')
+      jobs.push(
+        entry.async('string').then((t) => {
+          try {
+            ;(m[1] === 'items' ? items : models)[m[2]] = JSON.parse(t)
+          } catch {
+            // A broken file shouldn't stop the rest.
+          }
+        })
+      )
+  })
+  await Promise.all(jobs)
+  const byModel = resolveHypixelModels(items, models, (t) => textures.has(t))
+  if (Object.keys(byModel).length < 50) throw new Error('Hypixel’s SkyBlock pack looked empty. Orbit may need an update for it.')
+
+  const dir = addonPath('textures', HYPIXEL_PACK)
+  rmSync(dir, { recursive: true, force: true })
+  mkdirSync(dir, { recursive: true })
+  const needed = [...new Set(Object.values(byModel))]
+  let done = 0
+  for (const tex of needed) {
+    if (signal.aborted) throw new Error('Stopped.')
+    const entry = textures.get(tex)
+    if (entry) writeFileSync(join(dir, `${hypixelFileName(tex)}.png`), await entry.async('nodebuffer'))
+    if (++done % 100 === 0) step(`Saving Hypixel’s pictures… ${done} of ${needed.length}`, 0.7 + 0.3 * (done / needed.length))
+  }
+  const out = Object.fromEntries(Object.entries(byModel).map(([model, tex]) => [model, hypixelFileName(tex)]))
+  mkdirSync(addonPath('matchers'), { recursive: true })
+  writeFileSync(addonPath('matchers', `${HYPIXEL_PACK}.json`), JSON.stringify({ hash: version.hash ?? '', models: out }))
 }
 
 function remove(): void {

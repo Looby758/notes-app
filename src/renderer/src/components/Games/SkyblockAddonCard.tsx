@@ -51,7 +51,15 @@ function PackPicker({ packs, setPacks }: { packs: string[]; setPacks: (p: string
   )
 }
 
-const mbOf = (packs: string[]): number => Math.round((VANILLA_MB + packs.reduce((a, id) => a + (TEXTURE_PACKS.find((p) => p.id === id)?.mb ?? 0), 0)) * 10) / 10
+const mbOf = (packs: string[], kept = false): number =>
+  Math.round(
+    (VANILLA_MB +
+      packs.reduce((a, id) => {
+        const p = TEXTURE_PACKS.find((x) => x.id === id)
+        return a + ((kept ? p?.keepMb : undefined) ?? p?.mb ?? 0)
+      }, 0)) *
+      10
+  ) / 10
 
 /**
  * The SkyBlock add-on: get it, watch it download, change texture packs, or remove it. Everything
@@ -152,12 +160,12 @@ export default function SkyblockAddonCard({ compact = false }: { compact?: boole
             Cancel
           </button>
         )}
-        <span className="money-hint">Keeps about {Math.round(mbOf(chosen) + 3)} MB on this computer.</span>
+        <span className="money-hint">Keeps about {Math.round(mbOf(chosen, true) + 3)} MB on this computer.</span>
       </div>
       {s.error && <p className="setting-warning">{s.error}</p>}
       <p className="cal-note">
-        Recipes come from the NEU item repo, item pictures from skyblock-assets by mat (MIT licence), with packs by their own makers: FurfSky Reborn, PacksHQ, Hypixel+, RNBW,
-        Worlds and Beyond, Ectoplasm and FurfSky. All from GitHub.
+        Recipes come from the NEU item repo, and item pictures from skyblock-assets by mat (MIT licence) with packs by their own makers (FurfSky Reborn, PacksHQ, Hypixel+, RNBW,
+        Worlds and Beyond, Ectoplasm and FurfSky), all from GitHub. Hypixel’s own pack comes straight from Hypixel and stays © Hypixel Inc. under its licence.
       </p>
     </section>
   )

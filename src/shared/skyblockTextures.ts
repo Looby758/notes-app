@@ -24,11 +24,18 @@ export interface TextureMatcher {
 export interface TexturePack {
   id: string
   matchers: TextureMatcher[]
+  /** Hypixel's own pack: item model id ("hypixel_skyblock:item/…") → picture file name. */
+  models?: Record<string, string>
 }
 
+/** Hypixel's own SkyBlock pack (comes from Hypixel, not skyblock-assets). */
+export const HYPIXEL_PACK = 'hypixel'
+
 /** The packs Orbit offers, best known first, with roughly how much each downloads. Vanilla is always added last. */
-export const TEXTURE_PACKS: { id: string; name: string; about: string; mb: number }[] = [
+/** `mb` is the download; `keepMb`, when different, what stays on disk. */
+export const TEXTURE_PACKS: { id: string; name: string; about: string; mb: number; keepMb?: number }[] = [
   { id: 'furfsky_reborn', name: 'FurfSky Reborn', about: 'The most popular SkyBlock pack: almost every item redrawn.', mb: 9.7 },
+  { id: HYPIXEL_PACK, name: 'Hypixel (official)', about: 'Hypixel’s own SkyBlock pack, the pictures the game shows on new Minecraft versions.', mb: 19, keepMb: 6 },
   { id: 'packshq', name: 'PacksHQ', about: 'Clean, close to vanilla.', mb: 5.5 },
   { id: 'hypixel+', name: 'Hypixel+', about: 'Mostly armour and tools.', mb: 1.1 },
   { id: 'rnbw', name: 'RNBW', about: 'Bright and colourful.', mb: 3.4 },
@@ -39,7 +46,7 @@ export const TEXTURE_PACKS: { id: string; name: string; about: string; mb: numbe
 /** The plain Minecraft pictures, always downloaded, and the item list (a download that's mostly thrown away). */
 export const VANILLA_MB = 4.8
 export const ITEM_LIST_MB = 30
-export const DEFAULT_PACKS = ['furfsky_reborn']
+export const DEFAULT_PACKS = ['furfsky_reborn', HYPIXEL_PACK]
 
 export interface SkyblockAddonState {
   state: 'missing' | 'installing' | 'ready'
@@ -111,6 +118,8 @@ export interface TextureQuery {
   nbt: Record<string, unknown>
   /** The head's skin id, if it's a head (matched against matchers that name a skin). */
   skin?: string
+  /** Its new-style item model ("hypixel_skyblock:item/…"), for Hypixel's own pack. */
+  model?: string
 }
 
 type Entry = { m: TextureMatcher; n: number }
@@ -134,7 +143,7 @@ function matcherSkin(n: unknown): string {
 
 /** Packs with their matchers grouped by Minecraft item and SkyBlock id, so finding a picture doesn't scan every matcher. */
 export interface TextureIndex {
-  packs: { id: string; byItem: Map<string, ItemMatchers>; any: Entry[] }[]
+  packs: { id: string; byItem: Map<string, ItemMatchers>; any: Entry[]; models?: Map<string, string> }[]
 }
 
 const isPattern = (v: string): boolean => /^(i?pattern|i?regex):/.test(v)
@@ -166,7 +175,7 @@ export function indexPacks(packs: readonly TexturePack[]): TextureIndex {
           }
         }
       })
-      return { id: p.id, byItem, any }
+      return { id: p.id, byItem, any, models: p.models ? new Map(Object.entries(p.models)) : undefined }
     })
   }
 }
@@ -186,6 +195,8 @@ export function findTexture(q: TextureQuery, packs: readonly TexturePack[] | Tex
   })
   for (const exact of [true, false]) {
     for (let i = 0; i < index.packs.length; i++) {
+      const byModel = exact && q.model ? index.packs[i].models?.get(q.model) : undefined
+      if (byModel) return `${index.packs[i].id}/${byModel}.png`
       for (const { e, skinOnly } of lists[i]) {
         const c = e.m.m
         const hasD = c.d !== undefined && c.d !== null
@@ -262,6 +273,8 @@ export interface McItem {
   x?: string
   name?: string
   lore?: string[]
+  /** Its new-style item model, for Hypixel's own pack. */
+  m?: string
   /** Only a pack picture will do: NEU now lists some items as plain paper with a new-style model, which plain Minecraft would draw as paper. */
   p?: 1
 }
@@ -279,6 +292,8 @@ export function mcItemOfNeu(file: unknown, ids: Record<string, string>, vanillaD
   const skin = nbt ? skinFromSnbt(nbt) : ''
   if (skin) out.s = skin
   if (x) out.x = x
+  const model = /ItemModel:\\?"([a-z0-9_.:/-]+)\\?"/.exec(nbt)?.[1]
+  if (model) out.m = model
   if (typeof file.displayname === 'string') out.name = file.displayname
   if (Array.isArray(file.lore)) out.lore = file.lore.map(String)
   return out
@@ -287,7 +302,7 @@ export function mcItemOfNeu(file: unknown, ids: Record<string, string>, vanillaD
 /** The picture for an item: a texture from the packs if one matches, else its head skin, else nothing. */
 export function iconOf(mc: McItem, index: TextureIndex): ItemIcon {
   const nbt: Record<string, unknown> = { ExtraAttributes: { id: mc.x ?? '' }, display: { Name: mc.name ?? '', Lore: mc.lore ?? [] } }
-  const icon = iconOfNbt(mc.i, mc.d, nbt, mc.s ?? '', index)
+  const icon = iconOfNbt(mc.i, mc.d, nbt, mc.s ?? '', index, mc.m)
   return mc.p && icon.tex?.startsWith('vanilla/') ? {} : icon
 }
 
@@ -295,12 +310,69 @@ export function iconOf(mc: McItem, index: TextureIndex): ItemIcon {
  * Packs come first, then (for heads) the skin, then vanilla: a SkyBlock pack's picture for a head
  * item beats the head, and the head beats vanilla's plain Steve head.
  */
-export function iconOfNbt(id: string, damage: number, nbt: Record<string, unknown>, skin: string, index: TextureIndex): ItemIcon {
+export function iconOfNbt(id: string, damage: number, nbt: Record<string, unknown>, skin: string, index: TextureIndex, model?: string): ItemIcon {
   const packs = index.packs.filter((p) => p.id !== 'vanilla')
-  const tex = findTexture({ id, damage, nbt, skin }, { packs })
+  const tex = findTexture({ id, damage, nbt, skin, model }, { packs })
   if (tex) return { tex }
   if (skin) return { skin }
   const van = index.packs.find((p) => p.id === 'vanilla')
   const v = van ? findTexture({ id, damage, nbt, skin }, { packs: [van] }) : null
   return v ? { tex: v } : {}
+}
+
+// ---------- Hypixel's own pack ----------
+
+type Json = Record<string, unknown>
+
+/** The one model an item definition shows normally (not while pulling a bow, casting a rod…). */
+function mainModel(node: unknown): string {
+  if (!isObj(node)) return ''
+  switch (node.type) {
+    case 'model':
+    case 'minecraft:model':
+      return typeof node.model === 'string' ? node.model : ''
+    case 'condition':
+    case 'minecraft:condition':
+      return mainModel(node.on_false) || mainModel(node.on_true)
+    case 'select':
+    case 'minecraft:select':
+      return mainModel(node.fallback) || (Array.isArray(node.cases) && isObj(node.cases[0]) ? mainModel(node.cases[0].model) : '')
+    case 'range_dispatch':
+    case 'minecraft:range_dispatch':
+      return mainModel(node.fallback) || (Array.isArray(node.entries) && isObj(node.entries[0]) ? mainModel(node.entries[0].model) : '')
+    case 'composite':
+    case 'minecraft:composite':
+      return Array.isArray(node.models) ? (node.models.map(mainModel).find(Boolean) ?? '') : ''
+    default:
+      return ''
+  }
+}
+
+const NS = 'hypixel_skyblock:'
+
+/** The picture file name for a texture path ("item/combat/hyperion" → "item__combat__hyperion"). */
+export const hypixelFileName = (texture: string): string => texture.replace(/\//g, '__').replace(/[^\w-]/g, '_')
+
+/**
+ * Works out a picture for each of Hypixel's item models from the pack's own files: the item
+ * definition (assets/hypixel_skyblock/items/…) names a model, and the model (or its parents) names
+ * the texture. Returns item model id → texture path inside textures/ ("item/combat/hyperion").
+ * `items` and `models` are keyed by path without ".json" ("item/combat/hyperion").
+ */
+export function resolveHypixelModels(items: Record<string, Json>, models: Record<string, Json>, hasTexture: (path: string) => boolean): Record<string, string> {
+  const textureOf = (modelRef: string, depth = 0): string => {
+    if (!modelRef.startsWith(NS) || depth > 8) return ''
+    const m = models[modelRef.slice(NS.length)]
+    if (!m) return ''
+    const t = isObj(m.textures) ? m.textures : {}
+    const pick = [t.layer0, t.particle, ...Object.values(t)].find((v): v is string => typeof v === 'string' && v.startsWith(NS) && hasTexture(v.slice(NS.length)))
+    if (pick) return pick.slice(NS.length)
+    return typeof m.parent === 'string' ? textureOf(m.parent, depth + 1) : ''
+  }
+  const out: Record<string, string> = {}
+  for (const [path, def] of Object.entries(items)) {
+    const tex = textureOf(mainModel(def.model))
+    if (tex) out[NS + path] = tex
+  }
+  return out
 }

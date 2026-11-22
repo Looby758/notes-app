@@ -20,6 +20,7 @@ export interface AddonManifest {
 let manifest: AddonManifest | null | undefined
 let index: TextureIndex | null = null
 let neuIcons: Record<string, ItemIcon> | null = null
+let modelsBySbId: Record<string, string> | null = null
 let lookups: { ids: Record<string, string>; damages: Record<string, string> } | null = null
 const listeners: (() => void)[] = []
 /** Goes up whenever the pictures may have changed, so the page knows to ask again. */
@@ -56,6 +57,7 @@ export function setAddonManifest(m: AddonManifest | null): void {
   index = null
   neuIcons = null
   lookups = null
+  modelsBySbId = null
   iconsVersion++
   rmSync(addonPath('icons.json'), { force: true })
   if (m) {
@@ -79,8 +81,8 @@ function getIndex(): TextureIndex | null {
   if (!index) {
     const packs: TexturePack[] = []
     for (const id of [...m.packs, 'vanilla']) {
-      const file = readJson<{ matchers?: TexturePack['matchers'] } | null>(addonPath('matchers', `${id}.json`), null)
-      if (file?.matchers && existsSync(addonPath('textures', id))) packs.push({ id, matchers: file.matchers })
+      const file = readJson<{ matchers?: TexturePack['matchers']; models?: Record<string, string> } | null>(addonPath('matchers', `${id}.json`), null)
+      if ((file?.matchers || file?.models) && existsSync(addonPath('textures', id))) packs.push({ id, matchers: file.matchers ?? [], models: file.models })
     }
     index = indexPacks(packs)
   }
@@ -99,6 +101,7 @@ export function saveNeuPictures(files: unknown[]): void {
   }
   writeJson(addonPath('neu-items.json'), out)
   neuIcons = null
+  modelsBySbId = null
   rmSync(addonPath('icons.json'), { force: true })
   iconsVersion++
   for (const fn of listeners) fn()
@@ -129,6 +132,15 @@ export function neuItemIcons(): Record<string, ItemIcon> {
   return out
 }
 
+/** SkyBlock id → Hypixel's item model, from the NEU list (Hypixel's API gives 1.8 items without one). */
+function modelOf(sbId: string): string | undefined {
+  if (!modelsBySbId) {
+    modelsBySbId = {}
+    for (const mc of Object.values(readJson<Record<string, McItem>>(addonPath('neu-items.json'), {}))) if (mc.x && mc.m) modelsBySbId[mc.x] = mc.m
+  }
+  return modelsBySbId[sbId]
+}
+
 /** The picture for one slot of a Hypixel item list ({ id: 276, Damage: 0, tag: {...} }). */
 export function slotIcon(slot: Record<string, unknown>): ItemIcon | undefined {
   const idx = getIndex()
@@ -137,6 +149,8 @@ export function slotIcon(slot: Record<string, unknown>): ItemIcon | undefined {
   const raw = slot.id as string | number
   const { id, damage } = minecraftItem(raw, Number(slot.Damage) || 0, ids, damages)
   const tag = (slot.tag && typeof slot.tag === 'object' ? slot.tag : {}) as Record<string, unknown>
-  const icon = iconOfNbt(id, damage, tag, skinFromTag(tag), idx)
+  const extra = tag.ExtraAttributes && typeof tag.ExtraAttributes === 'object' ? (tag.ExtraAttributes as Record<string, unknown>) : {}
+  const model = typeof tag.ItemModel === 'string' ? tag.ItemModel : typeof extra.id === 'string' ? modelOf(extra.id) : undefined
+  const icon = iconOfNbt(id, damage, tag, skinFromTag(tag), idx, model)
   return icon.tex || icon.skin ? icon : undefined
 }

@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { findTexture, iconOf, iconOfNbt, indexPacks, mcItemOfNeu, minecraftItem, skinFromSnbt, skinFromTag, skinFromValue, type TexturePack } from './skyblockTextures'
+import {
+  findTexture,
+  hypixelFileName,
+  iconOf,
+  iconOfNbt,
+  indexPacks,
+  mcItemOfNeu,
+  minecraftItem,
+  resolveHypixelModels,
+  skinFromSnbt,
+  skinFromTag,
+  skinFromValue,
+  type TexturePack
+} from './skyblockTextures'
 import { viewItems } from './skyblockProfile'
 
 const skinValue = (hash: string): string => btoa(JSON.stringify({ textures: { SKIN: { url: `http://textures.minecraft.net/texture/${hash}` } } }))
@@ -110,5 +123,53 @@ describe('items to pictures', () => {
     )
     expect(list[0]).toMatchObject({ id: 'ASPECT_OF_THE_END', glint: true, icon: { tex: 'furfsky_reborn/aote.png' } })
     expect(list[1]).toMatchObject({ glint: false, icon: { tex: 'vanilla/dsword.png' } })
+  })
+})
+
+describe('Hypixel’s own pack', () => {
+  it('finds each item model’s picture through its definition and model parents', () => {
+    const items = {
+      'item/misc/teeth': { model: { type: 'model', model: 'hypixel_skyblock:item/misc/teeth' } },
+      'item/bow/term': {
+        model: {
+          type: 'condition',
+          property: 'using_item',
+          on_true: { type: 'model', model: 'hypixel_skyblock:item/bow/term_pulling' },
+          on_false: { type: 'model', model: 'hypixel_skyblock:item/bow/term' }
+        }
+      },
+      'item/odd/child': { model: { type: 'select', cases: [], fallback: { type: 'model', model: 'hypixel_skyblock:item/odd/child' } } },
+      'item/missing': { model: { type: 'model', model: 'hypixel_skyblock:item/nowhere' } }
+    }
+    const models = {
+      'item/misc/teeth': { parent: 'item/generated', textures: { layer0: 'hypixel_skyblock:item/misc/teeth' } },
+      'item/bow/term': { parent: 'item/bow', textures: { layer0: 'hypixel_skyblock:item/bow/term' } },
+      'item/bow/term_pulling': { textures: { layer0: 'hypixel_skyblock:item/bow/term_pulling' } },
+      'item/odd/child': { parent: 'hypixel_skyblock:item/odd/base' },
+      'item/odd/base': { textures: { particle: 'hypixel_skyblock:item/odd/base' } }
+    }
+    const have = new Set(['item/misc/teeth', 'item/bow/term', 'item/bow/term_pulling', 'item/odd/base'])
+    expect(resolveHypixelModels(items, models, (t) => have.has(t))).toEqual({
+      'hypixel_skyblock:item/misc/teeth': 'item/misc/teeth',
+      'hypixel_skyblock:item/bow/term': 'item/bow/term',
+      'hypixel_skyblock:item/odd/child': 'item/odd/base'
+    })
+    expect(hypixelFileName('item/bow/term')).toBe('item__bow__term')
+  })
+
+  it('draws NEU’s new paper items with Hypixel’s picture, by item model', () => {
+    const index = indexPacks([
+      { id: 'hypixel', matchers: [], models: { 'hypixel_skyblock:item/misc/teeth': 'item__misc__teeth' } },
+      { id: 'vanilla', matchers: [{ t: 'paper', m: { i: ['paper'] } }] }
+    ])
+    const teeth = mcItemOfNeu(
+      { internalname: 'KUUDRA_TEETH', itemid: 'minecraft:paper', nbttag: '{ExtraAttributes:{id:"KUUDRA_TEETH"},ItemModel:"hypixel_skyblock:item/misc/teeth"}' },
+      {},
+      {}
+    )!
+    expect(teeth.m).toBe('hypixel_skyblock:item/misc/teeth')
+    expect(iconOf(teeth, index)).toEqual({ tex: 'hypixel/item__misc__teeth.png' })
+    // Without Hypixel's picture it's left blank rather than drawn as paper.
+    expect(iconOf({ ...teeth, m: 'hypixel_skyblock:item/other' }, index)).toEqual({})
   })
 })
