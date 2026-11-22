@@ -565,7 +565,12 @@ export interface NotesApi {
   studioDefaultFolder(): Promise<string>
   studioPickFolder(): Promise<string | null>
   /** Starts a recording file in `folder` (null = Videos/Orbit Recordings). */
-  studioStart(folder: string | null, ext: 'mp4' | 'webm' | 'm4a', kind?: 'video' | 'voiceover' | 'take', take?: { script: string; index: number; title: string }): Promise<{ id: number; path: string }>
+  studioStart(
+    folder: string | null,
+    ext: 'mp4' | 'webm' | 'm4a',
+    kind?: 'video' | 'voiceover' | 'take',
+    take?: { script: string; index: number; title: string }
+  ): Promise<{ id: number; path: string }>
   /** A section take's sound (record by section), to play it back. */
   studioReadTake(path: string): Promise<Uint8Array>
   /** Joins section takes, in order, into "<script> voiceover (joined).wav" beside them; length in seconds. */
@@ -1243,6 +1248,10 @@ export interface NotesApi {
   skyblockAddonInstall(packs: string[]): Promise<SkyblockAddonState>
   skyblockAddonCancel(): Promise<SkyblockAddonState>
   skyblockAddonRemove(): Promise<SkyblockAddonState>
+  /** Use your own Minecraft pack (.zip, or a folder) under the SkyBlock packs. */
+  skyblockAddonPickVanilla(folder: boolean): Promise<SkyblockAddonState>
+  /** Back to plain Minecraft's pictures under the SkyBlock packs. */
+  skyblockAddonClearVanilla(): Promise<SkyblockAddonState>
   /** NEU item id → its picture. */
   skyblockAddonIcons(): Promise<Record<string, ItemIcon>>
   onSkyblockAddonChanged(callback: () => void): () => void

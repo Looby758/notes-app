@@ -19527,3 +19527,15 @@ button.board-add-picture:hover {
   align-self: flex-start;
   margin-top: 2px;
 }
+
+.sba-vanilla {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.sba-vanilla p {
+  margin: 0 0 2px;
+}
+.sba-vanilla .spin {
+  vertical-align: -1px;
+}

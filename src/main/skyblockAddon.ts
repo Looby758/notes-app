@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } f
 import { join } from 'path'
 import { pathToFileURL } from 'url'
 import {
+  CUSTOM_PACK,
   DEFAULT_PACKS,
   HYPIXEL_PACK,
   hypixelFileName,
@@ -17,6 +18,7 @@ import JSZip from 'jszip'
 import { addonDir, addonManifest, addonPath, iconsVersion, onAddonChanged, readJson, setAddonManifest, skyblockAddonReady } from './skyblockAddonFiles'
 import { downloadItemList } from './skyblockGoals'
 import { logError } from './log'
+import { clearVanillaPack, pickVanillaPack, vanillaPackInfo } from './skyblockVanillaPack'
 
 /**
  * The SkyBlock add-on: everything SkyBlock in Orbit (profile, goal planner, session summaries) is
@@ -60,10 +62,10 @@ function folderMb(dir: string): number {
 let sizeCache: { at: number; mb: number } | null = null
 function state(): SkyblockAddonState {
   const m = addonManifest()
-  if (installing) return { state: 'installing', packs: installing.packs, stage: installing.stage, progress: installing.progress, mb: 0, error: '', iconsVersion }
-  if (!m) return { state: 'missing', packs: DEFAULT_PACKS, stage: '', progress: 0, mb: 0, error: lastError, iconsVersion }
+  if (installing) return { state: 'installing', packs: installing.packs, stage: installing.stage, progress: installing.progress, mb: 0, error: '', iconsVersion, vanilla: null }
+  if (!m) return { state: 'missing', packs: DEFAULT_PACKS, stage: '', progress: 0, mb: 0, error: lastError, iconsVersion, vanilla: null }
   if (!sizeCache || sizeCache.at !== m.at) sizeCache = { at: m.at, mb: folderMb(addonDir()) }
-  return { state: 'ready', packs: m.packs, stage: '', progress: 1, mb: sizeCache.mb, error: lastError, iconsVersion }
+  return { state: 'ready', packs: m.packs, stage: '', progress: 1, mb: sizeCache.mb, error: lastError, iconsVersion, vanilla: vanillaPackInfo() }
 }
 
 async function fetchOk(url: string, signal: AbortSignal, tries = 3, timeout = 30_000): Promise<Buffer | null> {
@@ -141,7 +143,7 @@ async function install(packsIn: string[]): Promise<void> {
     if (wantHypixel) await installHypixelPack(signal, (stage, f) => step(stage, texEnd + (1 - texEnd) * f))
 
     // Packs you no longer use are deleted.
-    const keep = wantHypixel ? [...all, HYPIXEL_PACK] : all
+    const keep = [...all, CUSTOM_PACK, ...(wantHypixel ? [HYPIXEL_PACK] : [])]
     try {
       for (const d of readdirSync(addonPath('textures'))) if (!keep.includes(d)) rmSync(addonPath('textures', d), { recursive: true, force: true })
     } catch {
@@ -313,6 +315,16 @@ export function setupSkyblockAddon(): void {
   })
   ipcMain.handle('skyblockAddon:cancel', () => {
     installing?.abort.abort()
+    return state()
+  })
+  ipcMain.handle('skyblockAddon:pickVanilla', async (e, folder: boolean) => {
+    await pickVanillaPack(BrowserWindow.fromWebContents(e.sender), !!folder)
+    sizeCache = null
+    return state()
+  })
+  ipcMain.handle('skyblockAddon:clearVanilla', () => {
+    clearVanillaPack()
+    sizeCache = null
     return state()
   })
   ipcMain.handle('skyblockAddon:remove', () => {

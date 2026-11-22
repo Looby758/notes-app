@@ -85,8 +85,32 @@ function getIndex(): TextureIndex | null {
       if ((file?.matchers || file?.models) && existsSync(addonPath('textures', id))) packs.push({ id, matchers: file.matchers ?? [], models: file.models })
     }
     index = indexPacks(packs)
+    const custom = customPack()
+    if (custom) index.vanillaOverride = new Set(custom.files)
   }
   return index
+}
+
+/** Your own Minecraft pack, used in place of plain Minecraft's pictures (see skyblockVanillaPack.ts). */
+export interface CustomPack {
+  name: string
+  /** The plain-Minecraft pictures it replaces, saved as textures/custom/<name>.png. */
+  files: string[]
+  at: number
+}
+
+export function customPack(): CustomPack | null {
+  const c = readJson<CustomPack | null>(addonPath('custom.json'), null)
+  return c && Array.isArray(c.files) && existsSync(addonPath('textures', 'custom')) ? c : null
+}
+
+/** The pictures changed without a new download (your own pack added or taken away). */
+export function picturesChanged(): void {
+  index = null
+  neuIcons = null
+  iconsVersion++
+  rmSync(addonPath('icons.json'), { force: true })
+  for (const fn of listeners) fn()
 }
 
 /** Keep the Minecraft side of every NEU item (for pictures), from the item list download. */

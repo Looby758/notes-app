@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowDown, ArrowUp, Download, Image, Pause, RefreshCw, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Download, FolderOpen, Image, Pause, RefreshCw, Trash2, Undo2 } from 'lucide-react'
 import { DEFAULT_PACKS, ITEM_LIST_MB, TEXTURE_PACKS, VANILLA_MB } from '@shared/skyblockTextures'
 import { errorMessage } from '../../lib/paths'
 import { notify } from '../../store/notify'
@@ -48,6 +48,51 @@ function PackPicker({ packs, setPacks }: { packs: string[]; setPacks: (p: string
         )
       })}
     </ul>
+  )
+}
+
+/** The Minecraft pack under the SkyBlock packs: plain Minecraft, or one you put in. */
+function VanillaPack({ vanilla }: { vanilla: { name: string; pictures: number } | null }) {
+  const [busy, setBusy] = useState(false)
+  const run = async (job: () => Promise<unknown>): Promise<void> => {
+    setBusy(true)
+    try {
+      await job()
+    } catch (err) {
+      notify(clean(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="sba-vanilla" data-sba-vanilla>
+      <p>
+        <strong>Minecraft pack underneath:</strong> {vanilla ? `${vanilla.name} (${vanilla.pictures.toLocaleString('en-GB')} pictures)` : 'plain Minecraft'}
+        {busy && (
+          <span className="faint">
+            {' '}
+            · <RefreshCw size={11} className="spin" /> Reading the pack…
+          </span>
+        )}
+      </p>
+      <small className="money-hint">
+        Items the SkyBlock packs don’t cover are drawn from this. Put in any Minecraft resource pack (1.8 or newer) to use its pictures instead. Stairs, fences and other odd-shaped
+        blocks keep the plain pictures.
+      </small>
+      <div className="offline-ai-row">
+        <button className="btn" disabled={busy} onClick={() => void run(() => window.api.skyblockAddonPickVanilla(false))} data-sba-vanilla-zip>
+          <Image size={13} /> {vanilla ? 'Use another pack (.zip)…' : 'Use my own pack (.zip)…'}
+        </button>
+        <button className="btn" disabled={busy} onClick={() => void run(() => window.api.skyblockAddonPickVanilla(true))} data-sba-vanilla-folder>
+          <FolderOpen size={13} /> Use a pack folder…
+        </button>
+        {vanilla && (
+          <button className="btn" disabled={busy} onClick={() => void run(() => window.api.skyblockAddonClearVanilla())} data-sba-vanilla-clear>
+            <Undo2 size={13} /> Back to plain Minecraft
+          </button>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -122,7 +167,8 @@ export default function SkyblockAddonCard({ compact = false }: { compact?: boole
           <span className="cal-connected-dot" />
           <span>
             SkyBlock add-on installed ({s.mb} MB) with{' '}
-            {s.packs.length ? s.packs.map((id) => TEXTURE_PACKS.find((p) => p.id === id)?.name ?? id).join(', ') : 'plain Minecraft pictures'}.
+            {s.packs.length ? s.packs.map((id) => TEXTURE_PACKS.find((p) => p.id === id)?.name ?? id).join(', ') : 'plain Minecraft pictures'}
+            {s.vanilla ? `, over ${s.vanilla.name}` : ''}.
           </span>
         </div>
         <div className="offline-ai-row">
@@ -133,6 +179,7 @@ export default function SkyblockAddonCard({ compact = false }: { compact?: boole
             <Trash2 size={13} /> Remove
           </button>
         </div>
+        <VanillaPack vanilla={s.vanilla} />
         {s.error && <p className="setting-warning">{s.error}</p>}
       </section>
     )

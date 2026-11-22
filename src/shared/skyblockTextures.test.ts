@@ -5,6 +5,8 @@ import {
   iconOf,
   iconOfNbt,
   indexPacks,
+  isoCube,
+  pickTexture,
   mcItemOfNeu,
   minecraftItem,
   resolveHypixelModels,
@@ -171,5 +173,34 @@ describe('Hypixel’s own pack', () => {
     expect(iconOf(teeth, index)).toEqual({ tex: 'hypixel/item__misc__teeth.png' })
     // Without Hypixel's picture it's left blank rather than drawn as paper.
     expect(iconOf({ ...teeth, m: 'hypixel_skyblock:item/other' }, index)).toEqual({})
+  })
+})
+
+describe('your own Minecraft pack', () => {
+  const solid = (w: number, h: number, rgba: number[]) => ({ width: w, height: h, data: Uint8Array.from({ length: w * h * 4 }, (_, i) => rgba[i % 4]) })
+
+  it('draws a block as a shaded cube, first frame only', () => {
+    const cube = isoCube(solid(16, 64, [200, 100, 50, 255]), solid(16, 16, [100, 100, 100, 255]), solid(16, 16, [100, 100, 100, 255]))
+    expect(cube.width).toBe(64)
+    const px = (x: number, y: number) => Array.from(cube.data.slice((y * 64 + x) * 4, (y * 64 + x) * 4 + 4))
+    expect(px(32, 10)).toEqual([200, 100, 50, 255]) // top, fully lit
+    expect(px(10, 35)).toEqual([80, 80, 80, 255]) // front, darker
+    expect(px(50, 40)).toEqual([60, 60, 60, 255]) // side, darker still
+    expect(px(0, 0)[3]).toBe(0) // corners stay see-through
+  })
+
+  it('finds a texture by its 1.8 or newer name', () => {
+    const have = new Map([['item/golden_sword', 'new']])
+    expect(pickTexture(['items/gold_sword', 'item/golden_sword'], have)).toBe('new')
+    expect(pickTexture(['ITEMS/Gold_Sword'], new Map([['items/gold_sword', 'old']]))).toBe('old')
+    expect(pickTexture(['items/nothing'], have)).toBeUndefined()
+  })
+
+  it('swaps plain Minecraft pictures for your pack’s, but not SkyBlock pack ones', () => {
+    const index = indexPacks([furf, vanilla])
+    index.vanillaOverride = new Set(['dsword'])
+    expect(iconOfNbt('diamond_sword', 0, { ExtraAttributes: { id: 'PLAIN' } }, '', index)).toEqual({ tex: 'custom/dsword.png' })
+    expect(iconOfNbt('diamond_sword', 0, { ExtraAttributes: { id: 'ASPECT_OF_THE_END' } }, '', index)).toEqual({ tex: 'furfsky_reborn/aote.png' })
+    expect(iconOfNbt('stone', 1, {}, '', index)).toEqual({ tex: 'vanilla/granite.png' })
   })
 })

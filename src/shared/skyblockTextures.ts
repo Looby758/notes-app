@@ -28,6 +28,9 @@ export interface TexturePack {
   models?: Record<string, string>
 }
 
+/** Your own Minecraft pack, used in place of plain Minecraft's pictures. */
+export const CUSTOM_PACK = 'custom'
+
 /** Hypixel's own SkyBlock pack (comes from Hypixel, not skyblock-assets). */
 export const HYPIXEL_PACK = 'hypixel'
 
@@ -60,6 +63,8 @@ export interface SkyblockAddonState {
   error: string
   /** Changes whenever the item pictures do. */
   iconsVersion: number
+  /** Your own Minecraft pack in place of plain Minecraft's pictures, if you picked one. */
+  vanilla: { name: string; pictures: number } | null
 }
 
 export const TEXTURES_TAG = '2.0.11'
@@ -144,6 +149,8 @@ function matcherSkin(n: unknown): string {
 /** Packs with their matchers grouped by Minecraft item and SkyBlock id, so finding a picture doesn't scan every matcher. */
 export interface TextureIndex {
   packs: { id: string; byItem: Map<string, ItemMatchers>; any: Entry[]; models?: Map<string, string> }[]
+  /** Plain-Minecraft pictures your own pack replaces (saved under textures/custom/). */
+  vanillaOverride?: Set<string>
 }
 
 const isPattern = (v: string): boolean => /^(i?pattern|i?regex):/.test(v)
@@ -317,7 +324,9 @@ export function iconOfNbt(id: string, damage: number, nbt: Record<string, unknow
   if (skin) return { skin }
   const van = index.packs.find((p) => p.id === 'vanilla')
   const v = van ? findTexture({ id, damage, nbt, skin }, { packs: [van] }) : null
-  return v ? { tex: v } : {}
+  if (!v) return {}
+  const file = v.slice('vanilla/'.length, -'.png'.length)
+  return { tex: index.vanillaOverride?.has(file) ? `${CUSTOM_PACK}/${file}.png` : v }
 }
 
 // ---------- Hypixel's own pack ----------
@@ -375,4 +384,74 @@ export function resolveHypixelModels(items: Record<string, Json>, models: Record
     if (tex) out[NS + path] = tex
   }
   return out
+}
+
+// ---------- your own Minecraft pack under the SkyBlock packs ----------
+
+/** Pixels, 4 bytes each (any channel order; the last is alpha). */
+export interface Pixels {
+  width: number
+  height: number
+  data: Uint8Array
+}
+
+/**
+ * Draws a block as Minecraft shows it in the inventory: a cube seen from above, with the top lit
+ * fully, the front a bit darker and the side darker still. Animated textures (tall strips) use their
+ * first frame. The picture is 4× the texture's width (at least 64 px).
+ */
+export function isoCube(top: Pixels, front: Pixels, side: Pixels): Pixels {
+  const size = Math.max(64, Math.min(256, top.width * 4))
+  const out = new Uint8Array(size * size * 4)
+  const s = size / 64
+  // Corners, on a 64-unit grid: the top is a 2:1 diamond, the two faces hang below it.
+  const P = (x: number, y: number): [number, number] => [x * s, y * s]
+  const faces: { tex: Pixels; shade: number; o: [number, number]; u: [number, number]; v: [number, number] }[] = [
+    { tex: top, shade: 1, o: P(2, 16), u: vec(P(2, 16), P(32, 1)), v: vec(P(2, 16), P(32, 31)) },
+    { tex: front, shade: 0.8, o: P(2, 16), u: vec(P(2, 16), P(32, 31)), v: vec(P(2, 16), P(2, 48)) },
+    { tex: side, shade: 0.6, o: P(32, 31), u: vec(P(32, 31), P(62, 16)), v: vec(P(32, 31), P(32, 63)) }
+  ]
+  for (const f of faces) {
+    const det = f.u[0] * f.v[1] - f.u[1] * f.v[0]
+    const fw = f.tex.width
+    const fh = Math.min(f.tex.height, f.tex.width)
+    for (let y = 0; y < size; y++)
+      for (let x = 0; x < size; x++) {
+        const dx = x + 0.5 - f.o[0]
+        const dy = y + 0.5 - f.o[1]
+        const a = (dx * f.v[1] - dy * f.v[0]) / det
+        const b = (f.u[0] * dy - f.u[1] * dx) / det
+        if (a < 0 || a >= 1 || b < 0 || b >= 1) continue
+        const src = (Math.floor(b * fh) * fw + Math.floor(a * fw)) * 4
+        if (f.tex.data[src + 3] === 0) continue
+        const dst = (y * size + x) * 4
+        out[dst] = f.tex.data[src] * f.shade
+        out[dst + 1] = f.tex.data[src + 1] * f.shade
+        out[dst + 2] = f.tex.data[src + 2] * f.shade
+        out[dst + 3] = f.tex.data[src + 3]
+      }
+  }
+  return { width: size, height: size, data: out }
+}
+
+const vec = (a: [number, number], b: [number, number]): [number, number] => [b[0] - a[0], b[1] - a[1]]
+
+/**
+ * Where to find each plain-Minecraft picture in someone's own pack: for each vanilla picture, the
+ * texture names to try (1.8 names like "items/gold_sword" and 1.13+ names like "item/golden_sword"),
+ * and for blocks the top, front and side textures of the cube. Blocks that aren't plain cubes
+ * (stairs, fences, slabs…) keep the plain Minecraft picture.
+ */
+export interface VanillaNames {
+  items: Record<string, string[]>
+  cubes: Record<string, { top: string[]; side: string[]; front: string[] }>
+}
+
+/** Finds a pack's texture by trying each name ("item/golden_sword") in `have` (texture name → anything). */
+export function pickTexture<T>(names: readonly string[], have: ReadonlyMap<string, T>): T | undefined {
+  for (const n of names) {
+    const hit = have.get(n.toLowerCase())
+    if (hit !== undefined) return hit
+  }
+  return undefined
 }

@@ -671,6 +671,8 @@ const api: NotesApi = {
   skyblockAddonInstall: (packs) => ipcRenderer.invoke('skyblockAddon:install', packs),
   skyblockAddonCancel: () => ipcRenderer.invoke('skyblockAddon:cancel'),
   skyblockAddonRemove: () => ipcRenderer.invoke('skyblockAddon:remove'),
+  skyblockAddonPickVanilla: (folder) => ipcRenderer.invoke('skyblockAddon:pickVanilla', folder),
+  skyblockAddonClearVanilla: () => ipcRenderer.invoke('skyblockAddon:clearVanilla'),
   skyblockAddonIcons: () => ipcRenderer.invoke('skyblockAddon:icons'),
   onSkyblockAddonChanged: (callback) => on<void>('skyblockAddon:changed', () => callback()),
   terminalStart: (id, folder, cols, rows) => ipcRenderer.invoke('term:start', id, folder, cols, rows),
