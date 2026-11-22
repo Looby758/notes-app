@@ -60,6 +60,7 @@ import {
   Video,
   Hammer,
   ArrowDownToLine,
+  Target,
   type LucideIcon
 } from 'lucide-react'
 import { openGrokTab } from '../components/Grok/GrokPage'
@@ -104,6 +105,7 @@ import {
   MESSAGES_TAB,
   CLOCKS_TAB,
   COUNTDOWNS_TAB,
+  SKYBLOCK_GOALS_TAB,
   PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
@@ -230,6 +232,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   wiki: { icon: Library, run: () => openSpecialTab(WIKI_TAB) },
   youtube: { icon: MonitorPlay, run: () => void window.api.openYouTube() },
   games: { icon: Gamepad2, run: () => openSpecialTab(GAMES_TAB) },
+  'skyblock-goals': { icon: Target, run: () => openSpecialTab(SKYBLOCK_GOALS_TAB) },
   'mini-games': { icon: Joystick, run: () => openMiniGames(null) },
   snip: { icon: Scan, run: () => void startSnip() },
   'snip-picture': { icon: Crop, run: () => void startSnip('picture') },

@@ -66,6 +66,7 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'youtube', name: 'YouTube', blurb: 'A mini window that floats on top', group: 'Media', command: 'youtube.open', keywords: 'video' },
 
   { id: 'games', name: 'Games', blurb: 'Your Steam and other games', group: 'Play', command: 'games.open', keywords: 'steam epic play minecraft hypixel skyblock session summary coins per hour drops xp' },
+  { id: 'skyblock-goals', name: 'SkyBlock', blurb: 'Your profile like SkyCrypt, plus an ironman goal planner', group: 'Play', command: 'skyblockGoals.open', keywords: 'skycrypt profile stats skills slayer dungeons catacombs accessories pets wardrobe bestiary garden museum hypixel minecraft skyblock ironman goal planner craft crafting tree recipe collection slayer forge raw materials terminator' },
   { id: 'mini-games', name: 'Mini games', blurb: 'Sudoku, Minesweeper, Nonograms, Jigsaw, Wordle, Solitaire, 2048 and Chess', group: 'Play', command: 'minigames.open', keywords: 'sudoku minesweeper nonogram picross griddler jigsaw puzzle photo wordle word guess walking dead solitaire klondike patience cards 2048 chess quick break' },
 
   { id: 'snip', name: 'Screen snip', blurb: 'Grab text from anywhere on screen', group: 'Tools', command: 'snip.start', keywords: 'ocr screenshot copy text translate' },

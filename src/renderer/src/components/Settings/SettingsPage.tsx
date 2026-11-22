@@ -188,7 +188,7 @@ function TaskbarSnip() {
           <li>The installed Orbit adds an <strong>Orbit Snip</strong> button to the Start menu that you can pin to the taskbar.</li>
         )}
         <li>
-          Or right-click Orbit’s own taskbar button and choose <strong>Snip a picture</strong>.
+          Or right-click Orbit’s own taskbar button and choose <strong>Snip a picture</strong>, or <strong>Snip in 3, 5 or 10 seconds</strong> to hover over something first.
         </li>
         <li>
           Or set <strong>Clicking the tray icon</strong> (under Tray, above) to snip.

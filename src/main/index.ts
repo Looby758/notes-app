@@ -43,10 +43,10 @@ import { closePopout, setupPopout } from './popout'
 import { closeDiscordPopout, setupDiscordPopout } from './discordPopout'
 import { closeVideoWindow, setupVideoWindow } from './videoWindow'
 import { closeWebWindow, setupWebWindow } from './webWindow'
-import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
+import { applyCaptureShortcut, noteHiddenToTray, refreshTrayMenu, setTrayIcon, setupCapture, teardownCapture } from './capture'
 import { applySnipShortcut, openSnipFolder, setupSnip, startSnip } from './snip'
 import { setupSnipTaskbar } from './snipTaskbar'
-import { snipModeFromArgv } from '@shared/snipLaunch'
+import { snipDelayFromArgv, snipModeFromArgv } from '@shared/snipLaunch'
 import { applySongIdShortcut, setupSongId } from './songId'
 import { setupUpdater } from './updater'
 import { setupSettingsHealth } from './settingsHealth'
@@ -101,6 +101,8 @@ import { TEST_COPY, TEST_COPY_FOLDER } from './testCopy'
 import { setupGames } from './games'
 import { setupGameCovers } from './gameCovers'
 import { setupSkyblock } from './skyblock'
+import { setupSkyblockGoals } from './skyblockGoals'
+import { setupSkyblockAddon, SKYBLOCK_TEX_SCHEME } from './skyblockAddon'
 import { applyIconOutsideApp, taskbarIcon } from './appIcon'
 import { broadcastThemes, loadImportedThemes, setupThemes, THEME_SCHEME, themeFilePath, themesDir } from './themes'
 import { CODE_SANDBOX_SCHEME, registerCodeSandbox } from './codeSandbox'
@@ -140,7 +142,7 @@ if (!app.requestSingleInstanceLock()) {
     // The taskbar's "Orbit Snip" or jump list: just snip, without bringing the window up.
     const snip = snipModeFromArgv(argv)
     if (snip) {
-      if (app.isReady()) void startSnip(snip)
+      if (app.isReady()) void startSnip(snip, snipDelayFromArgv(argv))
       return
     }
     showMain()
@@ -241,6 +243,8 @@ function appIconFile(prefs: Prefs): { id: string; file?: string } {
 /** Settings that live outside the app's windows: the capture shortcut, the app icon and starting at login. */
 function applySystemPrefs(prefs: Prefs): void {
   applyCaptureShortcut(prefs.captureShortcut)
+  // The tray's "Snip after a delay" lists your own delay too.
+  safely('tray menu', refreshTrayMenu)
   applySnipShortcut(prefs.snipShortcut)
   applySongIdShortcut(prefs.songIdShortcut)
   applyReplayShortcut(prefs.replayOn ? prefs.replayShortcut : '')
@@ -414,7 +418,8 @@ protocol.registerSchemesAsPrivileged([
   // corsEnabled: your own music plays through the Web Audio visualiser, which needs it.
   { scheme: 'vault', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
   CODE_SANDBOX_SCHEME,
-  THEME_SCHEME
+  THEME_SCHEME,
+  SKYBLOCK_TEX_SCHEME
 ])
 
 /** Your own music and soundboard clips go through the Web Audio visualiser, which needs this. */
@@ -736,6 +741,8 @@ function registerIpc(): void {
   setupGames()
   setupGameCovers()
   setupSkyblock({ getMain: () => mainWindow })
+  setupSkyblockGoals()
+  setupSkyblockAddon()
   setupTerminal(() => vault?.root ?? null)
   setupAppStudio()
   // The Mac asks once whether Notes may use the microphone.
@@ -1107,11 +1114,11 @@ app.whenReady().then(async () => {
   safely('Orbit sync', () => setupOrbitSync({ root: () => vault?.root ?? null, enabled: () => currentPrefs().syncOrbit, window: () => mainWindow, parts: orbitParts(themesChanged) }))
   mainWindow = createWindow()
   // The extras: if one of them fails on some computer, the app itself still works.
-  safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: (as) => void startSnip(as), openSnips: () => void openSnipFolder() }))
+  safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: (as, delay) => void startSnip(as, delay), openSnips: () => void openSnipFolder() }))
   safely('screen snip', () => setupSnip({ getMain: () => mainWindow, showMain, prefs: currentPrefs }))
   safely('taskbar snip', setupSnipTaskbar)
   // Started from the taskbar's "Orbit Snip" (or its jump list) while Orbit wasn't running.
-  if (launchSnip) setTimeout(() => void startSnip(launchSnip), 300)
+  if (launchSnip) setTimeout(() => void startSnip(launchSnip, snipDelayFromArgv(process.argv)), 300)
   safely('what’s this song', () => setupSongId({ getMain: () => mainWindow }))
   safely('instant replay', () => setupClips({ getMain: () => mainWindow, showMain }))
   safely('screen controls', setupMonitors)

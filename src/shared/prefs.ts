@@ -201,6 +201,8 @@ export interface Prefs {
   snipShortcut: string
   /** A picture snip is saved as a file too, not just copied. */
   snipSave: boolean
+  /** Seconds to wait before a picture snip freezes the screen (0: straight away), so you can hover over something first. */
+  snipDelay: number
   /** Where picture snips are saved: a full folder path on this computer, or '' for Pictures/Screenshots. */
   snipFolder: string
   /** System-wide shortcut for "What's this song?" (listen to what's playing and find it); '' for none. */
@@ -367,6 +369,7 @@ export const DEFAULT_PREFS: Prefs = {
   captureRememberTarget: false,
   snipShortcut: IS_MAC ? 'Control+Alt+S' : 'Alt+Shift+S',
   snipSave: true,
+  snipDelay: 0,
   snipFolder: '',
   songIdShortcut: IS_MAC ? 'Control+Alt+W' : 'Alt+Shift+W',
   replayOn: false,
@@ -416,6 +419,7 @@ export const RANGES = {
   autoLockMinutes: { min: 0, max: 120, step: 5 },
   screensaverMinutes: { min: 1, max: 60, step: 1 },
   replaySeconds: { min: 10, max: 120, step: 5 },
+  snipDelay: { min: 0, max: 30, step: 1 },
   duckLevel: { min: 0.1, max: 0.8, step: 0.05 },
   scriptWpm: { min: 80, max: 250, step: 5 }
 } as const
@@ -522,7 +526,7 @@ export function normalizePrefs(raw: unknown): Prefs {
     out.spellcheckLanguage = input.spellcheckLanguage
   }
   out.tabSize = Math.round(out.tabSize)
-  for (const k of ['focusMinutes', 'breakMinutes', 'longBreakMinutes', 'focusRounds', 'autoLockMinutes', 'replaySeconds', 'scriptWpm'] as const) out[k] = Math.round(out[k])
+  for (const k of ['focusMinutes', 'breakMinutes', 'longBreakMinutes', 'focusRounds', 'autoLockMinutes', 'replaySeconds', 'scriptWpm', 'snipDelay'] as const) out[k] = Math.round(out[k])
   out.attachmentFolder = cleanFolder(input.attachmentFolder ?? DEFAULT_PREFS.attachmentFolder, DEFAULT_PREFS.attachmentFolder)
   out.webClipFolder = cleanFolder(input.webClipFolder ?? DEFAULT_PREFS.webClipFolder, DEFAULT_PREFS.webClipFolder)
   out.templatesFolder = cleanFolder(input.templatesFolder ?? DEFAULT_PREFS.templatesFolder, DEFAULT_PREFS.templatesFolder)

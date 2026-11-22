@@ -9,7 +9,7 @@ import { GameRunningError, localAiState, localComplete } from './localAi'
 import { logError } from './log'
 import { isTarget, OCR_LANGS, ocrLangByCode, ocrLangSetting, ocrLangUrl, onlineTranslateUrl, parseTranslation, readerForScript, tidyReading, TRANSLATE_SYSTEM, translatePrompt } from '@shared/translate'
 import type { SnipReading, SnipTranslation } from '@shared/types'
-import { snipFileName, type SnipMode } from '@shared/snipLaunch'
+import { cleanSnipDelay, snipFileName, type SnipMode } from '@shared/snipLaunch'
 import type { Prefs } from '@shared/prefs'
 import { matchSources } from '@shared/snipDisplays'
 import { acceleratorLabel, IS_MAC, SYSTEM_NAME } from '@shared/platform'
@@ -73,7 +73,107 @@ const openWins = (): BrowserWindow[] => [...active].filter((w) => !w.isDestroyed
 /** Opening one now (between pressing and the windows showing), so a second press doesn't open two. */
 let starting = false
 
-export async function startSnip(as: SnipMode = 'text'): Promise<void> {
+/**
+ * Starts a snip. A picture snip waits for the delay in Settings first (none by default); `delay`
+ * (seconds) overrides that, e.g. "Snip after a delay → 5 seconds" from the tray.
+ */
+export async function startSnip(as: SnipMode = 'text', delay?: number): Promise<void> {
+  // Pressed again while counting down: snip now.
+  if (countdown) {
+    finishCountdown()
+    return
+  }
+  const wait = cleanSnipDelay(delay ?? (as === 'picture' ? hooks.prefs().snipDelay : 0))
+  if (wait > 0 && !starting && !openWins().length) {
+    beginCountdown(as, wait)
+    return
+  }
+  await snipNow(as)
+}
+
+/** The countdown before a delayed snip: a small pill at the bottom of the screen you're on. */
+let countdown: { win: BrowserWindow; timer: NodeJS.Timeout; mode: SnipMode; left: number } | null = null
+
+const countdownPage = (seconds: number): string => `<!doctype html><html><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+<style>
+html,body{margin:0;height:100%;background:transparent;overflow:hidden;font:600 14px/1 system-ui,-apple-system,'Segoe UI',sans-serif;user-select:none}
+.pill{box-sizing:border-box;height:100%;display:flex;align-items:center;gap:10px;padding:0 8px 0 16px;border-radius:999px;background:rgba(22,23,29,.92);color:#eceef3;border:1px solid rgba(255,255,255,.12)}
+.n{display:inline-block;min-width:1.2em;text-align:center;color:#4ade80;font-size:18px;font-variant-numeric:tabular-nums}
+a{margin-left:auto;padding:6px 10px;border-radius:999px;color:#eceef3;background:rgba(255,255,255,.1);text-decoration:none;font-weight:500;font-size:12.5px}
+a:hover{background:rgba(255,255,255,.18)}
+</style></head><body><div class="pill">Snipping in <span class="n" id="n">${seconds}</span><a href="orbit-snip:cancel" title="Don’t snip">Cancel</a></div></body></html>`
+
+function beginCountdown(as: SnipMode, seconds: number): void {
+  const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea
+  const width = 230
+  const height = 44
+  const win = new BrowserWindow({
+    x: Math.round(area.x + (area.width - width) / 2),
+    y: area.y + area.height - height - 24,
+    width,
+    height,
+    show: false,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    hasShadow: false,
+    alwaysOnTop: true,
+    // Never takes the focus, so whatever you're hovering over (a menu, a tooltip) stays open.
+    focusable: false,
+    title: 'Snip countdown',
+    ...(IS_MAC ? { type: 'panel' } : {}),
+    webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, javascript: true }
+  })
+  win.setAlwaysOnTop(true, 'screen-saver')
+  if (IS_MAC) win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  // "Cancel" is a link: it's caught here instead of going anywhere.
+  win.webContents.on('will-navigate', (e, url) => {
+    e.preventDefault()
+    if (url === 'orbit-snip:cancel') cancelCountdown()
+  })
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  win.once('ready-to-show', () => !win.isDestroyed() && win.showInactive())
+  win.on('closed', () => {
+    if (countdown?.win === win) {
+      clearInterval(countdown.timer)
+      countdown = null
+    }
+  })
+  void win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(countdownPage(seconds))}`)
+  const timer = setInterval(() => {
+    if (!countdown) return
+    countdown.left--
+    if (countdown.left <= 0) finishCountdown()
+    else if (!win.isDestroyed()) void win.webContents.executeJavaScript(`document.getElementById('n').textContent = ${countdown.left}`).catch(() => undefined)
+  }, 1000)
+  countdown = { win, timer, mode: as, left: seconds }
+}
+
+function cancelCountdown(): void {
+  if (!countdown) return
+  const { win, timer } = countdown
+  countdown = null
+  clearInterval(timer)
+  if (!win.isDestroyed()) win.destroy()
+}
+
+/** Time's up (or pressed again): the pill goes, then the screen is frozen without it. */
+function finishCountdown(): void {
+  if (!countdown) return
+  const { mode: as } = countdown
+  cancelCountdown()
+  // Give the pill a moment to leave the screen, so it isn't in the picture.
+  setTimeout(() => void snipNow(as), 150)
+}
+
+async function snipNow(as: SnipMode): Promise<void> {
   const cursor = screen.getCursorScreenPoint()
   const under = screen.getDisplayNearestPoint(cursor)
   if (starting) return
@@ -394,7 +494,7 @@ export function setupSnip(h: Hooks): void {
   screen.on('display-added', () => warmSoon())
   screen.on('display-removed', () => warmSoon())
   screen.on('display-metrics-changed', () => warmSoon())
-  ipcMain.handle('snip:start', (_e, as?: SnipMode) => startSnip(as === 'picture' ? 'picture' : 'text'))
+  ipcMain.handle('snip:start', (_e, as?: SnipMode, delay?: number) => startSnip(as === 'picture' ? 'picture' : 'text', delay === undefined ? undefined : cleanSnipDelay(delay)))
   // A picture snip's box (or the text snip's "Copy picture"): onto the clipboard, ready to paste anywhere.
   ipcMain.handle('snip:copyPicture', (_e, png: Uint8Array) => {
     endSnip()

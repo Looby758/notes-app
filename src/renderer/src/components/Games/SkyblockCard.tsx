@@ -9,12 +9,29 @@ import { notify } from '../../store/notify'
 import { freeNoteName } from '../../lib/chat'
 
 /** The session card that's showing, if any (also opened from the Games page's past sessions). */
-export const useSkyblockCard = create<{ summary: SkyblockSummary | null }>(() => ({ summary: null }))
+export const useSkyblockCard = create<{ summary: SkyblockSummary | null; saved: Record<string, string> }>(() => ({ summary: null, saved: {} }))
 export const showSkyblockSummary = (summary: SkyblockSummary | null): void => useSkyblockCard.setState({ summary })
 
 const DEFAULT_FOLDER = 'SkyBlock'
 const NEW_FOLDER = '\u0000new'
 const FOLDER_KEY = 'skyblock.noteFolder'
+const JOURNAL_KEY = 'skyblock.journal'
+
+/** Your SkyBlock journal: every session saved as a note by itself, into the folder you last used. */
+function journalOn(): boolean {
+  try {
+    return localStorage.getItem(JOURNAL_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+function setJournal(on: boolean): void {
+  try {
+    localStorage.setItem(JOURNAL_KEY, on ? '1' : '0')
+  } catch {
+    // For now only.
+  }
+}
 
 /** The folder the last session was saved to (inside your notes; '' is the top). */
 function savedFolder(): string {
@@ -45,20 +62,29 @@ const cleanFolder = (f: string): string =>
     .filter((p) => p && p !== '.' && p !== '..')
     .join('/')
 
-async function saveAsNote(s: SkyblockSummary, folder: string): Promise<void> {
+async function saveQuietly(path: string, body: string): Promise<string> {
+  const created = await window.api.createNoteAt(path)
+  await window.api.writeNote(created, body)
+  await useVault.getState().refresh([created])
+  return created
+}
+
+async function saveAsNote(s: SkyblockSummary, folder: string, close = true): Promise<void> {
   const { title, body } = summaryAsNote(s)
   const { lookup } = useNoteIndex.getState()
   const prefix = folder ? `${folder}/` : ''
   const name = freeNoteName(title, (n) => lookup.has(`${prefix}${n}.md`))
   try {
-    const created = await useVault.getState().createNoteAt(`${prefix}${name}.md`, body)
+    // The journal saves quietly, without opening the note over what you're doing.
+    const created = close ? await useVault.getState().createNoteAt(`${prefix}${name}.md`, body) : await saveQuietly(`${prefix}${name}.md`, body)
     if (!created) return
+    useSkyblockCard.setState((st) => ({ saved: { ...st.saved, [s.id]: created } }))
     try {
       localStorage.setItem(FOLDER_KEY, folder)
     } catch {
       // remembered for now only
     }
-    showSkyblockSummary(null)
+    if (close) showSkyblockSummary(null)
   } catch (err) {
     notify(err)
   }
@@ -69,6 +95,8 @@ const sign = (n: number): string => `${n >= 0 ? '+' : ''}${shortNumber(n)}`
 /** The card that comes up when Minecraft closes: coins an hour, XP, rare drops and what you collected. */
 export default function SkyblockCard() {
   const s = useSkyblockCard((st) => st.summary)
+  const savedTo = useSkyblockCard((st) => (st.summary ? st.saved[st.summary.id] : undefined))
+  const [journal, setJournalState] = useState(journalOn)
   const tree = useVault((st) => st.tree)
   const [folder, setFolder] = useState(savedFolder)
   const [newFolder, setNewFolder] = useState<string | null>(null)
@@ -82,7 +110,10 @@ export default function SkyblockCard() {
   }, [s?.id])
 
   useEffect(() => {
-    const offShow = window.api.onSkyblockSummary((summary) => showSkyblockSummary(summary))
+    const offShow = window.api.onSkyblockSummary((summary) => {
+      showSkyblockSummary(summary)
+      if (journalOn() && !useSkyblockCard.getState().saved[summary.id]) void saveAsNote(summary, savedFolder(), false)
+    })
     const offUpdate = window.api.onSkyblockUpdated((summary) => {
       if (useSkyblockCard.getState().summary?.id === summary.id) showSkyblockSummary(summary)
     })
@@ -224,14 +255,14 @@ export default function SkyblockCard() {
           <Folder size={13} />
           <span>Save to</span>
           {newFolder === null ? (
-            <select
-              className="select"
-              value={folder}
-              onChange={(e) => (e.target.value === NEW_FOLDER ? setNewFolder('') : setFolder(e.target.value))}
-              data-skyblock-folder
-            >
+            <select className="select" value={folder} onChange={(e) => (e.target.value === NEW_FOLDER ? setNewFolder('') : setFolder(e.target.value))} data-skyblock-folder>
               <option value="">Top of your notes</option>
-              {!folders.includes(folder) && folder && <option value={folder}>{folder}{folder === DEFAULT_FOLDER ? ' (new)' : ''}</option>}
+              {!folders.includes(folder) && folder && (
+                <option value={folder}>
+                  {folder}
+                  {folder === DEFAULT_FOLDER ? ' (new)' : ''}
+                </option>
+              )}
               {folders.map((f) => (
                 <option key={f} value={f}>
                   {f}
@@ -263,9 +294,27 @@ export default function SkyblockCard() {
             />
           )}
         </label>
-        <button className="btn" onClick={() => void saveAsNote(s, newFolder !== null && cleanFolder(newFolder) ? cleanFolder(newFolder) : folder)} data-skyblock-save>
-          <FilePlus2 size={13} /> Save as note
-        </button>
+        <label className="sb-journal" title="Save every SkyBlock session as a note by itself, into this folder">
+          <input
+            type="checkbox"
+            checked={journal}
+            onChange={(e) => {
+              setJournal(e.target.checked)
+              setJournalState(e.target.checked)
+            }}
+            data-skyblock-journal
+          />
+          Journal
+        </label>
+        {savedTo ? (
+          <span className="faint sb-saved" data-skyblock-saved>
+            Saved to {savedTo.replace(/\.md$/, '')}
+          </span>
+        ) : (
+          <button className="btn" onClick={() => void saveAsNote(s, newFolder !== null && cleanFolder(newFolder) ? cleanFolder(newFolder) : folder)} data-skyblock-save>
+            <FilePlus2 size={13} /> Save as note
+          </button>
+        )}
         <button className="btn btn-primary" onClick={() => showSkyblockSummary(null)}>
           Done
         </button>
