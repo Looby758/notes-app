@@ -534,6 +534,7 @@
   flex: none;
 }
 .wiki-html .w-wiki-hidden {
+  text-align: left;
   margin: 8px 0;
   padding: 6px 10px;
   border: 1px dashed var(--border-strong);

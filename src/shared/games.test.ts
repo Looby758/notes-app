@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  steamAppIdFromLink,
+  steamDownloadFromManifest,
   addPlay,
   newestRobloxVersion,
   stripGames,
@@ -280,5 +282,21 @@ describe('what counts as playing', () => {
     expect(isNotAGame('Wallpaper Engine')).toBe(true)
     expect(isNotAGame('Steamworks Common Redistributables')).toBe(true)
     expect(isNotAGame('Rocket League')).toBe(false)
+  })
+})
+
+describe('Steam downloads', () => {
+  const acf = (flags: number, got = 500, total = 2000): string =>
+    `"AppState"\n{\n\t"appid"\t\t"1172470"\n\t"name"\t\t"Apex Legends"\n\t"StateFlags"\t\t"${flags}"\n\t"BytesToDownload"\t\t"${total}"\n\t"BytesDownloaded"\t\t"${got}"\n}`
+  it('reads what Steam is doing with a game', () => {
+    expect(steamDownloadFromManifest(acf(4))).toBeNull()
+    expect(steamDownloadFromManifest(acf(1026))).toEqual({ appId: '1172470', name: 'Apex Legends', state: 'waiting', downloaded: 500, total: 2000 })
+    expect(steamDownloadFromManifest(acf(1030 | 256))?.state).toBe('downloading')
+    expect(steamDownloadFromManifest(acf(4 | 2 | 512))?.state).toBe('paused')
+  })
+  it('finds the game in Steam links', () => {
+    expect(steamAppIdFromLink('https://store.steampowered.com/app/1172470/Apex_Legends/')).toBe('1172470')
+    expect(steamAppIdFromLink('steam://install/620')).toBe('620')
+    expect(steamAppIdFromLink('https://example.com/app/5')).toBeNull()
   })
 })

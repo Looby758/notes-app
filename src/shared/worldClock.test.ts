@@ -6,6 +6,8 @@ import {
   differenceText,
   findClockPlaces,
   lastChange,
+  messageTime,
+  nextGoodTime,
   nextChange,
   nextGapChange,
   offsetMinutes,
@@ -109,5 +111,27 @@ describe('places and saved clocks', () => {
       { id: 'c', label: 'New York', zone: 'America/New_York' }
     ])
     expect(cleanClocks(null)).toEqual([])
+  })
+})
+
+describe('friends', () => {
+  it('keeps a friend’s name when saved and repaired', () => {
+    const [c] = cleanClocks([{ id: 'c1', label: 'Sydney', zone: 'Australia/Sydney', person: '  Sam  ' }])
+    expect(c).toEqual({ id: 'c1', label: 'Sydney', zone: 'Australia/Sydney', person: 'Sam' })
+    expect(cleanClocks([{ id: 'c2', label: 'Paris', zone: 'Europe/Paris', person: '' }])[0].person).toBeUndefined()
+  })
+
+  it('says whether it’s a good time to message', () => {
+    expect(messageTime({ hour: 3, minute: 0 }).mood).toBe('asleep')
+    expect(messageTime({ hour: 7, minute: 30 }).mood).toBe('maybe')
+    expect(messageTime({ hour: 14, minute: 0 }).mood).toBe('good')
+    expect(messageTime({ hour: 22, minute: 15 }).mood).toBe('maybe')
+    expect(messageTime({ hour: 23, minute: 45 }).mood).toBe('asleep')
+  })
+
+  it('finds when they’ll next be up, following their daylight saving', () => {
+    // 1am in Sydney (UTC+11 in December) → good from 9am there, 22:00 UTC.
+    expect(nextGoodTime('Australia/Sydney', at('2026-12-01T14:00:00Z'))?.toISOString()).toBe('2026-12-01T22:00:00.000Z')
+    expect(nextGoodTime('Australia/Sydney', at('2026-12-01T03:00:00Z'))).toBeNull()
   })
 })

@@ -6,6 +6,7 @@ import { usePrefs } from '../../store/prefs'
 import { refreshAiStatus, useAi, usesOffline } from '../../store/ai'
 import { getNoteText } from '../../store/noteIndex'
 import { commands, shortcutFor } from '../../lib/commands'
+import { projectCommands } from '../../lib/terminal'
 import { fuzzyFilter } from '../../lib/fuzzy'
 import { errorMessage, isWithin, noteTitle, notePaths } from '../../lib/paths'
 import { describeCommand, interpretWithAi, parseCommand, runSmart } from '../../lib/smartCommands'
@@ -19,6 +20,8 @@ import BulkDialog from './BulkDialog'
 import ImportDialog from './ImportDialog'
 import AiDialog from '../Ai/AiDialog'
 import PlaceDialog from './PlaceDialog'
+import ImageCueDialog from './ImageCueDialog'
+import EpisodeDialog from './EpisodeDialog'
 import { showKeys } from '@shared/platform'
 
 /** Ctrl+P (quick switcher), Ctrl+K (command palette) and "new note from template", shown over the app. */
@@ -37,6 +40,8 @@ export default function Modals() {
         {modal === 'import' && <ImportDialog close={close} />}
         {modal === 'ai' && <AiDialog close={close} />}
         {modal === 'place' && <PlaceDialog close={close} />}
+        {modal === 'imageCue' && <ImageCueDialog close={close} />}
+        {modal === 'episode' && <EpisodeDialog close={close} />}
       </div>
     </div>
   )
@@ -179,7 +184,7 @@ function CommandPalette({ close }: { close: () => void }) {
   const items = useMemo<PickerItem[]>(() => {
     const q = query.trim()
     const smart = q.includes(' ') || /\d/.test(q) ? parseCommand(q) : null
-    const matches = fuzzyFilter(commands, query, (c) => c.title).map(({ item: c, positions }) => ({
+    const matches = fuzzyFilter([...commands, ...projectCommands()], query, (c) => c.title).map(({ item: c, positions }) => ({
       id: c.id,
       icon: <CommandIcon size={14} />,
       label: <Highlighted text={c.title} positions={positions} />,

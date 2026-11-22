@@ -144,8 +144,11 @@ onRelease(async (test) => {
   await Promise.all(stopping)
 })
 
-/** The file itself, in pieces as the window asks for them (that's what lets it jump around a film). */
-export const fileResponse = (full: string, range: string | null): Response => serveFile(full, range)
+/**
+ * The file itself, in pieces as the window asks for them (that's what lets it jump around a film).
+ * Marked shareable with Orbit's own pages so a frame can be copied off it (Publishing's frame grabber).
+ */
+export const fileResponse = (full: string, range: string | null): Response => serveFile(full, range, { 'Access-Control-Allow-Origin': '*' })
 
 /** Answers vault://video/… and vault://videostream/… for the window. */
 export async function videoResponse(url: URL, request: Request): Promise<Response> {

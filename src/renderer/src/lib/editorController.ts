@@ -62,6 +62,10 @@ export const CONFLICTS_TAB = 'conflicts:'
 export const AI_TAB = 'ai:'
 export const CHAT_TAB = 'chat:'
 export const FLASHCARDS_TAB = 'flashcards:'
+/** The screenshot organiser: tag pictures by character and episode (components/Screenshots). */
+export const SCREENSHOTS_TAB = 'screenshots:'
+/** The story timeline: eras, what happened and where it was shown or told (components/Timeline). */
+export const TIMELINE_TAB = 'timeline:'
 export const TERMINAL_TAB = 'terminal:'
 export const PASSWORDS_TAB = 'passwords:'
 export const EMAIL_TAB = 'email:'
@@ -69,35 +73,49 @@ export const HOME_TAB = 'home:'
 export const MONEY_TAB = 'money:'
 export const CONVERT_TAB = 'convert:'
 export const COMICS_TAB = 'comics:'
+/** Sign, merge, split, reorder and fill in PDFs (components/PdfEditor); what's open is in store/pdfEditor. */
+export const PDF_EDITOR_TAB = 'pdf-editor:'
 /** Downloaded wikis, read offline (components/Wiki). */
 export const WIKI_TAB = 'wiki:'
-/** Sudoku, Minesweeper, Nonograms, Jigsaw and Wordle (components/MiniGames); which one is showing is in store/miniGames. */
+/** The mini games, from Sudoku to Chess (components/MiniGames); which one is showing is in store/miniGames. */
 export const MINIGAMES_TAB = 'minigames:'
-/** Sudoku and Minesweeper had tabs of their own before Mini games; a saved tab of theirs opens Mini games. */
-const OLD_GAME_TABS = new Set(['sudoku:', 'minesweeper:'])
-const renameOldTab = (t: string): string => (OLD_GAME_TABS.has(t) ? MINIGAMES_TAB : t)
+/** Tabs of features folded into others: Sudoku and Minesweeper open Mini games, the old video downloader opens Downloads. */
+const OLD_TABS: Record<string, string> = { 'sudoku:': 'minigames:', 'minesweeper:': 'minigames:', 'downloader:': 'downloads:' }
+const renameOldTab = (t: string): string => OLD_TABS[t] ?? t
 /** Clocks for places around the world (components/Clocks). */
 export const CLOCKS_TAB = 'clocks:'
 /** Big countdown cards (components/Countdowns). */
 export const COUNTDOWNS_TAB = 'countdowns:'
+/** Getting videos ready for YouTube: title options, description, tags, chapters (components/Publishing). */
+export const PUBLISHING_TAB = 'publishing:'
 /** Monitor brightness, contrast and input (components/Screens). */
 export const SCREENS_TAB = 'screens:'
 /** A volume for each app (components/Mixer). */
 export const MIXER_TAB = 'mixer:'
-/** Download a video from a link into the attachments folder (components/Downloader). */
-export const DOWNLOADER_TAB = 'downloader:'
+/** The download manager: a queue that pauses, carries on and can wait for the night (components/Downloads). */
+export const DOWNLOADS_TAB = 'downloads:'
 /** Scenes, webcam and screen recording (components/Studio). */
 export const STUDIO_TAB = 'studio:'
+/** The apps you make with Claude Code: their cards and pull requests (components/AppStudio). */
+export const APPSTUDIO_TAB = 'appstudio:'
 /** Instant replay and the clip editor (components/Clips). */
 export const CLIPS_TAB = 'clips:'
+/** Video projects: script, research, pictures, recordings and thumbnail ideas for each video (components/Videos). */
+export const VIDEOS_TAB = 'videos:'
 /** Sound clips with hotkeys, the voice changer and music into a voice call (components/Soundboard). */
 export const SOUNDBOARD_TAB = 'soundboard:'
+/** The macro recorder and auto-clicker (components/Macros). */
+export const MACROS_TAB = 'macros:'
+/** Remap keys, everywhere or for one game (components/KeyRemap). */
+export const KEYREMAP_TAB = 'keyremap:'
 /** Who's in your Discord voice channel, with mute and deafen (components/Discord). */
 export const DISCORD_TAB = 'discord-voice:'
 /** WhatsApp and Discord in one tab (components/Messages). */
 export const MESSAGES_TAB = 'messages:'
 /** Grok, xAI's chat bot (components/Grok); it can float over your notes instead (store/grok). */
 export const GROK_TAB = 'grok:'
+/** Claude (claude.ai), the same way as Grok: a tab, or floating over your notes (components/ChatSite). */
+export const CLAUDE_TAB = 'claude:'
 export const GAMES_TAB = 'games:'
 /** The video player (components/Video); which video it shows is in store/videoPlayer. */
 export const VIDEO_TAB = 'video:'
@@ -275,6 +293,22 @@ export function insertBlockIntoActiveNote(text: string | ((note: string) => stri
   const before = at > line.from ? '\n' : ''
   const after = at < line.to ? '\n' : ''
   view.dispatch({ changes: { from: at, insert: before + insert + after }, selection: { anchor: at + before.length + insert.length } })
+  return true
+}
+
+/** Puts text at the cursor of the note being edited, in the line (a script marker); false if no note is open. */
+export function insertInlineIntoActiveNote(text: string | ((note: string) => string)): boolean {
+  const pv = views.get(activePane())
+  if (!pv?.shown || !isNoteTab(pv.shown)) return false
+  const view = pv.view
+  const insert = typeof text === 'string' ? text : text(pv.shown)
+  const { from, to } = view.state.selection.main
+  // A space either side unless there's one already (or it's the start / end of the line).
+  const before = from > 0 && !/\s/.test(view.state.sliceDoc(from - 1, from)) ? ' ' : ''
+  const after = to < view.state.doc.length && !/\s/.test(view.state.sliceDoc(to, to + 1)) ? ' ' : ''
+  const value = before + insert + after
+  view.dispatch({ changes: { from, to, insert: value }, selection: { anchor: from + value.length }, userEvent: 'input' })
+  view.focus()
   return true
 }
 

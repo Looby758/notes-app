@@ -184,6 +184,25 @@ export function macKey(code: string): number | null {
   return k === undefined ? null : k
 }
 
+/** The key code for a key Windows reported (its virtual-key number and extended flag), or "Vk<n>" for one with no name here. */
+export function codeFromWindows(vk: number, extended: boolean): string {
+  // Windows gives the plain Shift/Ctrl/Alt numbers for some keys sent by other programs.
+  const generic: Record<number, string> = { 0x10: 'ShiftLeft', 0x11: extended ? 'ControlRight' : 'ControlLeft', 0x12: extended ? 'AltRight' : 'AltLeft' }
+  if (generic[vk]) return generic[vk]
+  if (vk === 0x0d) return extended ? 'NumpadEnter' : 'Enter'
+  for (const [code, n] of Object.entries(WIN_VK)) if (n === vk && code !== 'NumpadEnter') return code
+  return `Vk${vk}`
+}
+
+/** The key code for a Mac key number, or "Mac<n>" for one with no name here. */
+export function codeFromMac(key: number): string {
+  // F13–F15 share their numbers with Print Screen, Scroll Lock and Pause (Apple keyboards have no such keys).
+  const prefer: Record<number, string> = { 105: 'F13', 107: 'F14', 113: 'F15' }
+  if (prefer[key]) return prefer[key]
+  for (const [code, n] of Object.entries(MAC_KEY)) if (n === key) return code
+  return `Mac${key}`
+}
+
 export const isKnownKey = (code: string): boolean => code in WIN_VK || code in MAC_KEY
 
 /** Mouse buttons by number, as in MouseEvent.button. */

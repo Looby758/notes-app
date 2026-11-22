@@ -112,3 +112,25 @@ setInterval(() => {
 window.addEventListener('focus', () => {
   for (const r of ranges.values()) if (Date.now() - r.at > STALE_ON_FOCUS_MS) fetchRange(`${r.from}|${r.to}`, r.from, r.to)
 })
+
+/**
+ * Shows a change to an event straight away (before Google answers), e.g. after you drag it.
+ * `change` returns the event as it now is, or null to take it off the calendar.
+ */
+export function patchExternal(id: string, change: (e: CalEvent) => CalEvent | null): void {
+  for (const r of ranges.values()) {
+    const at = r.items.findIndex((i) => i.event.id === id)
+    if (at === -1) continue
+    const next = change(r.items[at].event)
+    r.items = [...r.items.filter((i) => i.event.id !== id), ...(next ? toItems(next) : [])]
+  }
+  rebuild()
+}
+
+/** Fetches every range again, keeping what's shown until the new copy arrives (after you change an event). */
+export function reloadExternal(): void {
+  for (const r of ranges.values()) {
+    inFlight.delete(`${r.from}|${r.to}`)
+    fetchRange(`${r.from}|${r.to}`, r.from, r.to)
+  }
+}

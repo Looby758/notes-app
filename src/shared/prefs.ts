@@ -90,6 +90,8 @@ export interface Prefs {
   vimMode: boolean
   cursorBlink: boolean
   showWordCount: boolean
+  /** How fast you read a video script out loud, in words a minute (for its length estimate). */
+  scriptWpm: number
   /** Opening a note adds a tab instead of changing the current one. */
   openInNewTab: boolean
   /** Web links in notes open in a web tab beside the note, instead of your usual browser. */
@@ -158,6 +160,8 @@ export interface Prefs {
   templatesFolder: string
   /** Notes in the templates folder don't show up under tags (or in #tag searches). */
   hideTemplatesFromTags: boolean
+  /** Where new video projects get their folders (each video's script and research notes go in one inside it). */
+  videosFolder: string
 
   // Calendar
   dailyFolder: string
@@ -231,6 +235,9 @@ export interface Prefs {
   /** Ctrl+K: if no built-in pattern understands a sentence, offer to ask the AI (never sent without asking). */
   smartCommandsAi: boolean
 
+  /** Whole PC search in the Files tab: Orbit keeps a list of every file name on the computer, so results show as you type. */
+  filesWholePcSearch: boolean
+
   /** Shortcut overrides by command id: a shortcut like "Ctrl+Shift+K", or null for none. */
   shortcuts: Record<string, string | null>
 }
@@ -284,6 +291,7 @@ export const DEFAULT_PREFS: Prefs = {
   vimMode: false,
   cursorBlink: true,
   showWordCount: true,
+  scriptWpm: 150,
   openInNewTab: false,
   openLinksInApp: true,
   webRestoreTabs: true,
@@ -319,6 +327,7 @@ export const DEFAULT_PREFS: Prefs = {
   attachmentFolder: 'attachments',
   templatesFolder: 'Templates',
   hideTemplatesFromTags: true,
+  videosFolder: 'Videos',
 
   dailyFolder: 'Daily',
   dailyFormat: 'YYYY-MM-DD',
@@ -359,6 +368,7 @@ export const DEFAULT_PREFS: Prefs = {
   radialMiddleClick: true,
   radialFeatures: ['today', 'new-note', 'calendar', 'money', 'music', 'email', 'snip', 'ask'],
   smartCommandsAi: true,
+  filesWholePcSearch: true,
   phoneDeck: ['play-pause', 'next-song', 'previous-song', 'today', 'new-note', 'snip', 'streamer', 'lock-all', 'zen', 'money', 'calendar', 'messages'],
 
   shortcuts: {}
@@ -379,7 +389,8 @@ export const RANGES = {
   focusRounds: { min: 1, max: 12, step: 1 },
   autoLockMinutes: { min: 0, max: 120, step: 5 },
   screensaverMinutes: { min: 1, max: 60, step: 1 },
-  replaySeconds: { min: 10, max: 120, step: 5 }
+  replaySeconds: { min: 10, max: 120, step: 5 },
+  scriptWpm: { min: 80, max: 250, step: 5 }
 } as const
 
 const CHOICES = {
@@ -419,8 +430,8 @@ export const CAPTURE_SHORTCUTS = CHOICES.captureShortcut
 const cleanIds = (v: unknown): string[] =>
   Array.isArray(v) ? [...new Set(v.filter((id): id is string => typeof id === 'string' && /^[a-z0-9-]{1,40}$/.test(id)))].slice(0, 50) : []
 
-/** Features that were folded into another one: Sudoku and Minesweeper now live in Mini games. */
-const RENAMED_FEATURES: Record<string, string> = { sudoku: 'mini-games', minesweeper: 'mini-games' }
+/** Features that were folded into another one: Sudoku and Minesweeper now live in Mini games, the video downloader in Downloads. */
+const RENAMED_FEATURES: Record<string, string> = { sudoku: 'mini-games', minesweeper: 'mini-games', downloader: 'downloads' }
 const renameFeatures = (ids: string[]): string[] => [...new Set(ids.map((id) => RENAMED_FEATURES[id] ?? id))]
 
 const isHex = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)
@@ -476,11 +487,12 @@ export function normalizePrefs(raw: unknown): Prefs {
     out.spellcheckLanguage = input.spellcheckLanguage
   }
   out.tabSize = Math.round(out.tabSize)
-  for (const k of ['focusMinutes', 'breakMinutes', 'longBreakMinutes', 'focusRounds', 'autoLockMinutes', 'replaySeconds'] as const) out[k] = Math.round(out[k])
+  for (const k of ['focusMinutes', 'breakMinutes', 'longBreakMinutes', 'focusRounds', 'autoLockMinutes', 'replaySeconds', 'scriptWpm'] as const) out[k] = Math.round(out[k])
   out.attachmentFolder = cleanFolder(input.attachmentFolder ?? DEFAULT_PREFS.attachmentFolder, DEFAULT_PREFS.attachmentFolder)
   out.webClipFolder = cleanFolder(input.webClipFolder ?? DEFAULT_PREFS.webClipFolder, DEFAULT_PREFS.webClipFolder)
   out.templatesFolder = cleanFolder(input.templatesFolder ?? DEFAULT_PREFS.templatesFolder, DEFAULT_PREFS.templatesFolder)
   out.dailyFolder = cleanFolder(input.dailyFolder ?? DEFAULT_PREFS.dailyFolder, DEFAULT_PREFS.dailyFolder)
+  out.videosFolder = cleanFolder(input.videosFolder ?? DEFAULT_PREFS.videosFolder, DEFAULT_PREFS.videosFolder)
   out.dailyTemplate = cleanFolder(input.dailyTemplate ?? '', '')
   out.weekStart = Math.round(out.weekStart)
   // The format becomes a file path: it must contain a day and nothing Windows can't use in a name.

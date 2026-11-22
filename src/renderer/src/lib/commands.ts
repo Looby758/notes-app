@@ -1,4 +1,6 @@
 import { useEditor } from '../store/editor'
+import { searchWholePc } from '../store/filesReveal'
+import { focusIdeaBox } from '../store/videos'
 import { useVault } from '../store/vault'
 import { openExport, showRightView, showSearch, showSidebarView, toggleFocusMode, toggleMindMap, toggleZen, useUI } from '../store/ui'
 import { effectiveShortcut, setPrefs, usePrefs } from '../store/prefs'
@@ -11,6 +13,8 @@ import {
   REPLACE_TAB,
   CONFLICTS_TAB,
   FLASHCARDS_TAB,
+  SCREENSHOTS_TAB,
+  TIMELINE_TAB,
   TERMINAL_TAB,
   PASSWORDS_TAB,
   EMAIL_TAB,
@@ -18,16 +22,22 @@ import {
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
+  PDF_EDITOR_TAB,
   COMICS_TAB,
   WIKI_TAB,
   CLOCKS_TAB,
   COUNTDOWNS_TAB,
+  PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
-  DOWNLOADER_TAB,
+  DOWNLOADS_TAB,
   STUDIO_TAB,
+  APPSTUDIO_TAB,
   CLIPS_TAB,
+  VIDEOS_TAB,
   SOUNDBOARD_TAB,
+  MACROS_TAB,
+  KEYREMAP_TAB,
   DISCORD_TAB,
   EXPLORER_TAB,
   openExplorerTab,
@@ -69,6 +79,7 @@ import { sendToPhone } from '../store/phone'
 import { toggleDiscord } from '../store/discord'
 import { openRadial } from '../components/Nav/RadialMenu'
 import { openGrokTab, toggleGrokFloat } from '../components/Grok/GrokPage'
+import { openSiteTab, toggleSiteFloat } from '../components/ChatSite/ChatSite'
 import { startSnip } from './snip'
 import { openMiniGames } from '../store/miniGames'
 import { changeNotesPassword, lockAllNow, lockFolder, lockNote, lockNoteOwn, removeLock } from './lock/actions'
@@ -234,6 +245,8 @@ export const commands: Command[] = [
       openSpecialTab(MESSAGES_TAB)
     }
   },
+  { id: 'claude.open', group: 'Navigation', title: 'Open Claude in a tab', run: () => openSiteTab('claude') },
+  { id: 'claude.float', group: 'Navigation', title: 'Claude: float over your notes (pop out inside Orbit), or put it away', run: () => toggleSiteFloat('claude') },
   { id: 'grok.open', group: 'Navigation', title: 'Open Grok in a tab', run: () => openGrokTab() },
   { id: 'grok.float', group: 'Navigation', title: 'Grok: float over your notes (pop out inside Orbit), or put it away', run: () => toggleGrokFloat() },
   { id: 'email.open', group: 'Navigation', title: 'Open email', shortcut: 'Ctrl+Shift+A', run: () => openSpecialTab(EMAIL_TAB) },
@@ -323,36 +336,98 @@ export const commands: Command[] = [
   { id: 'graph.open', group: 'Navigation', title: 'Open graph', shortcut: 'Ctrl+Shift+G', run: () => openSpecialTab(GRAPH_TAB) },
   { id: 'home.open', group: 'Navigation', title: 'Go to Home', shortcut: 'Ctrl+Shift+J', run: () => openSpecialTab(HOME_TAB) },
   { id: 'flashcards.open', group: 'Navigation', title: 'Review flashcards', shortcut: 'Ctrl+Shift+Y', run: () => openSpecialTab(FLASHCARDS_TAB) },
+  { id: 'screenshots.open', group: 'Navigation', title: 'Screenshot organiser (tag pictures by character and episode)', run: () => openSpecialTab(SCREENSHOTS_TAB) },
+  { id: 'timeline.open', group: 'Navigation', title: 'Timeline (what happened in the story, by era and episode)', run: () => openSpecialTab(TIMELINE_TAB) },
+  {
+    id: 'timeline.capture',
+    group: 'Navigation',
+    title: 'Add to the timeline… (quick capture while watching)',
+    run: () =>
+      void import('../components/Timeline/TimelinePage').then((m) => {
+        m.captureNext()
+        openSpecialTab(TIMELINE_TAB)
+      })
+  },
+  { id: 'episode.find', group: 'Navigation', title: 'Find everything from an episode (S4E9) or comic issue…', run: () => useUI.setState({ modal: 'episode' }) },
   { id: 'terminal.open', group: 'Navigation', title: 'Open terminal (command line in the notes folder)', shortcut: 'Ctrl+Alt+T', run: () => openSpecialTab(TERMINAL_TAB) },
+  { id: 'terminal.new', group: 'Navigation', title: 'New terminal (another command line, in the notes folder)', run: () => void import('./terminal').then((t) => t.newTerminal()) },
   { id: 'money.open', group: 'Navigation', title: 'Open money tracker', shortcut: 'Ctrl+Shift+B', run: () => openSpecialTab(MONEY_TAB) },
   { id: 'convert.open', group: 'Navigation', title: 'Convert files (photos, Word, audio…)', run: () => openSpecialTab(CONVERT_TAB) },
+  { id: 'pdf.open', group: 'Navigation', title: 'PDF editor (sign, fill in, merge, split, reorder pages)', run: () => openSpecialTab(PDF_EDITOR_TAB) },
   { id: 'explorer.open', group: 'Navigation', title: 'Browse files on this computer (and Google Drive)', run: () => openSpecialTab(EXPLORER_TAB) },
+  { id: 'explorer.searchPc', group: 'Navigation', title: 'Search the whole PC for a file or folder', run: () => searchWholePc() },
   { id: 'explorer.newTab', group: 'Navigation', title: 'New Files tab (another folder, to drag files between)', run: () => openExplorerTab() },
   { id: 'comics.open', group: 'Navigation', title: 'Read comics (your comic book shelf)', run: () => openSpecialTab(COMICS_TAB) },
   { id: 'wiki.open', group: 'Navigation', title: 'Wikis (downloaded Fandom wikis, read offline)', run: () => openSpecialTab(WIKI_TAB) },
-  { id: 'minigames.open', group: 'Navigation', title: 'Mini games (Sudoku, Minesweeper, Nonograms, Jigsaw, Wordle)', run: () => openMiniGames(null) },
+  { id: 'minigames.open', group: 'Navigation', title: 'Mini games (Sudoku, Minesweeper, Nonograms, Jigsaw, Wordle, Solitaire, 2048, Chess)', run: () => openMiniGames(null) },
   { id: 'sudoku.open', group: 'Navigation', title: 'Play sudoku (take a quick break)', run: () => openMiniGames('sudoku') },
   { id: 'nonogram.open', group: 'Navigation', title: 'Play nonograms (picture logic puzzles)', run: () => openMiniGames('nonogram') },
   { id: 'jigsaw.open', group: 'Navigation', title: 'Make a jigsaw from a photo', run: () => openMiniGames('jigsaw') },
   { id: 'wordle.open', group: 'Navigation', title: 'Play Wordle (any time, 2 to 8 letters, Walking Dead mode)', run: () => openMiniGames('wordle') },
+  { id: 'solitaire.open', group: 'Navigation', title: 'Play Solitaire (Klondike, draw 1 or 3)', run: () => openMiniGames('solitaire') },
+  { id: 'g2048.open', group: 'Navigation', title: 'Play 2048', run: () => openMiniGames('g2048') },
+  { id: 'chess.open', group: 'Navigation', title: 'Play chess (against the computer or a friend)', run: () => openMiniGames('chess') },
   { id: 'discord.open', group: 'Navigation', title: 'Discord voice (who’s in voice, mute, deafen)', run: () => openSpecialTab(DISCORD_TAB) },
   { id: 'discord.popout', group: 'Discord', title: 'Discord: pop out the voice call (its own window)', run: () => void window.api.openDiscordPopout() },
   { id: 'discord.mute', group: 'Discord', title: 'Discord: mute / unmute', run: () => void toggleDiscord('mute') },
   { id: 'discord.deafen', group: 'Discord', title: 'Discord: deafen / undeafen', run: () => void toggleDiscord('deaf') },
   { id: 'soundboard.open', group: 'Navigation', title: 'Open the soundboard and voice changer', run: () => openSpecialTab(SOUNDBOARD_TAB) },
   { id: 'soundboard.stop', group: 'Navigation', title: 'Stop all soundboard sounds', run: () => void import('./soundboard').then((m) => m.stopAll()) },
+  { id: 'macros.open', group: 'Navigation', title: 'Macros: record and play keys and mouse, auto-clicker', run: () => openSpecialTab(MACROS_TAB) },
+  { id: 'keyremap.open', group: 'Navigation', title: 'Key remapper: remap keys, everywhere or for one game', run: () => openSpecialTab(KEYREMAP_TAB) },
+  { id: 'macros.record', group: 'Macros', title: 'Macros: start / stop recording', run: () => void window.api.macrosRecord() },
+  { id: 'macros.stop', group: 'Macros', title: 'Macros: stop playing or the auto-clicker', run: () => void window.api.macrosStop() },
   { id: 'studio.open', group: 'Navigation', title: 'Open the Studio (record your screen and webcam)', run: () => openSpecialTab(STUDIO_TAB) },
+  { id: 'appstudio.open', group: 'Navigation', title: 'Open App Studio (your apps and their pull requests)', run: () => openSpecialTab(APPSTUDIO_TAB) },
+  { id: 'appstudio.bug', group: 'Tools', title: 'Report a bug in one of your apps (snip the screen, then Report bug)', run: () => void window.api.startSnip() },
   { id: 'clips.open', group: 'Navigation', title: 'Open clips (instant replay and the clip editor)', run: () => openSpecialTab(CLIPS_TAB) },
+  { id: 'videos.idea', group: 'Navigation', title: 'Idea inbox for videos (jot down a video idea)', run: () => {
+    focusIdeaBox()
+    openSpecialTab(VIDEOS_TAB)
+  } },
+  { id: 'videos.open', group: 'Navigation', title: 'Video projects (script, research, pictures, recordings, thumbnail ideas)', run: () => openSpecialTab(VIDEOS_TAB) },
   { id: 'replay.save', group: 'Navigation', title: 'Save the last 30 seconds (instant replay)', run: () => void import('./replay').then((m) => m.saveReplay()) },
   { id: 'replay.toggle', group: 'Navigation', title: 'Turn instant replay on or off', run: () => setPrefs({ replayOn: !usePrefs.getState().prefs.replayOn }) },
   { id: 'studio.record', group: 'Navigation', title: 'Start or stop recording (Studio)', run: () => void import('./studio').then((m) => m.toggleRecording()) },
+  { id: 'studio.voiceover', group: 'Navigation', title: 'Record a voiceover (Studio, audio only)', run: () => {
+    void import('../store/studio').then((m) => m.setAudioOnly(true))
+    openSpecialTab(STUDIO_TAB)
+  } },
+  { id: 'studio.audioOnly', group: 'Navigation', title: 'Studio: switch between audio only and video', run: () => void import('../store/studio').then((m) => m.setAudioOnly(!m.useStudio.getState().audioOnly)) },
+  { id: 'studio.nextPreset', group: 'Navigation', title: 'Studio: load the next mic preset', run: () => void import('../store/studio').then((m) => m.nextPreset()) },
+  { id: 'teleprompter.open', group: 'Navigation', title: 'Teleprompter (read your script while you record)', run: () => {
+    void import('../store/teleprompter').then((m) => m.openPrompter(true))
+    openSpecialTab(STUDIO_TAB)
+  } },
+  { id: 'teleprompter.toggle', group: 'Navigation', title: 'Teleprompter: pause / carry on scrolling', shortcut: 'Ctrl+Alt+Space', run: () => void import('../store/teleprompter').then((m) => m.togglePrompter()) },
+  { id: 'takes.bySection', group: 'Navigation', title: 'Teleprompter: record by section (one section at a time)', run: () => {
+    openSpecialTab(STUDIO_TAB)
+    void import('../store/takes').then((m) => m.setBySection(!m.useTakes.getState().on))
+  } },
+  { id: 'takes.record', group: 'Navigation', title: 'Record by section: record (or stop) this section', run: () => {
+    openSpecialTab(STUDIO_TAB)
+    void import('../store/takes').then((m) => {
+      if (!m.useTakes.getState().on) m.setBySection(true)
+      void m.recordSection()
+    })
+  } },
+  { id: 'takes.retake', group: 'Navigation', title: 'Record by section: quick retake (start this section again)', run: () => void import('../store/takes').then((m) => m.quickRetake()) },
+  { id: 'takes.join', group: 'Navigation', title: 'Record by section: join the takes into one voiceover', run: () => {
+    openSpecialTab(STUDIO_TAB)
+    void import('../store/takes').then((m) => m.joinTakes())
+  } },
+  { id: 'studio.trim', group: 'Navigation', title: 'Studio: clean up the last voiceover (silences, mouth clicks, loudness)', run: () => {
+    openSpecialTab(STUDIO_TAB)
+    void import('./studio').then((m) => m.trimLastRecording())
+  } },
   { id: 'minesweeper.open', group: 'Navigation', title: 'Play minesweeper (take a quick break)', run: () => openMiniGames('minesweeper') },
   { id: 'video.open', group: 'Navigation', title: 'Video player (play any video, MKV, AVI…)', run: () => openSpecialTab(VIDEO_TAB) },
   { id: 'mixer.open', group: 'Navigation', title: 'Volume mixer (a volume for each app)', run: () => openSpecialTab(MIXER_TAB) },
   { id: 'screens.open', group: 'Navigation', title: 'Screens (monitor brightness, contrast and input)', run: () => openSpecialTab(SCREENS_TAB) },
   { id: 'screens.brighter', group: 'Navigation', title: 'Make every screen brighter', run: () => void window.api.monitorAction('all', { kind: 'brightness', mode: 'up', amount: 10 }) },
   { id: 'screens.dimmer', group: 'Navigation', title: 'Make every screen dimmer', run: () => void window.api.monitorAction('all', { kind: 'brightness', mode: 'down', amount: 10 }) },
-  { id: 'downloader.open', group: 'Navigation', title: 'Download a video from a link (YouTube, X, Instagram, TikTok…)', run: () => openSpecialTab(DOWNLOADER_TAB) },
+  { id: 'downloads.open', group: 'Navigation', title: 'Downloads (files and videos from links: YouTube, X, TikTok…; queue, pause, overnight)', run: () => openSpecialTab(DOWNLOADS_TAB) },
+  { id: 'publishing.open', group: 'Navigation', title: 'Publishing (titles, description, tags and chapters for a video)', run: () => openSpecialTab(PUBLISHING_TAB) },
   { id: 'countdowns.open', group: 'Navigation', title: 'Countdowns (days until a new season, trip, birthday…)', run: () => openSpecialTab(COUNTDOWNS_TAB) },
   { id: 'clocks.open', group: 'Navigation', title: 'World clocks (the time in other places)', run: () => openSpecialTab(CLOCKS_TAB) },
   { id: 'games.open', group: 'Navigation', title: 'Games (play your Steam and other games)', run: () => openSpecialTab(GAMES_TAB) },

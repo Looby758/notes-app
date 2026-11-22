@@ -12,6 +12,28 @@ export interface ReleaseNotes {
 /** Newest first. Add an entry with each release. */
 export const RELEASE_NOTES: readonly ReleaseNotes[] = [
   {
+    version: '1.12.1',
+    items: [
+      'App Studio: a home for the apps you make with Claude. See each app’s branch, last change and open pull requests, and get the latest and run it in one click.',
+      'Pull request inbox: try what Claude made in a separate test copy (your app’s own folder isn’t touched), then merge or close it.',
+      'Ideas & bugs board for each app, with Send to Claude. Report a bug straight from the screen snip, or sketch a screen.',
+      'Releases: bump the version and release in one click, and write the “What’s new” notes from the merged pull requests.',
+      'Screenshots: a gallery of each app’s features.',
+      'Claude as a tab or a panel floating inside Orbit, like Grok.',
+      'Terminal: several terminals, project run buttons, saved commands, and errors that stand out.'
+    ]
+  },
+  {
+    version: '1.11.1',
+    items: [
+      'The web browser is now a full browser.',
+      'Mini games: Wordle, with 2 to 8 letters and a Walking Dead mode.',
+      'Wikis: fewer spoilers from names (you see the names you know, not later ones), a readable main page, and a progress bar while Orbit checks a wiki for spoilers.',
+      'Fix: the Comics tab no longer freezes the app when it opens, and big .cbr files show unpacking progress.',
+      'Fix: the wiki spoiler check no longer repeats forever on Windows.'
+    ]
+  },
+  {
     version: '1.11.0',
     items: [
       'Mini games tab: Nonograms and Jigsaw, with Sudoku and Minesweeper in the same place.',

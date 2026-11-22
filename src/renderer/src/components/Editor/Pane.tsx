@@ -18,6 +18,8 @@ import {
   AI_TAB,
   CHAT_TAB,
   FLASHCARDS_TAB,
+  SCREENSHOTS_TAB,
+  TIMELINE_TAB,
   TERMINAL_TAB,
   PASSWORDS_TAB,
   EMAIL_TAB,
@@ -25,20 +27,27 @@ import {
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
+  PDF_EDITOR_TAB,
   COMICS_TAB,
   WIKI_TAB,
   MINIGAMES_TAB,
   CLOCKS_TAB,
   COUNTDOWNS_TAB,
+  PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
-  DOWNLOADER_TAB,
+  DOWNLOADS_TAB,
   STUDIO_TAB,
+  APPSTUDIO_TAB,
   CLIPS_TAB,
+  VIDEOS_TAB,
   SOUNDBOARD_TAB,
+  MACROS_TAB,
+  KEYREMAP_TAB,
   DISCORD_TAB,
   MESSAGES_TAB,
   GROK_TAB,
+  CLAUDE_TAB,
   GAMES_TAB,
   VIDEO_TAB,
   isExplorerTab,
@@ -48,6 +57,8 @@ import {
 import { getDrag, setDrag, zoneAt, type DropZone } from '../../lib/dnd'
 import NewTabPage from '../Picker/NewTabPage'
 import SettingsPage from '../Settings/SettingsPage'
+import ScreenshotsPage from '../Screenshots/ScreenshotsPage'
+import TimelinePage from '../Timeline/TimelinePage'
 import CalendarPage from '../Calendar/CalendarPage'
 import GraphPage from '../Graph/GraphPage'
 import ReplacePage from '../Replace/ReplacePage'
@@ -65,20 +76,27 @@ import PasswordsPage from '../Passwords/PasswordsPage'
 import EmailPage from '../Email/EmailPage'
 import MessagesPage from '../Messages/MessagesPage'
 import GrokPage from '../Grok/GrokPage'
+import ChatSitePage from '../ChatSite/ChatSite'
 import HomePage from '../Home/HomePage'
 import MoneyPage from '../Money/MoneyPage'
 import ConvertPage from '../Convert/ConvertPage'
-import VideoDownloaderPage from '../Downloader/VideoDownloaderPage'
+import DownloadsPage from '../Downloads/DownloadsPage'
+import PdfEditorPage from '../PdfEditor/PdfEditorPage'
 import MiniGamesPage from '../MiniGames/MiniGamesPage'
 import ComicsPage from '../Comics/ComicsPage'
 import WikiPage from '../Wiki/WikiPage'
 import WorldClocksPage from '../Clocks/WorldClocksPage'
 import CountdownsPage from '../Countdowns/CountdownsPage'
+import PublishingPage from '../Publishing/PublishingPage'
 import ScreensPage from '../Screens/ScreensPage'
 import MixerPage from '../Mixer/MixerPage'
 import StudioPage from '../Studio/StudioPage'
+import AppStudioPage from '../AppStudio/AppStudioPage'
 import ClipsPage from '../Clips/ClipsPage'
+import VideosPage from '../Videos/VideosPage'
 import SoundboardPage from '../Soundboard/SoundboardPage'
+import MacrosPage from '../Macros/MacrosPage'
+import KeyRemapPage from '../KeyRemap/KeyRemapPage'
 import DiscordVoicePage from '../Discord/DiscordVoicePage'
 import GamesPage from '../Games/GamesPage'
 import VideoPage from '../Video/VideoPage'
@@ -194,6 +212,7 @@ export default function Pane({ pane }: { pane: string }) {
         {tabs?.includes(MESSAGES_TAB) && <MessagesPage hidden={active !== MESSAGES_TAB} autoFocus={isActivePane} />}
         {/* And Grok, so a chat isn't lost by looking at a note. */}
         {tabs?.includes(GROK_TAB) && <GrokPage hidden={active !== GROK_TAB} autoFocus={isActivePane} />}
+        {tabs?.includes(CLAUDE_TAB) && <ChatSitePage site="claude" hidden={active !== CLAUDE_TAB} autoFocus={isActivePane} />}
         {active === SETTINGS_TAB && <SettingsPage />}
         {active === CALENDAR_TAB && <CalendarPage />}
         {active === GRAPH_TAB && <GraphPage />}
@@ -202,23 +221,31 @@ export default function Pane({ pane }: { pane: string }) {
         {active === AI_TAB && <AiPage autoFocus={isActivePane} />}
         {active === CHAT_TAB && <ChatPage autoFocus={isActivePane} />}
         {active === FLASHCARDS_TAB && <FlashcardsPage />}
+        {active === SCREENSHOTS_TAB && <ScreenshotsPage />}
+        {active === TIMELINE_TAB && <TimelinePage />}
         {active === TERMINAL_TAB && <TerminalPage />}
         {active === PASSWORDS_TAB && <PasswordsPage autoFocus={isActivePane} />}
         {active === EMAIL_TAB && <EmailPage />}
         {(active === HOME_TAB || !active) && <HomePage />}
         {active === MONEY_TAB && <MoneyPage />}
         {active === CONVERT_TAB && <ConvertPage />}
+        {active === PDF_EDITOR_TAB && <PdfEditorPage />}
         {active === COMICS_TAB && <ComicsPage />}
         {active === WIKI_TAB && <WikiPage />}
         {active === MINIGAMES_TAB && <MiniGamesPage />}
         {active === CLOCKS_TAB && <WorldClocksPage />}
         {active === COUNTDOWNS_TAB && <CountdownsPage />}
+        {active === PUBLISHING_TAB && <PublishingPage />}
         {active === SCREENS_TAB && <ScreensPage />}
         {active === MIXER_TAB && <MixerPage />}
-        {active === DOWNLOADER_TAB && <VideoDownloaderPage />}
+        {active === DOWNLOADS_TAB && <DownloadsPage />}
         {active === STUDIO_TAB && <StudioPage />}
+        {active === APPSTUDIO_TAB && <AppStudioPage />}
         {active === CLIPS_TAB && <ClipsPage />}
+        {active === VIDEOS_TAB && <VideosPage />}
         {active === SOUNDBOARD_TAB && <SoundboardPage />}
+        {active === MACROS_TAB && <MacrosPage />}
+        {active === KEYREMAP_TAB && <KeyRemapPage />}
         {active === DISCORD_TAB && <DiscordVoicePage />}
         {active === GAMES_TAB && <GamesPage />}
         {active === VIDEO_TAB && <VideoPage autoFocus={isActivePane} />}

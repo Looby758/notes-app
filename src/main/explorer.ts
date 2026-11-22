@@ -8,7 +8,10 @@ import {
   isHiddenName,
   isInside,
   isStreamable,
+  looksLikeAppFiles,
+  matchesWords,
   nameProblem,
+  PC_SEARCH_LIMIT,
   previewKind,
   SEARCH_LIMIT,
   TEXT_PREVIEW_BYTES,
@@ -24,6 +27,18 @@ import { pack, unpack } from './archive/unpack'
 import { logError } from './log'
 import { openOutside } from './openOutside'
 import { hold } from './undoBin'
+import fileIndexWorker from './fileIndex/fileIndexWorker?modulePath'
+import { fileIndexStatus, hasEverything, rebuildFileIndex, searchIndex, startFileIndex, stopFileIndex, systemSearch, touchedFiles, type IndexStatus } from './fileIndex'
+import { copyTags, moveTags, setupFileTags, taggedPaths } from './fileTags'
+import folderSizeWorker from './folderSize/folderSizeWorker?modulePath'
+import { folderSizesChanged, setupFolderSizes, wantFolderSizes } from './folderSize'
+import { deleteFromBin, emptyBin, listBin, openMacPrivacy, openSystemBin, restoreFromBin } from './recycleBin'
+
+/** Orbit changed something in these folders: Whole PC search and folder sizes catch up. */
+function changed(dirs: string[]): void {
+  touchedFiles(dirs)
+  folderSizesChanged(dirs)
+}
 
 /**
  * The file explorer tab's side of things: the places to start from, folder listings, text
@@ -196,6 +211,7 @@ async function create(dir: string, name: string, kind: 'folder' | 'file'): Promi
   const path = join(dir, uniqueName(checkName(name), await namesIn(dir), kind === 'folder'))
   if (kind === 'folder') await mkdir(path)
   else await writeFile(path, '', { flag: 'wx' })
+  changed([dir])
   return path
 }
 
@@ -206,6 +222,8 @@ async function renameItem(path: string, name: string): Promise<string> {
   if (next.toLowerCase() !== path.toLowerCase() && existsSync(next)) throw new Error(`There's already something called "${basename(next)}" here.`)
   await releaseFiles(path)
   await rename(path, next)
+  moveTags(path, next)
+  changed([dirname(path)])
   return next
 }
 
@@ -234,8 +252,11 @@ async function paste(paths: string[], dir: string, mode: PasteMode): Promise<{ f
     } else {
       await cp(from, to, { recursive: true, errorOnExist: true, force: false, preserveTimestamps: true })
     }
+    if (mode === 'move') moveTags(from, to)
+    else copyTags(from, to)
     done.push({ from, to })
   }
+  changed([dir, ...(mode === 'move' ? done.map((d) => dirname(d.from)) : [])])
   return done
 }
 
@@ -246,6 +267,9 @@ const SKIP_DIRS = new Set(['node_modules', '$recycle.bin', 'system volume inform
 async function search(vaultRoot: string | null, dir: string, query: string, showHidden: boolean): Promise<ExplorerEntry[]> {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean)
   if (!words.length) return []
+  // When the folder is in the Whole PC list, that answers straight away.
+  const listed = await searchIndex(query, { under: dir, limit: SEARCH_LIMIT, showHidden })
+  if (listed) return entriesOf(vaultRoot, listed.map((h) => h.path))
   const found: string[] = []
   const queue = [dir]
   const until = Date.now() + 4000
@@ -263,8 +287,50 @@ async function search(vaultRoot: string | null, dir: string, query: string, show
       if (found.length >= SEARCH_LIMIT) break
     }
   }
-  const entries = await Promise.all(found.map((p) => entryOf(vaultRoot, p)))
+  return entriesOf(vaultRoot, found)
+}
+
+async function entriesOf(vaultRoot: string | null, paths: string[]): Promise<ExplorerEntry[]> {
+  const entries = await Promise.all(paths.map((p) => entryOf(vaultRoot, p)))
   return entries.filter((e): e is ExplorerEntry => !!e)
+}
+
+/**
+ * Whole PC search: Orbit's list of every file (fileIndex/), with what Spotlight (Mac) or
+ * Everything (Windows, when it's running) find added in. Best matches first.
+ */
+async function searchPc(vaultRoot: string | null, query: string, showHidden: boolean): Promise<{ entries: ExplorerEntry[]; status: IndexStatus; system: boolean }> {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+  if (!words.length) return { entries: [], status: fileIndexStatus(), system: false }
+  const [listed, system] = await Promise.all([
+    searchIndex(query, { limit: PC_SEARCH_LIMIT, showHidden, prefer: homedir() }),
+    systemSearch(query, PC_SEARCH_LIMIT).catch(() => [])
+  ])
+  const seen = new Set<string>()
+  const paths: string[] = []
+  const add = (p: string): void => {
+    const key = p.toLowerCase()
+    if (seen.has(key) || paths.length >= PC_SEARCH_LIMIT) return
+    seen.add(key)
+    paths.push(p)
+  }
+  for (const h of listed ?? []) add(h.path)
+  for (const h of system) {
+    if (matchesWords(basename(h.path), words) && !looksLikeAppFiles(h.path, showHidden)) add(h.path)
+  }
+  return { entries: await entriesOf(vaultRoot, paths), status: fileIndexStatus(), system: system.length > 0 }
+}
+
+/** The drives (or, on a Mac, the home folder, Applications and other drives) Whole PC search lists. */
+const indexDrives = (): string[] => drives().map((d) => d.path)
+
+let indexWanted = false
+/** Whole PC search's list is kept while it's on in Settings → Files. */
+export function setFileIndexOn(on: boolean, userData: string, statusChanged: (s: IndexStatus) => void): void {
+  if (on === indexWanted) return
+  indexWanted = on
+  if (on) startFileIndex({ userData, home: homedir(), drives: indexDrives(), workerPath: fileIndexWorker, statusChanged })
+  else stopFileIndex()
 }
 
 const checkPaths = (paths: unknown): string[] => {
@@ -335,6 +401,7 @@ export function setupExplorer(vaultRoot: () => string | null): void {
       await hold(p)
       done.push(p)
     }
+    changed(done.map((p) => dirname(p)))
     return done
   })
   // Dropped from the explorer (or File Explorer / Finder) onto a folder in the sidebar's notes tree:
@@ -366,4 +433,23 @@ export function setupExplorer(vaultRoot: () => string | null): void {
     return pack(items, kind, { name: newArchiveName(items.map((p) => basename(p)), kind), password: pw(password) })
   })
   ipcMain.handle('explorer:search', (_e, dir: string, query: string, showHidden: boolean) => search(vaultRoot(), checkPath(dir), String(query ?? ''), !!showHidden))
+  ipcMain.handle('explorer:searchPc', (_e, query: string, showHidden: boolean) => searchPc(vaultRoot(), String(query ?? ''), !!showHidden))
+  ipcMain.handle('explorer:indexStatus', () => ({ ...fileIndexStatus(), everything: hasEverything(), wanted: indexWanted }))
+  ipcMain.handle('explorer:reindex', () => rebuildFileIndex())
+  ipcMain.handle('explorer:tagged', (_e, colour: string) => entriesOf(vaultRoot(), taggedPaths(colour)))
+  setupFileTags()
+  setupFolderSizes(folderSizeWorker)
+  // The Recycle Bin / Bin in the sidebar.
+  const ids = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [])
+  ipcMain.handle('bin:list', () => listBin())
+  ipcMain.handle('bin:restore', async (_e, list: unknown) => {
+    const back = await restoreFromBin(ids(list))
+    changed(back.map((p) => dirname(p)))
+    return back
+  })
+  ipcMain.handle('bin:delete', (_e, list: unknown) => deleteFromBin(ids(list)))
+  ipcMain.handle('bin:empty', () => emptyBin())
+  ipcMain.handle('bin:openSystem', () => openSystemBin())
+  ipcMain.handle('bin:macPrivacy', () => openMacPrivacy())
+  ipcMain.handle('explorer:folderSizes', (_e, paths: unknown, fresh: unknown) => wantFolderSizes(checkPaths(paths ?? []), !!fresh))
 }

@@ -7,7 +7,9 @@ import { findMentions, type Mention } from '../lib/mentions'
 import { buildVectors, relatedTo, type Related, type RelatedInput } from '../lib/related'
 import { readFrontmatter } from '../lib/properties'
 import { compareItems, parseDatedItems, type DatedItem } from '../lib/schedule'
+import { occurrences, shiftDay } from '@shared/repeat'
 import { dailyDateOf } from '../lib/dailyPaths'
+import { dayKey } from '../lib/dates'
 import { usePrefs } from './prefs'
 import { forgetLockState, noteLockState } from '../lib/lock/session'
 import { isLockedText } from '../lib/lock/crypto'
@@ -163,13 +165,31 @@ export function syncIndex(allPaths: string[], changed: string[] = []): Promise<v
 // ---------- calendar ----------
 
 /** Everything dated, grouped by day key and sorted (all-day first, then by time). */
-export function itemsByDay(): Map<string, DatedItem[]> {
+/**
+ * Dated items by day. Repeating events are copied onto each day they happen between `from` and
+ * `to` (day keys; by default from two months ago to a year ahead).
+ */
+export function itemsByDay(from?: string, to?: string): Map<string, DatedItem[]> {
+  const today = new Date()
+  const first = from ?? shiftDay(dayKey(today), -62)
+  const last = to ?? shiftDay(dayKey(today), 400)
   const byDay = new Map<string, DatedItem[]>()
+  const put = (item: DatedItem): void => {
+    const list = byDay.get(item.date)
+    if (list) list.push(item)
+    else byDay.set(item.date, [item])
+  }
   for (const { dated } of useNoteIndex.getState().notes.values()) {
     for (const item of dated) {
-      const list = byDay.get(item.date)
-      if (list) list.push(item)
-      else byDay.set(item.date, [item])
+      if (!item.repeat) {
+        put(item)
+        continue
+      }
+      for (const date of occurrences(item.repeat, item.date, first, last)) {
+        if (date === item.date) put(item)
+        // Copies aren't tick-able: ticking would tick the one line they all come from.
+        else put({ ...item, date, seriesDate: item.date, done: undefined })
+      }
     }
   }
   for (const list of byDay.values()) list.sort(compareItems)

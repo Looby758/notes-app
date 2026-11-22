@@ -111,6 +111,47 @@ export function steamLibraryFolders(vdfText: string): string[] {
   return out
 }
 
+/** A Steam game Steam is downloading or updating, from its appmanifest_<id>.acf. */
+export interface SteamDownload {
+  appId: string
+  name: string
+  /** downloading: going now. paused: paused in Steam. waiting: in Steam's queue (or waiting for its update hours). */
+  state: 'downloading' | 'paused' | 'waiting'
+  downloaded: number
+  /** 0 when Steam hasn't worked it out yet. */
+  total: number
+}
+
+// Steam's StateFlags: 2 update required, 4 fully installed, 256 update running, 512 update paused,
+// 1024 update started, 1048576 downloading, 2097152 staging, 4194304 committing.
+const UPDATE_REQUIRED = 2
+const UPDATE_RUNNING = 256
+const UPDATE_PAUSED = 512
+const DOWNLOADING = 1048576 | 2097152 | 4194304
+
+/** What Steam is doing with a game, from its manifest; null when it isn't downloading anything. */
+export function steamDownloadFromManifest(acfText: string): SteamDownload | null {
+  const state = section(parseVdf(acfText).appstate)
+  if (!state) return null
+  const appId = typeof state.appid === 'string' ? state.appid : ''
+  const name = typeof state.name === 'string' && state.name ? state.name : `Steam game ${appId}`
+  const flags = Number(state.stateflags) || 0
+  const num = (k: string): number => Number(typeof state[k] === 'string' ? state[k] : 0) || 0
+  const total = num('bytestodownload')
+  const downloaded = Math.min(num('bytesdownloaded'), total || Infinity)
+  if (!/^\d+$/.test(appId)) return null
+  const busy = flags & (UPDATE_REQUIRED | UPDATE_RUNNING | UPDATE_PAUSED | DOWNLOADING)
+  if (!busy) return null
+  const s: SteamDownload['state'] = flags & UPDATE_PAUSED ? 'paused' : flags & (UPDATE_RUNNING | DOWNLOADING) ? 'downloading' : 'waiting'
+  return { appId, name, state: s, downloaded, total }
+}
+
+/** The game's number in a Steam link (store page, steam://install/…, SteamDB), or null. */
+export function steamAppIdFromLink(link: string): string | null {
+  const m = /^(?:https?:\/\/)?(?:store\.steampowered\.com\/app|steamdb\.info\/app|steamcommunity\.com\/app)\/(\d+)/i.exec(link.trim()) ?? /^steam:\/\/(?:install|store|run|rungameid)\/(\d+)/i.exec(link.trim())
+  return m ? m[1] : null
+}
+
 export interface SteamApp {
   appId: string
   name: string

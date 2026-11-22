@@ -3,6 +3,7 @@ import type { Prefs } from '@shared/prefs'
 import {
   Ear,
   ArrowRightLeft,
+  FilePen,
   AudioLines,
   Clapperboard,
   Cpu,
@@ -18,10 +19,15 @@ import {
   Globe,
   Globe2,
   Hourglass,
+  Upload,
   HardDrive,
   House,
   KeyRound,
+  Keyboard,
+  Repeat2,
   Layers,
+  Images,
+  Clock,
   LibraryBig,
   Library,
   Mail,
@@ -45,14 +51,18 @@ import {
   Webcam,
   Zap,
   Headphones,
-  CloudDownload,
   History,
   Scissors,
   Bot,
+  Asterisk,
+  Video,
+  Hammer,
+  ArrowDownToLine,
   type LucideIcon
 } from 'lucide-react'
 import { openGrokTab } from '../components/Grok/GrokPage'
-import { useGrok } from '../store/grok'
+import { openSiteTab } from '../components/ChatSite/ChatSite'
+import { useChatSites, useGrok } from '../store/grok'
 import { openMiniGames } from '../store/miniGames'
 import { useVault } from '../store/vault'
 import { setPrefs, usePrefs } from '../store/prefs'
@@ -71,13 +81,20 @@ import {
   COMICS_TAB,
   WIKI_TAB,
   CONVERT_TAB,
+  PDF_EDITOR_TAB,
   STUDIO_TAB,
+  APPSTUDIO_TAB,
   CLIPS_TAB,
+  VIDEOS_TAB,
   SOUNDBOARD_TAB,
+  MACROS_TAB,
+  KEYREMAP_TAB,
   DISCORD_TAB,
   EMAIL_TAB,
   EXPLORER_TAB,
   FLASHCARDS_TAB,
+  SCREENSHOTS_TAB,
+  TIMELINE_TAB,
   GAMES_TAB,
   VIDEO_TAB,
   GRAPH_TAB,
@@ -85,9 +102,10 @@ import {
   MESSAGES_TAB,
   CLOCKS_TAB,
   COUNTDOWNS_TAB,
+  PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
-  DOWNLOADER_TAB,
+  DOWNLOADS_TAB,
   MONEY_TAB,
   PASSWORDS_TAB,
   SETTINGS_TAB,
@@ -173,8 +191,11 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   calendar: { icon: CalendarDays, run: () => openSpecialTab(CALENDAR_TAB) },
   clocks: { icon: Globe2, run: () => openSpecialTab(CLOCKS_TAB) },
   countdowns: { icon: Hourglass, run: () => openSpecialTab(COUNTDOWNS_TAB) },
+  publishing: { icon: Upload, run: () => openSpecialTab(PUBLISHING_TAB) },
   screens: { icon: Monitor, run: () => openSpecialTab(SCREENS_TAB) },
   mixer: { icon: SlidersVertical, run: () => openSpecialTab(MIXER_TAB) },
+  screenshots: { icon: Images, run: () => openSpecialTab(SCREENSHOTS_TAB) },
+  timeline: { icon: Clock, run: () => openSpecialTab(TIMELINE_TAB) },
   flashcards: { icon: Layers, run: () => openSpecialTab(FLASHCARDS_TAB), badge: () => <FeatureBadge id="flashcards" /> },
   zen: { icon: Moon, run: () => toggleZen() },
   money: { icon: PoundSterling, run: () => openSpecialTab(MONEY_TAB) },
@@ -196,6 +217,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   web: { icon: Globe, run: () => openWebTab('', { beside: true }) },
   chat: { icon: MessageSquare, run: () => openSpecialTab(CHAT_TAB) },
   grok: { icon: Bot, run: openGrokTab, useActive: () => useGrok((s) => s.floating) },
+  claude: { icon: Asterisk, run: () => openSiteTab('claude'), useActive: () => useChatSites((s) => s.claude.floating) },
   ask: { icon: Sparkles, run: () => openAsk() },
   music: { icon: Music, run: toggleMusic, useActive: () => useMusic((s) => s.open) },
   songid: { icon: Ear, run: showAndFindSong, useActive: () => useSongId((s) => s.phase === 'listening' || s.phase === 'thinking') },
@@ -208,7 +230,8 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   snip: { icon: Scan, run: () => void startSnip() },
   explorer: { icon: HardDrive, run: () => openSpecialTab(EXPLORER_TAB) },
   convert: { icon: ArrowRightLeft, run: () => openSpecialTab(CONVERT_TAB) },
-  downloader: { icon: CloudDownload, run: () => openSpecialTab(DOWNLOADER_TAB) },
+  'pdf-editor': { icon: FilePen, run: () => openSpecialTab(PDF_EDITOR_TAB) },
+  downloads: { icon: ArrowDownToLine, run: () => openSpecialTab(DOWNLOADS_TAB) },
   'offline-ai': {
     icon: Cpu,
     run: () => {
@@ -217,11 +240,15 @@ const BEHAVIOUR: Record<string, Behaviour> = {
     }
   },
   studio: { icon: Clapperboard, run: () => openSpecialTab(STUDIO_TAB) },
+  appstudio: { icon: Hammer, run: () => openSpecialTab(APPSTUDIO_TAB) },
   clips: { icon: Scissors, run: () => openSpecialTab(CLIPS_TAB) },
+  videos: { icon: Video, run: () => openSpecialTab(VIDEOS_TAB) },
   replay: { icon: History, run: () => void import('./replay').then((m) => m.saveReplay()), useActive: () => usePrefs((s) => s.prefs.replayOn) },
   soundboard: { icon: AudioLines, run: () => openSpecialTab(SOUNDBOARD_TAB) },
   'discord-voice': { icon: Headphones, run: () => openSpecialTab(DISCORD_TAB) },
   terminal: { icon: SquareTerminal, run: () => openSpecialTab(TERMINAL_TAB) },
+  macros: { icon: Keyboard, run: () => openSpecialTab(MACROS_TAB) },
+  keyremap: { icon: Repeat2, run: () => openSpecialTab(KEYREMAP_TAB) },
   streamer: { icon: Eye, run: toggleStreamerMode, useActive: () => usePrefs((s) => s.prefs.streamerMode) },
   settings: { icon: Settings, run: () => openSpecialTab(SETTINGS_TAB) }
 }

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ExternalLink, FileText, Film, FolderSearch, Pencil, SquarePen } from 'lucide-react'
+import { ExternalLink, FilePen, FileText, Film, FolderSearch, Pencil, SquarePen } from 'lucide-react'
+import { openInPdfEditor } from '../../store/pdfEditor'
+import { notify } from '../../store/notify'
 import { fileKind, openExternally, vaultUrl } from '../../lib/fileKinds'
 import { openNote } from '../../lib/editorController'
 import { noteTitle } from '../../lib/paths'
@@ -70,6 +72,11 @@ export default function FileViewer({ path }: { path: string }) {
         {kind === 'image' && !isSketch && (
           <button className="btn btn-primary" onClick={() => useUI.setState({ picEdit: { path } })} title="Crop, resize, add arrows, blur or text" data-edit-picture>
             <SquarePen size={13} /> Edit picture
+          </button>
+        )}
+        {kind === 'pdf' && (
+          <button className="btn btn-primary" onClick={() => void openInPdfEditor(name, vaultUrl(path)).catch(notify)} title="Sign it, fill it in, or change its pages" data-edit-pdf>
+            <FilePen size={13} /> Edit PDF
           </button>
         )}
         {kind === 'video' && (

@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type MouseEvent } from 'react'
-import { ArrowRightLeft, AudioLines, Bot, Headphones, Joystick, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Hourglass, HardDrive, House, KeyRound, Layers, LibraryBig, Library, Mail, MessageSquare, MessagesSquare, Monitor, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Scissors, Settings, SlidersVertical, Sparkles, SquareTerminal, Star, StarOff, X, CloudDownload, VenetianMask, Volume2, VolumeX } from 'lucide-react'
+import { unseenTerminalErrors, useTerminals } from '../../store/terminals'
+import { Asterisk, Hammer, ArrowRightLeft, AudioLines, Bot, Headphones, Joystick, CalendarDays, Clapperboard, Columns2, Copy, ExternalLink, FileDown, Film, FolderSearch, Gamepad2, GitCompare, Globe, Globe2, Hourglass, HardDrive, House, KeyRound, Layers, LibraryBig, Library, Mail, MessageSquare, MessagesSquare, Monitor, Network, Orbit, Pin, PinOff, Plus, PoundSterling, Replace, Rows2, Scissors, Settings, SlidersVertical, Video, Sparkles, SquareTerminal, Star, StarOff, X, VenetianMask, Volume2, VolumeX } from 'lucide-react'
 import Private from '../Streamer/Private'
 import { useHideNames } from '../../store/streamer'
 import { useEditor } from '../../store/editor'
 import { toggleStar, useStarred } from '../../store/starred'
+import { Images, Clock } from 'lucide-react'
 import { useNoteIndex } from '../../store/noteIndex'
+import { ArrowDownToLine, Keyboard, Repeat2, Upload } from 'lucide-react'
+import { FilePen } from 'lucide-react'
 import { isMindMap, openExport, toggleMindMap, useUI } from '../../store/ui'
 import {
   activateTab,
@@ -15,27 +19,36 @@ import {
   REPLACE_TAB,
   CONFLICTS_TAB,
   FLASHCARDS_TAB,
+  SCREENSHOTS_TAB,
+  TIMELINE_TAB,
   TERMINAL_TAB,
   PASSWORDS_TAB,
   EMAIL_TAB,
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
+  PDF_EDITOR_TAB,
   isExplorerTab,
   COMICS_TAB,
   WIKI_TAB,
   MINIGAMES_TAB,
   CLOCKS_TAB,
   COUNTDOWNS_TAB,
+  PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
-  DOWNLOADER_TAB,
+  DOWNLOADS_TAB,
   STUDIO_TAB,
+  APPSTUDIO_TAB,
   CLIPS_TAB,
+  VIDEOS_TAB,
   SOUNDBOARD_TAB,
+  MACROS_TAB,
+  KEYREMAP_TAB,
   DISCORD_TAB,
   MESSAGES_TAB,
   GROK_TAB,
+  CLAUDE_TAB,
   GAMES_TAB,
   VIDEO_TAB,
   closePane,
@@ -91,26 +104,35 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === AI_TAB) return 'Ask everything'
   if (id === CHAT_TAB) return 'Chat'
   if (id === FLASHCARDS_TAB) return 'Flashcards'
+  if (id === SCREENSHOTS_TAB) return 'Screenshots'
+  if (id === TIMELINE_TAB) return 'Timeline'
   if (id === TERMINAL_TAB) return 'Terminal'
   if (id === PASSWORDS_TAB) return 'Passwords'
   if (id === EMAIL_TAB) return 'Email'
   if (id === HOME_TAB) return 'Home'
   if (id === MONEY_TAB) return 'Money'
   if (id === CONVERT_TAB) return 'Convert files'
+  if (id === PDF_EDITOR_TAB) return 'PDF editor'
   if (id === COMICS_TAB) return 'Comics'
   if (id === WIKI_TAB) return 'Wikis'
   if (id === MINIGAMES_TAB) return 'Mini games'
   if (id === CLOCKS_TAB) return 'World clocks'
   if (id === COUNTDOWNS_TAB) return 'Countdowns'
+  if (id === PUBLISHING_TAB) return 'Publishing'
   if (id === SCREENS_TAB) return 'Screens'
   if (id === MIXER_TAB) return 'Volume mixer'
-  if (id === DOWNLOADER_TAB) return 'Download a video'
+  if (id === DOWNLOADS_TAB) return 'Downloads'
   if (id === STUDIO_TAB) return 'Studio'
+  if (id === APPSTUDIO_TAB) return 'App Studio'
   if (id === CLIPS_TAB) return 'Clips'
+  if (id === VIDEOS_TAB) return 'Videos'
   if (id === SOUNDBOARD_TAB) return 'Soundboard'
+  if (id === MACROS_TAB) return 'Macros'
+  if (id === KEYREMAP_TAB) return 'Key remapper'
   if (id === DISCORD_TAB) return 'Discord voice'
   if (id === MESSAGES_TAB) return 'Messages'
   if (id === GROK_TAB) return 'Grok'
+  if (id === CLAUDE_TAB) return 'Claude'
   if (id === GAMES_TAB) return 'Games'
   if (id === VIDEO_TAB) {
     const current = useVideoPlayer.getState().current
@@ -311,27 +333,37 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === AI_TAB && <Sparkles size={13} className="tab-icon" />}
               {id === CHAT_TAB && <MessageSquare size={13} className="tab-icon" />}
               {id === FLASHCARDS_TAB && <Layers size={13} className="tab-icon" />}
+              {id === SCREENSHOTS_TAB && <Images size={13} className="tab-icon" />}
+              {id === TIMELINE_TAB && <Clock size={13} className="tab-icon" />}
               {id === TERMINAL_TAB && <SquareTerminal size={13} className="tab-icon" />}
+              {id === TERMINAL_TAB && <TerminalErrorDot />}
               {id === PASSWORDS_TAB && <KeyRound size={13} className="tab-icon" />}
               {id === EMAIL_TAB && <Mail size={13} className="tab-icon" />}
               {isWebTab(id) && (isPrivateWebTab(id) ? <VenetianMask size={13} className="tab-icon" /> : web[id]?.url ? <SiteIcon url={web[id].url} size={13} className="tab-icon" /> : <Globe size={13} className="tab-icon" />)}
               {id === HOME_TAB && <House size={13} className="tab-icon" />}
               {id === MONEY_TAB && <PoundSterling size={13} className="tab-icon" />}
               {id === CONVERT_TAB && <ArrowRightLeft size={13} className="tab-icon" />}
+              {id === PDF_EDITOR_TAB && <FilePen size={13} className="tab-icon" />}
               {id === COMICS_TAB && <LibraryBig size={13} className="tab-icon" />}
               {id === WIKI_TAB && <Library size={13} className="tab-icon" />}
               {id === MINIGAMES_TAB && <Joystick size={13} className="tab-icon" />}
               {id === CLOCKS_TAB && <Globe2 size={13} className="tab-icon" />}
               {id === COUNTDOWNS_TAB && <Hourglass size={13} className="tab-icon" />}
+              {id === PUBLISHING_TAB && <Upload size={13} className="tab-icon" />}
               {id === SCREENS_TAB && <Monitor size={13} className="tab-icon" />}
               {id === MIXER_TAB && <SlidersVertical size={13} className="tab-icon" />}
-              {id === DOWNLOADER_TAB && <CloudDownload size={13} className="tab-icon" />}
+              {id === DOWNLOADS_TAB && <ArrowDownToLine size={13} className="tab-icon" />}
               {id === STUDIO_TAB && <Clapperboard size={13} className="tab-icon" />}
+              {id === APPSTUDIO_TAB && <Hammer size={13} className="tab-icon" />}
               {id === CLIPS_TAB && <Scissors size={13} className="tab-icon" />}
+              {id === VIDEOS_TAB && <Video size={13} className="tab-icon" />}
               {id === SOUNDBOARD_TAB && <AudioLines size={13} className="tab-icon" />}
+              {id === MACROS_TAB && <Keyboard size={13} className="tab-icon" />}
+              {id === KEYREMAP_TAB && <Repeat2 size={13} className="tab-icon" />}
               {id === DISCORD_TAB && <Headphones size={13} className="tab-icon" />}
               {id === MESSAGES_TAB && <MessagesSquare size={13} className="tab-icon" />}
               {id === GROK_TAB && <Bot size={13} className="tab-icon" />}
+              {id === CLAUDE_TAB && <Asterisk size={13} className="tab-icon" />}
               {id === GAMES_TAB && <Gamepad2 size={13} className="tab-icon" />}
               {id === VIDEO_TAB && <Film size={13} className="tab-icon" />}
               {isExplorerTab(id) && <HardDrive size={13} className="tab-icon" />}
@@ -406,6 +438,12 @@ export default function TabBar({ pane }: { pane: string }) {
 }
 
 /** A speaker on a web tab that's playing sound (or muted); clicking it mutes or unmutes the tab. */
+/** A red dot on the Terminal tab when a command printed errors you haven't looked at yet. */
+function TerminalErrorDot() {
+  const errors = useTerminals(unseenTerminalErrors)
+  return errors > 0 ? <span className="tab-error-dot" title={`${errors} error line${errors === 1 ? '' : 's'} in the terminal`} /> : null
+}
+
 function TabAudio({ tab }: { tab: string }) {
   const audio = useBrowser((s) => s.audio[tab])
   if (!audio || (!audio.audible && !audio.muted)) return null

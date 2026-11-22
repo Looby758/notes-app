@@ -16,6 +16,10 @@ import { notify } from '../store/notify'
 import { useEditor, type SaveStatus } from '../store/editor'
 import { useNoteIndex } from '../store/noteIndex'
 import { setPrefs, usePrefs } from '../store/prefs'
+import { useTerminals } from '../store/terminals'
+import { setSection, useAppStudio } from '../store/appStudio'
+import { reportBugFromSnip } from '../store/appBoard'
+import { boardKey } from '@shared/appStudio'
 import { showSearch, toggleZen, useUI } from '../store/ui'
 import { countNotes, parentOf } from '../lib/paths'
 import { FILE_MANAGER, IS_MAC, showKeys } from '@shared/platform'
@@ -26,6 +30,8 @@ import {
   isNoteTab,
   openNote,
   openSpecialTab,
+  APPSTUDIO_TAB,
+  MONEY_TAB,
   openWebTab,
   activateTab,
   refreshEmbeds,
@@ -54,8 +60,10 @@ import { watchReplay } from '../lib/replay'
 import { startFormatMenu } from '../lib/formatMenu'
 import { startDictionary } from '../lib/dictionary'
 import { EventDetails } from './Calendar/shared'
+import { CalendarOverlays } from './Calendar/edit'
 import Resizer from './Resizer'
 import UpdateToast from './UpdateToast'
+import SkyblockCard from './Games/SkyblockCard'
 import { DownloadPrompt } from './Web/Downloads'
 import { startBrowser, tabsByPage } from '../store/browser'
 import StartupNotices from './Notices/StartupNotices'
@@ -63,6 +71,7 @@ import Screensaver from './Screensaver/Screensaver'
 import Pet from './Motion/Pet'
 import MusicPlayer from './Music/MusicPlayer'
 import { GrokFloat } from './Grok/GrokPage'
+import { ChatSiteFloat } from './ChatSite/ChatSite'
 import RecordingBar from './Studio/RecordingBar'
 import ZenBar, { StatusTimer } from './ZenBar'
 import VoiceRecorder from './VoiceRecorder'
@@ -73,6 +82,8 @@ import { toggleStreamerMode } from '../store/streamer'
 import Private from './Streamer/Private'
 import DeviceDrop from './Share/DeviceDrop'
 import { startReminders, stopReminders } from '../lib/reminderScheduler'
+import { MONEY_IOU_LINK, startIouReminders, stopIouReminders } from '../lib/iouReminders'
+import { useMoneyView } from '../store/money'
 
 interface Props {
   vault: string
@@ -93,6 +104,7 @@ const STATUS_LABEL: Record<SaveStatus, string> = {
 }
 
 export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
+  useBugReports()
   const leftOpen = useUI((s) => s.leftOpen)
   const rightOpen = useUI((s) => s.rightOpen)
   const leftWidth = useUI((s) => s.leftWidth)
@@ -128,8 +140,14 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     initEditor(vault)
     const stopHistory = startNavHistory()
     void startReminders()
-    // (The test notification from Settings has no note to open.)
-    const offReminder = window.api.onReminderOpen((path, line) => path && openNote(path, { line }))
+    startIouReminders()
+    // (The test notification from Settings has no note to open.) An IOU reminder opens Money → IOUs.
+    const offReminder = window.api.onReminderOpen((path, line) => {
+      if (path === MONEY_IOU_LINK) {
+        useMoneyView.setState({ view: 'ious' })
+        openSpecialTab(MONEY_TAB)
+      } else if (path) openNote(path, { line })
+    })
     // "Open in Orbit" from File Explorer / Finder: any that came in while Orbit was starting, then each new one.
     const offOpenFile = window.api.onOpenFile(openFromComputer)
     void window.api.takeOpenedFiles().then((paths) => paths.forEach(openFromComputer))
@@ -180,6 +198,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       offSnips()
       offReplay()
       stopReminders()
+      stopIouReminders()
     }
   }, [vault])
 
@@ -376,6 +395,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       </div>
 
       <footer className="statusbar">
+        <TestCopyBadge />
         {/* The folder's path usually has your name in it. */}
         <Private>
           <span title={streamer ? undefined : vault}>{vault}</span>
@@ -412,13 +432,16 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <LockDialog />
       <SendToPhone />
       <EventDetails />
+      <CalendarOverlays />
       <Pet />
       <UpdateToast />
+      <SkyblockCard />
       <DownloadPrompt />
       <StartupNotices />
       <DeviceDrop />
       <MusicPlayer />
       <GrokFloat />
+      <ChatSiteFloat site="claude" />
       <RecordingBar />
       <ZenBar />
       <VoiceRecorder />
@@ -427,5 +450,40 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <PictureEditor />
       <Screensaver />
     </div>
+  )
+}
+
+/** "Test copy" in the status bar, so a copy started from Orbit's code is never mistaken for the real one. */
+function TestCopyBadge() {
+  const [test, setTest] = useState(false)
+  useEffect(() => {
+    window.api
+      .appsIsTestCopy()
+      .then((t) => {
+        setTest(t)
+        if (t) document.title = 'Orbit (test copy)'
+      })
+      .catch(() => undefined)
+  }, [])
+  return test ? (
+    <span className="statusbar-testcopy" title="Started from Orbit’s code: it has its own settings and notes, separate from your normal Orbit">
+      Test copy
+    </span>
+  ) : null
+}
+
+/** Bugs reported from the screen snip ("Report bug") open on App Studio's board. */
+function useBugReports(): void {
+  useEffect(
+    () =>
+      window.api.onAppStudioBug((png) => {
+        const project = useTerminals.getState().projects[0]
+        const info = project ? useAppStudio.getState().info[project.folder] : undefined
+        void reportBugFromSnip(png, usePrefs.getState().prefs.attachmentFolder, project ? boardKey({ name: project.name, repo: info?.repo }) : null, () => {
+          openSpecialTab(APPSTUDIO_TAB)
+          setSection('board')
+        })
+      }),
+    []
   )
 }

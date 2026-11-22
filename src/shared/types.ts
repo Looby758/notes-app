@@ -1,9 +1,13 @@
-import type { ExplorerEntry, ExplorerPlace, PasteMode } from './explorer'
+import type { AppInfo, GitHubStatus, MergedPull, PullRequest, Release, TestCopy } from './appStudio'
+import type { ExplorerEntry, ExplorerPlace, PasteMode, PcIndexStatus } from './explorer'
+import type { FileTagStore, TagColour } from './fileTags'
+import type { BinListing } from './recycleBin'
 import type { ArchiveEntry } from './archive'
 import type { ComicOpened, ComicPreparing, ComicSettings, ComicShelf } from './comics'
 import type { WikiAnswer, WikiCheck, WikiHit, WikiInfo, WikiPageView, WikiPictureChoice, WikiSpoilerView } from './wiki'
 import type { WikiSpoilerSettings } from './wikiSpoilers'
 import type { Prefs } from './prefs'
+import type { SkyblockStatus, SkyblockSummary } from './skyblock'
 import type { AutofillProfile, Bookmark, HistoryHit, ImportedLogin, SitePermission, SiteSettings, WebDownload } from './browser'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
@@ -13,6 +17,8 @@ import type { LocalLibrary } from './localMusic'
 import type { MixerState } from './mixer'
 import type { MonitorAction, MonitorSaved, MonitorSetting, MonitorsStatus, MonitorTarget } from './monitors'
 import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
+import type { ClickerSettings, Macro, MacroHotkeys, MacroStatus } from './macros'
+import type { RemapRule, RemapSet, RemapStatus } from './keyRemap'
 import type { CallRecord, DiscordStatus, SavedPlace } from './discord'
 import type { WifiNetwork } from './wifi'
 import type { MusicAction, MusicDevice, MusicItem, MusicQueue, MusicSearchResults, MusicState, MusicStatus } from './spotify'
@@ -222,6 +228,23 @@ export interface CalEvent {
   location?: string
   /** "Open in Google Calendar" link, if there is one. */
   url?: string
+  /** Google events: which calendar and event they are, for changing them from Orbit. */
+  google?: { calendarId: string; eventId: string; editable: boolean; recurring: boolean; description?: string }
+}
+
+/** An event to make or change in Google Calendar. Times are local wall-clock times in `timeZone`. */
+export interface GoogleEventInput {
+  title: string
+  /** All day: the first day and the day after the last ("2026-11-21", "2026-11-22"). */
+  allDay: boolean
+  /** All day: a day key. Timed: "2026-11-21T09:00:00" (local, no offset). */
+  start: string
+  end: string
+  timeZone: string
+  location?: string
+  description?: string
+  /** RRULE / EXDATE lines for a repeating event (only when making one). */
+  recurrence?: string[]
 }
 
 export interface CalendarSourcesStatus {
@@ -233,7 +256,9 @@ export interface CalendarSourcesStatus {
     email?: string
     /** e.g. "Sign-in expired, connect again". */
     error?: string
-    calendars: { id: string; name: string; color: string; enabled: boolean }[]
+    calendars: { id: string; name: string; color: string; enabled: boolean; writable: boolean }[]
+    /** The sign-in lets Orbit add and change events (sign-ins from before 1.13 only read them). */
+    canEdit: boolean
   }
   feeds: { id: string; name: string; color: string; error?: string }[]
   /** False if the system can't encrypt the saved sign-in (then connecting is refused). */
@@ -339,6 +364,23 @@ export interface AiReply {
 }
 
 /** The offline AI (src/main/localAi.ts): an optional download that runs on this computer's graphics card. */
+/**
+ * What the snip read. `lang`: the extra reader it used ('' for English only). `detected`: the
+ * alphabet it spotted (with "Detect automatically"). `need`: readers that would read it, when
+ * none is downloaded yet (then `text` is empty).
+ */
+export interface SnipReading {
+  text: string
+  lang?: string
+  detected?: string
+  need?: string[]
+}
+
+/** The screen snip's offline translation, or why there isn't one (`problem`). */
+export type SnipTranslation =
+  | { from: string; text: string; problem?: undefined; error?: undefined }
+  | { problem: 'missing' | 'downloading' | 'unsupported' | 'game' | 'failed'; error: string }
+
 export interface LocalAiState {
   state: 'missing' | 'downloading' | 'ready' | 'unsupported'
   /** While downloading: which part, and how far (0–1). */
@@ -477,6 +519,13 @@ export interface NotesApi {
   undoRestore(paths: string[], inVault: boolean): Promise<string[]>
   /** They can't be undone any more: on to the Recycle Bin / Bin. */
   undoRelease(paths: string[], inVault: boolean): Promise<void>
+  // Recently deleted videos (main/videoBin.ts): a deleted video's folder, kept for 30 days.
+  /** Moves a video's folder into .notesapp/deleted-videos/<id>. False if the folder wasn't there. */
+  videoBinKeep(folder: string, id: string): Promise<boolean>
+  /** Puts it back at `folder` (or "<name> (restored)"). Returns where it went, or null if it's gone. */
+  videoBinRestore(id: string, folder: string): Promise<string | null>
+  /** Sends a kept folder on to the Recycle Bin / Bin. */
+  videoBinDrop(id: string): Promise<void>
   /** Moves things back (full paths): each `to` goes back to `from`. Returns the moves made. */
   undoMoveBack(items: { from: string; to: string }[]): Promise<{ from: string; to: string }[]>
   /** Undo / Redo from the Mac's Edit menu. */
@@ -513,7 +562,15 @@ export interface NotesApi {
   studioDefaultFolder(): Promise<string>
   studioPickFolder(): Promise<string | null>
   /** Starts a recording file in `folder` (null = Videos/Orbit Recordings). */
-  studioStart(folder: string | null, ext: 'mp4' | 'webm'): Promise<{ id: number; path: string }>
+  studioStart(folder: string | null, ext: 'mp4' | 'webm' | 'm4a', kind?: 'video' | 'voiceover' | 'take', take?: { script: string; index: number; title: string }): Promise<{ id: number; path: string }>
+  /** A section take's sound (record by section), to play it back. */
+  studioReadTake(path: string): Promise<Uint8Array>
+  /** Joins section takes, in order, into "<script> voiceover (joined).wav" beside them; length in seconds. */
+  studioJoinTakes(parts: import('./takes').JoinPart[], script: string): Promise<{ path: string; length: number }>
+  /** Saves a copy of a Studio recording with the long pauses shortened ("… (trimmed).wav"); lengths in seconds. */
+  studioTrim(path: string, settings: import('./studioAudio').TrimSettings): Promise<{ path: string; before: number; after: number }>
+  /** Saves the teleprompter's cue times beside a Studio recording ("<recording>.cues.json"). */
+  studioWriteCues(path: string, json: string): Promise<void>
   studioChunk(id: number, data: Uint8Array): Promise<{ ok: boolean; error?: string }>
   /** Finishes the file; resolves to its path. */
   studioStop(id: number): Promise<string | null>
@@ -774,6 +831,21 @@ export interface NotesApi {
   /** Takes a finished or failed download off the list (the file stays). */
   forgetVideoDownload(id: number): Promise<void>
 
+  // Download manager (main/downloadManager.ts)
+  /** The queue, its settings, and whether it's night. Starts sending changes to onDownloadsState. */
+  downloadsState(): Promise<import('./downloadManager').DmState>
+  onDownloadsState(callback: (state: import('./downloadManager').DmState) => void): () => void
+  /** Adds links to the end of the queue (video pages go to the video downloader when their turn comes). */
+  downloadsAdd(request: import('./downloadManager').DmAddRequest): Promise<import('./downloadManager').DmItem[]>
+  downloadsAct(id: string, action: 'pause' | 'resume' | 'retry' | 'remove' | 'now' | 'tonight' | 'up' | 'down' | 'top'): Promise<void>
+  downloadsAll(action: 'pause' | 'resume' | 'clear'): Promise<void>
+  downloadsSettings(patch: Partial<import('./downloadManager').DmSettings>): Promise<import('./downloadManager').DmState>
+  /** What Steam is downloading or updating (read from its files), with a speed when it's going. */
+  steamDownloads(): Promise<(import('./games').SteamDownload & { speed?: number })[]>
+  /** Opens Steam's install window for a game (Steam asks which drive). */
+  steamInstall(appId: string): Promise<void>
+  steamOpenDownloads(): Promise<void>
+
   // Video player
   /** What's in a video (its tracks need the video helper, ffmpeg) and the subtitle files beside it. */
   videoInfo(path: string): Promise<VideoInfo>
@@ -837,6 +909,39 @@ export interface NotesApi {
   /** A soundboard hotkey was pressed (anywhere, even in a game). */
   onSoundboardHotkey(callback: (action: SoundboardAction) => void): () => void
   onSoundboardChanged(callback: (status: SoundboardStatus) => void): () => void
+  // Macro recorder and auto-clicker (main/macros.ts; the timing is done by a helper process)
+  macrosGet(): Promise<MacroStatus>
+  /** Starts recording a new macro, or stops (and keeps it). */
+  macrosRecord(): Promise<MacroStatus>
+  macrosPlay(id: string): Promise<MacroStatus>
+  /** Stops recording, playing or the auto-clicker. Held keys and buttons are let go of. */
+  macrosStop(): Promise<MacroStatus>
+  macrosClicker(on: boolean): Promise<MacroStatus>
+  macrosUpdate(id: string, patch: Partial<Pick<Macro, 'name' | 'hotkey' | 'repeat' | 'times' | 'speed' | 'mouse'>>): Promise<MacroStatus>
+  macrosRemove(id: string): Promise<MacroStatus>
+  /** The macro the Play hotkey plays. */
+  macrosSetCurrent(id: string): Promise<MacroStatus>
+  macrosSettings(patch: { hotkeys?: Partial<MacroHotkeys>; clicker?: Partial<ClickerSettings>; skipLeadingWait?: boolean }): Promise<MacroStatus>
+  /** Clears the last error and play report. */
+  macrosDismiss(): Promise<void>
+  /** Where the pointer is now (for the auto-clicker's spot). */
+  macrosPointer(): Promise<{ x: number; y: number }>
+  onMacrosChanged(callback: (status: MacroStatus) => void): () => void
+  // Key remapper (main/keyRemap.ts; the remapping is done by a helper process)
+  keyRemapGet(): Promise<RemapStatus>
+  /** Every remap on or off at once (only you ever switch this). */
+  keyRemapSetOn(on: boolean): Promise<RemapStatus>
+  keyRemapSetHotkey(accel: string): Promise<RemapStatus>
+  /** A set of remaps for one app or game, by its program's name. */
+  keyRemapAddSet(app: string, name?: string): Promise<RemapStatus>
+  keyRemapUpdateSet(id: string, patch: Partial<Pick<RemapSet, 'name' | 'app' | 'on'>>): Promise<RemapStatus>
+  keyRemapRemoveSet(id: string): Promise<RemapStatus>
+  /** Adds a remap (no id, or an unknown one) or changes one. */
+  keyRemapSaveRule(setId: string, rule: Partial<RemapRule>): Promise<RemapStatus>
+  keyRemapRemoveRule(setId: string, ruleId: string): Promise<RemapStatus>
+  /** Pauses remaps while the page picks a key, so you can press the real one. */
+  keyRemapHold(on: boolean): Promise<void>
+  onKeyRemapChanged(callback: (status: RemapStatus) => void): () => void
 
   // Discord voice controls (main/discord.ts, through Discord's official local RPC)
   discordGet(): Promise<DiscordStatus>
@@ -867,6 +972,12 @@ export interface NotesApi {
   discordCalls(): Promise<CallRecord[]>
   discordRemoveCall(id: string): Promise<CallRecord[]>
   discordClearCalls(): Promise<CallRecord[]>
+  /** The note for the call going on now (typed on the pop-out; saved with the call in the history). */
+  discordNote(): Promise<string>
+  discordSetNote(text: string, channelId: string): Promise<void>
+  /** Changes (or, with empty text, removes) a past call's note. */
+  discordSetCallNote(id: string, text: string): Promise<CallRecord[]>
+  onDiscordNote(callback: (text: string) => void): () => void
   onDiscordCalls(callback: (calls: CallRecord[]) => void): () => void
   /** The Discord voice pop-out (its own window, for a second screen): opens it or brings it back. */
   openDiscordPopout(): Promise<void>
@@ -891,13 +1002,23 @@ export interface NotesApi {
   snipStatus(): Promise<{ shortcut: string; error?: string }>
   /** Snip window: the picture of the screen (PNG) and the screen's scale factor. */
   snipImage(): Promise<{ png: Uint8Array; scale: number } | null>
-  /** Snip window: the text in part of the picture (read offline). */
-  snipRead(png: Uint8Array): Promise<string>
+  /** Snip window: the text in part of the picture (read offline), with an extra language reader if it's downloaded, or 'auto' to pick one. */
+  snipRead(png: Uint8Array, lang?: string): Promise<SnipReading>
+  /** Snip window: which extra language readers are downloaded (codes from OCR_LANGS). */
+  snipOcrLangs(): Promise<string[]>
+  /** Snip window: downloads one extra language reader (a couple of MB, checked before it's used). */
+  snipGetOcrLang(code: string): Promise<{ ok: true } | { error: string }>
+  /** Snip window: translates the text with the offline AI. Never goes online. */
+  snipTranslate(text: string, target: string): Promise<SnipTranslation>
   snipClose(): Promise<void>
+  /** The snip's "Report bug": this picture of the boxed part of the screen goes to App Studio as a new bug. */
+  snipReportBug(png: Uint8Array): Promise<void>
+  /** A bug reported from the screen snip, with its picture (App Studio opens it). */
+  onAppStudioBug(callback: (png: Uint8Array) => void): () => void
   /** Snip window: what to do with the text (closes the snip). */
-  snipSend(action: 'copy' | 'note' | 'web' | 'translate' | 'ask', text: string): Promise<void>
-  /** Main window: snipped text to save in today's note or ask the AI about. */
-  onSnipText(callback: (action: 'note' | 'ask', text: string) => void): () => void
+  snipSend(action: 'copy' | 'note' | 'web' | 'translate-online' | 'ask' | 'setup-ai', text: string, target?: string): Promise<void>
+  /** Main window: snipped text to save in today's note or ask the AI about, or "set up the offline AI". */
+  onSnipText(callback: (action: 'note' | 'ask' | 'setup-ai', text: string) => void): () => void
   onSnipFailed(callback: (message: string) => void): () => void
   openCapture(): Promise<void>
   closeCapture(): Promise<void>
@@ -923,6 +1044,11 @@ export interface NotesApi {
   removeCalendarFeed(id: string): Promise<CalendarSourcesStatus>
   /** Events between two instants from every enabled calendar (cached ones if offline). */
   fetchCalendarEvents(from: string, to: string): Promise<{ events: CalEvent[]; errors: string[]; offline: boolean }>
+  /** Makes an event in one of your Google calendars. */
+  googleCreateEvent(calendarId: string, event: GoogleEventInput): Promise<void>
+  /** Changes a Google event (a repeating one's single day, when that's the one given). */
+  googleUpdateEvent(calendarId: string, eventId: string, event: Partial<GoogleEventInput>): Promise<void>
+  googleDeleteEvent(calendarId: string, eventId: string): Promise<void>
   // Email (Gmail, using the Google sign-in above)
   emailStatus(): Promise<GoogleAuthStatus>
   /** Signs in to Google in your browser, asking for email access too. */
@@ -1075,17 +1201,75 @@ export interface NotesApi {
   gamesCovers(ids: string[]): Promise<Record<string, string>>
   /** A game started or stopped, or more time was counted. */
   onGamesChanged(callback: () => void): () => void
+  // SkyBlock session summary
+  skyblockStatus(): Promise<SkyblockStatus>
+  skyblockSessions(): Promise<SkyblockSummary[]>
+  /** Looks up the Minecraft name, checks the key with Hypixel (a blank key keeps the saved one) and saves both. */
+  skyblockSetup(input: { key?: string; player: string }): Promise<SkyblockStatus>
+  /** '' follows the profile you're on in game. */
+  skyblockSetProfile(id: string): Promise<SkyblockStatus>
+  skyblockSetLog(readLog: boolean, folder?: string): Promise<SkyblockStatus>
+  skyblockPickLogFolder(): Promise<SkyblockStatus>
+  skyblockForget(): Promise<SkyblockStatus>
+  skyblockStartNow(): Promise<SkyblockStatus>
+  skyblockEndNow(): Promise<SkyblockStatus>
+  skyblockDeleteSession(id: string): Promise<SkyblockSummary[]>
+  /** A session's card is ready (Minecraft closed and Hypixel caught up). */
+  onSkyblockSummary(callback: (summary: SkyblockSummary) => void): () => void
+  /** A card already shown got newer numbers from Hypixel. */
+  onSkyblockUpdated(callback: (summary: SkyblockSummary) => void): () => void
+  onSkyblockChanged(callback: () => void): () => void
   // Terminal tab
-  /** Starts the command line in the notes folder (or carries on with the one already running). */
-  terminalStart(cols: number, rows: number): Promise<TerminalStart>
-  /** Ends the command line (and whatever is running in it). */
-  terminalStop(): Promise<void>
-  /** What you typed or pasted into the Terminal tab. */
-  terminalInput(data: string): void
-  terminalResize(cols: number, rows: number): void
-  onTerminalData(callback: (data: string) => void): () => void
-  /** The command line ended (you typed exit, or it closed). */
-  onTerminalExit(callback: (code: number) => void): () => void
+  /**
+   * Starts command line `id` in `folder` (the notes folder when it's null or missing), or carries on
+   * with the one already running under that id.
+   */
+  terminalStart(id: string, folder: string | null, cols: number, rows: number): Promise<TerminalStart>
+  /** Ends a command line (and whatever is running in it). */
+  terminalStop(id: string): Promise<void>
+  /** What you typed or pasted into a terminal. */
+  terminalInput(id: string, data: string): void
+  terminalResize(id: string, cols: number, rows: number): void
+  onTerminalData(callback: (id: string, data: string) => void): () => void
+  /** A command line ended (you typed exit, or it closed). */
+  onTerminalExit(callback: (id: string, code: number) => void): () => void
+  /** Asks for an app's folder, for a Terminal project. Null if cancelled. */
+  terminalPickFolder(): Promise<string | null>
+  /** Your home folder (for paths starting with ~ in what a command prints). */
+  terminalHome(): Promise<string>
+  /** Opens a project's folder in File Explorer / Finder, or in VS Code. */
+  terminalOpenIn(folder: string, where: 'files' | 'vscode'): Promise<void>
+  // App Studio
+  /** Whether a GitHub token is saved (and whose it is). */
+  appsGithubStatus(): Promise<GitHubStatus>
+  /** Whether this is a test copy (started from Orbit's code), with its own settings and data. */
+  appsIsTestCopy(): Promise<boolean>
+  /** Checks a GitHub token with GitHub, then saves it encrypted. */
+  appsSetToken(token: string): Promise<GitHubStatus>
+  appsClearToken(): Promise<GitHubStatus>
+  /** What git and package.json say about an app's folder. */
+  appsInfo(folder: string): Promise<AppInfo>
+  /** Open pull requests on these GitHub repositories ("owner/name"), newest first; errors by repository. */
+  appsPulls(repos: string[]): Promise<{ pulls: PullRequest[]; errors: Record<string, string> }>
+  /** A repository's releases, newest first (drafts too, when the token can see them). */
+  appsReleases(repo: string): Promise<Release[]>
+  /** Pull requests merged after `since` (or recently, without it). */
+  appsMerged(repo: string, since?: string): Promise<MergedPull[]>
+  /** Puts notes on the release for a tag (making a draft release if there isn't one). Needs GitHub connected. */
+  appsSetReleaseNotes(repo: string, tag: string, body: string, title: string): Promise<Release>
+  /** The AI helper writes "What's new" notes from changelogSource(). */
+  aiWhatsNew(source: string): Promise<string>
+  /** An app's test copies (git worktrees in "<app>-test-copies" beside it). */
+  appsCopies(folder: string): Promise<TestCopy[]>
+  /** Makes a test copy with a branch's latest (or finds it); its folder. */
+  appsAddCopy(folder: string, branch: string): Promise<string>
+  appsRemoveCopy(folder: string, path: string): Promise<void>
+  /** Whether pull requests are open, merged or closed. */
+  appsPullStates(repo: string, numbers: number[]): Promise<Record<number, 'open' | 'merged' | 'closed'>>
+  /** Downloads a picture from a pull request's description. */
+  appsFetchImage(url: string): Promise<{ bytes: Uint8Array; type: string }>
+  appsMerge(repo: string, number: number): Promise<void>
+  appsClose(repo: string, number: number): Promise<void>
   /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */
   aiChat(messages: AiChatMessage[], engine?: AiEngine): Promise<AiReply>
   /** Saved chats, kept in the settings folder on this computer. */
@@ -1243,6 +1427,37 @@ export interface NotesApi {
   explorerTrash(paths: string[]): Promise<string[]>
   /** Finds names under a folder and all its subfolders. */
   explorerSearch(dir: string, query: string, showHidden: boolean): Promise<ExplorerEntry[]>
+  /** Whole PC search: every file and folder on the computer whose name has each word, best first. */
+  explorerSearchPc(query: string, showHidden: boolean): Promise<{ entries: ExplorerEntry[]; status: PcIndexStatus; system: boolean }>
+  /** How Whole PC search's list of files is getting on (`everything`: the Everything app's helper is installed). */
+  explorerIndexStatus(): Promise<PcIndexStatus & { everything: boolean; wanted: boolean }>
+  onExplorerIndexStatus(callback: (status: PcIndexStatus) => void): () => void
+  /** The folders shown now: their total sizes come in through onExplorerFolderSize (`fresh`: count again). */
+  explorerFolderSizes(paths: string[], fresh?: boolean): Promise<void>
+  /** A folder's size (`complete` false while still counting); null when it couldn't be read. */
+  onExplorerFolderSize(callback: (e: { path: string; size: { bytes: number; files: number; folders: number; complete: boolean; counting?: boolean } | null }) => void): () => void
+  /** Walks the drives again now. */
+  explorerReindex(): Promise<void>
+  /** Everything with this colour tag (that's still there). */
+  explorerTagged(colour: TagColour): Promise<ExplorerEntry[]>
+  // The Recycle Bin / Bin (Files tab)
+  binList(): Promise<BinListing>
+  /** Puts items back where they came from; returns where each went. */
+  binRestore(ids: string[]): Promise<string[]>
+  /** Deletes for good; returns how many. */
+  binDelete(ids: string[]): Promise<number>
+  binEmpty(): Promise<number>
+  /** The system's own Recycle Bin / Bin window. */
+  binOpenSystem(): Promise<void>
+  /** Mac: Privacy & Security → Full Disk Access, so Orbit can look in the Bin. */
+  binMacPrivacy(): Promise<void>
+  // Colour tags and favourite folders (Files tab)
+  tagsGet(): Promise<FileTagStore>
+  tagsSet(paths: string[], colour: TagColour, on: boolean): Promise<void>
+  /** Names a colour ("School"); an empty name goes back to the colour's own. */
+  tagsLabel(colour: TagColour, label: string): Promise<void>
+  tagsFavourites(paths: string[]): Promise<void>
+  onTagsChanged(callback: (store: FileTagStore) => void): () => void
   // Comic book reader
   comicsShelf(): Promise<ComicShelf>
   /** Adds comic files (asks which, when no paths are given). */
@@ -1277,7 +1492,7 @@ export interface NotesApi {
   /** Deletes a downloaded wiki from this computer. */
   wikiRemove(id: string): Promise<WikiInfo[]>
   /** Titles of the downloaded pages. */
-  wikiTitles(id: string): Promise<string[]>
+  wikiTitles(id: string): Promise<{ title: string; shown: string; known: string[] }[]>
   /** A downloaded page (null when it isn't downloaded), with anything past where you are taken out. */
   wikiPage(id: string, title: string, showUnplaced?: boolean): Promise<WikiPageView | null>
   /** The spoiler limit, the Show / Comics switch and how far you are, with the shows and comics found in the wiki. */
@@ -1349,7 +1564,7 @@ export interface AppleNote {
   locked: boolean
 }
 /** How starting the Terminal tab's command line went. */
-export type TerminalStart = { ok: true; name: string; resumed: boolean } | { ok: false; error: string }
+export type TerminalStart = { ok: true; name: string; resumed: boolean; folder: string } | { ok: false; error: string }
 
 /** A Google Sheet (.gsheet file) fetched for the spreadsheet viewer, or why it couldn't be. */
 export type GoogleSheetResult =
@@ -1404,6 +1619,8 @@ export interface VideoDownloadRequest {
   quality: import('./videoDownload').DownloadQuality
   /** The folder to save it in, inside the notes folder ('' for the top level). Made if it isn't there. */
   folder: string
+  /** From the download manager's queue. */
+  manager?: boolean
 }
 
 /** One video being downloaded from a link (or done, or failed). */
@@ -1423,6 +1640,8 @@ export interface VideoDownload {
   size?: number
   error?: string
   startedAt: number
+  /** Started by the download manager's queue (it shows it there itself). */
+  manager?: boolean
 }
 
 /** Whether ffmpeg (downloaded only when asked, for converting videos and streaming) is on this computer. */

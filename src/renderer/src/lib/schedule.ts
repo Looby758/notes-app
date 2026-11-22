@@ -2,6 +2,7 @@ import { maskCode } from './links'
 import { parseFrontmatter } from './tags'
 import { dayKey, fromDayKey } from './dates'
 import { REMINDER } from './reminders'
+import { formatRepeat, parseRepeat, REPEAT_TEXT, type RepeatRule } from '@shared/repeat'
 
 /**
  * Finding dated things in notes, for the calendar:
@@ -12,6 +13,7 @@ import { REMINDER } from './reminders'
  *     - 09:30-10:30 Standup     (timed)
  *     - 14:00 Dentist           (a point in time)
  *     - Holiday                 (all day)
+ *     - 18:00 Football 🔁 every Tuesday   (repeating, from that day on: see shared/repeat.ts)
  */
 
 export type DatedKind = 'daily' | 'note' | 'due' | 'event'
@@ -31,6 +33,10 @@ export interface DatedItem {
   done?: boolean
   /** Frontmatter `due:` rather than `date:`. */
   due?: boolean
+  /** A repeating event's rule (on the day it's written and on every copy). */
+  repeat?: RepeatRule
+  /** On a repeat's copies: the day the event is written on (its first day). */
+  seriesDate?: string
 }
 
 const DATE = /(\d{4}-\d{2}-\d{2})/
@@ -123,10 +129,20 @@ export function parseDatedItems(
       continue
     }
     if (scheduleLevel && dailyDate && body.trim()) {
-      items.push({ kind: 'event', date: dailyDate, path, line: i, ...parseEventText(body), ...(done !== undefined ? { done } : {}) })
+      const { text, repeat } = splitRepeat(body)
+      if (!text) continue
+      items.push({ kind: 'event', date: dailyDate, path, line: i, ...parseEventText(text), ...(done !== undefined ? { done } : {}), ...(repeat ? { repeat } : {}) })
     }
   }
   return items
+}
+
+/** "Football 🔁 every Tuesday" → the text and the rule (a 🔁 with words that aren't a rule stays in the text). */
+export function splitRepeat(body: string): { text: string; repeat?: RepeatRule } {
+  const m = REPEAT_TEXT.exec(body)
+  const repeat = m ? parseRepeat(m[1]) : null
+  if (!m || !repeat) return { text: body.trim() }
+  return { text: body.slice(0, m.index).trim(), repeat }
 }
 
 /** Sort key for a day's items: all-day first, then by time. */
@@ -138,10 +154,47 @@ export function compareItems(a: DatedItem, b: DatedItem): number {
   return ta.localeCompare(tb) || order[a.kind] - order[b.kind] || a.title.localeCompare(b.title)
 }
 
-/** "09:30", "10:30", "Standup" → "- 09:30-10:30 Standup" */
-export function formatEventLine(title: string, start?: string, end?: string): string {
+/** "09:30", "10:30", "Standup" → "- 09:30-10:30 Standup" (with "🔁 every Tuesday" on the end if it repeats). */
+export function formatEventLine(title: string, start?: string, end?: string, repeat?: RepeatRule): string {
+  return `- ${formatEventBody(title, start, end, repeat)}`
+}
+
+/** An event line's text after the bullet (and tick box). */
+export function formatEventBody(title: string, start?: string, end?: string, repeat?: RepeatRule): string {
   const time = start ? (end ? `${start}-${end} ` : `${start} `) : ''
-  return `- ${time}${title.trim()}`
+  return `${time}${title.trim()}${repeat ? ` 🔁 ${formatRepeat(repeat)}` : ''}`
+}
+
+/**
+ * Where an event is now in its note: at `item.line` if that line still reads as the same event,
+ * otherwise the first line under the schedule that does (edits since the last save can move it).
+ */
+export function findEventLine(text: string, item: Pick<DatedItem, 'line' | 'title' | 'start'>): number {
+  const lines = text.split('\n')
+  const matches = (l: string | undefined): boolean => {
+    const m = l === undefined ? null : LIST_ITEM.exec(l)
+    if (!m) return false
+    const ev = parseEventText(splitRepeat(m[2]).text)
+    return ev.title === item.title && (ev.start ?? '') === (item.start ?? '')
+  }
+  if (matches(lines[item.line])) return item.line
+  return lines.findIndex(matches)
+}
+
+/** Rewrites the event on `line`, keeping its bullet, indent and tick box. */
+export function replaceEventAt(text: string, line: number, body: string): string {
+  const lines = text.split('\n')
+  const m = /^(\s*[-*+]\s+(?:\[[ xX]\]\s+)?)/.exec(lines[line] ?? '')
+  if (!m) return text
+  lines[line] = m[1] + body
+  return lines.join('\n')
+}
+
+/** Takes the line out of a note. */
+export function removeLineAt(text: string, line: number): string {
+  const lines = text.split('\n')
+  lines.splice(line, 1)
+  return lines.join('\n')
 }
 
 /**

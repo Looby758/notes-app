@@ -20,7 +20,7 @@ import { existsSync, statSync } from 'fs'
 import { readFile } from 'fs/promises'
 import * as fsp from 'fs/promises'
 import { basename, extname, isAbsolute, join, relative } from 'path'
-import type { AiAskTurn, AiExtraContext, AiChat, AiChatMessage, AiEngine, AiNote, AiSortRow, ConfirmOptions, EmailFolder, OutgoingEmail } from '@shared/types'
+import type { AiAskTurn, AiExtraContext, AiChat, AiChatMessage, AiEngine, AiNote, AiSortRow, ConfirmOptions, EmailFolder, GoogleEventInput, OutgoingEmail } from '@shared/types'
 import type { MusicAction } from '@shared/spotify'
 import { normalizePrefs, type Prefs } from '@shared/prefs'
 import { activeThemeId, getTheme } from '@shared/themes'
@@ -47,20 +47,24 @@ import { setupSettingsHealth } from './settingsHealth'
 import { setupExport } from './exporter'
 import { setupConverter } from './converter'
 import { setupVideoDownloader } from './videoDownload'
+import { setupDownloadManager } from './downloadManager'
 import { isAppPage, setupStudio } from './studio'
 import { applyReplayShortcut, clipResponse, setupClips } from './clips'
 import { setupLocalAi } from './localAi'
 import { reloadSoundboard, setupSoundboard, soundboardFolder, soundFile } from './soundboard'
+import { macrosFolder, reloadMacros, setupMacros, teardownMacros } from './macros'
+import { setupKeyRemap, teardownKeyRemap } from './keyRemap'
 import { setupDiscord, teardownDiscord } from './discord'
 import { setupOrbitSync, syncOrbitSoon, type PartHandler } from './orbitSync'
 import { cleanPrefsPart, prefsPart } from '@shared/orbitSync'
 import { setupMonitors, teardownMonitors } from './monitors'
 import { setupMixer, teardownMixer } from './mixer'
 import { setupLive } from './live'
-import { explorerFile, setupExplorer } from './explorer'
+import { explorerFile, setFileIndexOn, setupExplorer } from './explorer'
 import { openOutside } from './openOutside'
 import { openInOrbit, pathsFromArgv, setupOpenInOrbit } from './openInOrbit'
 import { hold, setupUndoBin } from './undoBin'
+import { setupVideoBin } from './videoBin'
 import { setupVideoPlayer, videoResponse } from './videoPlayer'
 import { releaseFiles, serveFile } from './fileLocks'
 import { comicResponse, setupComics, shareProgress as shareComicProgress } from './comics'
@@ -84,8 +88,11 @@ import { setupOperaImport } from './operaImport'
 import { closeYouTube, setupYouTube } from './youtube'
 import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
+import { setupAppStudio } from './appStudio'
+import { TEST_COPY, TEST_COPY_FOLDER } from './testCopy'
 import { setupGames } from './games'
 import { setupGameCovers } from './gameCovers'
+import { setupSkyblock } from './skyblock'
 import { applyIconOutsideApp, taskbarIcon } from './appIcon'
 import { broadcastThemes, loadImportedThemes, setupThemes, THEME_SCHEME, themeFilePath, themesDir } from './themes'
 import { CODE_SANDBOX_SCHEME, registerCodeSandbox } from './codeSandbox'
@@ -101,8 +108,12 @@ let hubReleased: Promise<void> = Promise.resolve()
 
 logCrashes()
 
+// Each part of the app tidies up as it quits; there are more than Node's default warning level of 10.
+app.setMaxListeners(30)
+
 // The app used to be called Notes: keep its data folder so settings and sign-ins carry over.
-app.setPath('userData', join(app.getPath('appData'), 'Notes'))
+// A test copy (started from the code) has its own, so it can run next to your normal Orbit.
+app.setPath('userData', join(app.getPath('appData'), TEST_COPY ? TEST_COPY_FOLDER : 'Notes'))
 
 // Screens between the two computers: the picture goes straight across the home network, so the
 // computers need each other's real local addresses (Chromium hides them behind made-up names by
@@ -110,7 +121,7 @@ app.setPath('userData', join(app.getPath('appData'), 'Notes'))
 app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns')
 
 // Windows shows notifications under this app id (it matches the installer's).
-if (process.platform === 'win32') app.setAppUserModelId('com.notesapp.desktop')
+if (process.platform === 'win32') app.setAppUserModelId(TEST_COPY ? 'com.notesapp.desktop.testcopy' : 'com.notesapp.desktop')
 
 // Only one copy of Notes runs; starting it again just brings the window back.
 if (!app.requestSingleInstanceLock()) {
@@ -312,10 +323,18 @@ function broadcastPrefs(prefs: Prefs): void {
     win.webContents.send('prefs:changed', prefs)
   }
   safely('system settings', () => applySystemPrefs(prefs))
+  safely('whole PC search', () => applyFileIndex(prefs))
+}
+
+/** Whole PC search's list of files (Settings → Files), with its progress sent to every window. */
+function applyFileIndex(prefs: Prefs): void {
+  setFileIndexOn(prefs.filesWholePcSearch, app.getPath('userData'), (status) => {
+    for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send('explorer:indexStatus', status)
+  })
 }
 
 /** The parts of Orbit kept in the notes folder for your other computers (see orbitSync.ts). */
-function orbitParts(themesChanged: () => void): Record<'settings' | 'home' | 'themes' | 'soundboard' | 'calendar', PartHandler> {
+function orbitParts(themesChanged: () => void): Record<'settings' | 'home' | 'themes' | 'soundboard' | 'macros' | 'calendar', PartHandler> {
   const prefsHandler = (part: 'settings' | 'home'): PartHandler => ({
     kind: 'value',
     // Never changed from how Orbit starts: nothing to share, so another computer's is taken in.
@@ -343,6 +362,7 @@ function orbitParts(themesChanged: () => void): Record<'settings' | 'home' | 'th
       }
     },
     soundboard: { kind: 'folder', folder: soundboardFolder, reload: reloadSoundboard },
+    macros: { kind: 'folder', folder: macrosFolder, reload: reloadMacros },
     calendar: {
       kind: 'value',
       read: () => calendars.syncedCalendars(),
@@ -453,6 +473,7 @@ function createWindow(): BrowserWindow {
     minHeight: 480,
     show: false,
     backgroundColor: BG,
+    ...(TEST_COPY ? { title: 'Orbit (test copy)' } : {}),
     ...(IS_MAC
       ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 14, y: 12 } }
       : {
@@ -691,7 +712,9 @@ function registerIpc(): void {
   setupImporter()
   setupGames()
   setupGameCovers()
+  setupSkyblock({ getMain: () => mainWindow })
   setupTerminal(() => vault?.root ?? null)
+  setupAppStudio()
   // The Mac asks once whether Notes may use the microphone.
   ipcMain.handle('voice:access', async () => (IS_MAC ? systemPreferences.askForMediaAccess('microphone') : true))
   ipcMain.handle('app:fullscreen', (event, on: boolean) => BrowserWindow.fromWebContents(event.sender)?.setFullScreen(on))
@@ -772,6 +795,9 @@ function registerIpc(): void {
   ipcMain.handle('cal:addFeed', (_e, name: string, url: string) => calendars.addFeed(name, url))
   ipcMain.handle('cal:removeFeed', (_e, id: string) => calendars.removeFeed(id))
   ipcMain.handle('cal:events', (_e, from: string, to: string) => calendars.fetchEvents(from, to))
+  ipcMain.handle('cal:create', (_e, calendarId: string, event: GoogleEventInput) => calendars.createEvent(calendarId, event))
+  ipcMain.handle('cal:update', (_e, calendarId: string, eventId: string, event: Partial<GoogleEventInput>) => calendars.updateEvent(calendarId, eventId, event))
+  ipcMain.handle('cal:delete', (_e, calendarId: string, eventId: string) => calendars.deleteEvent(calendarId, eventId))
   ipcMain.handle('email:status', () => email.status())
   ipcMain.handle('email:connect', () => email.connect())
   ipcMain.handle('email:list', (_e, folder: EmailFolder, query: string, next?: string) => email.list(folder, query, next))
@@ -830,6 +856,7 @@ function registerIpc(): void {
     ai.askNotes(question, notes, history, extra, engine)
   )
   ipcMain.handle('ai:emailContext', (_e, question: string, engine?: AiEngine) => ai.emailContext(question, engine))
+  ipcMain.handle('ai:whatsNew', (_e, source: string) => ai.whatsNew(String(source).slice(0, 60_000)))
   ipcMain.handle('ai:chat', (_e, messages: AiChatMessage[], engine?: AiEngine) => ai.chat(messages, engine))
   ipcMain.handle('ai:setEngine', (_e, use: AiEngine) => ai.setEngine(use))
   ipcMain.handle('ai:sortMoney', (_e, rows: AiSortRow[], categories: { id: string; name: string; income?: boolean }[]) =>
@@ -843,7 +870,8 @@ function registerIpc(): void {
   ipcMain.handle('ai:saveChats', (_e, chats: AiChat[]) => ai.saveChats(chats))
   ipcMain.handle('handwriting:read', (_e, png: Uint8Array, reader: 'ai' | 'offline') => (reader === 'ai' ? ai.readHandwriting(png) : readHandwritingOffline(png)))
 
-  ipcMain.handle('vault:readAppData', (_e, name: string) => currentVault().readAppData(name))
+  // Before a notes folder is picked (a fresh start), there's nothing saved yet.
+  ipcMain.handle('vault:readAppData', (_e, name: string) => (vault ? vault.readAppData(name) : null))
   ipcMain.handle('vault:writeAppData', (_e, name: string, content: string) => currentVault().writeAppData(name, content))
   ipcMain.handle('safe:read', (_e, id: string) => currentVault().readSafeFile(id))
   ipcMain.handle('safe:write', (_e, id: string, data: Uint8Array) => currentVault().writeSafeFile(id, data))
@@ -1054,14 +1082,20 @@ app.whenReady().then(async () => {
   safely('export', setupExport)
   safely('converter', setupConverter)
   safely('video downloader', () => setupVideoDownloader(() => vault))
+  safely('download manager', setupDownloadManager)
   safely('studio', setupStudio)
   safely('offline AI', setupLocalAi)
   safely('soundboard', setupSoundboard)
+  safely('macros', setupMacros)
+  safely('key remapper', setupKeyRemap)
   safely('Discord voice', setupDiscord)
   safely('Discord voice pop-out', () => setupDiscordPopout(currentPrefs))
   safely('live streaming', setupLive)
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
+  // A few seconds in, so walking the drives doesn't slow Orbit's start.
+  setTimeout(() => safely('whole PC search', () => applyFileIndex(currentPrefs())), 5000)
   safely('undo', () => setupUndoBin(() => vault?.root ?? null))
+  safely('deleted videos', () => setupVideoBin(() => vault?.root ?? null))
   safely('video player', () => setupVideoPlayer(() => vault?.root ?? null))
   safely('video window', () => setupVideoWindow(() => mainWindow))
   safely('web window', () => setupWebWindow(() => mainWindow))
@@ -1113,6 +1147,8 @@ app.on('will-quit', () => {
   safely('Discord voice', teardownDiscord)
   safely('screen controls', teardownMonitors)
   safely('volume mixer', teardownMixer)
+  safely('macros', teardownMacros)
+  safely('key remapper', teardownKeyRemap)
   clearSecret()
 })
 

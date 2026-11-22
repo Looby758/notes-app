@@ -1,0 +1,273 @@
+import { describe, expect, it } from 'vitest'
+import { boardKey, commitAllCommand, describeChange, stashCommand, isTokenPermissionError, newTokenUrl, TOKEN_NOT_ALLOWED, bumpVersion, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
+
+describe('githubRepo', () => {
+  it('reads https and ssh remotes', () => {
+    expect(githubRepo('https://github.com/Looby758/notes-app.git')).toBe('Looby758/notes-app')
+    expect(githubRepo('https://github.com/Looby758/notes-app')).toBe('Looby758/notes-app')
+    expect(githubRepo('git@github.com:me/eclipse.git')).toBe('me/eclipse')
+    expect(githubRepo('http://127.0.0.1:1234/git/me/eclipse')).toBeNull()
+    expect(githubRepo('')).toBeNull()
+  })
+})
+
+describe('prSummary', () => {
+  const body = `<!-- claude-projects-attribution: {"github_login":"me"} -->
+_Requested by **Me** · [project thread](https://claude.ai/x)_
+
+Makes the Terminal tab better.
+
+## What's new
+- **Several terminals**: a strip along the top.
+- **Close app**: same as \`Ctrl+C\`.
+
+## Testing
+- tests pass
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+https://claude.ai/code/session_1`
+  it('picks the What’s new part, tidied', () => {
+    expect(prSummary(body)).toEqual(['• Several terminals: a strip along the top.', '• Close app: same as Ctrl+C.'])
+  })
+  it('uses the whole description when there are no headings, without Claude’s footer lines', () => {
+    const plain = 'Fixes the login button.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_1'
+    expect(prSummary(plain)).toEqual(['Fixes the login button.'])
+    expect(prSummary('')).toEqual([])
+  })
+  it('cuts long lines and takes away *emphasis*', () => {
+    const [line] = prSummary('Saved as its own *down* and *up* moment, ' + 'word '.repeat(60))
+    expect(line.startsWith('Saved as its own down and up moment,')).toBe(true)
+    expect(line.length).toBeLessThanOrEqual(170)
+    expect(line.endsWith('…')).toBe(true)
+  })
+  it('keeps to the most lines asked for', () => {
+    expect(prSummary('a\nb\nc\nd', 2)).toEqual(['a', 'b'])
+  })
+})
+
+describe('tryBranchCommand', () => {
+  it('fetches, switches branch, then gets latest and runs', () => {
+    const mac = tryBranchCommand(false, 'claude/fix-login')
+    expect(mac.startsWith('git fetch origin && git checkout claude/fix-login && before=')).toBe(true)
+    expect(mac.endsWith('npm run dev')).toBe(true)
+    const win = tryBranchCommand(true, 'claude/fix-login', 'npm start')
+    expect(win).toContain('git checkout claude/fix-login;')
+    expect(win).not.toContain('&&')
+  })
+})
+
+describe('timeAgo', () => {
+  const now = Date.parse('2026-11-21T20:00:00Z')
+  it('says how long ago', () => {
+    expect(timeAgo('2026-11-21T19:59:30Z', now)).toBe('just now')
+    expect(timeAgo('2026-11-21T19:55:00Z', now)).toBe('5 minutes ago')
+    expect(timeAgo('2026-11-21T17:00:00Z', now)).toBe('3 hours ago')
+    expect(timeAgo('2026-11-19T20:00:00Z', now)).toBe('2 days ago')
+    expect(timeAgo('nonsense', now)).toBe('')
+  })
+})
+
+describe('looksLikeGitHubToken', () => {
+  it('knows token shapes', () => {
+    expect(looksLikeGitHubToken('ghp_' + 'a'.repeat(36))).toBe(true)
+    expect(looksLikeGitHubToken('github_pat_' + 'A1_'.repeat(20))).toBe(true)
+    expect(looksLikeGitHubToken('hello')).toBe(false)
+  })
+})
+
+describe('idea board', () => {
+  const item = (over: Partial<BoardItem>): BoardItem => ({
+    id: 'a',
+    app: 'me/eclipse',
+    kind: 'idea',
+    title: 'Dark mode',
+    details: '',
+    column: 'ideas',
+    pictures: [],
+    created: '2026-11-21T20:00:00Z',
+    updated: '2026-11-21T20:00:00Z',
+    ...over
+  })
+  it('reads saved boards and skips broken items', () => {
+    const json = JSON.stringify({ items: [item({}), { id: 'x' }, item({ id: 'b', column: 'nonsense' as never, kind: 'bug' })] })
+    const board = readBoard(json)
+    expect(board.items.map((i) => i.id)).toEqual(['a', 'b'])
+    expect(board.items[1].column).toBe('ideas')
+    expect(board.items[1].kind).toBe('bug')
+    expect(readBoard('not json').items).toEqual([])
+    expect(readBoard(null).items).toEqual([])
+  })
+  it('keys apps by repository, else name', () => {
+    expect(boardKey({ name: 'Eclipse', repo: 'me/eclipse' })).toBe('me/eclipse')
+    expect(boardKey({ name: 'Eclipse' })).toBe('Eclipse')
+  })
+  it('writes a prompt for one idea', () => {
+    const p = claudePrompt({ name: 'Eclipse', repo: 'me/eclipse' }, [item({ details: 'A toggle in settings.' })])
+    expect(p).toBe('Please add this to my app Eclipse (GitHub: me/eclipse).\n\nDark mode\nA toggle in settings.\n\nWhen it’s done, open a pull request.')
+  })
+  it('writes a prompt for bugs and ideas together, mentioning pictures', () => {
+    const p = claudePrompt({ name: 'Eclipse' }, [item({ kind: 'bug', title: 'Login button does nothing', pictures: ['a.png'] }), item({ id: 'b', title: 'Dark mode' })])
+    expect(p).toContain("I'd like some changes to my app Eclipse.")
+    expect(p).toContain('Bugs to fix:\n\n1. Login button does nothing\n   (A picture is attached for this.)')
+    expect(p).toContain('New features to add:\n\n2. Dark mode')
+    expect(p).toContain('I’ve attached a picture to show what I mean.')
+  })
+})
+
+describe('releases', () => {
+  it('bumps versions', () => {
+    expect(bumpVersion('1.11.1', 'patch')).toBe('1.11.2')
+    expect(bumpVersion('1.11.1', 'minor')).toBe('1.12.0')
+    expect(bumpVersion('v1.11.1', 'major')).toBe('2.0.0')
+    expect(bumpVersion('1.2.3-beta.1', 'patch')).toBe('1.2.4')
+    expect(bumpVersion('nope', 'patch')).toBeNull()
+  })
+
+  it('makes the release command for each shell', () => {
+    expect(releaseCommand(false, 'minor')).toBe('npm version minor -m "Release %s" && git push --follow-tags')
+    expect(releaseCommand(true, 'patch')).toBe('npm version patch -m "Release %s"; if ($LASTEXITCODE -eq 0) { git push --follow-tags }')
+    expect(releaseCommand(false, 'patch', true)).toBe('npm test && npm version patch -m "Release %s" && git push --follow-tags')
+    expect(releaseCommand(true, 'patch', true)).toBe('npm test; if ($LASTEXITCODE -eq 0) { npm version patch -m "Release %s"; if ($LASTEXITCODE -eq 0) { git push --follow-tags } }')
+  })
+
+  it('writes plain notes from pull request titles', () => {
+    const notes = plainChangelog([
+      { title: 'feat: add a dark mode' },
+      { title: 'Fix the export button on Safari (#12)' },
+      { title: 'chore: bump dependencies' },
+      { title: 'App Studio: release builder.' },
+      { title: 'fix(sync): lost edits' }
+    ])
+    expect(notes).toBe("What's new\n- Add a dark mode\n- App Studio: release builder\n\nFixes\n- Fix the export button on Safari\n- Lost edits")
+    expect(plainChangelog([{ title: 'Fix crash' }])).toBe('Fixes\n- Fix crash')
+    expect(plainChangelog([])).toBe('')
+  })
+
+  it('gives the AI helper titles and short summaries', () => {
+    const src = changelogSource('Orbit', [{ number: 3, title: 'Add a thing', body: '## Summary\n- It does X\n\n## Testing\n- ran it', author: 'a', url: '', mergedAt: '' }])
+    expect(src).toContain('App: Orbit')
+    expect(src).toContain('- Add a thing\n  • It does X')
+    expect(src).not.toContain('ran it')
+  })
+
+  it('picks the release the notes go on', () => {
+    const r = (tag: string, draft = false): Release => ({ tag, name: tag, date: '', draft, prerelease: false, url: '', body: '' })
+    expect(notesTarget('1.2.0', [r('v1.3.0', true), r('v1.2.0')])).toBe('v1.3.0')
+    expect(notesTarget('1.3.0', [r('v1.2.0')])).toBe('v1.3.0')
+    expect(notesTarget('1.2.0', [r('v1.2.0')])).toBe('v1.3.0')
+    expect(notesTarget(undefined, [])).toBeNull()
+  })
+})
+
+describe('switchBranchCommand', () => {
+  it('switches and pulls', () => {
+    expect(switchBranchCommand(false, 'main')).toBe('git checkout main && git pull')
+    expect(switchBranchCommand(true, 'main')).toBe('git checkout main; if ($LASTEXITCODE -eq 0) { git pull }')
+  })
+})
+
+describe('test copies', () => {
+  it('names a copy after its branch', () => {
+    expect(copyFolderName('claude/dark-mode-x1')).toBe('claude-dark-mode-x1')
+    expect(copyFolderName('feature/über cool')).toBe('feature-ber-cool')
+    expect(copyFolderName('---')).toBe('copy')
+  })
+  it('runs a copy with the branch’s latest', () => {
+    expect(copyRunCommand(false, 'claude/x', 'npm run dev')).toBe(
+      'before=$(git rev-parse HEAD) && git fetch origin claude/x && git checkout --detach FETCH_HEAD && { if [ ! -d node_modules ] || ! git diff --quiet "$before" HEAD -- package.json package-lock.json yarn.lock pnpm-lock.yaml; then npm install; fi; } && npm run dev'
+    )
+    expect(copyRunCommand(true, 'claude/x')).toContain('git fetch origin claude/x; if ($LASTEXITCODE -eq 0) { git checkout --detach FETCH_HEAD;')
+  })
+})
+
+describe('matching pull requests to cards', () => {
+  const item = (over: Partial<BoardItem>): BoardItem => ({
+    id: 'a',
+    app: 'me/app',
+    kind: 'idea',
+    title: 'Dark mode for the player',
+    details: '',
+    column: 'building',
+    pictures: [],
+    created: '2026-11-01T00:00:00Z',
+    updated: '2026-11-01T00:00:00Z',
+    sentAt: '2026-11-20T10:00:00Z',
+    ...over
+  })
+  const pull = { title: 'Add dark mode to the music player', body: 'Adds a toggle.', createdAt: '2026-11-20T11:00:00Z' }
+
+  it('finds the card a pull request is for', () => {
+    const items = [item({}), item({ id: 'b', title: 'Keyboard shortcuts list' })]
+    expect(matchPull(items, pull)?.id).toBe('a')
+  })
+  it('leaves out cards not sent, already matched, done, or sent after it opened', () => {
+    expect(matchPull([item({ sentAt: undefined })], pull)).toBeNull()
+    expect(matchPull([item({ pull: 'me/app#3' })], pull)).toBeNull()
+    expect(matchPull([item({ column: 'done' })], pull)).toBeNull()
+    expect(matchPull([item({ sentAt: '2026-11-21T00:00:00Z' })], pull)).toBeNull()
+  })
+  it('needs enough words in common', () => {
+    expect(matchPull([item({ title: 'Better player' })], pull)).toBeNull()
+    expect(matchPull([item({ title: 'Faster sync for notes' })], pull)).toBeNull()
+  })
+  it('makes keys', () => {
+    expect(pullKey('me/app', 12)).toBe('me/app#12')
+    expect([...keywords('The Save buttons are broken!')]).toEqual(['save', 'button', 'broken'])
+  })
+})
+
+describe('screenshots', () => {
+  it('finds GitHub images in a description', () => {
+    const body = '![shot](https://github.com/user-attachments/assets/abc-123)\n<img width="400" src="https://user-images.githubusercontent.com/1/2.png">\n![x](https://evil.example/a.png) ![y](https://github.com/me/app/assets/1/def)'
+    expect(imageUrls(body)).toEqual(['https://github.com/user-attachments/assets/abc-123', 'https://github.com/me/app/assets/1/def', 'https://user-images.githubusercontent.com/1/2.png'])
+    expect(isGitHubImage('http://github.com/user-attachments/assets/a')).toBe(false)
+    expect(isGitHubImage('https://github.com/login')).toBe(false)
+  })
+  it('groups by feature, newest first', () => {
+    const shot = (id: string, feature: string, date: string): Shot => ({ id, app: 'a', feature, picture: `${id}.png`, date })
+    const groups = shotsByFeature([shot('1', 'Board', '2026-11-01'), shot('2', 'Releases', '2026-11-05'), shot('3', 'Board', '2026-11-03')])
+    expect(groups.map((g) => g.feature)).toEqual(['Releases', 'Board'])
+    expect(groups[1].shots.map((s) => s.id)).toEqual(['3', '1'])
+  })
+  it('reads links, screenshots and matches from the saved board', () => {
+    const data = readBoard(
+      JSON.stringify({
+        items: [{ id: 'a', app: 'x', title: 't', sentAt: '2026-11-20T10:00:00Z', pull: 'me/x#2' }],
+        claude: { x: 'https://claude.ai/project/1', bad: 3 },
+        shots: [{ id: 's', app: 'x', picture: 'a.png' }, { id: 'nope' }]
+      })
+    )
+    expect(data.items[0]).toMatchObject({ sentAt: '2026-11-20T10:00:00Z', pull: 'me/x#2' })
+    expect(data.claude).toEqual({ x: 'https://claude.ai/project/1' })
+    expect(data.shots).toEqual([{ id: 's', app: 'x', feature: 'Other', picture: 'a.png', date: new Date(0).toISOString(), note: undefined, source: undefined }])
+    expect(readBoard(null)).toEqual({ items: [], claude: {}, shots: [] })
+  })
+})
+
+describe('token permissions', () => {
+  it('links to a token with the right permissions', () => {
+    const url = new URL(newTokenUrl('Looby758'))
+    expect(url.pathname).toBe('/settings/personal-access-tokens/new')
+    expect(url.searchParams.get('pull_requests')).toBe('write')
+    expect(url.searchParams.get('contents')).toBe('write')
+    expect(url.searchParams.get('target_name')).toBe('Looby758')
+    expect(isTokenPermissionError(`${TOKEN_NOT_ALLOWED} merge pull requests on a/b.`)).toBe(true)
+    expect(isTokenPermissionError('GitHub said no (403).')).toBe(false)
+  })
+})
+
+describe('uncommitted changes', () => {
+  it('describes git status lines', () => {
+    expect(describeChange(' M package-lock.json')).toBe('package-lock.json (changed)')
+    expect(describeChange('?? notes.txt')).toBe('notes.txt (new)')
+    expect(describeChange(' D old.ts')).toBe('old.ts (deleted)')
+    expect(describeChange('R  a.ts -> b.ts')).toBe('b.ts (renamed)')
+    expect(describeChange('?? "with space.txt"')).toBe('with space.txt (new)')
+  })
+  it('commits and stashes', () => {
+    expect(commitAllCommand(false, 'Small "fixes"')).toBe('git add -A && git commit -m "Small fixes"')
+    expect(commitAllCommand(true, 'x')).toBe('git add -A; if ($LASTEXITCODE -eq 0) { git commit -m "x" }')
+    expect(stashCommand()).toContain('git stash push --include-untracked')
+  })
+})

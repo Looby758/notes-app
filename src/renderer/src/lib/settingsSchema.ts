@@ -374,6 +374,17 @@ export const SETTINGS: SettingDef[] = [
   { key: 'cursorBlink', section: 'editor', group: 'Display', type: 'toggle', label: 'Blinking cursor', keywords: 'caret' },
   { key: 'showWordCount', section: 'editor', group: 'Display', type: 'toggle', label: 'Word count in the status bar', keywords: 'words' },
   {
+    key: 'scriptWpm',
+    section: 'editor',
+    group: 'Display',
+    type: 'slider',
+    ...RANGES.scriptWpm,
+    format: (v) => `${v} words a minute`,
+    label: 'Speaking pace for video scripts',
+    description: 'How fast you read a script out loud, for the length shown at the bottom of a script note. Most people speak at around 130–160.',
+    keywords: 'youtube voiceover script length words per minute wpm duration video'
+  },
+  {
     key: 'typewriterCenter',
     section: 'editor',
     group: 'Typewriter mode',
@@ -588,6 +599,16 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'template'
   },
   {
+    key: 'videosFolder',
+    section: 'files',
+    group: 'Folders',
+    type: 'folder',
+    placeholder: 'Videos',
+    label: 'Videos folder',
+    description: 'Each video project gets a folder in here for its script and research notes. Rename or move this folder in Orbit (or in File Explorer, Finder or Google Drive) and Orbit follows it. Leave empty for the top level.',
+    keywords: 'youtube video projects script research voiceover'
+  },
+  {
     key: 'showAttachments',
     section: 'files',
     group: 'Folders',
@@ -595,6 +616,15 @@ export const SETTINGS: SettingDef[] = [
     label: 'Show pictures, recordings and other files',
     description: 'In the file list, next to your notes. Pictures, recordings, videos and PDFs open in a tab; drag one into a note to show it there.',
     keywords: 'attachments images audio pdf files hide show tree'
+  },
+  {
+    key: 'filesWholePcSearch',
+    section: 'files',
+    group: 'Files tab',
+    type: 'toggle',
+    label: 'Whole PC search',
+    description: 'Orbit keeps a list of the name of every file on this computer (not what’s in them), so searching the whole PC in the Files tab shows results as you type. The list is made in the background and kept up to date as files change. Turning this off deletes nothing but stops the list being kept.',
+    keywords: 'search everything whole pc computer find file index spotlight instant'
   },
   {
     key: 'randomIncludeDaily',

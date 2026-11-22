@@ -36,3 +36,35 @@ describe('money and Ctrl+Z', () => {
     await expect(history.undo()).rejects.toThrow(/reloaded/)
   })
 })
+
+describe('accounts, net worth and IOUs', () => {
+  beforeEach(async () => {
+    await loadMoney()
+    history.clear()
+  })
+
+  it('writes today’s net worth when an account changes, and undo puts both back', async () => {
+    const { addAccount, updateAccount } = await import('./money')
+    const acc = addAccount({ name: 'Savings', kind: 'savings', amount: 10000, date: '2026-11-01' })
+    expect(useMoney.getState().netWorth.at(-1)?.total).toBe(10000)
+    updateAccount(acc.id, { amount: 25000 })
+    expect(useMoney.getState().netWorth.at(-1)?.total).toBe(25000)
+    expect(useMoney.getState().netWorth).toHaveLength(1)
+    await history.undo()
+    expect(useMoney.getState().accounts[0].amount).toBe(10000)
+    expect(useMoney.getState().netWorth.at(-1)?.total).toBe(10000)
+  })
+
+  it('pays back part of an IOU, then settles it, and undoes', async () => {
+    const { addIous, payBackIou } = await import('./money')
+    const [made] = addIous([{ person: 'Sam', amount: 1000, theyOwe: true, note: 'Takeaway', date: '2026-11-01', remind: '' }])
+    payBackIou(made.id, 400)
+    expect(useMoney.getState().ious[0]).toMatchObject({ paid: 400 })
+    expect(useMoney.getState().ious[0].settled).toBeUndefined()
+    payBackIou(made.id, 9999)
+    expect(useMoney.getState().ious[0]).toMatchObject({ paid: 1000 })
+    expect(useMoney.getState().ious[0].settled).toBeTruthy()
+    expect(await history.undo()).toBe('Settled up with Sam')
+    expect(useMoney.getState().ious[0].settled).toBeUndefined()
+  })
+})

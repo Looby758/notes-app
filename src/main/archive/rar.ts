@@ -1,4 +1,3 @@
-import { createExtractorFromFile } from 'node-unrar-js'
 import type { ArchiveEntry } from '@shared/archive'
 import { safeRelative } from '@shared/archive'
 
@@ -8,9 +7,27 @@ import { safeRelative } from '@shared/archive'
  * read a file at a time the way zip can (a "solid" RAR has to be unpacked from the start), so
  * files are unpacked to a folder on disk.
  *
- * The unpacking runs here in the main process, one file at a time with a pause between, so the app
- * stays responsive. The unrar code can only work on one archive at once, so jobs queue up.
+ * The unrar code is synchronous, and one step (a file deep inside a solid RAR) can take seconds, so
+ * it runs in a worker thread, never in the main process. Jobs queue up, one archive at a time.
+ * Worker threads can't load files from inside app.asar, so node-unrar-js is unpacked next to it
+ * (electron-builder.yml) and loaded from there.
  */
+
+export interface RarProgress {
+  name: string
+  done: number
+  total: number
+}
+
+export interface RarJob {
+  kind: 'list' | 'extract'
+  path: string
+  password?: string
+  /** extract: the folder to unpack into. */
+  dest?: string
+  /** extract: the files to unpack (by their name in the archive) and where each goes inside the folder. */
+  targets?: Record<string, string>
+}
 
 let queue: Promise<unknown> = Promise.resolve()
 
@@ -20,41 +37,29 @@ function inTurn<T>(job: () => Promise<T>): Promise<T> {
   return run
 }
 
-/** The archive is only closed by reading to its end; this closes it after stopping early. */
-function closeQuietly(extractor: object): void {
-  try {
-    ;(extractor as unknown as { closeArc: () => void }).closeArc()
-  } catch {
-    // Already closed.
-  }
-}
-
-const pause = (): Promise<void> => new Promise((r) => setImmediate(r))
-
 function explain(err: unknown, password?: string): Error {
   const reason = (err as { reason?: string })?.reason
   if (reason === 'ERAR_MISSING_PASSWORD' || reason === 'ERAR_BAD_PASSWORD') return new Error(password ? 'That password isn’t right.' : 'This RAR has a password.')
   if (reason === 'ERAR_BAD_ARCHIVE' || reason === 'ERAR_UNKNOWN_FORMAT' || reason === 'ERAR_BAD_DATA') return new Error('This RAR is damaged, or isn’t really a RAR.')
   if (reason === 'ERAR_EOPEN') return new Error('Couldn’t open this RAR (is it still downloading, or part of a set?).')
-  return err instanceof Error ? err : new Error(String(err))
+  const message = (err as { message?: string })?.message
+  return err instanceof Error ? err : new Error(message ?? String(err))
+}
+
+export type RarRunner = <T>(job: RarJob, onProgress?: (p: RarProgress) => void, cancelled?: () => boolean) => Promise<T>
+
+/** The app's runner: a worker thread per job. Loaded lazily (it needs electron-vite's ?modulePath). */
+let runInWorker: RarRunner = async (job, onProgress, cancelled) => (await import('./rarThread')).runInThread(job, onProgress, cancelled)
+
+/** Tests run unrar in the same thread. */
+export function setRarRunner(next: RarRunner): void {
+  runInWorker = next
 }
 
 export function listRar(path: string, password?: string): Promise<ArchiveEntry[]> {
   return inTurn(async () => {
     try {
-      const extractor = await createExtractorFromFile({ filepath: path, password })
-      try {
-        return [...extractor.getFileList().fileHeaders].map((h) => ({
-          name: h.name.replace(/\\/g, '/'),
-          size: h.unpSize,
-          packedSize: h.packSize,
-          isDir: h.flags.directory,
-          encrypted: h.flags.encrypted
-        }))
-      } finally {
-        // Reading the list to its end closes the RAR, but a wrong password stops it part way.
-        closeQuietly(extractor)
-      }
+      return await runInWorker<ArchiveEntry[]>({ kind: 'list', path, password })
     } catch (err) {
       throw explain(err, password)
     }
@@ -77,35 +82,14 @@ export interface RarExtractOptions {
 /** Unpacks files from a RAR into `dest` (made if needed). Resolves with the names unpacked. */
 export function extractRar(path: string, dest: string, opts: RarExtractOptions = {}): Promise<string[]> {
   return inTurn(async () => {
-    const rename = (name: string): string => safeRelative(opts.rename ? opts.rename(name.replace(/\\/g, '/')) : name) || '_'
     try {
-      const counting = await createExtractorFromFile({ filepath: path, password: opts.password })
-      const wanted = (name: string, isDir: boolean): boolean => !isDir && (!opts.only || opts.only(name.replace(/\\/g, '/')))
-      let total: number
-      try {
-        total = [...counting.getFileList().fileHeaders].filter((h) => wanted(h.name, h.flags.directory)).length
-      } finally {
-        closeQuietly(counting)
+      // The worker can't call back into functions, so which files and where they go is worked out here.
+      const targets: Record<string, string> = {}
+      for (const e of await runInWorker<ArchiveEntry[]>({ kind: 'list', path, password: opts.password })) {
+        if (e.isDir || (opts.only && !opts.only(e.name))) continue
+        targets[e.name] = safeRelative(opts.rename ? opts.rename(e.name) : e.name) || '_'
       }
-
-      const extractor = await createExtractorFromFile({ filepath: path, password: opts.password, targetPath: dest, filenameTransform: rename })
-      const done: string[] = []
-      const files = extractor.extract({ files: (h) => wanted(h.name, h.flags.directory) }).files
-      try {
-        // Each step of the loop unpacks the next file.
-        while (done.length < total && !opts.cancelled?.()) {
-          const next = files.next()
-          if (next.done) break
-          const name = next.value.fileHeader.name.replace(/\\/g, '/')
-          done.push(name)
-          opts.onFile?.(name, done.length, total)
-          await pause()
-        }
-      } finally {
-        // Stopping before the end of the archive leaves it open; close it for the next job.
-        closeQuietly(extractor)
-      }
-      return done
+      return await runInWorker<string[]>({ kind: 'extract', path, password: opts.password, dest, targets }, (p) => opts.onFile?.(p.name, p.done, p.total), opts.cancelled)
     } catch (err) {
       throw explain(err, opts.password)
     }
