@@ -26,6 +26,8 @@ export const EVENTS_SCOPE = 'https://www.googleapis.com/auth/calendar.events'
 const SCOPE = `https://www.googleapis.com/auth/calendar.readonly ${EVENTS_SCOPE} ${SHEETS_SCOPE} openid email`
 /** Read, label, archive and send email (not delete forever). */
 export const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.modify'
+/** Only the files Orbit itself puts in your Drive (the big file sender's links), nothing else there. */
+export const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
 // Overridable for tests, which point these at a local fake Google server.
 const AUTH_URL = process.env.NOTES_GOOGLE_AUTH_URL ?? 'https://accounts.google.com/o/oauth2/v2/auth'
 const TOKEN_URL = process.env.NOTES_GOOGLE_TOKEN_URL ?? 'https://oauth2.googleapis.com/token'
@@ -45,6 +47,8 @@ interface Stored {
   scopes?: string
   /** You turned on the Email page, so signing in again asks for Gmail too. */
   gmail?: boolean
+  /** You made a Drive link in the big file sender, so signing in again asks for that too. */
+  drive?: boolean
   /** Google calendars you've switched off. */
   disabled: string[]
   /** `writable`: you own the calendar or can change its events. */
@@ -221,7 +225,7 @@ export const hasGmail = (): boolean => (load().scopes ?? '').split(' ').includes
  * Signs in to Google in your browser. `withGmail` also asks for email access (from the Email page);
  * once you've allowed it, signing in again from Settings keeps asking for it.
  */
-export async function connect(withGmail = false): Promise<CalendarSourcesStatus> {
+export async function connect(withGmail = false, withDrive = false): Promise<CalendarSourcesStatus> {
   const s = load()
   if (!safeStorage.isEncryptionAvailable()) throw new Error('Windows can’t protect a saved sign-in on this computer, so Google can’t be connected.')
   if (!s.clientId || !s.clientSecret) throw new Error('Add your Google client ID and secret first.')
@@ -236,7 +240,7 @@ export async function connect(withGmail = false): Promise<CalendarSourcesStatus>
       client_id: s.clientId,
       redirect_uri: redirect,
       response_type: 'code',
-      scope: withGmail || s.gmail ? `${SCOPE} ${GMAIL_SCOPE}` : SCOPE,
+      scope: [SCOPE, withGmail || s.gmail ? GMAIL_SCOPE : '', withDrive || s.drive ? DRIVE_FILE_SCOPE : ''].filter(Boolean).join(' '),
       code_challenge: challenge,
       code_challenge_method: 'S256',
       state,
@@ -269,13 +273,15 @@ export async function connect(withGmail = false): Promise<CalendarSourcesStatus>
     s.email = emailFromIdToken(tokens.id_token)
     s.scopes = typeof tokens.scope === 'string' ? tokens.scope : undefined
     if (withGmail) s.gmail = true
+    if (withDrive) s.drive = true
     accessToken = { token: String(tokens.access_token), expires: Date.now() + Number(tokens.expires_in ?? 3600) * 1000 }
     googleError = undefined
     save()
     if (withGmail && !hasGmail()) throw new Error('Google didn’t give Notes access to your email. Connect again and tick the Gmail box.')
+    if (withDrive && !(s.scopes ?? '').split(' ').includes(DRIVE_FILE_SCOPE)) throw new Error('Google didn’t give Orbit access to Drive. Connect again and tick the Drive box.')
     // Connecting from the Email page shouldn't fail just because the calendar isn't set up.
     await refreshCalendarList().catch((err) => {
-      if (!withGmail) throw err
+      if (!withGmail && !withDrive) throw err
     })
     return status()
   } finally {
@@ -293,6 +299,7 @@ export async function disconnect(): Promise<CalendarSourcesStatus> {
   s.email = undefined
   s.scopes = undefined
   s.gmail = undefined
+  s.drive = undefined
   s.calendars = []
   accessToken = null
   googleError = undefined

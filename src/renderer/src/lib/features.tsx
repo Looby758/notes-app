@@ -1,6 +1,7 @@
 import { useSyncExternalStore, type ComponentType } from 'react'
 import type { Prefs } from '@shared/prefs'
 import {
+  Send,
   Ear,
   ArrowRightLeft,
   FilePen,
@@ -84,6 +85,7 @@ import {
   COMICS_TAB,
   WIKI_TAB,
   CONVERT_TAB,
+  FILESENDER_TAB,
   PDF_EDITOR_TAB,
   STUDIO_TAB,
   APPSTUDIO_TAB,
@@ -238,6 +240,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   'snip-picture': { icon: Crop, run: () => void startSnip('picture') },
   explorer: { icon: HardDrive, run: () => openSpecialTab(EXPLORER_TAB) },
   convert: { icon: ArrowRightLeft, run: () => openSpecialTab(CONVERT_TAB) },
+  filesender: { icon: Send, run: () => openSpecialTab(FILESENDER_TAB) },
   'pdf-editor': { icon: FilePen, run: () => openSpecialTab(PDF_EDITOR_TAB) },
   downloads: { icon: ArrowDownToLine, run: () => openSpecialTab(DOWNLOADS_TAB) },
   'offline-ai': {

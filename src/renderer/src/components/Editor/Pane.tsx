@@ -27,6 +27,7 @@ import {
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
+  FILESENDER_TAB,
   PDF_EDITOR_TAB,
   COMICS_TAB,
   WIKI_TAB,
@@ -82,6 +83,7 @@ import ChatSitePage from '../ChatSite/ChatSite'
 import HomePage from '../Home/HomePage'
 import MoneyPage from '../Money/MoneyPage'
 import ConvertPage from '../Convert/ConvertPage'
+import FileSenderPage from '../FileSender/FileSenderPage'
 import DownloadsPage from '../Downloads/DownloadsPage'
 import PdfEditorPage from '../PdfEditor/PdfEditorPage'
 import MiniGamesPage from '../MiniGames/MiniGamesPage'
@@ -233,6 +235,7 @@ export default function Pane({ pane }: { pane: string }) {
         {(active === HOME_TAB || !active) && <HomePage />}
         {active === MONEY_TAB && <MoneyPage />}
         {active === CONVERT_TAB && <ConvertPage />}
+        {active === FILESENDER_TAB && <FileSenderPage />}
         {active === PDF_EDITOR_TAB && <PdfEditorPage />}
         {active === COMICS_TAB && <ComicsPage />}
         {active === WIKI_TAB && <WikiPage />}
