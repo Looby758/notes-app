@@ -610,3 +610,240 @@ body.voice-toast-window {
 .vt-yes {
   flex: none;
 }
+
+/* ---------- the call note ---------- */
+.vp-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
+}
+.vp-note-text,
+.vp-call-edit textarea {
+  flex: 1;
+  min-height: 120px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  resize: none;
+}
+.vp-note-text:focus,
+.vp-call-edit textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.vp-note-hint {
+  font-size: 11px;
+}
+.vp-call-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 5px 7px;
+  border: none;
+  border-left: 2px solid var(--accent);
+  border-radius: 0 6px 6px 0;
+  background: var(--bg-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.vp-call-note svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+.vp-call-note span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-wrap;
+}
+.vp-call-note.open span {
+  display: block;
+}
+.vp-call-edit {
+  margin-top: 6px;
+}
+.vp-call-edit textarea {
+  min-height: 70px;
+  resize: vertical;
+}
+.vp-call-edit-buttons {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+/* ---------- history / stats switch ---------- */
+.vp-switch {
+  display: inline-flex;
+  gap: 2px;
+  margin-bottom: 8px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--bg-raised);
+}
+.vp-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.vp-switch button.on {
+  background: var(--bg-panel);
+  color: var(--text-strong);
+}
+
+/* ---------- call stats ---------- */
+.vp-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.vp-stat-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.vp-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-width: 0;
+}
+.vp-stat b {
+  color: var(--text-strong);
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.vp-stat .vp-faint {
+  font-size: 11px;
+}
+.vp-stat-label {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.vp-stats.wide .vp-stat b {
+  font-size: 22px;
+}
+.vp-stats-head {
+  margin: 12px 0 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.vp-weeks {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 4px;
+  height: 120px;
+}
+.vp-stats.wide .vp-weeks {
+  height: 160px;
+}
+.vp-week {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  min-width: 0;
+}
+.vp-week-value,
+.vp-week-label {
+  color: var(--text-muted);
+  font-size: 10px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+}
+.vp-week-track {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  border-bottom: 1px solid var(--border);
+}
+.vp-week-bar {
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.vp-week.now .vp-week-bar {
+  background: var(--accent);
+}
+.vp-week.now .vp-week-label {
+  color: var(--text-strong);
+}
+.vp-week:hover .vp-week-bar {
+  filter: brightness(1.15);
+}
+.vp-people {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.vp-people li {
+  display: grid;
+  grid-template-columns: minmax(60px, 30%) 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.vp-person-name {
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vp-person-track {
+  height: 8px;
+}
+.vp-person-bar {
+  display: block;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+  background: var(--accent);
+}
+.vp-person-value {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.vp-stats-foot {
+  margin: 10px 0 0;
+  font-size: 11px;
+}
+.vp-stats.wide .vp-people li {
+  grid-template-columns: minmax(60px, 160px) 1fr auto;
+}

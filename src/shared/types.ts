@@ -938,6 +938,12 @@ export interface NotesApi {
   discordCalls(): Promise<CallRecord[]>
   discordRemoveCall(id: string): Promise<CallRecord[]>
   discordClearCalls(): Promise<CallRecord[]>
+  /** The note for the call going on now (typed on the pop-out; saved with the call in the history). */
+  discordNote(): Promise<string>
+  discordSetNote(text: string, channelId: string): Promise<void>
+  /** Changes (or, with empty text, removes) a past call's note. */
+  discordSetCallNote(id: string, text: string): Promise<CallRecord[]>
+  onDiscordNote(callback: (text: string) => void): () => void
   onDiscordCalls(callback: (calls: CallRecord[]) => void): () => void
   /** The Discord voice pop-out (its own window, for a second screen): opens it or brings it back. */
   openDiscordPopout(): Promise<void>

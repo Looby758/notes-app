@@ -425,6 +425,14 @@ const api: NotesApi = {
   discordCalls: () => ipcRenderer.invoke('discord:calls'),
   discordRemoveCall: (id) => ipcRenderer.invoke('discord:remove-call', id),
   discordClearCalls: () => ipcRenderer.invoke('discord:clear-calls'),
+  discordNote: () => ipcRenderer.invoke('discord:note'),
+  discordSetNote: (text, channelId) => ipcRenderer.invoke('discord:set-note', text, channelId),
+  discordSetCallNote: (id, text) => ipcRenderer.invoke('discord:set-call-note', id, text),
+  onDiscordNote: (callback) => {
+    const handler = (_e: Electron.IpcRendererEvent, text: string): void => callback(text)
+    ipcRenderer.on('discord:note-changed', handler)
+    return () => ipcRenderer.removeListener('discord:note-changed', handler)
+  },
   onDiscordCalls: (callback) => {
     const handler = (_e: Electron.IpcRendererEvent, calls: Parameters<typeof callback>[0]): void => callback(calls)
     ipcRenderer.on('discord:calls-changed', handler)
