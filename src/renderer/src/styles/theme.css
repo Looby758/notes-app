@@ -10851,6 +10851,220 @@ body.theme-light .hangman-page {
   font-size: 18px;
 }
 
+/* ---------- blackjack (shares the sudoku page's layout and Solitaire's cards) ---------- */
+.blackjack-page {
+  outline: none;
+}
+.blackjack-inner {
+  max-width: 860px;
+}
+.bj-coins {
+  vertical-align: -2px;
+  color: #f5a524;
+}
+.bj-net {
+  align-self: center;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: var(--bg-hover);
+  color: var(--text-strong);
+  font-weight: 700;
+}
+.bj-net.up {
+  background: #2f7a45;
+  color: #fff;
+}
+.bj-net.down {
+  background: #8f2d33;
+  color: #fff;
+}
+.bj-table {
+  --card-w: clamp(58px, 9vw, 82px);
+  --card-h: calc(var(--card-w) * 1.4);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 20px 22px;
+  border-radius: 14px;
+  background: radial-gradient(ellipse at 50% 30%, #1f7a4a, #134d30);
+  color: #e9f5ee;
+}
+.bj-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 10px;
+  transition: background 0.15s;
+}
+.bj-side.active {
+  background: rgba(255, 255, 255, 0.08);
+  outline: 2px solid rgba(255, 212, 59, 0.7);
+}
+.bj-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+.bj-total {
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  text-transform: none;
+}
+.bj-bet {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #ffd76a;
+  text-transform: none;
+}
+.bj-outcome {
+  padding: 1px 8px;
+  border-radius: 10px;
+  text-transform: none;
+}
+.bj-outcome.blackjack,
+.bj-outcome.win {
+  background: #ffd43b;
+  color: #1a1a1a;
+}
+.bj-outcome.push {
+  background: rgba(255, 255, 255, 0.25);
+}
+.bj-outcome.lose {
+  background: rgba(0, 0, 0, 0.4);
+  color: #ffb3b8;
+}
+.bj-side.lose .bj-cards {
+  opacity: 0.6;
+}
+.bj-cards {
+  position: relative;
+  display: flex;
+  min-height: var(--card-h);
+}
+.bj-cards .sol-card.bj-card {
+  position: relative;
+  flex-shrink: 0;
+  margin-right: calc(var(--card-w) * -0.55);
+  animation: bj-deal 0.25s cubic-bezier(0.2, 0.8, 0.3, 1) backwards;
+}
+@keyframes bj-deal {
+  from {
+    transform: translate(40px, -30px) rotate(6deg);
+    opacity: 0;
+  }
+}
+.bj-spot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--card-w) * 2);
+  height: var(--card-h);
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 12px;
+  text-align: center;
+}
+.bj-hands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+}
+.bj-hands .bj-side {
+  min-width: calc(var(--card-w) * 2.6);
+}
+.bj-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+.bj-controls .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.bj-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bj-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 4px dashed rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  background: #c92a2a;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  transition: transform 0.1s;
+}
+.bj-chip[data-chip='25'] {
+  background: #2b8a3e;
+}
+.bj-chip[data-chip='50'] {
+  background: #1864ab;
+}
+.bj-chip[data-chip='100'] {
+  background: #212529;
+}
+.bj-chip:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+.bj-chip:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.bj-clear {
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.bj-bet-now {
+  margin-left: 6px;
+  font-size: 15px;
+}
+.bj-bet-now strong {
+  color: #ffd76a;
+  font-size: 18px;
+}
+.bj-hint {
+  font-weight: 600;
+}
+.bj-inline {
+  vertical-align: -2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bj-cards .sol-card.bj-card {
+    animation: none;
+  }
+}
+
 /* ---------- wordle (shares the sudoku page's layout) ---------- */
 .wordle-page {
   --wordle-right: #3f9b57;

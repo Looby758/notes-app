@@ -34,7 +34,7 @@ const cardKey = (c: Card): string => `${c.suit}-${c.rank}`
 
 const sameFrom = (a: From | null, b: From): boolean => JSON.stringify(a) === JSON.stringify(b)
 
-function CardFace({ card }: { card: Card }) {
+export function CardFace({ card }: { card: Card }) {
   const name = rankName(card.rank)
   const suit = SUITS[card.suit]
   return (
@@ -52,7 +52,7 @@ function CardFace({ card }: { card: Card }) {
   )
 }
 
-const cardLabel = (c: Card): string => `${['Ace', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'Jack', 'Queen', 'King'][c.rank - 1]} of ${['spades', 'hearts', 'diamonds', 'clubs'][c.suit]}`
+export const cardLabel = (c: Card): string => `${['Ace', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'Jack', 'Queen', 'King'][c.rank - 1]} of ${['spades', 'hearts', 'diamonds', 'clubs'][c.suit]}`
 
 interface Drag {
   from: From
