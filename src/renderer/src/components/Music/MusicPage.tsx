@@ -576,6 +576,8 @@ function askRename(id: string): void {
 
 function Header({ kicker, title, sub, art, icon, songs, onRename, editable, renameId }: { kicker: string; title: string; sub?: string; art?: string; icon?: React.ReactNode; songs: LocalSong[]; onRename?: (name: string) => void; editable?: LocalSong[]; renameId?: string }) {
   const [editing, setEditing] = useState(false)
+  /** When renaming was started from the right-click menu (the page and menu settling can take the focus away just after). */
+  const askedAt = useRef(0)
   useEffect(() => {
     if (!renameId) return
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -583,6 +585,7 @@ function Header({ kicker, title, sub, art, icon, songs, onRename, editable, rena
       if (renameOnOpen !== renameId) return
       renameOnOpen = null
       // After the right-click menu has closed, or its closing takes the focus from the name box (which ends renaming).
+      askedAt.current = Date.now()
       timer = setTimeout(() => setEditing(true), 60)
     }
     check()
@@ -637,7 +640,15 @@ function Header({ kicker, title, sub, art, icon, songs, onRename, editable, rena
             value={name}
             autoFocus
             onChange={(e) => setName(e.target.value)}
-            onBlur={finish}
+            onBlur={(e) => {
+              // Lost the focus to the page or menu settling, not to you: keep renaming.
+              if (Date.now() - askedAt.current < 800) {
+                const input = e.currentTarget
+                setTimeout(() => input.isConnected && input.focus(), 0)
+                return
+              }
+              finish()
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') finish()
               if (e.key === 'Escape') {
