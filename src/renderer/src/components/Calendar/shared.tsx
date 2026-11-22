@@ -14,9 +14,10 @@ import { allRecurring, occurrences } from '../../lib/moneyInsights'
 import { formatPounds } from '../../lib/money'
 import type { DatedItem } from '../../lib/schedule'
 import { EventWeather } from '../Weather/Weather'
+import type { CalEvent } from '@shared/types'
 import { describeRepeat, repeatChoices, type RepeatRule } from '@shared/repeat'
 import { canEditGoogle, deleteGoogle, updateGoogle, type EventTarget } from '../../lib/calendarEdit'
-import { showEventMenu, startDayDrag, useWritableCalendars } from './edit'
+import { allowGoogleEditing, openCalendarSettings, showEventMenu, startDayDrag, useCalendarStatus, useWritableCalendars } from './edit'
 
 /**
  * Calendar items by day, recomputed whenever any note changes. Repeating events are filled in
@@ -326,6 +327,7 @@ export function EventDetails() {
             {e.calendarName}
             {editable ? '' : ' · read-only'}
           </div>
+          {!editable && <ReadOnlyHint event={e} onAct={() => set(null)} />}
           <div className="event-card-actions">
             {editable && (
               <button className="btn" onClick={() => setEditing(true)} title={recurring ? 'Changes this day only' : undefined}>
@@ -361,6 +363,41 @@ export function EventDetails() {
             )}
           </div>
         </>
+      )}
+    </div>
+  )
+}
+
+/** Why an event can't be changed from Orbit, and the button that fixes it when there is one. */
+function ReadOnlyHint({ event, onAct }: { event: CalEvent; onAct: () => void }) {
+  const status = useCalendarStatus()
+  if (!status || event.sourceId === 'money' || event.sourceId === 'videos') return null
+  const g = status.google
+  let text: string
+  let button: { label: string; run: () => void } | null = null
+  if (event.sourceId.startsWith('feed:')) {
+    text = g.connected && g.canEdit ? 'This comes from a calendar link, which Orbit can only read. Events from your Google sign-in can be edited.' : 'This comes from a calendar link, which Orbit can only read. To edit Google events here, connect Google in Settings → Calendar.'
+    if (!g.connected || !g.canEdit) button = { label: 'Open calendar settings', run: openCalendarSettings }
+  } else if (g.connected && !g.canEdit) {
+    text = 'Orbit can only read your Google Calendar so far.'
+    button = { label: 'Allow editing', run: () => void allowGoogleEditing() }
+  } else if (!g.connected) {
+    text = 'Your Google sign-in has ended. Connect again to see and edit events.'
+    button = { label: 'Open calendar settings', run: openCalendarSettings }
+  } else return null // a calendar shared with you as view-only
+  return (
+    <div className="event-card-hint">
+      {text}
+      {button && (
+        <button
+          className="link-btn"
+          onClick={() => {
+            onAct()
+            button!.run()
+          }}
+        >
+          {button.label}
+        </button>
       )}
     </div>
   )
@@ -429,6 +466,26 @@ function EditGoogleEvent({ item, onDone, onCancel }: { item: ExternalItem; onDon
 const addHour = (t: string): string => {
   const [h, m] = t.split(':').map(Number)
   return `${String(Math.min(23, h + 1)).padStart(2, '0')}:${String(h + 1 > 23 ? 59 : m).padStart(2, '0')}`
+}
+
+/** In the add box: how to get Google calendars into the "add to" menu. */
+function GoogleAddHint() {
+  const status = useCalendarStatus()
+  if (!status) return null
+  const g = status.google
+  if (g.connected && !g.canEdit)
+    return (
+      <button type="button" className="link-btn quick-add-google" onClick={() => void allowGoogleEditing()} title="Sign in to Google again and allow Orbit to add events">
+        Add to Google too? Allow editing
+      </button>
+    )
+  if (!g.connected)
+    return (
+      <button type="button" className="link-btn quick-add-google" onClick={openCalendarSettings} title="Connect Google Calendar in Settings">
+        Add to Google Calendar…
+      </button>
+    )
+  return null
 }
 
 export interface QuickAddExtra {
@@ -510,6 +567,7 @@ export function QuickAdd({
             </option>
           ))}
         </select>
+        {calendars.length === 0 && <GoogleAddHint />}
         {calendars.length > 0 && (
           <select
             value={google ? google.id : ''}

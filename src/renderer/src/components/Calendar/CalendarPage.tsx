@@ -504,8 +504,8 @@ function TimelineView({ days, onAdd }: { days: Date[]; onAdd: (e: MouseEvent, d:
                     gesture.current = null
                     setPreview(null)
                   }}
-                  // Clicks are handled on pointer up (so a drag doesn't also open the event); keyboard still works.
-                  onClick={(e) => e.detail === 0 && item.onClick(e)}
+                  // Movable events handle clicks on pointer up (so a drag doesn't also open them); keyboard still works.
+                  onClick={(e) => (!item.movable || e.detail === 0) && item.onClick(e)}
                   onContextMenu={(e) => {
                     if (!item.local) return
                     e.preventDefault()

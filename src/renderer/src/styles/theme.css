@@ -2667,6 +2667,19 @@ body.capture-window {
 .quick-add-buttons {
   justify-content: flex-end;
 }
+.event-card-hint {
+  margin: 8px 0 0 18px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.event-card-hint .link-btn {
+  margin-left: 6px;
+}
+.quick-add-google {
+  font-size: 12px;
+  white-space: nowrap;
+}
 .event-edit {
   display: flex;
   flex-direction: column;

@@ -6,10 +6,12 @@ import { describeRepeat } from '@shared/repeat'
 import type { CalendarSourcesStatus } from '@shared/types'
 import { deleteEvent, endSeriesBefore, moveEvent, skipOccurrence, type EventMove } from '../../lib/daily'
 import { moveGoogle } from '../../lib/calendarEdit'
-import { openNote } from '../../lib/editorController'
+import { openNote, openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
 import { formatDate, fromDayKey } from '../../lib/dates'
 import type { DatedItem } from '../../lib/schedule'
-import { useExternal, type ExternalItem } from '../../store/externalEvents'
+import { refreshExternal, useExternal, type ExternalItem } from '../../store/externalEvents'
+import { useUI } from '../../store/ui'
+import { notify } from '../../store/notify'
 
 /**
  * Bits the calendar views share for changing events: the "Only this day / Every one" question
@@ -169,24 +171,46 @@ export async function dropOnDay(e: React.DragEvent, date: string): Promise<void>
 
 // ---------- Google calendars you can add to ----------
 
-let calendarsCache: CalendarSourcesStatus['google']['calendars'] | null = null
+let statusCache: CalendarSourcesStatus | null = null
 
-/** Your Google calendars that Orbit may add events to (empty until you reconnect with editing allowed). */
-export function useWritableCalendars(): { id: string; name: string; color: string }[] {
+/** Your Google sign-in and calendars (fetched again when calendar settings change). */
+export function useCalendarStatus(): CalendarSourcesStatus | null {
   const generation = useExternal((s) => s.generation)
-  const [calendars, setCalendars] = useState(calendarsCache ?? [])
+  const [status, setStatus] = useState(statusCache)
   useEffect(() => {
     let live = true
     window.api
       .calendarSources()
       .then((s) => {
-        calendarsCache = s.google.canEdit ? s.google.calendars.filter((c) => c.writable && c.enabled) : []
-        if (live) setCalendars(calendarsCache)
+        statusCache = s
+        if (live) setStatus(s)
       })
       .catch(() => undefined)
     return () => {
       live = false
     }
   }, [generation])
-  return calendars
+  return status
+}
+
+/** Your Google calendars that Orbit may add events to (empty until you allow editing). */
+export function useWritableCalendars(): { id: string; name: string; color: string }[] {
+  const status = useCalendarStatus()
+  return status?.google.canEdit ? status.google.calendars.filter((c) => c.writable && c.enabled) : []
+}
+
+/** Opens Settings → Calendar (where Google is connected and editing allowed). */
+export function openCalendarSettings(): void {
+  useUI.setState({ settingsSection: 'calendar' })
+  openSpecialTab(SETTINGS_TAB)
+}
+
+/** Signs in to Google again, this time allowing Orbit to change events. */
+export async function allowGoogleEditing(): Promise<void> {
+  try {
+    await window.api.googleConnect()
+    refreshExternal()
+  } catch (err) {
+    notify(err)
+  }
 }
