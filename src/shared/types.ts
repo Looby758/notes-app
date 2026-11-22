@@ -1250,6 +1250,10 @@ export interface NotesApi {
   skyblockAddonRemove(): Promise<SkyblockAddonState>
   /** Use your own Minecraft pack (.zip, or a folder) under the SkyBlock packs. */
   skyblockAddonPickVanilla(folder: boolean): Promise<SkyblockAddonState>
+  /** Use your own Minecraft pack from a path (a .zip or a pack folder), picked in Orbit's own file browser. */
+  skyblockAddonUseVanilla(path: string): Promise<SkyblockAddonState>
+  /** Minecraft's resource pack folders on this computer, for the file browser's shortcuts. */
+  skyblockAddonPackFolders(): Promise<string[]>
   /** Back to plain Minecraft's pictures under the SkyBlock packs. */
   skyblockAddonClearVanilla(): Promise<SkyblockAddonState>
   /** NEU item id → its picture. */

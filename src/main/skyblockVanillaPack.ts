@@ -1,5 +1,5 @@
-import { BrowserWindow, dialog, nativeImage } from 'electron'
-import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'fs'
+import { app, BrowserWindow, dialog, nativeImage } from 'electron'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'fs'
 import { basename, extname, join, relative, sep } from 'path'
 import JSZip from 'jszip'
 import { CUSTOM_PACK, isoCube, pickTexture, type Pixels, type VanillaNames } from '@shared/skyblockTextures'
@@ -115,7 +115,12 @@ async function importPack(src: { textures: Source; name: string }): Promise<numb
 /** Use your own pack, from a .zip or folder path. */
 export async function useVanillaPack(path: string): Promise<number> {
   if (!skyblockAddonReady()) throw new Error('Get the SkyBlock add-on first.')
-  const isDir = statSync(path).isDirectory()
+  let isDir: boolean
+  try {
+    isDir = statSync(path).isDirectory()
+  } catch {
+    throw new Error('That pack isn’t there any more.')
+  }
   return importPack(isDir ? folderSource(path) : await zipSource(path))
 }
 
@@ -135,6 +140,18 @@ export async function pickVanillaPack(win: BrowserWindow | null, folder: boolean
   if (picked.canceled || !picked.filePaths[0]) return false
   await useVanillaPack(picked.filePaths[0])
   return true
+}
+
+/** Minecraft's own resource pack folders on this computer (the official launcher's). */
+export function minecraftPackFolders(): string[] {
+  const home = app.getPath('home')
+  const candidates =
+    process.platform === 'win32'
+      ? [join(app.getPath('appData'), '.minecraft', 'resourcepacks')]
+      : process.platform === 'darwin'
+        ? [join(home, 'Library', 'Application Support', 'minecraft', 'resourcepacks')]
+        : [join(home, '.minecraft', 'resourcepacks')]
+  return candidates.filter((d) => existsSync(d))
 }
 
 export const vanillaPackInfo = (): { name: string; pictures: number } | null => {

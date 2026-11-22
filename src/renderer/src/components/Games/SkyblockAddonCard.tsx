@@ -4,6 +4,8 @@ import { DEFAULT_PACKS, ITEM_LIST_MB, TEXTURE_PACKS, VANILLA_MB } from '@shared/
 import { errorMessage } from '../../lib/paths'
 import { notify } from '../../store/notify'
 import { useSkyblockAddon } from './SkyblockPic'
+import { McText } from './SkyblockProfile'
+import PackBrowser from './PackBrowser'
 
 const clean = (err: unknown): string => errorMessage(err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
 
@@ -54,6 +56,7 @@ function PackPicker({ packs, setPacks }: { packs: string[]; setPacks: (p: string
 /** The Minecraft pack under the SkyBlock packs: plain Minecraft, or one you put in. */
 function VanillaPack({ vanilla }: { vanilla: { name: string; pictures: number } | null }) {
   const [busy, setBusy] = useState(false)
+  const [browsing, setBrowsing] = useState(false)
   const run = async (job: () => Promise<unknown>): Promise<void> => {
     setBusy(true)
     try {
@@ -67,7 +70,14 @@ function VanillaPack({ vanilla }: { vanilla: { name: string; pictures: number } 
   return (
     <div className="sba-vanilla" data-sba-vanilla>
       <p>
-        <strong>Minecraft pack underneath:</strong> {vanilla ? `${vanilla.name} (${vanilla.pictures.toLocaleString('en-GB')} pictures)` : 'plain Minecraft'}
+        <strong>Minecraft pack underneath:</strong>{' '}
+        {vanilla ? (
+          <>
+            <McText text={vanilla.name} /> ({vanilla.pictures.toLocaleString('en-GB')} pictures)
+          </>
+        ) : (
+          'plain Minecraft'
+        )}
         {busy && (
           <span className="faint">
             {' '}
@@ -80,11 +90,8 @@ function VanillaPack({ vanilla }: { vanilla: { name: string; pictures: number } 
         blocks keep the plain pictures.
       </small>
       <div className="offline-ai-row">
-        <button className="btn" disabled={busy} onClick={() => void run(() => window.api.skyblockAddonPickVanilla(false))} data-sba-vanilla-zip>
-          <Image size={13} /> {vanilla ? 'Use another pack (.zip)…' : 'Use my own pack (.zip)…'}
-        </button>
-        <button className="btn" disabled={busy} onClick={() => void run(() => window.api.skyblockAddonPickVanilla(true))} data-sba-vanilla-folder>
-          <FolderOpen size={13} /> Use a pack folder…
+        <button className="btn" disabled={busy} onClick={() => setBrowsing(true)} data-sba-vanilla-choose>
+          <FolderOpen size={13} /> {vanilla ? 'Choose another pack…' : 'Choose a pack…'}
         </button>
         {vanilla && (
           <button className="btn" disabled={busy} onClick={() => void run(() => window.api.skyblockAddonClearVanilla())} data-sba-vanilla-clear>
@@ -92,6 +99,19 @@ function VanillaPack({ vanilla }: { vanilla: { name: string; pictures: number } 
           </button>
         )}
       </div>
+      {browsing && (
+        <PackBrowser
+          close={() => setBrowsing(false)}
+          onPick={(path) => {
+            setBrowsing(false)
+            void run(() => window.api.skyblockAddonUseVanilla(path))
+          }}
+          onSystem={() => {
+            setBrowsing(false)
+            void run(() => window.api.skyblockAddonPickVanilla(false))
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -168,7 +188,7 @@ export default function SkyblockAddonCard({ compact = false }: { compact?: boole
           <span>
             SkyBlock add-on installed ({s.mb} MB) with{' '}
             {s.packs.length ? s.packs.map((id) => TEXTURE_PACKS.find((p) => p.id === id)?.name ?? id).join(', ') : 'plain Minecraft pictures'}
-            {s.vanilla ? `, over ${s.vanilla.name}` : ''}.
+            {s.vanilla ? `, over ${s.vanilla.name.replace(/§./g, '')}` : ''}.
           </span>
         </div>
         <div className="offline-ai-row">

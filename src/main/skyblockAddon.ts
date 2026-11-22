@@ -18,7 +18,7 @@ import JSZip from 'jszip'
 import { addonDir, addonManifest, addonPath, iconsVersion, onAddonChanged, readJson, setAddonManifest, skyblockAddonReady } from './skyblockAddonFiles'
 import { downloadItemList } from './skyblockGoals'
 import { logError } from './log'
-import { clearVanillaPack, pickVanillaPack, vanillaPackInfo } from './skyblockVanillaPack'
+import { clearVanillaPack, minecraftPackFolders, pickVanillaPack, useVanillaPack, vanillaPackInfo } from './skyblockVanillaPack'
 
 /**
  * The SkyBlock add-on: everything SkyBlock in Orbit (profile, goal planner, session summaries) is
@@ -322,6 +322,13 @@ export function setupSkyblockAddon(): void {
     sizeCache = null
     return state()
   })
+  ipcMain.handle('skyblockAddon:useVanilla', async (_e, path: string) => {
+    if (typeof path !== 'string' || !path) throw new Error('Pick a pack first.')
+    await useVanillaPack(path)
+    sizeCache = null
+    return state()
+  })
+  ipcMain.handle('skyblockAddon:packFolders', () => minecraftPackFolders())
   ipcMain.handle('skyblockAddon:clearVanilla', () => {
     clearVanillaPack()
     sizeCache = null

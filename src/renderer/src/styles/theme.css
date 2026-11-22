@@ -19566,3 +19566,138 @@ button.board-add-picture:hover {
 .sbp-loadout-items > :nth-child(5) {
   margin-left: 8px;
 }
+
+/* Orbit's own file browser for picking a Minecraft pack */
+.modal-backdrop.sba-browser-backdrop {
+  align-items: center;
+  padding: 24px;
+}
+.modal.sba-browser {
+  width: 820px;
+  height: min(560px, calc(100vh - 48px));
+  display: flex;
+  flex-direction: column;
+}
+.sba-browser-head,
+.sba-browser-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+}
+.sba-browser-head {
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+.sba-browser-foot {
+  border-top: 1px solid var(--border);
+}
+.sba-browser-chosen {
+  flex: 1;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sba-browser-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.sba-browser-places {
+  width: 180px;
+  flex: none;
+  padding: 8px;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sba-browser-places button,
+.sba-browser-list button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.sba-browser-places button:hover,
+.sba-browser-list button:hover {
+  background: var(--bg-hover);
+}
+.sba-browser-places button.active,
+.sba-browser-list button.picked {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.sba-browser-files {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.sba-browser-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.sba-browser-crumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  min-width: 0;
+}
+.sba-browser-crumbs span {
+  display: inline-flex;
+  align-items: center;
+}
+.sba-browser-crumbs button {
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.sba-browser-crumbs button:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+.sba-browser-pack {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 10px 0;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+}
+.sba-browser-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  flex: 1;
+}
+.sba-browser-list li.faint,
+.sba-browser-list li.setting-warning {
+  padding: 8px;
+}
+.sba-browser-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
