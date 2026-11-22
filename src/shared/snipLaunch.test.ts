@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { snipModeFromArgv } from './snipLaunch'
+import { cleanSnipDelay, snipDelayFromArgv, snipModeFromArgv } from './snipLaunch'
 
 describe('snipModeFromArgv', () => {
   it('spots the taskbar shortcut and jump list flags', () => {
@@ -34,5 +34,23 @@ describe('snipFileName', () => {
   it('names a snip after when it was taken, safely for Windows', () => {
     expect(snipFileName(new Date(2026, 10, 22, 9, 5, 7))).toBe('Snip 2026-11-22 09-05-07.png')
     expect(snipFileName(new Date(2026, 10, 22, 9, 5, 7), 2)).toBe('Snip 2026-11-22 09-05-07 (2).png')
+  })
+})
+
+describe('snip delays', () => {
+  it('reads the delay from the jump list flag', () => {
+    expect(snipModeFromArgv(['Orbit.exe', '--snip-delay=5'])).toBe('picture')
+    expect(snipDelayFromArgv(['Orbit.exe', '--snip-delay=5'])).toBe(5)
+    expect(snipDelayFromArgv(['Orbit.exe', '--snip-delay=999'])).toBe(30)
+    expect(snipDelayFromArgv(['Orbit.exe', '--snip'])).toBeUndefined()
+    expect(snipDelayFromArgv(['--snip-delay=5'])).toBeUndefined()
+  })
+  it('keeps delays to whole seconds from 0 to 30', () => {
+    expect(cleanSnipDelay(3.4)).toBe(3)
+    expect(cleanSnipDelay(-2)).toBe(0)
+    expect(cleanSnipDelay(45)).toBe(30)
+    expect(cleanSnipDelay('7')).toBe(7)
+    expect(cleanSnipDelay('soon')).toBe(0)
+    expect(cleanSnipDelay(undefined)).toBe(0)
   })
 })

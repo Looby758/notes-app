@@ -1019,7 +1019,7 @@ export interface NotesApi {
    * Takes a picture of every monitor and opens a snip window over each one. 'picture' copies the
    * box as a picture as soon as you let go; 'text' (the default) reads the text in it.
    */
-  startSnip(mode?: 'text' | 'picture'): Promise<void>
+  startSnip(mode?: 'text' | 'picture', delay?: number): Promise<void>
   /** Snip window: this picture goes on the clipboard (closes the snip). */
   snipCopyPicture(png: Uint8Array): Promise<void>
   /** Windows: whether the taskbar snip is there ("Orbit Snip" in the Start menu, and the jump list). */

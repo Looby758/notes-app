@@ -4,7 +4,7 @@ import { join } from 'path'
 import { icoFromImage } from './appIcon'
 import { logError } from './log'
 import { TEST_COPY } from './testCopy'
-import { SNIP_PICTURE_FLAG, SNIP_TEXT_FLAG } from '@shared/snipLaunch'
+import { SNIP_DELAY_FLAG, SNIP_DELAYS, SNIP_PICTURE_FLAG, SNIP_TEXT_FLAG } from '@shared/snipLaunch'
 
 /**
  * Snipping from the Windows taskbar, without opening Orbit's window:
@@ -60,6 +60,15 @@ function setJumpList(icon: string): void {
       iconPath: icon,
       iconIndex: 0
     },
+    // After a few seconds, so you can hover over something (open a menu, show a tooltip) first.
+    ...SNIP_DELAYS.map((s) => ({
+      program: process.execPath,
+      arguments: launchArgs(`${SNIP_DELAY_FLAG}=${s}`),
+      title: `Snip in ${s} seconds`,
+      description: `Waits ${s} seconds, so you can hover over something, then freezes the screen for you to drag a box.`,
+      iconPath: icon,
+      iconIndex: 0
+    })),
     {
       program: process.execPath,
       arguments: launchArgs(SNIP_TEXT_FLAG),

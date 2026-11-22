@@ -3,7 +3,7 @@ import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, screen,
 import { join } from 'path'
 import { activeThemeId, getTheme } from '@shared/themes'
 import type { Prefs } from '@shared/prefs'
-import type { SnipMode } from '@shared/snipLaunch'
+import { SNIP_DELAYS, type SnipMode } from '@shared/snipLaunch'
 import { openPopout } from './popout'
 import { acceleratorLabel, IS_MAC, SYSTEM_NAME } from '@shared/platform'
 
@@ -37,7 +37,7 @@ interface Hooks {
   showMain: () => void
   prefs: () => Prefs
   /** Starts a screen snip (main/snip.ts): reading text, or copying a picture. */
-  snip?: (mode?: SnipMode) => void
+  snip?: (mode?: SnipMode, delay?: number) => void
   /** Opens the folder picture snips are saved in. */
   openSnips?: () => void
 }
@@ -139,6 +139,21 @@ export function applyCaptureShortcut(accel: string): void {
   updateTrayMenu()
 }
 
+/** "Snip after a delay": 3, 5 and 10 seconds, plus yours from Settings if it's another. */
+function delayItems(): Electron.MenuItemConstructorOptions[] {
+  const yours = hooks.prefs().snipDelay
+  const delays: number[] = [...SNIP_DELAYS]
+  if (yours > 0 && !delays.includes(yours)) delays.push(yours)
+  return delays
+    .sort((a, b) => a - b)
+    .map((s) => ({ label: `${s} seconds${s === yours ? ' (yours)' : ''}`, click: () => void hooks.snip?.('picture', s) }))
+}
+
+/** Settings changed: the tray menu shows your snip delay. */
+export function refreshTrayMenu(): void {
+  updateTrayMenu()
+}
+
 function updateTrayMenu(): void {
   if (!tray) return
   const shortcut = registered ? `\t${shortcutLabel(registered)}` : ''
@@ -147,6 +162,7 @@ function updateTrayMenu(): void {
       { label: 'Open Orbit', click: () => hooks.showMain() },
       { label: `Summon bar${shortcut}`, click: openCapture },
       { label: 'Snip a picture (copy to paste anywhere)', click: () => void hooks.snip?.('picture') },
+      { label: 'Snip after a delay', submenu: delayItems() },
       { label: 'Snip text', click: () => void hooks.snip?.('text') },
       { label: 'Open snips folder', click: () => void hooks.openSnips?.() },
       { label: 'Pop out an app…', click: () => openPopout() },
