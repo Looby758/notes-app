@@ -1,5 +1,5 @@
 import { useState, type DragEvent } from 'react'
-import { Check, Cloud, Copy, Download, ExternalLink, FolderOpen, FolderUp, Loader2, Play, Send, Server, ShieldCheck, Trash2, TriangleAlert, Upload, X } from 'lucide-react'
+import { File as FileIcon2, Check, Cloud, Copy, Download, ExternalLink, FolderOpen, FolderUp, Loader2, Play, Send, Server, ShieldCheck, Trash2, TriangleAlert, Upload, X } from 'lucide-react'
 import { DRIVE_KEEP_DAYS, ROUTE_TEXT, runnableFiles, type DriveShare, type FileSendState, type Transfer } from '@shared/fileSend'
 import { sizeText, speedText, timeLeft } from '@shared/downloadManager'
 import { acceptReceive, declineReceive, useFileSend } from '../../store/fileSend'
@@ -27,7 +27,7 @@ const STATUS: Record<Transfer['status'], string> = {
 
 const until = (at: number): string => {
   const m = Math.max(1, Math.round((at - Date.now()) / 60_000))
-  return m < 60 ? `${m} min` : `${Math.round(m / 60)} hr`
+  return m < 60 ? `${m} min` : m < 36 * 60 ? `${Math.round(m / 60)} hr` : `${Math.round(m / 1440)} days`
 }
 
 function statusLine(t: Transfer): string {
@@ -46,7 +46,7 @@ function statusLine(t: Transfer): string {
       .join(' · ')
   }
   if (t.status === 'done') return `${sizeText(t.total)} · ${receiving ? `from ${t.peer ?? 'them'}` : `to ${t.peer ?? 'them'}`}`
-  if (t.status === 'waiting' && t.expires) return `${STATUS.waiting} · code works for ${until(t.expires)}`
+  if (t.status === 'waiting' && t.expires) return `${STATUS.waiting} · they have ${until(t.expires)} to type it in, then it takes as long as it needs`
   return STATUS[t.status] + (t.done ? ` · ${sizeText(t.done)} of ${sizeText(t.total)}` : '')
 }
 
@@ -495,27 +495,28 @@ export default function FileSenderPage() {
                 )}
               </div>
             ) : (
-              <button
-                className={`convert-drop${over ? ' over' : ''}`}
-                disabled={busy || needsServer}
+              <div
+                className={`convert-drop fsend-drop${over ? ' over' : ''}${busy || needsServer ? ' off' : ''}`}
                 onDragOver={(e) => {
                   e.preventDefault()
-                  setOver(true)
+                  if (!needsServer) setOver(true)
                 }}
                 onDragLeave={() => setOver(false)}
-                onDrop={onDrop}
-                onClick={() => void pick('files')}
+                onDrop={(e) => (needsServer ? (e.preventDefault(), setOver(false)) : onDrop(e))}
                 data-fsend-drop
               >
                 {busy ? <Loader2 size={22} className="spin" /> : viaDrive ? <Cloud size={22} /> : <FolderUp size={22} />}
                 {viaDrive ? 'Drop files or a folder to put on Google Drive' : needsServer ? 'Set up sending with a code first (above)' : 'Drop files or a folder here'}
-                <span>{viaDrive ? `Free Drive holds 15 GB. Taken off after ${DRIVE_KEEP_DAYS} days.` : needsServer ? 'Or pick “Google Drive link”, which works without it' : 'or click to pick files'}</span>
-              </button>
-            )}
-            {!(viaDrive && state.driveAccess !== 'ready') && (
-              <button className="btn fsend-folder" disabled={busy || needsServer} onClick={() => void pick('folder')}>
-                <FolderOpen size={14} /> Pick a folder
-              </button>
+                <span>{viaDrive ? `Free Drive holds 15 GB. Taken off after ${DRIVE_KEEP_DAYS} days.` : needsServer ? 'Or pick “Google Drive link”, which works without it' : 'or pick them:'}</span>
+                <div className="fsend-pick">
+                  <button className="btn" disabled={busy || needsServer} onClick={() => void pick('files')} data-fsend-pick-files>
+                    <FileIcon2 size={14} /> Pick files
+                  </button>
+                  <button className="btn" disabled={busy || needsServer} onClick={() => void pick('folder')} data-fsend-pick-folder>
+                    <FolderOpen size={14} /> Pick a folder
+                  </button>
+                </div>
+              </div>
             )}
           </section>
 

@@ -83,7 +83,7 @@ function load(): Saved {
     if (!ACTIVE.has(t.status)) continue
     if (t.direction === 'send' && !t.accepted && t.expires && t.expires < Date.now()) {
       t.status = 'failed'
-      t.error = 'Nobody used the code within an hour.'
+      t.error = 'Nobody typed the code in within a day.'
     } else if (t.direction === 'send' && !t.accepted) {
       // A code nobody has used yet: just wait for them again.
       t.status = 'waiting'
@@ -797,7 +797,7 @@ function expireCodes(): void {
     if (t.direction === 'send' && !t.accepted && ACTIVE.has(t.status) && t.expires && t.expires < Date.now()) {
       closeRoom(t.id)
       toEngine({ id: t.id, kind: 'stop' })
-      changed(t, { status: 'failed', error: 'Nobody used the code within an hour. Send again for a new one.' }, true)
+      changed(t, { status: 'failed', error: 'Nobody typed the code in within a day. Send again for a new one.' }, true)
     }
   }
 }

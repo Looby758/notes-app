@@ -22732,3 +22732,21 @@ img.tm-icon {
   flex: 1;
   min-width: 160px;
 }
+.fsend-drop {
+  cursor: default;
+}
+.fsend-drop.off {
+  opacity: 0.6;
+}
+.fsend-pick {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.fsend-pick .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

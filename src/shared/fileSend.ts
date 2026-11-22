@@ -33,7 +33,8 @@ export const CODE_WORD_COUNT = 3
 export const ROOM_MIN = 1000
 export const ROOM_MAX = 9999
 /** A code nobody has used goes stale after this long. */
-export const CODE_LIFETIME_MS = 60 * 60 * 1000
+/** How long your friend has to type the code in. Once they accept, the send takes as long as it needs. */
+export const CODE_LIFETIME_MS = 24 * 60 * 60 * 1000
 /** Wrong-code attempts before the sender gives up on a code (stops anyone guessing). */
 export const MAX_BAD_TRIES = 3
 
