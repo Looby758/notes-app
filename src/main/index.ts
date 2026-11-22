@@ -47,6 +47,7 @@ import { setupSettingsHealth } from './settingsHealth'
 import { setupExport } from './exporter'
 import { setupConverter } from './converter'
 import { setupVideoDownloader } from './videoDownload'
+import { setupSoundFromLink } from './soundFromLink'
 import { setupDownloadManager } from './downloadManager'
 import { isAppPage, setupStudio } from './studio'
 import { applyReplayShortcut, clipResponse, setupClips } from './clips'
@@ -59,6 +60,7 @@ import { setupOrbitSync, syncOrbitSoon, type PartHandler } from './orbitSync'
 import { cleanPrefsPart, prefsPart } from '@shared/orbitSync'
 import { setupMonitors, teardownMonitors } from './monitors'
 import { setupMixer, teardownMixer } from './mixer'
+import { applyDuckPrefs, setupMusicDuck } from './musicDuck'
 import { setupLive } from './live'
 import { explorerFile, setFileIndexOn, setupExplorer } from './explorer'
 import { openOutside } from './openOutside'
@@ -227,6 +229,7 @@ function applySystemPrefs(prefs: Prefs): void {
   applySnipShortcut(prefs.snipShortcut)
   applySongIdShortcut(prefs.songIdShortcut)
   applyReplayShortcut(prefs.replayOn ? prefs.replayShortcut : '')
+  applyDuckPrefs()
   safely('app icon', () => applyAppIcon(prefs))
   // Only the installed app registers itself (in development it would register electron.exe).
   if (!app.isPackaged) return
@@ -1086,6 +1089,7 @@ app.whenReady().then(async () => {
   safely('studio', setupStudio)
   safely('offline AI', setupLocalAi)
   safely('soundboard', setupSoundboard)
+  safely('soundboard from a link', setupSoundFromLink)
   safely('macros', setupMacros)
   safely('key remapper', setupKeyRemap)
   safely('Discord voice', setupDiscord)
@@ -1112,6 +1116,7 @@ app.whenReady().then(async () => {
   safely('instant replay', () => setupClips({ getMain: () => mainWindow, showMain }))
   safely('screen controls', setupMonitors)
   safely('volume mixer', setupMixer)
+  safely('music dipping', () => setupMusicDuck(currentPrefs))
   // A password copied from the vault isn't passed to the other computer.
   safely('mouse sharing', () => setupMouseShare(() => mainWindow, (text) => text === copiedSecret))
   safely('screens between computers', () => setupScreenLink(() => mainWindow))

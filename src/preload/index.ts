@@ -56,12 +56,21 @@ const api: NotesApi = {
     ipcRenderer.on('replay:save', handler)
     return () => ipcRenderer.removeListener('replay:save', handler)
   },
+  onMusicDuck: (callback) => {
+    const handler = (_e: unknown, level: number): void => callback(level)
+    ipcRenderer.on('music:duck', handler)
+    return () => ipcRenderer.removeListener('music:duck', handler)
+  },
   onClipsOpen: (callback) => {
     const handler = (_e: unknown, path: string): void => callback(path)
     ipcRenderer.on('clips:open', handler)
     return () => ipcRenderer.removeListener('clips:open', handler)
   },
   clipsList: (folder) => ipcRenderer.invoke('clips:list', folder),
+  clipsMeta: (folder) => ipcRenderer.invoke('clips:meta', folder),
+  clipsStar: (folder, path, on) => ipcRenderer.invoke('clips:star', folder, path, on),
+  clipsMove: (folder, path, to) => ipcRenderer.invoke('clips:move', folder, path, to),
+  clipsRenameFolder: (folder, from, to) => ipcRenderer.invoke('clips:renameFolder', folder, from, to),
   clipsExport: (folder, request) => ipcRenderer.invoke('clips:export', folder, request),
   clipsCancel: () => ipcRenderer.invoke('clips:cancel'),
   onClipsProgress: (callback) => {
@@ -382,6 +391,14 @@ const api: NotesApi = {
   soundboardMove: (id, to) => ipcRenderer.invoke('soundboard:move', id, to),
   soundboardOpenLink: (which) => ipcRenderer.invoke('soundboard:open-link', which),
   soundboardShowFolder: () => ipcRenderer.invoke('soundboard:show-folder'),
+  soundLinkFetch: (id, link) => ipcRenderer.invoke('soundLink:fetch', id, link),
+  soundLinkMake: (id, start, end, name) => ipcRenderer.invoke('soundLink:make', id, start, end, name),
+  soundLinkForget: (id) => ipcRenderer.invoke('soundLink:forget', id),
+  onSoundLinkProgress: (callback) => {
+    const handler = (_e: unknown, id: string, done: number | null): void => callback(id, done)
+    ipcRenderer.on('soundLink:progress', handler)
+    return () => ipcRenderer.removeListener('soundLink:progress', handler)
+  },
   onSoundboardHotkey: (callback) => {
     const handler = (_e: unknown, action: Parameters<typeof callback>[0]): void => callback(action)
     ipcRenderer.on('soundboard:hotkey', handler)

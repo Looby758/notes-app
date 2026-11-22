@@ -593,8 +593,17 @@ export interface NotesApi {
   onReplaySave(callback: () => void): () => void
   /** Main window: open this clip in the clip editor (a click on the "Replay saved" notification). */
   onClipsOpen(callback: (path: string) => void): () => void
+  /** Music dipping (main/musicDuck.ts): turn Orbit's own music to this level (1 = normal) while friends talk in Discord. */
+  onMusicDuck(callback: (level: number) => void): () => void
   /** The videos in the recordings folder, newest first. */
   clipsList(folder: string | null): Promise<ClipInfo[]>
+  /** The game folders in the recordings folder, and which game goes in which. */
+  clipsMeta(folder: string | null): Promise<import('./clips').ClipsMeta>
+  clipsStar(folder: string | null, path: string, on: boolean): Promise<void>
+  /** Moves a clip into a game folder ('' for the top of the recordings folder); makes the folder if it's new. Resolves to its new path. */
+  clipsMove(folder: string | null, path: string, to: string): Promise<string>
+  /** Renames a game folder; that game's future replays go to the new name. */
+  clipsRenameFolder(folder: string | null, from: string, to: string): Promise<void>
   /** Makes a trimmed (and maybe captioned) copy; resolves to the new file. */
   clipsExport(folder: string | null, request: import('./clips').ClipExport): Promise<{ path: string; size: number }>
   clipsCancel(): Promise<void>
@@ -906,6 +915,13 @@ export interface NotesApi {
   soundboardMove(id: string, to: number): Promise<SoundboardStatus>
   soundboardOpenLink(which: 'cable' | 'blackhole'): Promise<void>
   soundboardShowFolder(): Promise<void>
+  /** From a link: downloads a video's sound (YouTube, TikTok…) to pick a part from. `id` is the caller's own, to match progress to it. */
+  soundLinkFetch(id: string, link: string): Promise<{ title: string; bytes: Uint8Array; name: string }>
+  /** Cuts the picked part (seconds) of a fetched sound and adds it to the board as a button. */
+  soundLinkMake(id: string, start: number, end: number, name: string): Promise<{ status: SoundboardStatus; skipped: string[] }>
+  /** Stops a download, or throws away a fetched sound. */
+  soundLinkForget(id: string): Promise<void>
+  onSoundLinkProgress(callback: (id: string, done: number | null) => void): () => void
   /** A soundboard hotkey was pressed (anywhere, even in a game). */
   onSoundboardHotkey(callback: (action: SoundboardAction) => void): () => void
   onSoundboardChanged(callback: (status: SoundboardStatus) => void): () => void
@@ -1655,6 +1671,14 @@ export interface ClipInfo {
   path: string
   size: number
   modified: number
+  /** Its place in the recordings folder: "file.mp4", or "SkyBlock/file.mp4" in a game's folder. */
+  rel: string
+  /** The game folder it's in ('' at the top of the recordings folder). */
+  folder: string
+  /** What the list calls it ("SkyBlock 21 Nov 23:10"). */
+  title: string
+  /** Starred. */
+  favourite: boolean
 }
 
 export interface FfmpegState {

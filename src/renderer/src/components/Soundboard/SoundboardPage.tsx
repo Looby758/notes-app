@@ -1,6 +1,6 @@
 import './soundboard.css'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Check, ChevronDown, ChevronRight, FolderOpen, Headphones, Keyboard, Mic, MicOff, Music, Pencil, Plus, Square, Trash2, Volume2, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, FolderOpen, Headphones, Keyboard, Link2, Mic, MicOff, Music, Pencil, Plus, Square, Trash2, Volume2, X } from 'lucide-react'
 import {
   acceleratorFromEvent,
   hotkeyLabel,
@@ -17,6 +17,7 @@ import { IS_MAC } from '@shared/platform'
 import { setSoundboard, useSoundboard, type RepeatPress } from '../../store/soundboard'
 import { useMusic } from '../../store/music'
 import { callLevel, micLevel, playClip, setBoardStatus, stopAll, stopClip } from '../../lib/soundboard'
+import FromLink from './FromLink'
 
 /**
  * The soundboard tab: buttons for your sound clips (each with a hotkey that works in games), the
@@ -85,6 +86,7 @@ function TopBar() {
   const playing = useSoundboard((s) => s.playing.length > 0)
   const problem = useSoundboard((s) => s.problem)
   const [skipped, setSkipped] = useState<string[]>([])
+  const [fromLink, setFromLink] = useState(false)
   return (
     <>
       <header className="sb-top">
@@ -97,6 +99,9 @@ function TopBar() {
         <button className="btn" title="Open the folder Orbit keeps your sounds in" onClick={() => void window.api.soundboardShowFolder()}>
           <FolderOpen size={14} />
         </button>
+        <button className="btn" onClick={() => setFromLink((o) => !o)} title="Make a button from part of a YouTube or TikTok video" data-sound-from-link>
+          <Link2 size={14} /> From a link
+        </button>
         <button
           className="btn btn-primary"
           onClick={async () => {
@@ -108,6 +113,7 @@ function TopBar() {
           <Plus size={14} /> Add sounds
         </button>
       </header>
+      {fromLink && <FromLink onClose={() => setFromLink(false)} />}
       {problem && (
         <p className="sb-problem">
           {problem}
