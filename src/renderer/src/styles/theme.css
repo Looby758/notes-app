@@ -19086,6 +19086,9 @@ button.board-add-picture:hover {
 }
 .sbp-tip {
   position: fixed;
+  left: 0;
+  top: 0;
+  will-change: transform;
   z-index: 1000;
   max-width: 360px;
   padding: 8px 10px;
@@ -21010,4 +21013,26 @@ button.sbp-coop-row:hover {
   background: #10112a;
   border-color: var(--sbx-line);
   border-radius: 14px;
+}
+
+/* The profile switcher's menu hangs below the header, so the header mustn't clip it. */
+.sbp-hero {
+  overflow: visible;
+  z-index: 3;
+}
+.sbx-zoom {
+  position: absolute;
+  left: 50%;
+  bottom: 84px;
+  z-index: 31;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(12, 13, 30, 0.85);
+  border: 1px solid var(--sbx-line);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  pointer-events: none;
+  animation: sbx-rise 0.15s var(--ease);
 }

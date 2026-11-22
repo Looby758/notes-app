@@ -1,4 +1,5 @@
-import { Component, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
+import { Component, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronDown, Plus, Search, Share2, Star, X } from 'lucide-react'
 import { describeMinutes, MODE_NAMES, shortNumber } from '@shared/skyblock'
 import { MC_COLORS } from '@shared/skyblockGoals'
@@ -82,21 +83,67 @@ interface Picked {
 let pickSetter: ((p: Picked | null) => void) | null = null
 const pick = (p: Picked): void => pickSetter?.(p)
 
+/** How much the SkyBlock page is zoomed (Ctrl + scroll), so fixed-position pop-ups land under the mouse. */
+let uiZoom = 1
+export const setSkyblockZoom = (z: number): void => {
+  uiZoom = z
+}
+
+/**
+ * The item tooltip. It only re-renders when the item changes; following the mouse just moves it,
+ * once per frame, so it glides instead of redrawing the description on every mouse move.
+ */
 function ItemTip() {
-  const [tip, setTip] = useState<{ item: SbViewItem; x: number; y: number } | null>(null)
+  const [item, setItem] = useState<SbViewItem | null>(null)
+  const box = useRef<HTMLDivElement>(null)
+  const at = useRef({ x: 0, y: 0 })
+  const frame = useRef(0)
+  const place = (): void => {
+    frame.current = 0
+    const el = box.current
+    if (!el) return
+    const z = uiZoom || 1
+    const w = el.offsetWidth * z
+    const h = el.offsetHeight * z
+    let x = at.current.x + 16
+    let y = at.current.y + 14
+    if (x + w > window.innerWidth - 8) x = Math.max(8, at.current.x - 16 - w)
+    if (y + h > window.innerHeight - 8) y = Math.max(8, window.innerHeight - 8 - h)
+    el.style.transform = `translate(${x / z}px, ${y / z}px)`
+  }
   useEffect(() => {
-    tipSetter = setTip
+    let shown: SbViewItem | null = null
+    tipSetter = (t) => {
+      if (!t) {
+        shown = null
+        setItem(null)
+        return
+      }
+      at.current = { x: t.x, y: t.y }
+      if (t.item !== shown) {
+        shown = t.item
+        setItem(t.item)
+      }
+      if (!frame.current) frame.current = requestAnimationFrame(place)
+    }
     return () => {
       tipSetter = null
+      cancelAnimationFrame(frame.current)
     }
   }, [])
-  if (!tip) return null
-  const left = Math.min(tip.x + 16, window.innerWidth - 380)
-  const top = Math.max(8, Math.min(tip.y + 12, window.innerHeight - 40 - Math.min(600, 22 + tip.item.lore.length * 18)))
+  // Placed again once the new description is drawn (its size changes).
+  useLayoutEffect(() => {
+    if (item) place()
+  }, [item])
+  if (!item) return null
   return (
-    <div className="sbp-tip" style={{ left, top }}>
-      <Lore item={tip.item} />
-    </div>
+    // On top of everything (the dock too), at the page's zoom.
+    createPortal(
+      <div className="sbp-tip" ref={box} style={{ zoom: uiZoom }}>
+        <Lore item={item} />
+      </div>,
+      document.body
+    )
   )
 }
 
@@ -434,6 +481,14 @@ export default function SkyblockProfile({ page, onChoose, onShare }: { page: SbP
 function Hero({ page, go, onChoose, onShare }: { page: SbProfilePage; go: (s: Section) => void; onChoose: (profileId: string) => void; onShare: () => void }) {
   const v = page.view
   const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    const esc = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [open])
   const lvl = v.skyblockLevel.level
   const mp = v.accessories ? (v.accessories.highestMagicalPower ?? v.accessories.magicalPower) : null
   const name = page.player.name || v.player?.name || 'You'

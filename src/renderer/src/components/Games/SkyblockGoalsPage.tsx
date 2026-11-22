@@ -28,7 +28,7 @@ import { GAMES_TAB, openSpecialTab, SKYBLOCK_GOALS_TAB } from '../../lib/editorC
 import { errorMessage } from '../../lib/paths'
 import { HomeBox } from '../Home/HomePage'
 import type { SbFriend, SbProfilePage } from '@shared/skyblockMore'
-import SkyblockProfile from './SkyblockProfile'
+import SkyblockProfile, { setSkyblockZoom } from './SkyblockProfile'
 import { ComparePage, DriftWall, HelpersPage, PlayerSearch, ProgressPage, ShareCard } from './SkyblockExtras'
 import SkyblockAddonCard from './SkyblockAddonCard'
 import { ItemPic, useSkyblockAddon } from './SkyblockPic'
@@ -76,6 +76,18 @@ function ago(at: number): string {
  * materials with what you have, a flat shopping list, what's stopping you crafting it, and time left
  * at your own rates. Ironman only: nothing here uses the Bazaar or Auction House.
  */
+const ZOOM_KEY = 'orbit.skyblock.zoom'
+const ZOOM_MIN = 0.6
+const ZOOM_MAX = 1.6
+const savedZoom = (): number => {
+  try {
+    const z = Number(localStorage.getItem(ZOOM_KEY))
+    return z >= ZOOM_MIN && z <= ZOOM_MAX ? z : 1
+  } catch {
+    return 1
+  }
+}
+
 type Tab = 'profile' | 'progress' | 'goals' | 'helpers' | 'compare'
 
 const DOCK: { id: Tab; label: string; icon: string; mineOnly?: boolean }[] = [
@@ -104,6 +116,37 @@ export default function SkyblockGoalsPage() {
   const [share, setShare] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   const addon = useSkyblockAddon()
+  const [zoom, setZoom] = useState(savedZoom)
+  const [zoomShown, setZoomShown] = useState(false)
+  setSkyblockZoom(zoom)
+
+  // Ctrl + scroll makes this page bigger or smaller, and remembers it.
+  useEffect(() => {
+    const el = root.current
+    if (!el) return
+    let hide = 0
+    const wheel = (e: WheelEvent): void => {
+      if (!e.ctrlKey) return
+      e.preventDefault()
+      setZoom((z) => {
+        const next = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z + (e.deltaY < 0 ? 0.1 : -0.1))) * 10) / 10
+        try {
+          localStorage.setItem(ZOOM_KEY, String(next))
+        } catch {
+          // For now only.
+        }
+        return next
+      })
+      setZoomShown(true)
+      clearTimeout(hide)
+      hide = window.setTimeout(() => setZoomShown(false), 900)
+    }
+    el.addEventListener('wheel', wheel, { passive: false })
+    return () => {
+      el.removeEventListener('wheel', wheel)
+      clearTimeout(hide)
+    }
+  }, [state?.installed, addon?.state])
 
   const run = useCallback(
     async (job: () => Promise<SkyblockGoalsState>): Promise<void> => {
@@ -210,7 +253,7 @@ export default function SkyblockGoalsPage() {
       <DriftWall ids={wallIds} />
       <div className="sbx-light" aria-hidden />
       <div className="sbx-scroll">
-        <div className="sbg-inner">
+        <div className="sbg-inner" style={{ zoom }}>
           <header className="sbx-top">
             <div className="sbx-top-title">
               <h2 className="sbx-title">SkyBlock</h2>
@@ -428,6 +471,7 @@ export default function SkyblockGoalsPage() {
           ))}
         </nav>
       )}
+      {zoomShown && <div className="sbx-zoom">{Math.round(zoom * 100)}%</div>}
       {share && page && <ShareCard page={page} close={() => setShare(false)} />}
     </div>
   )
