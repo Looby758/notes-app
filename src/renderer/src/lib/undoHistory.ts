@@ -110,6 +110,11 @@ export class UndoHistory {
     return this.step(this.undone, this.done, 'redo')
   }
 
+  /** Undoes `step` only if it's still the last thing done (an "Undo" button on a toast, say). */
+  undoIfLatest(step: UndoStep): Promise<string | null> {
+    return this.done.at(-1)?.undo === step.undo ? this.undo() : Promise.resolve(null)
+  }
+
   /** Forgets everything (another notes folder was opened, say). */
   clear(): void {
     for (const e of this.done.splice(0)) e.forget?.(true)
