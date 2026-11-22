@@ -1556,6 +1556,37 @@ export interface NotesApi {
   dropTargets(): Promise<DropTarget[]>
   onDropTargets(callback: (targets: DropTarget[]) => void): () => void
   dropSend(target: DropTarget['id'], paths: string[]): Promise<string>
+  /** Big file sender (main/fileSend.ts): sends with a code, and Google Drive links. */
+  fileSendState(): Promise<import('./fileSend').FileSendState>
+  onFileSendState(callback: (state: import('./fileSend').FileSendState) => void): () => void
+  fileSendSetServer(address: string): Promise<{ relay: boolean }>
+  /** Puts the intro server on your Cloudflare account with a key you made there. */
+  fileSendSetUp(token: string): Promise<{ relay: boolean; relayNote?: string }>
+  fileSendRelayOn(keyId?: string, apiToken?: string): Promise<void>
+  fileSendOpen(page: 'signup' | 'token' | 'turn' | 'workers'): Promise<void>
+  fileSendPick(kind: 'files' | 'folder'): Promise<string[]>
+  fileSendStart(paths: string[]): Promise<import('./fileSend').Transfer>
+  fileSendReceive(code: string): Promise<import('./fileSend').Transfer>
+  /** Accept a receive; `chooseFolder` asks where first (otherwise Downloads). Resolves where to start. */
+  fileSendAccept(id: string, chooseFolder: boolean): Promise<import('./fileSend').Position>
+  fileSendCancel(id: string): Promise<void>
+  fileSendForget(id: string): Promise<void>
+  fileSendResume(id: string): Promise<void>
+  fileSendReveal(id: string): Promise<void>
+  fileSendDrive(paths: string[]): Promise<import('./fileSend').DriveShare>
+  fileSendDriveConnect(): Promise<void>
+  fileSendDriveRemove(id: string): Promise<void>
+  fileSendDriveForget(id: string): Promise<void>
+  /** The WebRTC side of the big file sender (renderer lib/fileSendEngine.ts). */
+  onFileSendEvent(callback: (event: { id: string; kind: 'peer' | 'signal' | 'gone' | 'stop'; ice?: RTCIceServer[]; signal?: import('./fileSend').FsSignal }) => void): () => void
+  fileSendSignal(id: string, signal: import('./fileSend').FsSignal): Promise<void>
+  fileSendUpdate(id: string, patch: { status?: import('./fileSend').TransferStatus; route?: import('./fileSend').Route; done?: number; error?: string }): Promise<void>
+  fileSendManifest(id: string): Promise<import('./fileSend').Manifest | null>
+  fileSendGotManifest(id: string, manifest: unknown): Promise<import('./fileSend').Position | null>
+  fileSendStarted(id: string, pos: unknown): Promise<import('./fileSend').Position | null>
+  fileSendDeclined(id: string): Promise<void>
+  fileSendRead(id: string, index: number, offset: number, length: number): Promise<Uint8Array>
+  fileSendWrite(id: string, data: Uint8Array): Promise<{ done: number; finished: boolean }>
   /** The phone webcam (Windows): turn it on/off, its status and settings, and a live preview of the phone's frames. */
   camStatus(): Promise<CamStatus>
   camOn(): Promise<CamStatus>

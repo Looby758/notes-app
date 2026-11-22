@@ -23361,3 +23361,309 @@ img.tm-icon {
   opacity: 0.75;
   transition: height 300ms var(--ease);
 }
+
+/* ---------- Big file sender (components/FileSender) ---------- */
+.fsend-server-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fsend-setup {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-panel);
+}
+.fsend-setup h3,
+.fsend-box h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+.fsend-setup p {
+  margin: 0 0 10px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.fsend-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 16px;
+}
+@media (max-width: 720px) {
+  .fsend-columns {
+    grid-template-columns: 1fr;
+  }
+}
+.fsend-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.fsend-how {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12.5px;
+}
+.fsend-how label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+.fsend-how small,
+.fsend-hint {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.fsend-hint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+}
+.fsend-box .convert-drop {
+  padding: 20px 14px;
+}
+.fsend-box .convert-drop:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.fsend-folder {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+}
+.fsend-drive-setup {
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.fsend-code {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.fsend-code code {
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  user-select: all;
+}
+.fsend-code code.fsend-link {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fsend-code .btn,
+.fsend-ask-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+}
+.fsend-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-size: 13px;
+}
+.fsend-ask-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.fsend-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: #d9822b;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.fsend-warn svg {
+  flex: none;
+  margin-top: 2px;
+}
+.fsend-item.failed .convert-name small,
+.fsend-item.cancelled .convert-name small {
+  color: var(--text-faint);
+}
+.fsend-item.failed .convert-name small {
+  color: #e0524a;
+}
+.fsend-resume {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+}
+.fsend-serverbar {
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-panel);
+}
+.fsend-serverbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.fsend-serverbar-text {
+  flex: 1;
+  min-width: 140px;
+}
+.fsend-serverbar .btn,
+.fsend-steps .btn,
+.fsend-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+}
+.fsend-link-btn {
+  align-self: flex-start;
+  border-color: transparent;
+  background: none;
+  color: var(--text-muted);
+}
+.fsend-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fsend-setup p,
+.fsend-friend p,
+.fsend-relay-manual p {
+  margin: 0;
+}
+.fsend-tabs {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--bg-hover);
+}
+.fsend-tabs button {
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.fsend-tabs button.on {
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.fsend-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.fsend-steps li > div {
+  margin-top: 6px;
+}
+.fsend-friend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.fsend-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg);
+  list-style: none;
+  font-size: 12.5px;
+}
+.fsend-progress li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+}
+.fsend-progress li.done svg {
+  color: var(--accent);
+}
+.fsend-progress li.failed {
+  color: #e0524a;
+}
+.fsend-progress li.skipped svg {
+  color: #d9822b;
+}
+.fsend-relay-manual {
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.fsend-relay-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.fsend-relay-fields .text-input {
+  flex: 1;
+  min-width: 160px;
+}
+.fsend-drop {
+  cursor: default;
+}
+.fsend-drop.off {
+  opacity: 0.6;
+}
+.fsend-pick {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.fsend-pick .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

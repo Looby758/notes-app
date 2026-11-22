@@ -56,6 +56,7 @@ import { setupConverter } from './converter'
 import { setupVideoDownloader } from './videoDownload'
 import { setupSoundFromLink } from './soundFromLink'
 import { setupDownloadManager } from './downloadManager'
+import { setupFileSend } from './fileSend'
 import { isAppPage, setupStudio } from './studio'
 import { applyReplayShortcut, clipResponse, setupClips } from './clips'
 import { setupLocalAi } from './localAi'
@@ -1090,6 +1091,7 @@ app.whenReady().then(async () => {
   safely('converter', setupConverter)
   safely('video downloader', () => setupVideoDownloader(() => vault))
   safely('download manager', setupDownloadManager)
+  safely('big file sender', setupFileSend)
   safely('studio', setupStudio)
   safely('offline AI', setupLocalAi)
   safely('soundboard', setupSoundboard)

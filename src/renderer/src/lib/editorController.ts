@@ -72,6 +72,8 @@ export const EMAIL_TAB = 'email:'
 export const HOME_TAB = 'home:'
 export const MONEY_TAB = 'money:'
 export const CONVERT_TAB = 'convert:'
+/** Send huge files to a friend with a code, or a Google Drive link (components/FileSender). */
+export const FILESENDER_TAB = 'filesender:'
 export const COMICS_TAB = 'comics:'
 /** Sign, merge, split, reorder and fill in PDFs (components/PdfEditor); what's open is in store/pdfEditor. */
 export const PDF_EDITOR_TAB = 'pdf-editor:'
