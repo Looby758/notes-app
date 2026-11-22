@@ -105,6 +105,26 @@ hint: Updates were rejected because the remote contains work that you do not hav
     expect(explainProblem('sh: 1: vitest: not found').fixes).toEqual(['npm-install'])
   })
 
+  it('doesn’t take test names or code in a test run for git problems', () => {
+    // A failed run lists the tests that passed in the same file, and their names can sound like a problem.
+    const out = [
+      ' ❯ src/shared/releaseCheck.test.ts (21 tests | 1 failed) 40ms',
+      '   ✓ explaining what went wrong > explains a leftover tag, uncommitted files, protected branches and no internet 1ms',
+      '   √ explaining what went wrong > explains git not being signed in 0ms',
+      '   × the app’s What’s new list > adds an entry at the top 3ms',
+      " FAIL  src/shared/releaseCheck.test.ts > the app’s What’s new list > adds an entry at the top",
+      "AssertionError: expected 'remote: error: GH006: Protected branch update failed' to contain 'x'",
+      ' Test Files  1 failed | 185 passed (186)',
+      '      Tests  1 failed | 1822 passed (1823)'
+    ].join('\n')
+    const p = explainProblem(out, { source: 'tests' })
+    expect(p.title).toBe('1 test failed')
+    expect(p.detail).toContain('releaseCheck.test.ts › adds an entry at the top')
+    // The same words from git itself still explain a push.
+    expect(explainProblem('remote: error: GH006: Protected branch update failed for refs/heads/main.', { source: 'git', main: 'main' }).title).toBe('GitHub doesn’t allow pushing straight to main')
+    expect(explainProblem(out, { source: 'build' }).title).toBe('1 test failed')
+  })
+
   it('falls back to the last error line, and Claude', () => {
     const p = explainProblem('doing things\nnpm error code E418\nnpm error I’m a teapot\nmore')
     expect(p.title).toBe('Something went wrong')
@@ -148,7 +168,8 @@ describe('reading tool output', () => {
 })
 
 describe('the app’s What’s new list', () => {
-  const real = readFileSync(join(__dirname, 'whatsNew.ts'), 'utf8')
+  // Git on Windows may check the file out with \r\n line endings; the tests are about the list, not those.
+  const real = readFileSync(join(__dirname, 'whatsNew.ts'), 'utf8').replace(/\r\n/g, '\n')
 
   it('reads the versions in Orbit’s own list', () => {
     expect(isNotesList(real)).toBe(true)
@@ -176,6 +197,12 @@ describe('the app’s What’s new list', () => {
     expect(notes[1].version).toBe('1.13.0')
     // Indented like the entries already there.
     expect(out).toContain("\n  {\n    version: '9.9.9',\n    items: [\n      'Releases: checks before releasing',")
+  })
+
+  it('keeps Windows line endings', () => {
+    const out = addNotesEntry(real.replace(/\n/g, '\r\n'), '9.9.9', ['A'])!
+    expect(out).toContain("version: '9.9.9'")
+    expect(out.replace(/\r\n/g, '')).not.toContain('\n')
   })
 
   it('adds to an empty list, and leaves a version that’s already there', () => {

@@ -140,6 +140,8 @@ export function aheadBehind(text: string | null): { ahead: number; behind: numbe
 }
 
 interface Rule {
+  /** Only for what git (or npm version) said: never matched in a test run's or GitHub build's output. */
+  git?: boolean
   test: RegExp
   problem: (m: RegExpExecArray, ctx: ExplainContext) => Problem
 }
@@ -150,6 +152,12 @@ export interface ExplainContext {
   tag?: string
   /** The app's main branch. */
   main?: string
+  /**
+   * Where the output came from. A test run's output is full of test names and code ("explains
+   * protected branches", "Authentication failed" in a fixture…), so git's explanations aren't
+   * looked for in it.
+   */
+  source?: 'git' | 'tests' | 'build'
 }
 
 const plural = (n: number, one: string, many = one + 's'): string => `${n} ${n === 1 ? one : many}`
@@ -210,6 +218,7 @@ const RULES: Rule[] = [
     })
   },
   {
+    git: true,
     test: /Git working directory not clean|working tree (?:is )?not clean|Your local changes to the following files would be overwritten/i,
     problem: () => ({
       title: 'Some files are changed but not committed',
@@ -218,6 +227,7 @@ const RULES: Rule[] = [
     })
   },
   {
+    git: true,
     test: /tag '?(v?[\w.+-]+)'? already exists/i,
     problem: (m) => ({
       title: `There’s already a ${m[1]} tag`,
@@ -226,7 +236,8 @@ const RULES: Rule[] = [
     })
   },
   {
-    test: /GH006|protected branch/i,
+    git: true,
+    test: /GH006|Protected branch update failed|protected branch hook declined/i,
     problem: (_m, ctx) => ({
       title: `GitHub doesn’t allow pushing straight to ${ctx.main ?? 'main'}`,
       detail: `${ctx.main ?? 'main'} is a protected branch on GitHub, so the version change can’t go straight onto it. Turn off “Require a pull request before merging” in the repository’s Settings → Branches, or release from GitHub’s Actions tab instead.`,
@@ -234,6 +245,7 @@ const RULES: Rule[] = [
     })
   },
   {
+    git: true,
     test: /refusing to allow a (?:Personal Access Token|OAuth App) to create or update workflow/i,
     problem: () => ({
       title: 'Git’s sign-in can’t change the release workflow',
@@ -242,6 +254,7 @@ const RULES: Rule[] = [
     })
   },
   {
+    git: true,
     test: /\[rejected\][^\n]*\((?:fetch first|non-fast-forward)\)|Updates were rejected because the (?:remote contains work|tip of your current branch is behind)/,
     problem: () => ({
       title: 'GitHub has changes this computer doesn’t',
@@ -250,6 +263,7 @@ const RULES: Rule[] = [
     })
   },
   {
+    git: true,
     test: /Authentication failed|could not read (?:Username|Password)|terminal prompts disabled|Permission denied \(publickey\)|returned error: 403|Permission to \S+ denied to/i,
     problem: () => ({
       title: 'Git couldn’t sign in to GitHub',
@@ -258,6 +272,7 @@ const RULES: Rule[] = [
     })
   },
   {
+    git: true,
     test: /Could not resolve host|Failed to connect to|unable to access|ETIMEDOUT|ENOTFOUND|ECONNRESET|Couldn.t reach GitHub/i,
     problem: () => ({
       title: 'Couldn’t reach GitHub',
@@ -266,6 +281,7 @@ const RULES: Rule[] = [
     })
   },
   {
+    git: true,
     test: /Not possible to fast-forward|diverging branches|have diverged/i,
     problem: (_m, ctx) => ({
       title: `This computer’s ${ctx.main ?? 'main'} and GitHub’s have gone different ways`,
@@ -274,6 +290,7 @@ const RULES: Rule[] = [
     })
   },
   {
+    git: true,
     test: /CONFLICT \(|Automatic merge failed/i,
     problem: () => ({
       title: 'Git found changes that clash',
@@ -300,8 +317,13 @@ const RULES: Rule[] = [
 
 /** What went wrong, in plain words, with what to do about it. */
 export function explainProblem(output: string, ctx: ExplainContext = {}): Problem {
+  // Tests that passed say nothing about what went wrong, but their names can sound like it.
   const text = cleanOutput(output)
+    .split('\n')
+    .filter((l) => !/^\s*[✓✔√]\s/.test(l))
+    .join('\n')
   for (const rule of RULES) {
+    if (rule.git && (ctx.source === 'tests' || ctx.source === 'build')) continue
     const m = rule.test.exec(text)
     if (m) {
       const p = rule.problem(m, ctx)
@@ -375,7 +397,9 @@ export function addNotesEntry(source: string, version: string, items: string[]):
   const lines = [`${indent}{`, `${indent}${unit}version: '${version}',`, `${indent}${unit}items: [`]
   items.forEach((item, i) => lines.push(`${indent}${unit}${unit}${quote(item)}${i < items.length - 1 ? ',' : ''}`))
   lines.push(`${indent}${unit}]`, `${indent}}${/^\s*\]/.test(rest) ? '' : ','}`)
-  return source.slice(0, at) + '\n' + lines.join('\n') + (/^\s*\n/.test(rest) ? '' : '\n') + rest
+  // Windows line endings stay Windows line endings (git on Windows often checks files out that way).
+  const eol = source.includes('\r\n') ? '\r\n' : '\n'
+  return source.slice(0, at) + eol + lines.join(eol) + (/^[ \t]*\r?\n/.test(rest) ? '' : eol) + rest
 }
 
 // ---------- After the release: GitHub's build ----------
