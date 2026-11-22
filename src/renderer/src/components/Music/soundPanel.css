@@ -1,0 +1,197 @@
+/* The Sound and Phone remote pop-ups (SoundPanel.tsx), opened from the Music page's bar and the full-screen player. */
+
+.sound-panel {
+  position: absolute;
+  right: 12px;
+  bottom: calc(100% + 8px);
+  z-index: 30;
+  width: 460px;
+  max-width: calc(100vw - 32px);
+  max-height: min(640px, calc(100vh - 120px));
+  overflow-y: auto;
+  padding: 14px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--bg-raised);
+  color: var(--text);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  font-size: 13px;
+  animation: pop 140ms var(--ease);
+  text-align: left;
+}
+.sound-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.sound-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-strong);
+}
+.sound-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0 2px;
+}
+.sound-row > span {
+  min-width: 78px;
+  color: var(--text-strong);
+  font-weight: 600;
+}
+.sound-row em {
+  min-width: 36px;
+  font-style: normal;
+  color: var(--text-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.sound-row input[type='range'] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+.sound-note {
+  margin: 4px 0 10px;
+  color: var(--text-faint);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.sound-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-strong);
+  font-weight: 600;
+  cursor: pointer;
+}
+.sound-switch input {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+}
+.sound-eq-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+.sound-eq-head .sound-switch {
+  flex: 1;
+}
+.sound-eq-head select {
+  padding: 4px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+.sound-eq {
+  display: flex;
+  justify-content: space-between;
+  gap: 2px;
+  margin-top: 10px;
+  padding: 10px 6px 6px;
+  border-radius: 10px;
+  background: var(--bg);
+}
+.sound-eq.off {
+  opacity: 0.45;
+}
+.sound-eq-gap {
+  width: 1px;
+  margin: 18px 4px;
+  background: var(--border);
+}
+.sound-band {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 32px;
+  cursor: pointer;
+}
+.sound-band em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.sound-band span {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.sound-band input[type='range'] {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 22px;
+  height: 120px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.sound-styles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.sound-styles button {
+  padding: 4px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.sound-styles button.on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast, #fff);
+}
+.remote-qr {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin: 12px 0 8px;
+}
+.remote-qr .phone-qr {
+  flex: none;
+  width: 168px;
+  height: 168px;
+  margin: 0;
+}
+.remote-qr .phone-qr img {
+  width: 156px;
+  height: 156px;
+}
+.remote-qr > div {
+  flex: 1;
+  min-width: 0;
+}
+.remote-qr p {
+  margin: 0 0 8px;
+  line-height: 1.5;
+}
+.remote-url {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.remote-url code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.sound-panel .link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

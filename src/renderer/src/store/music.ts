@@ -303,11 +303,11 @@ export function startMusic(): () => void {
 
 export const setMusicMini = (open: boolean): Promise<boolean> => window.api.setMusicMini(open)
 
-/** The next few songs of your own music, for the mini player. */
+/** The next songs of your own music, for the mini player (which shows five) and the phone remote. */
 function miniUpNext(): MusicMiniSong[] | undefined {
   if (useMusic.getState().state?.source !== 'local') return undefined
   return localUpNext()
-    .slice(0, 5)
+    .slice(0, 25)
     .map((s) => ({ title: s.title, artist: s.artist, art: s.art ? localArtUrl(s.path, s.added) : undefined }))
 }
 
@@ -347,6 +347,7 @@ function startMini(): () => void {
   })
   const offCommand = window.api.onMusicMiniCommand((command) => {
     if ('seek' in command) void musicSeek(command.seek)
+    else if ('volume' in command) void musicSetVolume(command.volume)
     else if ('jump' in command) {
       const { index, queue } = useLocalMusic.getState()
       const to = index + 1 + Math.max(0, Math.floor(Number(command.jump) || 0))

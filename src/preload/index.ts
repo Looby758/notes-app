@@ -683,6 +683,10 @@ const api: NotesApi = {
     return () => ipcRenderer.removeListener('musicMini:command', handler)
   },
   musicMiniLayout: () => ipcRenderer.invoke('musicMini:layout'),
+  musicRemoteStatus: () => ipcRenderer.invoke('musicRemote:status'),
+  setMusicRemote: (on, fresh) => ipcRenderer.invoke('musicRemote:set', on, fresh),
+  localMusicLyrics: (path) => ipcRenderer.invoke('localMusic:lyrics', path),
+  localMusicSaveLyrics: (path, text) => ipcRenderer.invoke('localMusic:saveLyrics', path, text),
   setMusicMiniLayout: (layout) => ipcRenderer.invoke('musicMini:setLayout', layout),
   onMusicMiniLayout: (callback) => {
     const handler = (_e: unknown, layout: MusicMiniLayout): void => callback(layout)
