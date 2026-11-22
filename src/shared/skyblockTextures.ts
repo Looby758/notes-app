@@ -455,3 +455,25 @@ export function pickTexture<T>(names: readonly string[], have: ReadonlyMap<strin
   }
   return undefined
 }
+
+/** A resource pack folder the pack browser offers as a shortcut. */
+export interface PackFolder {
+  /** The instance's name ("Minecraft" for the official launcher). */
+  label: string
+  /** Which launcher it's from ("Prism Launcher"). */
+  group: string
+  path: string
+}
+
+/** Where Prism Launcher (or PolyMC/MultiMC) keeps instances: InstanceDir in its .cfg, relative to its data folder, else "instances". */
+export function prismInstancesDir(cfg: string, root: string): string {
+  const m = /^InstanceDir=(.*)$/m.exec(cfg)
+  const dir = m?.[1].trim().replace(/^"|"$/g, '') || 'instances'
+  if (/^([a-z]:[\\/]|[\\/])/i.test(dir)) return dir
+  return `${root.replace(/[\\/]+$/, '')}${root.includes('\\') ? '\\' : '/'}${dir}`
+}
+
+/** An instance's name from its instance.cfg ("name=SkyBlock 1.8.9"). */
+export function prismInstanceName(cfg: string): string {
+  return /^name=(.*)$/m.exec(cfg)?.[1].trim() ?? ''
+}

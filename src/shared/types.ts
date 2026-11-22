@@ -1253,7 +1253,7 @@ export interface NotesApi {
   /** Use your own Minecraft pack from a path (a .zip or a pack folder), picked in Orbit's own file browser. */
   skyblockAddonUseVanilla(path: string): Promise<SkyblockAddonState>
   /** Minecraft's resource pack folders on this computer, for the file browser's shortcuts. */
-  skyblockAddonPackFolders(): Promise<string[]>
+  skyblockAddonPackFolders(): Promise<import('./skyblockTextures').PackFolder[]>
   /** Back to plain Minecraft's pictures under the SkyBlock packs. */
   skyblockAddonClearVanilla(): Promise<SkyblockAddonState>
   /** NEU item id → its picture. */

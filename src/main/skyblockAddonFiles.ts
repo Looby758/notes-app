@@ -24,7 +24,7 @@ let modelsBySbId: Record<string, string> | null = null
 let lookups: { ids: Record<string, string>; damages: Record<string, string> } | null = null
 const listeners: (() => void)[] = []
 /** Goes up whenever the pictures may have changed, so the page knows to ask again. */
-export let iconsVersion = 0
+export let iconsVersion = Math.floor(Date.now() / 1000)
 
 export const addonDir = (): string => join(app.getPath('userData'), 'skyblock-addon')
 export const addonPath = (...parts: string[]): string => join(addonDir(), ...parts)

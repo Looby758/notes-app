@@ -126,7 +126,8 @@ export function ItemPic({
   const [broken, setBroken] = useState<string | null>(null)
   const style = { width: size, height: size }
   if (pic?.tex && broken !== pic.tex) {
-    const src = `sbtex://tex/${pic.tex.split('/').map(encodeURIComponent).join('/')}`
+    // The version makes the page fetch again after the pictures change (a new pack keeps the same file names).
+    const src = `sbtex://tex/${pic.tex.split('/').map(encodeURIComponent).join('/')}?v=${addonState?.iconsVersion ?? 0}`
     return (
       <span className={`sb-pic ${className}`} style={style}>
         <img src={src} alt="" draggable={false} onError={() => setBroken(pic.tex!)} />

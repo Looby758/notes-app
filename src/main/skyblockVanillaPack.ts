@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, nativeImage } from 'electron'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'fs'
 import { basename, extname, join, relative, sep } from 'path'
 import JSZip from 'jszip'
-import { CUSTOM_PACK, isoCube, pickTexture, type Pixels, type VanillaNames } from '@shared/skyblockTextures'
+import { CUSTOM_PACK, isoCube, pickTexture, prismInstanceName, prismInstancesDir, type PackFolder, type Pixels, type VanillaNames } from '@shared/skyblockTextures'
 import NAMES from '@shared/skyblockVanillaNames.json'
 import { addonPath, customPack, picturesChanged, skyblockAddonReady, writeJson } from './skyblockAddonFiles'
 
@@ -142,16 +142,72 @@ export async function pickVanillaPack(win: BrowserWindow | null, folder: boolean
   return true
 }
 
-/** Minecraft's own resource pack folders on this computer (the official launcher's). */
-export function minecraftPackFolders(): string[] {
+/** Where launchers keep their data, per platform (the official launcher, Prism and its relatives, Modrinth). */
+function launcherDirs(): { minecraft: string; multimc: string[]; modrinth: string; curseforge: string } {
   const home = app.getPath('home')
-  const candidates =
-    process.platform === 'win32'
-      ? [join(app.getPath('appData'), '.minecraft', 'resourcepacks')]
-      : process.platform === 'darwin'
-        ? [join(home, 'Library', 'Application Support', 'minecraft', 'resourcepacks')]
-        : [join(home, '.minecraft', 'resourcepacks')]
-  return candidates.filter((d) => existsSync(d))
+  const appData = app.getPath('appData')
+  if (process.platform === 'win32')
+    return {
+      minecraft: join(appData, '.minecraft'),
+      multimc: [join(appData, 'PrismLauncher'), join(appData, 'PolyMC'), join(appData, 'MultiMC')],
+      modrinth: join(appData, 'ModrinthApp'),
+      curseforge: join(home, 'curseforge', 'minecraft', 'Instances')
+    }
+  if (process.platform === 'darwin')
+    return {
+      minecraft: join(appData, 'minecraft'),
+      multimc: [join(appData, 'PrismLauncher'), join(appData, 'PolyMC'), join(appData, 'MultiMC')],
+      modrinth: join(appData, 'ModrinthApp'),
+      curseforge: join(home, 'Documents', 'curseforge', 'minecraft', 'Instances')
+    }
+  const share = process.env.XDG_DATA_HOME || join(home, '.local', 'share')
+  return {
+    minecraft: join(home, '.minecraft'),
+    multimc: [join(share, 'PrismLauncher'), join(share, 'PolyMC'), join(share, 'multimc'), join(home, '.var', 'app', 'org.prismlauncher.PrismLauncher', 'data', 'PrismLauncher')],
+    modrinth: join(share, 'ModrinthApp'),
+    curseforge: join(home, 'curseforge', 'minecraft', 'Instances')
+  }
+}
+
+const readText = (file: string): string => {
+  try {
+    return readFileSync(file, 'utf8')
+  } catch {
+    return ''
+  }
+}
+
+const subfolders = (dir: string): string[] => {
+  try {
+    return readdirSync(dir, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name)
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Resource pack folders on this computer: the official launcher's, and one per instance in Prism
+ * Launcher (and PolyMC/MultiMC, which it came from), the Modrinth app and CurseForge.
+ */
+export function minecraftPackFolders(): PackFolder[] {
+  const dirs = launcherDirs()
+  const out: PackFolder[] = [{ label: 'Minecraft', group: 'Minecraft launcher', path: join(dirs.minecraft, 'resourcepacks') }]
+  for (const root of dirs.multimc) {
+    const launcher = /prism/i.test(root) ? 'Prism Launcher' : /polymc/i.test(root) ? 'PolyMC' : 'MultiMC'
+    const cfg = readText(join(root, root.toLowerCase().includes('prism') ? 'prismlauncher.cfg' : /polymc/i.test(root) ? 'polymc.cfg' : 'multimc.cfg'))
+    const instances = prismInstancesDir(cfg, root)
+    for (const name of subfolders(instances)) {
+      const at = join(instances, name)
+      const game = existsSync(join(at, '.minecraft')) ? join(at, '.minecraft') : join(at, 'minecraft')
+      out.push({ label: prismInstanceName(readText(join(at, 'instance.cfg'))) || name, group: launcher, path: join(game, 'resourcepacks') })
+    }
+  }
+  for (const name of subfolders(join(dirs.modrinth, 'profiles'))) out.push({ label: name, group: 'Modrinth', path: join(dirs.modrinth, 'profiles', name, 'resourcepacks') })
+  for (const name of subfolders(dirs.curseforge)) out.push({ label: name, group: 'CurseForge', path: join(dirs.curseforge, name, 'resourcepacks') })
+  const seen = new Set<string>()
+  return out.filter((f) => existsSync(f.path) && !seen.has(f.path) && seen.add(f.path))
 }
 
 export const vanillaPackInfo = (): { name: string; pictures: number } | null => {

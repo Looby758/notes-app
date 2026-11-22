@@ -7,6 +7,8 @@ import {
   indexPacks,
   isoCube,
   pickTexture,
+  prismInstanceName,
+  prismInstancesDir,
   mcItemOfNeu,
   minecraftItem,
   resolveHypixelModels,
@@ -202,5 +204,15 @@ describe('your own Minecraft pack', () => {
     expect(iconOfNbt('diamond_sword', 0, { ExtraAttributes: { id: 'PLAIN' } }, '', index)).toEqual({ tex: 'custom/dsword.png' })
     expect(iconOfNbt('diamond_sword', 0, { ExtraAttributes: { id: 'ASPECT_OF_THE_END' } }, '', index)).toEqual({ tex: 'furfsky_reborn/aote.png' })
     expect(iconOfNbt('stone', 1, {}, '', index)).toEqual({ tex: 'vanilla/granite.png' })
+  })
+})
+
+describe('launcher instances', () => {
+  it('finds Prism Launcher’s instances folder and instance names', () => {
+    expect(prismInstancesDir('[General]\n', 'C:\\Users\\me\\AppData\\Roaming\\PrismLauncher')).toBe('C:\\Users\\me\\AppData\\Roaming\\PrismLauncher\\instances')
+    expect(prismInstancesDir('InstanceDir=D:/Games/MC\n', 'C:\\x')).toBe('D:/Games/MC')
+    expect(prismInstancesDir('InstanceDir=mine\n', '/home/me/.local/share/PrismLauncher/')).toBe('/home/me/.local/share/PrismLauncher/mine')
+    expect(prismInstanceName('InstanceType=OneSix\nname=SkyBlock 1.8.9\n')).toBe('SkyBlock 1.8.9')
+    expect(prismInstanceName('')).toBe('')
   })
 })

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowUp, ChevronRight, FileArchive, Folder, FolderOpen, Gamepad2, HardDrive, House, Loader2, X } from 'lucide-react'
 import { crumbsOf, describeBytes, parentPath, type ExplorerEntry, type ExplorerPlace } from '@shared/explorer'
+import type { PackFolder } from '@shared/skyblockTextures'
 import { errorMessage } from '../../lib/paths'
 import { McText } from './SkyblockProfile'
 
@@ -28,7 +29,7 @@ const isZip = (e: ExplorerEntry): boolean => !e.isDir && /\.zip$/i.test(e.name)
  * Minecraft's resourcepacks folder when there is one, and shows only folders and .zip files.
  */
 export default function PackBrowser({ onPick, onSystem, close }: { onPick: (path: string) => void; onSystem: () => void; close: () => void }) {
-  const [mcFolders, setMcFolders] = useState<string[]>([])
+  const [mcFolders, setMcFolders] = useState<PackFolder[]>([])
   const [places, setPlaces] = useState<ExplorerPlace[]>([])
   const [dir, setDir] = useState<string | null>(null)
   const [entries, setEntries] = useState<ExplorerEntry[] | null>(null)
@@ -39,7 +40,7 @@ export default function PackBrowser({ onPick, onSystem, close }: { onPick: (path
     void Promise.all([window.api.skyblockAddonPackFolders().catch(() => []), window.api.explorerPlaces().catch(() => [])]).then(([mc, pl]) => {
       setMcFolders(mc)
       setPlaces(pl.filter((p) => p.kind !== 'google' && p.kind !== 'notes'))
-      setDir(readLast() ?? mc[0] ?? pl.find((p) => p.kind === 'downloads')?.path ?? pl[0]?.path ?? null)
+      setDir(readLast() ?? mc[0]?.path ?? pl.find((p) => p.kind === 'downloads')?.path ?? pl[0]?.path ?? null)
     })
   }, [])
 
@@ -84,6 +85,11 @@ export default function PackBrowser({ onPick, onSystem, close }: { onPick: (path
   // A folder with pack.mcmeta (or assets/) in it is a pack you can use as it is.
   const isPack = !!entries?.some((e) => (!e.isDir && e.name.toLowerCase() === 'pack.mcmeta') || (e.isDir && e.name.toLowerCase() === 'assets'))
   const up = dir ? parentPath(dir) : null
+  const groups = useMemo(() => {
+    const m = new Map<string, PackFolder[]>()
+    for (const f of mcFolders) m.set(f.group, [...(m.get(f.group) ?? []), f])
+    return [...m]
+  }, [mcFolders])
   const pickedEntry = picked ? shown.find((e) => e.path === picked) : undefined
 
   const placeIcon = (p: ExplorerPlace) => (p.kind === 'drive' ? <HardDrive size={14} /> : p.kind === 'home' ? <House size={14} /> : <Folder size={14} />)
@@ -99,11 +105,17 @@ export default function PackBrowser({ onPick, onSystem, close }: { onPick: (path
         </header>
         <div className="sba-browser-main">
           <nav className="sba-browser-places">
-            {mcFolders.map((f) => (
-              <button key={f} className={dir === f ? 'active' : ''} onClick={() => setDir(f)} data-sba-browser-place="minecraft">
-                <Gamepad2 size={14} /> Minecraft packs
-              </button>
+            {groups.map(([group, list]) => (
+              <div key={group} className="sba-browser-group">
+                <span className="sba-browser-group-name">{group}</span>
+                {list.map((f) => (
+                  <button key={f.path} className={dir === f.path ? 'active' : ''} onClick={() => setDir(f.path)} title={f.path} data-sba-browser-place={f.label}>
+                    <Gamepad2 size={14} /> <span className="sba-browser-name">{f.label}</span>
+                  </button>
+                ))}
+              </div>
             ))}
+            {places.length > 0 && <span className="sba-browser-group-name">This computer</span>}
             {places.map((p) => (
               <button key={p.id} className={dir === p.path ? 'active' : ''} onClick={() => setDir(p.path)}>
                 {placeIcon(p)} {p.label}
