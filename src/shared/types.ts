@@ -1,4 +1,5 @@
-import type { AppInfo, GitHubStatus, MergedPull, PullRequest, Release, TestCopy } from './appStudio'
+import type { MadeApp, NewApp } from './appStarters'
+import type { AppInfo, BugReport, GitHubStatus, HealthReport, MergedPull, PullRequest, Release, TestCopy } from './appStudio'
 import type { DriveSpace, ExplorerEntry, ExplorerPlace, PasteMode, PcIndexStatus } from './explorer'
 import type { FileTagStore, TagColour } from './fileTags'
 import type { BinListing } from './recycleBin'
@@ -1443,6 +1444,16 @@ export interface NotesApi {
   appsPullStates(repo: string, numbers: number[]): Promise<Record<number, 'open' | 'merged' | 'closed'>>
   /** Downloads a picture from a pull request's description. */
   appsFetchImage(url: string): Promise<{ bytes: Uint8Array; type: string }>
+  /** Marks a release as a pre-release, so it isn't the latest and apps that update themselves skip it (or back again). */
+  appsSetPrerelease(repo: string, tag: string, prerelease: boolean): Promise<Release>
+  /** Starts a new app from a starter: its folder, files, git repository and (if asked) GitHub repository. */
+  appsCreateApp(req: NewApp): Promise<MadeApp>
+  /** The open issues on an app's repository: bug reports from people using it. */
+  appsIssues(repo: string): Promise<BugReport[]>
+  /** Closes an issue on GitHub, with a comment first if one is given. */
+  appsCloseIssue(repo: string, number: number, comment?: string): Promise<void>
+  /** Checks an app's npm packages: newer versions, and known security problems (npm outdated and npm audit). */
+  appsHealth(folder: string): Promise<HealthReport>
   appsMerge(repo: string, number: number): Promise<void>
   appsClose(repo: string, number: number): Promise<void>
   /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */
