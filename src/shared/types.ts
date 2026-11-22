@@ -853,6 +853,8 @@ export interface NotesApi {
   /** Where a stream that copies the picture from `at` really starts (the keyframe before). */
   videoKeyframe(path: string, at: number, fileStart: number): Promise<number>
   /** Stops a page's live video stream. */
+  /** The picture `at` seconds into a video, as PNG bytes (needs the video helper). */
+  videoFrame(path: string, at: number): Promise<Uint8Array>
   stopVideoStream(session: string): Promise<void>
   /** The video player closed this video: everything reading it stops, so it can be deleted or moved. */
   releaseVideo(path: string): Promise<void>

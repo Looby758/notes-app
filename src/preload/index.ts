@@ -341,6 +341,7 @@ const api: NotesApi = {
   videoInfo: (path) => ipcRenderer.invoke('video:info', path),
   videoSubtitles: (path, source) => ipcRenderer.invoke('video:subtitles', path, source),
   videoKeyframe: (path, at, fileStart) => ipcRenderer.invoke('video:keyframe', path, at, fileStart),
+  videoFrame: (path, at) => ipcRenderer.invoke('video:frame', path, at),
   stopVideoStream: (session) => ipcRenderer.invoke('video:stop', session),
   releaseVideo: (path) => ipcRenderer.invoke('video:release', path),
   releaseFile: (path) => ipcRenderer.invoke('files:release', path),

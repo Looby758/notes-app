@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   cuesAt,
   formatTime,
+  frameArgs,
   frameName,
   frameNoteText,
   frameStep,
@@ -250,5 +251,14 @@ describe('grabbed frames', () => {
   })
   it('makes a picture line for the note', () => {
     expect(frameNoteText('/v/[Sub] Show 01.mkv', 75, 'attachments/x.png')).toBe('![Sub Show 01.mkv at 1:15](vault:attachments/x.png)')
+  })
+})
+
+describe('frame from the file', () => {
+  it('asks ffmpeg for one PNG frame at the spot', () => {
+    const args = frameArgs('/v/a.mkv', 75.4)
+    expect(args.slice(args.indexOf('-ss'), args.indexOf('-ss') + 4)).toEqual(['-ss', '75.400', '-i', '/v/a.mkv'])
+    expect(args).toContain('png')
+    expect(args.at(-1)).toBe('pipe:1')
   })
 })

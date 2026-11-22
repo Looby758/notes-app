@@ -230,24 +230,6 @@ function lastFrameDest(): Dest | null {
 /** 75.4 → "1:15.40": the time down to the frame, shown while stepping frame by frame. */
 const preciseTime = (t: number): string => `${formatTime(t)}.${String(Math.floor((t % 1) * 100)).padStart(2, '0')}`
 
-/** The picture on screen right now, as PNG bytes. */
-async function framePng(v: HTMLVideoElement): Promise<Uint8Array> {
-  if (!v.videoWidth || !v.videoHeight) throw new Error('There’s no picture to save yet.')
-  const canvas = document.createElement('canvas')
-  canvas.width = v.videoWidth
-  canvas.height = v.videoHeight
-  canvas.getContext('2d')!.drawImage(v, 0, 0)
-  const blob = await new Promise<Blob | null>((done) => {
-    try {
-      canvas.toBlob(done, 'image/png')
-    } catch {
-      done(null)
-    }
-  })
-  if (!blob) throw new Error('Couldn’t copy this frame.')
-  return new Uint8Array(await blob.arrayBuffer())
-}
-
 /** `offset`: where the stream's own clock starts in the video; `target`: where to jump to once it's loaded. */
 type Source = { mode: PlayMode; src: string; offset: number; target: number } | { mode: 'needs-helper' | 'broken' }
 
@@ -550,10 +532,13 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
     if (!v) return
     v.pause()
     setMenu(null)
+    const at = pendingSeek.current?.t ?? offset + v.currentTime
     try {
-      setGrab({ png: await framePng(v), at: offset + v.currentTime })
+      // Read from the file itself by the video helper: the picture on screen can't be copied off the
+      // page (the window won't share it), and this gives the full-size frame even for converted videos.
+      setGrab({ png: await window.api.videoFrame(path, at), at })
     } catch (err) {
-      notify(errorMessage(err))
+      notify(errorMessage(err).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''))
     }
   }
   const saveFrame = async (dest: Dest): Promise<void> => {
@@ -791,8 +776,6 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
           key={source.src}
           className={skipping ? 'skipping' : ''}
           src={source.src}
-          // Shared like the file itself (see main/videoPlayer.ts), so "Save this frame" can copy the picture.
-          crossOrigin="anonymous"
           autoPlay
           onClick={() => (menu ? setMenu(null) : togglePlay())}
           onDoubleClick={toggleFullscreen}

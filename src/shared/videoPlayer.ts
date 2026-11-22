@@ -194,6 +194,14 @@ export function parseKeyframe(out: string): number | null {
   return (Number(row[1]) * Number(tb[1])) / Number(tb[2])
 }
 
+/**
+ * One frame of the video, `at` seconds in (on the same clock as the player), as a PNG. Read straight
+ * from the file at full size, so it's the exact picture even for videos converted as they play.
+ */
+export function frameArgs(file: string, at: number): string[] {
+  return ['-hide_banner', '-nostdin', '-loglevel', 'error', '-ss', Math.max(0, at).toFixed(3), '-i', file, '-map', '0:v:0', '-frames:v', '1', '-c:v', 'png', '-f', 'image2pipe', 'pipe:1']
+}
+
 /** Arguments that turn one of a video's own subtitle tracks into WebVTT text. */
 export function subtitleArgs(file: string, stream: number): string[] {
   return ['-hide_banner', '-nostdin', '-loglevel', 'error', '-i', file, '-map', `0:${stream}`, '-f', 'webvtt', 'pipe:1']
