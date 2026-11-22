@@ -10,6 +10,7 @@ import {
   VIDEO_EXTS,
   isSubtitleFile,
   isVideoFile,
+  frameArgs,
   keyframeArgs,
   matchingSubtitles,
   parseKeyframe,
@@ -109,6 +110,22 @@ async function keyframe(path: string, at: number, fileStart: number): Promise<nu
   return k === null ? at : Math.max(0, Math.min(at, k - (Number(fileStart) || 0)))
 }
 
+/** The picture `at` seconds into a video, as PNG bytes ("Save this frame" in the player). */
+async function frame(path: string, at: number): Promise<Uint8Array> {
+  const full = videoPath(path)
+  if (!hasFfmpeg()) throw new Error('Saving a frame needs the video helper. Download it from the video player’s list page (a one-time 25 MB download).')
+  const png = await new Promise<Buffer | null>((done) => {
+    const child = execFile(ffmpegPath(), frameArgs(full, Number(at) || 0), { windowsHide: true, timeout: 30_000, maxBuffer: 256 * 1024 * 1024, encoding: 'buffer' }, (error, out, err) => {
+      reads.delete(child)
+      if (error && !out?.length) logError('video frame', String(err ?? error).slice(-500))
+      done(out?.length ? out : null)
+    })
+    reads.set(child, full)
+  })
+  if (!png) throw new Error('Couldn’t copy this frame.')
+  return new Uint8Array(png)
+}
+
 // ---------- serving ----------
 
 /** Live ffmpeg streams, by the page's session id: a new one replaces the old (after a seek). */
@@ -190,6 +207,7 @@ export function setupVideoPlayer(vaultRoot: () => string | null): void {
   ipcMain.handle('video:info', (_e, path: string) => info(path))
   ipcMain.handle('video:subtitles', (_e, path: string, source: { stream?: number; file?: string }) => subtitles(path, source))
   ipcMain.handle('video:keyframe', (_e, path: string, at: number, fileStart: number) => keyframe(path, Number(at), Number(fileStart)))
+  ipcMain.handle('video:frame', (_e, path: string, at: number) => frame(path, Number(at)))
   ipcMain.handle('video:stop', (_e, session: string) => stopStream(String(session)))
   // The player closed (or moved on to another video): let go of this one completely.
   ipcMain.handle('video:release', (_e, path: unknown) => (typeof path === 'string' && isAbsolute(path) ? releaseFiles(path) : undefined))
