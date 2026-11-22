@@ -49,6 +49,61 @@ export function parseItunes(json: unknown): FoundTrack[] {
   return out
 }
 
+export const deezerSearchUrl = (query: string, limit = 40): string => `https://api.deezer.com/search?limit=${limit}&q=${encodeURIComponent(query.trim())}`
+
+/**
+ * Deezer's answer as songs. Deezer's free search (no key) has songs Apple's search leaves out, such as
+ * Bad Bunny's "DÁKITI" or Childish Gambino's "Lithonia", but no year or genre.
+ */
+export function parseDeezer(json: unknown): FoundTrack[] {
+  const results = (json as { data?: unknown[] } | null)?.data
+  if (!Array.isArray(results)) return []
+  const https = (v: unknown): string | undefined => (typeof v === 'string' && v.startsWith('https://') ? v : undefined)
+  const out: FoundTrack[] = []
+  for (const r of results as Record<string, unknown>[]) {
+    if (!r || (r.type !== undefined && r.type !== 'track') || typeof r.title !== 'string') continue
+    const artist = r.artist as { name?: unknown } | undefined
+    const album = r.album as { title?: unknown; cover_big?: unknown; cover_medium?: unknown } | undefined
+    out.push({
+      id: `dz-${String(r.id ?? `${artist?.name}-${r.title}`)}`,
+      title: r.title,
+      artist: typeof artist?.name === 'string' ? artist.name : '',
+      album: typeof album?.title === 'string' ? album.title : '',
+      year: '',
+      genre: '',
+      durationMs: typeof r.duration === 'number' ? r.duration * 1000 : 0,
+      art: https(album?.cover_big) ?? https(album?.cover_medium),
+      preview: https(r.preview)
+    })
+  }
+  return out
+}
+
+/**
+ * Both catalogues' answers as one list: Deezer's first (it's ordered by how popular a song is, so the
+ * original comes before covers), then Apple's. A song in both appears once, with Apple's year and genre.
+ */
+export function mergeSearches(deezer: FoundTrack[], itunes: FoundTrack[]): FoundTrack[] {
+  const byKey = new Map<string, FoundTrack>()
+  const out: FoundTrack[] = []
+  const add = (t: FoundTrack): void => {
+    const key = songKey(t.artist, t.title)
+    const had = byKey.get(key)
+    if (!had) {
+      byKey.set(key, t)
+      out.push(t)
+    } else {
+      had.year ||= t.year
+      had.genre ||= t.genre
+      had.art ||= t.art
+      had.preview ||= t.preview
+    }
+  }
+  deezer.forEach((t) => add({ ...t }))
+  itunes.forEach((t) => add({ ...t }))
+  return out
+}
+
 /** What to type into YouTube to find a song's video. */
 export const youtubeQuery = (artist: string, title: string): string => `${artist} ${title}`.replace(/\s+/g, ' ').trim()
 

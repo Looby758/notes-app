@@ -44,6 +44,10 @@ async function lookUpKnown(known: FoundTrack): Promise<FoundTrack | null> {
   }
 }
 
+/** The song you picked, with anything it's missing filled in from the catalogue's copy. */
+const withGaps = (known: FoundTrack, more: FoundTrack | null): FoundTrack =>
+  more ? { ...known, album: known.album || more.album, year: known.year || more.year, genre: known.genre || more.genre, art: known.art ?? more.art } : known
+
 async function save(sender: WebContents, id: string, link: string, known: FoundTrack | null): Promise<void> {
   const tell = (p: Omit<MusicLinkProgress, 'id'>): void => {
     if (!sender.isDestroyed()) sender.send('musicLink:progress', { id, ...p })
@@ -62,7 +66,8 @@ async function save(sender: WebContents, id: string, link: string, known: FoundT
     const guess = songFromVideoTitle(videoTitle)
     // Saved from Search: the song you picked there is the one. Otherwise, look it up.
     // A song known only by its name and artist (from a Spotify list): its album and cover are looked up.
-    const found = known?.album ? known : known ? ((await lookUpKnown(known)) ?? known) : await lookUp(videoTitle, guess)
+    // A song picked from Deezer's results has no year or genre: Apple's catalogue fills them in if it has the song.
+    const found = known?.album && known.year ? known : known ? withGaps(known, await lookUpKnown(known)) : await lookUp(videoTitle, guess)
     const song = {
       title: found?.title ?? guess.title,
       artist: found?.artist ?? guess.artist,
@@ -75,7 +80,7 @@ async function save(sender: WebContents, id: string, link: string, known: FoundT
       const tags: NodeID3.Tags = { title: song.title, artist: song.artist, album: song.album, year: song.year, genre: song.genre }
       // The catalogue's cover, or else the video's own picture (on YouTube Music that's the album cover).
       const videoId = youTubeVideoId(link)
-      const pictures = found?.art ? [found.art.replace('/300x300bb.', '/600x600bb.')] : videoId ? [`https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`, `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`] : []
+      const pictures = found?.art ? [found.art.replace('/300x300bb.', '/600x600bb.').replace('/500x500-', '/1000x1000-')] : videoId ? [`https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`, `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`] : []
       for (const url of pictures) {
         try {
           const { data, mime } = await imageFrom({ url })

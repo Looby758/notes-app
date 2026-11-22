@@ -1,27 +1,37 @@
 import { ipcMain, net } from 'electron'
-import { firstVideoId, itunesSearchUrl, parseItunes, youtubeQuery, youtubeWatchUrl, type FoundTrack } from '@shared/songSearch'
+import { deezerSearchUrl, firstVideoId, itunesSearchUrl, mergeSearches, parseDeezer, parseItunes, youtubeQuery, youtubeWatchUrl, type FoundTrack } from '@shared/songSearch'
 import { youTubeSearchUrl } from '@shared/youtube'
 import { parseSpotifyEmbed, parseSpotifyLink, spotifyEmbedUrl, type SpotifyList } from '@shared/spotifyImport'
 import { logError } from './log'
 
 /**
- * Song search on the Music page (shared/songSearch.ts): any song, from Apple's free iTunes Search
- * API, and the YouTube video for one. Only the words you search for are sent, nothing else.
+ * Song search on the Music page (shared/songSearch.ts): any song, from Deezer's and Apple's free
+ * search APIs, and the YouTube video for one. Only the words you search for are sent, nothing else.
  */
 
 const BROWSER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36'
 
+/** One catalogue's songs, or null if it couldn't be reached. */
+async function ask(url: string, parse: (json: unknown) => FoundTrack[], what: string): Promise<FoundTrack[] | null> {
+  try {
+    const res = await net.fetch(url)
+    if (!res.ok) {
+      logError(`searching ${what}`, new Error(`status ${res.status}`))
+      return null
+    }
+    return parse(await res.json())
+  } catch (err) {
+    logError(`searching ${what}`, err)
+    return null
+  }
+}
+
+/** Songs from Deezer and Apple together (each has songs the other is missing). */
 async function search(query: string): Promise<FoundTrack[]> {
   if (!query.trim()) return []
-  let res: Response
-  try {
-    res = await net.fetch(itunesSearchUrl(query))
-  } catch (err) {
-    logError('searching for songs', err)
-    throw new Error('Couldn’t reach the song search. Check you’re online, then try again.')
-  }
-  if (!res.ok) throw new Error(`The song search didn’t answer (${res.status}). Try again in a moment.`)
-  return parseItunes(await res.json())
+  const [deezer, itunes] = await Promise.all([ask(deezerSearchUrl(query), parseDeezer, 'Deezer'), ask(itunesSearchUrl(query), parseItunes, 'iTunes')])
+  if (!deezer && !itunes) throw new Error('Couldn’t reach the song search. Check you’re online, then try again.')
+  return mergeSearches(deezer ?? [], itunes ?? [])
 }
 
 /** Videos already found this session. */

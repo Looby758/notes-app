@@ -12,7 +12,7 @@ import { saveMp3 } from '../../store/musicLink'
 import { Download } from 'lucide-react'
 
 /**
- * The Music page's Search: any song there is (Apple's free iTunes Search, no account needed), with a
+ * The Music page's Search: any song there is (Deezer's and Apple's free search, no account needed), with a
  * 30-second sample, its YouTube video (right-click to copy the link), and a Play button when the
  * song is already in your own music.
  */
@@ -177,7 +177,7 @@ export default function MusicSearch({ songs }: { songs: LocalSong[] }) {
           )}
         </label>
         <p className="mp-search-note">
-          <Globe size={12} /> Searches every song (Apple’s free music catalogue). Click YouTube to watch a song’s video, or right-click it to copy the link.
+          <Globe size={12} /> Searches every song (Deezer’s and Apple’s free music catalogues). Click YouTube to watch a song’s video, or right-click it to copy the link.
         </p>
       </div>
       {error && <p className="mp-empty">{error}</p>}

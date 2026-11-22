@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { catalogueMatch, firstVideoId, itunesSearchUrl, parseItunes, sameSong, songFromVideoTitle, songKey, youtubeQuery } from './songSearch'
+import { catalogueMatch, firstVideoId, itunesSearchUrl, mergeSearches, parseDeezer, parseItunes, sameSong, songFromVideoTitle, songKey, youtubeQuery } from './songSearch'
 
 describe('song search', () => {
   it('builds the iTunes search address', () => {
@@ -69,5 +69,31 @@ describe('matching a video to the catalogue', () => {
   it('picks nothing rather than a guess', () => {
     expect(catalogueMatch(found, 'No One Left To Love')).toBeNull()
     expect(catalogueMatch(found, 'John Duff - No One Left To Love')?.album).toBe('No One Left To Love - Single')
+  })
+})
+
+describe('Deezer search', () => {
+  const deezer = {
+    data: [
+      { id: 1122450992, type: 'track', title: 'DÁKITI', duration: 204, preview: 'https://cdnt-preview.dzcdn.net/p.mp3', artist: { name: 'Bad Bunny' }, album: { title: 'DÁKITI', cover_big: 'https://cdn-images.dzcdn.net/images/cover/x/500x500-000000-80-0-0.jpg' } },
+      { id: 2, type: 'album', title: 'Not a song' },
+      { id: 3, type: 'track', title: 'Dakiti (Workout Remix 128 BPM)', duration: 214, artist: { name: 'Power Music Workout' }, album: { title: 'Dakiti (Workout Remix)' } }
+    ]
+  }
+  it('reads songs', () => {
+    const songs = parseDeezer(deezer)
+    expect(songs).toHaveLength(2)
+    expect(songs[0]).toEqual({ id: 'dz-1122450992', title: 'DÁKITI', artist: 'Bad Bunny', album: 'DÁKITI', year: '', genre: '', durationMs: 204000, art: 'https://cdn-images.dzcdn.net/images/cover/x/500x500-000000-80-0-0.jpg', preview: 'https://cdnt-preview.dzcdn.net/p.mp3' })
+    expect(parseDeezer(null)).toEqual([])
+  })
+  it('merges with Apple, Deezer first, one copy of each song', () => {
+    const apple = [
+      { id: '9', title: 'Dakiti (Workout Remix 128 BPM)', artist: 'Power Music Workout', album: 'X', year: '2020', genre: 'Fitness', durationMs: 0 },
+      { id: '8', title: 'Dakiti', artist: 'Lofi Fruits Music', album: 'Y', year: '2021', genre: 'Lofi', durationMs: 0 }
+    ]
+    const merged = mergeSearches(parseDeezer(deezer), apple)
+    expect(merged.map((t) => t.id)).toEqual(['dz-1122450992', 'dz-3', '8'])
+    expect(merged[1].year).toBe('2020')
+    expect(merged[1].genre).toBe('Fitness')
   })
 })

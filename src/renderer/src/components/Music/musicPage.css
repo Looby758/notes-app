@@ -1463,3 +1463,35 @@ body.motion-off .mp-eq i {
 .mp-tabs button {
   white-space: nowrap;
 }
+
+/* Add songs to a playlist */
+.mp-add-list {
+  max-height: 52vh;
+}
+.mp-pick-list button.on {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.mp-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--text-faint);
+  border-radius: 4px;
+  color: #fff;
+}
+.mp-check.on {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.mp-add-time {
+  color: var(--text-faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.mp-bar-right {
+  align-items: center;
+  gap: 6px;
+}

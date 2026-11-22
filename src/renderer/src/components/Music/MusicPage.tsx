@@ -34,7 +34,8 @@ import {
   FilePlus2,
   Sparkle,
   Download,
-  ListChecks
+  ListChecks,
+  PictureInPicture2
 } from 'lucide-react'
 import { filterSongs, localArtUrl, plainText, type LocalSong } from '@shared/localMusic'
 import { formatTime } from '@shared/spotify'
@@ -65,7 +66,7 @@ import {
   resumeLastSession,
   useLocalMusic
 } from '../../store/localMusic'
-import { currentPosition, musicControl, musicSeek, useMusic } from '../../store/music'
+import { currentPosition, musicControl, musicSeek, setMusicMini, useMusic } from '../../store/music'
 import {
   addToPlaylist,
   createPlaylist,
@@ -690,16 +691,21 @@ function PlaylistView({ playlist, byPath, setView, folder }: { playlist: MusicPl
         <PlayButtons
           songs={songs}
           extra={
-            <button className="icon-btn mp-big-icon" onClick={() => void deletePlaylist(playlist.id).then((ok) => ok && setView({ kind: 'songs' }))} title="Delete this playlist (Ctrl+Z brings it back)" data-mp-delete-playlist>
-              <Trash2 size={18} />
-            </button>
+            <>
+              <button className="btn mp-add-songs" onClick={() => openMusicDialog({ kind: 'addSongs', playlistId: playlist.id })} title="Pick songs from your music to add" data-mp-playlist-add>
+                <Plus size={14} /> Add songs
+              </button>
+              <button className="icon-btn mp-big-icon" onClick={() => void deletePlaylist(playlist.id).then((ok) => ok && setView({ kind: 'songs' }))} title="Delete this playlist (Ctrl+Z brings it back)" data-mp-delete-playlist>
+                <Trash2 size={18} />
+              </button>
+            </>
           }
         />
         <FindBox value={query} onChange={setQuery} placeholder="Find in this playlist" />
       </div>
       {missing > 0 && <p className="mp-note">{missing === 1 ? 'One song isn’t' : `${missing} songs aren’t`} in your music folder any more (moved, renamed or deleted), shown greyed out. Right-click one to find it again.</p>}
       {rows.length === 0 ? (
-        <p className="mp-empty">{q ? 'Nothing found.' : 'Drag songs onto this playlist in the list on the left, or right-click songs → Add to playlist.'}</p>
+        <p className="mp-empty">{q ? 'Nothing found.' : 'Press Add songs to pick songs, drag songs onto this playlist on the left, or right-click songs → Add to playlist.'}</p>
       ) : (
         <SongTable
           rows={rows}
@@ -1127,6 +1133,7 @@ function PlayerBar({ setView }: { setView: (v: View) => void }) {
   const pos = live ? currentPosition(live, at) : 0
   const [scrub, setScrub] = useState<number | null>(null)
   const shownPos = scrub ?? pos
+  const miniOpen = useMusic((s) => s.miniOpen)
 
   return (
     <footer className="mp-bar" data-mp-bar>
@@ -1196,6 +1203,14 @@ function PlayerBar({ setView }: { setView: (v: View) => void }) {
         </div>
       </div>
       <div className="mp-bar-right">
+        <button
+          className={`icon-btn ${miniOpen ? 'mp-on' : ''}`}
+          onClick={() => void setMusicMini(!miniOpen)}
+          title={miniOpen ? 'Close the mini player' : 'Open the mini player (floats on top of other apps)'}
+          data-mp-mini
+        >
+          <PictureInPicture2 size={16} />
+        </button>
         {live?.volume !== undefined && <VolumeSlider volume={live.volume} />}
       </div>
     </footer>

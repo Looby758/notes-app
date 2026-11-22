@@ -5,7 +5,7 @@ import { canTag, duplicateGroups, filterSongs, guessFromName, localArtUrl, tidyM
 import { formatTime } from '@shared/spotify'
 import { allTags, cleanTag } from '@shared/musicLibrary'
 import { useLocalMusic } from '../../store/localMusic'
-import { tagSongs, useMusicData } from '../../store/musicData'
+import { addToPlaylist, tagSongs, useMusicData } from '../../store/musicData'
 import { editSongs, fillFromNames, keepOne, moveSongs, relink, setCover } from '../../store/musicFiles'
 import { notify } from '../../store/notify'
 
@@ -14,7 +14,7 @@ import { notify } from '../../store/notify'
  * file names, spare copies and missing songs.
  */
 
-type Dialog = { kind: 'edit'; songs: LocalSong[] } | { kind: 'tidy' } | { kind: 'relink'; path: string } | null
+type Dialog = { kind: 'edit'; songs: LocalSong[] } | { kind: 'tidy' } | { kind: 'relink'; path: string } | { kind: 'addSongs'; playlistId: string } | null
 
 export const useMusicDialog = create<{ dialog: Dialog }>(() => ({ dialog: null }))
 export const openMusicDialog = (dialog: Dialog): void => useMusicDialog.setState({ dialog })
@@ -25,6 +25,7 @@ export function MusicDialogs() {
   if (!dialog) return null
   if (dialog.kind === 'edit') return <EditDetails songs={dialog.songs} />
   if (dialog.kind === 'tidy') return <TidyFiles />
+  if (dialog.kind === 'addSongs') return <AddSongs playlistId={dialog.playlistId} />
   return <FindMissing path={dialog.path} />
 }
 
@@ -370,6 +371,76 @@ function FindMissing({ path }: { path: string }) {
         ))}
       </ul>
       <div className="mp-modal-actions">
+        <button className="btn" onClick={close}>
+          Cancel
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
+// ---------- Adding songs to a playlist ----------
+
+function AddSongs({ playlistId }: { playlistId: string }) {
+  const songs = useLocalMusic((s) => s.library?.songs ?? [])
+  const playlist = useMusicData((s) => s.data.playlists.find((p) => p.id === playlistId))
+  const [query, setQuery] = useState('')
+  const [picked, setPicked] = useState<LocalSong[]>([])
+  const inList = useMemo(() => new Set(playlist?.songs ?? []), [playlist])
+  const shown = useMemo(() => {
+    const found = query.trim() ? filterSongs(songs, query) : [...songs].sort((a, b) => a.title.localeCompare(b.title))
+    return found.slice(0, 300)
+  }, [songs, query])
+  if (!playlist) return null
+  const toggle = (s: LocalSong): void => setPicked((p) => (p.includes(s) ? p.filter((x) => x !== s) : [...p, s]))
+  const add = (): void => {
+    // A song already in the playlist isn't added twice.
+    const fresh = picked.filter((s) => !inList.has(s.path))
+    if (!fresh.length) {
+      notify(`${picked.length === 1 ? 'That song is' : 'Those songs are'} already in “${playlist.name}”.`, 'info')
+      return close()
+    }
+    void addToPlaylist(playlist.id, fresh).then(close)
+  }
+  return (
+    <Modal label="Add songs" title={`Add songs to ${playlist.name}`} wide>
+      <label className="mp-find mp-modal-find">
+        <Search size={14} />
+        <input value={query} autoFocus onChange={(e) => setQuery(e.target.value)} placeholder="Find songs by title, artist or album" spellCheck={false} data-mp-add-find />
+      </label>
+      <ul className="mp-pick-list mp-add-list" data-mp-add-list>
+        {shown.length === 0 && <li className="mp-nav-note">Nothing found. Try fewer words.</li>}
+        {shown.map((s) => {
+          const on = picked.includes(s)
+          return (
+            <li key={s.path}>
+              <button className={on ? 'on' : ''} onClick={() => toggle(s)} aria-pressed={on} data-mp-add-song={s.title}>
+                <span className={`mp-check ${on ? 'on' : ''}`}>{on && <Check size={12} />}</span>
+                <span className="mp-row-art">{s.art ? <img src={localArtUrl(s.path, s.added)} alt="" loading="lazy" /> : <Music size={13} />}</span>
+                <span className="mp-row-text">
+                  <strong>{s.title}</strong>
+                  <span>
+                    {s.artist || 'Unknown artist'}
+                    {s.album ? ` · ${s.album}` : ''}
+                  </span>
+                </span>
+                {inList.has(s.path) && <em className="mp-chip">In this playlist</em>}
+                <span className="mp-add-time">{formatTime(s.durationMs)}</span>
+              </button>
+            </li>
+          )
+        })}
+        {shown.length === 300 && <li className="mp-nav-note">Showing the first 300. Type to find more.</li>}
+      </ul>
+      <div className="mp-modal-actions">
+        <button className="btn btn-primary" disabled={!picked.length} onClick={add} data-mp-add-confirm>
+          <Plus size={13} /> {picked.length ? `Add ${picked.length} ${picked.length === 1 ? 'song' : 'songs'}` : 'Add songs'}
+        </button>
+        {picked.length > 0 && (
+          <button className="btn" onClick={() => setPicked([])}>
+            Clear selection
+          </button>
+        )}
         <button className="btn" onClick={close}>
           Cancel
         </button>
