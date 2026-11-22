@@ -2303,7 +2303,7 @@ body.capture-window {
   color: var(--text-muted);
 }
 .quick-add-row input[type='time'] {
-  width: 94px;
+  width: 112px;
 }
 .quick-add-hint {
   flex: 1;
@@ -2448,8 +2448,11 @@ body.capture-window {
 }
 .cal-week-head,
 .cal-allday {
+  /* Leave room for the timeline's scroll bar so the day columns line up with it. */
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
   display: grid;
-  grid-template-columns: 56px repeat(7, minmax(0, 1fr));
+  grid-template-columns: 56px repeat(var(--cal-cols, 7), minmax(0, 1fr));
   border-bottom: 1px solid var(--border);
   background: var(--bg-panel);
 }
@@ -2496,8 +2499,9 @@ body.capture-window {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   display: grid;
-  grid-template-columns: 56px repeat(7, minmax(0, 1fr));
+  grid-template-columns: 56px repeat(var(--cal-cols, 7), minmax(0, 1fr));
 }
 .cal-hour {
   position: relative;
@@ -2600,6 +2604,104 @@ body.capture-window {
   background: none;
 }
 
+/* Moving and resizing events */
+.cal-event.movable {
+  cursor: grab;
+  touch-action: none;
+}
+.cal-event.dragging {
+  z-index: 5;
+  cursor: grabbing;
+  opacity: 0.9;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+.cal-event-resize {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 6px;
+  cursor: ns-resize;
+}
+.cal-event-resize:hover {
+  background: color-mix(in srgb, var(--event-color, var(--accent)) 45%, transparent);
+}
+.cal-repeat-icon {
+  flex-shrink: 0;
+  margin-left: 3px;
+  vertical-align: -1px;
+  opacity: 0.75;
+}
+.cal-item[draggable='true'] {
+  cursor: grab;
+}
+.cal-cell.drop-over,
+.cal-allday-cell.drop-over {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  outline: 1px dashed var(--accent);
+  outline-offset: -2px;
+}
+.cal-single-day .cal-event {
+  font-size: 12.5px;
+}
+.which-card {
+  width: 300px;
+}
+.quick-add select {
+  min-width: 0;
+  flex: 1;
+  height: 28px;
+  color-scheme: dark;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+.quick-add-icon {
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+.quick-add-buttons {
+  justify-content: flex-end;
+}
+.event-card-hint {
+  margin: 8px 0 0 18px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.event-card-hint .link-btn {
+  margin-left: 6px;
+}
+.quick-add-google {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.event-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.event-edit .quick-add-title,
+.event-edit input[type='date'],
+.event-edit input[type='time'] {
+  height: 28px;
+  color-scheme: dark;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+.event-edit .event-card-line {
+  margin-left: 0;
+}
+
 /* Events from Google Calendar / calendar links */
 .cal-ext-bar {
   flex-shrink: 0;
@@ -2676,6 +2778,15 @@ body.capture-window {
 }
 
 /* Settings → Calendar → Google Calendar & links */
+.cal-edit-notice {
+  margin: 0 0 10px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
 .cal-sources-intro {
   margin: 4px 0 12px;
   font-size: 12.5px;
@@ -15784,6 +15895,292 @@ button.board-add-picture:hover {
 .release-commit .text-input {
   flex: 1;
   min-width: 180px;
+}
+
+/* ---------- Money: accounts, net worth and IOUs ---------- */
+
+.money-tiles.money-tiles-4 {
+  grid-template-columns: 1.3fr 1fr 1fr 1fr;
+}
+.money-tile small {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.money-tile .up,
+.money-tile strong.up {
+  color: #2fbf8a;
+}
+.money-tile .down,
+.money-tile strong.down {
+  color: #e66767;
+}
+.money-tile-main {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+.money-tile-main strong {
+  font-size: 26px;
+}
+.money-nw-chart {
+  position: relative;
+  padding: 12px 14px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-panel);
+}
+.money-nw-ranges {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+}
+.money-nw-ranges button {
+  height: 22px;
+  padding: 0 9px;
+  font-size: 11.5px;
+}
+.money-nw-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 26px;
+}
+.money-nw-chart text {
+  fill: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.money-nw-chart .grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.money-nw-chart .zero {
+  stroke: var(--text-faint);
+  stroke-dasharray: 3 3;
+}
+.money-nw-chart .line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.money-nw-chart .area {
+  fill: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.money-nw-chart .cursor {
+  stroke: var(--text-faint);
+}
+.money-nw-chart .dot {
+  fill: var(--accent);
+  stroke: var(--bg-panel);
+  stroke-width: 2;
+}
+.money-nw-readout {
+  min-height: 18px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.money-nw-readout strong {
+  color: var(--text-strong);
+}
+.money-accounts,
+.money-people,
+.money-ious {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.money-account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13.5px;
+}
+.money-account-icon {
+  width: 22px;
+  text-align: center;
+  font-size: 16px;
+}
+.money-account-name {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.money-account-name .money-goal-name {
+  font-size: 13.5px;
+  padding: 0;
+}
+.money-account-name small,
+.money-iou-what small,
+.money-person-name small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.money-account-name small.stale {
+  color: #c98500;
+}
+.money-account > strong,
+.money-iou > strong {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-strong);
+}
+.money-account strong.negative {
+  color: #e66767;
+}
+.money-account-amount {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.money-account-amount input,
+.money-new-iou input:not([type='checkbox']),
+.money-new-iou select {
+  padding: 5px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+.money-account-amount input {
+  width: 96px;
+}
+.money-new-iou {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-panel);
+}
+.money-new-iou .segmented {
+  align-self: flex-start;
+}
+.money-new-iou .segmented svg {
+  vertical-align: -2px;
+}
+.money-new-iou .money-new-goal-row > input:first-child {
+  min-width: 220px;
+}
+.money-new-iou .money-amount input {
+  width: 80px;
+}
+.money-iou-note {
+  flex: 1;
+  min-width: 160px;
+}
+.money-iou-options {
+  min-height: 30px;
+}
+.money-iou-preview {
+  margin: 0;
+  color: var(--accent);
+  font-size: 12.5px;
+}
+.money-iou-options .btn-primary {
+  margin-left: auto;
+}
+.money-new-iou select.select {
+  width: auto;
+}
+.money-new-account select.select {
+  width: auto;
+}
+.money-new-account .money-new-goal-row > input {
+  flex: 1;
+  min-width: 180px;
+  padding: 6px 8px;
+}
+.money-new-account .money-amount input {
+  width: 90px;
+}
+.money-account-spacer {
+  width: 28px;
+  flex: none;
+}
+.money-person {
+  margin-bottom: 10px;
+  padding: 10px 14px 4px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--bg-panel);
+}
+.money-person.owes-you {
+  border-left-color: #2fbf8a;
+}
+.money-person.you-owe {
+  border-left-color: #e66767;
+}
+.money-person-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 6px;
+}
+.money-person-avatar {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--bg-hover);
+  color: var(--text-strong);
+  font-weight: 600;
+}
+.money-person-name {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  color: var(--text-strong);
+  font-weight: 600;
+}
+.money-person.owes-you .money-person-name small {
+  color: #2fbf8a;
+}
+.money-person.you-owe .money-person-name small {
+  color: #e66767;
+}
+.money-iou {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.money-iou-what {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.money-iou-remind {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+}
+.money-iou-remind.due {
+  color: #c98500;
+}
+.money-iou-remind input {
+  padding: 3px 5px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+}
+.money-home-next.link-button {
+  display: block;
+  padding: 0;
+  text-align: left;
 }
 
 /* ---------- Files: Whole PC search, colour tags and favourites ---------- */

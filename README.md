@@ -26,9 +26,9 @@ Orbit checks the Releases page every few hours (Settings → About shows the res
 
 Install [Google Drive for Desktop](https://www.google.com/drive/download/), create a folder such as `G:\My Drive\Notes`, and choose it as your notes folder (on first launch, or via the folder name at the top left → *Switch notes folder…*). Drive syncs the files; the app picks up changes from other devices as they arrive.
 
-## Seeing your Google Calendar (read-only)
+## Your Google Calendar in Orbit
 
-There are two ways. Both are in **Settings → Calendar**, and both are read-only: Orbit never changes your calendar.
+There are two ways. Both are in **Settings → Calendar**. A calendar link only lets Orbit *show* your events; signing in with Google also lets you add, move and edit them from Orbit.
 
 **Easiest: a calendar link (no sign-in, never expires).** In Google Calendar on the web, open *Settings → (your calendar) → Integrate calendar* and copy the **Secret address in iCal format**. Paste it under *Calendar links* with a name. Repeat for each calendar you want. Outlook and Apple calendar links work too.
 
@@ -38,7 +38,15 @@ There are two ways. Both are in **Settings → Calendar**, and both are read-onl
 2. In *APIs & Services → Library*, enable the **Google Calendar API**.
 3. In *OAuth consent screen*, pick **External**, give the app a name, and add your own Google account under **Test users**.
 4. In *Credentials*, choose *Create credentials → OAuth client ID → Desktop app*. Copy the **client ID** and **client secret** into Orbit and click **Connect Google Calendar**.
-5. Your browser opens Google's sign-in page; approve read-only access. Pick which calendars to show.
+5. Your browser opens Google's sign-in page; approve access (tick the calendar box). Pick which calendars to show.
+
+Orbit asks to read your calendars and change their *events*, never the calendars themselves or who they're shared with. If you connected before Orbit could change events, Settings → Calendar shows **Allow editing**: press it and sign in again once. Then:
+
+- When you add an event, choose **Google: (calendar)** under the repeat menu instead of *Orbit (daily note)*. Orbit remembers your choice.
+- Click a Google event and press **Edit** to change its name, day, times or place, or **Delete**. For a repeating Google event this changes just that day; open it in Google Calendar to change every one.
+- Drag Google events to move them and drag their bottom edge to change how long they are, like your own events.
+
+Calendars someone shared with you as view-only, and calendar links, stay read-only.
 
 While the project is in Google's "Testing" mode, Google ends the sign-in after 7 days and Orbit will ask you to reconnect. The calendar link method above doesn't have that limit.
 
@@ -219,7 +227,10 @@ Orbit never makes notes for you: you choose what goes where. Where you're up to 
 - **Images and files** — paste a screenshot or drop files in; they're saved to your attachments folder and linked. Ctrl+click a file link to open it in its usual app.
 - **Embeds** — a line with just `![[Note]]` or `![[Note#Heading]]` shows that note (or section) inline, kept up to date.
 - **Places** — type `/place` (or *Add a place* in the command palette), search for a shop, an address or a town, and pick one: it goes into the note as a 📍 link that opens Google Maps, shown as a card with a small map and the address. Pasting a Google Maps link on its own line shows a card too. No account or key needed: searching and the maps come from [OpenStreetMap](https://www.openstreetmap.org/copyright), so it needs an internet connection.
-- **Calendar** — daily notes (Ctrl+Shift+D for today's), events under a `## Schedule` heading (`- 09:30-10:30 Standup`), tasks with due dates (`- [ ] Pay rent 📅 2026-10-30`), notes with `date:`/`due:` in frontmatter. A month calendar and agenda in the right panel, and a full month/week calendar (Ctrl+Shift+C) where you can click to add events.
+- **Calendar** — daily notes (Ctrl+Shift+D for today's), events under a `## Schedule` heading (`- 09:30-10:30 Standup`), tasks with due dates (`- [ ] Pay rent 📅 2026-10-30`), notes with `date:`/`due:` in frontmatter. A month calendar and agenda in the right panel, and a full month, week and day calendar (Ctrl+Shift+C) where you can click to add events.
+  - **Repeating events**: pick *Every Tuesday*, *Every month on the 1st*, *Every weekday* and so on when you add one, or write it yourself after a 🔁: `- 18:00-19:00 Football 🔁 every Tuesday`, `- Rent 🔁 the 1st of every month`, `- 09:00 Standup 🔁 every weekday until 2027-03-31`, `- Bins 🔁 every 2 weeks on Thursday except 2026-12-24`. It repeats from the day of the note it's in. Right-click one to skip a single day, stop it repeating from that day on, or delete it.
+  - **Drag to move**: in the week and day views drag an event to another time or day, and drag its bottom edge to make it longer or shorter (it snaps to 15 minutes). In the month view drag events between days. Moving a repeating event asks whether to move only that day or every one (moving every Tuesday to Wednesday makes it every Wednesday).
+  - **Day view**: one day's timeline, bigger, with the all-day row on top.
 - **Quick capture** — press **Win+Shift+N** (Mac: **⌃⌥Space**) in any app, type, press Enter: it's added to today's note (under *Captured*) or your Inbox note. The **→** menu at the top sends it to any other note or folder instead. Write a time (*"dinner with Jack at 8 tomorrow"*) and it goes into the calendar instead, optionally with a reminder; or pick a day with the 📅 button. Closing the window keeps Notes running in the tray (Mac: the menu bar) so this always works; quit from its icon (or ⌘Q). It can also start when you log in (Settings → Quick capture).
 - **Settings** (Ctrl+,) — five dark and three light themes (or switch with your system's light/dark mode), any accent colour, fonts, text size and spacing, note width, density, zoom; editor options (live preview, spellcheck language, autosave delay, line numbers, Vim keys…); every keyboard shortcut can be changed. Everything is stored in `settings.json` (Windows: `%APPDATA%\Notes`; Mac: `~/Library/Application Support/Notes`), which you can also edit by hand.
 - **Spellcheck** — right-click a misspelled word for suggestions.
