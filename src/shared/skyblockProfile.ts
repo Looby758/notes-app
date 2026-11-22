@@ -402,6 +402,10 @@ export interface SbProfileView {
   stats: { key: string; value: number }[]
   /** Plain sentences about what's missing because an API setting is off. */
   hidden: string[]
+  /** What it's worth at Auction House and Bazaar prices (filled in by the app). */
+  networth?: import('./skyblockMore').Networth
+  /** Each co-op member's share (filled in by the app). */
+  coop?: import('./skyblockMore').CoopMember[]
 }
 
 const SKILL_ORDER = ['farming', 'mining', 'combat', 'foraging', 'fishing', 'enchanting', 'alchemy', 'taming', 'carpentry', 'runecrafting', 'social', 'hunting']

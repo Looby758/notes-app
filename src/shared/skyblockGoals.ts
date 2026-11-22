@@ -818,6 +818,9 @@ export interface SkyblockGoalsState {
   keyWarning: string
   goals: SbGoal[]
   plans: GoalPlan[]
+  /** Your profiles, and the one you're looking at (goals are kept for each). */
+  choices: import('./skyblockMore').SbProfileChoice[]
+  viewing: string
 }
 
 /** Minecraft's colour codes, for item names in their rarity colour. */

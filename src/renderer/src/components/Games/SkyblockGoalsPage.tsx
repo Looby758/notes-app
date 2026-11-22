@@ -1,12 +1,35 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Check, ChevronDown, ChevronRight, Download, HelpCircle, Image, Lock, Pickaxe, Pin, PinOff, Plus, RefreshCw, Search, Target, Trash2 } from 'lucide-react'
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  HelpCircle,
+  Image,
+  Loader2,
+  Lock,
+  Pickaxe,
+  Pin,
+  PinOff,
+  Plus,
+  RefreshCw,
+  Search,
+  Star,
+  Target,
+  Trash2,
+  TrendingUp
+} from 'lucide-react'
 import { API_SETTINGS_PATH, describeHours, MC_COLORS, tagLabel, type GoalPlan, type PlanNode, type SkyblockGoalsState, type SkyblockItemHit } from '@shared/skyblockGoals'
 import { MODE_NAMES } from '@shared/skyblock'
 import { addHomeCard } from '../../lib/home'
 import { GAMES_TAB, openSpecialTab, SKYBLOCK_GOALS_TAB } from '../../lib/editorController'
 import { errorMessage } from '../../lib/paths'
 import { HomeBox } from '../Home/HomePage'
+import type { SbFriend, SbProfilePage } from '@shared/skyblockMore'
 import SkyblockProfile from './SkyblockProfile'
+import { ComparePage, DriftWall, HelpersPage, PlayerSearch, ProgressPage, ShareCard } from './SkyblockExtras'
 import SkyblockAddonCard from './SkyblockAddonCard'
 import { ItemPic, useSkyblockAddon } from './SkyblockPic'
 
@@ -53,13 +76,33 @@ function ago(at: number): string {
  * materials with what you have, a flat shopping list, what's stopping you crafting it, and time left
  * at your own rates. Ironman only: nothing here uses the Bazaar or Auction House.
  */
+type Tab = 'profile' | 'progress' | 'goals' | 'helpers' | 'compare'
+
+const DOCK: { id: Tab; label: string; icon: string; mineOnly?: boolean }[] = [
+  { id: 'profile', label: 'Profile', icon: 'NAME_TAG' },
+  { id: 'progress', label: 'Progress', icon: 'EXP_BOTTLE', mineOnly: true },
+  { id: 'goals', label: 'Goals', icon: 'DIAMOND_PICKAXE', mineOnly: true },
+  { id: 'helpers', label: 'Helpers', icon: 'WORKBENCH', mineOnly: true },
+  { id: 'compare', label: 'Compare', icon: 'COMPASS' }
+]
+
+/**
+ * SkyBlock: your profiles (or anyone's) like SkyCrypt, your progress over time, goals with whole
+ * crafting trees, ironman helpers, and comparing with friends. Frosted glass over a slow wall of items.
+ */
 export default function SkyblockGoalsPage() {
   const [state, setState] = useGoals(true)
   const [selected, setSelected] = useState<string | null>(null)
   const [view, setView] = useState<'tree' | 'raw' | 'blockers'>('tree')
-  const [page, setPage] = useState<'profile' | 'goals'>('profile')
+  const [tab, setTab] = useState<Tab>('profile')
   const [error, setError] = useState<string | null>(null)
   const [packsOpen, setPacksOpen] = useState(false)
+  const [mine, setMine] = useState<SbProfilePage | null>(null)
+  const [other, setOther] = useState<SbProfilePage | null>(null)
+  const [looking, setLooking] = useState<string | null>(null)
+  const [friends, setFriends] = useState<SbFriend[]>([])
+  const [share, setShare] = useState(false)
+  const root = useRef<HTMLDivElement>(null)
   const addon = useSkyblockAddon()
 
   const run = useCallback(
@@ -74,198 +117,318 @@ export default function SkyblockGoalsPage() {
     [setState]
   )
 
-  if (!state || !addon) return <div className="sbg-page" />
+  // Your own page follows every change (a refresh, new prices, another profile chosen).
+  useEffect(() => {
+    if (!state?.installed) return
+    let live = true
+    void window.api
+      .skyblockProfilePage()
+      .then((p) => live && setMine(p))
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [state])
+  useEffect(() => {
+    void window.api
+      .skyblockPlayersList()
+      .then(setFriends)
+      .catch(() => undefined)
+  }, [])
+  // Leaving a profile (or the page) counts as having seen it, so "since last time" starts again.
+  const mineId = mine?.view.profileId
+  useEffect(() => {
+    if (!mineId) return
+    return () => void window.api.skyblockProfileSeen(mineId).catch(() => undefined)
+  }, [mineId])
+
+  const openPlayer = useCallback(
+    async (who: string, profileId?: string, fresh?: boolean): Promise<void> => {
+      setLooking(who)
+      setError(null)
+      try {
+        const p = await window.api.skyblockPlayersLookup(who, profileId, fresh)
+        if (p.mine) {
+          setOther(null)
+          if (profileId && profileId !== mineId) setState(await window.api.skyblockProfileChoose(profileId))
+        } else {
+          setOther(p)
+          setTab((t) => (t === 'compare' ? t : 'profile'))
+        }
+        setFriends(await window.api.skyblockPlayersList())
+      } catch (err) {
+        setError(clean(err))
+      } finally {
+        setLooking(null)
+      }
+    },
+    [mineId, setState]
+  )
+
+  const star = async (uuid: string, on: boolean): Promise<void> => {
+    setFriends(await window.api.skyblockPlayersStar(uuid, on))
+    if (other?.player.uuid === uuid) setOther({ ...other, starred: on })
+  }
+
+  if (!state || !addon) return <div className="sbg-page sbx" />
   // Everything SkyBlock is an optional download, like the offline AI.
   if (!state.installed || addon.state !== 'ready')
     return (
-      <div className="sbg-page" data-skyblock-goals data-skyblock-addon-missing>
-        <div className="sbg-inner sbg-get">
-          <div className="sbg-get-hero">
-            <Target size={30} />
-            <h2>SkyBlock</h2>
-            <p className="faint">Your Hypixel SkyBlock profile, item pictures from your favourite texture pack, and an ironman goal planner.</p>
+      <div className="sbg-page sbx" data-skyblock-goals data-skyblock-addon-missing>
+        <DriftWall />
+        <div className="sbx-scroll">
+          <div className="sbg-inner sbg-get">
+            <div className="sbg-get-hero">
+              <Target size={30} />
+              <h2 className="sbx-title">SkyBlock</h2>
+              <p className="faint">Your Hypixel SkyBlock profile, item pictures from your favourite texture pack, and an ironman goal planner.</p>
+            </div>
+            <SkyblockAddonCard />
           </div>
-          <SkyblockAddonCard />
         </div>
       </div>
     )
   const plan = state.plans.find((p) => p.goal.id === selected) ?? state.plans[0] ?? null
+  const page = other ?? mine
+  const dock = DOCK.filter((d) => !other || !d.mineOnly)
+  const shownTab: Tab = other && DOCK.find((d) => d.id === tab)?.mineOnly ? 'profile' : tab
+  const wallIds = page?.view.gear ? [...page.view.gear.armor, ...page.view.gear.equipment, ...page.view.gear.inventory].filter((i) => !!i).map((i) => i!.id) : undefined
 
   return (
-    <div className="sbg-page" data-skyblock-goals>
-      <div className="sbg-inner">
-        <div className="sbg-head">
-          <div>
-            <h2>
-              <Target size={20} /> SkyBlock
-            </h2>
-            <p className="faint">
-              {state.profile ? (
-                <>
-                  {state.profile.profileName}
-                  {MODE_NAMES[state.profile.mode] ? ` (${MODE_NAMES[state.profile.mode]})` : ''} · items checked {ago(state.profile.at)}
-                </>
-              ) : state.ready ? (
-                'Not checked with Hypixel yet'
-              ) : (
-                'Set up Hypixel to see what you have'
-              )}
-              {state.data && (
-                <>
-                  {' '}
-                  · item list from{' '}
-                  {new Date(state.data.at).toLocaleDateString([], {
-                    day: 'numeric',
-                    month: 'short'
-                  })}
-                </>
-              )}
-            </p>
-          </div>
-          <div className="sbg-head-actions">
-            <button
-              className="btn"
-              disabled={!state.ready || state.refreshing}
-              onClick={() => run(() => window.api.skyblockGoalsRefresh())}
-              title="Ask Hypixel what you have now"
-              data-sbg-refresh
-            >
-              <RefreshCw size={13} className={state.refreshing ? 'spin' : ''} /> {state.refreshing ? 'Checking…' : 'Refresh'}
-            </button>
-            <button className={`btn ${packsOpen ? 'active' : ''}`} onClick={() => setPacksOpen(!packsOpen)} title="Texture packs, or remove the SkyBlock add-on" data-sbg-packs>
-              <Image size={13} /> Pictures
-            </button>
-            <button
-              className="btn"
-              disabled={!!state.downloading}
-              onClick={() => run(() => window.api.skyblockGoalsDownload())}
-              title="Download the latest recipes from the NEU item repo"
-              data-sbg-download
-            >
-              <Download size={13} /> Update recipes
-            </button>
-          </div>
-        </div>
-
-        {packsOpen && <SkyblockAddonCard compact />}
-        {!state.ready && (
-          <div className="sbg-warning">
-            <AlertTriangle size={14} />
-            <span>
-              Orbit needs your Hypixel API key and Minecraft name to see what you have. Add them on the{' '}
-              <button className="link-btn" onClick={() => openSpecialTab(GAMES_TAB)}>
-                Games page → SkyBlock
+    <div
+      className="sbg-page sbx"
+      ref={root}
+      onMouseMove={(e) => {
+        const r = root.current?.getBoundingClientRect()
+        if (r) {
+          root.current!.style.setProperty('--mx', `${e.clientX - r.left}px`)
+          root.current!.style.setProperty('--my', `${e.clientY - r.top}px`)
+        }
+      }}
+      data-skyblock-goals
+    >
+      <DriftWall ids={wallIds} />
+      <div className="sbx-light" aria-hidden />
+      <div className="sbx-scroll">
+        <div className="sbg-inner">
+          <header className="sbx-top">
+            <div className="sbx-top-title">
+              <h2 className="sbx-title">SkyBlock</h2>
+              <p className="faint">
+                {state.profile ? (
+                  <>
+                    {state.profile.profileName}
+                    {MODE_NAMES[state.profile.mode] ? ` (${MODE_NAMES[state.profile.mode]})` : ''} · checked {ago(state.profile.at)}
+                  </>
+                ) : state.ready ? (
+                  'Not checked with Hypixel yet'
+                ) : (
+                  'Set up Hypixel to see what you have'
+                )}
+              </p>
+            </div>
+            <PlayerSearch onOpen={(who) => void openPlayer(who)} friends={friends} onStar={(u, on) => void star(u, on)} />
+            <div className="sbg-head-actions">
+              <button
+                className="btn"
+                disabled={!state.ready || state.refreshing || !!looking}
+                onClick={() => (other ? void openPlayer(other.player.uuid, other.view.profileId, true) : void run(() => window.api.skyblockGoalsRefresh()))}
+                title={other ? `Ask Hypixel for ${other.player.name}’s profile again` : 'Ask Hypixel what you have now'}
+                data-sbg-refresh
+              >
+                <RefreshCw size={13} className={state.refreshing || looking ? 'spin' : ''} /> {state.refreshing || looking ? 'Checking…' : 'Refresh'}
               </button>
-              . You can still plan without them.
-            </span>
-          </div>
-        )}
-        {state.keyWarning && (
-          <div className="sbg-warning" data-sbg-key-warning>
-            <AlertTriangle size={14} />
-            <span>{state.keyWarning}</span>
-          </div>
-        )}
-        {state.profile && state.profile.hidden.length > 0 && (
-          <div className="sbg-warning" data-sbg-api-off>
-            <AlertTriangle size={14} />
-            <span>
-              {state.profile.hidden.join(' ')} Turn it on in game: <b>{API_SETTINGS_PATH}</b>, then press Refresh in a few minutes.
-            </span>
-          </div>
-        )}
-        {state.profile && state.profile.mode !== 'ironman' && (
-          <p className="faint sbg-note">This profile isn’t ironman. The planner still works, but it never uses the Bazaar or Auction House.</p>
-        )}
-        {state.profileError && <p className="setting-warning">{state.profileError}</p>}
-        {state.dataError && <p className="setting-warning">{state.dataError}</p>}
-        {error && <p className="setting-warning">{error}</p>}
-
-        {state.downloading ? (
-          <div className="sbg-empty">
-            <RefreshCw size={18} className="spin" />
-            <p>{state.downloading}</p>
-            <p className="faint">The recipes come from the NEU item repo on GitHub. It’s a one-off download, kept offline and refreshed weekly.</p>
-          </div>
-        ) : !state.data ? (
-          <div className="sbg-empty">
-            <p>Orbit needs the item list (recipes, drops, NPC shops and the Forge) from the NEU item repo.</p>
-            <button className="btn btn-primary" onClick={() => run(() => window.api.skyblockGoalsDownload())}>
-              <Download size={14} /> Download it
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="segmented sbg-pages">
-              <button className={page === 'profile' ? 'selected' : ''} onClick={() => setPage('profile')} data-sbg-page-profile>
-                Profile
+              <button className={`btn ${packsOpen ? 'active' : ''}`} onClick={() => setPacksOpen(!packsOpen)} title="Texture packs, or remove the SkyBlock add-on" data-sbg-packs>
+                <Image size={13} /> Pictures
               </button>
-              <button className={page === 'goals' ? 'selected' : ''} onClick={() => setPage('goals')} data-sbg-page-goals>
-                Goals{state.plans.length ? ` (${state.plans.length})` : ''}
+              <button
+                className="btn"
+                disabled={!!state.downloading}
+                onClick={() => run(() => window.api.skyblockGoalsDownload())}
+                title="Download the latest recipes from the NEU item repo"
+                data-sbg-download
+              >
+                <Download size={13} /> Update recipes
               </button>
             </div>
-            {page === 'profile' ? (
-              <SkyblockProfile />
-            ) : (
-              <>
-                <AddGoal onAdd={(id, amount) => run(() => window.api.skyblockGoalsAdd(id, amount)).then(() => setSelected(id))} />
-                {state.plans.length === 0 ? (
-                  <div className="sbg-empty">
-                    <Pickaxe size={22} />
-                    <p>Search for something you want, like a Terminator or Aspect of the End, and add it as a goal.</p>
-                  </div>
+          </header>
+
+          {other && (
+            <div className="sbx-viewing" data-sbx-viewing={other.player.name}>
+              <span>
+                Looking at <b>{other.player.name}</b>’s profile. Goals, progress and helpers stay on yours.
+              </span>
+              <button className={`btn sbx-star ${other.starred ? 'on' : ''}`} onClick={() => void star(other.player.uuid, !other.starred)} data-sbx-star>
+                <Star size={13} fill={other.starred ? 'currentColor' : 'none'} /> {other.starred ? 'Starred' : 'Star'}
+              </button>
+              <button className="btn btn-primary" onClick={() => setOther(null)} data-sbx-back>
+                <ArrowLeft size={13} /> Back to my profile
+              </button>
+            </div>
+          )}
+          {looking && !other && (
+            <p className="faint sbx-loading">
+              <Loader2 size={14} className="spin" /> Looking up {looking.length > 20 ? 'that player' : looking}…
+            </p>
+          )}
+          {packsOpen && <SkyblockAddonCard compact />}
+          {!state.ready && (
+            <div className="sbg-warning">
+              <AlertTriangle size={14} />
+              <span>
+                Orbit needs your Hypixel API key and Minecraft name to see what you have. Add them on the{' '}
+                <button className="link-btn" onClick={() => openSpecialTab(GAMES_TAB)}>
+                  Games page → SkyBlock
+                </button>
+                . You can still plan without them.
+              </span>
+            </div>
+          )}
+          {state.keyWarning && (
+            <div className="sbg-warning" data-sbg-key-warning>
+              <AlertTriangle size={14} />
+              <span>{state.keyWarning}</span>
+            </div>
+          )}
+          {!other && state.profile && state.profile.hidden.length > 0 && (
+            <div className="sbg-warning" data-sbg-api-off>
+              <AlertTriangle size={14} />
+              <span>
+                {state.profile.hidden.join(' ')} Turn it on in game: <b>{API_SETTINGS_PATH}</b>, then press Refresh in a few minutes.
+              </span>
+            </div>
+          )}
+          {state.profileError && <p className="setting-warning">{state.profileError}</p>}
+          {state.dataError && <p className="setting-warning">{state.dataError}</p>}
+          {error && <p className="setting-warning">{error}</p>}
+
+          {state.downloading ? (
+            <div className="sbg-empty">
+              <RefreshCw size={18} className="spin" />
+              <p>{state.downloading}</p>
+              <p className="faint">The recipes come from the NEU item repo on GitHub. It’s a one-off download, kept offline and refreshed weekly.</p>
+            </div>
+          ) : !state.data ? (
+            <div className="sbg-empty">
+              <p>Orbit needs the item list (recipes, drops, NPC shops and the Forge) from the NEU item repo.</p>
+              <button className="btn btn-primary" onClick={() => run(() => window.api.skyblockGoalsDownload())}>
+                <Download size={14} /> Download it
+              </button>
+            </div>
+          ) : (
+            <div className="sbx-body" key={`${shownTab}-${other?.player.uuid ?? 'me'}`}>
+              {shownTab === 'profile' &&
+                (page ? (
+                  <>
+                    {!other && mine?.since && mine.since.changes.length > 0 && (
+                      <button className="sbx-since" onClick={() => setTab('progress')} data-sbx-since>
+                        <TrendingUp size={14} /> Since you last looked:{' '}
+                        {mine.since.changes
+                          .slice(0, 3)
+                          .map((c) => c.label)
+                          .join(', ')}
+                        {mine.since.changes.length > 3 ? ` and ${mine.since.changes.length - 3} more` : ''} went up.
+                        <span className="faint">See progress</span>
+                      </button>
+                    )}
+                    <SkyblockProfile
+                      key={`${page.player.uuid}-${page.view.profileId}`}
+                      page={page}
+                      onChoose={(id) => (other ? void openPlayer(other.player.uuid, id) : void run(() => window.api.skyblockProfileChoose(id)))}
+                      onShare={() => setShare(true)}
+                    />
+                  </>
                 ) : (
-                  <div className="sbg-body">
-                    <ul className="sbg-list" data-sbg-list>
-                      {state.plans.map((p) => (
-                        <li key={p.goal.id} className={plan?.goal.id === p.goal.id ? 'active' : ''}>
-                          <button className="sbg-list-main" onClick={() => setSelected(p.goal.id)}>
-                            <ItemPic id={p.goal.id} name={p.name} size={30} className="sbg-list-pic" />
-                            <span className="sbg-list-name" style={{ color: colorOf(p.color) }}>
-                              {p.goal.amount > 1 && <span className="faint">{p.goal.amount} × </span>}
-                              {p.name}
-                            </span>
-                            <span className="sbg-bar">
-                              <i
-                                style={{
-                                  width: `${Math.round(p.progress * 100)}%`
-                                }}
-                              />
-                            </span>
-                            <span className="faint sbg-list-meta">
-                              {Math.round(p.progress * 100)}% · {timeLeft(p) || 'No time estimate yet'}
-                              {p.blockers.some((b) => b.check.met === false) && (
-                                <>
-                                  {' '}
-                                  · <Lock size={10} /> {p.blockers.filter((b) => b.check.met === false).length}
-                                </>
-                              )}
-                            </span>
-                          </button>
-                          <button
-                            className="icon-btn"
-                            title={p.goal.pinned ? 'Unpin (hide from Home)' : 'Pin (show on Home)'}
-                            onClick={() =>
-                              run(() =>
-                                window.api.skyblockGoalsUpdate(p.goal.id, {
-                                  pinned: !p.goal.pinned
-                                })
-                              )
-                            }
-                          >
-                            {p.goal.pinned ? <Pin size={13} className="sbg-pinned" /> : <PinOff size={13} />}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                    {plan && <GoalView plan={plan} view={view} setView={setView} run={run} hasProfile={!!state.profile} />}
+                  <div className="sbg-empty">
+                    <p>{state.ready ? 'Press Refresh to read your profile.' : 'Set up Hypixel on the Games page to see your profile, or look up any player above.'}</p>
                   </div>
-                )}
-              </>
-            )}
-          </>
-        )}
+                ))}
+              {shownTab === 'progress' && (mine ? <ProgressPage page={mine} /> : <div className="sbg-empty">Your progress shows once Orbit has read your profile.</div>)}
+              {shownTab === 'helpers' && <HelpersPage profileId={mine?.view.profileId ?? ''} />}
+              {shownTab === 'compare' && <ComparePage mine={mine} other={other} friends={friends} setFriends={setFriends} open={(who) => void openPlayer(who)} />}
+              {shownTab === 'goals' && (
+                <>
+                  {state.profile && state.profile.mode !== 'ironman' && (
+                    <p className="faint sbg-note">This profile isn’t ironman. The planner still works, but it never uses the Bazaar or Auction House.</p>
+                  )}
+                  {mine && mine.choices.length > 1 && (
+                    <p className="faint sbg-note">
+                      Goals for <b>{mine.view.profileName}</b>. Each of your profiles keeps its own goals: switch profile from the Profile page.
+                    </p>
+                  )}
+                  <AddGoal onAdd={(id, amount) => run(() => window.api.skyblockGoalsAdd(id, amount)).then(() => setSelected(id))} />
+                  {state.plans.length === 0 ? (
+                    <div className="sbg-empty">
+                      <Pickaxe size={22} />
+                      <p>Search for something you want, like a Terminator or Aspect of the End, and add it as a goal.</p>
+                    </div>
+                  ) : (
+                    <div className="sbg-body">
+                      <ul className="sbg-list" data-sbg-list>
+                        {state.plans.map((p) => (
+                          <li key={p.goal.id} className={plan?.goal.id === p.goal.id ? 'active' : ''}>
+                            <button className="sbg-list-main" onClick={() => setSelected(p.goal.id)}>
+                              <ItemPic id={p.goal.id} name={p.name} size={30} className="sbg-list-pic" />
+                              <span className="sbg-list-name" style={{ color: colorOf(p.color) }}>
+                                {p.goal.amount > 1 && <span className="faint">{p.goal.amount} × </span>}
+                                {p.name}
+                              </span>
+                              <span className="sbg-bar">
+                                <i
+                                  style={{
+                                    width: `${Math.round(p.progress * 100)}%`
+                                  }}
+                                />
+                              </span>
+                              <span className="faint sbg-list-meta">
+                                {Math.round(p.progress * 100)}% · {timeLeft(p) || 'No time estimate yet'}
+                                {p.blockers.some((b) => b.check.met === false) && (
+                                  <>
+                                    {' '}
+                                    · <Lock size={10} /> {p.blockers.filter((b) => b.check.met === false).length}
+                                  </>
+                                )}
+                              </span>
+                            </button>
+                            <button
+                              className="icon-btn"
+                              title={p.goal.pinned ? 'Unpin (hide from Home)' : 'Pin (show on Home)'}
+                              onClick={() =>
+                                run(() =>
+                                  window.api.skyblockGoalsUpdate(p.goal.id, {
+                                    pinned: !p.goal.pinned
+                                  })
+                                )
+                              }
+                            >
+                              {p.goal.pinned ? <Pin size={13} className="sbg-pinned" /> : <PinOff size={13} />}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                      {plan && <GoalView plan={plan} view={view} setView={setView} run={run} hasProfile={!!state.profile} />}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
+      {state.data && !state.downloading && (
+        <nav className="sbx-dock" data-sbx-dock>
+          {dock.map((d) => (
+            <button key={d.id} className={shownTab === d.id ? 'active' : ''} onClick={() => setTab(d.id)} data-sbg-page={d.id}>
+              <ItemPic id={d.icon} name={d.label} size={22} />
+              <span>
+                {d.label}
+                {d.id === 'goals' && state.plans.length ? ` (${state.plans.length})` : ''}
+              </span>
+            </button>
+          ))}
+        </nav>
+      )}
+      {share && page && <ShareCard page={page} close={() => setShare(false)} />}
     </div>
   )
 }

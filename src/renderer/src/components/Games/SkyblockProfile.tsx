@@ -1,13 +1,14 @@
 import { Component, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
-import { Plus, Search, X } from 'lucide-react'
+import { ChevronDown, Plus, Search, Share2, Star, X } from 'lucide-react'
 import { describeMinutes, MODE_NAMES, shortNumber } from '@shared/skyblock'
 import { MC_COLORS } from '@shared/skyblockGoals'
 import type { Level, SbPet, SbProfileView, SbViewItem } from '@shared/skyblockProfile'
+import { statBreakdown, type SbProfilePage } from '@shared/skyblockMore'
 import { errorMessage } from '../../lib/paths'
 import { notify } from '../../store/notify'
 import { Head, ItemPic } from './SkyblockPic'
 
-const fmt = (n: number | null | undefined): string => (n === null || n === undefined ? '—' : Math.round(n).toLocaleString('en-GB'))
+export const fmt = (n: number | null | undefined): string => (n === null || n === undefined ? '—' : Math.round(n).toLocaleString('en-GB'))
 const clean = (err: unknown): string => errorMessage(err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
 
 const RARITY_COLOR: Record<string, string> = {
@@ -22,7 +23,7 @@ const RARITY_COLOR: Record<string, string> = {
   'VERY SPECIAL': '#ff6b6b'
 }
 const RARITIES = ['COMMON', 'UNCOMMON', 'RARE', 'EPIC', 'LEGENDARY', 'MYTHIC', 'DIVINE', 'SPECIAL', 'VERY SPECIAL']
-const rarityColor = (r: string | undefined): string => (r && RARITY_COLOR[r]) || 'var(--border-strong)'
+export const rarityColor = (r: string | undefined): string => (r && RARITY_COLOR[r]) || 'var(--border-strong)'
 const plain = (s: string): string => s.replace(/§./g, '')
 const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX']
 const roman = (n: number): string => ROMAN[n] ?? String(n)
@@ -115,7 +116,7 @@ function Lore({ item }: { item: SbViewItem }) {
   )
 }
 
-function Detail() {
+function Detail({ mine }: { mine: boolean }) {
   const [p, setP] = useState<Picked | null>(null)
   useEffect(() => {
     pickSetter = setP
@@ -157,7 +158,7 @@ function Detail() {
           {p.note && <div className="sbp-tip-line faint">{p.note}</div>}
         </div>
       )}
-      {p.id && (
+      {p.id && mine && (
         <div className="sbp-detail-actions">
           <button className="btn btn-primary" onClick={() => void addGoal()} data-sbp-add-goal>
             <Plus size={13} /> {p.item ? 'Add another as a goal' : 'Add as a goal'}
@@ -175,7 +176,7 @@ function Detail() {
 
 // ---------- building blocks ----------
 
-function Slot({ item, size = 40 }: { item: SbViewItem | null; size?: number }) {
+export function Slot({ item, size = 40 }: { item: SbViewItem | null; size?: number }) {
   if (!item) return <div className="sbp-slot empty" style={{ width: size, height: size }} />
   return (
     <button
@@ -217,7 +218,7 @@ function Chest({ items, cols = 9, title }: { items: (SbViewItem | null)[]; cols?
 }
 
 /** A round progress ring with something in the middle. */
-function Ring({ progress, size = 64, children, maxed }: { progress: number; size?: number; children?: ReactNode; maxed?: boolean }) {
+export function Ring({ progress, size = 64, children, maxed }: { progress: number; size?: number; children?: ReactNode; maxed?: boolean }) {
   const r = size / 2 - 4
   const c = 2 * Math.PI * r
   return (
@@ -232,7 +233,7 @@ function Ring({ progress, size = 64, children, maxed }: { progress: number; size
 }
 
 /** A card with a ring, a picture and a level: skills, slayers, classes, HotM… */
-function LevelCard({ icon, name, l, sub, extra }: { icon: ReactNode; name: string; l: Level; sub?: ReactNode; extra?: ReactNode }) {
+export function LevelCard({ icon, name, l, sub, extra }: { icon: ReactNode; name: string; l: Level; sub?: ReactNode; extra?: ReactNode }) {
   const maxed = l.level >= l.max
   return (
     <div className={`sbp-lcard ${maxed ? 'maxed' : ''}`}>
@@ -249,7 +250,7 @@ function LevelCard({ icon, name, l, sub, extra }: { icon: ReactNode; name: strin
   )
 }
 
-function Bar({ progress, color }: { progress: number; color?: string }) {
+export function Bar({ progress, color }: { progress: number; color?: string }) {
   return (
     <span className="sbp-bar2">
       <i style={{ width: `${Math.round(Math.max(0, Math.min(1, progress)) * 100)}%`, background: color }} />
@@ -257,7 +258,7 @@ function Bar({ progress, color }: { progress: number; color?: string }) {
   )
 }
 
-function Chip({ label, value, icon, tone }: { label: string; value: ReactNode; icon?: ReactNode; tone?: string }) {
+export function Chip({ label, value, icon, tone }: { label: string; value: ReactNode; icon?: ReactNode; tone?: string }) {
   return (
     <div className="sbp-chip" style={tone ? ({ '--tone': tone } as CSSProperties) : undefined}>
       {icon}
@@ -269,7 +270,7 @@ function Chip({ label, value, icon, tone }: { label: string; value: ReactNode; i
   )
 }
 
-function Panel({ title, children, wide, right }: { title: ReactNode; children: ReactNode; wide?: boolean; right?: ReactNode }) {
+export function Panel({ title, children, wide, right }: { title: ReactNode; children: ReactNode; wide?: boolean; right?: ReactNode }) {
   return (
     <section className={`sbp-panel ${wide ? 'wide' : ''}`}>
       <header>
@@ -281,10 +282,10 @@ function Panel({ title, children, wide, right }: { title: ReactNode; children: R
   )
 }
 
-const Nothing = ({ what }: { what: string }) => <p className="faint sbp-nothing">{what}</p>
+export const Nothing = ({ what }: { what: string }) => <p className="faint sbp-nothing">{what}</p>
 
 /** Small tile with a picture: collections, minions, missing accessories, museum… */
-function Tile({
+export function Tile({
   id,
   name,
   children,
@@ -321,6 +322,7 @@ function Tile({
 
 const SECTIONS = [
   ['overview', 'Overview', 'NETHER_STAR'],
+  ['networth', 'Networth', 'EMERALD'],
   ['gear', 'Gear', 'DIAMOND_CHESTPLATE'],
   ['inventories', 'Inventories', 'CHEST'],
   ['accessories', 'Accessories', 'HEGEMONY_ARTIFACT'],
@@ -335,6 +337,7 @@ const SECTIONS = [
   ['crimson', 'Crimson Isle', 'BLAZE_ROD'],
   ['rift', 'Rift', 'RIFT_PRISM'],
   ['museum', 'Museum', 'ITEM_FRAME'],
+  ['coop', 'Co-op', 'CAKE'],
   ['stats', 'Misc stats', 'BOOK_AND_QUILL']
 ] as const
 type Section = (typeof SECTIONS)[number][0]
@@ -364,7 +367,7 @@ const SLAYER_ICONS: Record<string, string> = {
 const CLASS_ICONS: Record<string, string> = { healer: 'POTION', mage: 'BLAZE_ROD', berserk: 'IRON_SWORD', archer: 'BOW', tank: 'LEATHER_CHESTPLATE' }
 
 /** The SkyBlock level colours, as in game. */
-function levelColor(l: number): string {
+export function levelColor(l: number): string {
   const steps: [number, string][] = [
     [480, '#aa0000'],
     [440, '#ff5555'],
@@ -382,35 +385,19 @@ function levelColor(l: number): string {
   return steps.find(([at]) => l >= at)?.[1] ?? '#aaaaaa'
 }
 
-/** Your SkyBlock profile, like SkyCrypt but only for you and inside Orbit. */
-export default function SkyblockProfile() {
-  const [view, setView] = useState<SbProfileView | null | undefined>(undefined)
+/** A SkyBlock profile page (yours or anyone's), like SkyCrypt inside Orbit. */
+export default function SkyblockProfile({ page, onChoose, onShare }: { page: SbProfilePage; onChoose: (profileId: string) => void; onShare: () => void }) {
   const [section, setSection] = useState<Section>('overview')
-  useEffect(() => {
-    let alive = true
-    const load = (): void => void window.api.skyblockProfileView().then((v) => alive && setView(v))
-    load()
-    const off = window.api.onSkyblockGoalsChanged(load)
-    return () => {
-      alive = false
-      off()
-    }
-  }, [])
-  if (view === undefined) return null
-  if (!view)
-    return (
-      <div className="sbg-empty">
-        <p>Your profile shows here once Orbit has asked Hypixel. Press Refresh above.</p>
-      </div>
-    )
+  const view = page.view
+  const shown = SECTIONS.filter(([id]) => id !== 'coop' || (view.coop?.length ?? 0) > 1)
   return (
     <div className="sbp" data-sbp>
       <ItemTip />
-      <Detail />
-      <Hero v={view} go={setSection} />
+      <Detail mine={page.mine} />
+      <Hero page={page} go={setSection} onChoose={onChoose} onShare={onShare} />
       <div className="sbp-layout">
         <nav className="sbp-nav">
-          {SECTIONS.map(([id, name, icon]) => (
+          {shown.map(([id, name, icon]) => (
             <button key={id} className={section === id ? 'active' : ''} onClick={() => setSection(id)} data-sbp-section={id}>
               <ItemPic id={icon} name={name} size={20} />
               <span>{name}</span>
@@ -420,6 +407,8 @@ export default function SkyblockProfile() {
         <SectionGuard key={section}>
           <div className="sbp-body">
             {section === 'overview' && <Overview v={view} go={setSection} />}
+            {section === 'networth' && <NetworthSection v={view} />}
+            {section === 'coop' && <Coop v={view} />}
             {section === 'gear' && <Gear v={view} />}
             {section === 'inventories' && <Inventories v={view} />}
             {section === 'accessories' && <Accessories v={view} />}
@@ -442,28 +431,78 @@ export default function SkyblockProfile() {
   )
 }
 
-function Hero({ v, go }: { v: SbProfileView; go: (s: Section) => void }) {
+function Hero({ page, go, onChoose, onShare }: { page: SbProfilePage; go: (s: Section) => void; onChoose: (profileId: string) => void; onShare: () => void }) {
+  const v = page.view
+  const [open, setOpen] = useState(false)
   const lvl = v.skyblockLevel.level
   const mp = v.accessories ? (v.accessories.highestMagicalPower ?? v.accessories.magicalPower) : null
+  const name = page.player.name || v.player?.name || 'You'
+  const skin = page.player.skin || v.player?.skin
   return (
     <header className="sbp-hero" style={{ '--lvl': levelColor(lvl) } as CSSProperties}>
-      <div className="sbp-hero-head">{v.player?.skin ? <Head skin={v.player.skin} size={84} /> : <ItemPic id="SKULL_ITEM-3" name="Steve" size={84} />}</div>
+      <div className="sbp-hero-head">{skin ? <Head skin={skin} size={84} /> : <ItemPic id="SKULL_ITEM-3" name="Steve" size={84} />}</div>
       <div className="sbp-hero-main">
         <div className="sbp-hero-name">
           <Ring progress={v.skyblockLevel.progress} size={46}>
             <b className="sbp-hero-lvl">{lvl}</b>
           </Ring>
           <div>
-            <h3>{v.player?.name || 'You'}</h3>
+            <h3>
+              {name}
+              {page.starred && <Star size={14} className="sbp-hero-star" fill="currentColor" />}
+            </h3>
             <span className="sbp-hero-sub">
-              <span className="sbp-badge">{v.profileName || 'Profile'}</span>
+              <span className="sbp-switch">
+                <button className="sbp-badge sbp-switch-btn" onClick={() => setOpen((o) => !o)} disabled={page.choices.length < 2} title="Switch profile" data-sbp-switch>
+                  {v.profileName || 'Profile'}
+                  {page.choices.length > 1 && <ChevronDown size={12} />}
+                </button>
+                {open && (
+                  <>
+                    <div className="sbp-switch-shield" onMouseDown={() => setOpen(false)} />
+                    <div className="sbp-switch-menu" data-sbp-switch-menu>
+                      {page.choices.map((c) => (
+                        <button
+                          key={c.id}
+                          className={c.id === v.profileId ? 'active' : ''}
+                          onClick={() => {
+                            setOpen(false)
+                            if (c.id !== v.profileId) onChoose(c.id)
+                          }}
+                          data-sbp-choice={c.name}
+                        >
+                          <b>{c.name}</b>
+                          {c.mode && <span className={`sbp-badge mode-${c.mode}`}>{MODE_NAMES[c.mode] ?? c.mode}</span>}
+                          <span className="faint">
+                            Level {c.level}
+                            {c.members > 1 ? ` · co-op of ${c.members}` : ''}
+                            {c.selected ? ' · on now' : ''}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </span>
               {v.mode && <span className={`sbp-badge mode-${v.mode}`}>{MODE_NAMES[v.mode] ?? v.mode}</span>}
-              {v.coopMembers > 1 && <span className="sbp-badge">Co-op of {v.coopMembers}</span>}
+              {v.coopMembers > 1 && (
+                <button className="sbp-badge sbp-badge-btn" onClick={() => go('coop')}>
+                  Co-op of {v.coopMembers}
+                </button>
+              )}
               <span className="faint">checked {new Date(v.at).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
             </span>
           </div>
+          <button className="btn sbp-hero-share" onClick={onShare} title="Make a picture of this profile to share" data-sbp-share>
+            <Share2 size={13} /> Share card
+          </button>
         </div>
         <div className="sbp-hero-chips">
+          {v.networth && (
+            <button className="sbp-chip-btn" onClick={() => go('networth')}>
+              <Chip label="Networth" value={shortNumber(v.networth.total)} icon={<ItemPic id="EMERALD" size={22} />} tone="#8fe3ff" />
+            </button>
+          )}
           <Chip label="Purse" value={shortNumber(v.purse ?? 0)} icon={<ItemPic id="GOLD_INGOT" size={22} />} tone="#fcc419" />
           <Chip label="Bank" value={v.bank === null ? 'API off' : shortNumber(v.bank)} icon={<ItemPic id="GOLD_BLOCK" size={22} />} tone="#fab005" />
           <button className="sbp-chip-btn" onClick={() => go('overview')}>
@@ -483,6 +522,161 @@ function Hero({ v, go }: { v: SbProfileView; go: (s: Section) => void }) {
         </div>
       </div>
     </header>
+  )
+}
+
+const SECTION_ICONS: Record<string, string> = {
+  armor: 'DIAMOND_CHESTPLATE',
+  wardrobe: 'ARMOR_STAND',
+  inventory: 'CHEST',
+  ender: 'ENDER_CHEST',
+  backpacks: 'LARGE_BACKPACK',
+  vault: 'IRON_CHEST',
+  bags: 'LARGE_FISHING_BAG',
+  sacks: 'LARGE_ENCHANTED_MINING_SACK',
+  accessories: 'HEGEMONY_ARTIFACT',
+  pets: 'BEE;4',
+  museum: 'ITEM_FRAME'
+}
+
+function NetworthSection({ v }: { v: SbProfileView }) {
+  const [open, setOpen] = useState<string | null>(null)
+  const nw = v.networth
+  if (!nw) return <Nothing what="Orbit is still fetching item prices. Networth shows up here in a moment." />
+  const most = Math.max(1, ...nw.sections.map((s) => s.value), nw.coins)
+  const top = nw.sections
+    .flatMap((s) => s.items)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 12)
+  return (
+    <div className="sbp-panels">
+      <Panel
+        title="Networth"
+        wide
+        right={<span className="faint">prices from {nw.pricesAt ? new Date(nw.pricesAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'earlier'}</span>}
+      >
+        <div className="sbp-nw-total" data-sbp-networth>
+          <b>{fmt(nw.total)}</b>
+          <span className="faint">coins · {shortNumber(nw.total)}</span>
+        </div>
+        <p className="faint sbp-hint">
+          Items are valued at their lowest Auction House BIN or Bazaar price{v.mode === 'ironman' ? ', even on Ironman where you can’t sell them' : ''}.
+          {nw.unpriced > 0 && ` ${fmt(nw.unpriced)} item${nw.unpriced === 1 ? ' has' : 's have'} no price and ${nw.unpriced === 1 ? 'isn’t' : 'aren’t'} counted.`}
+        </p>
+        <div className="sbp-nw-rows">
+          <div className="sbp-nw-row">
+            <ItemPic id="GOLD_INGOT" size={22} />
+            <span>Purse and bank</span>
+            <Bar progress={nw.coins / most} color="#fcc419" />
+            <b>{shortNumber(nw.coins)}</b>
+          </div>
+          {nw.sections
+            .filter((s) => s.value > 0)
+            .sort((a, b) => b.value - a.value)
+            .map((s) => (
+              <div key={s.id} className="sbp-nw-group">
+                <button className="sbp-nw-row" onClick={() => setOpen(open === s.id ? null : s.id)} data-sbp-nw-section={s.id}>
+                  <ItemPic id={SECTION_ICONS[s.id] ?? 'CHEST'} size={22} />
+                  <span>{s.name}</span>
+                  <Bar progress={s.value / most} color="#8fe3ff" />
+                  <b>{shortNumber(s.value)}</b>
+                </button>
+                {open === s.id && (
+                  <div className="sbp-nw-items">
+                    {[...s.items]
+                      .sort((a, b) => b.value - a.value)
+                      .slice(0, 40)
+                      .map((it, i) => (
+                        <div key={i} className="sbp-nw-item">
+                          <ItemPic id={it.id} name={it.name} size={20} />
+                          <span>
+                            {it.name}
+                            {it.count > 1 && <span className="faint"> ×{fmt(it.count)}</span>}
+                          </span>
+                          <b>{shortNumber(it.value)}</b>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            ))}
+        </div>
+      </Panel>
+      <Panel title="Most valuable" wide>
+        <div className="sbp-nw-top">
+          {top.map((it, i) => (
+            <div key={i} className="sbp-nw-card">
+              <ItemPic id={it.id} name={it.name} size={36} />
+              <span>{it.name}</span>
+              <b>{shortNumber(it.value)}</b>
+            </div>
+          ))}
+        </div>
+      </Panel>
+    </div>
+  )
+}
+
+function Coop({ v }: { v: SbProfileView }) {
+  const members = v.coop ?? []
+  const [sort, setSort] = useState<string | null>(null)
+  const names = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const g of v.collections ?? []) for (const c of g.items) m.set(c.id, c.name)
+    return m
+  }, [v.collections])
+  const ids = useMemo(() => {
+    const total = new Map<string, number>()
+    for (const mem of members) for (const [id, n] of Object.entries(mem.collections)) total.set(id, (total.get(id) ?? 0) + n)
+    return [...total].sort((a, b) => b[1] - a[1]).map(([id]) => id)
+  }, [members])
+  if (members.length < 2) return <Nothing what="This profile isn’t a co-op." />
+  const shownIds = sort ? [sort, ...ids.filter((i) => i !== sort)] : ids
+  return (
+    <div className="sbp-panels">
+      <Panel title={`Co-op of ${members.length}`} wide>
+        <div className="sbp-coop-members">
+          {members.map((m) => (
+            <div key={m.uuid} className={`sbp-coop-member ${m.you ? 'you' : ''}`} data-sbp-coop={m.name || m.uuid}>
+              <b>{m.name || 'Loading name…'}</b>
+              {m.you && <span className="sbp-badge">This player</span>}
+              <span className="faint">
+                Level {m.skyblockLevel} · {m.minionTiers} minion tiers
+              </span>
+            </div>
+          ))}
+        </div>
+      </Panel>
+      <Panel title="Who collected what" wide right={<span className="faint">click a row to put it first</span>}>
+        <div className="sbp-coop-table">
+          <div className="sbp-coop-row head">
+            <span>Collection</span>
+            {members.map((m) => (
+              <span key={m.uuid}>{m.name || '…'}</span>
+            ))}
+          </div>
+          {shownIds.slice(0, 60).map((id) => {
+            const total = members.reduce((a, m) => a + (m.collections[id] ?? 0), 0) || 1
+            return (
+              <button key={id} className="sbp-coop-row" onClick={() => setSort(id)}>
+                <span className="sbp-coop-name">
+                  <ItemPic id={id} size={18} /> {names.get(id) ?? id.toLowerCase().replace(/_/g, ' ')}
+                </span>
+                {members.map((m) => {
+                  const n = m.collections[id] ?? 0
+                  return (
+                    <span key={m.uuid} className="sbp-coop-cell">
+                      <Bar progress={n / total} color={m.you ? '#8fe3ff' : '#b4a2ff'} />
+                      <small>{shortNumber(n)}</small>
+                    </span>
+                  )
+                })}
+              </button>
+            )
+          })}
+        </div>
+      </Panel>
+    </div>
   )
 }
 
@@ -695,6 +889,8 @@ function Gear({ v }: { v: SbProfileView }) {
           </div>
         </Panel>
       )}
+      <GearStats armor={shownArmor} equipment={shownEquip} accessories={v.accessories?.items ?? []} label={preview?.label} />
+      {g.loadouts.length + g.wardrobe.length > 1 && <CompareSets g={g} />}
       <Panel title={`Wardrobe (${g.wardrobe.length})`} wide right={!g.loadouts.length && back}>
         <SetRow
           sets={g.wardrobe}
@@ -716,6 +912,139 @@ function Gear({ v }: { v: SbProfileView }) {
         </Panel>
       )}
     </div>
+  )
+}
+
+/** Every stat from the armour, equipment and accessories (as their descriptions give it), and where it comes from. */
+function GearStats({ armor, equipment, accessories, label }: { armor: (SbViewItem | null)[]; equipment: (SbViewItem | null)[]; accessories: SbViewItem[]; label?: string }) {
+  const [open, setOpen] = useState<string | null>(null)
+  const lines = useMemo(
+    () =>
+      statBreakdown([
+        { source: 'Armour', items: armor },
+        { source: 'Equipment', items: equipment },
+        { source: 'Accessories', items: accessories }
+      ]),
+    [armor, equipment, accessories]
+  )
+  return (
+    <Panel title="Stats from your gear" wide right={<span className="faint">{label ? `with ${label}` : 'as worn'}</span>}>
+      {lines.length ? (
+        <div className="sbp-stats-grid" data-sbp-stats>
+          {lines.map((l) => (
+            <button key={l.stat} className={`sbp-stat ${open === l.stat ? 'open' : ''}`} onClick={() => setOpen(open === l.stat ? null : l.stat)}>
+              <span className="sbp-stat-name">{l.stat}</span>
+              <b>
+                {l.total > 0 ? '+' : ''}
+                {fmt(l.total)}
+              </b>
+              <span className="sbp-stat-split">
+                {l.from.map((f) => (
+                  <span
+                    key={f.source}
+                    className={`sbp-stat-src src-${f.source.toLowerCase()}`}
+                    style={{ flexGrow: Math.max(1, Math.abs(f.value)) }}
+                    title={`${f.source}: ${fmt(f.value)}`}
+                  />
+                ))}
+              </span>
+              {open === l.stat && (
+                <span className="sbp-stat-items">
+                  {l.from.flatMap((f) =>
+                    f.items
+                      .sort((a, b) => b.value - a.value)
+                      .slice(0, 8)
+                      .map((it, i) => (
+                        <small key={`${f.source}${i}`}>
+                          <span className="faint">{f.source}</span> {it.name} <b>{fmt(it.value)}</b>
+                        </small>
+                      ))
+                  )}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <Nothing what="No stats found on your gear." />
+      )}
+      <p className="faint sbp-hint">Added up from each item’s description, so reforges, enchants and gemstones are in. Skills, pets and potions aren’t.</p>
+    </Panel>
+  )
+}
+
+type GearSets = {
+  wardrobe: ItemSet[]
+  equipmentSets: ItemSet[]
+  loadouts: NonNullable<NonNullable<SbProfileView['gear']>['loadouts']>
+  armor: (SbViewItem | null)[]
+  equipment: (SbViewItem | null)[]
+}
+
+/** Two loadouts or wardrobe sets side by side, stat by stat. */
+function CompareSets({ g }: { g: GearSets }) {
+  const options = useMemo(() => {
+    const out: { key: string; label: string; items: (SbViewItem | null)[] }[] = [{ key: 'worn', label: 'What you’re wearing', items: [...g.armor, ...g.equipment] }]
+    for (const l of g.loadouts) {
+      const a = g.wardrobe.find((w) => w.slot === l.armorSet)?.pieces ?? g.armor
+      const e = g.equipmentSets.find((w) => w.slot === l.equipmentSet)?.pieces ?? g.equipment
+      out.push({ key: `l${l.slot}`, label: `Loadout: ${plain(l.name)}`, items: [...a, ...e] })
+    }
+    for (const w of g.wardrobe) out.push({ key: `w${w.slot}`, label: `Wardrobe set ${w.slot}`, items: w.pieces })
+    return out
+  }, [g])
+  const [a, setA] = useState(options[0]?.key ?? '')
+  const [b, setB] = useState(options[1]?.key ?? '')
+  const left = options.find((o) => o.key === a)
+  const right = options.find((o) => o.key === b)
+  const rows = useMemo(() => {
+    const ls = statBreakdown([{ source: 'A', items: left?.items ?? [] }])
+    const rs = statBreakdown([{ source: 'B', items: right?.items ?? [] }])
+    const stats = [...new Set([...ls.map((l) => l.stat), ...rs.map((l) => l.stat)])]
+    return stats.map((stat) => ({ stat, a: ls.find((l) => l.stat === stat)?.total ?? 0, b: rs.find((l) => l.stat === stat)?.total ?? 0 }))
+  }, [left, right])
+  const pickBox = (value: string, set: (k: string) => void, name: string) => (
+    <select value={value} onChange={(e) => set(e.target.value)} data-sbp-compare={name}>
+      {options.map((o) => (
+        <option key={o.key} value={o.key}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  )
+  return (
+    <Panel title="Compare sets" wide>
+      <div className="sbp-compare-pick">
+        {pickBox(a, setA, 'a')}
+        <span className="faint">against</span>
+        {pickBox(b, setB, 'b')}
+      </div>
+      <div className="sbp-compare-sets">
+        <div className="sbp-loadout-items">
+          {left?.items.map((p, i) => (
+            <Slot key={i} item={p} size={36} />
+          ))}
+        </div>
+        <div className="sbp-loadout-items">
+          {right?.items.map((p, i) => (
+            <Slot key={i} item={p} size={36} />
+          ))}
+        </div>
+      </div>
+      <div className="sbp-compare-table">
+        {rows.map((r) => {
+          const d = r.b - r.a
+          return (
+            <div key={r.stat} className="sbp-compare-row">
+              <span>{r.stat}</span>
+              <b>{fmt(r.a)}</b>
+              <b>{fmt(r.b)}</b>
+              <span className={d > 0 ? 'up' : d < 0 ? 'down' : 'faint'}>{d === 0 ? 'same' : `${d > 0 ? '+' : ''}${fmt(d)}`}</span>
+            </div>
+          )
+        })}
+      </div>
+    </Panel>
   )
 }
 

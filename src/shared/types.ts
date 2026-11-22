@@ -1235,6 +1235,28 @@ export interface NotesApi {
   skyblockGoalsDownload(): Promise<SkyblockGoalsState>
   /** The SkyBlock profile page: levels, gear, accessories, pets, collections and the rest. */
   skyblockProfileView(): Promise<SbProfileView | null>
+  /** Your profile page: the view plus your profiles, history, "since last time" and milestones. */
+  skyblockProfilePage(): Promise<import('./skyblockMore').SbProfilePage | null>
+  /** Shows another of your profiles (goals, history and helpers follow it). */
+  skyblockProfileChoose(id: string): Promise<SkyblockGoalsState>
+  /** You've looked at this profile now ("since last time" starts again). */
+  skyblockProfileSeen(id: string): Promise<void>
+  /** Anyone's profile page by Minecraft name or id; `fresh` asks Hypixel again. */
+  skyblockPlayersLookup(who: string, profileId?: string, fresh?: boolean): Promise<import('./skyblockMore').SbProfilePage>
+  /** Players you've looked up or starred, with their last numbers. */
+  skyblockPlayersList(): Promise<import('./skyblockMore').SbFriend[]>
+  skyblockPlayersStar(uuid: string, on: boolean): Promise<import('./skyblockMore').SbFriend[]>
+  skyblockPlayersForget(uuid: string): Promise<import('./skyblockMore').SbFriend[]>
+  /** Looks every starred player up again for the friends board. */
+  skyblockPlayersRefreshStarred(): Promise<import('./skyblockMore').SbFriend[]>
+  /** Ironman helpers for the profile you're looking at. */
+  skyblockHelpers(): Promise<{
+    craftable: import('./skyblockMore').Craftable[]
+    mp: import('./skyblockMore').MpStep[]
+    minions: import('./skyblockMore').MinionStep[]
+  } | null>
+  /** The SkyBlock date, the next events and the mayor. */
+  skyblockCalendar(): Promise<{ now: import('./skyblockMore').SbDate; events: import('./skyblockMore').SbEvent[]; mayor: import('./skyblockMore').SbMayor | null }>
   /** Asks Hypixel for what you own now. */
   skyblockGoalsRefresh(): Promise<SkyblockGoalsState>
   skyblockGoalsSearch(query: string): Promise<SkyblockItemHit[]>

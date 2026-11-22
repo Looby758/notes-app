@@ -22,6 +22,39 @@ import {
 } from '@shared/skyblockGoals'
 import type { SkyblockGoalsState, SkyblockItemHit } from '@shared/skyblockGoals'
 import { buildExtras, profileView, type SbProfileView } from '@shared/skyblockProfile'
+import {
+  addSnapshot,
+  changesBetween,
+  coopMembers,
+  craftableNow,
+  friendSummary,
+  milestones,
+  minionHelper,
+  mpPlanner,
+  networthOf,
+  profileList,
+  skyblockDate,
+  snapshotOf,
+  thin,
+  upcomingEvents,
+  type SbProfileChoice,
+  type SbProfilePage,
+  type SbSnapshot
+} from '@shared/skyblockMore'
+import {
+  currentMayor,
+  currentPrices,
+  errorText,
+  forgetPlayer,
+  lookedUp,
+  onPricesChanged,
+  playerById,
+  playerByName,
+  readHistory,
+  rememberPlayer,
+  starPlayer,
+  writeHistory
+} from './skyblockPlayers'
 import { hypixel, KeyRejected, onSkyblockProfiles, skyblockAccount } from './skyblock'
 import { logError } from './log'
 import { neuItemIcons, onAddonChanged, saveNeuPictures, skyblockAddonReady, slotIcon } from './skyblockAddonFiles'
@@ -43,7 +76,14 @@ const PLAY_REFRESH = Number(process.env.NOTES_SKYBLOCK_GOALS_REFRESH_MS) || 10 *
 const MAX_GOALS = 40
 
 interface Stored {
-  goals: SbGoal[]
+  /** Goals for each of your profiles (by profile id; '' before Orbit knows which profile). */
+  goalsBy: Record<string, SbGoal[]>
+  /** The profile you're looking at in Orbit ('' = the one you're on in game). */
+  viewing: string
+  /** Your profiles, for the switcher. */
+  choices: SbProfileChoice[]
+  /** When you last looked at each profile, for "since last time". */
+  seen: Record<string, number>
   profile: SbProfileData | null
   /** The profile page's view, and the last garden and museum answers (only the parts it uses). */
   view?: SbProfileView | null
@@ -67,12 +107,38 @@ function load(): Stored {
   if (stored) return stored
   try {
     const raw = JSON.parse(readFileSync(goalsFile(), 'utf8'))
-    stored = { goals: Array.isArray(raw.goals) ? raw.goals : [], profile: raw.profile ?? null, view: raw.view ?? null, garden: raw.garden, museum: raw.museum, player: raw.player }
+    const goalsBy: Record<string, SbGoal[]> = raw.goalsBy && typeof raw.goalsBy === 'object' ? raw.goalsBy : {}
+    // Goals from before profiles were kept apart belong to the profile that was showing.
+    if (Array.isArray(raw.goals) && raw.goals.length) goalsBy[raw.view?.profileId ?? ''] = [...(goalsBy[raw.view?.profileId ?? ''] ?? []), ...raw.goals]
+    stored = {
+      goalsBy,
+      viewing: typeof raw.viewing === 'string' ? raw.viewing : '',
+      choices: Array.isArray(raw.choices) ? raw.choices : [],
+      seen: raw.seen && typeof raw.seen === 'object' ? raw.seen : {},
+      profile: raw.profile ?? null,
+      view: raw.view ?? null,
+      garden: raw.garden,
+      museum: raw.museum,
+      player: raw.player
+    }
   } catch {
-    stored = { goals: [], profile: null }
+    stored = { goalsBy: {}, viewing: '', choices: [], seen: {}, profile: null }
   }
   return stored!
 }
+
+/** The profile whose goals are showing. */
+const goalsKey = (): string => load().view?.profileId ?? load().viewing ?? ''
+
+/** The goals for the profile you're looking at. */
+function goals(): SbGoal[] {
+  const s = load()
+  const key = goalsKey()
+  if (!s.goalsBy[key]) s.goalsBy[key] = []
+  return s.goalsBy[key]
+}
+
+const anyGoals = (): boolean => Object.values(load().goalsBy).some((g) => g.length > 0)
 
 function writeJson(file: string, value: unknown): void {
   writeFileSync(`${file}.tmp`, JSON.stringify(value), 'utf8')
@@ -105,7 +171,7 @@ function state(): SkyblockGoalsState {
   const s = load()
   const d = getData()
   const acct = skyblockAccount()
-  const goals = orderGoals(s.goals)
+  const list = orderGoals(goals())
   return {
     installed: skyblockAddonReady(),
     ready: !!acct.key && !!acct.uuid,
@@ -116,8 +182,10 @@ function state(): SkyblockGoalsState {
     profileError,
     refreshing,
     keyWarning: keyWarning(acct.keySavedAt, acct.personalKey, Date.now()),
-    plans: d ? planGoals(goals, d, s.profile, learnRates(acct.sessions)) : [],
-    goals
+    plans: d ? planGoals(list, d, s.profile, learnRates(acct.sessions)) : [],
+    goals: list,
+    choices: s.choices,
+    viewing: s.view?.profileId ?? s.viewing
   }
 }
 
@@ -200,6 +268,7 @@ export async function downloadItemList(signal?: AbortSignal): Promise<void> {
     }
     writeJson(dataFile(), next)
     data = next
+    itemNames = null
     dataError = ''
     saveNeuPictures(files)
     // A new item list can read more of the profile, so ask again.
@@ -218,17 +287,53 @@ function countItems(b64: string): Record<string, number> {
 
 const decodeNbt = (b64: string): unknown => readNbt(gunzipSync(Buffer.from(b64, 'base64')))
 
+/** The last answer from Hypixel about you (kept in memory so switching profile is instant). */
+let lastBody: unknown = null
+/** Item id → name, for "since last time" and milestones. */
+let itemNames: Record<string, string> | null = null
+const namesOf = (d: SbData): Record<string, string> => (itemNames ??= Object.fromEntries(Object.values(d.items).map((i) => [i.id, i.name.replace(/§./g, '')])))
+
+/** A profile's view with its networth and co-op members filled in. */
+function fullView(body: unknown, uuid: string, profileId: string, at: number, d: SbData, extra: { garden?: unknown; museum?: unknown }): SbProfileView | null {
+  const v = profileView(body, uuid, profileId, at, d, decodeNbt, { ...extra, iconOf: slotIcon })
+  if (!v) return null
+  const p = currentPrices()
+  if (p) v.networth = networthOf(v, p.prices, p.at, namesOf(d))
+  const coop = coopMembers(body, v.profileId, uuid)
+  if (coop.length > 1) {
+    v.coop = coop
+    for (const m of coop) {
+      void playerById(m.uuid).then((who) => {
+        if (who.name && !m.name) {
+          m.name = who.name
+          broadcast()
+        }
+      })
+    }
+  }
+  return v
+}
+
 function takeProfiles(body: unknown): void {
   const acct = skyblockAccount()
   const s = load()
-  const p = profileData(body, acct.uuid, acct.profileId, Date.now(), countItems)
+  lastBody = body
+  const pick = s.viewing || acct.profileId
+  const p = profileData(body, acct.uuid, pick, Date.now(), countItems)
   if (!p) return
   s.profile = p
+  s.choices = profileList(body, acct.uuid)
   const d = getData()
   if (d?.extras) {
     try {
-      s.view = profileView(body, acct.uuid, acct.profileId, p.at, d, decodeNbt, { garden: s.garden, museum: s.museum, iconOf: slotIcon })
+      s.view = fullView(body, acct.uuid, pick, p.at, d, { garden: s.garden, museum: s.museum })
       if (s.view && s.player) s.view.player = { name: s.player.name, skin: s.player.skin }
+      // Goals added before Orbit knew which profile go to this one.
+      if (s.view && s.goalsBy['']?.length) {
+        s.goalsBy[s.view.profileId] = [...(s.goalsBy[s.view.profileId] ?? []), ...s.goalsBy['']]
+        delete s.goalsBy['']
+      }
+      saveHistory(body, acct.uuid, d)
     } catch (err) {
       logError('reading your SkyBlock profile', err)
     }
@@ -236,6 +341,93 @@ function takeProfiles(body: unknown): void {
   profileError = ''
   save()
   broadcast()
+}
+
+/** A snapshot of every profile you have, for the graphs and "since last time". */
+function saveHistory(body: unknown, uuid: string, d: SbData): void {
+  const history = readHistory<SbSnapshot>()
+  const s = load()
+  for (const c of s.choices) {
+    const v = c.id === s.view?.profileId ? s.view : fullView(body, uuid, c.id, Date.now(), d, {})
+    if (!v) continue
+    history[c.id] = addSnapshot(history[c.id] ?? [], snapshotOf(v, Date.now()))
+  }
+  writeHistory(history)
+}
+
+/** The profile page for your own account. */
+function ownPage(): SbProfilePage | null {
+  const s = load()
+  const view = s.view
+  if (!view) return null
+  const d = getData()
+  const history = readHistory<SbSnapshot>()[view.profileId] ?? []
+  const names = d ? namesOf(d) : {}
+  const seenAt = s.seen[view.profileId] ?? 0
+  const before = [...history].reverse().find((h) => h.at <= seenAt)
+  const latest = history[history.length - 1]
+  const changes = before && latest && latest.at > before.at ? changesBetween(before, latest, names) : []
+  return {
+    view,
+    mine: true,
+    player: { uuid: skyblockAccount().uuid, name: s.player?.name ?? '', skin: s.player?.skin ?? '' },
+    choices: s.choices,
+    history: thin(history),
+    since: before && changes.length ? { at: before.at, changes } : null,
+    milestones: milestones(history, names),
+    starred: false
+  }
+}
+
+// ---------- anyone else's profile ----------
+
+const others = new Map<string, { at: number; body: unknown; extra: Map<string, { garden?: unknown; museum?: unknown }> }>()
+const OTHERS_MAX_AGE = 5 * 60_000
+
+async function otherPage(who: string, profileId: string, fresh: boolean): Promise<SbProfilePage> {
+  const acct = skyblockAccount()
+  if (!acct.key) throw new Error('Orbit needs your Hypixel API key to look players up. Add it on the Games page → SkyBlock.')
+  const d = getData()
+  if (!d?.extras) throw new Error('Orbit needs the item list first. Press Update recipes.')
+  const { uuid, name } = /^[0-9a-f]{32}$/i.test(who.replace(/-/g, '')) ? { uuid: who.replace(/-/g, '').toLowerCase(), name: '' } : await playerByName(who)
+  if (uuid === acct.uuid.replace(/-/g, '').toLowerCase()) {
+    if (profileId && profileId !== load().view?.profileId) chooseProfile(profileId)
+    const own = ownPage()
+    if (own) return own
+  }
+  let cached = others.get(uuid)
+  if (!cached || fresh || Date.now() - cached.at > OTHERS_MAX_AGE) {
+    const body = await hypixel(`/v2/skyblock/profiles?uuid=${uuid}`, acct.key)
+    cached = { at: Date.now(), body, extra: new Map() }
+    others.set(uuid, cached)
+  }
+  const choices = profileList(cached.body, uuid)
+  if (!choices.length) throw new Error(`${name || 'That player'} hasn’t played SkyBlock.`)
+  const pid = choices.some((c) => c.id === profileId) ? profileId : (choices.find((c) => c.selected) ?? choices[0]).id
+  let extra = cached.extra.get(pid)
+  if (!extra) {
+    const [garden, museum] = await Promise.allSettled([hypixel(`/v2/skyblock/garden?profile=${pid}`, acct.key), hypixel(`/v2/skyblock/museum?profile=${pid}`, acct.key)])
+    extra = { garden: garden.status === 'fulfilled' ? garden.value : undefined, museum: museum.status === 'fulfilled' ? trimMuseum(museum.value, uuid) : undefined }
+    cached.extra.set(pid, extra)
+  }
+  const view = fullView(cached.body, uuid, pid, cached.at, d, extra)
+  if (!view) throw new Error(`Couldn’t read ${name || 'that player'}’s profile.`)
+  const who2 = await playerById(uuid)
+  view.player = { name: who2.name || name, skin: who2.skin }
+  const known = lookedUp().find((f) => f.uuid === uuid)
+  rememberPlayer({ uuid, name: who2.name || name, skin: who2.skin, at: Date.now(), summary: friendSummary(view) })
+  return { view, mine: false, player: { uuid, name: who2.name || name, skin: who2.skin }, choices, history: [], since: null, milestones: [], starred: !!known?.starred }
+}
+
+/** Shows another of your profiles (goals, history and helpers follow it). */
+function chooseProfile(id: string): void {
+  const s = load()
+  s.viewing = id
+  s.garden = undefined
+  s.museum = undefined
+  if (lastBody) takeProfiles(lastBody)
+  save()
+  void refreshProfile()
 }
 
 /** Only what the profile page reads from the museum answer (the donated items' own data is large). */
@@ -293,12 +485,13 @@ async function refreshProfile(): Promise<void> {
 export function setupSkyblockGoals(): void {
   // Every time the session summary asks Hypixel, the planner gets the same answer for free.
   onSkyblockProfiles((body) => {
-    if (skyblockAddonReady() && (load().goals.length || load().view)) takeProfiles(body)
+    if (skyblockAddonReady() && (anyGoals() || load().view)) takeProfiles(body)
   })
 
   // Installed, removed or new packs: read the item list again and redraw the pictures.
   onAddonChanged(() => {
     data = undefined
+    itemNames = null
     if (skyblockAddonReady() && load().profile) void refreshProfile()
     broadcast()
   })
@@ -308,7 +501,7 @@ export function setupSkyblockGoals(): void {
     () => {
       const acct = skyblockAccount()
       const p = load().profile
-      if (acct.playing && skyblockAddonReady() && (load().goals.length || load().view) && (!p || Date.now() - p.at > PLAY_REFRESH - 5000)) void refreshProfile()
+      if (acct.playing && skyblockAddonReady() && (anyGoals() || load().view) && (!p || Date.now() - p.at > PLAY_REFRESH - 5000)) void refreshProfile()
     },
     Math.min(PLAY_REFRESH, 60_000)
   )
@@ -316,21 +509,83 @@ export function setupSkyblockGoals(): void {
   /** `page`: the Goals page is open, so fetch the item list if there isn't one (the Home box doesn't). */
   ipcMain.handle('skyblockGoals:state', (_e, page?: boolean) => {
     const d = getData()
-    if (skyblockAddonReady() && (page || load().goals.length) && (!d || d.version !== SB_DATA_VERSION || Date.now() - d.at > DATA_MAX_AGE) && !downloading && !dataError)
-      void download()
+    if (skyblockAddonReady() && (page || anyGoals()) && (!d || d.version !== SB_DATA_VERSION || Date.now() - d.at > DATA_MAX_AGE) && !downloading && !dataError) void download()
     return state()
   })
+  // New prices: work networth out again.
+  onPricesChanged(() => {
+    if (lastBody) takeProfiles(lastBody)
+  })
+
   /** The profile page: everything about your profile (null until Orbit has asked Hypixel with the new item list). */
   let staleAsked = false
   ipcMain.handle('skyblockProfile:view', () => {
     const view = load().view ?? null
-    // Saved by an Orbit from before loadouts: read the profile again so the wardrobe fills in.
-    if (view?.gear && !Array.isArray(view.gear.loadouts) && !staleAsked) {
+    // Saved by an Orbit from before loadouts and profiles: read the profile again so it all fills in.
+    if (view?.gear && (!Array.isArray(view.gear.loadouts) || !load().choices.length || !lastBody) && !staleAsked) {
       staleAsked = true
       void refreshProfile()
     }
     return view
   })
+  /** Your profile page: the view plus your profiles, history, "since last time" and milestones. */
+  ipcMain.handle('skyblockProfile:page', () => ownPage())
+  ipcMain.handle('skyblockProfile:choose', (_e, id: string) => {
+    if (typeof id === 'string') chooseProfile(id)
+    return state()
+  })
+  /** You've seen this profile's page: "since last time" starts again from now. */
+  ipcMain.handle('skyblockProfile:seen', (_e, id: string) => {
+    const s = load()
+    if (typeof id === 'string' && id) {
+      s.seen[id] = Date.now()
+      save()
+    }
+  })
+  /** Anyone's profile, by Minecraft name (or id), and which of their profiles. */
+  ipcMain.handle('skyblockPlayers:lookup', async (_e, who: string, profileId?: string, fresh?: boolean) => {
+    try {
+      return await otherPage(String(who ?? ''), typeof profileId === 'string' ? profileId : '', !!fresh)
+    } catch (err) {
+      if (!(err instanceof KeyRejected)) logError('looking up a SkyBlock player', err)
+      throw new Error(errorText(err))
+    }
+  })
+  ipcMain.handle('skyblockPlayers:list', () => lookedUp())
+  ipcMain.handle('skyblockPlayers:star', (_e, uuid: string, on: boolean) => {
+    starPlayer(String(uuid), !!on)
+    return lookedUp()
+  })
+  ipcMain.handle('skyblockPlayers:forget', (_e, uuid: string) => {
+    forgetPlayer(String(uuid))
+    return lookedUp()
+  })
+  /** Looks every starred player up again, a second apart, for the friends board. */
+  ipcMain.handle('skyblockPlayers:refreshStarred', async () => {
+    for (const f of lookedUp().filter((x) => x.starred)) {
+      try {
+        await otherPage(f.uuid, '', true)
+      } catch {
+        // Keep their last numbers.
+      }
+      await new Promise((r) => setTimeout(r, 800))
+    }
+    return lookedUp()
+  })
+  /** Ironman helpers for the profile you're looking at: craftable now, Magical Power planner, minions. */
+  ipcMain.handle('skyblockHelpers:get', () => {
+    const s = load()
+    const d = getData()
+    if (!d || !s.view || !s.profile) return null
+    const rates = learnRates(skyblockAccount().sessions)
+    return {
+      craftable: craftableNow(d, s.profile.owned),
+      mp: mpPlanner(s.view, d, s.profile, rates),
+      minions: minionHelper(s.view, d, s.profile.owned)
+    }
+  })
+  /** The SkyBlock date, what's on next, and the mayor. */
+  ipcMain.handle('skyblock:calendar', async () => ({ now: skyblockDate(Date.now()), events: upcomingEvents(Date.now(), 10), mayor: await currentMayor() }))
   /** NEU item id → picture, for everything that isn't one of your own items. */
   ipcMain.handle('skyblockAddon:icons', () => neuItemIcons())
   ipcMain.handle('skyblockGoals:download', async () => {
@@ -350,18 +605,19 @@ export function setupSkyblockGoals(): void {
     const s = load()
     const d = getData()
     if (typeof id !== 'string' || (d && !d.items[id])) throw new Error('Orbit doesn’t know that item.')
-    const existing = s.goals.find((g) => g.id === id)
+    const list = goals()
+    const existing = list.find((g) => g.id === id)
     if (existing) existing.amount = clampAmount(existing.amount + clampAmount(amount))
     else {
-      if (s.goals.length >= MAX_GOALS) throw new Error(`That’s ${MAX_GOALS} goals already. Remove one first.`)
-      s.goals.push({ id, amount: clampAmount(amount), pinned: s.goals.filter((g) => g.pinned).length < 3, added: Date.now() })
+      if (list.length >= MAX_GOALS) throw new Error(`That’s ${MAX_GOALS} goals already. Remove one first.`)
+      list.push({ id, amount: clampAmount(amount), pinned: list.filter((g) => g.pinned).length < 3, added: Date.now() })
     }
     save()
     if (!s.profile || Date.now() - s.profile.at > 5 * 60_000) void refreshProfile()
     return state()
   })
   ipcMain.handle('skyblockGoals:update', (_e, id: string, change: { amount?: number; pinned?: boolean }) => {
-    const g = load().goals.find((x) => x.id === id)
+    const g = goals().find((x) => x.id === id)
     if (g) {
       if (typeof change?.amount === 'number') g.amount = clampAmount(change.amount)
       if (typeof change?.pinned === 'boolean') g.pinned = change.pinned
@@ -371,7 +627,7 @@ export function setupSkyblockGoals(): void {
   })
   ipcMain.handle('skyblockGoals:remove', (_e, id: string) => {
     const s = load()
-    s.goals = s.goals.filter((g) => g.id !== id)
+    s.goalsBy[goalsKey()] = goals().filter((g) => g.id !== id)
     save()
     return state()
   })
