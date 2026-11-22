@@ -9463,6 +9463,42 @@ a.passwords-text:hover {
 .explorer-place.google svg {
   color: var(--accent);
 }
+/* A drive with its space: name, a thin bar of how full it is, and "120 GB free of 476 GB". */
+.explorer-place.drive:has(.explorer-drive) {
+  height: auto;
+  min-height: 30px;
+  padding-top: 5px;
+  padding-bottom: 6px;
+}
+.explorer-place .explorer-drive {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.explorer-drive-bar {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-hover);
+  box-shadow: inset 0 0 0 1px var(--border);
+  overflow: hidden;
+}
+.explorer-drive-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: width 300ms var(--ease);
+}
+.explorer-drive-bar.low > span {
+  background: var(--danger, #e5484d);
+}
+.explorer-place .explorer-drive-free {
+  color: var(--text-faint);
+  font-size: 11px;
+}
 .explorer-main {
   display: flex;
   flex-direction: column;

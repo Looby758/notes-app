@@ -1,6 +1,6 @@
 import { app, ipcMain, nativeImage, shell, type NativeImage } from 'electron'
 import { existsSync, readdirSync } from 'fs'
-import { cp, mkdir, open, readdir, rename, rm, stat, writeFile } from 'fs/promises'
+import { cp, mkdir, open, readdir, rename, rm, stat, statfs, writeFile } from 'fs/promises'
 import { homedir } from 'os'
 import { releaseFiles } from './fileLocks'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'path'
@@ -8,6 +8,7 @@ import {
   isHiddenName,
   isInside,
   isStreamable,
+  driveSpaceFromStatfs,
   looksLikeAppFiles,
   matchesWords,
   nameProblem,
@@ -16,6 +17,7 @@ import {
   SEARCH_LIMIT,
   TEXT_PREVIEW_BYTES,
   uniqueName,
+  type DriveSpace,
   type ExplorerEntry,
   type ExplorerPlace,
   type PasteMode
@@ -97,6 +99,24 @@ function drives(): ExplorerPlace[] {
     }
   }
   return list
+}
+
+/** How full each drive is. A drive that doesn't answer within a few seconds (a sleeping network drive, an ejected USB stick) is null, so one slow drive never holds up the rest. */
+async function driveSpace(paths: string[]): Promise<Record<string, DriveSpace | null>> {
+  const one = async (path: string): Promise<DriveSpace | null> => {
+    let timer: NodeJS.Timeout | undefined
+    try {
+      const late = new Promise<null>((done) => (timer = setTimeout(() => done(null), 4000)))
+      const read = statfs(path).then(driveSpaceFromStatfs)
+      return await Promise.race([read, late])
+    } catch {
+      return null
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+  const sizes = await Promise.all(paths.map(one))
+  return Object.fromEntries(paths.map((p, i) => [p, sizes[i]]))
 }
 
 function places(vaultRoot: string | null): ExplorerPlace[] {
@@ -374,6 +394,8 @@ export function setupExplorer(vaultRoot: () => string | null): void {
     }
   })
   ipcMain.handle('explorer:places', () => places(vaultRoot()))
+  // Only the drives the Drives list shows: nothing else on the computer can be asked about.
+  ipcMain.handle('explorer:driveSpace', () => driveSpace(drives().map((d) => d.path)))
   ipcMain.handle('explorer:list', (_e, dir: string) => list(vaultRoot(), checkPath(dir)))
   ipcMain.handle('explorer:readText', (_e, path: string) => {
     const full = checkPath(path)
