@@ -385,14 +385,19 @@ function AddSongs({ playlistId }: { playlistId: string }) {
   const songs = useLocalMusic((s) => s.library?.songs ?? [])
   const playlist = useMusicData((s) => s.data.playlists.find((p) => p.id === playlistId))
   const [query, setQuery] = useState('')
-  const [picked, setPicked] = useState<LocalSong[]>([])
+  // Kept by file path: the library is read again when a song is added to the folder, and that mustn't lose your ticks.
+  const [pickedPaths, setPickedPaths] = useState<string[]>([])
+  const picked = useMemo(() => {
+    const byPath = new Map(songs.map((s) => [s.path, s]))
+    return pickedPaths.map((p) => byPath.get(p)).filter((s): s is LocalSong => !!s)
+  }, [songs, pickedPaths])
   const inList = useMemo(() => new Set(playlist?.songs ?? []), [playlist])
   const shown = useMemo(() => {
     const found = query.trim() ? filterSongs(songs, query) : [...songs].sort((a, b) => a.title.localeCompare(b.title))
     return found.slice(0, 300)
   }, [songs, query])
   if (!playlist) return null
-  const toggle = (s: LocalSong): void => setPicked((p) => (p.includes(s) ? p.filter((x) => x !== s) : [...p, s]))
+  const toggle = (s: LocalSong): void => setPickedPaths((p) => (p.includes(s.path) ? p.filter((x) => x !== s.path) : [...p, s.path]))
   const add = (): void => {
     // A song already in the playlist isn't added twice.
     const fresh = picked.filter((s) => !inList.has(s.path))
@@ -411,7 +416,7 @@ function AddSongs({ playlistId }: { playlistId: string }) {
       <ul className="mp-pick-list mp-add-list" data-mp-add-list>
         {shown.length === 0 && <li className="mp-nav-note">Nothing found. Try fewer words.</li>}
         {shown.map((s) => {
-          const on = picked.includes(s)
+          const on = pickedPaths.includes(s.path)
           return (
             <li key={s.path}>
               <button className={on ? 'on' : ''} onClick={() => toggle(s)} aria-pressed={on} data-mp-add-song={s.title}>
@@ -437,7 +442,7 @@ function AddSongs({ playlistId }: { playlistId: string }) {
           <Plus size={13} /> {picked.length ? `Add ${picked.length} ${picked.length === 1 ? 'song' : 'songs'}` : 'Add songs'}
         </button>
         {picked.length > 0 && (
-          <button className="btn" onClick={() => setPicked([])}>
+          <button className="btn" onClick={() => setPickedPaths([])}>
             Clear selection
           </button>
         )}

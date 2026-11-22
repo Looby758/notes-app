@@ -57,6 +57,7 @@ export interface Settings {
   /** The floating mini music player: where it was left, and whether it was showing. */
   musicMiniWindow?: WindowBounds
   musicMiniOpen?: boolean
+  musicMiniLayout?: MusicMiniLayout
   /** The pop-out window (any app, floating on top): where it was left, and how see-through it was. */
   popoutWindow?: WindowBounds
   popoutOpacity?: number
@@ -175,10 +176,24 @@ export interface MusicMiniState {
   state: MusicState | null
   /** When `state` arrived (for the progress bar). */
   at: number
+  /** Your own music: the next few songs. */
+  upNext?: MusicMiniSong[]
 }
 
-/** A button pressed in the floating mini player, for the notes window to carry out. */
-export type MusicMiniCommand = { action: MusicAction } | { seek: number }
+export interface MusicMiniSong {
+  title: string
+  artist: string
+  art?: string
+}
+
+/** What the mini player shows under the song (each can be hidden). */
+export interface MusicMiniLayout {
+  visualiser: boolean
+  upNext: boolean
+}
+
+/** A button pressed in the floating mini player, for the notes window to carry out. `jump` plays the song that many places into Up next (0 is the next one). */
+export type MusicMiniCommand = { action: MusicAction } | { seek: number } | { jump: number }
 
 export interface CaptureStatus {
   /** e.g. "Win+Shift+N", or '' if none is set or it couldn't be registered. */
@@ -1172,6 +1187,13 @@ export interface NotesApi {
   /** Mini player → notes window. */
   sendMusicMiniCommand(command: MusicMiniCommand): void
   onMusicMiniCommand(callback: (command: MusicMiniCommand) => void): () => void
+  /** What the mini player shows under the song, and news of changes (both windows hear it). */
+  musicMiniLayout(): Promise<MusicMiniLayout>
+  setMusicMiniLayout(layout: MusicMiniLayout): Promise<void>
+  onMusicMiniLayout(callback: (layout: MusicMiniLayout) => void): () => void
+  /** The visualiser's bars (0–100 each), notes window → mini player. */
+  pushMusicMiniLevels(levels: number[]): void
+  onMusicMiniLevels(callback: (levels: number[]) => void): () => void
   /** Your own music files; `fresh` looks through the folder again. */
   localMusicLibrary(fresh?: boolean): Promise<LocalLibrary>
   /** Asks which folder your music is in, then lists it. */

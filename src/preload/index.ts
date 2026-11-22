@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { LocalAiState, MusicLinkProgress, MusicMiniCommand, MusicMiniState, NotesApi } from '@shared/types'
+import type { LocalAiState, MusicLinkProgress, MusicMiniCommand, MusicMiniLayout, MusicMiniState, NotesApi } from '@shared/types'
 import type { MusicData } from '@shared/musicLibrary'
 import type { LocalLibrary } from '@shared/localMusic'
 
@@ -681,6 +681,19 @@ const api: NotesApi = {
     const handler = (_e: unknown, command: MusicMiniCommand): void => callback(command)
     ipcRenderer.on('musicMini:command', handler)
     return () => ipcRenderer.removeListener('musicMini:command', handler)
+  },
+  musicMiniLayout: () => ipcRenderer.invoke('musicMini:layout'),
+  setMusicMiniLayout: (layout) => ipcRenderer.invoke('musicMini:setLayout', layout),
+  onMusicMiniLayout: (callback) => {
+    const handler = (_e: unknown, layout: MusicMiniLayout): void => callback(layout)
+    ipcRenderer.on('musicMini:layout', handler)
+    return () => ipcRenderer.removeListener('musicMini:layout', handler)
+  },
+  pushMusicMiniLevels: (levels) => ipcRenderer.send('musicMini:levels', levels),
+  onMusicMiniLevels: (callback) => {
+    const handler = (_e: unknown, levels: number[]): void => callback(levels)
+    ipcRenderer.on('musicMini:levels', handler)
+    return () => ipcRenderer.removeListener('musicMini:levels', handler)
   },
   musicTransfer: (deviceId) => ipcRenderer.invoke('music:transfer', deviceId),
   musicOpen: (what) => ipcRenderer.invoke('music:open', what),

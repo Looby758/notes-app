@@ -350,7 +350,7 @@ function Sidebar({ view, setView, folder, loading, onSaveLink, linkOpen }: { vie
               label: 'Rename',
               icon: <Pencil size={14} />,
               onClick: () => {
-                renameOnOpen = listMenu.playlist.id
+                askRename(listMenu.playlist.id)
                 setView({ kind: 'playlist', id: listMenu.playlist.id })
               }
             },
@@ -568,13 +568,29 @@ function SongView({ kicker, title, sub, art, icon, songs, setView, folder, empty
 
 /** A playlist to start renaming once it's open (Rename in its right-click menu). */
 let renameOnOpen: string | null = null
+const renameAsks = new Set<() => void>()
+function askRename(id: string): void {
+  renameOnOpen = id
+  renameAsks.forEach((fn) => fn())
+}
 
 function Header({ kicker, title, sub, art, icon, songs, onRename, editable, renameId }: { kicker: string; title: string; sub?: string; art?: string; icon?: React.ReactNode; songs: LocalSong[]; onRename?: (name: string) => void; editable?: LocalSong[]; renameId?: string }) {
   const [editing, setEditing] = useState(false)
   useEffect(() => {
-    if (renameId && renameOnOpen === renameId) {
+    if (!renameId) return
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const check = (): void => {
+      if (renameOnOpen !== renameId) return
       renameOnOpen = null
-      setEditing(true)
+      // After the right-click menu has closed, or its closing takes the focus from the name box (which ends renaming).
+      timer = setTimeout(() => setEditing(true), 60)
+    }
+    check()
+    // Asked while this playlist is already open.
+    renameAsks.add(check)
+    return () => {
+      renameAsks.delete(check)
+      clearTimeout(timer)
     }
   }, [renameId])
   const [coverOver, setCoverOver] = useState(false)

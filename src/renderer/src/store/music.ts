@@ -1,13 +1,15 @@
 import { create } from 'zustand'
 import { nextRepeat, type MusicAction, type MusicState, type MusicStatus } from '@shared/spotify'
 import { errorMessage } from '../lib/paths'
+import { localArtUrl } from '@shared/localMusic'
+import type { MusicMiniSong } from '@shared/types'
 import { useUI } from './ui'
 import { usePrefs } from './prefs'
 import { startMusicData } from './musicData'
 import { songMarkdown, type SongTarget } from '@shared/songLinks'
 import { insertBlockIntoActiveNote } from '../lib/editorController'
 import { notify } from './notify'
-import { loadLocalLibrary, playLocal, resumeLastSession, useLocalMusic, playLocalPath, localNext, localPause, localPrevious, localRepeat, localSeek, localShuffle, localToggle, localVolume, stopLocal } from './localMusic'
+import { localJump, localUpNext, soundLevels, loadLocalLibrary, playLocal, resumeLastSession, useLocalMusic, playLocalPath, localNext, localPause, localPrevious, localRepeat, localSeek, localShuffle, localToggle, localVolume, stopLocal } from './localMusic'
 
 /** The music player in the corner: what's playing (asked for every couple of seconds while it's open). */
 
@@ -301,22 +303,62 @@ export function startMusic(): () => void {
 
 export const setMusicMini = (open: boolean): Promise<boolean> => window.api.setMusicMini(open)
 
+/** The next few songs of your own music, for the mini player. */
+function miniUpNext(): MusicMiniSong[] | undefined {
+  if (useMusic.getState().state?.source !== 'local') return undefined
+  return localUpNext()
+    .slice(0, 5)
+    .map((s) => ({ title: s.title, artist: s.artist, art: s.art ? localArtUrl(s.path, s.added) : undefined }))
+}
+
 /** Sends what's playing to the mini player (and a paired phone's remote), and does what their buttons ask. */
 function startMini(): () => void {
   const push = (): void => {
     const { state, at } = useMusic.getState()
-    window.api.pushMusicMini({ state, at })
+    window.api.pushMusicMini({ state, at, upNext: miniUpNext() })
   }
+  // The visualiser's bars go to the mini player while it shows them and your music plays.
+  let showBars = false
+  let bars: ReturnType<typeof setInterval> | undefined
+  const levels = (): void => {
+    const { miniOpen, state } = useMusic.getState()
+    const want = miniOpen && showBars && state?.source === 'local' && state.playing
+    if (!want) {
+      clearInterval(bars)
+      bars = undefined
+      return
+    }
+    if (bars) return
+    const read = soundLevels()
+    if (!read) return
+    bars = setInterval(() => window.api.pushMusicMiniLevels(Array.from(read(), (v) => Math.round(v * 100))), 40)
+  }
+  void window.api.musicMiniLayout().then((l) => {
+    showBars = l.visualiser
+    levels()
+  })
+  const offLayout = window.api.onMusicMiniLayout((l) => {
+    showBars = l.visualiser
+    levels()
+  })
   const offOpen = window.api.onMusicMiniOpen((miniOpen) => {
     useMusic.setState({ miniOpen })
     if (miniOpen) void refreshMusic().then(push)
   })
   const offCommand = window.api.onMusicMiniCommand((command) => {
     if ('seek' in command) void musicSeek(command.seek)
-    else void musicControl(command.action)
+    else if ('jump' in command) {
+      const { index, queue } = useLocalMusic.getState()
+      const to = index + 1 + Math.max(0, Math.floor(Number(command.jump) || 0))
+      if (useMusic.getState().state?.source === 'local' && to < queue.length) void localJump(to)
+    } else void musicControl(command.action)
   })
   const offState = useMusic.subscribe((now, before) => {
     if (now.state !== before.state || now.at !== before.at || (now.miniOpen && !before.miniOpen)) push()
+    levels()
+  })
+  const offQueue = useLocalMusic.subscribe((now, before) => {
+    if (now.queue !== before.queue || now.index !== before.index) push()
   })
   // It comes back if it was showing when Notes closed.
   void window.api.musicMiniWasOpen().then((was) => was && setMusicMini(true))
@@ -324,6 +366,9 @@ function startMini(): () => void {
     offOpen()
     offCommand()
     offState()
+    offQueue()
+    offLayout()
+    clearInterval(bars)
   }
 }
 

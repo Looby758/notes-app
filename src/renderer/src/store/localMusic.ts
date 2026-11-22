@@ -263,6 +263,32 @@ let graph: { ctx: AudioContext; source: MediaElementAudioSourceNode; duck: GainN
 /** Music dipping's level (1 = normal), for a graph made while it's dipped. */
 let duckLevel = 1
 
+export const BARS = 48
+
+/**
+ * Your music's sound as BARS levels (0–1): low notes first, high last. Null until your own music
+ * has played (the sound is only wired in then).
+ */
+export function soundLevels(): (() => Float32Array) | null {
+  const analyser = localAnalyser()
+  if (!analyser) return null
+  const data = new Uint8Array(analyser.frequencyBinCount)
+  const out = new Float32Array(BARS)
+  // Spread the bars over the notes we hear most of (the top of the range is mostly empty).
+  const usable = Math.floor(data.length * 0.72)
+  return () => {
+    analyser.getByteFrequencyData(data)
+    for (let i = 0; i < BARS; i++) {
+      const from = Math.floor((i / BARS) ** 1.6 * usable)
+      const to = Math.max(from + 1, Math.floor(((i + 1) / BARS) ** 1.6 * usable))
+      let sum = 0
+      for (let j = from; j < to; j++) sum += data[j]
+      out[i] = sum / (to - from) / 255
+    }
+    return out
+  }
+}
+
 /** Your music's sound in Web Audio (an element can only be wired in once, so the visualiser and the soundboard share it). */
 function musicGraph(): { ctx: AudioContext; source: MediaElementAudioSourceNode; duck: GainNode } | null {
   if (graph || !audio) return graph
