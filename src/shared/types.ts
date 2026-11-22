@@ -1,4 +1,4 @@
-import type { AppInfo, GitHubStatus, MergedPull, PullRequest, Release, TestCopy } from './appStudio'
+import type { AppInfo, GitHubStatus, HealthReport, MergedPull, PullRequest, Release, TestCopy } from './appStudio'
 import type { DriveSpace, ExplorerEntry, ExplorerPlace, PasteMode, PcIndexStatus } from './explorer'
 import type { FileTagStore, TagColour } from './fileTags'
 import type { BinListing } from './recycleBin'
@@ -1474,6 +1474,8 @@ export interface NotesApi {
   appsPullStates(repo: string, numbers: number[]): Promise<Record<number, 'open' | 'merged' | 'closed'>>
   /** Downloads a picture from a pull request's description. */
   appsFetchImage(url: string): Promise<{ bytes: Uint8Array; type: string }>
+  /** Checks an app's npm packages: newer versions, and known security problems (npm outdated and npm audit). */
+  appsHealth(folder: string): Promise<HealthReport>
   appsMerge(repo: string, number: number): Promise<void>
   appsClose(repo: string, number: number): Promise<void>
   /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */

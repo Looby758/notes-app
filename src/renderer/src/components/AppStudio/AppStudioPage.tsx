@@ -32,6 +32,7 @@ import Board from './Board'
 import Releases from './Releases'
 import Screenshots from './Screenshots'
 import TokenProblem from './TokenProblem'
+import Health from './Health'
 
 /** Pull requests are fetched again when you come back after this long. */
 const PULLS_FRESH_MS = 2 * 60_000
@@ -211,6 +212,7 @@ function AppCard({ project }: { project: TerminalProject }) {
               {pulls.length ? `${pulls.length} open pull request${pulls.length === 1 ? '' : 's'}` : 'No open pull requests'}
             </button>
           )}
+          <Health project={project} repo={info.repo} />
         </>
       )}
       <CopyList project={project} />

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addDownloadDay, countText, downloadsByPlatform, downloadsSince, isDownloadFile, platformOf, type DownloadHistory, boardKey, commitAllCommand, describeChange, stashCommand, isTokenPermissionError, newTokenUrl, TOKEN_NOT_ALLOWED, bumpVersion, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
+import { parseOutdated, parseAudit, severityCounts, healthLevel, healthLine, healthBoardItem, type HealthReport, addDownloadDay, countText, downloadsByPlatform, downloadsSince, isDownloadFile, platformOf, type DownloadHistory, boardKey, commitAllCommand, describeChange, stashCommand, isTokenPermissionError, newTokenUrl, TOKEN_NOT_ALLOWED, bumpVersion, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
 
 describe('githubRepo', () => {
   it('reads https and ssh remotes', () => {
@@ -315,5 +315,54 @@ describe('downloads', () => {
     expect(downloadsSince(h, 7, '2026-11-15')).toBe(80)
     expect(downloadsSince(h, 30, '2026-11-15')).toBeNull()
     expect(downloadsSince([], 7, '2026-11-15')).toBeNull()
+  })
+})
+
+describe('health check', () => {
+  it('reads npm outdated', () => {
+    const json = JSON.stringify({
+      react: { current: '18.2.0', wanted: '18.3.1', latest: '19.1.0', type: 'devDependencies' },
+      zustand: { current: '5.0.1', wanted: '5.0.8', latest: '5.0.8', type: 'devDependencies' },
+      chokidar: [{ current: '4.0.1', wanted: '4.0.3', latest: '4.0.3', type: 'dependencies' }],
+      broken: { current: '1.0.0' }
+    })
+    const list = parseOutdated(json)
+    expect(list.map((p) => p.name)).toEqual(['chokidar', 'zustand', 'react'])
+    expect(list.find((p) => p.name === 'react')).toMatchObject({ major: true, dev: true })
+    expect(list.find((p) => p.name === 'chokidar')).toMatchObject({ major: false, dev: false })
+    expect(parseOutdated('')).toEqual([])
+    expect(parseOutdated('not json')).toEqual([])
+  })
+  it('reads npm audit', () => {
+    const json = JSON.stringify({
+      vulnerabilities: {
+        'brace-expansion': { name: 'brace-expansion', severity: 'low', via: [{ title: 'ReDoS', url: 'https://github.com/advisories/1' }], fixAvailable: true },
+        vite: { name: 'vite', severity: 'high', via: [{ title: 'File read', url: 'https://github.com/advisories/2' }], fixAvailable: { name: 'vite', version: '7.0.0', isSemVerMajor: true } },
+        'electron-vite': { name: 'electron-vite', severity: 'high', via: ['vite'], fixAvailable: false }
+      }
+    })
+    const list = parseAudit(json)
+    expect(list.map((w) => w.name)).toEqual(['electron-vite', 'vite', 'brace-expansion'])
+    expect(list[0].title).toBe('Uses vite, which has a problem')
+    expect(list[1]).toMatchObject({ easyFix: false, majorFix: true })
+    expect(list[2]).toMatchObject({ easyFix: true, majorFix: false })
+    expect(severityCounts(list)).toEqual([
+      { severity: 'high', count: 2 },
+      { severity: 'low', count: 1 }
+    ])
+  })
+  it('sums it up', () => {
+    const report: HealthReport = { checkedAt: '', outdated: [], security: [], problems: [] }
+    expect(healthLevel(report)).toBe('good')
+    expect(healthLine(report)).toBe('All up to date and safe')
+    report.outdated = [{ name: 'a', current: '1.0.0', wanted: '1.1.0', latest: '2.0.0', major: true, dev: false }]
+    expect(healthLevel(report)).toBe('fine')
+    report.security = [{ name: 'b', severity: 'high', title: 'Bad', easyFix: true, majorFix: false }]
+    expect(healthLevel(report)).toBe('attention')
+    expect(healthLine(report)).toBe('1 security warning (1 high) · 1 update')
+    const card = healthBoardItem(report)
+    expect(card.title).toBe('Fix the security warnings and update packages')
+    expect(card.details).toContain('- b (high): Bad')
+    expect(card.details).toContain('- a 1.0.0 → 2.0.0')
   })
 })

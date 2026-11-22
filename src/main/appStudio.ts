@@ -2,7 +2,7 @@ import { app, ipcMain, net, safeStorage } from 'electron'
 import { execFile } from 'child_process'
 import { existsSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'path'
-import { copyFolderName, githubRepo, isDownloadFile, isGitHubImage, TOKEN_NOT_ALLOWED, type AppInfo, type TestCopy, type GitHubStatus, type MergedPull, type PullRequest, type Release } from '@shared/appStudio'
+import { copyFolderName, githubRepo, isDownloadFile, isGitHubImage, parseAudit, parseOutdated, TOKEN_NOT_ALLOWED, type HealthReport, type AppInfo, type TestCopy, type GitHubStatus, type MergedPull, type PullRequest, type Release } from '@shared/appStudio'
 import { logError } from './log'
 import { TEST_COPY } from './testCopy'
 
@@ -384,6 +384,38 @@ async function fetchImage(url: string): Promise<{ bytes: Uint8Array; type: strin
   return { bytes, type }
 }
 
+/** Runs npm in a folder; its output either way (npm outdated and npm audit exit with 1 when they find something). */
+function npm(folder: string, args: string[]): Promise<{ out: string; err: string; missing: boolean }> {
+  return new Promise((done) => {
+    execFile(
+      process.platform === 'win32' ? 'npm.cmd' : 'npm',
+      args,
+      // npm.cmd only runs through the shell on Windows; the arguments are fixed, never typed in.
+      { cwd: folder, timeout: 120_000, windowsHide: true, maxBuffer: 16 * 1024 * 1024, shell: process.platform === 'win32' },
+      (err, stdout, stderr) => {
+        const missing = !!err && ((err as NodeJS.ErrnoException).code === 'ENOENT' || /not recognized|not found/i.test(String(stderr)))
+        done({ out: String(stdout ?? ''), err: String(stderr || ''), missing: missing && !String(stdout ?? '').trim() })
+      }
+    )
+  })
+}
+
+/** Checks an app's packages: which have newer versions, and which have known security problems. */
+async function health(folder: string): Promise<HealthReport> {
+  if (!existsSync(join(folder, 'package.json'))) throw new Error('This app has no package.json, so there are no npm packages to check.')
+  const problems: string[] = []
+  const hasLock = existsSync(join(folder, 'package-lock.json'))
+  const [outdated, audit] = await Promise.all([
+    npm(folder, ['outdated', '--json', '--long']),
+    hasLock ? npm(folder, ['audit', '--json']) : Promise.resolve({ out: '', err: '', missing: false })
+  ])
+  if (outdated.missing) throw new Error('npm isn’t installed on this computer (it comes with Node.js).')
+  if (!hasLock) problems.push('There’s no package-lock.json, so npm can’t check for security problems. Run npm install once to make one.')
+  else if (!audit.out.trim()) problems.push(`npm couldn’t check for security problems${/ENOTFOUND|ETIMEDOUT|network/i.test(audit.err) ? ' (no internet?)' : ''}.`)
+  if (!existsSync(join(folder, 'node_modules'))) problems.push('The packages aren’t installed yet (no node_modules), so “now” shows as not installed.')
+  return { checkedAt: new Date().toISOString(), outdated: parseOutdated(outdated.out), security: parseAudit(audit.out), problems }
+}
+
 function needToken(): void {
   if (!token()) throw new Error('Connect GitHub in App Studio first, so Orbit can do that for you.')
 }
@@ -423,6 +455,10 @@ export function setupAppStudio(): void {
   ipcMain.handle('apps:pullStates', (_e, repo: unknown, numbers: unknown) => {
     if (!validRepo(repo) || !Array.isArray(numbers)) throw new Error('Not allowed')
     return pullStates(repo, numbers.filter((n): n is number => Number.isInteger(n) && n > 0))
+  })
+  ipcMain.handle('apps:health', (_e, folder: unknown) => {
+    if (!validFolder(folder)) throw new Error('This app’s folder isn’t there any more.')
+    return health(folder)
   })
   ipcMain.handle('apps:fetchImage', (_e, url: unknown) => fetchImage(String(url)))
   ipcMain.handle('apps:merge', async (_e, repo: unknown, number: unknown) => {

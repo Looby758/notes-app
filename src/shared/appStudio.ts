@@ -593,3 +593,151 @@ export function commitAllCommand(windows: boolean, message: string): string {
   const m = message.replace(/["`$\\]/g, '').trim() || 'Update'
   return windows ? `git add -A; if ($LASTEXITCODE -eq 0) { git commit -m "${m}" }` : `git add -A && git commit -m "${m}"`
 }
+
+// ---------- Health check ----------
+
+/** A package with a newer version out. */
+export interface OutdatedPackage {
+  name: string
+  /** What's installed (missing when the packages aren't installed yet). */
+  current?: string
+  /** The newest version package.json already allows (what `npm update` gets). */
+  wanted: string
+  /** The newest version there is. */
+  latest: string
+  /** Getting `latest` means a new major version, which can need code changes. */
+  major: boolean
+  dev: boolean
+}
+
+export type Severity = 'critical' | 'high' | 'moderate' | 'low' | 'info'
+
+export const SEVERITIES: Severity[] = ['critical', 'high', 'moderate', 'low', 'info']
+
+/** A package with a known security problem. */
+export interface SecurityWarning {
+  name: string
+  severity: Severity
+  /** What the problem is, from the advisory. */
+  title: string
+  url?: string
+  /** Whether `npm audit fix` can fix it without a major update. */
+  easyFix: boolean
+  /** Fixing it needs a major update of a package (npm audit fix --force), which can break things. */
+  majorFix: boolean
+}
+
+export interface HealthReport {
+  checkedAt: string
+  outdated: OutdatedPackage[]
+  security: SecurityWarning[]
+  /** Something that stopped part of the check (npm not installed, no package-lock.json…). */
+  problems: string[]
+}
+
+const majorOf = (v?: string): number | null => {
+  const m = /^\D*(\d+)\./.exec(v ?? '')
+  return m ? Number(m[1]) : null
+}
+
+/** Reads `npm outdated --json --long`. */
+export function parseOutdated(json: string): OutdatedPackage[] {
+  let data: unknown
+  try {
+    data = JSON.parse(json || '{}')
+  } catch {
+    return []
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return []
+  const out: OutdatedPackage[] = []
+  for (const [name, raw] of Object.entries(data as Record<string, unknown>)) {
+    // Workspaces list a package once for each place it's used.
+    const entry = (Array.isArray(raw) ? raw[0] : raw) as { current?: string; wanted?: string; latest?: string; type?: string } | undefined
+    if (!entry || typeof entry.latest !== 'string' || typeof entry.wanted !== 'string') continue
+    const from = majorOf(entry.current ?? entry.wanted)
+    const to = majorOf(entry.latest)
+    out.push({
+      name,
+      current: entry.current,
+      wanted: entry.wanted,
+      latest: entry.latest,
+      major: from !== null && to !== null && to > from,
+      dev: entry.type === 'devDependencies'
+    })
+  }
+  return out.sort((a, b) => Number(a.major) - Number(b.major) || a.name.localeCompare(b.name))
+}
+
+/** Reads `npm audit --json` (npm 7 and later): one warning for each package with a problem. */
+export function parseAudit(json: string): SecurityWarning[] {
+  let data: { vulnerabilities?: Record<string, { name?: string; severity?: string; via?: unknown[]; fixAvailable?: unknown }> }
+  try {
+    data = JSON.parse(json || '{}')
+  } catch {
+    return []
+  }
+  const out: SecurityWarning[] = []
+  for (const [key, v] of Object.entries(data?.vulnerabilities ?? {})) {
+    const severity = (SEVERITIES as string[]).includes(v.severity ?? '') ? (v.severity as Severity) : 'info'
+    // "via" holds the advisories themselves, or the names of other packages that bring the problem in.
+    const advisory = (v.via ?? []).find((x): x is { title?: string; url?: string } => !!x && typeof x === 'object')
+    const through = (v.via ?? []).filter((x): x is string => typeof x === 'string')
+    const fix = v.fixAvailable
+    out.push({
+      name: v.name ?? key,
+      severity,
+      title: advisory?.title ?? (through.length ? `Uses ${through.slice(0, 3).join(', ')}, which ${through.length === 1 ? 'has' : 'have'} a problem` : 'A known problem'),
+      url: advisory?.url,
+      easyFix: fix === true || (!!fix && typeof fix === 'object' && !(fix as { isSemVerMajor?: boolean }).isSemVerMajor),
+      majorFix: !!fix && typeof fix === 'object' && !!(fix as { isSemVerMajor?: boolean }).isSemVerMajor
+    })
+  }
+  return out.sort((a, b) => SEVERITIES.indexOf(a.severity) - SEVERITIES.indexOf(b.severity) || a.name.localeCompare(b.name))
+}
+
+/** Each severity and how many warnings have it, worst first ("2 high, 1 low"). */
+export function severityCounts(warnings: SecurityWarning[]): { severity: Severity; count: number }[] {
+  return SEVERITIES.map((severity) => ({ severity, count: warnings.filter((w) => w.severity === severity).length })).filter((c) => c.count > 0)
+}
+
+/** How the app is doing: good (nothing to do), fine (updates, no security problems), or attention (security problems). */
+export function healthLevel(report: HealthReport): 'good' | 'fine' | 'attention' {
+  if (report.security.some((w) => w.severity !== 'info' && w.severity !== 'low')) return 'attention'
+  if (report.security.length || report.outdated.length) return 'fine'
+  return 'good'
+}
+
+/** One line about it, for the app's card. */
+export function healthLine(report: HealthReport): string {
+  const parts: string[] = []
+  if (report.security.length) {
+    const worst = severityCounts(report.security)[0]
+    parts.push(`${report.security.length} security warning${report.security.length === 1 ? '' : 's'}${worst.severity !== 'info' ? ` (${worst.count} ${worst.severity})` : ''}`)
+  }
+  if (report.outdated.length) parts.push(`${report.outdated.length} update${report.outdated.length === 1 ? '' : 's'}`)
+  return parts.length ? parts.join(' · ') : report.problems.length ? 'Couldn’t check everything' : 'All up to date and safe'
+}
+
+/** A board card asking Claude to update the packages and fix the security warnings. */
+export function healthBoardItem(report: HealthReport): { title: string; details: string } {
+  const lines: string[] = []
+  if (report.security.length) {
+    lines.push('Security warnings from npm audit:')
+    for (const w of report.security) lines.push(`- ${w.name} (${w.severity}): ${w.title}${w.url ? ` ${w.url}` : ''}`)
+  }
+  const majors = report.outdated.filter((p) => p.major)
+  const minors = report.outdated.filter((p) => !p.major)
+  if (minors.length) {
+    if (lines.length) lines.push('')
+    lines.push('Safe updates:')
+    for (const p of minors) lines.push(`- ${p.name} ${p.current ?? '(not installed)'} → ${p.latest}`)
+  }
+  if (majors.length) {
+    if (lines.length) lines.push('')
+    lines.push('Big updates (new major versions, check nothing breaks):')
+    for (const p of majors) lines.push(`- ${p.name} ${p.current ?? '(not installed)'} → ${p.latest}`)
+  }
+  lines.push('', 'Update what’s safe, fix the security warnings, and make sure the app still builds and its tests pass.')
+  const title = report.security.length ? 'Fix the security warnings and update packages' : 'Update packages'
+  return { title, details: lines.join('\n') }
+}

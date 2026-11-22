@@ -16251,6 +16251,135 @@ a.appstudio-repo:hover {
   cursor: pointer;
   text-align: left;
 }
+.appstudio-health {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.appstudio-health-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+.appstudio-health.good .appstudio-health-line svg:first-child {
+  color: var(--accent);
+}
+.appstudio-health.fine .appstudio-health-line svg:first-child {
+  color: #d29215;
+}
+.appstudio-health.attention .appstudio-health-line {
+  color: #e5484d;
+}
+.appstudio-health-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.appstudio-health-chevron {
+  margin-left: auto;
+  flex: none;
+  color: var(--text-faint);
+  transition: transform 0.15s var(--ease);
+}
+.appstudio-health-chevron.open {
+  transform: rotate(180deg);
+}
+.appstudio-health-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  font-size: 12.5px;
+}
+.appstudio-health-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.appstudio-health-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.appstudio-health-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.appstudio-health-row strong {
+  flex: none;
+  font-weight: 600;
+}
+.appstudio-health-what {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.appstudio-health-problem,
+.appstudio-health-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.appstudio-health-error {
+  color: #e5484d;
+  font-size: 12.5px;
+}
+.appstudio-health-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.appstudio-health-when {
+  flex: none;
+  white-space: nowrap;
+}
+.appstudio-health-actions .btn {
+  padding: 3px 10px;
+  font-size: 12.5px;
+}
+.appstudio-health-actions .icon-btn {
+  margin-left: auto;
+}
+.appstudio-severity {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+}
+.appstudio-severity.critical,
+.appstudio-severity.high {
+  background: rgba(229, 72, 77, 0.14);
+  color: #e5484d;
+}
+.appstudio-severity.moderate {
+  background: rgba(229, 160, 13, 0.16);
+  color: #d29215;
+}
 .appstudio-pr-link:disabled {
   color: var(--text-faint);
   cursor: default;

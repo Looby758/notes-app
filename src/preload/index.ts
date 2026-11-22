@@ -824,6 +824,7 @@ const api: NotesApi = {
   appsRemoveCopy: (folder, path) => ipcRenderer.invoke('apps:removeCopy', folder, path),
   appsPullStates: (repo, numbers) => ipcRenderer.invoke('apps:pullStates', repo, numbers),
   appsFetchImage: (url) => ipcRenderer.invoke('apps:fetchImage', url),
+  appsHealth: (folder) => ipcRenderer.invoke('apps:health', folder),
   appsMerge: (repo, number) => ipcRenderer.invoke('apps:merge', repo, number),
   appsClose: (repo, number) => ipcRenderer.invoke('apps:close', repo, number),
   aiChat: (messages, engine) => ipcRenderer.invoke('ai:chat', messages, engine),
