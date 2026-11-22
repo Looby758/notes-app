@@ -286,6 +286,64 @@ export interface Release {
   url: string
   /** Its notes, as written. */
   body: string
+  /** How many times its installers were downloaded (the updater's own files left out). */
+  downloads?: number
+  /** Each installer file and its downloads. */
+  files?: ReleaseFile[]
+}
+
+export interface ReleaseFile {
+  name: string
+  downloads: number
+}
+
+/** Files on a release that people don't download themselves: the updater's own files, checksums, signatures. */
+const NOT_A_DOWNLOAD = /(\.(ya?ml|blockmap|json|txt|sha(1|256|512)|sig|asc|md5)|^(latest|RELEASES)[\w.-]*)$/i
+
+/** Whether a release file is an installer (or a zip of the app) that counts as a download. */
+export const isDownloadFile = (name: string): boolean => !NOT_A_DOWNLOAD.test(name)
+
+export type Platform = 'Windows' | 'Mac' | 'Linux' | 'Other'
+
+/** Which computer a release file is for, from its name. */
+export function platformOf(name: string): Platform {
+  const n = name.toLowerCase()
+  if (/\.(exe|msi|appx|msix)$/.test(n) || /\b(win|windows|win32|win64)\b/.test(n)) return 'Windows'
+  if (/\.(dmg|pkg)$/.test(n) || /\b(mac|macos|darwin|osx)\b/.test(n)) return 'Mac'
+  if (/\.(appimage|deb|rpm|snap|flatpak)$/.test(n) || /\blinux\b/.test(n)) return 'Linux'
+  return 'Other'
+}
+
+/** A release's downloads by computer, biggest first. */
+export function downloadsByPlatform(files: ReleaseFile[]): { platform: Platform; downloads: number }[] {
+  const out = new Map<Platform, number>()
+  for (const f of files) out.set(platformOf(f.name), (out.get(platformOf(f.name)) ?? 0) + f.downloads)
+  return [...out].map(([platform, downloads]) => ({ platform, downloads })).sort((a, b) => b.downloads - a.downloads)
+}
+
+/** 1234 → "1,234", 15300 → "15.3k". */
+export function countText(n: number): string {
+  if (n < 10_000) return n.toLocaleString('en-GB')
+  if (n < 1_000_000) return `${(n / 1000).toFixed(n < 100_000 ? 1 : 0).replace(/\.0$/, '')}k`
+  return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}m`
+}
+
+/** An app's total downloads, noted once a day on this computer, so the week and month can be worked out. */
+export type DownloadHistory = { day: string; total: number }[]
+
+/** Adds today's total (replacing today's earlier one), keeping the last year. */
+export function addDownloadDay(history: DownloadHistory, day: string, total: number): DownloadHistory {
+  const rest = history.filter((h) => h.day !== day)
+  return [...rest, { day, total }].sort((a, b) => a.day.localeCompare(b.day)).slice(-366)
+}
+
+/** Downloads in the last `days` days, from the history; null when it doesn't go back that far yet. */
+export function downloadsSince(history: DownloadHistory, days: number, today: string): number | null {
+  if (!history.length) return null
+  const cutoff = new Date(Date.parse(today + 'T00:00:00Z') - days * 86_400_000).toISOString().slice(0, 10)
+  const before = [...history].reverse().find((h) => h.day <= cutoff)
+  if (!before) return null
+  return Math.max(0, history[history.length - 1].total - before.total)
 }
 
 /** A pull request that was merged. */

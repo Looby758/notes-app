@@ -2,7 +2,7 @@ import { app, ipcMain, net, safeStorage } from 'electron'
 import { execFile } from 'child_process'
 import { existsSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'path'
-import { copyFolderName, githubRepo, isGitHubImage, TOKEN_NOT_ALLOWED, type AppInfo, type TestCopy, type GitHubStatus, type MergedPull, type PullRequest, type Release } from '@shared/appStudio'
+import { copyFolderName, githubRepo, isDownloadFile, isGitHubImage, TOKEN_NOT_ALLOWED, type AppInfo, type TestCopy, type GitHubStatus, type MergedPull, type PullRequest, type Release } from '@shared/appStudio'
 import { logError } from './log'
 import { TEST_COPY } from './testCopy'
 
@@ -294,19 +294,27 @@ interface ApiRelease {
   html_url: string
   created_at: string
   published_at: string | null
+  assets?: { name: string; download_count: number }[]
 }
 
-async function releases(repo: string): Promise<Release[]> {
-  const list = await github<ApiRelease[]>(`/repos/${repo}/releases?per_page=20`)
-  return list.map((r) => ({
+function toRelease(r: ApiRelease): Release {
+  const files = (r.assets ?? []).filter((a) => isDownloadFile(a.name)).map((a) => ({ name: a.name, downloads: a.download_count ?? 0 }))
+  return {
     tag: r.tag_name,
     name: r.name || r.tag_name,
     date: r.published_at ?? r.created_at,
     draft: r.draft,
     prerelease: r.prerelease,
     url: r.html_url,
-    body: r.body ?? ''
-  }))
+    body: r.body ?? '',
+    downloads: files.reduce((n, f) => n + f.downloads, 0),
+    files
+  }
+}
+
+async function releases(repo: string): Promise<Release[]> {
+  const list = await github<ApiRelease[]>(`/repos/${repo}/releases?per_page=30`)
+  return list.map(toRelease)
 }
 
 interface ApiClosedPull extends ApiPull {
@@ -340,7 +348,7 @@ async function setReleaseNotes(repo: string, tag: string, body: string, title: s
   const r = found
     ? await github<ApiRelease>(`/repos/${repo}/releases/${found.id}`, { method: 'PATCH', body: { body }, doing: 'change releases', needs: 'Contents' })
     : await github<ApiRelease>(`/repos/${repo}/releases`, { method: 'POST', body: { tag_name: tag, name: title, body, draft: true }, doing: 'make releases', needs: 'Contents' })
-  return { tag: r.tag_name, name: r.name || r.tag_name, date: r.published_at ?? r.created_at, draft: r.draft, prerelease: r.prerelease, url: r.html_url, body: r.body ?? '' }
+  return toRelease(r)
 }
 
 /** Whether each pull request is still open, was merged, or was closed without merging. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boardKey, commitAllCommand, describeChange, stashCommand, isTokenPermissionError, newTokenUrl, TOKEN_NOT_ALLOWED, bumpVersion, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
+import { addDownloadDay, countText, downloadsByPlatform, downloadsSince, isDownloadFile, platformOf, type DownloadHistory, boardKey, commitAllCommand, describeChange, stashCommand, isTokenPermissionError, newTokenUrl, TOKEN_NOT_ALLOWED, bumpVersion, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
 
 describe('githubRepo', () => {
   it('reads https and ssh remotes', () => {
@@ -269,5 +269,51 @@ describe('uncommitted changes', () => {
     expect(commitAllCommand(false, 'Small "fixes"')).toBe('git add -A && git commit -m "Small fixes"')
     expect(commitAllCommand(true, 'x')).toBe('git add -A; if ($LASTEXITCODE -eq 0) { git commit -m "x" }')
     expect(stashCommand()).toContain('git stash push --include-untracked')
+  })
+})
+
+describe('downloads', () => {
+  it('counts installers, not the updater’s own files', () => {
+    expect(isDownloadFile('Orbit-Setup-1.13.0.exe')).toBe(true)
+    expect(isDownloadFile('Orbit-1.13.0-arm64.dmg')).toBe(true)
+    expect(isDownloadFile('Orbit-1.13.0-mac.zip')).toBe(true)
+    expect(isDownloadFile('latest.yml')).toBe(false)
+    expect(isDownloadFile('latest-mac.yml')).toBe(false)
+    expect(isDownloadFile('Orbit-Setup-1.13.0.exe.blockmap')).toBe(false)
+    expect(isDownloadFile('checksums.sha256')).toBe(false)
+  })
+  it('tells which computer a file is for', () => {
+    expect(platformOf('Orbit-Setup-1.13.0.exe')).toBe('Windows')
+    expect(platformOf('Orbit-1.13.0-arm64.dmg')).toBe('Mac')
+    expect(platformOf('Orbit-1.13.0-mac.zip')).toBe('Mac')
+    expect(platformOf('orbit_1.13.0_amd64.deb')).toBe('Linux')
+    expect(platformOf('source.zip')).toBe('Other')
+    const files = [
+      { name: 'a.exe', downloads: 3 },
+      { name: 'a.dmg', downloads: 5 },
+      { name: 'b.msi', downloads: 4 }
+    ]
+    expect(downloadsByPlatform(files)).toEqual([
+      { platform: 'Windows', downloads: 7 },
+      { platform: 'Mac', downloads: 5 }
+    ])
+  })
+  it('writes counts short', () => {
+    expect(countText(0)).toBe('0')
+    expect(countText(1234)).toBe('1,234')
+    expect(countText(15_300)).toBe('15.3k')
+    expect(countText(250_000)).toBe('250k')
+    expect(countText(2_000_000)).toBe('2m')
+  })
+  it('keeps one total a day and works out the last week', () => {
+    let h: DownloadHistory = []
+    h = addDownloadDay(h, '2026-11-01', 100)
+    h = addDownloadDay(h, '2026-11-10', 150)
+    h = addDownloadDay(h, '2026-11-15', 170)
+    h = addDownloadDay(h, '2026-11-15', 180)
+    expect(h).toHaveLength(3)
+    expect(downloadsSince(h, 7, '2026-11-15')).toBe(80)
+    expect(downloadsSince(h, 30, '2026-11-15')).toBeNull()
+    expect(downloadsSince([], 7, '2026-11-15')).toBeNull()
   })
 })
