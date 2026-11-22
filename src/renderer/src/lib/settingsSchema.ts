@@ -796,7 +796,7 @@ export const SETTINGS: SettingDef[] = [
     type: 'toggle',
     label: 'Sign in with Google as Firefox',
     description:
-      'Leave this off unless Google refuses to sign you in with “This browser or app may not be secure” (in Grok, a web tab or Messages). On, Google’s sign-in pages are told this is Firefox, but that can send “Sign in with Google” back to “Choose an account” each time.',
+      'Leave this off: when Google refuses to sign you in (“This browser or app may not be secure”), Orbit already tries that sign-in again as Firefox by itself. On, Google’s sign-in pages are always told this is Firefox, which can send “Sign in with Google” (in Grok) back to “Choose an account” each time.',
     keywords: 'google sign in login log in account chooser loop grok firefox browser not secure web tab'
   },
 
@@ -916,6 +916,50 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'discord voice call pop out popout second monitor screen notification join vc'
   },
   {
+    key: 'duckMusic',
+    section: 'studio',
+    group: 'Discord voice',
+    type: 'toggle',
+    label: 'Turn music down while people talk',
+    description: 'In a Discord call, your music dips while someone else is speaking and comes back up a moment after they stop. Needs Discord connected in Orbit.',
+    keywords: 'duck ducking dip lower music volume spotify discord talk speaking friends mixer auto'
+  },
+  {
+    key: 'duckLevel',
+    section: 'studio',
+    group: 'Discord voice',
+    type: 'slider',
+    ...RANGES.duckLevel,
+    format: pct,
+    label: 'Music volume while they talk',
+    keywords: 'duck dip level how quiet'
+  },
+  {
+    key: 'duckWhenITalk',
+    section: 'studio',
+    group: 'Discord voice',
+    type: 'toggle',
+    label: 'Dip it when I talk too',
+    description: 'Not only while friends talk: also while Discord is sending your voice.',
+    keywords: 'duck dip my voice me talking speaking'
+  },
+  {
+    key: 'duckSpotify',
+    section: 'studio',
+    group: 'Discord voice',
+    type: 'toggle',
+    label: 'Dip Spotify',
+    keywords: 'duck spotify'
+  },
+  {
+    key: 'duckOrbit',
+    section: 'studio',
+    group: 'Discord voice',
+    type: 'toggle',
+    label: 'Dip Orbit’s own music',
+    keywords: 'duck music player own songs'
+  },
+  {
     key: 'snipShortcut',
     section: 'capture',
     group: 'Screen snip',
@@ -924,6 +968,15 @@ export const SETTINGS: SettingDef[] = [
     label: 'Shortcut',
     description: 'Drag a box round text anywhere on screen to copy it, save it, search it, translate it or ask the AI about it. Read on this computer.',
     keywords: 'snip screenshot ocr text grab copy translate hotkey'
+  },
+  {
+    key: 'snipSave',
+    section: 'capture',
+    group: 'Screen snip',
+    type: 'toggle',
+    label: 'Save picture snips as files too',
+    description: 'Each picture snip is copied, ready to paste, and also saved as a PNG named after when you took it. Pick the folder at the bottom of this page.',
+    keywords: 'snip screenshot save folder location where saved png pictures screenshots'
   },
   {
     key: 'captureTarget',
@@ -979,6 +1032,24 @@ export const SETTINGS: SettingDef[] = [
       : 'So quick capture works any time. Quit from the tray icon’s menu.',
     keywords: 'tray menu bar background minimize system'
   },
+  // A Mac's menu bar icon always opens its menu on a click, so this is Windows only.
+  ...(IS_MAC
+    ? []
+    : [
+        {
+          key: 'trayClick',
+          section: 'capture',
+          group: 'Tray',
+          type: 'choice',
+          options: [
+            { value: 'open', label: 'Opens Orbit' },
+            { value: 'snip', label: 'Snips a picture' }
+          ],
+          label: 'Clicking the tray icon',
+          description: 'Snips a picture: drag a box round anything and it’s copied, ready to paste anywhere. Right-click the icon for everything else, including Open Orbit.',
+          keywords: 'tray click snip snipping tool screenshot taskbar picture clipboard'
+        } satisfies SettingDef
+      ]),
   {
     key: 'launchAtStartup',
     section: 'capture',

@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { quietPasskeys } from '@shared/passkeys'
-import { firefoxOnGoogleSignIn, firefoxUserAgent, isGoogleSignIn } from '@shared/web'
+import { chromeInPage, firefoxOnGoogleSignIn, firefoxUserAgent, hintPlatform, isGoogleSignIn } from '@shared/web'
 import { classifyField, profileValue, type AutofillProfile, type FieldKind } from '@shared/browser'
 
 /**
@@ -20,6 +20,8 @@ import { classifyField, profileValue, type AutofillProfile, type FieldKind } fro
  */
 
 contextBridge.executeInMainWorld({ func: quietPasskeys })
+// Pages see Google Chrome (its brands and window.chrome), as the requests say (see chromeInPage).
+contextBridge.executeInMainWorld({ func: chromeInPage, args: [process.versions.chrome ?? '', hintPlatform(process.platform)] })
 // With "Sign in with Google as Firefox" on, Google's sign-in pages see the same Firefox the request
 // said (see firefoxOnGoogleSignIn). Only Google's sign-in pages ask.
 if (isGoogleSignIn(location.href) && ipcRenderer.sendSync('web:googleAsFirefox') === true) {

@@ -56,12 +56,21 @@ const api: NotesApi = {
     ipcRenderer.on('replay:save', handler)
     return () => ipcRenderer.removeListener('replay:save', handler)
   },
+  onMusicDuck: (callback) => {
+    const handler = (_e: unknown, level: number): void => callback(level)
+    ipcRenderer.on('music:duck', handler)
+    return () => ipcRenderer.removeListener('music:duck', handler)
+  },
   onClipsOpen: (callback) => {
     const handler = (_e: unknown, path: string): void => callback(path)
     ipcRenderer.on('clips:open', handler)
     return () => ipcRenderer.removeListener('clips:open', handler)
   },
   clipsList: (folder) => ipcRenderer.invoke('clips:list', folder),
+  clipsMeta: (folder) => ipcRenderer.invoke('clips:meta', folder),
+  clipsStar: (folder, path, on) => ipcRenderer.invoke('clips:star', folder, path, on),
+  clipsMove: (folder, path, to) => ipcRenderer.invoke('clips:move', folder, path, to),
+  clipsRenameFolder: (folder, from, to) => ipcRenderer.invoke('clips:renameFolder', folder, from, to),
   clipsExport: (folder, request) => ipcRenderer.invoke('clips:export', folder, request),
   clipsCancel: () => ipcRenderer.invoke('clips:cancel'),
   onClipsProgress: (callback) => {
@@ -341,6 +350,7 @@ const api: NotesApi = {
   videoInfo: (path) => ipcRenderer.invoke('video:info', path),
   videoSubtitles: (path, source) => ipcRenderer.invoke('video:subtitles', path, source),
   videoKeyframe: (path, at, fileStart) => ipcRenderer.invoke('video:keyframe', path, at, fileStart),
+  videoFrame: (path, at) => ipcRenderer.invoke('video:frame', path, at),
   stopVideoStream: (session) => ipcRenderer.invoke('video:stop', session),
   releaseVideo: (path) => ipcRenderer.invoke('video:release', path),
   releaseFile: (path) => ipcRenderer.invoke('files:release', path),
@@ -382,6 +392,14 @@ const api: NotesApi = {
   soundboardMove: (id, to) => ipcRenderer.invoke('soundboard:move', id, to),
   soundboardOpenLink: (which) => ipcRenderer.invoke('soundboard:open-link', which),
   soundboardShowFolder: () => ipcRenderer.invoke('soundboard:show-folder'),
+  soundLinkFetch: (id, link) => ipcRenderer.invoke('soundLink:fetch', id, link),
+  soundLinkMake: (id, start, end, name) => ipcRenderer.invoke('soundLink:make', id, start, end, name),
+  soundLinkForget: (id) => ipcRenderer.invoke('soundLink:forget', id),
+  onSoundLinkProgress: (callback) => {
+    const handler = (_e: unknown, id: string, done: number | null): void => callback(id, done)
+    ipcRenderer.on('soundLink:progress', handler)
+    return () => ipcRenderer.removeListener('soundLink:progress', handler)
+  },
   onSoundboardHotkey: (callback) => {
     const handler = (_e: unknown, action: Parameters<typeof callback>[0]): void => callback(action)
     ipcRenderer.on('soundboard:hotkey', handler)
@@ -472,7 +490,14 @@ const api: NotesApi = {
     return () => ipcRenderer.removeListener('discord:changed', handler)
   },
 
-  startSnip: () => ipcRenderer.invoke('snip:start'),
+  startSnip: (mode) => ipcRenderer.invoke('snip:start', mode),
+  snipCopyPicture: (png) => ipcRenderer.invoke('snip:copyPicture', png),
+  snipTaskbar: () => ipcRenderer.invoke('snip:taskbar'),
+  snipShowShortcut: () => ipcRenderer.invoke('snip:showShortcut'),
+  snipSaveInfo: () => ipcRenderer.invoke('snip:saveInfo'),
+  snipPickFolder: () => ipcRenderer.invoke('snip:pickFolder'),
+  snipOpenFolder: () => ipcRenderer.invoke('snip:openFolder'),
+  snipShowLast: () => ipcRenderer.invoke('snip:showLast'),
   snipStatus: () => ipcRenderer.invoke('snip:status'),
   snipImage: () => ipcRenderer.invoke('snip:image'),
   snipRead: (png, lang) => ipcRenderer.invoke('snip:read', png, lang),
@@ -480,6 +505,29 @@ const api: NotesApi = {
   snipGetOcrLang: (code) => ipcRenderer.invoke('snip:getOcrLang', code),
   snipTranslate: (text, target) => ipcRenderer.invoke('snip:translate', text, target),
   snipClose: () => ipcRenderer.invoke('snip:close'),
+  snipBoxing: () => ipcRenderer.invoke('snip:boxing'),
+  snipDrawn: () => ipcRenderer.invoke('snip:drawn'),
+  snipPainted: () => ipcRenderer.invoke('snip:painted'),
+  onSnipNew: (callback) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('snip:new', handler)
+    return () => ipcRenderer.removeListener('snip:new', handler)
+  },
+  onSnipVisible: (callback) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('snip:visible', handler)
+    return () => ipcRenderer.removeListener('snip:visible', handler)
+  },
+  onSnipReset: (callback) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('snip:reset', handler)
+    return () => ipcRenderer.removeListener('snip:reset', handler)
+  },
+  onSnipClear: (callback) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('snip:clear', handler)
+    return () => ipcRenderer.removeListener('snip:clear', handler)
+  },
   snipReportBug: (png) => ipcRenderer.invoke('snip:bug', png),
   onAppStudioBug: (callback) => {
     const handler = (_e: unknown, png: Uint8Array): void => callback(png)

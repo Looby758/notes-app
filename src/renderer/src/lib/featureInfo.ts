@@ -69,6 +69,7 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'mini-games', name: 'Mini games', blurb: 'Sudoku, Minesweeper, Nonograms, Jigsaw, Wordle, Solitaire, 2048 and Chess', group: 'Play', command: 'minigames.open', keywords: 'sudoku minesweeper nonogram picross griddler jigsaw puzzle photo wordle word guess walking dead solitaire klondike patience cards 2048 chess quick break' },
 
   { id: 'snip', name: 'Screen snip', blurb: 'Grab text from anywhere on screen', group: 'Tools', command: 'snip.start', keywords: 'ocr screenshot copy text translate' },
+  { id: 'snip-picture', name: 'Snip a picture', blurb: 'Drag a box and it’s copied, ready to paste anywhere', group: 'Tools', command: 'snip.picture', keywords: 'snipping tool screenshot screen grab clipboard image paste taskbar crop' },
   { id: 'mixer', name: 'Volume mixer', blurb: 'A volume for each app: games, Discord, Spotify', group: 'Tools', command: 'mixer.open', keywords: 'sound audio volume loud quiet mute discord spotify game per app levels' },
   { id: 'screens', name: 'Screens', blurb: 'Monitor brightness, contrast and input, with hotkeys', group: 'Tools', command: 'screens.open', keywords: 'monitor display brightness contrast input hdmi displayport usb-c ddc dim switch' },
   { id: 'explorer', name: 'Files', blurb: 'Files on this computer', group: 'Tools', command: 'explorer.open', keywords: 'explorer finder folders drive' },

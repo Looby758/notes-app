@@ -40,13 +40,16 @@ import { closeDiscordPopout, setupDiscordPopout } from './discordPopout'
 import { closeVideoWindow, setupVideoWindow } from './videoWindow'
 import { closeWebWindow, setupWebWindow } from './webWindow'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
-import { applySnipShortcut, setupSnip, startSnip } from './snip'
+import { applySnipShortcut, openSnipFolder, setupSnip, startSnip } from './snip'
+import { setupSnipTaskbar } from './snipTaskbar'
+import { snipModeFromArgv } from '@shared/snipLaunch'
 import { applySongIdShortcut, setupSongId } from './songId'
 import { setupUpdater } from './updater'
 import { setupSettingsHealth } from './settingsHealth'
 import { setupExport } from './exporter'
 import { setupConverter } from './converter'
 import { setupVideoDownloader } from './videoDownload'
+import { setupSoundFromLink } from './soundFromLink'
 import { setupDownloadManager } from './downloadManager'
 import { isAppPage, setupStudio } from './studio'
 import { applyReplayShortcut, clipResponse, setupClips } from './clips'
@@ -59,6 +62,7 @@ import { setupOrbitSync, syncOrbitSoon, type PartHandler } from './orbitSync'
 import { cleanPrefsPart, prefsPart } from '@shared/orbitSync'
 import { setupMonitors, teardownMonitors } from './monitors'
 import { setupMixer, teardownMixer } from './mixer'
+import { applyDuckPrefs, setupMusicDuck } from './musicDuck'
 import { setupLive } from './live'
 import { explorerFile, setFileIndexOn, setupExplorer } from './explorer'
 import { openOutside } from './openOutside'
@@ -69,7 +73,7 @@ import { setupVideoPlayer, videoResponse } from './videoPlayer'
 import { releaseFiles, serveFile } from './fileLocks'
 import { comicResponse, setupComics, shareProgress as shareComicProgress } from './comics'
 import { setupWiki, shareWikiProgress, wikiImageResponse } from './wiki'
-import { IS_MAC, TRASH_NAME } from '@shared/platform'
+import { IS_MAC } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
 import { dictionaryMenu, setupDictionary } from './dictionary'
@@ -131,6 +135,12 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   // "Open in Orbit" from File Explorer while Orbit is running starts a second copy, which hands the file over here.
   app.on('second-instance', (_e, argv) => {
+    // The taskbar's "Orbit Snip" or jump list: just snip, without bringing the window up.
+    const snip = snipModeFromArgv(argv)
+    if (snip) {
+      if (app.isReady()) void startSnip(snip)
+      return
+    }
     showMain()
     pathsFromArgv(argv).forEach(openInOrbit)
     // A link clicked in another app while Orbit is the default browser.
@@ -155,6 +165,9 @@ app.on('open-file', (e, path) => {
 app.on('activate', () => {
   if (app.isReady()) showMain()
 })
+
+/** Started by the taskbar's "Orbit Snip" or jump list: which snip to open once Orbit is up. */
+const launchSnip = snipModeFromArgv(process.argv)
 
 function showMain(): void {
   if (!app.isReady()) return
@@ -229,6 +242,7 @@ function applySystemPrefs(prefs: Prefs): void {
   applySnipShortcut(prefs.snipShortcut)
   applySongIdShortcut(prefs.songIdShortcut)
   applyReplayShortcut(prefs.replayOn ? prefs.replayShortcut : '')
+  applyDuckPrefs()
   safely('app icon', () => applyAppIcon(prefs))
   // Only the installed app registers itself (in development it would register electron.exe).
   if (!app.isPackaged) return
@@ -499,8 +513,9 @@ function createWindow(): BrowserWindow {
     }
   })
 
-  // Started at login: stay in the tray / menu bar until you open it.
-  const startHidden = startedAtLogin() && prefs.closeToTray
+  // Started at login: stay in the tray / menu bar until you open it. Started by the taskbar's
+  // "Orbit Snip": just the snip (the first window is the one; later ones were opened on purpose).
+  const startHidden = (startedAtLogin() && prefs.closeToTray) || (!mainWindow && !!launchSnip)
   let shown = false
   const reveal = (): void => {
     if (shown || win.isDestroyed()) return
@@ -941,22 +956,12 @@ function registerIpc(): void {
     await openOutside(e.sender, full, !!ask)
   })
 
-  // Several at once: one question, then each to the Bin. Returns the ones moved.
-  ipcMain.handle('fs:trashMany', async (event, paths: string[]) => {
+  // Several at once, straight into Orbit's undo bin (no question: Ctrl+Z or the toast's Undo brings
+  // them back, and they go on to the Recycle Bin / Bin afterwards). Returns the ones moved.
+  ipcMain.handle('fs:trashMany', async (_event, paths: string[]) => {
     const v = currentVault()
     const items = paths.filter(Boolean)
     if (items.length === 0) return []
-    const win = BrowserWindow.fromWebContents(event.sender)!
-    const { response } = await dialog.showMessageBox(win, {
-      type: 'warning',
-      buttons: [`Move to ${TRASH_NAME}`, 'Cancel'],
-      defaultId: 0,
-      cancelId: 1,
-      noLink: true,
-      message: `Delete ${items.length} items?`,
-      detail: `They'll be moved to the ${TRASH_NAME}:\n${items.slice(0, 8).map((p) => basename(p).replace(/\.md$/i, '')).join('\n')}${items.length > 8 ? `\n…and ${items.length - 8} more` : ''}`
-    })
-    if (response !== 0) return []
     const done: string[] = []
     for (const p of items) {
       try {
@@ -969,24 +974,11 @@ function registerIpc(): void {
     return done
   })
 
-  ipcMain.handle('fs:trash', async (event, path: string) => {
+  // No question either: it can be undone (and it ends up in the Recycle Bin / Bin anyway).
+  ipcMain.handle('fs:trash', async (_event, path: string) => {
     const v = currentVault()
     if (!path) throw new Error('The notes folder itself cannot be deleted here.')
     const full = v.abs(path)
-    const isFolder = statSync(full).isDirectory()
-    const win = BrowserWindow.fromWebContents(event.sender)!
-    const { response } = await dialog.showMessageBox(win, {
-      type: 'warning',
-      buttons: [`Move to ${TRASH_NAME}`, 'Cancel'],
-      defaultId: 0,
-      cancelId: 1,
-      noLink: true,
-      message: `Delete "${basename(full).replace(/\.md$/i, '')}"?`,
-      detail: isFolder
-        ? `The folder and everything in it will be moved to the ${TRASH_NAME}.`
-        : `The note will be moved to the ${TRASH_NAME}.`
-    })
-    if (response !== 0) return false
     await hold(full)
     return true
   })
@@ -1091,6 +1083,7 @@ app.whenReady().then(async () => {
   safely('studio', setupStudio)
   safely('offline AI', setupLocalAi)
   safely('soundboard', setupSoundboard)
+  safely('soundboard from a link', setupSoundFromLink)
   safely('macros', setupMacros)
   safely('key remapper', setupKeyRemap)
   safely('Discord voice', setupDiscord)
@@ -1111,12 +1104,16 @@ app.whenReady().then(async () => {
   safely('Orbit sync', () => setupOrbitSync({ root: () => vault?.root ?? null, enabled: () => currentPrefs().syncOrbit, window: () => mainWindow, parts: orbitParts(themesChanged) }))
   mainWindow = createWindow()
   // The extras: if one of them fails on some computer, the app itself still works.
-  safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: () => void startSnip() }))
-  safely('screen snip', () => setupSnip({ getMain: () => mainWindow, showMain }))
+  safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: (as) => void startSnip(as), openSnips: () => void openSnipFolder() }))
+  safely('screen snip', () => setupSnip({ getMain: () => mainWindow, showMain, prefs: currentPrefs }))
+  safely('taskbar snip', setupSnipTaskbar)
+  // Started from the taskbar's "Orbit Snip" (or its jump list) while Orbit wasn't running.
+  if (launchSnip) setTimeout(() => void startSnip(launchSnip), 300)
   safely('what’s this song', () => setupSongId({ getMain: () => mainWindow }))
   safely('instant replay', () => setupClips({ getMain: () => mainWindow, showMain }))
   safely('screen controls', setupMonitors)
   safely('volume mixer', setupMixer)
+  safely('music dipping', () => setupMusicDuck(currentPrefs))
   // A password copied from the vault isn't passed to the other computer.
   safely('mouse sharing', () => setupMouseShare(() => mainWindow, (text) => text === copiedSecret))
   safely('screens between computers', () => setupScreenLink(() => mainWindow))

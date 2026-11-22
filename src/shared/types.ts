@@ -601,8 +601,17 @@ export interface NotesApi {
   onReplaySave(callback: () => void): () => void
   /** Main window: open this clip in the clip editor (a click on the "Replay saved" notification). */
   onClipsOpen(callback: (path: string) => void): () => void
+  /** Music dipping (main/musicDuck.ts): turn Orbit's own music to this level (1 = normal) while friends talk in Discord. */
+  onMusicDuck(callback: (level: number) => void): () => void
   /** The videos in the recordings folder, newest first. */
   clipsList(folder: string | null): Promise<ClipInfo[]>
+  /** The game folders in the recordings folder, and which game goes in which. */
+  clipsMeta(folder: string | null): Promise<import('./clips').ClipsMeta>
+  clipsStar(folder: string | null, path: string, on: boolean): Promise<void>
+  /** Moves a clip into a game folder ('' for the top of the recordings folder); makes the folder if it's new. Resolves to its new path. */
+  clipsMove(folder: string | null, path: string, to: string): Promise<string>
+  /** Renames a game folder; that game's future replays go to the new name. */
+  clipsRenameFolder(folder: string | null, from: string, to: string): Promise<void>
   /** Makes a trimmed (and maybe captioned) copy; resolves to the new file. */
   clipsExport(folder: string | null, request: import('./clips').ClipExport): Promise<{ path: string; size: number }>
   clipsCancel(): Promise<void>
@@ -862,6 +871,8 @@ export interface NotesApi {
   /** Where a stream that copies the picture from `at` really starts (the keyframe before). */
   videoKeyframe(path: string, at: number, fileStart: number): Promise<number>
   /** Stops a page's live video stream. */
+  /** The picture `at` seconds into a video, as PNG bytes (needs the video helper). */
+  videoFrame(path: string, at: number): Promise<Uint8Array>
   stopVideoStream(session: string): Promise<void>
   /** The video player closed this video: everything reading it stops, so it can be deleted or moved. */
   releaseVideo(path: string): Promise<void>
@@ -914,6 +925,13 @@ export interface NotesApi {
   soundboardMove(id: string, to: number): Promise<SoundboardStatus>
   soundboardOpenLink(which: 'cable' | 'blackhole'): Promise<void>
   soundboardShowFolder(): Promise<void>
+  /** From a link: downloads a video's sound (YouTube, TikTok…) to pick a part from. `id` is the caller's own, to match progress to it. */
+  soundLinkFetch(id: string, link: string): Promise<{ title: string; bytes: Uint8Array; name: string }>
+  /** Cuts the picked part (seconds) of a fetched sound and adds it to the board as a button. */
+  soundLinkMake(id: string, start: number, end: number, name: string): Promise<{ status: SoundboardStatus; skipped: string[] }>
+  /** Stops a download, or throws away a fetched sound. */
+  soundLinkForget(id: string): Promise<void>
+  onSoundLinkProgress(callback: (id: string, done: number | null) => void): () => void
   /** A soundboard hotkey was pressed (anywhere, even in a game). */
   onSoundboardHotkey(callback: (action: SoundboardAction) => void): () => void
   onSoundboardChanged(callback: (status: SoundboardStatus) => void): () => void
@@ -1005,11 +1023,37 @@ export interface NotesApi {
   openRobloxDownload(): Promise<void>
 
   // Screen snip (main/snip.ts)
-  /** Takes a picture of the screen under the pointer and opens the snip window over it. */
-  startSnip(): Promise<void>
+  /**
+   * Takes a picture of every monitor and opens a snip window over each one. 'picture' copies the
+   * box as a picture as soon as you let go; 'text' (the default) reads the text in it.
+   */
+  startSnip(mode?: 'text' | 'picture'): Promise<void>
+  /** Snip window: this picture goes on the clipboard (closes the snip). */
+  snipCopyPicture(png: Uint8Array): Promise<void>
+  /** Windows: whether the taskbar snip is there ("Orbit Snip" in the Start menu, and the jump list). */
+  snipTaskbar(): Promise<{ available: boolean; shortcut: boolean }>
+  /** Shows the "Orbit Snip" shortcut in File Explorer (right-click → Pin to taskbar). */
+  snipShowShortcut(): Promise<void>
+  /** Where picture snips are saved (the folder you picked, or Pictures/Screenshots), and the last one saved. */
+  snipSaveInfo(): Promise<{ save: boolean; folder: string; custom: boolean; last: string | null }>
+  /** Asks for a folder to save snips in. Null if you cancelled. */
+  snipPickFolder(): Promise<string | null>
+  snipOpenFolder(): Promise<void>
+  /** Shows the last saved snip in File Explorer / Finder. */
+  snipShowLast(): Promise<void>
   snipStatus(): Promise<{ shortcut: string; error?: string }>
-  /** Snip window: the picture of the screen (PNG) and the screen's scale factor. */
-  snipImage(): Promise<{ png: Uint8Array; scale: number } | null>
+  /** Snip window: the picture of its monitor (raw BGRA pixels), the snip's kind and the screen's scale factor. */
+  snipImage(): Promise<{ bitmap: Uint8Array; width: number; height: number; scale: number; mode: 'text' | 'picture'; saveTo?: string } | null>
+  /** Snip window: this snip's picture is drawn, so show the window. */
+  snipDrawn(): Promise<void>
+  /** Snip window: shown and painted, so it can be seen (it's see-through until then, so there's no flash). */
+  snipPainted(): Promise<void>
+  /** Snip window: a new snip has a picture for this monitor. */
+  onSnipNew(callback: () => void): () => void
+  /** Snip window: it's on screen now (still see-through until snipPainted). */
+  onSnipVisible(callback: () => void): () => void
+  /** Snip window: the snip ended and this window was hidden, ready for the next one. */
+  onSnipReset(callback: () => void): () => void
   /** Snip window: the text in part of the picture (read offline), with an extra language reader if it's downloaded, or 'auto' to pick one. */
   snipRead(png: Uint8Array, lang?: string): Promise<SnipReading>
   /** Snip window: which extra language readers are downloaded (codes from OCR_LANGS). */
@@ -1019,6 +1063,10 @@ export interface NotesApi {
   /** Snip window: translates the text with the offline AI. Never goes online. */
   snipTranslate(text: string, target: string): Promise<SnipTranslation>
   snipClose(): Promise<void>
+  /** Snip window: a box was started here, so the snip windows on other monitors clear theirs. */
+  snipBoxing(): Promise<void>
+  /** Snip window: a box was started on another monitor, so clear this one's. */
+  onSnipClear(callback: () => void): () => void
   /** The snip's "Report bug": this picture of the boxed part of the screen goes to App Studio as a new bug. */
   snipReportBug(png: Uint8Array): Promise<void>
   /** A bug reported from the screen snip, with its picture (App Studio opens it). */
@@ -1713,6 +1761,14 @@ export interface ClipInfo {
   path: string
   size: number
   modified: number
+  /** Its place in the recordings folder: "file.mp4", or "SkyBlock/file.mp4" in a game's folder. */
+  rel: string
+  /** The game folder it's in ('' at the top of the recordings folder). */
+  folder: string
+  /** What the list calls it ("SkyBlock 21 Nov 23:10"). */
+  title: string
+  /** Starred. */
+  favourite: boolean
 }
 
 export interface FfmpegState {

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { displayUrl, firefoxOnGoogleSignIn, firefoxUserAgent, isGoogleSignIn, isWebUrl, plainUserAgent, toWebUrl } from './web'
+import { chromeBrands, chromeHints, hintPlatform, isGoogleRejection } from './web'
 
 describe('toWebUrl', () => {
   it('opens addresses', () => {
@@ -104,5 +105,41 @@ describe('firefoxOnGoogleSignIn', () => {
   it('leaves every other page alone', () => {
     expect(run('https://grok.com/').userAgent).toBe('Chrome')
     expect(run('https://www.google.com/search?q=x').userAgent).toBe('Chrome')
+  })
+})
+
+describe('isGoogleRejection', () => {
+  it('spots Google’s “This browser or app may not be secure” page', () => {
+    expect(isGoogleRejection('https://accounts.google.com/v3/signin/rejected?rrk=46&hl=en-GB')).toBe(true)
+    expect(isGoogleRejection('https://accounts.google.com/signin/rejected?rrk=46')).toBe(true)
+    expect(isGoogleRejection('https://accounts.google.com/signin/v2/deniedsigninrejected?flowName=GlifWebSignIn')).toBe(true)
+  })
+
+  it('leaves the rest of sign-in alone', () => {
+    expect(isGoogleRejection('https://accounts.google.com/v3/signin/identifier?continue=x')).toBe(false)
+    expect(isGoogleRejection('https://accounts.google.com/o/oauth2/v2/auth?client_id=x')).toBe(false)
+    expect(isGoogleRejection('https://example.com/signin/rejected')).toBe(false)
+  })
+})
+
+describe('looking like Google Chrome', () => {
+  it('names Google Chrome among the brands', () => {
+    expect(chromeBrands('136.0.7103.177').map((b) => `${b.brand} ${b.version}`)).toEqual(['Chromium 136', 'Google Chrome 136', 'Not.A/Brand 99'])
+    expect(chromeBrands('136.0.7103.177', true)[1]).toEqual({ brand: 'Google Chrome', version: '136.0.7103.177' })
+    expect(hintPlatform('darwin')).toBe('macOS')
+    expect(hintPlatform('win32')).toBe('Windows')
+  })
+
+  it('sends the client hints Chrome sends, putting right the ones Chromium sent', () => {
+    const none = chromeHints({ 'User-Agent': 'x' }, '136.0.7103.177', 'darwin')
+    expect(none['sec-ch-ua']).toBe('"Chromium";v="136", "Google Chrome";v="136", "Not.A/Brand";v="99"')
+    expect(none['sec-ch-ua-mobile']).toBe('?0')
+    expect(none['sec-ch-ua-platform']).toBe('"macOS"')
+    expect(none['User-Agent']).toBe('x')
+    const some = chromeHints({ 'Sec-CH-UA': '"Chromium";v="136", "Not.A/Brand";v="99"', 'sec-ch-ua-full-version-list': '"Chromium";v="136.0.7103.177"' }, '136.0.7103.177', 'win32')
+    expect(some['Sec-CH-UA']).toBeUndefined()
+    expect(some['sec-ch-ua']).toContain('"Google Chrome";v="136"')
+    expect(some['sec-ch-ua-full-version-list']).toContain('"Google Chrome";v="136.0.7103.177"')
+    expect(some['sec-ch-ua-platform']).toBe('"Windows"')
   })
 })

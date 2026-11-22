@@ -63,6 +63,8 @@ function updateShortcuts(icon: string): number {
       try {
         const link = shell.readShortcutLink(file)
         if (!samePath(link.target, process.execPath)) continue
+        // The "Orbit Snip" shortcut keeps its own snip icon (main/snipTaskbar.ts).
+        if (/--snip\b/i.test(link.args ?? '')) continue
         if (link.icon && samePath(link.icon, icon)) continue
         if (!link.icon && samePath(icon, process.execPath)) continue
         if (shell.writeShortcutLink(file, 'update', { ...link, icon, iconIndex: 0 })) changed++

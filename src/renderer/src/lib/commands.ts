@@ -325,6 +325,7 @@ export const commands: Command[] = [
   { id: 'launcher', group: 'Navigation', title: 'All features (the launcher)', shortcut: 'Ctrl+Shift+Space', run: () => useUI.setState({ launcherOpen: true }) },
   { id: 'radial', group: 'Navigation', title: 'Radial menu (your favourite features in a ring)', run: () => openRadial() },
   { id: 'snip.start', group: 'Tools', title: 'Screen snip: grab text from anywhere on screen', shortcut: 'Ctrl+Shift+S', run: () => void startSnip() },
+  { id: 'snip.picture', group: 'Tools', title: 'Snip a picture: drag a box and it’s copied, ready to paste anywhere', run: () => void startSnip('picture') },
   { id: 'switcher', group: 'Navigation', title: 'Open note…', shortcut: 'Ctrl+P', run: () => useUI.setState({ modal: 'switcher' }) },
   { id: 'palette', group: 'Navigation', title: 'Show all commands', shortcut: 'Ctrl+K', run: () => useUI.setState({ modal: 'commands' }) },
   { id: 'search', group: 'Navigation', title: 'Search all notes', shortcut: 'Ctrl+Shift+F', run: () => showSearch() },

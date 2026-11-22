@@ -111,6 +111,7 @@ function update(patch: Partial<DiscordStatus>): void {
   }
   trackCall()
   broadcast()
+  for (const l of statusListeners) l(status)
   if (before !== after) for (const l of channelListeners) l(before, after, firstLook)
 }
 
@@ -190,6 +191,14 @@ function finishCall(): void {
   if (calls !== before) saveCalls()
   // The pop-out's note box starts empty for the next call.
   for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send('discord:note-changed', '')
+}
+
+const statusListeners = new Set<(status: DiscordStatus) => void>()
+
+/** Called on every change (who's talking included), for main/musicDuck.ts. */
+export function onDiscordStatus(listener: (status: DiscordStatus) => void): () => void {
+  statusListeners.add(listener)
+  return () => statusListeners.delete(listener)
 }
 
 type ChannelListener = (before: string | null, after: string | null, firstLook: boolean) => void

@@ -155,6 +155,21 @@ function addFiles(paths: string[]): { status: SoundboardStatus; skipped: string[
   return { status: changed(), skipped }
 }
 
+/**
+ * Adds one sound file as a button called `name` (the soundboard's "From a link": the part you
+ * picked, cut from a video's sound). The file is copied, so the caller can delete it after.
+ */
+export function addSoundFile(path: string, name: string): { status: SoundboardStatus; skipped: string[] } {
+  const before = board.clips.length
+  const res = addFiles([path])
+  const label = name.trim().slice(0, 60)
+  if (board.clips.length > before && label) {
+    board = { ...board, clips: board.clips.map((c, i) => (i === board.clips.length - 1 ? { ...c, name: label } : c)) }
+    return { status: changed(), skipped: res.skipped }
+  }
+  return res
+}
+
 export function setupSoundboard(): void {
   load()
   applyHotkeys()

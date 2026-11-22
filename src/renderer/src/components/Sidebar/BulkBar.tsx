@@ -33,7 +33,7 @@ export default function BulkBar() {
         <button className="icon-btn" title="Export…" onClick={() => openExport('', true, paths)} data-bulk="export">
           <FileDown size={15} />
         </button>
-        <button className="icon-btn danger" title="Delete…" onClick={() => trashMany(paths)} data-bulk="delete">
+        <button className="icon-btn danger" title="Delete" onClick={() => trashMany(paths)} data-bulk="delete">
           <Trash2 size={15} />
         </button>
       </div>

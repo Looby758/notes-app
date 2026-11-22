@@ -3,6 +3,7 @@ import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, screen,
 import { join } from 'path'
 import { activeThemeId, getTheme } from '@shared/themes'
 import type { Prefs } from '@shared/prefs'
+import type { SnipMode } from '@shared/snipLaunch'
 import { openPopout } from './popout'
 import { acceleratorLabel, IS_MAC, SYSTEM_NAME } from '@shared/platform'
 
@@ -35,8 +36,10 @@ interface Hooks {
   getMain: () => BrowserWindow | null
   showMain: () => void
   prefs: () => Prefs
-  /** Starts a screen snip (main/snip.ts). */
-  snip?: () => void
+  /** Starts a screen snip (main/snip.ts): reading text, or copying a picture. */
+  snip?: (mode?: SnipMode) => void
+  /** Opens the folder picture snips are saved in. */
+  openSnips?: () => void
 }
 let hooks: Hooks
 
@@ -103,9 +106,11 @@ export function openCapture(): void {
   else reveal()
 }
 
-/** Hides the summon bar (e.g. before a screen snip, so it isn't in the picture). */
-export function hideCaptureWindow(): void {
-  captureWin?.hide()
+/** Hides the summon bar (e.g. before a screen snip, so it isn't in the picture). True if it was showing. */
+export function hideCaptureWindow(): boolean {
+  const showing = !!captureWin && !captureWin.isDestroyed() && captureWin.isVisible()
+  if (showing) captureWin!.hide()
+  return showing
 }
 
 /**
@@ -141,7 +146,9 @@ function updateTrayMenu(): void {
     Menu.buildFromTemplate([
       { label: 'Open Orbit', click: () => hooks.showMain() },
       { label: `Summon bar${shortcut}`, click: openCapture },
-      { label: 'Screen snip', click: () => void hooks.snip?.() },
+      { label: 'Snip a picture (copy to paste anywhere)', click: () => void hooks.snip?.('picture') },
+      { label: 'Snip text', click: () => void hooks.snip?.('text') },
+      { label: 'Open snips folder', click: () => void hooks.openSnips?.() },
       { label: 'Pop out an app…', click: () => openPopout() },
       { type: 'separator' },
       { label: 'Quit Orbit', click: () => app.quit() }
@@ -160,7 +167,8 @@ function createTray(): void {
   }
   tray = new Tray(image)
   tray.setToolTip('Orbit')
-  tray.on('click', () => hooks.showMain())
+  // Settings → Tray can make a click snip a picture instead (the menu still opens Orbit).
+  tray.on('click', () => (hooks.prefs().trayClick === 'snip' && hooks.snip ? hooks.snip('picture') : hooks.showMain()))
   updateTrayMenu()
 }
 

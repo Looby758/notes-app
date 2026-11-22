@@ -10,6 +10,8 @@ files:
   - build/icon.png
   - build/trayTemplate.png
   - build/trayTemplate@2x.png
+  # The "Orbit Snip" taskbar shortcut's icon (main/snipTaskbar.ts).
+  - build/snip.png
   # The Terminal tab's command line (node-pty): only the ready-made parts, without debug files.
   - '!node_modules/node-pty/{src,deps,third_party,scripts,build,typings,node-addon-api}/**'
   - '!node_modules/node-pty/binding.gyp'

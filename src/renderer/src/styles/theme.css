@@ -2049,6 +2049,35 @@ body.capture-window {
   font-size: 12px;
 }
 
+/* Settings → Summon bar & snip: snipping from the Windows taskbar. */
+.capture-status.taskbar-snip {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin-top: 12px;
+}
+.capture-status.taskbar-snip p {
+  display: block;
+  line-height: 1.5;
+}
+.taskbar-snip ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+.snip-folder-path {
+  word-break: break-all;
+}
+.taskbar-snip .snip-last {
+  color: var(--text-muted);
+}
+.taskbar-snip-buttons {
+  display: flex;
+  gap: 8px;
+}
+
 /* ---------- Calendar ---------- */
 
 /* Mini calendar (right panel) */
@@ -3006,6 +3035,32 @@ body.dragging-note .starred-empty {
   background: var(--bg-raised);
   border-color: var(--border-strong);
   color: var(--text);
+}
+.toast.with-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.toast.with-action > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.toast-action {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.toast-action:hover {
+  background: var(--bg-hover);
 }
 
 .tab.pinned {
@@ -6694,6 +6749,15 @@ body.theme-light .flashcard-grade.grade-easy span {
 }
 .pic-canvas.tool-text {
   cursor: text;
+}
+.pic-step-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font: 700 9px/1 system-ui, sans-serif;
 }
 .pic-hint {
   color: var(--text-faint);
@@ -14656,6 +14720,52 @@ body.reduce-motion .theme-loading-text {
 /* Volume mixer (components/Mixer) */
 .mixer-inner {
   max-width: 720px;
+}
+.mixer-duck {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mixer-duck-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+.mixer-duck-main svg {
+  margin-top: 1px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.mixer-duck-main span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mixer-duck-main strong {
+  font-weight: 600;
+  font-size: 13px;
+}
+.mixer-duck-main em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.mixer-duck-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding-left: 24px;
+  font-size: 12.5px;
+}
+.mixer-duck-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.mixer-duck-level input {
+  width: 140px;
 }
 .mixer-card {
   display: flex;

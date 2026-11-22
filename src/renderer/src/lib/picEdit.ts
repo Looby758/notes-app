@@ -1,8 +1,10 @@
 /**
- * The quick picture editor: crop, resize, arrows, blur and text on a picture from the notes folder.
+ * The quick picture editor: crop, resize, and mark up a picture from the notes folder with arrows,
+ * boxes, circles, a highlighter, numbered steps, a pen, blur and text.
  *
  * Nothing is changed until you save. An edit is the original picture plus a list of changes, all
- * measured in the original picture's pixels: the crop box, the marks (arrows, blurred boxes, text),
+ * measured in the original picture's pixels: the crop box, the marks (arrows, shapes, lines drawn,
+ * blurred boxes, text),
  * and the size the result is saved at. Kept free of the app so it can be tested.
  */
 
@@ -17,6 +19,18 @@ export type Mark =
   | { kind: 'arrow'; x1: number; y1: number; x2: number; y2: number; color: string; size: number }
   | { kind: 'blur'; x: number; y: number; w: number; h: number }
   | { kind: 'text'; x: number; y: number; text: string; color: string; size: number }
+  /** An outlined box. */
+  | { kind: 'box'; x: number; y: number; w: number; h: number; color: string; size: number }
+  /** An outlined circle or oval that fits inside the box. */
+  | { kind: 'circle'; x: number; y: number; w: number; h: number; color: string; size: number }
+  /** A see-through marker stroke, drawn under everything but blur. */
+  | { kind: 'highlight'; points: Point[]; color: string; size: number }
+  /** A freehand pen line. */
+  | { kind: 'pen'; points: Point[]; color: string; size: number }
+  /** A numbered dot (1, 2, 3…) for showing steps in order. `size` is its radius. */
+  | { kind: 'step'; x: number; y: number; n: number; color: string; size: number }
+
+export type Point = [number, number]
 
 export interface PicEdit {
   /** The original picture's size. */
@@ -103,11 +117,53 @@ export function shaftEnd(x1: number, y1: number, x2: number, y2: number, size: n
  */
 export const blurCell = (r: Pick<Rect, 'w' | 'h'>): number => Math.max(10, Math.min(80, Math.round(Math.min(r.w, r.h) / 4)))
 
-/** The pen sizes, scaled to the picture so a mark looks the same on a phone photo or a small screenshot. */
-export function markSizes(edit: Pick<PicEdit, 'width' | 'height'>): { arrow: number[]; text: number[] } {
+/**
+ * The pen sizes, scaled to the picture so a mark looks the same on a phone photo or a small screenshot.
+ * `arrow` is also the line width of boxes, circles and the pen; `step` is a numbered dot's radius.
+ */
+export function markSizes(edit: Pick<PicEdit, 'width' | 'height'>): { arrow: number[]; text: number[]; highlight: number[]; step: number[] } {
   const scale = Math.max(0.5, Math.max(edit.width, edit.height) / 1600)
   const s = (n: number): number => Math.max(1, Math.round(n * scale))
-  return { arrow: [s(3), s(6), s(10)], text: [s(24), s(40), s(64)] }
+  return { arrow: [s(3), s(6), s(10)], text: [s(24), s(40), s(64)], highlight: [s(14), s(24), s(36)], step: [s(14), s(20), s(28)] }
+}
+
+/** The number the next step dot gets: one more than the biggest so far (so undo takes it back too). */
+export const nextStep = (marks: readonly Mark[]): number => marks.reduce((n, m) => (m.kind === 'step' ? Math.max(n, m.n) : n), 0) + 1
+
+/**
+ * The box for a box or circle dragged from (x1, y1) to (x2, y2). With `even` (Shift held) it's a
+ * square, so a circle is perfectly round, growing the way you dragged.
+ */
+export function shapeBox(x1: number, y1: number, x2: number, y2: number, even = false): Rect {
+  if (!even) return rectFrom(x1, y1, x2, y2)
+  const side = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1))
+  return rectFrom(x1, y1, x1 + (x2 >= x1 ? side : -side), y1 + (y2 >= y1 ? side : -side))
+}
+
+/**
+ * A pen or highlighter line with `p` added, skipping points closer than `gap` to the last one so a
+ * long scribble stays small and smooth.
+ */
+export function addPoint(points: readonly Point[], p: Point, gap: number): Point[] {
+  const last = points[points.length - 1]
+  if (last && Math.hypot(p[0] - last[0], p[1] - last[1]) < gap) return points as Point[]
+  return [...points, p]
+}
+
+/** How far a drawn line reaches, end to end of its bounding box (to tell a scribble from a stray click). */
+export function pathSpan(points: readonly Point[]): number {
+  if (points.length === 0) return 0
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  for (const [x, y] of points) {
+    minX = Math.min(minX, x)
+    minY = Math.min(minY, y)
+    maxX = Math.max(maxX, x)
+    maxY = Math.max(maxY, y)
+  }
+  return Math.hypot(maxX - minX, maxY - minY)
 }
 
 // ---------- the file ----------
