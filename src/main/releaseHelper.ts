@@ -251,12 +251,12 @@ async function runTests(folder: string): Promise<Check> {
   if (scripts.typecheck) {
     const r = await run(folder, 'npm', ['run', 'typecheck'], { timeout: 10 * 60_000 })
     output += r.out
-    if (!r.ok) return fromProblem('tests', explainProblem(r.out, { windows: WINDOWS }), r.out)
+    if (!r.ok) return fromProblem('tests', explainProblem(r.out, { windows: WINDOWS, source: 'tests' }), r.out)
   }
   if (hasTests) {
     const r = await run(folder, 'npm', ['test'], { timeout: 15 * 60_000 })
     output += '\n' + r.out
-    if (!r.ok) return fromProblem('tests', explainProblem(r.out, { windows: WINDOWS }), r.out)
+    if (!r.ok) return fromProblem('tests', explainProblem(r.out, { windows: WINDOWS, source: 'tests' }), r.out)
     const count = /Tests\s+(\d+) passed/.exec(r.out)?.[1]
     return check('tests', 'pass', `${scripts.typecheck ? 'The type check and ' : ''}${count ? `all ${count} tests` : 'the tests'} passed.`.replace(/^t/, 'T'), { output: lastLines(output, 30) })
   }
@@ -454,7 +454,7 @@ async function buildStatus(folder: string, repo: string, tag: string): Promise<B
       if (bad) {
         const log = await githubText(`/repos/${repo}/actions/jobs/${bad.id}/logs`)
         const step = list.find((j) => j.name === bad.name)?.failedStep ?? ''
-        out.problem = explainProblem(log ?? `${step} failed`, { tag, windows: /windows/i.test(bad.name) })
+        out.problem = explainProblem(log ?? `${step} failed`, { tag, windows: /windows/i.test(bad.name), source: 'build' })
         if (log) out.log = lastLines(log, 80)
         // Without the log, at least say which step it was.
         if (!log && out.problem.title === 'Something went wrong') out.problem = { title: `The “${step || bad.name}” step failed`, detail: 'Open it on GitHub to see why, or connect GitHub (with Actions access) so Orbit can read it.', fixes: ['ask-claude'] }

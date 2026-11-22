@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { create } from 'zustand'
-import { AlertTriangle, Check as CheckIcon, CircleSlash, ExternalLink, Hammer, Loader2, RefreshCw, Rocket, ShieldCheck, Sparkles, X } from 'lucide-react'
+import { AlertTriangle, Check as CheckIcon, ClipboardCopy, CircleSlash, ExternalLink, Hammer, Loader2, RefreshCw, Rocket, ShieldCheck, Sparkles, X } from 'lucide-react'
 import { changelogSource, newTokenUrl, plainChangelog, type VersionBump } from '@shared/appStudio'
 import {
   buildPhase,
@@ -157,6 +157,9 @@ function Details({ output, label = 'Show what it said' }: { output?: string; lab
     <details className="release-details">
       <summary>{label}</summary>
       <pre>{output}</pre>
+      <button className="btn" onClick={() => void navigator.clipboard.writeText(output).then(() => notify('Copied. Paste it to Claude to ask about it.', 'info'), notify)}>
+        <ClipboardCopy size={13} /> Copy
+      </button>
     </details>
   )
 }
