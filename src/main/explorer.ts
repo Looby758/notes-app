@@ -32,6 +32,7 @@ import { fileIndexStatus, hasEverything, rebuildFileIndex, searchIndex, startFil
 import { copyTags, moveTags, setupFileTags, taggedPaths } from './fileTags'
 import folderSizeWorker from './folderSize/folderSizeWorker?modulePath'
 import { folderSizesChanged, setupFolderSizes, wantFolderSizes } from './folderSize'
+import { deleteFromBin, emptyBin, listBin, openMacPrivacy, openSystemBin, restoreFromBin } from './recycleBin'
 
 /** Orbit changed something in these folders: Whole PC search and folder sizes catch up. */
 function changed(dirs: string[]): void {
@@ -438,5 +439,17 @@ export function setupExplorer(vaultRoot: () => string | null): void {
   ipcMain.handle('explorer:tagged', (_e, colour: string) => entriesOf(vaultRoot(), taggedPaths(colour)))
   setupFileTags()
   setupFolderSizes(folderSizeWorker)
+  // The Recycle Bin / Bin in the sidebar.
+  const ids = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [])
+  ipcMain.handle('bin:list', () => listBin())
+  ipcMain.handle('bin:restore', async (_e, list: unknown) => {
+    const back = await restoreFromBin(ids(list))
+    changed(back.map((p) => dirname(p)))
+    return back
+  })
+  ipcMain.handle('bin:delete', (_e, list: unknown) => deleteFromBin(ids(list)))
+  ipcMain.handle('bin:empty', () => emptyBin())
+  ipcMain.handle('bin:openSystem', () => openSystemBin())
+  ipcMain.handle('bin:macPrivacy', () => openMacPrivacy())
   ipcMain.handle('explorer:folderSizes', (_e, paths: unknown, fresh: unknown) => wantFolderSizes(checkPaths(paths ?? []), !!fresh))
 }

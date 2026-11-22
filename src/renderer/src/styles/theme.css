@@ -16364,3 +16364,28 @@ button.board-add-picture:hover {
 .explorer-size-counting {
   opacity: 0.6;
 }
+.explorer-bin-title .btn {
+  height: 26px;
+  padding: 0 9px;
+  color: var(--text);
+  font-size: 12px;
+}
+.explorer-bin-title .btn.danger:not(:disabled) {
+  color: #f08a8a;
+}
+.explorer-bin-title > span {
+  flex: 1 0 auto;
+  overflow: visible;
+}
+.explorer-place.bin.drop {
+  background: color-mix(in srgb, #f08a8a 18%, transparent);
+  color: #f08a8a;
+}
+.explorer-bin-blocked {
+  max-width: 420px;
+  line-height: 1.5;
+  text-align: center;
+}
+.explorer-bin-title > svg {
+  flex: none;
+}

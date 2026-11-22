@@ -81,6 +81,36 @@ export async function hold(full: string): Promise<boolean> {
 
 export const isHeld = (full: string): boolean => !!held.get(keyOf(full))?.length
 
+/** Everything deleted in Orbit that's still held here (for the Recycle Bin in the Files tab). */
+export const heldItems = (): { from: string; at: string }[] =>
+  [...held.values()].flat().filter((h) => !h.copy && existsSync(h.at)).map(({ from, at }) => ({ from, at }))
+
+/** Deleted for good from the Recycle Bin view: a held item is removed instead of going on to the Bin. */
+export async function forgetHeld(at: string): Promise<boolean> {
+  for (const [key, list] of held) {
+    const i = list.findIndex((h) => keyOf(h.at) === keyOf(at))
+    if (i < 0) continue
+    const [item] = list.splice(i, 1)
+    if (!list.length) held.delete(key)
+    await rm(item.slot, { recursive: true, force: true })
+    return true
+  }
+  return false
+}
+
+/** Brings back the held item now at `at` (from the Recycle Bin view). Returns where it went. */
+export async function restoreHeld(at: string): Promise<string | null> {
+  for (const [key, list] of held) {
+    const i = list.findIndex((h) => keyOf(h.at) === keyOf(at))
+    if (i < 0) continue
+    // restore() brings back the newest from that place, so this one is made the newest first.
+    list.push(...list.splice(i, 1))
+    void key
+    return restore(list[list.length - 1].from)
+  }
+  return null
+}
+
 /** Puts the newest thing deleted from `full` back (as "name (2)" if something's there now). Returns where it went. */
 export async function restore(full: string): Promise<string> {
   const key = keyOf(full)

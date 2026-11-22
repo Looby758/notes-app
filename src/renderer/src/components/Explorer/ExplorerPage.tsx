@@ -47,6 +47,7 @@ import {
   StarOff,
   Tag,
   Trash2,
+  Undo2,
   X
 } from 'lucide-react'
 import {
@@ -70,6 +71,7 @@ import {
   type PasteMode,
   type PcIndexStatus
 } from '@shared/explorer'
+import type { BinItem, BinListing } from '@shared/recycleBin'
 import { sharedTags, TAG_COLOURS, TAG_DEFAULT_NAMES, TAG_HEX, tagCounts, tagName, type FileTagStore, type TagColour } from '@shared/fileTags'
 import { loadFileTags, moveFavourite, toggleFavourite, useFileTags } from '../../store/fileTags'
 import { useFilesPcSearch } from '../../store/filesReveal'
@@ -204,6 +206,9 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
   const [indexStatus, setIndexStatus] = useState<(PcIndexStatus & { everything?: boolean; wanted?: boolean }) | null>(null)
   const [systemToo, setSystemToo] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
+  /** Showing what's in the Recycle Bin / Bin. */
+  const [binView, setBinView] = useState(false)
+  const [bin, setBin] = useState<BinListing | null>(null)
   /** Folders' total sizes, added up in the background (main/folderSize). */
   const [folderSizes, setFolderSizes] = useState<ReadonlyMap<string, FolderSize | null>>(() => new Map(folderSizeCache))
   /** The next size request counts again rather than using remembered sizes (Refresh). */
@@ -282,6 +287,25 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
     window.api.explorerIndexStatus().then(setIndexStatus).catch(() => undefined)
     return window.api.onExplorerIndexStatus((s) => setIndexStatus((old) => ({ ...old, ...s })))
   }, [scope])
+
+  // What's in the Recycle Bin / Bin (read again on Refresh and after each change).
+  useEffect(() => {
+    setBin(null)
+    if (!binView) return
+    let live = true
+    window.api
+      .binList()
+      .then((b) => live && setBin(b))
+      .catch((err) => live && (setBin({ items: [], canRestore: false, blocked: false }), notify(err)))
+    return () => {
+      live = false
+    }
+  }, [binView, reload])
+  const binItems = useMemo(() => new Map((bin?.items ?? []).map((i) => [i.at, i])), [bin])
+  const binEntries = useMemo<ExplorerEntry[] | null>(
+    () => (bin ? bin.items.map((i) => ({ name: i.name, path: i.at, isDir: i.isDir, size: i.size, modified: i.deletedAt, hidden: false, vaultPath: null })) : null),
+    [bin]
+  )
 
   // Everything with a colour tag (fetched again when tags change).
   const taggedKey = tagView ? Object.entries(tags.items).filter(([, l]) => l.includes(tagView)).map(([p]) => p).join('\n') : ''
@@ -394,7 +418,7 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
     if (autoFocus) listRef.current?.focus({ preventScroll: true })
   }, [autoFocus])
 
-  const searching = deep && !!query.trim() && !tagView
+  const searching = deep && !!query.trim() && !tagView && !binView
   /** Whole PC results come best match first; sorting by name would bury the one you're after. */
   const ranked = searching && scope === 'pc' && sort === 'name'
   // Biggest first puts the biggest folders first too, once they've been added up.
@@ -406,7 +430,9 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
   }, [sort, folderSizes])
   const shown = useMemo(
     () =>
-      tagView
+      binView
+        ? sortEntries(filterEntries(binEntries ?? [], query, true), sort, sizesForSort)
+        : tagView
         ? sortEntries(filterEntries(tagged ?? [], query, true), sort, sizesForSort)
         : searching
           ? ranked
@@ -415,10 +441,10 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
           : entries
             ? sortEntries(filterEntries(entries, query, showHidden), sort, sizesForSort)
             : [],
-    [tagView, tagged, searching, ranked, results, entries, query, showHidden, sort, sizesForSort]
+    [binView, binEntries, tagView, tagged, searching, ranked, results, entries, query, showHidden, sort, sizesForSort]
   )
   /** Search results and tag lists are from all over: each row says where it is. */
-  const scattered = searching || !!tagView
+  const scattered = searching || !!tagView || binView
   const visible = shown.slice(0, MAX_SHOWN)
 
   // The folders on show get their sizes added up, the first ones first; leaving stops the rest.
@@ -451,8 +477,9 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
 
   const go = (to: string, from: 'click' | 'back' | 'forward' = 'click'): void => {
     setAddress(null)
-    if (tagView) {
+    if (tagView || binView) {
       setTagView(null)
+      setBinView(false)
       setQuery('')
       if (to === dir) return
     }
@@ -480,6 +507,8 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
   const up = dir ? parentPath(dir) : null
 
   const open = (entry: ExplorerEntry): void => {
+    // In the Recycle Bin, things are only looked at (and put back), not opened.
+    if (binView) return pickOnly(entry.path)
     if (entry.isDir) return go(entry.path)
     // Opening a file never kicks off something unexpected.
     // Videos (anywhere on the computer) go in the video player's Up next, without playing.
@@ -604,6 +633,7 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
 
   const remove = async (list: ExplorerEntry[]): Promise<void> => {
     if (!list.length) return
+    if (binView) return forget(list)
     const ok = await window.api.confirm({
       type: 'warning',
       message: list.length === 1 ? `Delete "${list[0].name}"?` : `Delete ${plural(list.length, 'item')}?`,
@@ -621,6 +651,83 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
   }
 
   const togglePin = toggleFavourite
+
+  // ---- the Recycle Bin / Bin ----
+
+  const showBin = (): void => {
+    setBinView(true)
+    setTagView(null)
+    setQuery('')
+    pickOnly(null)
+    listRef.current?.focus({ preventScroll: true })
+  }
+  const binOf = (list: ExplorerEntry[]): BinItem[] => list.map((e) => binItems.get(e.path)).filter((i): i is BinItem => !!i)
+  /** Puts things back where they were (a folder that's gone is made again). */
+  const putBack = (list: ExplorerEntry[]): void => {
+    const items = binOf(list).filter((i) => i.from)
+    if (!items.length) return notify(`Only Finder knows where that came from: open the ${TRASH_NAME} in Finder and choose Put Back.`)
+    window.api
+      .binRestore(items.map((i) => i.id))
+      .then((back) => {
+        refresh()
+        undoChanged('files')
+        notify(back.length === 1 ? `Put “${nameOf(back[0])}” back in “${nameOf(parentPath(back[0]) ?? back[0])}”.` : `Put ${plural(back.length, 'item')} back.`, 'info')
+      })
+      .catch((err) => (notify(err), refresh()))
+  }
+  /** Deletes for good, after asking. */
+  const forget = async (list: ExplorerEntry[]): Promise<void> => {
+    const items = binOf(list)
+    if (!items.length) return
+    const ok = await window.api.confirm({
+      type: 'warning',
+      message: items.length === 1 ? `Delete “${items[0].name}” for good?` : `Delete ${plural(items.length, 'item')} for good?`,
+      detail: 'There’s no getting it back after this.',
+      ok: 'Delete for good'
+    })
+    if (!ok) return
+    await window.api.binDelete(items.map((i) => i.id)).catch(notify)
+    pickOnly(null)
+    refresh()
+  }
+  const emptyTheBin = async (): Promise<void> => {
+    const n = bin?.items.length ?? 0
+    if (!n) return
+    const ok = await window.api.confirm({
+      type: 'warning',
+      message: `Empty the ${TRASH_NAME}?`,
+      detail: `${plural(n, 'item')} will be deleted for good. There’s no getting them back after this.`,
+      ok: `Empty ${TRASH_NAME}`
+    })
+    if (!ok) return
+    const done = await window.api.binEmpty().catch((err) => (notify(err), 0))
+    pickOnly(null)
+    refresh()
+    if (done) notify(`Emptied the ${TRASH_NAME} (${plural(done, 'item')}).`, 'info')
+  }
+  const binMenu = (entry: ExplorerEntry): MenuItem[] => {
+    const list = targets(entry)
+    const items = binOf(list)
+    const one = items.length === 1 ? items[0] : null
+    return [
+      ...(items.some((i) => i.from) ? [{ label: list.length > 1 ? `Put ${list.length} items back` : 'Put back', icon: <Undo2 size={14} />, onClick: () => putBack(list) }] : []),
+      ...(one?.from
+        ? [
+            {
+              label: 'Show where it was',
+              icon: <Folder size={14} />,
+              onClick: () => {
+                const p = parentPath(one.from!)
+                if (p) go(p)
+              }
+            },
+            { label: 'Copy where it was', icon: <Link size={14} />, onClick: () => void navigator.clipboard.writeText(one.from!) }
+          ]
+        : []),
+      'separator',
+      { label: list.length > 1 ? `Delete ${list.length} items for good` : 'Delete for good', icon: <Trash2 size={14} />, danger: true, onClick: () => void forget(list) }
+    ]
+  }
 
   /** Turns a colour tag on for all of these, or off when they all have it already. */
   const toggleTag = (list: ExplorerEntry[], colour: TagColour): void => {
@@ -872,7 +979,10 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
   /** Where a result is: "Documents › School" inside the folder searched, or the folder's path (from Home) for the whole PC. */
   const whereOf = (entry: ExplorerEntry): string => {
     if (searching && scope === 'subfolders' && dir) return whereIn(entry.path, dir) || nameOf(dir)
-    const folder = parentPath(entry.path) ?? entry.path
+    const item = binView ? binItems.get(entry.path) : null
+    if (binView && !item?.from) return item?.kind === 'orbit' ? 'Deleted in Orbit' : 'Put back from Finder'
+    const at = item?.from ?? entry.path
+    const folder = parentPath(at) ?? at
     if (home && folder.toLowerCase().startsWith(home.toLowerCase())) return ['Home', ...crumbsOf(folder).slice(crumbsOf(home).length).map((c) => c.name)].join(' › ')
     return crumbsOf(folder).map((c) => c.name).filter((n) => n !== '/').join(' › ') || folder
   }
@@ -913,6 +1023,31 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
             <div key={group} className="explorer-group">
               <div className="explorer-group-title">{group === 'folders' ? 'Places' : 'Drives'}</div>
               {places.filter((p) => (p.kind === 'drive') === (group === 'drives')).map((p) => placeButton(p.id, p.path, p.label, PLACE_ICONS[p.kind], p.kind))}
+              {group === 'folders' && (
+                <button
+                  className={`explorer-place bin ${binView ? 'active' : ''} ${dropOn === '::bin' ? 'drop' : ''}`}
+                  onClick={showBin}
+                  title={`What’s in the ${TRASH_NAME}: put things back, or delete them for good. Drop files here to delete them.`}
+                  onDragOver={(e) => {
+                    if (!computerPaths(getDrag()).length) return
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = 'move'
+                    setDropOn('::bin')
+                  }}
+                  onDragLeave={() => setDropOn((d) => (d === '::bin' ? null : d))}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    setDropOn(null)
+                    const paths = computerPaths(getDrag())
+                    setDrag(null)
+                    if (paths.length) void remove(paths.map((p) => shown.find((x) => x.path === p) ?? { name: nameOf(p), path: p, isDir: false, size: 0, modified: 0, hidden: false, vaultPath: null }))
+                  }}
+                  data-explorer-bin
+                >
+                  <Trash2 size={15} />
+                  <span>{TRASH_NAME}</span>
+                </button>
+              )}
             </div>
           ))}
           <div className="explorer-group" data-explorer-tags>
@@ -950,7 +1085,22 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
             <button className="icon-btn" onClick={() => openExplorerTab(dir ?? undefined, { beside: true })} title="Open this folder beside, to drag files between the two">
               <Columns2 size={15} />
             </button>
-            {tagView ? (
+            {binView ? (
+              <div className="explorer-crumbs explorer-tag-title explorer-bin-title">
+                <Trash2 size={14} />
+                <strong>{TRASH_NAME}</strong>
+                <span>{bin ? plural(bin.items.length, 'item') : ''}</span>
+                <button className="btn" disabled={!binOf(targets()).some((i) => i.from)} onClick={() => putBack(targets())} title="Put the picked items back where they were" data-bin-restore>
+                  <Undo2 size={13} /> Put back
+                </button>
+                <button className="btn danger" disabled={!bin?.items.length} onClick={() => void emptyTheBin()} data-bin-empty>
+                  <Trash2 size={13} /> Empty {TRASH_NAME}
+                </button>
+                <button className="icon-btn" onClick={() => void window.api.binOpenSystem().catch(notify)} title={`Open the ${TRASH_NAME} in ${FILE_MANAGER}`}>
+                  <ExternalLink size={14} />
+                </button>
+              </div>
+            ) : tagView ? (
               <div className="explorer-crumbs explorer-tag-title">
                 <span className="tag-dot" style={{ background: TAG_HEX[tagView] }} />
                 <strong>{tagName(tags, tagView)}</strong>
@@ -988,7 +1138,7 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
                 ))}
               </div>
             )}
-            {dir && !tagView && (
+            {dir && !tagView && !binView && (
               <button className={`icon-btn explorer-star ${pins.includes(dir) ? 'on' : ''}`} onClick={() => togglePin(dir)} title={pins.includes(dir) ? 'Remove this folder from favourites' : 'Add this folder to favourites'} data-explorer-star>
                 <Star size={15} fill={pins.includes(dir) ? 'currentColor' : 'none'} />
               </button>
@@ -996,6 +1146,8 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
           </div>
 
           <div className="explorer-tools">
+            {!binView && (
+              <>
             <button className="icon-btn" onClick={() => create('folder')} title="New folder (Ctrl+Shift+N)">
               <FolderPlus size={15} />
             </button>
@@ -1018,10 +1170,14 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
             <button className="icon-btn danger" disabled={!targets().length} onClick={() => void remove(targets())} title={`Delete to the ${TRASH_NAME} (Delete)`}>
               <Trash2 size={15} />
             </button>
+              </>
+            )}
             <span className="explorer-count">
               {picked.size > 1
                 ? `${picked.size} picked`
-                : tagView
+                : binView
+                  ? ' '
+                  : tagView
                   ? tagged
                     ? plural(shown.length, 'item')
                     : ' '
@@ -1049,12 +1205,12 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
                     listRef.current?.focus({ preventScroll: true })
                   }
                 }}
-                placeholder={tagView ? `Search ${tagName(tags, tagView)}` : scope === 'pc' ? 'Search the whole PC' : scope === 'subfolders' ? 'Search all subfolders' : 'Search here'}
+                placeholder={binView ? `Search the ${TRASH_NAME}` : tagView ? `Search ${tagName(tags, tagView)}` : scope === 'pc' ? 'Search the whole PC' : scope === 'subfolders' ? 'Search all subfolders' : 'Search here'}
                 spellCheck={false}
                 data-explorer-search
               />
             </label>
-            {!tagView && (
+            {!tagView && !binView && (
               <div className="explorer-scope" role="radiogroup" title="Where to search">
                 {(
                   [
@@ -1106,14 +1262,31 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
             {...(dir && !scattered ? dropProps(dir) : {})}
             data-explorer-list
           >
-            {(tagView ? !tagged : searching ? !results : !entries) && (
+            {(binView ? !bin : tagView ? !tagged : searching ? !results : !entries) && (
               <div className="explorer-empty">
                 <Loader2 size={18} className="spin" />
               </div>
             )}
-            {(tagView ? tagged : searching ? results : entries) && !shown.length && (
+            {(binView ? bin : tagView ? tagged : searching ? results : entries) && !shown.length && (
               <div className="explorer-empty">
-                {tagView
+                {binView
+                  ? bin?.blocked
+                    ? (
+                      <span className="explorer-bin-blocked">
+                        macOS only lets apps look in the Bin once you allow it: System Settings → Privacy &amp; Security → Full Disk Access → turn on Orbit.{' '}
+                        <button className="link-btn" onClick={() => void window.api.binMacPrivacy()}>
+                          Open that setting
+                        </button>{' '}
+                        or{' '}
+                        <button className="link-btn" onClick={() => void window.api.binOpenSystem()}>
+                          open the Bin in Finder
+                        </button>
+                      </span>
+                    )
+                    : query
+                      ? `Nothing in the ${TRASH_NAME} matches that.`
+                      : `The ${TRASH_NAME} is empty.`
+                  : tagView
                   ? query
                     ? 'Nothing with this tag matches that.'
                     : `Nothing is tagged ${tagName(tags, tagView)} yet. Right-click any file or folder and pick this colour (or press Alt+${TAG_COLOURS.indexOf(tagView) + 1}).`
@@ -1163,7 +1336,7 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
                     {scattered && view === 'list' && <small className="explorer-in">{whereOf(entry)}</small>}
                   </span>
                 )}
-                <TagDots colours={tags.items[entry.path]} store={tags} />
+                {!binView && <TagDots colours={tags.items[entry.path]} store={tags} />}
                 {view === 'list' && (
                   <>
                     <span className="explorer-date">{describeModified(entry.modified)}</span>
@@ -1179,7 +1352,7 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
           {scope === 'pc' && !tagView && <IndexFooter status={indexStatus} system={systemToo} />}
         </section>
 
-        <Preview entry={picked.size > 1 ? null : current} count={picked.size} folderSize={current?.isDir ? folderSizes.get(current.path) : undefined} tags={tags} onTag={(e, c) => toggleTag([e], c)} onClearTags={(e) => clearTags([e])} onOpen={open} onRename={(e) => setRenaming(e.path)} onDelete={(e) => void remove([e])} onExtract={extract} />
+        <Preview binItem={current && binView ? binItems.get(current.path) : undefined} onPutBack={(e) => putBack([e])} onForget={(e) => void forget([e])} entry={picked.size > 1 ? null : current} count={picked.size} folderSize={current?.isDir ? folderSizes.get(current.path) : undefined} tags={tags} onTag={(e, c) => toggleTag([e], c)} onClearTags={(e) => clearTags([e])} onOpen={open} onRename={(e) => setRenaming(e.path)} onDelete={(e) => void remove([e])} onExtract={extract} />
       </div>
       {naming && <TagNameDialog colour={naming} store={tags} onClose={() => setNaming(null)} />}
       {compressing && (
@@ -1193,7 +1366,7 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
         />
       )}
       {menu && (
-        <ContextMenu x={menu.x} y={menu.y} items={menu.tag ? tagMenu(menu.tag) : menu.pin ? pinMenu(menu.pin) : menu.entry ? itemMenu(menu.entry) : folderMenu()} onClose={closeMenu} />
+        <ContextMenu x={menu.x} y={menu.y} items={menu.tag ? tagMenu(menu.tag) : menu.pin ? pinMenu(menu.pin) : menu.entry ? (binView ? binMenu(menu.entry) : itemMenu(menu.entry)) : binView ? [] : folderMenu()} onClose={closeMenu} />
       )}
     </div>
   )
@@ -1245,8 +1418,14 @@ function Preview({
   tags,
   onTag,
   onClearTags,
-  folderSize
+  folderSize,
+  binItem,
+  onPutBack,
+  onForget
 }: {
+  binItem?: BinItem
+  onPutBack: (e: ExplorerEntry) => void
+  onForget: (e: ExplorerEntry) => void
   folderSize?: FolderSize | null
   entry: ExplorerEntry | null
   count: number
@@ -1342,6 +1521,15 @@ function Preview({
             </>
           )
         )}
+        {binItem ? (
+          <>
+            <dt>Deleted</dt>
+            <dd>{entry.modified ? new Date(entry.modified).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'Not known'}</dd>
+            <dt>Was in</dt>
+            <dd className="explorer-where">{binItem.from ? (parentPath(binItem.from) ?? binItem.from) : binItem.kind === 'orbit' ? 'Deleted in Orbit' : 'Only Finder knows (use Put Back there)'}</dd>
+          </>
+        ) : (
+          <>
         <dt>Changed</dt>
         <dd>{new Date(entry.modified).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</dd>
         <dt>Where</dt>
@@ -1350,7 +1538,22 @@ function Preview({
         <dd>
           <TagPicker store={tags} paths={[entry.path]} onPick={(c) => onTag(entry, c)} onClear={() => onClearTags(entry)} small />
         </dd>
+          </>
+        )}
       </dl>
+      {binItem ? (
+        <div className="explorer-actions" data-bin-actions>
+          {binItem.from && (
+            <button className="btn btn-primary" onClick={() => onPutBack(entry)}>
+              <Undo2 size={13} /> Put back
+            </button>
+          )}
+          <button className="btn danger" onClick={() => onForget(entry)}>
+            <Trash2 size={13} /> Delete for good
+          </button>
+        </div>
+      ) : (
+        <>
       <div className="explorer-actions">
         <button className="btn btn-primary" onClick={() => onOpen(entry)}>
           {entry.isDir ? <FolderOpen size={13} /> : <ExternalLink size={13} />} Open
@@ -1377,6 +1580,8 @@ function Preview({
         <p className="explorer-hint">
           <File size={12} /> Drag it into a note to add it.{entry.vaultPath ? ' It’s already in your notes folder, so it’s linked where it is.' : ' A copy goes in your attachments folder.'}
         </p>
+      )}
+        </>
       )}
     </aside>
   )

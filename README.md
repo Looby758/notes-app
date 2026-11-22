@@ -186,6 +186,8 @@ Use one mouse and keyboard on a Windows PC and a Mac side by side, both running 
 
 **Folder sizes.** Folders show their total size in the size column, like files do (no more Properties). Sizes are added up in the background, the folders on screen first, and *Biggest first* sorts folders by size too. The preview shows how many files and folders are inside. Refresh (F5) counts again.
 
+**Recycle Bin.** *Recycle Bin* (*Bin* on a Mac) in the Files sidebar shows what's in it, with where each thing was and when it was deleted. *Put back* returns it to where it was, *Delete for good* removes it, and *Empty Recycle Bin* clears the lot (each asks first). Drop files on it to delete them. On a Mac, macOS only lets apps look in the Bin with Full Disk Access (Orbit shows a button for that setting), and Put Back for things deleted outside Orbit is done in Finder.
+
 **Colour tags.** Right-click any file or folder and click a colour, or press **Alt+1** to **Alt+7** (Alt+0 takes them off). Tagged items get a coloured dot, and a tagged folder's icon takes the colour. Click a tag under **Tags** in the Files sidebar to see everything with it, wherever it is; right-click a tag to give it a name ("School", "Urgent"). Tags follow a file when Orbit renames or moves it, and copies keep them.
 
 **Favourite folders.** Press the ☆ at the top right of a folder (or right-click a folder → *Add to favourites*) to keep it under **Favourites** at the top of the Files sidebar. Right-click a favourite to move it up or down. Folders you'd pinned before are now favourites.
