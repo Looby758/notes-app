@@ -5,7 +5,7 @@ import { windowSizedToPage } from '@shared/messages'
 import { classifyField, profileValue, type AutofillProfile, type FieldKind } from '@shared/browser'
 
 /**
- * Runs in every web page (web tabs, private tabs, the messages hub, the YouTube mini window) before
+ * Runs in every web page (web tabs, private tabs, the messages hub) before
  * the site's own code, in a world of its own: the page can't see or call anything here.
  *
  * Everywhere, it stops passkey prompts popping up as pages load (see quietPasskeys) and gives the

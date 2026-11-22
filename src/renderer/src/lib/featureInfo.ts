@@ -63,7 +63,6 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'comics', name: 'Comics', blurb: 'Read .cbz and .cbr comic books', group: 'Media', command: 'comics.open', keywords: 'comic book cbr cbz manga graphic novel read zen' },
   { id: 'wiki', name: 'Wikis', blurb: 'Fandom wikis offline, with an AI that answers from them', group: 'Media', command: 'wiki.open', keywords: 'wiki fandom offline lore characters walking dead skyblock game show read ask' },
   { id: 'soundboard', name: 'Soundboard', blurb: 'Sounds with hotkeys and a voice changer, into Discord', group: 'Media', command: 'soundboard.open', keywords: 'sound effects meme mic discord voice changer robot deep chipmunk hotkey' },
-  { id: 'youtube', name: 'YouTube', blurb: 'A mini window that floats on top', group: 'Media', command: 'youtube.open', keywords: 'video' },
 
   { id: 'games', name: 'Games', blurb: 'Your Steam and other games', group: 'Play', command: 'games.open', keywords: 'steam epic play minecraft hypixel skyblock session summary coins per hour drops xp' },
   { id: 'skyblock-goals', name: 'SkyBlock', blurb: 'Your profile like SkyCrypt, plus an ironman goal planner', group: 'Play', command: 'skyblockGoals.open', keywords: 'skycrypt profile stats skills slayer dungeons catacombs accessories pets wardrobe bestiary garden museum hypixel minecraft skyblock ironman goal planner craft crafting tree recipe collection slayer forge raw materials terminator' },

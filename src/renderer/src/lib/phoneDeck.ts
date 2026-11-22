@@ -61,7 +61,6 @@ const FEATURE_EMOJI: Record<string, string> = {
   music: '🎵',
   songid: '👂',
   comics: '📚',
-  youtube: '📺',
   video: '🎞️',
   games: '🎮',
   'skyblock-goals': '🎯',
@@ -83,7 +82,7 @@ const FEATURE_EMOJI: Record<string, string> = {
 }
 
 // Features that are toggles or run in the background: pressing them shouldn't pull Orbit to the front.
-const QUIET = new Set(['music', 'reading', 'streamer', 'capture', 'snip', 'snip-picture', 'youtube', 'phone', 'replay'])
+const QUIET = new Set(['music', 'reading', 'streamer', 'capture', 'snip', 'snip-picture', 'phone', 'replay'])
 
 /** Everything that can go on the deck, for Settings. */
 export const DECK_CHOICES = [
