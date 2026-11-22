@@ -121,6 +121,47 @@ function SnipShortcutStatus() {
   )
 }
 
+/** Windows: snipping from the taskbar, like the Snipping Tool (main/snipTaskbar.ts). */
+function TaskbarSnip() {
+  const [state, setState] = useState<{ available: boolean; shortcut: boolean } | null>(null)
+  useEffect(() => {
+    void window.api.snipTaskbar().then(setState)
+  }, [])
+  if (!state?.available) return null
+  return (
+    <div className="capture-status taskbar-snip" data-taskbar-snip>
+      <p>
+        <strong>Snip from the taskbar.</strong> Click, drag a box round anything, and it’s copied, ready to paste anywhere with <kbd>Ctrl+V</kbd>. Works on every monitor, without opening Orbit.
+      </p>
+      <ul>
+        {state.shortcut ? (
+          <li>
+            For a one-click button: open Start, find <strong>Orbit Snip</strong>, right-click it and choose <strong>Pin to taskbar</strong>.
+          </li>
+        ) : (
+          <li>The installed Orbit adds an <strong>Orbit Snip</strong> button to the Start menu that you can pin to the taskbar.</li>
+        )}
+        <li>
+          Or right-click Orbit’s own taskbar button and choose <strong>Snip a picture</strong>.
+        </li>
+        <li>
+          Or set <strong>Clicking the tray icon</strong> (under Tray, above) to snip.
+        </li>
+      </ul>
+      <div className="taskbar-snip-buttons">
+        <button className="btn" onClick={() => void window.api.startSnip('picture')} data-taskbar-snip-try>
+          Try it now
+        </button>
+        {state.shortcut && (
+          <button className="btn" onClick={() => void window.api.snipShowShortcut()} title="Shows Orbit Snip in File Explorer, where right-click → Pin to taskbar works too">
+            Show Orbit Snip
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function CaptureShortcutStatus() {
   const shortcut = usePrefs((s) => s.prefs.captureShortcut)
   const [status, setStatus] = useState<CaptureStatus | null>(null)
@@ -341,6 +382,7 @@ export default function SettingsPage() {
                   {section === 'navigation' && <NavEditor />}
                   {section === 'capture' && <CaptureShortcutStatus />}
                   {section === 'capture' && <SnipShortcutStatus />}
+                  {section === 'capture' && <TaskbarSnip />}
                   {section === 'ai' && <OfflineAiSettings />}
                   {section === 'ai' && <AiSettings />}
                   {section === 'music' && <MusicSettings />}

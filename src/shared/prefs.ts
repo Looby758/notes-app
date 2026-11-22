@@ -214,6 +214,8 @@ export interface Prefs {
   discordPopoutPrompt: boolean
   /** Closing the window keeps Notes running in the tray (so quick capture still works). */
   closeToTray: boolean
+  /** Clicking the tray icon: open Orbit, or snip a picture (copied, ready to paste anywhere). */
+  trayClick: 'open' | 'snip'
   launchAtStartup: boolean
 
   /** Look for a newer version on GitHub now and then. */
@@ -357,6 +359,7 @@ export const DEFAULT_PREFS: Prefs = {
   replayMic: false,
   discordPopoutPrompt: true,
   closeToTray: true,
+  trayClick: 'open',
   launchAtStartup: false,
 
   checkForUpdates: true,
@@ -400,6 +403,7 @@ const CHOICES = {
   gameAnimatedCovers: ['always', 'hover', 'off'],
   timeFormat: ['24h', '12h'],
   captureTarget: ['daily', 'inbox'],
+  trayClick: ['open', 'snip'],
   typewriterDimUnit: ['paragraph', 'line'],
   graphStyle: ['neighbourhood', 'constellation'],
   handwritingReader: ['auto', 'ai', 'offline'],

@@ -979,6 +979,24 @@ export const SETTINGS: SettingDef[] = [
       : 'So quick capture works any time. Quit from the tray icon’s menu.',
     keywords: 'tray menu bar background minimize system'
   },
+  // A Mac's menu bar icon always opens its menu on a click, so this is Windows only.
+  ...(IS_MAC
+    ? []
+    : [
+        {
+          key: 'trayClick',
+          section: 'capture',
+          group: 'Tray',
+          type: 'choice',
+          options: [
+            { value: 'open', label: 'Opens Orbit' },
+            { value: 'snip', label: 'Snips a picture' }
+          ],
+          label: 'Clicking the tray icon',
+          description: 'Snips a picture: drag a box round anything and it’s copied, ready to paste anywhere. Right-click the icon for everything else, including Open Orbit.',
+          keywords: 'tray click snip snipping tool screenshot taskbar picture clipboard'
+        } satisfies SettingDef
+      ]),
   {
     key: 'launchAtStartup',
     section: 'capture',

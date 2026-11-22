@@ -1,4 +1,4 @@
-import { BrowserWindow, clipboard, desktopCapturer, globalShortcut, ipcMain, nativeImage, net, screen } from 'electron'
+import { BrowserWindow, clipboard, desktopCapturer, globalShortcut, ipcMain, nativeImage, net, Notification, screen } from 'electron'
 import { createHash } from 'crypto'
 import { existsSync, mkdirSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -8,6 +8,7 @@ import { GameRunningError, localAiState, localComplete } from './localAi'
 import { logError } from './log'
 import { isTarget, OCR_LANGS, ocrLangByCode, ocrLangSetting, ocrLangUrl, onlineTranslateUrl, parseTranslation, readerForScript, tidyReading, TRANSLATE_SYSTEM, translatePrompt } from '@shared/translate'
 import type { SnipReading, SnipTranslation } from '@shared/types'
+import type { SnipMode } from '@shared/snipLaunch'
 import { matchSources } from '@shared/snipDisplays'
 import { acceleratorLabel, IS_MAC, SYSTEM_NAME } from '@shared/platform'
 
@@ -23,12 +24,18 @@ import { acceleratorLabel, IS_MAC, SYSTEM_NAME } from '@shared/platform'
  * How: a picture of every monitor is taken first, then each is shown full screen in a frameless
  * window on its own monitor, so you're really drawing on a still picture of the screen, on
  * whichever monitor you like.
+ *
+ * A picture snip (from the taskbar, the tray or "Snip a picture") is the same windows, but letting
+ * go of the box copies that part of the screen as a picture and closes, like the Windows Snipping
+ * Tool: click, drag, paste anywhere.
  */
 
 /** One snip window per monitor, each over a still picture of its own monitor. */
 const wins = new Map<number, BrowserWindow>()
 const shots = new Map<number, { png: Buffer; scale: number }>()
 let registered = ''
+/** What the open snip does with its box. */
+let mode: SnipMode = 'text'
 let shortcutError: string | undefined
 
 interface Hooks {
@@ -39,13 +46,32 @@ let hooks: Hooks
 
 const openWins = (): BrowserWindow[] => [...wins.values()].filter((w) => !w.isDestroyed())
 
-export async function startSnip(): Promise<void> {
+/** Opening one now (between pressing and the windows existing), so a second press doesn't open two sets. */
+let starting = false
+
+export async function startSnip(as: SnipMode = 'text'): Promise<void> {
   const cursor = screen.getCursorScreenPoint()
   const under = screen.getDisplayNearestPoint(cursor)
+  if (starting) return
   if (openWins().length) {
-    ;(wins.get(under.id) ?? openWins()[0])?.focus()
+    // Already snipping: the windows are one per webContents, so find the one on this monitor.
+    const here = openWins().find((w) => {
+      const b = w.getBounds()
+      return cursor.x >= b.x && cursor.x < b.x + b.width && cursor.y >= b.y && cursor.y < b.y + b.height
+    })
+    ;(here ?? openWins()[0])?.focus()
     return
   }
+  starting = true
+  try {
+    await openSnip(as, under)
+  } finally {
+    starting = false
+  }
+}
+
+async function openSnip(as: SnipMode, under: Electron.Display): Promise<void> {
+  mode = as
   hideCaptureWindow()
   const displays = screen.getAllDisplays()
   const pictures = new Map<number, { png: Buffer; scale: number }>()
@@ -203,6 +229,25 @@ function forDetecting(png: Uint8Array): Uint8Array {
   }
 }
 
+/** A small "Copied" note with the picture, so you know it worked (it goes away by itself). */
+function copiedNote(image: Electron.NativeImage): void {
+  if (!Notification.isSupported()) return
+  try {
+    const { width, height } = image.getSize()
+    const n = new Notification({
+      title: 'Snip copied',
+      body: `${width} × ${height}. Paste it anywhere with ${IS_MAC ? '⌘V' : 'Ctrl+V'}.`,
+      icon: image.resize(width >= height ? { width: Math.min(width, 256) } : { height: Math.min(height, 256) }),
+      silent: true,
+      timeoutType: 'default'
+    })
+    n.show()
+    setTimeout(() => n.close(), 6000)
+  } catch (err) {
+    logError('snip copied note', err)
+  }
+}
+
 function closeSnip(): void {
   for (const w of openWins()) w.close()
 }
@@ -224,12 +269,21 @@ export function applySnipShortcut(accel: string): void {
 
 export function setupSnip(h: Hooks): void {
   hooks = h
-  ipcMain.handle('snip:start', () => startSnip())
+  ipcMain.handle('snip:start', (_e, as?: SnipMode) => startSnip(as === 'picture' ? 'picture' : 'text'))
+  // A picture snip's box (or the text snip's "Copy picture"): onto the clipboard, ready to paste anywhere.
+  ipcMain.handle('snip:copyPicture', (_e, png: Uint8Array) => {
+    closeSnip()
+    if (!(png instanceof Uint8Array) || png.length > 80 * 1024 * 1024) return
+    const image = nativeImage.createFromBuffer(Buffer.from(png))
+    if (image.isEmpty()) return
+    clipboard.writeImage(image)
+    copiedNote(image)
+  })
   ipcMain.handle('snip:status', () => ({ shortcut: registered ? acceleratorLabel(registered) : '', error: shortcutError }))
   // Each monitor's snip window gets the picture of its own monitor.
   ipcMain.handle('snip:image', (e) => {
     const shot = shots.get(e.sender.id)
-    return shot ? { png: new Uint8Array(shot.png), scale: shot.scale } : null
+    return shot ? { png: new Uint8Array(shot.png), scale: shot.scale, mode } : null
   })
   // A box was started on one monitor: the others drop theirs, so there's only ever one.
   ipcMain.handle('snip:boxing', (e) => {

@@ -107,6 +107,23 @@ body.snip-window #root {
     transform: translate(-50%, -6px);
   }
 }
+.snip-copy-picture {
+  margin: 8px 6px 0 0;
+  padding: 5px 10px;
+  font-size: 12.5px;
+}
+/* Picture snip: the box's size in pixels, just above it (or below, at the top of the screen). */
+.snip-size {
+  position: absolute;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(20, 20, 24, 0.85);
+  color: #fff;
+  font: 12px/1.5 system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  white-space: nowrap;
+}
 .snip-bug {
   margin-top: 8px;
   padding: 5px 10px;
