@@ -18112,6 +18112,154 @@ button.board-add-picture:hover {
   min-width: 180px;
 }
 
+/* App Studio: the release helper (checks before a release, fixes, GitHub's build) */
+.release-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.release-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.release-checks-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 4px;
+  font-size: 13px;
+}
+.release-check {
+  display: flex;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 12.5px;
+  border-top: 1px solid var(--border);
+}
+.release-check-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  margin-top: 1px;
+  color: var(--text-muted);
+}
+.release-check-pass .release-check-icon {
+  color: #2ea043;
+}
+.release-check-warn .release-check-icon {
+  color: #d29215;
+}
+.release-check-fail .release-check-icon {
+  color: #fff;
+  background: #d1453b;
+}
+.release-check-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.release-check-pass .release-check-body > span,
+.release-check-skip .release-check-body > span {
+  color: var(--text-muted);
+}
+.release-check-fail .release-check-body > span,
+.release-check-warn .release-check-body > span {
+  color: var(--text);
+}
+.release-checks-end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.release-fixes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+.release-fixes .btn {
+  padding: 3px 10px;
+  font-size: 12.5px;
+}
+.release-details summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.release-details pre {
+  margin: 6px 0 0;
+  max-height: 240px;
+  overflow: auto;
+  padding: 8px;
+  border-radius: var(--radius);
+  background: var(--bg-elevated, rgba(0, 0, 0, 0.25));
+  font-size: 11.5px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.release-result {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, #d1453b 45%, transparent);
+  background: color-mix(in srgb, #d1453b 10%, transparent);
+  font-size: 12.5px;
+}
+.release-result.ok {
+  border-color: color-mix(in srgb, #2ea043 45%, transparent);
+  background: color-mix(in srgb, #2ea043 10%, transparent);
+}
+.release-notes-writer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+.release-build {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  padding: 0 4px;
+}
+.release-build.ok svg {
+  color: #2ea043;
+}
+.release-build-card {
+  gap: 6px;
+  font-size: 12.5px;
+}
+.release-build-failed,
+.release-build-not-pushed,
+.release-build-draft {
+  border-color: color-mix(in srgb, #d1453b 45%, var(--border));
+}
+.release-build-card .link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+}
+
 /* ---------- Money: accounts, net worth and IOUs ---------- */
 
 .money-tiles.money-tiles-4 {

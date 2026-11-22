@@ -251,6 +251,7 @@ describe('token permissions', () => {
     expect(url.pathname).toBe('/settings/personal-access-tokens/new')
     expect(url.searchParams.get('pull_requests')).toBe('write')
     expect(url.searchParams.get('contents')).toBe('write')
+    expect(url.searchParams.get('actions')).toBe('write')
     expect(url.searchParams.get('target_name')).toBe('Looby758')
     expect(isTokenPermissionError(`${TOKEN_NOT_ALLOWED} merge pull requests on a/b.`)).toBe(true)
     expect(isTokenPermissionError('GitHub said no (403).')).toBe(false)
