@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
-import { Lightbulb, RotateCcw, Skull, TextSearch, Trophy } from 'lucide-react'
+import { Eye, EyeOff, Lightbulb, RotateCcw, Skull, TextSearch, Trophy } from 'lucide-react'
 import { displayWord, makeWordSearch, sizeOf, snapLine, themeOf, walkingDeadSearchKind, wordAt, WORD_SEARCH_SIZES, type WordSearch, type WordSearchSize } from '../../lib/wordSearch'
 import { WORD_SEARCH_THEMES, type WordSearchTheme } from '../../lib/wordSearchWords'
 import { loadRecords, saveGame, type GameRecord } from '../../lib/gameStats'
@@ -21,6 +21,15 @@ interface Game {
 
 // The puzzle lives on this computer only (not in the notes folder): it's just for fun.
 const GAME_KEY = 'notesapp.wordsearch.game'
+const HIDE_KEY = 'notesapp.wordsearch.hideList'
+
+function loadHide(): boolean {
+  try {
+    return localStorage.getItem(HIDE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
 
 function loadGame(): Game | null {
   try {
@@ -65,9 +74,11 @@ const hueOf = (n: number): number => (n * 137 + 200) % 360
 
 /** Word search: find the theme's words hidden in the letters, as many puzzles as you like. */
 export default function WordSearchPage() {
-  const [game, setGame] = useState<Game>(() => loadGame() ?? newGame('walkingDead', 'medium'))
+  const [game, setGame] = useState<Game>(() => loadGame() ?? newGame('animals', 'medium'))
   const [records, setRecords] = useState<Record<string, GameRecord>>(loadRecords)
   const [selection, setSelection] = useState<number[]>([])
+  // Hide the list of words: look for anything that fits the theme, without knowing what's there.
+  const [hideList, setHideList] = useState(loadHide)
   // A first square clicked (not dragged): the next click picks the line from here.
   const [anchor, setAnchor] = useState<number | null>(null)
   const [hinted, setHinted] = useState<number | null>(null)
@@ -81,6 +92,13 @@ export default function WordSearchPage() {
   const twd = puzzle.theme === 'walkingDead'
 
   useEffect(() => saveGameState(game), [game])
+  useEffect(() => {
+    try {
+      localStorage.setItem(HIDE_KEY, hideList ? '1' : '0')
+    } catch {
+      // Not remembered; it still works.
+    }
+  }, [hideList])
   useEffect(() => board.current?.focus(), [])
 
   useEffect(() => {
@@ -188,7 +206,7 @@ export default function WordSearchPage() {
     if (!left.length || game.won) return
     const pick = left[Math.floor(Math.random() * left.length)]
     setHinted(pick.cells[0])
-    setMessage({ text: `${displayWord(pick.word)} starts at the flashing letter`, tone: 'found' })
+    setMessage({ text: hideList ? 'A word starts at the flashing letter' : `${displayWord(pick.word)} starts at the flashing letter`, tone: 'found' })
     setGame((g) => ({ ...g, hints: g.hints + 1 }))
     board.current?.focus()
   }
@@ -295,10 +313,28 @@ export default function WordSearchPage() {
 
           <aside className="wordsearch-words" aria-label="Words to find">
             <h3>
-              {theme.label} · {size.label}
+              <span>
+                {theme.label} · {size.label}
+              </span>
+              <button
+                className="wordsearch-hide"
+                onClick={() => setHideList((h) => !h)}
+                title={hideList ? 'Show the words to find' : 'Hide the words, and find them without knowing what they are'}
+                data-wordsearch-hide
+              >
+                {hideList ? <Eye size={14} /> : <EyeOff size={14} />} {hideList ? 'Show words' : 'Hide words'}
+              </button>
             </h3>
+            {hideList && !game.won && (
+              <p className="wordsearch-hidden-note" data-wordsearch-hidden-note>
+                {puzzle.words.length - game.found.length} word{puzzle.words.length - game.found.length === 1 ? '' : 's'} still hidden. Words you
+                find show up here.
+              </p>
+            )}
             <ul>
-              {puzzle.words.map(({ word }) => {
+              {puzzle.words
+                .filter(({ word }) => !hideList || game.won || game.found.includes(word))
+                .map(({ word }) => {
                 const n = game.found.indexOf(word)
                 const kind = twd ? walkingDeadSearchKind(word) : null
                 return (

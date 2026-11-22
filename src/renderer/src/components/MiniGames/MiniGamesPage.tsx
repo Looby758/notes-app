@@ -1,12 +1,14 @@
 import type { ComponentType } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Bomb, ChevronLeft, Crown, Grid2x2Check, Grid3x3, Joystick, Puzzle, Spade, SpellCheck2, SquareStack, TextSearch } from 'lucide-react'
+import { Bomb, BrickWall, ChevronLeft, Crown, Grid2x2Check, Grid3x3, Joystick, Puzzle, Spade, SpellCheck2, SquareStack, TextSearch, Type } from 'lucide-react'
 import SudokuPage from '../Sudoku/SudokuPage'
 import MinesweeperPage from '../Minesweeper/MinesweeperPage'
 import NonogramPage from './NonogramPage'
 import JigsawPage from './JigsawPage'
 import WordlePage from './WordlePage'
 import WordSearchPage from './WordSearchPage'
+import HangmanPage from './HangmanPage'
+import BreakoutPage from './BreakoutPage'
 import SolitairePage from './SolitairePage'
 import Game2048Page from './Game2048Page'
 import ChessPage from './ChessPage'
@@ -19,8 +21,10 @@ export const MINI_GAMES: { id: MiniGameId; name: string; blurb: string; icon: Lu
   { id: 'jigsaw', name: 'Jigsaw', blurb: 'Turn one of your photos into a jigsaw puzzle', icon: Puzzle },
   { id: 'wordle', name: 'Wordle', blurb: 'Guess the hidden word, 2 to 8 letters, or play Walking Dead mode', icon: SpellCheck2 },
   { id: 'wordsearch', name: 'Word search', blurb: 'Find the hidden words, endless puzzles, including a Walking Dead theme', icon: TextSearch },
+  { id: 'hangman', name: 'Hangman', blurb: 'Guess the word a letter at a time, any words or a theme, Walking Dead too', icon: Type },
   { id: 'solitaire', name: 'Solitaire', blurb: 'Classic Klondike patience, draw one or draw three', icon: Spade },
   { id: 'g2048', name: '2048', blurb: 'Slide the tiles so matching numbers join, and make 2048', icon: SquareStack },
+  { id: 'breakout', name: 'Breakout', blurb: 'Bounce the ball to smash every brick, level after level', icon: BrickWall },
   { id: 'chess', name: 'Chess', blurb: 'Play the computer (easy, medium or hard) or a friend on this computer', icon: Crown }
 ]
 
@@ -33,8 +37,10 @@ const PAGES: Record<MiniGameId, ComponentType> = {
   jigsaw: JigsawPage,
   wordle: WordlePage,
   wordsearch: WordSearchPage,
+  hangman: HangmanPage,
   solitaire: SolitairePage,
   g2048: Game2048Page,
+  breakout: BreakoutPage,
   chess: ChessPage
 }
 

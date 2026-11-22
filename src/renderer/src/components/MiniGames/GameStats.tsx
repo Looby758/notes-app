@@ -3,14 +3,25 @@ import { winPercent, type GameRecord } from '../../lib/gameStats'
 import { formatTime } from '../../lib/sudoku'
 
 /** Played, win %, streak, best streak and fastest win for one game (or one way of playing it). */
-export default function GameStats({ title, record, extra }: { title: string; record: GameRecord | undefined; extra?: { label: string; value: string } }) {
+export default function GameStats({
+  title,
+  record,
+  extra,
+  noTime
+}: {
+  title: string
+  record: GameRecord | undefined
+  extra?: { label: string; value: string }
+  /** Leave out the best time (for games that aren't against the clock). */
+  noTime?: boolean
+}) {
   const r = record
   const cells = [
     { label: 'Played', value: String(r?.played ?? 0) },
     { label: 'Won', value: `${winPercent(r)}%` },
     { label: 'Streak', value: String(r?.streak ?? 0) },
     { label: 'Best streak', value: String(r?.bestStreak ?? 0) },
-    { label: 'Best time', value: r?.bestTime !== undefined ? formatTime(r.bestTime) : '–' },
+    ...(noTime ? [] : [{ label: 'Best time', value: r?.bestTime !== undefined ? formatTime(r.bestTime) : '–' }]),
     ...(extra ? [extra] : [])
   ]
   return (
