@@ -709,7 +709,7 @@ export function setupBrowser(options: BrowserDeps): void {
   ipcMain.handle('web:permissionAnswer', (_e, id: string, allow: boolean) => answerAsk(String(id), allow === true))
 }
 
-/** Each web page gets the ad blocker's CSS; YouTube (in a web tab or the mini window) its script too. */
+/** Each web page gets the ad blocker's CSS; YouTube its script too. */
 export function blockAds(page: WebContents): void {
   page.on('dom-ready', () => {
     if (page.session !== webSession() && page.session !== privateSession()) return

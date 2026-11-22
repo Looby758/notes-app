@@ -95,7 +95,6 @@ import { setupWeather } from './weather'
 import { releaseMessages, saveMessages, setupBrowser } from './browser'
 import { openInOtherBrowser, openLinksFromArgv, setupDefaultBrowser } from './defaultBrowser'
 import { setupOperaImport } from './operaImport'
-import { closeYouTube, setupYouTube } from './youtube'
 import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
 import { setupAppStudio } from './appStudio'
@@ -588,9 +587,8 @@ function createWindow(): BrowserWindow {
     const maximized = win.isMaximized()
     const b = maximized ? win.getNormalBounds() : win.getBounds()
     saveSettings({ window: { ...b, maximized } })
-    // The notes window is really closing: the YouTube mini window goes with it.
+    // The notes window is really closing: its other windows go with it.
     if (win === mainWindow) {
-      closeYouTube()
       closeMusicMini()
       closePopout()
       closeDiscordPopout()
@@ -1085,7 +1083,6 @@ app.whenReady().then(async () => {
     })
   )
   safely('Opera GX import', setupOperaImport)
-  safely('YouTube mini window', () => setupYouTube(currentPrefs))
   safely('Music mini player', () => setupMusicMini(currentPrefs, () => mainWindow))
   safely('music phone remote', setupMusicRemote)
   safely('pop-out window', () => setupPopout(currentPrefs))

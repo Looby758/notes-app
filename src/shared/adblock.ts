@@ -1,5 +1,5 @@
 /**
- * The ad blocker for the web tabs and the YouTube mini window. Three parts:
+ * The ad blocker for the web tabs. Three parts:
  *  - requests to ad and tracking servers are refused outright (except from YouTube's pages, see isAdRequest);
  *  - every page gets CSS that hides the usual ad boxes (and the gaps they'd leave);
  *  - YouTube pages also get a little script that mutes and speeds through ads and presses Skip,

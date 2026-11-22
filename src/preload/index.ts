@@ -212,19 +212,7 @@ const api: NotesApi = {
     ipcRenderer.on('web:mouseNav', handler)
     return () => ipcRenderer.removeListener('web:mouseNav', handler)
   },
-  openYouTube: (url, seconds) => ipcRenderer.invoke('youtube:open', url, seconds),
   popOutWebPage: (url, seconds) => ipcRenderer.invoke('webWindow:open', url, seconds),
-  youTubeState: () => ipcRenderer.invoke('youtube:state'),
-  rememberYouTube: (url) => ipcRenderer.invoke('youtube:remember', url),
-  pinYouTube: (on) => ipcRenderer.invoke('youtube:pin', on),
-  setYouTubeVideoOnly: (on) => ipcRenderer.invoke('youtube:videoOnly', on),
-  minimizeYouTube: () => ipcRenderer.invoke('youtube:minimize'),
-  closeYouTube: () => ipcRenderer.invoke('youtube:close'),
-  onYouTubeLoad: (callback) => {
-    const handler = (_e: unknown, url: string, seconds?: number): void => callback(url, Number(seconds) || 0)
-    ipcRenderer.on('youtube:load', handler)
-    return () => ipcRenderer.removeListener('youtube:load', handler)
-  },
   pickImport: (kind, extensions) => ipcRenderer.invoke('import:pick', kind, extensions),
   listImport: (root) => ipcRenderer.invoke('import:list', root),
   readImport: (path) => ipcRenderer.invoke('import:read', path),

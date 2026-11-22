@@ -10,7 +10,6 @@ import { phoneAppHtml } from './phoneApp'
 import { sendInput, type PhoneInput } from './phoneInput'
 import { lastMusic, musicCommand, onMusic } from './musicMini'
 import { handleMusicRemote } from './musicRemote'
-import { youTubeControl, type YouTubeAction } from './youtube'
 import { readPrintedText } from './handwriting'
 import { mixerSet, mixerSlide, mixerState } from './mixer'
 import { currentWifi } from './wifi'
@@ -25,7 +24,6 @@ import { logError } from './log'
 
 const MAX_UPLOAD = 100 * 1024 * 1024
 const MUSIC_ACTIONS = new Set(['toggle', 'next', 'previous'])
-const YOUTUBE_ACTIONS = new Set(['toggle', 'back', 'forward', 'next'])
 
 let getWindow: () => BrowserWindow | null
 let saveFile: (name: string, data: Uint8Array) => Promise<string>
@@ -150,10 +148,6 @@ async function command(cmd: { kind?: string; [key: string]: unknown }): Promise<
   switch (cmd.kind) {
     case 'music':
       if (MUSIC_ACTIONS.has(cmd.action as string)) musicCommand({ action: cmd.action as 'toggle' })
-      return
-    case 'youtube':
-      if (!YOUTUBE_ACTIONS.has(cmd.action as string)) return
-      if (!(await youTubeControl(cmd.action as YouTubeAction))) throw new Error('Open the YouTube mini window in Notes first.')
       return
     case 'move':
     case 'click':

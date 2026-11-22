@@ -53,11 +53,6 @@ export interface Settings {
   toldAboutTray?: boolean
   /** Mac: you chose not to be asked again about moving Notes into Applications. */
   keepOutsideApplications?: boolean
-  /** The YouTube mini window: where it was left, what was playing, and how it was set. */
-  youtubeWindow?: WindowBounds
-  youtubeUrl?: string
-  youtubePinned?: boolean
-  youtubeVideoOnly?: boolean
   /** The floating mini music player: where it was left, and whether it was showing. */
   musicMiniWindow?: WindowBounds
   musicMiniOpen?: boolean
@@ -469,14 +464,6 @@ export interface AiChat {
   messages: AiChatMessage[]
 }
 
-export interface YouTubeState {
-  url: string
-  /** Where to start a video popped out from another website, in seconds. */
-  startAt?: number
-  pinned: boolean
-  videoOnly: boolean
-}
-
 /** Something shared with a phone over the local Wi-Fi: `url` goes in the QR code. */
 export interface PhoneShare {
   token: string
@@ -793,24 +780,6 @@ export interface NotesApi {
   /** The mouse's back (-1) or forward (1) button was pressed in a web page (by its web contents id). */
   onWebMouseNav(callback: (contentsId: number, dir: 1 | -1) => void): () => void
 
-  // The YouTube mini window
-  /**
-   * Opens the floating YouTube window (or brings it back), playing `url` if given: a YouTube link,
-   * or any web page with a video on it, played from `seconds` in.
-   */
-  openYouTube(url?: string, seconds?: number): Promise<void>
-  /** In the mini window: what to show first, and how you left it set. */
-  youTubeState(): Promise<YouTubeState>
-  /** In the mini window: the page showing now, so it carries on there next time. */
-  rememberYouTube(url: string): Promise<void>
-  /** In the mini window: float over other windows, or not. */
-  pinYouTube(on: boolean): Promise<void>
-  /** In the mini window: show only the video on a video's page, or the whole YouTube page. */
-  setYouTubeVideoOnly(on: boolean): Promise<void>
-  minimizeYouTube(): Promise<void>
-  closeYouTube(): Promise<void>
-  /** In the mini window: play this page (opened from the notes window). */
-  onYouTubeLoad(callback: (url: string, seconds: number) => void): () => void
   /**
    * Opens a web page in a window of its own, which can go full screen on another screen while Orbit
    * carries on; its video starts `seconds` in.

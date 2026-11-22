@@ -90,8 +90,6 @@ textarea{min-height:110px;resize:vertical}
   <div class="card"><img id="art" alt=""><div><b id="song">Nothing playing</b><span id="artist"></span></div></div>
   <div class="row"><button class="btn alt" data-music="previous">⏮</button><button class="btn" data-music="toggle" id="playBtn">⏯</button><button class="btn alt" data-music="next">⏭</button></div>
   <a class="btn alt" id="fullRemote" style="text-align:center;text-decoration:none">Full music remote: volume, seek, Up next</a>
-  <h2>YouTube mini window</h2>
-  <div class="row"><button class="btn alt" data-yt="back">−10s</button><button class="btn" data-yt="toggle">⏯</button><button class="btn alt" data-yt="forward">+10s</button><button class="btn alt" data-yt="next">⏭</button></div>
   <h2>Volume</h2>
   <div id="mixer"><p class="note">Looking at what’s playing…</p></div>
 </section>
@@ -319,7 +317,6 @@ document.querySelectorAll('nav button').forEach(function (b) { b.addEventListene
 // Remote.
 $('fullRemote').href = BASE + '/music'
 document.querySelectorAll('[data-music]').forEach(function (b) { b.onclick = function () { cmd({ kind: 'music', action: b.dataset.music }) } })
-document.querySelectorAll('[data-yt]').forEach(function (b) { b.onclick = function () { cmd({ kind: 'youtube', action: b.dataset.yt }) } })
 
 // Touchpad: movement is gathered up and sent a few dozen times a second.
 var pad = $('pad'), touches = {}, moved = 0, startT = 0, fingers = 0, mx = 0, my = 0, sy = 0, flushing = false
