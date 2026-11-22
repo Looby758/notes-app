@@ -9,6 +9,7 @@ import { endSession, lanAddress, newToken, openSession } from './phoneLink'
 import { phoneAppHtml } from './phoneApp'
 import { sendInput, type PhoneInput } from './phoneInput'
 import { lastMusic, musicCommand, onMusic } from './musicMini'
+import { handleMusicRemote } from './musicRemote'
 import { youTubeControl, type YouTubeAction } from './youtube'
 import { readPrintedText } from './handwriting'
 import { mixerSet, mixerSlide, mixerState } from './mixer'
@@ -203,6 +204,8 @@ async function handle(req: IncomingMessage, res: ServerResponse, rest: string, b
     return void res.end(phoneAppHtml(base))
   }
   if (req.method === 'GET' && rest === '/events') return connect(req, res)
+  // The full music remote, under the paired page's own address.
+  if (rest === '/music' || rest.startsWith('/music/')) return handleMusicRemote(req, res, rest.slice('/music'.length) || '/', `${base}/music`)
   const get = /^\/get\/([A-Za-z0-9_-]{22})$/.exec(rest)
   if (get && (req.method === 'GET' || req.method === 'HEAD')) return serveOffered(req, res, get[1])
   if (req.method !== 'POST') return json(res, 404, { error: 'Not found' })

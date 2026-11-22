@@ -74,6 +74,10 @@ export interface Settings {
   /** The paired phone's link (its token, and the port it was on), so the phone reconnects by itself. */
   phoneToken?: string
   phonePort?: number
+  /** The music phone remote: whether it's on, and its link's token (so a phone that has it keeps working). */
+  musicRemote?: boolean
+  musicRemoteToken?: string
+  musicRemotePort?: number
   /** One mouse, two computers: whether it's on, the paired computer, and how it's set up. */
   mouseShare?: ShareSaved
   /** Screens between the two computers: which of this computer's screens goes on the other one ('' = worked out). */
@@ -196,8 +200,8 @@ export interface MusicMiniLayout {
   upNext: boolean
 }
 
-/** A button pressed in the floating mini player, for the notes window to carry out. `jump` plays the song that many places into Up next (0 is the next one). */
-export type MusicMiniCommand = { action: MusicAction } | { seek: number } | { jump: number }
+/** A button pressed in the floating mini player, for the notes window to carry out. `jump` plays the song that many places into Up next (0 is the next one); `volume` is 0–100 (from the phone remote). */
+export type MusicMiniCommand = { action: MusicAction } | { seek: number } | { jump: number } | { volume: number }
 
 export interface CaptureStatus {
   /** e.g. "Win+Shift+N", or '' if none is set or it couldn't be registered. */
@@ -481,6 +485,15 @@ export interface PhoneShare {
 }
 
 /** The paired phone's QR address, and how many phones have its page open now. */
+export interface MusicRemoteStatus {
+  on: boolean
+  /** The address to open on the phone (and put in the QR code). */
+  url: string | null
+  /** Phones with the remote open now. */
+  connected: number
+  error?: string
+}
+
 export interface PhonePairing {
   url: string
   connected: number
@@ -1209,6 +1222,12 @@ export interface NotesApi {
   onMusicMiniCommand(callback: (command: MusicMiniCommand) => void): () => void
   /** What the mini player shows under the song, and news of changes (both windows hear it). */
   musicMiniLayout(): Promise<MusicMiniLayout>
+  /** The music phone remote (main/musicRemote.ts): whether it's on and its address; `fresh` makes a new address (the old one stops working). */
+  musicRemoteStatus(): Promise<MusicRemoteStatus>
+  setMusicRemote(on: boolean, fresh?: boolean): Promise<MusicRemoteStatus>
+  /** A song's lyrics (from a .lrc/.txt file next to it, or inside it), and saving them next to it. */
+  localMusicLyrics(path: string): Promise<{ text: string; source: 'lrc' | 'txt' | 'tag' } | null>
+  localMusicSaveLyrics(path: string, text: string): Promise<void>
   setMusicMiniLayout(layout: MusicMiniLayout): Promise<void>
   onMusicMiniLayout(callback: (layout: MusicMiniLayout) => void): () => void
   /** The visualiser's bars (0–100 each), notes window → mini player. */

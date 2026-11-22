@@ -54,7 +54,8 @@ export default function MusicMini() {
   }
 
   const local = state?.source === 'local'
-  const upNext = mini?.upNext ?? []
+  // The phone remote gets a longer list; five fit here.
+  const upNext = (mini?.upNext ?? []).slice(0, 5)
   return (
     <div className="music-mini-window">
       <div className="music-mini" data-music-mini>
