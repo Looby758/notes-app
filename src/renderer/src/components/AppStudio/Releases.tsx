@@ -4,9 +4,10 @@ import { boardKey, bumpVersion, rollbackVersion, countText, describeChange, down
 import { useTerminals, type TerminalProject } from '../../store/terminals'
 import { refreshApps, setSection, useAppStudio } from '../../store/appStudio'
 import { downloadDay, lastRelease, loadReleases, putRelease, setNotes, setReleasesApp, totalDownloads, useAppReleases } from '../../store/appReleases'
-import { commitChanges, releaseApp, rollBack, runProjectCommand, stashChanges, switchBranch } from '../../lib/terminal'
+import { commitChanges, rollBack, runProjectCommand, stashChanges, switchBranch } from '../../lib/terminal'
 import { notify } from '../../store/notify'
 import TokenProblem from './TokenProblem'
+import { BuildCard, ReleaseFlow } from './ReleaseHelper'
 import { errorMessage } from '../../lib/paths'
 
 /** Releases are read from GitHub again when you come back after this long. */
@@ -53,6 +54,8 @@ export default function Releases() {
 function AppReleases({ project, repo }: { project: TerminalProject; repo?: string }) {
   const data = useAppReleases((s) => (repo ? s.byRepo[repo] : undefined))
   const loading = useAppReleases((s) => (repo ? !!s.loading[repo] : false))
+  const releaseWorkflow = useAppStudio((s) => !!s.info[project.folder]?.releaseWorkflow)
+  const appKey = boardKey({ name: project.name, repo })
 
   useEffect(() => {
     if (repo && (!data || Date.now() - data.at > FRESH_MS)) void loadReleases(repo)
@@ -62,7 +65,8 @@ function AppReleases({ project, repo }: { project: TerminalProject; repo?: strin
   return (
     <div className="releases-grid">
       <div className="releases-main">
-        <NextRelease project={project} releases={data?.releases ?? []} />
+        <NextRelease project={project} releases={data?.releases ?? []} appKey={appKey} repo={repo} />
+        {repo && releaseWorkflow && <BuildCard project={project} appKey={appKey} repo={repo} />}
         {repo ? (
           <WhatsNew project={project} repo={repo} />
         ) : (
@@ -283,10 +287,9 @@ function RollBack({ release, project, repo, releases }: { release: Release; proj
   )
 }
 
-function NextRelease({ project, releases }: { project: TerminalProject; releases: Release[] }) {
+function NextRelease({ project, releases, appKey, repo }: { project: TerminalProject; releases: Release[]; appKey: string; repo?: string }) {
   const info = useAppStudio((s) => s.info[project.folder])
   const [bump, setBump] = useState<VersionBump>('minor')
-  const [confirm, setConfirm] = useState(false)
   const version = info?.version
   const next = version ? bumpVersion(version, bump) : null
   const last = lastRelease(releases)
@@ -299,18 +302,6 @@ function NextRelease({ project, releases }: { project: TerminalProject; releases
     // The card catches up once git has switched.
     window.setTimeout(() => void refreshApps(), 4000)
     window.setTimeout(() => void refreshApps(), 10000)
-  }
-
-  const release = (): void => {
-    if (!confirm) {
-      setConfirm(true)
-      return
-    }
-    setConfirm(false)
-    releaseApp(project, bump, !!info?.hasTests)
-    notify(info?.releaseWorkflow ? `Releasing v${next}. GitHub builds the installers next.` : `Releasing v${next} in the terminal.`, 'info')
-    // The version changes once npm has run.
-    window.setTimeout(() => void refreshApps(), 8000)
   }
 
   return (
@@ -334,7 +325,7 @@ function NextRelease({ project, releases }: { project: TerminalProject; releases
         <>
           <div className="release-bumps">
             {VERSION_BUMPS.map((b) => (
-              <button key={b.id} className={b.id === bump ? 'active' : ''} onClick={() => (setBump(b.id), setConfirm(false))} title={b.hint}>
+              <button key={b.id} className={b.id === bump ? 'active' : ''} onClick={() => setBump(b.id)} title={b.hint}>
                 <strong>{b.label}</strong>
                 <span>v{bumpVersion(version, b.id)}</span>
               </button>
@@ -352,15 +343,11 @@ function NextRelease({ project, releases }: { project: TerminalProject; releases
               </button>
             </div>
           )}
-          <div className="appstudio-pull-actions">
-            <button className={`btn btn-primary${confirm ? ' appstudio-confirm' : ''}`} disabled={dirty || !next} onClick={release} onBlur={() => setConfirm(false)}>
-              <Rocket size={14} /> {confirm ? `Release v${next}?` : `Release v${next}`}
-            </button>
-          </div>
+          <ReleaseFlow project={project} appKey={appKey} repo={repo} bump={bump} />
           <p className="muted release-explain">
-            {info?.hasTests && 'Runs the tests first and stops if any fail. Then it '}
+            {info?.hasTests && 'Runs the tests first. Then it '}
             {info?.releaseWorkflow
-              ? `${info?.hasTests ? 's' : 'S'}ets the version to ${next}, commits it, tags it v${next} and pushes. GitHub then builds the installers and publishes the release, which takes a few minutes.`
+              ? `${info?.hasTests ? 's' : 'S'}ets the version to ${next}, commits it, tags it v${next} and pushes. GitHub then builds the installers and publishes the release, which takes a few minutes; Orbit watches it below.`
               : `${info?.hasTests ? 's' : 'S'}ets the version to ${next}, commits it, tags it v${next} and pushes. This app has no release workflow on GitHub, so build the installers here.`}
           </p>
         </>

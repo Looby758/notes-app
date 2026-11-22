@@ -99,6 +99,7 @@ import { setupOperaImport } from './operaImport'
 import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
 import { setupAppStudio } from './appStudio'
+import { setupReleaseHelper } from './releaseHelper'
 import { TEST_COPY, TEST_COPY_FOLDER } from './testCopy'
 import { setupGames } from './games'
 import { setupGameCovers } from './gameCovers'
@@ -746,6 +747,7 @@ function registerIpc(): void {
   setupSkyblockAddon()
   setupTerminal(() => vault?.root ?? null)
   setupAppStudio()
+  setupReleaseHelper()
   // The Mac asks once whether Notes may use the microphone.
   ipcMain.handle('voice:access', async () => (IS_MAC ? systemPreferences.askForMediaAccess('microphone') : true))
   ipcMain.handle('app:fullscreen', (event, on: boolean) => BrowserWindow.fromWebContents(event.sender)?.setFullScreen(on))

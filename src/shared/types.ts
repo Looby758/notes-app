@@ -1,5 +1,6 @@
 import type { MadeApp, NewApp } from './appStarters'
-import type { AppInfo, BugReport, GitHubStatus, HealthReport, MergedPull, PullRequest, Release, TestCopy } from './appStudio'
+import type { AppInfo, BugReport, GitHubStatus, HealthReport, MergedPull, PullRequest, Release, TestCopy, VersionBump } from './appStudio'
+import type { BuildStatus, Check, FixResult, Preflight, ReleaseResult } from './releaseCheck'
 import type { DriveSpace, ExplorerEntry, ExplorerPlace, PasteMode, PcIndexStatus } from './explorer'
 import type { FileTagStore, TagColour } from './fileTags'
 import type { BinListing } from './recycleBin'
@@ -1454,6 +1455,22 @@ export interface NotesApi {
   appsCloseIssue(repo: string, number: number, comment?: string): Promise<void>
   /** Checks an app's npm packages: newer versions, and known security problems (npm outdated and npm audit). */
   appsHealth(folder: string): Promise<HealthReport>
+  /** The quick checks before releasing an app (git, the version, the What's new notes, GitHub). The tests come from appsReleaseTests. */
+  appsPreflight(folder: string, bump: VersionBump): Promise<Preflight>
+  /** Runs the app's type check and tests, as GitHub's build would. */
+  appsReleaseTests(folder: string): Promise<Check>
+  /** Releases the app: npm version, then pushes the commit and tag. `expected` is the version the checks were for. */
+  appsRelease(folder: string, bump: VersionBump, expected: string): Promise<ReleaseResult>
+  /** One of the release helper's one-click fixes (put-away, switch-main, pull, finish-push, delete-tag, retag). */
+  appsReleaseFix(folder: string, fix: string, tag?: string): Promise<FixResult>
+  /** Adds "What's new" notes for a version to the app's list in its code, and commits them. */
+  appsWriteNotes(folder: string, version: string, items: string[]): Promise<FixResult>
+  /** What GitHub's build of a release tag is doing, and why it failed. */
+  appsBuildStatus(folder: string, repo: string, tag: string): Promise<BuildStatus>
+  /** Runs a build's failed jobs again on GitHub. */
+  appsRerunBuild(repo: string, runId: number): Promise<void>
+  /** Windows: opens Settings → For developers (Developer Mode). */
+  appsOpenDeveloperSettings(): Promise<void>
   appsMerge(repo: string, number: number): Promise<void>
   appsClose(repo: string, number: number): Promise<void>
   /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */
