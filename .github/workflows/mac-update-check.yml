@@ -12,6 +12,7 @@ on:
       - src/main/macUpdate.ts
       - electron-builder.yml
       - build/adhoc-sign.cjs
+      - scripts/make-mac-signing-cert.sh
       - .github/workflows/mac-update-check.yml
 
 jobs:
@@ -28,6 +29,15 @@ jobs:
           cache: npm
       - run: npm ci
 
+      # Both builds are signed by the same (throwaway) certificate, the way releases are once
+      # MAC_SIGNING_CERT is set up, so the new version keeps the old one's Keychain access.
+      - name: Make a throwaway signing certificate
+        run: |
+          sh scripts/make-mac-signing-cert.sh "$RUNNER_TEMP/cert"
+          echo "::add-mask::$(cat "$RUNNER_TEMP/cert/MAC_SIGNING_CERT_PASSWORD.txt")"
+          echo "MAC_SIGNING_CERT=$(cat "$RUNNER_TEMP/cert/MAC_SIGNING_CERT.txt")" >> "$GITHUB_ENV"
+          echo "MAC_SIGNING_CERT_PASSWORD=$(cat "$RUNNER_TEMP/cert/MAC_SIGNING_CERT_PASSWORD.txt")" >> "$GITHUB_ENV"
+
       - name: Build and install the current version
         run: |
           npx electron-vite build
@@ -37,6 +47,7 @@ jobs:
           # As if it came from a browser download.
           xattr -w com.apple.quarantine "0083;$(printf %x "$(date +%s)");Safari;" /Applications/Orbit.app
           xattr -l /Applications/Orbit.app
+          codesign -dr - /Applications/Orbit.app
 
       - name: Build version 99.0.0 as the update
         run: |
@@ -82,7 +93,7 @@ jobs:
         run: |
           cat results/first-run.log || true
           ls -d ~/Library/Application\ Support/*/ || true
-          pgrep -fl Orbit || true
+          pgrep -fl 'Orbit|SecurityAgent' || true
           log show --last 3m --predicate 'process == "Orbit"' --style compact 2>/dev/null | tail -40 || true
           ls -la ~/Library/Application\ Support/*/pending-update 2>/dev/null || true
           cat ~/Library/Application\ Support/*/pending-update/last-install.txt 2>/dev/null || true

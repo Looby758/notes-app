@@ -70,6 +70,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # No paid certificates: don't look for signing identities.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          # Orbit's own free Mac certificate (build/adhoc-sign.cjs), if it's been set up. Without it
+          # the Mac build is signed ad hoc.
+          MAC_SIGNING_CERT: ${{ secrets.MAC_SIGNING_CERT }}
+          MAC_SIGNING_CERT_PASSWORD: ${{ secrets.MAC_SIGNING_CERT_PASSWORD }}
         run: npx electron-builder ${{ matrix.target }} --publish always
 
   publish:
