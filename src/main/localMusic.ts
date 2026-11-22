@@ -144,7 +144,7 @@ export async function library(fresh = false): Promise<LocalLibrary> {
   if (last && !fresh && last.folder === musicFolder()) return last
   scanning ??= scan().finally(() => (scanning = null))
   last = await scanning
-  return last
+  return { ...last, chosen: typeof load().folder === 'string' }
 }
 
 /** The album picture inside a file, if it has one. */
@@ -164,6 +164,17 @@ export function setupLocalMusic(): void {
     const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
     if (result.canceled || !result.filePaths[0]) return library()
     load().folder = result.filePaths[0]
+    last = null
+    return library(true)
+  })
+  // Back to the computer's own Music folder.
+  ipcMain.handle('localMusic:defaultFolder', () => {
+    delete load().folder
+    try {
+      store()
+    } catch (err) {
+      logError('saving local-music.json', err)
+    }
     last = null
     return library(true)
   })

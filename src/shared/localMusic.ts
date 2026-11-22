@@ -27,6 +27,8 @@ export interface LocalLibrary {
   songs: LocalSong[]
   /** Stopped at the limit, so some songs aren't listed. */
   truncated?: boolean
+  /** A folder you chose, rather than the computer's own Music folder. */
+  chosen?: boolean
 }
 
 /** At most this many songs are listed. */

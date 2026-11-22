@@ -613,7 +613,10 @@ const api: NotesApi = {
   musicMoveInPlaylist: (uri, from, to) => ipcRenderer.invoke('music:moveInPlaylist', uri, from, to),
   localMusicLibrary: (fresh) => ipcRenderer.invoke('localMusic:library', fresh),
   localMusicChooseFolder: () => ipcRenderer.invoke('localMusic:chooseFolder'),
+  localMusicDefaultFolder: () => ipcRenderer.invoke('localMusic:defaultFolder'),
   musicDataGet: () => ipcRenderer.invoke('musicData:get'),
+  songSearch: (query) => ipcRenderer.invoke('songSearch:search', query),
+  songYouTube: (artist, title) => ipcRenderer.invoke('songSearch:youtube', artist, title),
   musicDataEdit: (edits) => ipcRenderer.invoke('musicData:edit', edits),
   onMusicDataChanged: (callback) => {
     const handler = (_e: unknown, data: MusicData): void => callback(data)

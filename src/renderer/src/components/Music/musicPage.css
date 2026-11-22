@@ -855,3 +855,73 @@ body.motion-off .mp-eq i {
 .mp-menu-stars .mp-stars {
   padding: 0 28px;
 }
+
+/* Search: any song, with its sample and YouTube video */
+.mp-search-top {
+  padding: 24px 24px 12px;
+}
+.mp-search-top h1 {
+  margin: 0 0 14px;
+  font-size: 28px;
+}
+.mp-find.mp-search-box {
+  width: 480px;
+  max-width: 100%;
+  padding: 10px 14px;
+  border-radius: 24px;
+  font-size: 15px;
+}
+.mp-search-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 2px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.mp-search-credit {
+  margin: 14px 8px 0;
+}
+.mp-found .mp-tr {
+  grid-template-columns: 36px minmax(0, 4fr) minmax(0, 3fr) auto 56px;
+}
+.mp-found-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.mp-found-actions .icon-btn {
+  width: 30px;
+  height: 30px;
+}
+.mp-found-actions .icon-btn.mp-on {
+  color: var(--accent);
+}
+.mp-yt:hover {
+  color: #ff3d3d;
+}
+.mp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 4px;
+  padding: 3px 9px;
+  border: none;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.mp-chip:hover {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+.mp-year {
+  color: var(--text-muted);
+  font-style: normal;
+}
+

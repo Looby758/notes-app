@@ -35,6 +35,7 @@ import * as emailAsk from './emailAsk'
 import * as spotify from './spotify'
 import * as localMusic from './localMusic'
 import { setupMusicData } from './musicData'
+import { setupSongSearch } from './songSearch'
 import { closeMusicMini, setupMusicMini } from './musicMini'
 import { closePopout, setupPopout } from './popout'
 import { closeDiscordPopout, setupDiscordPopout } from './discordPopout'
@@ -726,6 +727,7 @@ function registerIpc(): void {
   setupWeather()
   localMusic.setupLocalMusic()
   setupMusicData()
+  setupSongSearch()
   setupImporter()
   setupGames()
   setupGameCovers()

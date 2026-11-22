@@ -960,3 +960,24 @@ body.music-player-dragging * {
   width: calc(100% - 8px);
   margin: 2px 4px;
 }
+
+/* Settings → Music folder */
+.mp-folder-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mp-folder-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+.mp-folder-path em {
+  color: var(--text-muted);
+  font-family: var(--font-ui, inherit);
+  font-style: normal;
+}

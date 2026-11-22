@@ -72,6 +72,7 @@ import {
 } from '../../store/musicData'
 import ContextMenu, { type MenuItem } from '../ContextMenu'
 import { VolumeSlider } from './MusicPlayer'
+import MusicSearch from './MusicSearch'
 
 /**
  * The Music page: your own music files as a full music app, laid out like Spotify. Your library on
@@ -80,6 +81,7 @@ import { VolumeSlider } from './MusicPlayer'
  */
 
 type View =
+  | { kind: 'search' }
   | { kind: 'songs' }
   | { kind: 'albums' }
   | { kind: 'album'; key: string }
@@ -180,6 +182,7 @@ function Sidebar({ view, setView, folder, loading }: { view: View; setView: (v: 
   return (
     <nav className="mp-sidebar">
       <div className="mp-nav-group">
+        {item({ kind: 'search' }, <Search size={16} />, 'Search')}
         {item({ kind: 'songs' }, <Music size={16} />, 'Songs')}
         {item({ kind: 'albums' }, <Disc3 size={16} />, 'Albums')}
         {item({ kind: 'artists' }, <Mic2 size={16} />, 'Artists')}
@@ -244,6 +247,8 @@ function ViewContent({ view, setView, songs, folder }: { view: View; setView: (v
   const artists = useMemo(() => artistsOf(songs), [songs])
 
   switch (view.kind) {
+    case 'search':
+      return <MusicSearch songs={songs} />
     case 'albums':
       return (
         <CardGrid

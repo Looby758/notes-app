@@ -1,10 +1,11 @@
 import './music.css'
 import { useEffect, useState } from 'react'
-import { Check, ChevronDown, Copy, Ear, ExternalLink, LogOut, Music } from 'lucide-react'
+import { Check, ChevronDown, Copy, Ear, ExternalLink, FolderOpen, LogOut, Music } from 'lucide-react'
 import type { SongIdStatus } from '@shared/songId'
 import { usePrefs } from '../../store/prefs'
 import { refreshMusicStatus, setMusicOpen, useMusic } from '../../store/music'
 import { errorMessage } from '../../lib/paths'
+import { loadLocalLibrary, useLocalMusic } from '../../store/localMusic'
 import { IS_MAC, SYSTEM_NAME } from '@shared/platform'
 
 /** Settings → Music: what the player can do straight away, and connecting your Spotify account. */
@@ -221,6 +222,58 @@ export function SongIdSettings() {
         </div>
       )}
       {status.shortcutError && <p className="setting-warning">{status.shortcutError}</p>}
+      {error && <p className="setting-warning">{error}</p>}
+    </section>
+  )
+}
+
+/** Settings → Music: which folder your songs are in (your computer's Music folder unless you choose one). */
+export function MusicFolderSetting() {
+  const library = useLocalMusic((s) => s.library)
+  const loading = useLocalMusic((s) => s.loading)
+  const error = useLocalMusic((s) => s.error)
+  useEffect(() => {
+    if (!useLocalMusic.getState().library) void loadLocalLibrary()
+  }, [])
+  const useDefault = async (): Promise<void> => {
+    useLocalMusic.setState({ loading: true, error: null })
+    try {
+      useLocalMusic.setState({ library: await window.api.localMusicDefaultFolder() })
+    } catch (err) {
+      useLocalMusic.setState({ error: errorMessage(err) })
+    } finally {
+      useLocalMusic.setState({ loading: false })
+    }
+  }
+  const count = library?.songs.length ?? 0
+  return (
+    <section className="settings-group cal-sources" data-section="music-folder">
+      <h3>Music folder</h3>
+      <p className="cal-sources-intro">
+        The folder your MP3s are in, for example your Google Drive music folder. Folders inside it are included. Your playlists,
+        liked songs and play counts are kept beside them, in <code>orbit-music.json</code>, so they go wherever the folder goes.
+      </p>
+      <div className="cal-connected mp-folder-row">
+        <FolderOpen size={15} />
+        <span className="mp-folder-path" title={library?.folder ?? ''} data-music-folder>
+          {library?.folder ?? (library ? 'No folder chosen yet' : 'Looking…')}
+          {library?.folder && (
+            <em>
+              {' '}
+              · {loading ? 'reading…' : `${count} song${count === 1 ? '' : 's'}`}
+              {!library.chosen && ' · your computer’s Music folder'}
+            </em>
+          )}
+        </span>
+        <button className="btn btn-primary" disabled={loading} onClick={() => void loadLocalLibrary(false, true)} data-music-folder-choose>
+          Choose…
+        </button>
+        {library?.chosen && (
+          <button className="btn" disabled={loading} onClick={() => void useDefault()} title="Go back to your computer’s Music folder" data-music-folder-default>
+            Use default
+          </button>
+        )}
+      </div>
       {error && <p className="setting-warning">{error}</p>}
     </section>
   )

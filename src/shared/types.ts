@@ -15,6 +15,7 @@ import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
 import type { LocalLibrary } from './localMusic'
 import type { MusicData, MusicEdit } from './musicLibrary'
+import type { FoundTrack } from './songSearch'
 import type { MixerState } from './mixer'
 import type { MonitorAction, MonitorSaved, MonitorSetting, MonitorsStatus, MonitorTarget } from './monitors'
 import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
@@ -1174,6 +1175,12 @@ export interface NotesApi {
   localMusicLibrary(fresh?: boolean): Promise<LocalLibrary>
   /** Asks which folder your music is in, then lists it. */
   localMusicChooseFolder(): Promise<LocalLibrary>
+  /** Goes back to the computer's own Music folder. */
+  localMusicDefaultFolder(): Promise<LocalLibrary>
+  /** Any song (Apple's free iTunes Search), for the Music page's Search. */
+  songSearch(query: string): Promise<FoundTrack[]>
+  /** A song's YouTube video (`exact` false: YouTube's search for it instead). */
+  songYouTube(artist: string, title: string): Promise<{ url: string; exact: boolean }>
   /** Playlists, liked songs, ratings and play counts for your own music (orbit-music.json in the music folder). */
   musicDataGet(): Promise<MusicData>
   /** Makes changes to it and saves them; returns it afterwards. */
