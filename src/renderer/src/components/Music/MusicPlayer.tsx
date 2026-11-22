@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   AudioLines,
   Ear,
+  Expand,
   GripHorizontal,
   Heart,
   Laptop,
@@ -56,6 +57,7 @@ import { SleepButton, SleepTimer } from './SleepTimer'
 import { LocalMusic, LocalUpNext } from './LocalMusic'
 import { Visualiser } from './Visualiser'
 import { SongPopup } from './SongPopup'
+import { FullPlayer, openFullPlayer } from './FullPlayer'
 import { SongFinder } from './SongFinder'
 import { useSongId, watchSongIdShortcut } from '../../store/songId'
 import { setPrefs, usePrefs } from '../../store/prefs'
@@ -88,6 +90,7 @@ export default function MusicPlayer() {
   return (
     <>
       <SongPopup />
+      <FullPlayer />
       {open && <Player />}
     </>
   )
@@ -431,6 +434,11 @@ function Footer({ state, panel, onPanel }: { state: MusicState; panel: Tab | nul
             data-music-visualiser-toggle
           >
             <AudioLines size={13} />
+          </button>
+        )}
+        {state.source === 'local' && (
+          <button className="icon-btn" onClick={openFullPlayer} title="Full-screen Now playing, with lyrics" data-music-full>
+            <Expand size={13} />
           </button>
         )}
         <button className="icon-btn" onClick={shareSongToNote} title="Add this song to the note you’re writing (as a card that plays it)" data-music-share>

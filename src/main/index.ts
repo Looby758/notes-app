@@ -35,6 +35,7 @@ import * as emailAsk from './emailAsk'
 import * as spotify from './spotify'
 import * as localMusic from './localMusic'
 import { setupMusicData } from './musicData'
+import { setupMusicRemote } from './musicRemote'
 import { setupSongSearch } from './songSearch'
 import { setupMusicTags } from './musicTags'
 import { setupMusicFromLink } from './musicFromLink'
@@ -1086,6 +1087,7 @@ app.whenReady().then(async () => {
   safely('Opera GX import', setupOperaImport)
   safely('YouTube mini window', () => setupYouTube(currentPrefs))
   safely('Music mini player', () => setupMusicMini(currentPrefs, () => mainWindow))
+  safely('music phone remote', setupMusicRemote)
   safely('pop-out window', () => setupPopout(currentPrefs))
   safely('export', setupExport)
   safely('converter', setupConverter)

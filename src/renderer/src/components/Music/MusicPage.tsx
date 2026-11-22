@@ -35,8 +35,15 @@ import {
   Sparkle,
   Download,
   ListChecks,
-  PictureInPicture2
+  PictureInPicture2,
+  BarChart3,
+  Maximize2,
+  SlidersHorizontal,
+  Smartphone
 } from 'lucide-react'
+import ListeningStats from './ListeningStats'
+import { openFullPlayer } from './FullPlayer'
+import { RemotePanel, SoundPanel } from './SoundPanel'
 import { filterSongs, localArtUrl, plainText, type LocalSong } from '@shared/localMusic'
 import { formatTime } from '@shared/spotify'
 import {
@@ -108,6 +115,7 @@ type View =
   | { kind: 'recent' }
   | { kind: 'most' }
   | { kind: 'history' }
+  | { kind: 'stats' }
   | { kind: 'playlist'; id: string }
   | { kind: 'tag'; tag: string }
   | { kind: 'duplicates' }
@@ -272,6 +280,7 @@ function Sidebar({ view, setView, folder, loading, onSaveLink, linkOpen }: { vie
         {item({ kind: 'recent' }, <Sparkles size={16} />, 'Recently added')}
         {item({ kind: 'most' }, <TrendingUp size={16} />, 'Most played')}
         {item({ kind: 'history' }, <History size={16} />, 'History')}
+        {item({ kind: 'stats' }, <BarChart3 size={16} />, 'Listening stats')}
       </div>
       <div className="mp-nav-heading">
         <span>Playlists</span>
@@ -442,6 +451,8 @@ function ViewContent({ view, setView, songs, folder }: { view: View; setView: (v
       const list = [...data.history].reverse().map((h) => byPath.get(h.path)).filter((s): s is LocalSong => !!s).slice(0, 300)
       return <SongView kicker="Your library" title="History" icon={<History size={42} />} songs={list} setView={setView} folder={folder} empty="Songs you play show up here." />
     }
+    case 'stats':
+      return <ListeningStats songs={songs} openArtist={(name) => setView({ kind: 'artist', name })} openAlbum={(key) => setView({ kind: 'album', key })} />
     case 'tag':
       return <SongView kicker="Tag" title={view.tag} icon={<Tag size={42} />} songs={songsWithTag(songs, data, view.tag)} setView={setView} folder={folder} empty="No songs have this tag any more." />
     case 'duplicates':
@@ -1061,7 +1072,9 @@ function NowPlayingPanel({ setView }: { setView: (v: View) => void }) {
     <aside className="mp-right" data-mp-now>
       {song ? (
         <>
-          <div className="mp-now-art">{song.art ? <img src={localArtUrl(song.path, song.added)} alt="" /> : <Music size={48} />}</div>
+          <div className="mp-now-art clickable" onClick={openFullPlayer} title="Full-screen Now playing, with lyrics" data-mp-now-art>
+            {song.art ? <img src={localArtUrl(song.path, song.added)} alt="" /> : <Music size={48} />}
+          </div>
           <div className="mp-now-text">
             <div>
               <strong title={song.title}>{song.title}</strong>
@@ -1161,6 +1174,7 @@ function PlayerBar({ setView }: { setView: (v: View) => void }) {
   const [scrub, setScrub] = useState<number | null>(null)
   const shownPos = scrub ?? pos
   const miniOpen = useMusic((s) => s.miniOpen)
+  const [panel, setPanel] = useState<'sound' | 'remote' | null>(null)
 
   return (
     <footer className="mp-bar" data-mp-bar>
@@ -1230,6 +1244,17 @@ function PlayerBar({ setView }: { setView: (v: View) => void }) {
         </div>
       </div>
       <div className="mp-bar-right">
+        <button className={`icon-btn ${panel === 'remote' ? 'mp-on' : ''}`} onClick={() => setPanel(panel === 'remote' ? null : 'remote')} title="Phone remote: control this music from your phone" data-mp-remote>
+          <Smartphone size={16} />
+        </button>
+        <button className={`icon-btn ${panel === 'sound' ? 'mp-on' : ''}`} onClick={() => setPanel(panel === 'sound' ? null : 'sound')} title="Sound: crossfade, equaliser and visualiser" data-mp-sound>
+          <SlidersHorizontal size={16} />
+        </button>
+        <button className="icon-btn" onClick={openFullPlayer} title="Full-screen Now playing, with lyrics" data-mp-full>
+          <Maximize2 size={15} />
+        </button>
+        {panel === 'sound' && <SoundPanel onClose={() => setPanel(null)} />}
+        {panel === 'remote' && <RemotePanel onClose={() => setPanel(null)} />}
         <button
           className={`icon-btn ${miniOpen ? 'mp-on' : ''}`}
           onClick={() => void setMusicMini(!miniOpen)}
