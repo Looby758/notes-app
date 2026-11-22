@@ -58,23 +58,102 @@ function Bar({ value }: { value: number }) {
   )
 }
 
-function SetupBox({ state }: { state: FileSendState }) {
-  const [open, setOpen] = useState(!state.server)
-  const [address, setAddress] = useState(state.server)
+function ServerBar({ state, onChange }: { state: FileSendState; onChange: () => void }) {
+  const [copied, setCopied] = useState(false)
+  const [relayOpen, setRelayOpen] = useState(false)
+  const [keyId, setKeyId] = useState('')
+  const [apiToken, setApiToken] = useState('')
   const [busy, setBusy] = useState(false)
-  if (!open) {
-    return (
-      <button className="btn fsend-server-btn" onClick={() => setOpen(true)} data-fsend-server-edit>
-        <Server size={13} /> Intro server: {state.server.replace(/^https:\/\//, '')}
-      </button>
-    )
-  }
-  const saveIt = async (): Promise<void> => {
+  const relayOn = async (manual: boolean): Promise<void> => {
     setBusy(true)
     try {
-      const { relay } = await window.api.fileSendSetServer(address)
-      notify(relay || !address.trim() ? 'Saved.' : 'Saved. The relay isn’t set up yet, so some friends may not be able to connect.', 'info')
-      if (address.trim()) setOpen(false)
+      await window.api.fileSendRelayOn(manual ? keyId : undefined, manual ? apiToken : undefined)
+      notify('The relay is on.', 'info')
+      setRelayOpen(false)
+    } catch (err) {
+      if (manual) notify(err)
+      else setRelayOpen(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="fsend-serverbar" data-fsend-serverbar>
+      <div className="fsend-serverbar-row">
+        <Server size={14} />
+        <span className="fsend-serverbar-text">
+          Ready to send with a code{state.relay ? ' · relay on' : ''}
+        </span>
+        <button
+          className="btn"
+          title="Your friends paste this into their Big file sender once"
+          onClick={() => {
+            void navigator.clipboard.writeText(state.server)
+            setCopied(true)
+            setTimeout(() => setCopied(false), 1500)
+          }}
+        >
+          {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? 'Copied' : 'Copy address for friends'}
+        </button>
+        {state.ownServer && !state.relay && (
+          <button className="btn" disabled={busy} onClick={() => void relayOn(false)} title="For friends whose internet blocks direct connections" data-fsend-relay>
+            {busy ? <Loader2 size={13} className="spin" /> : <ShieldCheck size={13} />} Turn on the relay
+          </button>
+        )}
+        <button className="btn fsend-link-btn" onClick={onChange}>
+          Change
+        </button>
+      </div>
+      {relayOpen && (
+        <div className="fsend-relay-manual">
+          <p>Orbit’s key isn’t allowed to make the relay, so make it on Cloudflare’s site instead:</p>
+          <ol className="fsend-steps">
+            <li>
+              <button className="btn" onClick={() => void window.api.fileSendOpen('turn')}>
+                <ExternalLink size={13} /> Open Cloudflare’s relay (TURN) page
+              </button>{' '}
+              and press <b>Create</b>.
+            </li>
+            <li>
+              Copy the two things it shows into here:
+              <div className="fsend-relay-fields">
+                <input className="text-input" placeholder="Turn Token ID" value={keyId} spellCheck={false} onChange={(e) => setKeyId(e.target.value)} />
+                <input className="text-input" placeholder="API Token" type="password" value={apiToken} onChange={(e) => setApiToken(e.target.value)} />
+                <button className="btn primary" disabled={busy || !keyId.trim() || !apiToken.trim()} onClick={() => void relayOn(true)}>
+                  Turn it on
+                </button>
+              </div>
+            </li>
+          </ol>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SetupBox({ state, onDone }: { state: FileSendState; onDone: () => void }) {
+  const [mode, setMode] = useState<'own' | 'friend'>('own')
+  const [token, setToken] = useState('')
+  const [address, setAddress] = useState(state.server)
+  const [busy, setBusy] = useState(false)
+  const setUp = async (): Promise<void> => {
+    setBusy(true)
+    try {
+      const r = await window.api.fileSendSetUp(token)
+      setToken('')
+      notify(r.relay ? 'All set. You can send with a code now.' : `All set. ${r.relayNote ?? ''}`, 'info')
+      onDone()
+    } catch (err) {
+      notify(err)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const saveAddress = async (): Promise<void> => {
+    setBusy(true)
+    try {
+      await window.api.fileSendSetServer(address)
+      onDone()
     } catch (err) {
       notify(err)
     } finally {
@@ -84,31 +163,91 @@ function SetupBox({ state }: { state: FileSendState }) {
   return (
     <div className="fsend-setup" data-fsend-setup>
       <h3>
-        <Server size={15} /> Intro server
+        <Server size={15} /> Set up sending with a code
       </h3>
       <p>
-        Sending with a code needs a tiny free server that introduces the two computers (it never sees the files). Set it up once on Cloudflare’s free plan by following{' '}
-        <code>server/file-sender/README.md</code> in Orbit’s code, then paste its address here. Your friend’s Orbit needs the same address.
+        Once, about 5 minutes, free. Sending with a code needs a small “intro server” that helps the two computers find each other (it never sees your files). Only one of you needs to set it up; the other
+        just pastes its address.
       </p>
-      <div className="vdl-form">
-        <input
-          className="text-input vdl-link"
-          placeholder="https://orbit-file-sender.your-name.workers.dev"
-          value={address}
-          spellCheck={false}
-          onChange={(e) => setAddress(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && void saveIt()}
-          data-fsend-server
-        />
-        <button className="btn primary" disabled={busy} onClick={() => void saveIt()}>
-          {busy ? <Loader2 size={14} className="spin" /> : 'Save'}
+      <div className="fsend-tabs" role="tablist">
+        <button className={mode === 'own' ? 'on' : ''} onClick={() => setMode('own')} role="tab" aria-selected={mode === 'own'}>
+          I’ll set it up
         </button>
-        {state.server && (
-          <button className="icon-btn" title="Close" onClick={() => setOpen(false)}>
-            <X size={14} />
-          </button>
-        )}
+        <button className={mode === 'friend' ? 'on' : ''} onClick={() => setMode('friend')} role="tab" aria-selected={mode === 'friend'} data-fsend-friend-tab>
+          A friend already did
+        </button>
       </div>
+      {mode === 'own' ? (
+        <ol className="fsend-steps">
+          <li>
+            <b>Make a free Cloudflare account</b> (skip this if you have one).
+            <div>
+              <button className="btn" onClick={() => void window.api.fileSendOpen('signup')}>
+                <ExternalLink size={13} /> Open Cloudflare sign-up
+              </button>
+            </div>
+          </li>
+          <li>
+            <b>Make a key for Orbit.</b> The page opens with the right setting (“Workers Scripts: Edit”) already ticked. Scroll to the bottom, press <b>Continue to summary</b>, then <b>Create Token</b>, then{' '}
+            <b>Copy</b>.
+            <div>
+              <button className="btn" onClick={() => void window.api.fileSendOpen('token')} data-fsend-token-page>
+                <ExternalLink size={13} /> Open the key page
+              </button>
+            </div>
+          </li>
+          <li>
+            <b>Paste the key here.</b> Orbit does the rest.
+            <div className="vdl-form">
+              <input
+                className="text-input vdl-link"
+                type="password"
+                placeholder="Paste the key from Cloudflare"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && token.trim() && void setUp()}
+                data-fsend-token
+              />
+              <button className="btn primary" disabled={busy || !token.trim()} onClick={() => void setUp()} data-fsend-setup-go>
+                {busy ? <Loader2 size={14} className="spin" /> : 'Set it up'}
+              </button>
+            </div>
+          </li>
+        </ol>
+      ) : (
+        <div className="fsend-friend">
+          <p>Ask them to press “Copy address for friends” in their Big file sender, then paste it here.</p>
+          <div className="vdl-form">
+            <input
+              className="text-input vdl-link"
+              placeholder="https://orbit-file-sender.something.workers.dev"
+              value={address}
+              spellCheck={false}
+              onChange={(e) => setAddress(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && void saveAddress()}
+              data-fsend-server
+            />
+            <button className="btn primary" disabled={busy || !address.trim()} onClick={() => void saveAddress()}>
+              {busy ? <Loader2 size={14} className="spin" /> : 'Save'}
+            </button>
+          </div>
+        </div>
+      )}
+      {state.setupSteps && state.setupSteps.length > 0 && (
+        <ul className="fsend-progress" data-fsend-progress>
+          {state.setupSteps.map((st, i) => (
+            <li key={i} className={st.state}>
+              {st.state === 'doing' ? <Loader2 size={13} className="spin" /> : st.state === 'done' ? <Check size={13} /> : st.state === 'failed' ? <X size={13} /> : <TriangleAlert size={13} />}{' '}
+              {st.text}
+            </li>
+          ))}
+        </ul>
+      )}
+      {state.server && (
+        <button className="btn fsend-link-btn" onClick={onDone}>
+          Keep using {state.server.replace(/^https?:\/\//, '')}
+        </button>
+      )}
     </div>
   )
 }
@@ -278,6 +417,7 @@ export default function FileSenderPage() {
   const [code, setCode] = useState('')
   const [viaDrive, setViaDrive] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [changing, setChanging] = useState(false)
   if (!state) return <div className="convert-page" data-fsend-page />
 
   const send = async (paths: string[]): Promise<void> => {
@@ -323,7 +463,7 @@ export default function FileSenderPage() {
           the connection drops it carries on where it stopped. Keep Orbit open on both until it’s done (your computer won’t go to sleep meanwhile).
         </p>
 
-        <SetupBox key={state.server} state={state} />
+        {state.server && !changing ? <ServerBar state={state} onChange={() => setChanging(true)} /> : <SetupBox state={state} onDone={() => setChanging(false)} />}
 
         <div className="fsend-columns">
           <section className="fsend-box">
@@ -365,8 +505,8 @@ export default function FileSenderPage() {
                 data-fsend-drop
               >
                 {busy ? <Loader2 size={22} className="spin" /> : viaDrive ? <Cloud size={22} /> : <FolderUp size={22} />}
-                {viaDrive ? 'Drop files or a folder to put on Google Drive' : 'Drop files or a folder here'}
-                <span>{viaDrive ? `Free Drive holds 15 GB. Taken off after ${DRIVE_KEEP_DAYS} days.` : 'or click to pick files'}</span>
+                {viaDrive ? 'Drop files or a folder to put on Google Drive' : needsServer ? 'Set up sending with a code first (above)' : 'Drop files or a folder here'}
+                <span>{viaDrive ? `Free Drive holds 15 GB. Taken off after ${DRIVE_KEEP_DAYS} days.` : needsServer ? 'Or pick “Google Drive link”, which works without it' : 'or click to pick files'}</span>
               </button>
             )}
             {!(viaDrive && state.driveAccess !== 'ready') && (
@@ -380,7 +520,7 @@ export default function FileSenderPage() {
             <h3>
               <Download size={15} /> Get
             </h3>
-            <p className="fsend-hint">Type the code your friend gave you.</p>
+            <p className="fsend-hint">{state.server ? 'Type the code your friend gave you.' : 'Set up sending with a code first (above). If a friend set it up, choose “A friend already did”.'}</p>
             <div className="vdl-form">
               <input
                 className="text-input vdl-link"

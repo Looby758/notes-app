@@ -190,7 +190,7 @@ Send huge files or whole folders (a game folder, a long recording) to a friend's
 - A code works once, for an hour. If someone types a wrong code three times, that code stops working.
 - **Google Drive link**, for a friend without Orbit: Orbit uploads to your Google Drive and gives you a normal link (anyone with it can download). It's taken off your Drive after 7 days, or press ✕ to remove it sooner. It uses the Google sign-in from Settings → Calendar; also switch on the **Google Drive API** in the same Google Cloud project. Free Drive space is 15 GB.
 
-Sending with a code needs a small free "intro server" that introduces the two computers (it never sees the files). Set it up once on Cloudflare's free plan: see [server/file-sender/README.md](server/file-sender/README.md).
+Sending with a code needs a small free "intro server" that introduces the two computers (it never sees the files). Orbit sets it up for you on a free Cloudflare account: open Big file sender and follow **Set up sending with a code** (only one of you needs to; the other pastes the address it gives). To do it by hand instead, see [server/file-sender/README.md](server/file-sender/README.md).
 
 ## Files tab: Whole PC search, colour tags and favourites
 

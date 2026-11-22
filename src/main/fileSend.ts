@@ -28,6 +28,7 @@ import {
 import { codeKey, seal, unseal } from './fileSendCrypto'
 import { logError } from './log'
 import * as drive from './driveShare'
+import { TOKEN_PAGE, decryptKey, setRelaySecrets, setUpServer, turnOnRelay, type SetupStep } from './fileSendSetup'
 
 /**
  * The big file sender. Send: pick files or a folder, get a code. Receive: type the code, see who
@@ -58,6 +59,9 @@ interface Stored extends Transfer {
 
 interface Saved {
   server?: string
+  relay?: boolean
+  /** Set up from here: the Cloudflare key (encrypted) and account, to turn the relay on later. */
+  cloudflare?: { key: string; account: string }
   transfers: Stored[]
 }
 
@@ -129,6 +133,9 @@ function publicOf(t: Stored): Transfer {
 export function state(): FileSendState {
   return {
     server: serverAddress(),
+    ownServer: !!load().cloudflare,
+    relay: !!load().relay,
+    setupSteps,
     transfers: load().transfers.map(publicOf),
     drive: drive.shares(),
     driveAccess: drive.access()
@@ -718,10 +725,52 @@ async function setServer(address: string): Promise<{ relay: boolean }> {
   }
   if (body.app !== 'orbit-file-sender') throw new Error('That address works, but it isn’t the Orbit intro server.')
   load().server = `${url.origin}${url.pathname.replace(/\/+$/, '')}`
+  load().relay = !!body.relay
   save(true)
   broadcast(true)
   return { relay: !!body.relay }
 }
+
+// ---------- Setting up the intro server from here ----------
+
+let setupSteps: SetupStep[] | undefined
+/** The Cloudflare key, for this run of Orbit (when the computer can't keep it locked on disk). */
+let sessionKey: string | null = null
+let settingUp = false
+
+async function setUp(token: string): Promise<{ relay: boolean; relayNote?: string }> {
+  if (settingUp) throw new Error('Already setting it up.')
+  settingUp = true
+  try {
+    const r = await setUpServer(token, (steps) => {
+      setupSteps = steps
+      broadcast(true)
+    })
+    const s = load()
+    s.server = r.address
+    s.relay = r.relay
+    s.cloudflare = { key: r.savedKey, account: r.account }
+    sessionKey = r.token
+    save(true)
+    broadcast(true)
+    return { relay: r.relay, relayNote: r.relayNote }
+  } finally {
+    settingUp = false
+  }
+}
+
+/** Turns the relay on for a server set up from here: by itself, or with a TURN key made on Cloudflare's site. */
+async function relayOn(keyId?: string, apiToken?: string): Promise<void> {
+  const s = load()
+  const token = decryptKey(s.cloudflare?.key) ?? sessionKey
+  if (!token || !s.cloudflare) throw new Error('This Orbit didn’t set up the intro server, so it can’t change it. Ask whoever did.')
+  if (keyId && apiToken) await setRelaySecrets(token, s.cloudflare.account, keyId, apiToken)
+  else await turnOnRelay(token, s.cloudflare.account)
+  s.relay = true
+  save(true)
+  broadcast(true)
+}
+
 
 async function pick(kind: 'files' | 'folder'): Promise<string[]> {
   const win = BrowserWindow.getFocusedWindow()
@@ -757,6 +806,16 @@ export function setupFileSend(): void {
   drive.setup(() => broadcast())
   ipcMain.handle('fsend:state', () => state())
   ipcMain.handle('fsend:setServer', (_e, address: string) => setServer(address))
+  ipcMain.handle('fsend:setUp', (_e, token: string) => setUp(String(token ?? '')))
+  ipcMain.handle('fsend:relayOn', (_e, keyId?: string, apiToken?: string) => relayOn(keyId ? String(keyId) : undefined, apiToken ? String(apiToken) : undefined))
+  ipcMain.handle('fsend:open', (_e, which: string) => {
+    const pages: Record<string, string> = {
+      signup: 'https://dash.cloudflare.com/sign-up',
+      token: TOKEN_PAGE,
+      turn: 'https://dash.cloudflare.com/?to=/:account/realtime/turn'
+    }
+    if (pages[which]) void shell.openExternal(pages[which])
+  })
   ipcMain.handle('fsend:pick', (_e, kind: 'files' | 'folder') => pick(kind === 'folder' ? 'folder' : 'files'))
   ipcMain.handle('fsend:send', (_e, paths: string[]) => startSend(paths))
   ipcMain.handle('fsend:receive', (_e, code: string) => startReceive(code))

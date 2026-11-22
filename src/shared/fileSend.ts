@@ -284,6 +284,12 @@ export interface Transfer {
 export interface FileSendState {
   /** The intro server's address, or '' if it hasn't been set up. */
   server: string
+  /** Set up from this Orbit on your Cloudflare account (so the relay can be turned on from here). */
+  ownServer: boolean
+  /** The relay is on (as far as this Orbit knows). */
+  relay: boolean
+  /** Setting it up: each step and how it went. */
+  setupSteps?: { text: string; state: 'doing' | 'done' | 'failed' | 'skipped' }[]
   transfers: Transfer[]
   drive: DriveShare[]
   /** Google sign-in: whether Drive links can be made yet. */

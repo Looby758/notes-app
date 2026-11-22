@@ -5,7 +5,14 @@ introduces the two computers to each other. It never sees the file, and it can't
 setting-up messages either (they're locked with the words in the code, which never leave the two
 computers). It runs on Cloudflare's free plan.
 
-## Set it up (about 10 minutes, once)
+## The easy way: from Orbit
+
+Open **Big file sender** in Orbit and follow **Set up sending with a code**: make a free Cloudflare
+account, make a key on the page Orbit opens, and paste it. Orbit puts this server on your account,
+gives it an address and turns on the relay. Then press **Copy address for friends** and send it to
+them once; they choose **A friend already did** and paste it.
+
+## Set it up by hand (about 10 minutes, once)
 
 You need a free [Cloudflare account](https://dash.cloudflare.com/sign-up) and Node.js.
 
