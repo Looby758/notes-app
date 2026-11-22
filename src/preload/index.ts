@@ -408,6 +408,20 @@ const api: NotesApi = {
     ipcRenderer.on('macros:changed', handler)
     return () => ipcRenderer.removeListener('macros:changed', handler)
   },
+  keyRemapGet: () => ipcRenderer.invoke('keyremap:get'),
+  keyRemapSetOn: (on) => ipcRenderer.invoke('keyremap:on', on),
+  keyRemapSetHotkey: (accel) => ipcRenderer.invoke('keyremap:hotkey', accel),
+  keyRemapAddSet: (app, name) => ipcRenderer.invoke('keyremap:addSet', app, name),
+  keyRemapUpdateSet: (id, patch) => ipcRenderer.invoke('keyremap:updateSet', id, patch),
+  keyRemapRemoveSet: (id) => ipcRenderer.invoke('keyremap:removeSet', id),
+  keyRemapSaveRule: (setId, rule) => ipcRenderer.invoke('keyremap:saveRule', setId, rule),
+  keyRemapRemoveRule: (setId, ruleId) => ipcRenderer.invoke('keyremap:removeRule', setId, ruleId),
+  keyRemapHold: (on) => ipcRenderer.invoke('keyremap:hold', on),
+  onKeyRemapChanged: (callback) => {
+    const handler = (_e: unknown, status: Parameters<typeof callback>[0]): void => callback(status)
+    ipcRenderer.on('keyremap:changed', handler)
+    return () => ipcRenderer.removeListener('keyremap:changed', handler)
+  },
 
   discordGet: () => ipcRenderer.invoke('discord:get'),
   discordSaveApp: (clientId, secret) => ipcRenderer.invoke('discord:save-app', clientId, secret),

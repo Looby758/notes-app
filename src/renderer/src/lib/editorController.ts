@@ -106,6 +106,8 @@ export const VIDEOS_TAB = 'videos:'
 export const SOUNDBOARD_TAB = 'soundboard:'
 /** The macro recorder and auto-clicker (components/Macros). */
 export const MACROS_TAB = 'macros:'
+/** Remap keys, everywhere or for one game (components/KeyRemap). */
+export const KEYREMAP_TAB = 'keyremap:'
 /** Who's in your Discord voice channel, with mute and deafen (components/Discord). */
 export const DISCORD_TAB = 'discord-voice:'
 /** WhatsApp and Discord in one tab (components/Messages). */

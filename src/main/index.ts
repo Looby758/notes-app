@@ -53,6 +53,7 @@ import { applyReplayShortcut, clipResponse, setupClips } from './clips'
 import { setupLocalAi } from './localAi'
 import { reloadSoundboard, setupSoundboard, soundboardFolder, soundFile } from './soundboard'
 import { macrosFolder, reloadMacros, setupMacros, teardownMacros } from './macros'
+import { setupKeyRemap, teardownKeyRemap } from './keyRemap'
 import { setupDiscord, teardownDiscord } from './discord'
 import { setupOrbitSync, syncOrbitSoon, type PartHandler } from './orbitSync'
 import { cleanPrefsPart, prefsPart } from '@shared/orbitSync'
@@ -1088,6 +1089,7 @@ app.whenReady().then(async () => {
   safely('offline AI', setupLocalAi)
   safely('soundboard', setupSoundboard)
   safely('macros', setupMacros)
+  safely('key remapper', setupKeyRemap)
   safely('Discord voice', setupDiscord)
   safely('Discord voice pop-out', () => setupDiscordPopout(currentPrefs))
   safely('live streaming', setupLive)
@@ -1148,6 +1150,7 @@ app.on('will-quit', () => {
   safely('screen controls', teardownMonitors)
   safely('volume mixer', teardownMixer)
   safely('macros', teardownMacros)
+  safely('key remapper', teardownKeyRemap)
   clearSecret()
 })
 

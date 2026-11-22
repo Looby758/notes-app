@@ -13368,6 +13368,38 @@ body.reduce-motion .theme-loading-text {
   margin-top: 2px;
   color: var(--accent);
 }
+.clocks-head-buttons {
+  display: flex;
+  gap: 6px;
+}
+.clock-message {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 12.5px;
+}
+.clock-message-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+.clock-message.mood-good .clock-message-dot {
+  background: #3fb950;
+}
+.clock-message.mood-maybe .clock-message-dot {
+  background: #d29922;
+}
+.clock-message.mood-asleep .clock-message-dot {
+  background: #8b8fd9;
+}
+.clocks-home-row .clock-message {
+  margin: 0;
+  font-size: inherit;
+}
 .clocks-home-row {
   display: flex;
   align-items: center;
@@ -15809,6 +15841,98 @@ body.reduce-motion .theme-loading-text {
   gap: 8px;
   font-size: 13px;
   color: var(--text-muted);
+}
+
+/* ---------- Key remapper (reuses the macro page's layout) ---------- */
+.keyremap-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.keyremap-picker .btn {
+  padding: 5px 11px;
+  font-size: 12px;
+}
+.keyremap-select {
+  width: 104px;
+  height: 28px;
+  font-size: 12px;
+}
+.keyremap-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.keyremap-rule {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+.keyremap-rule.off {
+  opacity: 0.6;
+}
+.keyremap-rule.new {
+  border-style: dashed;
+  border-color: var(--accent);
+}
+.keyremap-rule-main {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+}
+.keyremap-arrow {
+  margin-top: 7px;
+  color: var(--text-muted);
+}
+.keyremap-target {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+.keyremap-rule-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 4px;
+}
+.keyremap-summary {
+  margin: 0;
+}
+.keyremap-app {
+  width: 200px;
+  height: 28px;
+}
+.keyremap-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 11px;
+}
+.keyremap-add {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+  font-size: 13px;
+}
+.keyremap-add .text-input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
 }
 
 

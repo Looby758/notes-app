@@ -20,6 +20,7 @@ import type { MixerState } from './mixer'
 import type { MonitorAction, MonitorSaved, MonitorSetting, MonitorsStatus, MonitorTarget } from './monitors'
 import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
 import type { ClickerSettings, Macro, MacroHotkeys, MacroStatus } from './macros'
+import type { RemapRule, RemapSet, RemapStatus } from './keyRemap'
 import type { CallRecord, DiscordStatus, SavedPlace } from './discord'
 import type { WifiNetwork } from './wifi'
 import type { MusicAction, MusicDevice, MusicItem, MusicQueue, MusicSearchResults, MusicState, MusicStatus } from './spotify'
@@ -928,6 +929,21 @@ export interface NotesApi {
   /** Where the pointer is now (for the auto-clicker's spot). */
   macrosPointer(): Promise<{ x: number; y: number }>
   onMacrosChanged(callback: (status: MacroStatus) => void): () => void
+  // Key remapper (main/keyRemap.ts; the remapping is done by a helper process)
+  keyRemapGet(): Promise<RemapStatus>
+  /** Every remap on or off at once (only you ever switch this). */
+  keyRemapSetOn(on: boolean): Promise<RemapStatus>
+  keyRemapSetHotkey(accel: string): Promise<RemapStatus>
+  /** A set of remaps for one app or game, by its program's name. */
+  keyRemapAddSet(app: string, name?: string): Promise<RemapStatus>
+  keyRemapUpdateSet(id: string, patch: Partial<Pick<RemapSet, 'name' | 'app' | 'on'>>): Promise<RemapStatus>
+  keyRemapRemoveSet(id: string): Promise<RemapStatus>
+  /** Adds a remap (no id, or an unknown one) or changes one. */
+  keyRemapSaveRule(setId: string, rule: Partial<RemapRule>): Promise<RemapStatus>
+  keyRemapRemoveRule(setId: string, ruleId: string): Promise<RemapStatus>
+  /** Pauses remaps while the page picks a key, so you can press the real one. */
+  keyRemapHold(on: boolean): Promise<void>
+  onKeyRemapChanged(callback: (status: RemapStatus) => void): () => void
 
   // Discord voice controls (main/discord.ts, through Discord's official local RPC)
   discordGet(): Promise<DiscordStatus>

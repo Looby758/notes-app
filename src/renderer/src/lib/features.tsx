@@ -24,6 +24,7 @@ import {
   House,
   KeyRound,
   Keyboard,
+  Repeat2,
   Layers,
   Images,
   Clock,
@@ -88,6 +89,7 @@ import {
   VIDEOS_TAB,
   SOUNDBOARD_TAB,
   MACROS_TAB,
+  KEYREMAP_TAB,
   DISCORD_TAB,
   EMAIL_TAB,
   EXPLORER_TAB,
@@ -249,6 +251,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   'discord-voice': { icon: Headphones, run: () => openSpecialTab(DISCORD_TAB) },
   terminal: { icon: SquareTerminal, run: () => openSpecialTab(TERMINAL_TAB) },
   macros: { icon: Keyboard, run: () => openSpecialTab(MACROS_TAB) },
+  keyremap: { icon: Repeat2, run: () => openSpecialTab(KEYREMAP_TAB) },
   streamer: { icon: Eye, run: toggleStreamerMode, useActive: () => usePrefs((s) => s.prefs.streamerMode) },
   settings: { icon: Settings, run: () => openSpecialTab(SETTINGS_TAB) }
 }
