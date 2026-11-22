@@ -658,6 +658,20 @@ body.theme-light .minigames-glow::after {
   background: rgba(255, 255, 255, 0.22);
 }
 
+/* Nonogram clues take the board's size (it grows with zoom). */
+.minigames-page .nono-inner {
+  max-width: 1500px;
+}
+.minigames-page .nono-clue {
+  font-size: inherit;
+}
+.minigames-page .nono-board {
+  margin: 0 auto;
+}
+.minigames-page .nono-cell:focus-visible {
+  outline: none;
+}
+
 /* ---------- Minesweeper ---------- */
 .minigames-page .mines-inner {
   max-width: 1500px;
