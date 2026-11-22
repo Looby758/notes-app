@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, desktopCapturer, globalShortcut, ipcMain, nativeImage, net, Notification, screen } from 'electron'
+import { app, BrowserWindow, clipboard, desktopCapturer, globalShortcut, ipcMain, nativeImage, net, screen } from 'electron'
 import { createHash } from 'crypto'
 import { existsSync, mkdirSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -27,7 +27,7 @@ import { acceleratorLabel, IS_MAC, SYSTEM_NAME } from '@shared/platform'
  *
  * A picture snip (from the taskbar, the tray or "Snip a picture") is the same windows, but letting
  * go of the box copies that part of the screen as a picture and closes, like the Windows Snipping
- * Tool: click, drag, paste anywhere.
+ * Tool: click, drag, paste anywhere. No notification pops up: it's just on the clipboard.
  */
 
 /** A still picture of one monitor, as raw pixels (no PNG to encode or decode, so it's quick). */
@@ -324,25 +324,6 @@ function forDetecting(png: Uint8Array): Uint8Array {
   }
 }
 
-/** A small "Copied" note with the picture, so you know it worked (it goes away by itself). */
-function copiedNote(image: Electron.NativeImage): void {
-  if (!Notification.isSupported()) return
-  try {
-    const { width, height } = image.getSize()
-    const n = new Notification({
-      title: 'Snip copied',
-      body: `${width} × ${height}. Paste it anywhere with ${IS_MAC ? '⌘V' : 'Ctrl+V'}.`,
-      icon: image.resize(width >= height ? { width: Math.min(width, 256) } : { height: Math.min(height, 256) }),
-      silent: true,
-      timeoutType: 'default'
-    })
-    n.show()
-    setTimeout(() => n.close(), 6000)
-  } catch (err) {
-    logError('snip copied note', err)
-  }
-}
-
 /** (Re)registers the system-wide snip shortcut. */
 export function applySnipShortcut(accel: string): void {
   if (registered === accel) return
@@ -378,8 +359,8 @@ export function setupSnip(h: Hooks): void {
     if (!(png instanceof Uint8Array) || png.length > 80 * 1024 * 1024) return
     const image = nativeImage.createFromBuffer(Buffer.from(png))
     if (image.isEmpty()) return
+    // Straight onto the clipboard, quietly (no notification).
     clipboard.writeImage(image)
-    copiedNote(image)
   })
   ipcMain.handle('snip:status', () => ({ shortcut: registered ? acceleratorLabel(registered) : '', error: shortcutError }))
   // Each monitor's snip window gets the picture of its own monitor.
