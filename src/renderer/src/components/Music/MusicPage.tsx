@@ -228,8 +228,11 @@ export default function MusicPage() {
 function Sidebar({ view, setView, folder, loading, onSaveLink, linkOpen }: { view: View; setView: (v: View) => void; folder: string; loading: boolean; onSaveLink: () => void; linkOpen: boolean }) {
   const playlists = useMusicData((s) => s.data.playlists)
   const data = useMusicData((s) => s.data)
-  const tags = useMemo(() => allTags(data), [data])
-  const likedCount = useMusicData((s) => Object.keys(s.data.liked).length)
+  const songs = useLocalMusic((s) => s.library?.songs)
+  // Only songs still in your music count (one deleted outside Orbit keeps its like, in case it comes back).
+  const present = useMemo(() => new Set((songs ?? []).map((s) => s.path)), [songs])
+  const tags = useMemo(() => allTags(data, present), [data, present])
+  const likedCount = useMemo(() => Object.keys(data.liked).filter((p) => present.has(p)).length, [data, present])
   const [dropOn, setDropOn] = useState<string | null>(null)
   const item = (v: View, icon: React.ReactNode, label: string, extra?: string) => (
     <button className={`mp-nav-item ${sameView(view, v) ? 'active' : ''}`} onClick={() => setView(v)} data-mp-nav={v.kind}>

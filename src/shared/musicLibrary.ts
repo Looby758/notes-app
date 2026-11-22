@@ -226,10 +226,13 @@ function renamePaths(data: MusicData, map: Record<string, string>): MusicData {
   }
 }
 
-/** Every tag you've used, most used first. */
-export function allTags(data: MusicData): { tag: string; count: number }[] {
+/** Every tag you've used, most used first (only on songs in `present`, when given). */
+export function allTags(data: MusicData, present?: Set<string>): { tag: string; count: number }[] {
   const counts = new Map<string, number>()
-  for (const list of Object.values(data.tags ?? {})) for (const t of list) counts.set(t, (counts.get(t) ?? 0) + 1)
+  for (const [path, list] of Object.entries(data.tags ?? {})) {
+    if (present && !present.has(path)) continue
+    for (const t of list) counts.set(t, (counts.get(t) ?? 0) + 1)
+  }
   return [...counts].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
 }
 
