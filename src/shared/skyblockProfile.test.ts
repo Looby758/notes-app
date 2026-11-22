@@ -128,6 +128,39 @@ describe('profileView', () => {
     expect(profileView({ profiles: [{ profile_id: 'p', members: { abc: only } }] }, 'abc', '', 1, data, decode)!.gear?.wardrobe.map((w) => w.slot)).toEqual([3])
   })
 
+  it('reads loadouts, their armour sets and the Equipment Wardrobe', () => {
+    const one = (id: string, kind: string) => ({ type: 0, data: nbtOf([slot(id, `§f${id}`, 'RARE', kind)]) })
+    const empty = { type: 0, data: nbtOf([{}]) }
+    const withLoadouts = {
+      ...me,
+      pets_data: { pets: [{ type: 'BEE', tier: 'RARE', exp: 0, uuid: 'ab-cd' }] },
+      inventory: { ...me.inventory, equipment_contents: { data: nbtOf([slot('NECK', '§fNeck', 'RARE', 'NECKLACE'), null, null, null]) } },
+      loadout: {
+        armor: {
+          equipped_set: 1,
+          '1': { id: 1, HELMET: empty, CHESTPLATE: empty, LEGGINGS: empty, BOOTS: empty },
+          '3': { id: 3, HELMET: one('TANK_HAT', 'HELMET'), CHESTPLATE: one('TANK_CHEST', 'CHESTPLATE'), LEGGINGS: empty, BOOTS: empty }
+        },
+        equipment: { equipped_set: 2, '1': { id: 1, EQUIPMENT_SLOT_2: one('CLOAK', 'CLOAK') } },
+        loadouts: {
+          '1': { id: 1, name: '§aTank', armor_set_id: 3, equipment_set_id: 1, pet: 'abcd', power_stone: 'SILKY' },
+          '2': { id: 2, name: '' }
+        }
+      }
+    }
+    const g = profileView({ profiles: [{ profile_id: 'p', members: { abc: withLoadouts } }] }, 'abc', '', 1, data, decode)!.gear!
+    expect(g.wardrobe.map((w) => [w.slot, w.pieces.map((p) => p?.id ?? null)])).toEqual([
+      [1, ['HAT', null, null, 'BOOTS']],
+      [3, ['TANK_HAT', 'TANK_CHEST', null, null]]
+    ])
+    expect(g.wardrobeEquipped).toBe(1)
+    expect(g.equipmentSets.map((w) => [w.slot, w.pieces.map((p) => p?.id ?? null)])).toEqual([
+      [1, [null, 'CLOAK', null, null]],
+      [2, ['NECK', null, null, null]]
+    ])
+    expect(g.loadouts).toEqual([{ slot: 1, name: '§aTank', armorSet: 3, equipmentSet: 1, pet: 'abcd', power: 'Silky' }])
+  })
+
   it('keeps empty slots so wardrobe and grids line up', () => {
     expect(viewItems({ i: [null, {}, { Count: 2, tag: { ExtraAttributes: { id: 'X' } } }] }).map((i) => i?.id ?? null)).toEqual([null, null, 'X'])
   })

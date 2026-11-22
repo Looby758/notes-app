@@ -254,6 +254,17 @@ export interface SbPet {
   heldItemId: string
   candy: number
   skin: string
+  uuid?: string
+}
+
+export interface SbLoadout {
+  slot: number
+  name: string
+  armorSet: number | null
+  equipmentSet: number | null
+  /** The pet's uuid (matches SbPet.uuid). */
+  pet: string
+  power: string
 }
 
 export interface SbProfileView {
@@ -298,8 +309,14 @@ export interface SbProfileView {
   gear: {
     armor: (SbViewItem | null)[]
     equipment: (SbViewItem | null)[]
+    /** Armour sets: the wardrobe (helmet, chestplate, leggings, boots). */
     wardrobe: { slot: number; pieces: (SbViewItem | null)[] }[]
     wardrobeEquipped: number | null
+    /** Equipment sets from the Equipment Wardrobe (/eq): necklace, cloak, belt, gloves. */
+    equipmentSets: { slot: number; pieces: (SbViewItem | null)[] }[]
+    equipmentEquipped: number | null
+    /** Loadouts: each names an armour set, an equipment set, a pet and a power stone. */
+    loadouts: SbLoadout[]
     inventory: (SbViewItem | null)[]
     enderChest: (SbViewItem | null)[]
     backpacks: { slot: number; items: (SbViewItem | null)[] }[]
@@ -605,17 +622,61 @@ export function profileView(
       .filter((s) => s.count > 0)
       .sort((a, b) => b.count - a.count)
     const armor = decodeAll(inv.inv_armor, decode, extra.iconOf).reverse()
-    // The set you're wearing isn't in the wardrobe's data (its slot is empty while it's on you), so it's put back in its slot.
-    const equipped = num(inv.wardrobe_equipped_slot)
-    if (equipped && equipped > 0 && armor.some(Boolean) && !wardrobe.some((w) => w.slot === equipped)) {
-      wardrobe.push({ slot: equipped, pieces: [0, 1, 2, 3].map((i) => armor[i] ?? null) })
-      wardrobe.sort((a, b) => a.slot - b.slot)
+    const equipment = decodeAll(inv.equipment_contents, decode, extra.iconOf)
+    // Since loadouts (July 2026) the wardrobe and the Equipment Wardrobe live under member.loadout:
+    // { armor: { equipped_set, "1": { HELMET, CHESTPLATE, LEGGINGS, BOOTS } }, equipment: { equipped_set, "1": { EQUIPMENT_SLOT_1…4 } }, loadouts: { "1": {…} } }.
+    const lo = obj(me.loadout)
+    const piece = (v: unknown): SbViewItem | null => {
+      const packed = typeof v === 'string' ? { data: v } : v
+      return decodeAll(packed, decode, extra.iconOf).find(Boolean) ?? null
     }
+    const setsOf = (group: unknown, keys: string[]): { slot: number; pieces: (SbViewItem | null)[] }[] =>
+      Object.entries(obj(group))
+        .filter(([k, v]) => /^\d+$/.test(k) && isObj(v))
+        .map(([k, v]) => ({ slot: Number(k), pieces: keys.map((key) => piece((v as Record<string, unknown>)[key])) }))
+        .filter((w) => w.pieces.some(Boolean))
+    let wardrobeEquipped = num(inv.wardrobe_equipped_slot)
+    if (isObj(lo.armor)) {
+      const sets = setsOf(lo.armor, ['HELMET', 'CHESTPLATE', 'LEGGINGS', 'BOOTS'])
+      // Keep the old wardrobe's sets too, for any slot the loadout data doesn't have.
+      wardrobe.splice(0, wardrobe.length, ...sets, ...wardrobe.filter((w) => !sets.some((x) => x.slot === w.slot)))
+      wardrobeEquipped = num(lo.armor.equipped_set) ?? wardrobeEquipped
+    }
+    const equipmentSets = setsOf(lo.equipment, ['EQUIPMENT_SLOT_1', 'EQUIPMENT_SLOT_2', 'EQUIPMENT_SLOT_3', 'EQUIPMENT_SLOT_4'])
+    const equipmentEquipped = num(obj(lo.equipment).equipped_set)
+    // The set you're wearing isn't in the saved sets (its slot is empty while it's on you), so it's put back in its slot.
+    const putBack = (sets: { slot: number; pieces: (SbViewItem | null)[] }[], at: number | null, worn: (SbViewItem | null)[]): void => {
+      if (!at || at < 1 || !worn.some(Boolean) || sets.some((w) => w.slot === at)) return
+      sets.push({ slot: at, pieces: [0, 1, 2, 3].map((i) => worn[i] ?? null) })
+    }
+    putBack(wardrobe, wardrobeEquipped, armor)
+    putBack(equipmentSets, equipmentEquipped, equipment)
+    wardrobe.sort((a, b) => a.slot - b.slot)
+    equipmentSets.sort((a, b) => a.slot - b.slot)
+    const loadouts: SbLoadout[] = Object.entries(obj(lo.loadouts))
+      .filter(([k, v]) => /^\d+$/.test(k) && isObj(v))
+      .map(([k, raw]) => {
+        const v = raw as Record<string, unknown>
+        const set = (n: unknown): number | null => ((num(n) ?? 0) > 0 ? (num(n) as number) : null)
+        return {
+          slot: Number(k),
+          name: typeof v.name === 'string' && v.name.trim() ? v.name : `Loadout ${k}`,
+          armorSet: set(v.armor_set_id),
+          equipmentSet: set(v.equipment_set_id),
+          pet: typeof v.pet === 'string' ? v.pet : '',
+          power: typeof v.power_stone === 'string' && v.power_stone ? title(v.power_stone.toLowerCase()) : ''
+        }
+      })
+      .filter((l) => l.armorSet || l.equipmentSet || l.pet || l.power)
+      .sort((a, b) => a.slot - b.slot)
     gear = {
       armor,
-      equipment: decodeAll(inv.equipment_contents, decode, extra.iconOf),
+      equipment,
       wardrobe,
-      wardrobeEquipped: num(inv.wardrobe_equipped_slot),
+      wardrobeEquipped,
+      equipmentSets,
+      equipmentEquipped,
+      loadouts,
       inventory: decodeAll(inv.inv_contents, decode, extra.iconOf),
       enderChest: decodeAll(inv.ender_chest_contents, decode, extra.iconOf),
       backpacks,
@@ -686,7 +747,8 @@ export function profileView(
         heldItem: typeof p.heldItem === 'string' ? itemName(p.heldItem) : '',
         heldItemId: typeof p.heldItem === 'string' ? p.heldItem : '',
         candy: num(p.candyUsed) ?? 0,
-        skin: typeof p.skin === 'string' ? title(p.skin.toLowerCase()) : ''
+        skin: typeof p.skin === 'string' ? title(p.skin.toLowerCase()) : '',
+        uuid: typeof p.uuid === 'string' ? p.uuid : ''
       }
     })
     .sort((a, b) => Number(b.active) - Number(a.active) || RARITIES.indexOf(b.rarity) - RARITIES.indexOf(a.rarity) || b.level.level - a.level.level)

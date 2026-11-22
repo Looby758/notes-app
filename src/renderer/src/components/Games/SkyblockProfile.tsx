@@ -560,29 +560,64 @@ function Overview({ v, go }: { v: SbProfileView; go: (s: Section) => void }) {
 
 const TOOL_RE = /\b(SWORD|BOW|WAND|DUNGEON SWORD|DUNGEON BOW|LONGSWORD|PICKAXE|DRILL|GAUNTLET|AXE|HOE|SHOVEL|FISHING ROD|FISHING WEAPON)\b/
 
+type ItemSet = { slot: number; pieces: (SbViewItem | null)[] }
+const petKey = (uuid: string): string => uuid.replace(/-/g, '').toLowerCase()
+
+/** One row of saved sets (wardrobe or Equipment Wardrobe); hovering one shows it on the character. */
+function SetRow({ sets, on, picked, pick, what }: { sets: ItemSet[]; on: number | null; picked: number | null; pick: (slot: number) => void; what: string }) {
+  if (!sets.length) return <Nothing what={`${what} is empty.`} />
+  return (
+    <div className="sbp-wardrobe">
+      {sets.map((w) => (
+        <div
+          key={w.slot}
+          className={`sbp-wardrobe-set ${on === w.slot ? 'on' : ''} ${picked === w.slot ? 'picked' : ''}`}
+          onMouseEnter={() => pick(w.slot)}
+          data-sbp-wardrobe={w.slot}
+        >
+          <span className="sbp-wardrobe-num">{on === w.slot ? 'On' : w.slot}</span>
+          {w.pieces.map((p, i) => (
+            <Slot key={i} item={p} size={40} />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function Gear({ v }: { v: SbProfileView }) {
-  const [set, setSet] = useState<number | null>(null)
+  // What the character shows: an armour set, an equipment set, or both from a loadout.
+  const [preview, setPreview] = useState<{ armor?: number | null; equip?: number | null; label: string } | null>(null)
   if (!v.gear) return <Nothing what="Turn on the Inventory API to see your gear." />
   const g = v.gear
   const tools = [...g.inventory, ...g.enderChest].filter((it): it is SbViewItem => !!it && TOOL_RE.test(plain(it.lore[it.lore.length - 1] ?? '')))
-  const shown = set === null ? null : g.wardrobe.find((w) => w.slot === set)
+  const armorSet = (n: number | null | undefined): ItemSet | undefined => (n ? g.wardrobe.find((w) => w.slot === n) : undefined)
+  const equipSet = (n: number | null | undefined): ItemSet | undefined => (n ? g.equipmentSets.find((w) => w.slot === n) : undefined)
+  const shownArmor = armorSet(preview?.armor)?.pieces ?? g.armor
+  const shownEquip = equipSet(preview?.equip)?.pieces ?? g.equipment
+  const pets = new Map(v.pets.filter((p) => p.uuid).map((p) => [petKey(p.uuid!), p]))
+  const back = preview && (
+    <button className="link-btn" onClick={() => setPreview(null)}>
+      Show what I’m wearing
+    </button>
+  )
   return (
     <div className="sbp-panels">
       <Panel title="Your character">
         <div className="sbp-paperdoll">
           <div className="sbp-paperdoll-col">
-            {(shown ? shown.pieces : g.armor).map((it, i) => (
+            {shownArmor.map((it, i) => (
               <Slot key={i} item={it} size={52} />
             ))}
           </div>
           <div className="sbp-paperdoll-me">{v.player?.skin ? <Head skin={v.player.skin} size={96} /> : <ItemPic id="SKULL_ITEM-3" size={96} />}</div>
           <div className="sbp-paperdoll-col">
-            {g.equipment.map((it, i) => (
+            {shownEquip.map((it, i) => (
               <Slot key={i} item={it} size={52} />
             ))}
           </div>
         </div>
-        <p className="faint sbp-hint">{shown ? `Showing wardrobe set ${shown.slot}.` : 'Click any item to see it in full, or to add it as a goal.'}</p>
+        <p className="faint sbp-hint">{preview ? `Showing ${preview.label}.` : 'Click any item to see it in full, or to add it as a goal.'}</p>
       </Panel>
       <Panel title="Weapons and tools">
         {tools.length ? (
@@ -595,37 +630,67 @@ function Gear({ v }: { v: SbProfileView }) {
           <Nothing what="None in your inventory or ender chest." />
         )}
       </Panel>
-      <Panel
-        title={`Wardrobe (${g.wardrobe.length})`}
-        wide
-        right={
-          set !== null && (
-            <button className="link-btn" onClick={() => setSet(null)}>
-              Show what I’m wearing
-            </button>
-          )
-        }
-      >
-        {g.wardrobe.length ? (
-          <div className="sbp-wardrobe">
-            {g.wardrobe.map((w) => (
-              <div
-                key={w.slot}
-                className={`sbp-wardrobe-set ${g.wardrobeEquipped === w.slot ? 'on' : ''} ${set === w.slot ? 'picked' : ''}`}
-                onMouseEnter={() => setSet(w.slot)}
-                data-sbp-wardrobe={w.slot}
-              >
-                <span className="sbp-wardrobe-num">{g.wardrobeEquipped === w.slot ? 'On' : w.slot}</span>
-                {w.pieces.map((p, i) => (
-                  <Slot key={i} item={p} size={40} />
-                ))}
-              </div>
-            ))}
+      {g.loadouts.length > 0 && (
+        <Panel title={`Loadouts (${g.loadouts.length})`} wide right={back}>
+          <div className="sbp-loadouts">
+            {g.loadouts.map((l) => {
+              const pet = l.pet ? pets.get(petKey(l.pet)) : undefined
+              const a = armorSet(l.armorSet)
+              const e = equipSet(l.equipmentSet)
+              return (
+                <div
+                  key={l.slot}
+                  className={`sbp-loadout ${preview?.label === plain(l.name) ? 'picked' : ''}`}
+                  onMouseEnter={() => setPreview({ armor: l.armorSet, equip: l.equipmentSet, label: plain(l.name) })}
+                  data-sbp-loadout={l.slot}
+                >
+                  <strong>
+                    <McText text={l.name} />
+                  </strong>
+                  <div className="sbp-loadout-items">
+                    {(a?.pieces ?? [null, null, null, null]).map((p, i) => (
+                      <Slot key={`a${i}`} item={p} size={32} />
+                    ))}
+                    {(e?.pieces ?? [null, null, null, null]).map((p, i) => (
+                      <Slot key={`e${i}`} item={p} size={32} />
+                    ))}
+                  </div>
+                  <small className="faint">
+                    {[
+                      l.armorSet ? `Armour set ${l.armorSet}` : 'Armour as worn',
+                      l.equipmentSet ? `equipment set ${l.equipmentSet}` : '',
+                      pet ? `${pet.name} pet` : l.pet ? 'a pet' : '',
+                      l.power ? `${l.power} power` : ''
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </small>
+                </div>
+              )
+            })}
           </div>
-        ) : (
-          <Nothing what="Wardrobe is empty." />
-        )}
+        </Panel>
+      )}
+      <Panel title={`Wardrobe (${g.wardrobe.length})`} wide right={!g.loadouts.length && back}>
+        <SetRow
+          sets={g.wardrobe}
+          on={g.wardrobeEquipped}
+          picked={preview?.armor ?? null}
+          pick={(slot) => setPreview({ armor: slot, equip: preview?.equip, label: `wardrobe set ${slot}` })}
+          what="Wardrobe"
+        />
       </Panel>
+      {(g.equipmentSets.length > 0 || g.loadouts.length > 0) && (
+        <Panel title={`Equipment wardrobe (${g.equipmentSets.length})`} wide>
+          <SetRow
+            sets={g.equipmentSets}
+            on={g.equipmentEquipped}
+            picked={preview?.equip ?? null}
+            pick={(slot) => setPreview({ armor: preview?.armor, equip: slot, label: `equipment set ${slot}` })}
+            what="Equipment wardrobe"
+          />
+        </Panel>
+      )}
     </div>
   )
 }
