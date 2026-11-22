@@ -24,6 +24,8 @@ import type { SkyblockGoalsState, SkyblockItemHit } from '@shared/skyblockGoals'
 import { buildExtras, profileView, type SbProfileView } from '@shared/skyblockProfile'
 import { hypixel, KeyRejected, onSkyblockProfiles, skyblockAccount } from './skyblock'
 import { logError } from './log'
+import { neuItemIcons, onAddonChanged, saveNeuPictures, skyblockAddonReady, slotIcon } from './skyblockAddonFiles'
+import { skinFromValue } from '@shared/skyblockTextures'
 
 /**
  * SkyBlock ironman goal planner. The recipe book comes from the NEU item repo (downloaded once a
@@ -34,6 +36,7 @@ import { logError } from './log'
 
 const NEU_ZIP = process.env.NOTES_NEU_REPO_URL ?? 'https://github.com/NotEnoughUpdates/NotEnoughUpdates-REPO/archive/refs/heads/master.zip'
 const HYPIXEL = process.env.NOTES_HYPIXEL_URL ?? 'https://api.hypixel.net'
+const MOJANG_SESSION = process.env.NOTES_MOJANG_SESSION_URL ?? 'https://sessionserver.mojang.com'
 const DATA_MAX_AGE = 7 * 86_400_000
 /** How often the profile is asked for again while you're playing. */
 const PLAY_REFRESH = Number(process.env.NOTES_SKYBLOCK_GOALS_REFRESH_MS) || 10 * 60_000
@@ -46,6 +49,8 @@ interface Stored {
   view?: SbProfileView | null
   garden?: unknown
   museum?: unknown
+  /** Your name and skin, from Mojang, for the head at the top of the profile. */
+  player?: { name: string; skin: string; at: number }
 }
 
 let stored: Stored | null = null
@@ -62,7 +67,7 @@ function load(): Stored {
   if (stored) return stored
   try {
     const raw = JSON.parse(readFileSync(goalsFile(), 'utf8'))
-    stored = { goals: Array.isArray(raw.goals) ? raw.goals : [], profile: raw.profile ?? null, view: raw.view ?? null, garden: raw.garden, museum: raw.museum }
+    stored = { goals: Array.isArray(raw.goals) ? raw.goals : [], profile: raw.profile ?? null, view: raw.view ?? null, garden: raw.garden, museum: raw.museum, player: raw.player }
   } catch {
     stored = { goals: [], profile: null }
   }
@@ -102,6 +107,7 @@ function state(): SkyblockGoalsState {
   const acct = skyblockAccount()
   const goals = orderGoals(s.goals)
   return {
+    installed: skyblockAddonReady(),
     ready: !!acct.key && !!acct.uuid,
     data: d ? { at: d.at, items: Object.keys(d.items).length } : null,
     downloading,
@@ -119,18 +125,31 @@ function state(): SkyblockGoalsState {
 
 async function download(): Promise<void> {
   if (downloading) return
-  downloading = 'Downloading the item list…'
   dataError = ''
+  try {
+    await downloadItemList()
+  } catch (err) {
+    dataError = err instanceof Error ? err.message : String(err)
+    logError('downloading the SkyBlock item list', err)
+  }
+}
+
+/** Downloads the NEU item list (recipes, accessories, levels) and Hypixel's collection tiers. Throws if it can't. */
+export async function downloadItemList(signal?: AbortSignal): Promise<void> {
+  if (downloading) throw new Error('The item list is already downloading.')
+  downloading = 'Downloading the item list…'
   broadcast()
   try {
     let res: Response
     try {
-      res = await net.fetch(NEU_ZIP, { signal: AbortSignal.timeout(180_000) })
+      res = await net.fetch(NEU_ZIP, { signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(180_000)]) : AbortSignal.timeout(180_000) })
     } catch {
+      if (signal?.aborted) throw new Error('Stopped.')
       throw new Error('Couldn’t reach GitHub to download the item list. Check the internet connection.')
     }
     if (!res.ok) throw new Error(`GitHub answered ${res.status} when downloading the item list. Try again in a bit.`)
     const zip = await JSZip.loadAsync(await res.arrayBuffer())
+    if (signal?.aborted) throw new Error('Stopped.')
     downloading = 'Reading recipes…'
     broadcast()
     const files: unknown[] = []
@@ -171,14 +190,20 @@ async function download(): Promise<void> {
     } catch {
       // Keep the old tiers; recipes still work without them.
     }
-    const next: SbData = { at: Date.now(), version: SB_DATA_VERSION, items: buildItems(files), collections, ...buildLevels(constants.leveling), extras: buildExtras(constants, files) }
+    const next: SbData = {
+      at: Date.now(),
+      version: SB_DATA_VERSION,
+      items: buildItems(files),
+      collections,
+      ...buildLevels(constants.leveling),
+      extras: buildExtras(constants, files)
+    }
     writeJson(dataFile(), next)
     data = next
+    dataError = ''
+    saveNeuPictures(files)
     // A new item list can read more of the profile, so ask again.
     void refreshProfile()
-  } catch (err) {
-    dataError = err instanceof Error ? err.message : String(err)
-    logError('downloading the SkyBlock item list', err)
   } finally {
     downloading = null
     broadcast()
@@ -202,7 +227,8 @@ function takeProfiles(body: unknown): void {
   const d = getData()
   if (d?.extras) {
     try {
-      s.view = profileView(body, acct.uuid, acct.profileId, p.at, d, decodeNbt, { garden: s.garden, museum: s.museum })
+      s.view = profileView(body, acct.uuid, acct.profileId, p.at, d, decodeNbt, { garden: s.garden, museum: s.museum, iconOf: slotIcon })
+      if (s.view && s.player) s.view.player = { name: s.player.name, skin: s.player.skin }
     } catch (err) {
       logError('reading your SkyBlock profile', err)
     }
@@ -219,12 +245,28 @@ function trimMuseum(body: unknown, uuid: string): unknown {
   return { members: { [uuid.replace(/-/g, '').toLowerCase()]: { value: me.value, items: Object.fromEntries(Object.keys(me.items ?? {}).map((k) => [k, 1])) } } }
 }
 
+/** Your skin from Mojang, once a day (it's only for the picture at the top). */
+async function refreshPlayer(uuid: string): Promise<void> {
+  const s = load()
+  if (s.player && Date.now() - s.player.at < 86_400_000) return
+  try {
+    const res = await net.fetch(`${MOJANG_SESSION}/session/minecraft/profile/${uuid.replace(/-/g, '')}`, { signal: AbortSignal.timeout(15_000) })
+    if (!res.ok) return
+    const body = (await res.json()) as { name?: string; properties?: { name?: string; value?: string }[] }
+    const value = body.properties?.find((p) => p.name === 'textures')?.value ?? ''
+    s.player = { name: body.name ?? '', skin: value ? skinFromValue(value) : '', at: Date.now() }
+  } catch {
+    // The head falls back to Steve.
+  }
+}
+
 async function refreshProfile(): Promise<void> {
   const acct = skyblockAccount()
-  if (!acct.key || !acct.uuid || refreshing) return
+  if (!acct.key || !acct.uuid || refreshing || !skyblockAddonReady()) return
   refreshing = true
   broadcast()
   try {
+    await refreshPlayer(acct.uuid)
     const body = await hypixel(`/v2/skyblock/profiles?uuid=${acct.uuid}`, acct.key)
     takeProfiles(body)
     const s = load()
@@ -251,24 +293,37 @@ async function refreshProfile(): Promise<void> {
 export function setupSkyblockGoals(): void {
   // Every time the session summary asks Hypixel, the planner gets the same answer for free.
   onSkyblockProfiles((body) => {
-    if (load().goals.length || load().view) takeProfiles(body)
+    if (skyblockAddonReady() && (load().goals.length || load().view)) takeProfiles(body)
+  })
+
+  // Installed, removed or new packs: read the item list again and redraw the pictures.
+  onAddonChanged(() => {
+    data = undefined
+    if (skyblockAddonReady() && load().profile) void refreshProfile()
+    broadcast()
   })
 
   // While you play, ask again now and then so the progress bars move.
-  setInterval(() => {
-    const acct = skyblockAccount()
-    const p = load().profile
-    if (acct.playing && (load().goals.length || load().view) && (!p || Date.now() - p.at > PLAY_REFRESH - 5000)) void refreshProfile()
-  }, Math.min(PLAY_REFRESH, 60_000))
+  setInterval(
+    () => {
+      const acct = skyblockAccount()
+      const p = load().profile
+      if (acct.playing && skyblockAddonReady() && (load().goals.length || load().view) && (!p || Date.now() - p.at > PLAY_REFRESH - 5000)) void refreshProfile()
+    },
+    Math.min(PLAY_REFRESH, 60_000)
+  )
 
   /** `page`: the Goals page is open, so fetch the item list if there isn't one (the Home box doesn't). */
   ipcMain.handle('skyblockGoals:state', (_e, page?: boolean) => {
     const d = getData()
-    if ((page || load().goals.length) && (!d || d.version !== SB_DATA_VERSION || Date.now() - d.at > DATA_MAX_AGE) && !downloading && !dataError) void download()
+    if (skyblockAddonReady() && (page || load().goals.length) && (!d || d.version !== SB_DATA_VERSION || Date.now() - d.at > DATA_MAX_AGE) && !downloading && !dataError)
+      void download()
     return state()
   })
   /** The profile page: everything about your profile (null until Orbit has asked Hypixel with the new item list). */
   ipcMain.handle('skyblockProfile:view', () => load().view ?? null)
+  /** NEU item id → picture, for everything that isn't one of your own items. */
+  ipcMain.handle('skyblockAddon:icons', () => neuItemIcons())
   ipcMain.handle('skyblockGoals:download', async () => {
     await download()
     return state()

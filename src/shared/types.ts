@@ -10,6 +10,7 @@ import type { Prefs } from './prefs'
 import type { SkyblockStatus, SkyblockSummary } from './skyblock'
 import type { SkyblockGoalsState, SkyblockItemHit } from './skyblockGoals'
 import type { SbProfileView } from './skyblockProfile'
+import type { ItemIcon, SkyblockAddonState } from './skyblockTextures'
 import type { AutofillProfile, Bookmark, HistoryHit, ImportedLogin, SitePermission, SiteSettings, WebDownload } from './browser'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
@@ -1236,6 +1237,15 @@ export interface NotesApi {
   skyblockGoalsUpdate(id: string, change: { amount?: number; pinned?: boolean }): Promise<SkyblockGoalsState>
   skyblockGoalsRemove(id: string): Promise<SkyblockGoalsState>
   onSkyblockGoalsChanged(callback: () => void): () => void
+  /** The SkyBlock add-on (everything SkyBlock is off until it's downloaded). */
+  skyblockAddonState(): Promise<SkyblockAddonState>
+  /** Downloads it, or changes its texture packs (best first). Resolves when done or stopped. */
+  skyblockAddonInstall(packs: string[]): Promise<SkyblockAddonState>
+  skyblockAddonCancel(): Promise<SkyblockAddonState>
+  skyblockAddonRemove(): Promise<SkyblockAddonState>
+  /** NEU item id → its picture. */
+  skyblockAddonIcons(): Promise<Record<string, ItemIcon>>
+  onSkyblockAddonChanged(callback: () => void): () => void
   // Terminal tab
   /**
    * Starts command line `id` in `folder` (the notes folder when it's null or missing), or carries on

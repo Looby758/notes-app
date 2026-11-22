@@ -21,6 +21,7 @@ import {
   type SkyblockSummary
 } from '@shared/skyblock'
 import { logError } from './log'
+import { skyblockAddonReady } from './skyblockAddonFiles'
 
 /**
  * SkyBlock session summary. While Orbit is running (even with its window closed) it looks for
@@ -416,7 +417,8 @@ function show(summary: SkyblockSummary): void {
 
 async function tick(): Promise<void> {
   const s = load()
-  if (!s.apiKey || !s.uuid) return
+  // Session summaries are part of the SkyBlock add-on: nothing runs until it's downloaded.
+  if (!s.apiKey || !s.uuid || !skyblockAddonReady()) return
   const open = await minecraftOpen()
   if (!open) waitForClose = false
   if (open && !s.current && !waitForClose) await begin(firstTick)

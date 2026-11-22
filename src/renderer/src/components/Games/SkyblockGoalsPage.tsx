@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Check, ChevronDown, ChevronRight, Download, HelpCircle, Lock, Pickaxe, Pin, PinOff, Plus, RefreshCw, Search, Target, Trash2 } from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, ChevronRight, Download, HelpCircle, Image, Lock, Pickaxe, Pin, PinOff, Plus, RefreshCw, Search, Target, Trash2 } from 'lucide-react'
 import { API_SETTINGS_PATH, describeHours, MC_COLORS, tagLabel, type GoalPlan, type PlanNode, type SkyblockGoalsState, type SkyblockItemHit } from '@shared/skyblockGoals'
 import { MODE_NAMES } from '@shared/skyblock'
 import { addHomeCard } from '../../lib/home'
@@ -7,6 +7,8 @@ import { GAMES_TAB, openSpecialTab, SKYBLOCK_GOALS_TAB } from '../../lib/editorC
 import { errorMessage } from '../../lib/paths'
 import { HomeBox } from '../Home/HomePage'
 import SkyblockProfile from './SkyblockProfile'
+import SkyblockAddonCard from './SkyblockAddonCard'
+import { ItemPic, useSkyblockAddon } from './SkyblockPic'
 
 addHomeCard({
   id: 'skyblock-goals',
@@ -57,6 +59,8 @@ export default function SkyblockGoalsPage() {
   const [view, setView] = useState<'tree' | 'raw' | 'blockers'>('tree')
   const [page, setPage] = useState<'profile' | 'goals'>('profile')
   const [error, setError] = useState<string | null>(null)
+  const [packsOpen, setPacksOpen] = useState(false)
+  const addon = useSkyblockAddon()
 
   const run = useCallback(
     async (job: () => Promise<SkyblockGoalsState>): Promise<void> => {
@@ -70,7 +74,21 @@ export default function SkyblockGoalsPage() {
     [setState]
   )
 
-  if (!state) return <div className="sbg-page" />
+  if (!state || !addon) return <div className="sbg-page" />
+  // Everything SkyBlock is an optional download, like the offline AI.
+  if (!state.installed || addon.state !== 'ready')
+    return (
+      <div className="sbg-page" data-skyblock-goals data-skyblock-addon-missing>
+        <div className="sbg-inner sbg-get">
+          <div className="sbg-get-hero">
+            <Target size={30} />
+            <h2>SkyBlock</h2>
+            <p className="faint">Your Hypixel SkyBlock profile, item pictures from your favourite texture pack, and an ironman goal planner.</p>
+          </div>
+          <SkyblockAddonCard />
+        </div>
+      </div>
+    )
   const plan = state.plans.find((p) => p.goal.id === selected) ?? state.plans[0] ?? null
 
   return (
@@ -114,6 +132,9 @@ export default function SkyblockGoalsPage() {
             >
               <RefreshCw size={13} className={state.refreshing ? 'spin' : ''} /> {state.refreshing ? 'Checking…' : 'Refresh'}
             </button>
+            <button className={`btn ${packsOpen ? 'active' : ''}`} onClick={() => setPacksOpen(!packsOpen)} title="Texture packs, or remove the SkyBlock add-on" data-sbg-packs>
+              <Image size={13} /> Pictures
+            </button>
             <button
               className="btn"
               disabled={!!state.downloading}
@@ -126,6 +147,7 @@ export default function SkyblockGoalsPage() {
           </div>
         </div>
 
+        {packsOpen && <SkyblockAddonCard compact />}
         {!state.ready && (
           <div className="sbg-warning">
             <AlertTriangle size={14} />
@@ -198,6 +220,7 @@ export default function SkyblockGoalsPage() {
                       {state.plans.map((p) => (
                         <li key={p.goal.id} className={plan?.goal.id === p.goal.id ? 'active' : ''}>
                           <button className="sbg-list-main" onClick={() => setSelected(p.goal.id)}>
+                            <ItemPic id={p.goal.id} name={p.name} size={30} className="sbg-list-pic" />
                             <span className="sbg-list-name" style={{ color: colorOf(p.color) }}>
                               {p.goal.amount > 1 && <span className="faint">{p.goal.amount} × </span>}
                               {p.name}
@@ -304,6 +327,7 @@ function AddGoal({ onAdd }: { onAdd: (id: string, amount: number) => void }) {
           {hits.map((h) => (
             <li key={h.id}>
               <button onClick={() => pick(h)}>
+                <ItemPic id={h.id} name={h.name} size={22} />
                 <span style={{ color: colorOf(h.color) }}>{h.name}</span>
                 <span className="faint">{h.crafted ? 'crafted' : ''}</span>
                 <Plus size={12} />
@@ -333,7 +357,8 @@ function GoalView({
   return (
     <section className="sbg-goal" data-sbg-goal={plan.goal.id}>
       <header className="sbg-goal-head">
-        <div>
+        <ItemPic id={plan.goal.id} name={plan.name} size={56} className="sbg-goal-pic" />
+        <div className="sbg-goal-title">
           <h3 style={{ color: colorOf(plan.color) }}>{plan.name}</h3>
           <div className="sbg-bar big">
             <i style={{ width: `${Math.round(plan.progress * 100)}%` }} />
@@ -421,6 +446,7 @@ function TreeRow({ node, depth }: { node: PlanNode; depth: number }) {
           <span className="sbg-toggle" />
         )}
         {done ? <Check size={13} className="sbg-tick" /> : node.locked.length ? <Lock size={13} className="sbg-lock" /> : <span className="sbg-dot" />}
+        <ItemPic id={node.id} name={node.name} size={22} />
         <span className="sbg-name" style={{ color: colorOf(node.color) }} title={node.locked.map((l) => `${l.label}: ${l.detail}`).join('\n')}>
           {node.name}
         </span>
@@ -457,7 +483,12 @@ function RawList({ plan }: { plan: GoalPlan }) {
         <tbody>
           {lines.map((l) => (
             <tr key={l.id} className={l.missing ? '' : 'done'}>
-              <td style={{ color: colorOf(l.color) }}>{l.name}</td>
+              <td style={{ color: colorOf(l.color) }}>
+                <span className="sbg-raw-name">
+                  <ItemPic id={l.id} name={l.name} size={20} />
+                  {l.name}
+                </span>
+              </td>
               <td className="num">{fmt(l.have)}</td>
               <td className="num">{fmt(l.need)}</td>
               <td className="num">{l.missing ? fmt(l.missing) : <Check size={12} />}</td>
@@ -510,7 +541,7 @@ function Blockers({ plan }: { plan: GoalPlan }) {
 function SkyblockGoalsHomeCard() {
   const [state] = useGoals(false)
   const pinned = state?.plans.filter((p) => p.goal.pinned) ?? []
-  if (!pinned.length) return null
+  if (!pinned.length || !state?.installed) return null
   return (
     <HomeBox
       icon={<Target size={15} />}
@@ -526,6 +557,7 @@ function SkyblockGoalsHomeCard() {
         {pinned.map((p) => (
           <button key={p.goal.id} className="sbg-home-goal" onClick={() => openSpecialTab(SKYBLOCK_GOALS_TAB)}>
             <span className="sbg-home-top">
+              <ItemPic id={p.goal.id} name={p.name} size={20} />
               <span style={{ color: colorOf(p.color) }}>{p.name}</span>
               <b>{Math.round(p.progress * 100)}%</b>
             </span>

@@ -803,6 +803,8 @@ export interface SkyblockItemHit {
 }
 
 export interface SkyblockGoalsState {
+  /** The SkyBlock add-on is downloaded (until it is, everything SkyBlock is off). */
+  installed: boolean
   /** A Hypixel key and Minecraft name are set up (Games page → SkyBlock). */
   ready: boolean
   /** The downloaded recipe book, if there is one. */

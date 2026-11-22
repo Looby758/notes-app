@@ -9,6 +9,7 @@
  */
 
 import { neuId, prettyId, stripColors, type SbData } from './skyblockGoals'
+import type { ItemIcon } from './skyblockTextures'
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
@@ -198,10 +199,17 @@ export interface SbViewItem {
   recomb: boolean
   /** Minecraft item, for an icon: "minecraft:diamond_sword", or the numeric id from 1.8. */
   material: string
+  /** Enchanted, so drawn with the shimmer. */
+  glint: boolean
+  /** Its picture from the SkyBlock add-on's texture packs, or its head skin. */
+  icon?: ItemIcon
 }
 
+/** Works out an item's picture from its raw slot (Minecraft id, damage and NBT). */
+export type SlotIconOf = (slot: Record<string, unknown>) => ItemIcon | undefined
+
 /** An item list ({ i: [...] }) into items, keeping empty slots as null (so wardrobe slots line up). */
-export function viewItems(root: unknown): (SbViewItem | null)[] {
+export function viewItems(root: unknown, iconOf?: SlotIconOf): (SbViewItem | null)[] {
   const list = isObj(root) && Array.isArray(root.i) ? root.i : []
   return list.map((slot) => {
     if (!isObj(slot) || !isObj(slot.tag)) return null
@@ -220,7 +228,9 @@ export function viewItems(root: unknown): (SbViewItem | null)[] {
       rarity: rarityOf(lore),
       stars: (num(extra.upgrade_level) ?? num(extra.dungeon_item_level) ?? 0) as number,
       recomb: num(extra.rarity_upgrades) === 1,
-      material: String(slot.id ?? '')
+      material: String(slot.id ?? ''),
+      glint: (isObj(extra.enchantments) && Object.keys(extra.enchantments).length > 0) || (Array.isArray(tag.ench) && tag.ench.length > 0),
+      icon: iconOf?.(slot)
     }
   })
 }
@@ -238,13 +248,18 @@ export interface SbPet {
   rarity: string
   level: Level
   active: boolean
+  /** The NEU item id for its picture: the pet ("BEE;4") or its skin ("PET_SKIN_…"). */
+  neuId: string
   heldItem: string
+  heldItemId: string
   candy: number
   skin: string
 }
 
 export interface SbProfileView {
   at: number
+  /** Your Minecraft name and skin id (for the head at the top), filled in by the app. */
+  player?: { name: string; skin: string }
   profileId: string
   profileName: string
   mode: string
@@ -383,7 +398,14 @@ const SLAYER_NAMES: Record<string, string> = {
   vampire: 'Riftstalker Bloodfiend'
 }
 /** Hypixel's garden crop ids → the NEU repo's milestone names. */
-const CROP_KEYS: Record<string, string> = { CARROT_ITEM: 'CARROT', POTATO_ITEM: 'POTATO', 'INK_SACK:3': 'COCOA_BEANS', MUSHROOM_COLLECTION: 'MUSHROOM', NETHER_STALK: 'NETHER_WART', DOUBLE_PLANT: 'SUNFLOWER' }
+const CROP_KEYS: Record<string, string> = {
+  CARROT_ITEM: 'CARROT',
+  POTATO_ITEM: 'POTATO',
+  'INK_SACK:3': 'COCOA_BEANS',
+  MUSHROOM_COLLECTION: 'MUSHROOM',
+  NETHER_STALK: 'NETHER_WART',
+  DOUBLE_PLANT: 'SUNFLOWER'
+}
 const MP: Record<string, number> = {
   COMMON: 3,
   UNCOMMON: 5,
@@ -412,10 +434,10 @@ export function petLevel(type: string, tier: string, exp: number, x: SbExtras): 
   return { ...l, level: l.level + 1, max: l.max + 1 }
 }
 
-function decodeAll(v: unknown, decode: (b64: string) => unknown): (SbViewItem | null)[] {
+function decodeAll(v: unknown, decode: (b64: string) => unknown, iconOf?: SlotIconOf): (SbViewItem | null)[] {
   if (!isObj(v) || typeof v.data !== 'string' || !v.data) return []
   try {
-    return viewItems(decode(v.data))
+    return viewItems(decode(v.data), iconOf)
   } catch {
     return []
   }
@@ -429,7 +451,7 @@ export function profileView(
   at: number,
   data: SbData,
   decode: (b64: string) => unknown,
-  extra: { garden?: unknown; museum?: unknown } = {}
+  extra: { garden?: unknown; museum?: unknown; iconOf?: SlotIconOf } = {}
 ): SbProfileView | null {
   const x = data.extras
   if (!x) return null
@@ -545,7 +567,7 @@ export function profileView(
   let gear: SbProfileView['gear'] = null
   let accessories: SbProfileView['accessories'] = null
   if (inv && isObj(inv.inv_contents)) {
-    const wardrobeRaw = decodeAll(inv.wardrobe_contents, decode)
+    const wardrobeRaw = decodeAll(inv.wardrobe_contents, decode, extra.iconOf)
     const wardrobe: { slot: number; pieces: (SbViewItem | null)[] }[] = []
     const pages = Math.ceil(wardrobeRaw.length / 36)
     for (let page = 0; page < pages; page++) {
@@ -557,7 +579,7 @@ export function profileView(
     const backpacks = Object.entries(obj(inv.backpack_contents))
       .map(([slot, v]) => ({
         slot: Number(slot) + 1,
-        items: decodeAll(v, decode)
+        items: decodeAll(v, decode, extra.iconOf)
       }))
       .sort((a, b) => a.slot - b.slot)
     const bagNames: Record<string, string> = {
@@ -571,7 +593,7 @@ export function profileView(
       .filter(([k]) => k !== 'talisman_bag')
       .map(([k, v]) => ({
         name: bagNames[k] ?? title(k),
-        items: decodeAll(v, decode)
+        items: decodeAll(v, decode, extra.iconOf)
       }))
       .filter((b) => b.items.some(Boolean))
     const sacks = Object.entries(obj(inv.sacks_counts))
@@ -582,23 +604,23 @@ export function profileView(
       }))
       .filter((s) => s.count > 0)
       .sort((a, b) => b.count - a.count)
-    const armor = decodeAll(inv.inv_armor, decode).reverse()
+    const armor = decodeAll(inv.inv_armor, decode, extra.iconOf).reverse()
     gear = {
       armor,
-      equipment: decodeAll(inv.equipment_contents, decode),
+      equipment: decodeAll(inv.equipment_contents, decode, extra.iconOf),
       wardrobe,
       wardrobeEquipped: num(inv.wardrobe_equipped_slot),
-      inventory: decodeAll(inv.inv_contents, decode),
-      enderChest: decodeAll(inv.ender_chest_contents, decode),
+      inventory: decodeAll(inv.inv_contents, decode, extra.iconOf),
+      enderChest: decodeAll(inv.ender_chest_contents, decode, extra.iconOf),
       backpacks,
-      vault: decodeAll(inv.personal_vault_contents, decode),
+      vault: decodeAll(inv.personal_vault_contents, decode, extra.iconOf),
       bags,
       sacks
     }
     if (!isObj(inv.personal_vault_contents)) hidden.push('Personal Vault API is off, so the vault is empty here.')
 
     // Accessories: the bag, plus any carried in the inventory.
-    const bag = decodeAll(obj(inv.bag_contents).talisman_bag, decode).filter((i): i is SbViewItem => !!i)
+    const bag = decodeAll(obj(inv.bag_contents).talisman_bag, decode, extra.iconOf).filter((i): i is SbViewItem => !!i)
     const known = new Set(x.accessories.map((a) => a.id))
     const carried = [...gear.inventory, ...gear.enderChest].filter((i): i is SbViewItem => !!i && known.has(i.id))
     const items = [...bag, ...carried]
@@ -642,6 +664,7 @@ export function profileView(
   } else hidden.push('Inventory API is off, so your gear, inventories and accessories can’t be shown.')
 
   // Pets
+  const PET_TIERS = ['COMMON', 'UNCOMMON', 'RARE', 'EPIC', 'LEGENDARY', 'MYTHIC']
   const pets: SbPet[] = (Array.isArray(obj(me.pets_data).pets) ? (obj(me.pets_data).pets as unknown[]) : [])
     .filter(isObj)
     .map((p) => {
@@ -653,7 +676,9 @@ export function profileView(
         rarity: tier.replace('_', ' '),
         level: petLevel(type, tier, num(p.exp) ?? 0, x),
         active: p.active === true,
+        neuId: typeof p.skin === 'string' && p.skin ? `PET_SKIN_${p.skin}` : `${type};${Math.max(0, PET_TIERS.indexOf(tier))}`,
         heldItem: typeof p.heldItem === 'string' ? itemName(p.heldItem) : '',
+        heldItemId: typeof p.heldItem === 'string' ? p.heldItem : '',
         candy: num(p.candyUsed) ?? 0,
         skin: typeof p.skin === 'string' ? title(p.skin.toLowerCase()) : ''
       }
