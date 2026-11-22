@@ -8,6 +8,8 @@ import { notify } from '../../store/notify'
 import { localPause, playLocal } from '../../store/localMusic'
 import { useMusic } from '../../store/music'
 import ContextMenu, { type MenuItem } from '../ContextMenu'
+import { saveMp3 } from '../../store/musicLink'
+import { Download } from 'lucide-react'
 
 /**
  * The Music page's Search: any song there is (Apple's free iTunes Search, no account needed), with a
@@ -143,6 +145,17 @@ export default function MusicSearch({ songs }: { songs: LocalSong[] }) {
     const items: MenuItem[] = [
       { label: 'Copy YouTube link', icon: <Copy size={14} />, onClick: () => void copy(t) },
       { label: 'Open on YouTube', icon: <Youtube size={14} />, onClick: () => void open(t) },
+      {
+        label: 'Save MP3 to my music',
+        icon: <Download size={14} />,
+        onClick: () =>
+          void withLookup(t, async () => {
+            const { url, exact } = await youtubeLink(t)
+            if (!exact) return notify(`Couldn’t find the video for “${t.title}”, so it can’t be saved.`)
+            notify(`Saving “${t.title}” to your music…`, 'info')
+            await saveMp3(url)
+          })
+      },
       { label: 'Copy song name', icon: <Copy size={14} />, onClick: () => void navigator.clipboard.writeText(`${t.artist} – ${t.title}`) }
     ]
     if (t.preview) items.unshift({ label: sampling === t.id ? 'Stop the sample' : 'Play a 30-second sample', icon: <Play size={14} />, onClick: () => playSample(t) })

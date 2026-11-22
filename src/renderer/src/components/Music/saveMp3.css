@@ -1,0 +1,101 @@
+.save-mp3 {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12.5px;
+}
+.save-mp3 form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+}
+.save-mp3 input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+.save-mp3 input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+.save-mp3 .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.save-mp3-note {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 11.5px;
+}
+.save-mp3 ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.save-mp3-job {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.save-mp3-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.save-mp3-job.done .save-mp3-icon {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--accent);
+}
+.save-mp3-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.save-mp3-text strong {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+.save-mp3-text em {
+  color: var(--text-muted);
+  font-style: normal;
+  font-size: 11.5px;
+}
+.save-mp3-job.error .save-mp3-text em {
+  color: var(--danger, #e5484d);
+}
+.save-mp3-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+.save-mp3-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 200ms;
+}

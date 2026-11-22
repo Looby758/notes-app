@@ -64,7 +64,7 @@ function SongList({ songs, playing, onPlay }: { songs: LocalSong[]; playing?: st
       {songs.map((song, i) => (
         <li key={`${song.path}:${i}`}>
           <button className={playing === localUri(song) ? 'active' : ''} onClick={() => onPlay(i)} title={`Play ${song.title}`} data-music-local-song={song.title}>
-            <ItemArt art={song.art ? localArtUrl(song.path) : undefined} />
+            <ItemArt art={song.art ? localArtUrl(song.path, song.added) : undefined} />
             <span className="music-item-text">
               <strong>{song.title}</strong>
               <span>{[song.artist, song.album].filter(Boolean).join(' · ') || song.path}</span>

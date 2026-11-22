@@ -13,7 +13,7 @@ import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
 import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
-import type { LocalLibrary } from './localMusic'
+import type { LocalLibrary, SongTagPatch } from './localMusic'
 import type { MusicData, MusicEdit } from './musicLibrary'
 import type { FoundTrack } from './songSearch'
 import type { MixerState } from './mixer'
@@ -1177,6 +1177,32 @@ export interface NotesApi {
   localMusicChooseFolder(): Promise<LocalLibrary>
   /** Goes back to the computer's own Music folder. */
   localMusicDefaultFolder(): Promise<LocalLibrary>
+  /** Songs were added, changed or removed in the music folder. */
+  onLocalMusicChanged(callback: (library: LocalLibrary) => void): () => void
+  /** Writes details into the songs (MP3s); each song gets its own changes. */
+  musicTagsEdit(changes: { path: string; patch: SongTagPatch }[]): Promise<MusicFileResult>
+  /** Fills empty details from the file names ("01 - Artist - Title.mp3"). */
+  musicTagsFillFromNames(paths: string[]): Promise<MusicFileResult>
+  /** Sets the cover of these songs from a picture file or an https link. */
+  musicTagsSetCover(paths: string[], source: { file?: string; url?: string }): Promise<MusicFileResult>
+  /** Covers found online for an album (Apple's free catalogue). */
+  musicTagsFindCovers(artist: string, album: string): Promise<{ url: string; album: string; artist: string }[]>
+  /** Asks for a picture file; null if cancelled. */
+  musicTagsChooseImage(): Promise<string | null>
+  /** Copies music files (full paths) into the music folder. */
+  localMusicImport(files: string[]): Promise<MusicImportResult>
+  /** Asks which music files to add, then copies them in; null if cancelled. */
+  localMusicChooseImport(): Promise<MusicImportResult | null>
+  /** Renames or moves songs inside the music folder. */
+  localMusicMove(moves: { from: string; to: string }[]): Promise<{ library: LocalLibrary; done: { from: string; to: string }[]; failed: string[] }>
+  /** Puts songs in the Recycle Bin / Bin. */
+  localMusicTrash(paths: string[]): Promise<LocalLibrary>
+  /** Each song's sound quality (kbps) and size, for choosing which copy to keep. */
+  localMusicQuality(paths: string[]): Promise<Record<string, { bitrate: number; size: number }>>
+  /** Downloads a link's sound as an MP3 into the music folder; returns the job's id (progress comes through onMusicLinkProgress). */
+  musicLinkSave(link: string): Promise<string>
+  musicLinkCancel(id: string): Promise<void>
+  onMusicLinkProgress(callback: (progress: MusicLinkProgress) => void): () => void
   /** Any song (Apple's free iTunes Search), for the Music page's Search. */
   songSearch(query: string): Promise<FoundTrack[]>
   /** A song's YouTube video (`exact` false: YouTube's search for it instead). */
@@ -1767,4 +1793,33 @@ export interface VideoConvertRequest {
   /** The caption bar as a PNG, exactly `gif.width` pixels wide. */
   captionPng?: Uint8Array
   captionHeight?: number
+}
+
+export interface MusicFileResult {
+  library: LocalLibrary
+  /** Songs that couldn't be changed, with why. */
+  failed: { path: string; why: string }[]
+}
+
+export interface MusicImportResult {
+  library: LocalLibrary
+  /** Where the new songs are in the music folder. */
+  added: string[]
+  /** Files that weren't music, or couldn't be copied. */
+  skipped: string[]
+}
+
+/** How "Save MP3 to my music" is getting on. */
+export interface MusicLinkProgress {
+  id: string
+  stage: 'downloading' | 'details' | 'done' | 'error' | 'cancelled'
+  /** 0–1 while known. */
+  done?: number | null
+  title?: string
+  artist?: string
+  /** Where the song is in the music folder (done). */
+  path?: string
+  /** Its details came from Apple's catalogue (done). */
+  matched?: boolean
+  error?: string
 }

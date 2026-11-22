@@ -1,3 +1,7 @@
+import { Music2 } from 'lucide-react'
+import { LOCAL_AUDIO } from '@shared/localMusic'
+import { importSongs } from '../../store/musicFiles'
+import { useVault } from '../../store/vault'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowDownToLine,
@@ -108,6 +112,15 @@ function Bar({ value }: { value: number | null }) {
   )
 }
 
+const isSong = (path: string): boolean => LOCAL_AUDIO.some((ext) => path.toLowerCase().endsWith(ext))
+
+/** A downloaded song goes into your music folder too (videos are kept in the notes folder). */
+async function addToMusic(d: DmItem): Promise<void> {
+  if (!d.path) return
+  const full = d.kind === 'video' ? `${useVault.getState().vault}/${d.path}` : d.path
+  await importSongs([full])
+}
+
 function openItem(d: DmItem): void {
   if (!d.path) return
   if (d.kind === 'video') {
@@ -190,6 +203,11 @@ function QueueItem({ d, state, first, last }: { d: DmItem; state: DmState; first
                 data-dm-insert
               >
                 <FileInput size={14} />
+              </button>
+            )}
+            {isSong(d.path) && (
+              <button className="icon-btn" title="Add to my music (copies it into your music folder)" onClick={() => void addToMusic(d)} data-dm-to-music>
+                <Music2 size={14} />
               </button>
             )}
             <button

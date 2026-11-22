@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { LocalAiState, MusicMiniCommand, MusicMiniState, NotesApi } from '@shared/types'
+import type { LocalAiState, MusicLinkProgress, MusicMiniCommand, MusicMiniState, NotesApi } from '@shared/types'
 import type { MusicData } from '@shared/musicLibrary'
+import type { LocalLibrary } from '@shared/localMusic'
 
 /** Listens for a message from the main process; returns the way to stop. */
 function on<T>(channel: string, callback: (value: T) => void): () => void {
@@ -614,6 +615,28 @@ const api: NotesApi = {
   localMusicLibrary: (fresh) => ipcRenderer.invoke('localMusic:library', fresh),
   localMusicChooseFolder: () => ipcRenderer.invoke('localMusic:chooseFolder'),
   localMusicDefaultFolder: () => ipcRenderer.invoke('localMusic:defaultFolder'),
+  onLocalMusicChanged: (callback) => {
+    const handler = (_e: unknown, library: LocalLibrary): void => callback(library)
+    ipcRenderer.on('localMusic:changed', handler)
+    return () => ipcRenderer.removeListener('localMusic:changed', handler)
+  },
+  musicTagsEdit: (changes) => ipcRenderer.invoke('musicTags:edit', changes),
+  musicTagsFillFromNames: (paths) => ipcRenderer.invoke('musicTags:fillFromNames', paths),
+  musicTagsSetCover: (paths, source) => ipcRenderer.invoke('musicTags:setCover', paths, source),
+  musicTagsFindCovers: (artist, album) => ipcRenderer.invoke('musicTags:findCovers', artist, album),
+  musicTagsChooseImage: () => ipcRenderer.invoke('musicTags:chooseImage'),
+  localMusicImport: (files) => ipcRenderer.invoke('localMusic:import', files),
+  localMusicChooseImport: () => ipcRenderer.invoke('localMusic:chooseImport'),
+  localMusicMove: (moves) => ipcRenderer.invoke('localMusic:move', moves),
+  localMusicTrash: (paths) => ipcRenderer.invoke('localMusic:trash', paths),
+  localMusicQuality: (paths) => ipcRenderer.invoke('localMusic:quality', paths),
+  musicLinkSave: (link) => ipcRenderer.invoke('musicLink:save', link),
+  musicLinkCancel: (id) => ipcRenderer.invoke('musicLink:cancel', id),
+  onMusicLinkProgress: (callback) => {
+    const handler = (_e: unknown, p: MusicLinkProgress): void => callback(p)
+    ipcRenderer.on('musicLink:progress', handler)
+    return () => ipcRenderer.removeListener('musicLink:progress', handler)
+  },
   musicDataGet: () => ipcRenderer.invoke('musicData:get'),
   songSearch: (query) => ipcRenderer.invoke('songSearch:search', query),
   songYouTube: (artist, title) => ipcRenderer.invoke('songSearch:youtube', artist, title),

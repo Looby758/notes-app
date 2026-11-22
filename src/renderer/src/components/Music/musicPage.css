@@ -960,3 +960,388 @@ body.motion-off .mp-eq i {
   font-style: normal;
 }
 
+
+/* ---- part 3: your files ---- */
+.mp-tools {
+  display: flex;
+  gap: 2px;
+  padding: 6px 4px 0 6px;
+  border-top: 1px solid var(--border);
+}
+.mp-tools .icon-btn {
+  width: 28px;
+  height: 28px;
+}
+.mp-tools .icon-btn.mp-on {
+  color: var(--accent);
+}
+.mp-tags {
+  max-height: 30%;
+  overflow-y: auto;
+}
+.mp-drop-overlay {
+  position: absolute;
+  inset: 8px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 2px dashed var(--accent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  color: var(--text-strong);
+  pointer-events: none;
+}
+.mp-drop-overlay span {
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.mp-header-art {
+  position: relative;
+}
+.mp-header-art.editable {
+  cursor: pointer;
+}
+.mp-header-art-edit {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.mp-header-art.editable:hover .mp-header-art-edit,
+.mp-header-art.drop .mp-header-art-edit {
+  opacity: 1;
+}
+.mp-header-art.drop {
+  outline: 2px dashed var(--accent);
+  outline-offset: 3px;
+}
+
+/* dialogs */
+.modal.mp-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 520px;
+  max-height: 80vh;
+  padding: 18px 20px;
+  overflow-y: auto;
+}
+.modal.mp-modal.wide {
+  width: 680px;
+}
+.mp-modal h3 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text-strong);
+}
+.mp-modal-intro {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.mp-modal-intro code,
+.mp-tidy-choice code {
+  font-size: 11.5px;
+  word-break: break-all;
+}
+.mp-modal .mp-nav-note {
+  margin: 0;
+  padding: 0;
+}
+.mp-modal-actions {
+  display: flex;
+  gap: 8px;
+}
+.mp-modal .setting-warning {
+  margin: 0;
+}
+.mp-edit {
+  display: flex;
+  gap: 18px;
+}
+.mp-edit-cover {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 170px;
+  flex-shrink: 0;
+}
+.mp-edit-cover .btn {
+  justify-content: center;
+}
+.mp-edit-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 170px;
+  height: 170px;
+  border-radius: 8px;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  overflow: hidden;
+}
+.mp-edit-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.mp-edit-drop {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.mp-edit-art.drop {
+  outline: 2px dashed var(--accent);
+}
+.mp-edit-art.drop .mp-edit-drop,
+.mp-edit-art:hover .mp-edit-drop {
+  opacity: 1;
+}
+.mp-edit-fields {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+  align-content: start;
+}
+.mp-edit-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.mp-edit-fields label.short {
+  grid-column: auto;
+}
+.mp-edit-fields input {
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+}
+.mp-edit-fields input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+.mp-edit-guess {
+  grid-column: 1 / -1;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+}
+.mp-cover-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+.mp-cover-results button {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+.mp-cover-results img {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  object-fit: cover;
+  transition: transform 120ms;
+}
+.mp-cover-results button:hover img {
+  transform: scale(1.04);
+  outline: 2px solid var(--accent);
+}
+.mp-cover-results span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.mp-tidy-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mp-tidy-choice label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.mp-tidy-list {
+  margin: 0;
+  padding: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  border-radius: 6px;
+  background: var(--bg);
+  list-style: none;
+  font-size: 12px;
+}
+.mp-tidy-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+  padding: 2px 0;
+}
+.mp-tidy-list span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.mp-tidy-list span:last-child {
+  color: var(--accent);
+}
+.mp-tidy-list em {
+  color: var(--text-faint);
+  font-style: normal;
+}
+.mp-modal-find {
+  width: auto;
+  max-width: none;
+  padding: 8px 10px;
+}
+.mp-pick-list {
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  list-style: none;
+}
+.mp-pick-list button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mp-pick-list button:hover {
+  background: var(--bg-hover);
+}
+.mp-pick-list .mp-row-text {
+  flex: 1;
+  min-width: 0;
+}
+.mp-menu-tags .mp-tick {
+  display: inline-flex;
+  width: 14px;
+  margin-left: -22px;
+  margin-right: 8px;
+  color: var(--accent);
+}
+.mp-tag-new {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 32px;
+  color: var(--text-faint);
+}
+.mp-tag-new input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+/* duplicates */
+.mp-dup {
+  margin: 0 24px 16px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--bg-hover);
+}
+.mp-dup h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--text-strong);
+}
+.mp-dup h3 span {
+  margin-left: 6px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+.mp-dup-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+.mp-dup-path {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12.5px;
+}
+.mp-dup-q {
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.mp-dup .mp-chip {
+  font-style: normal;
+  cursor: default;
+}
+.mp-main.with-link {
+  display: flex;
+  flex-direction: column;
+}
+.mp-main.with-link > .save-mp3 {
+  border-radius: 8px 8px 0 0;
+}
+.mp-main.with-link > :not(.save-mp3) {
+  flex: 1;
+  min-height: 0;
+}
+.mp-dup-path svg {
+  vertical-align: -2px;
+  flex-shrink: 0;
+}
+.mp-dup-path {
+  display: block;
+}

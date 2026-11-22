@@ -36,12 +36,14 @@ export interface MusicData {
   stats: Record<string, SongStats>
   /** What you played, newest last (only the most recent are kept). */
   history: { path: string; at: number }[]
+  /** Song path → your own tags ("gym", "chill"…). */
+  tags: Record<string, string[]>
 }
 
 /** How many plays the history keeps. */
 export const HISTORY_LIMIT = 2000
 
-export const emptyMusicData = (): MusicData => ({ version: 1, playlists: [], liked: {}, ratings: {}, stats: {}, history: [] })
+export const emptyMusicData = (): MusicData => ({ version: 1, playlists: [], liked: {}, ratings: {}, stats: {}, history: [], tags: {} })
 
 export type MusicEdit =
   | { kind: 'createPlaylist'; id: string; name: string; songs?: string[]; at: number }
@@ -57,6 +59,13 @@ export type MusicEdit =
   | { kind: 'like'; paths: string[]; liked: boolean; at: number }
   | { kind: 'rate'; path: string; stars: number }
   | { kind: 'played'; path: string; at: number }
+  /** Adds a tag to the songs, or takes it off. */
+  | { kind: 'tag'; paths: string[]; tag: string; on: boolean }
+  /** Files that moved (tidying, finding a missing song, keeping one of two copies): old path → new path. */
+  | { kind: 'renamePaths'; map: Record<string, string> }
+
+/** A tag as it's kept: trimmed, lower case, one space between words. */
+export const cleanTag = (tag: string): string => tag.trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 40)
 
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const str = (v: unknown): v is string => typeof v === 'string'
@@ -89,12 +98,18 @@ export function normalizeMusicData(raw: unknown): MusicData {
     for (const h of raw.history) if (isRecord(h) && str(h.path) && num(h.at)) out.history.push({ path: h.path, at: h.at })
     out.history = out.history.slice(-HISTORY_LIMIT)
   }
+  if (isRecord(raw.tags)) {
+    for (const [k, v] of Object.entries(raw.tags)) {
+      const list = Array.isArray(v) ? [...new Set(v.filter(str).map(cleanTag).filter(Boolean))] : []
+      if (list.length) out.tags[k] = list
+    }
+  }
   return out
 }
 
 /** The data after one change (a new object; `data` is left as it was). */
 export function applyMusicEdit(data: MusicData, edit: MusicEdit): MusicData {
-  const d: MusicData = { ...data, playlists: data.playlists, liked: data.liked, ratings: data.ratings, stats: data.stats, history: data.history }
+  const d: MusicData = { ...data, playlists: data.playlists, liked: data.liked, ratings: data.ratings, stats: data.stats, history: data.history, tags: data.tags ?? {} }
   const updatePlaylist = (id: string, change: (p: MusicPlaylist) => MusicPlaylist): void => {
     d.playlists = data.playlists.map((p) => (p.id === id ? change(p) : p))
   }
@@ -149,9 +164,63 @@ export function applyMusicEdit(data: MusicData, edit: MusicEdit): MusicData {
       d.history = [...data.history, { path: edit.path, at: edit.at }].slice(-HISTORY_LIMIT)
       break
     }
+    case 'tag': {
+      const tag = cleanTag(edit.tag)
+      if (!tag) return data
+      const tags = { ...d.tags }
+      for (const path of edit.paths) {
+        const now = (tags[path] ?? []).filter((t) => t !== tag)
+        if (edit.on) now.push(tag)
+        if (now.length) tags[path] = now
+        else delete tags[path]
+      }
+      d.tags = tags
+      break
+    }
+    case 'renamePaths':
+      return renamePaths(d, edit.map)
   }
   return d
 }
+
+/** Moves everything Orbit knows about a song to its new path; two songs becoming one are merged. */
+function renamePaths(data: MusicData, map: Record<string, string>): MusicData {
+  const to = (p: string): string => map[p] ?? p
+  const moved = Object.keys(map).filter((k) => map[k] && map[k] !== k)
+  if (!moved.length) return data
+  const liked: Record<string, number> = {}
+  for (const [p, at] of Object.entries(data.liked)) liked[to(p)] = Math.min(liked[to(p)] ?? at, at)
+  const ratings: Record<string, number> = {}
+  // A song's own rating wins over the one merged into it.
+  for (const [p, n] of Object.entries(data.ratings)) if (!(p in map)) ratings[p] = n
+  for (const [p, n] of Object.entries(data.ratings)) if (p in map) ratings[to(p)] ??= n
+  const stats: Record<string, SongStats> = {}
+  for (const [p, st] of Object.entries(data.stats)) {
+    const old = stats[to(p)]
+    const lastPlayed = Math.max(old?.lastPlayed ?? 0, st.lastPlayed ?? 0)
+    stats[to(p)] = { plays: (old?.plays ?? 0) + st.plays, ...(lastPlayed ? { lastPlayed } : {}) }
+  }
+  const tags: Record<string, string[]> = {}
+  for (const [p, list] of Object.entries(data.tags ?? {})) tags[to(p)] = [...new Set([...(tags[to(p)] ?? []), ...list])]
+  return {
+    ...data,
+    playlists: data.playlists.map((p) => (p.songs.some((s) => s in map) ? { ...p, songs: p.songs.map(to) } : p)),
+    liked,
+    ratings,
+    stats,
+    history: data.history.map((h) => (h.path in map ? { ...h, path: to(h.path) } : h)),
+    tags
+  }
+}
+
+/** Every tag you've used, most used first. */
+export function allTags(data: MusicData): { tag: string; count: number }[] {
+  const counts = new Map<string, number>()
+  for (const list of Object.values(data.tags ?? {})) for (const t of list) counts.set(t, (counts.get(t) ?? 0) + 1)
+  return [...counts].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
+}
+
+export const songsWithTag = (songs: LocalSong[], data: MusicData, tag: string): LocalSong[] => songs.filter((s) => data.tags?.[s.path]?.includes(tag))
 
 // ---------- Views of your library ----------
 

@@ -36,6 +36,8 @@ import * as spotify from './spotify'
 import * as localMusic from './localMusic'
 import { setupMusicData } from './musicData'
 import { setupSongSearch } from './songSearch'
+import { setupMusicTags } from './musicTags'
+import { setupMusicFromLink } from './musicFromLink'
 import { closeMusicMini, setupMusicMini } from './musicMini'
 import { closePopout, setupPopout } from './popout'
 import { closeDiscordPopout, setupDiscordPopout } from './discordPopout'
@@ -728,6 +730,8 @@ function registerIpc(): void {
   localMusic.setupLocalMusic()
   setupMusicData()
   setupSongSearch()
+  setupMusicTags()
+  setupMusicFromLink()
   setupImporter()
   setupGames()
   setupGameCovers()

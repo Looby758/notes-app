@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { emptyMusicData, type MusicData, type MusicEdit, type MusicPlaylist } from '@shared/musicLibrary'
+import { cleanTag, emptyMusicData, type MusicData, type MusicEdit, type MusicPlaylist } from '@shared/musicLibrary'
 import type { LocalSong } from '@shared/localMusic'
 import { errorMessage } from '../lib/paths'
 import { recordUndo } from '../lib/undo'
@@ -134,3 +134,19 @@ export function recordPlay(song: LocalSong): void {
     () => undefined
   )
 }
+
+/** Adds a tag ("gym", "chill"…) to the songs, or takes it off. */
+export function tagSongs(songs: LocalSong[], tag: string, on: boolean): Promise<boolean> {
+  const clean = cleanTag(tag)
+  if (!songs.length || !clean) return Promise.resolve(false)
+  const { tags } = useMusicData.getState().data
+  const had = songs.filter((s) => tags[s.path]?.includes(clean)).map((s) => s.path)
+  const label = `${on ? 'Tagged' : 'Untagged'} ${songs.length === 1 ? `“${songs[0].title}”` : `${songs.length} songs`} “${clean}”`
+  const back: MusicEdit[] = on
+    ? [{ kind: 'tag', paths: paths(songs).filter((p) => !had.includes(p)), tag: clean, on: false }]
+    : [{ kind: 'tag', paths: had, tag: clean, on: true }]
+  return undoable(label, [{ kind: 'tag', paths: paths(songs), tag: clean, on }], back)
+}
+
+/** Songs that moved: everything about them (playlists, likes, plays, tags) follows. Not undoable by itself. */
+export const movePaths = (map: Record<string, string>): Promise<boolean> => (Object.keys(map).length ? edit([{ kind: 'renamePaths', map }]) : Promise.resolve(true))

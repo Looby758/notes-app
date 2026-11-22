@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { LocalSong } from './localMusic'
 import {
+  allTags,
   albumsOf,
   applyMusicEdit,
   artistsOf,
@@ -62,6 +63,35 @@ describe('applyMusicEdit', () => {
     expect(d.ratings).toEqual({ a: 4 })
     d = applyMusicEdit(d, { kind: 'rate', path: 'a', stars: 0 })
     expect(d.ratings).toEqual({})
+  })
+})
+
+describe('tags and moved files', () => {
+  it('tags songs and lists the tags', () => {
+    let d = applyMusicEdit(emptyMusicData(), { kind: 'tag', paths: ['a', 'b'], tag: ' Gym ', on: true })
+    d = applyMusicEdit(d, { kind: 'tag', paths: ['a'], tag: 'chill', on: true })
+    expect(d.tags).toEqual({ a: ['gym', 'chill'], b: ['gym'] })
+    expect(allTags(d)).toEqual([{ tag: 'gym', count: 2 }, { tag: 'chill', count: 1 }])
+    d = applyMusicEdit(d, { kind: 'tag', paths: ['b'], tag: 'gym', on: false })
+    expect(d.tags).toEqual({ a: ['gym', 'chill'] })
+  })
+
+  it('moves everything about a song to its new path, merging two copies', () => {
+    let d = emptyMusicData()
+    d = applyMusicEdit(d, { kind: 'createPlaylist', id: 'p', name: 'P', songs: ['old.mp3', 'x.mp3'], at: 1 })
+    d = applyMusicEdit(d, { kind: 'like', paths: ['old.mp3'], liked: true, at: 3 })
+    d = applyMusicEdit(d, { kind: 'like', paths: ['new.mp3'], liked: true, at: 2 })
+    d = applyMusicEdit(d, { kind: 'played', path: 'old.mp3', at: 5 })
+    d = applyMusicEdit(d, { kind: 'played', path: 'new.mp3', at: 4 })
+    d = applyMusicEdit(d, { kind: 'rate', path: 'old.mp3', stars: 2 })
+    d = applyMusicEdit(d, { kind: 'tag', paths: ['old.mp3'], tag: 'gym', on: true })
+    d = applyMusicEdit(d, { kind: 'renamePaths', map: { 'old.mp3': 'new.mp3' } })
+    expect(d.playlists[0].songs).toEqual(['new.mp3', 'x.mp3'])
+    expect(d.liked).toEqual({ 'new.mp3': 2 })
+    expect(d.stats).toEqual({ 'new.mp3': { plays: 2, lastPlayed: 5 } })
+    expect(d.ratings).toEqual({ 'new.mp3': 2 })
+    expect(d.tags).toEqual({ 'new.mp3': ['gym'] })
+    expect(d.history.map((h) => h.path)).toEqual(['new.mp3', 'new.mp3'])
   })
 })
 

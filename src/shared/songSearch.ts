@@ -68,3 +68,29 @@ const fold = (s: string): string =>
 
 /** A key that matches the same song in your library despite small differences ("(Remastered)", "The …"). */
 export const songKey = (artist: string, title: string): string => `${fold(artist)}|${fold(title)}`
+
+const NOISE = /\s*[([](?:[^)\]]*\b(?:official|video|audio|lyrics?|visuali[sz]er|hd|hq|4k|mv|clip|music video|full song|explicit)\b[^)\]]*)[)\]]/gi
+
+/** A video's title as a song: "Artist - Title (Official Video)" → Artist, Title. */
+export function songFromVideoTitle(videoTitle: string): { artist: string; title: string } {
+  const clean = videoTitle
+    .replace(NOISE, '')
+    .replace(/\s*\|\s*.*$/, '')
+    .replace(/[“”"]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const parts = clean.split(/\s+[-–—]\s+/)
+  if (parts.length >= 2) return { artist: parts[0].trim(), title: parts.slice(1).join(' - ').trim() }
+  return { artist: '', title: clean }
+}
+
+/** Whether a catalogue song is the one a video is of (titles match; artists too when known). */
+export function sameSong(found: { artist: string; title: string }, want: { artist: string; title: string }): boolean {
+  const ft = fold(found.title)
+  const wt = fold(want.title)
+  if (!ft || !wt || !(ft.includes(wt) || wt.includes(ft))) return false
+  if (!want.artist) return true
+  const fa = fold(found.artist)
+  const wa = fold(want.artist)
+  return !!fa && !!wa && (fa.includes(wa) || wa.includes(fa))
+}

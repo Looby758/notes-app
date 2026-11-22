@@ -27,7 +27,13 @@ import {
   X,
   FolderSearch,
   ListEnd,
-  ListStart
+  ListStart,
+  Tag,
+  Copy,
+  Wand2,
+  FilePlus2,
+  Sparkle,
+  Download
 } from 'lucide-react'
 import { filterSongs, localArtUrl, type LocalSong } from '@shared/localMusic'
 import { formatTime } from '@shared/spotify'
@@ -39,6 +45,8 @@ import {
   playlistSongs,
   recentlyAdded,
   songsByPath,
+  songsWithTag,
+  allTags,
   sortSongsBy,
   totalLength,
   type MusicPlaylist,
@@ -73,6 +81,11 @@ import {
 import ContextMenu, { type MenuItem } from '../ContextMenu'
 import { VolumeSlider } from './MusicPlayer'
 import MusicSearch from './MusicSearch'
+import { droppedPicture, DuplicatesView, hasPicture, MusicDialogs, openMusicDialog, TagMenu } from './MusicTools'
+import { fillFromNames, importSongs, setCover } from '../../store/musicFiles'
+import SaveMp3 from './SaveMp3'
+import { onMusicLinkDone } from '../../store/musicLink'
+import { notify } from '../../store/notify'
 
 /**
  * The Music page: your own music files as a full music app, laid out like Spotify. Your library on
@@ -92,6 +105,8 @@ type View =
   | { kind: 'most' }
   | { kind: 'history' }
   | { kind: 'playlist'; id: string }
+  | { kind: 'tag'; tag: string }
+  | { kind: 'duplicates' }
 
 const VIEW_KEY = 'orbit.musicPageView'
 const SONGS_MIME = 'application/x-orbit-songs'
@@ -106,6 +121,18 @@ function savedView(): View {
   return { kind: 'songs' }
 }
 
+/** A cover by its song's path, new as soon as the file changes. */
+let indexFor: LocalSong[] | null = null
+let index = new Map<string, LocalSong>()
+function artUrl(path: string): string {
+  const songs = useLocalMusic.getState().library?.songs ?? null
+  if (songs !== indexFor) {
+    indexFor = songs
+    index = songsByPath(songs ?? [])
+  }
+  return localArtUrl(path, index.get(path)?.added)
+}
+
 const sameView = (a: View, b: View): boolean => JSON.stringify(a) === JSON.stringify(b)
 
 export default function MusicPage() {
@@ -113,6 +140,8 @@ export default function MusicPage() {
   const loading = useLocalMusic((s) => s.loading)
   const error = useLocalMusic((s) => s.error)
   const [view, setViewState] = useState<View>(savedView)
+  const [filesOver, setFilesOver] = useState(false)
+  const [linkOpen, setLinkOpen] = useState(false)
   const setView = (v: View): void => {
     setViewState(v)
     try {
@@ -121,6 +150,16 @@ export default function MusicPage() {
       // Only a convenience.
     }
   }
+
+  // A song saved from a link: say so, wherever you are.
+  useEffect(
+    () =>
+      onMusicLinkDone((p) => {
+        if (p.stage === 'done') notify(`“${p.title}” is in your music.`, 'info')
+        else if (p.error) notify(p.error)
+      }),
+    []
+  )
 
   useEffect(() => {
     startMusicData()
@@ -145,21 +184,51 @@ export default function MusicPage() {
   }
 
   return (
-    <div className="mp-page" data-music-page>
-      <Sidebar view={view} setView={setView} folder={library.folder} loading={loading} />
-      <main className="mp-main">
+    <div
+      className="mp-page"
+      data-music-page
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes('Files') || e.defaultPrevented) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'copy'
+        setFilesOver(true)
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setFilesOver(false)
+      }}
+      onDrop={(e) => {
+        setFilesOver(false)
+        if (e.defaultPrevented || !e.dataTransfer.files.length) return
+        e.preventDefault()
+        const files = [...e.dataTransfer.files].map((f) => window.api.pathForFile(f)).filter(Boolean)
+        void importSongs(files).then((added) => added.length && setView({ kind: 'recent' }))
+      }}
+    >
+      <Sidebar view={view} setView={setView} folder={library.folder} loading={loading} onSaveLink={() => setLinkOpen(!linkOpen)} linkOpen={linkOpen} />
+      <main className={`mp-main ${linkOpen ? 'with-link' : ''}`}>
+        {linkOpen && <SaveMp3 onClose={() => setLinkOpen(false)} />}
         <ViewContent view={view} setView={setView} songs={library.songs} folder={library.folder} />
       </main>
       <NowPlayingPanel setView={setView} />
       <PlayerBar setView={setView} />
+      {filesOver && (
+        <div className="mp-drop-overlay" data-mp-drop-overlay>
+          <FilePlus2 size={36} />
+          <strong>Drop to add to your music</strong>
+          <span>The songs are copied into your music folder.</span>
+        </div>
+      )}
+      <MusicDialogs />
     </div>
   )
 }
 
 // ---------- Left: your library ----------
 
-function Sidebar({ view, setView, folder, loading }: { view: View; setView: (v: View) => void; folder: string; loading: boolean }) {
+function Sidebar({ view, setView, folder, loading, onSaveLink, linkOpen }: { view: View; setView: (v: View) => void; folder: string; loading: boolean; onSaveLink: () => void; linkOpen: boolean }) {
   const playlists = useMusicData((s) => s.data.playlists)
+  const data = useMusicData((s) => s.data)
+  const tags = useMemo(() => allTags(data), [data])
   const likedCount = useMusicData((s) => Object.keys(s.data.liked).length)
   const [dropOn, setDropOn] = useState<string | null>(null)
   const item = (v: View, icon: React.ReactNode, label: string, extra?: string) => (
@@ -220,6 +289,36 @@ function Sidebar({ view, setView, folder, loading }: { view: View; setView: (v: 
           </button>
         ))}
       </div>
+      {tags.length > 0 && (
+        <>
+          <div className="mp-nav-heading">
+            <span>Tags</span>
+          </div>
+          <div className="mp-nav-group mp-tags">
+            {tags.map((t) => (
+              <button key={t.tag} className={`mp-nav-item ${view.kind === 'tag' && view.tag === t.tag ? 'active' : ''}`} onClick={() => setView({ kind: 'tag', tag: t.tag })} data-mp-tag={t.tag}>
+                <Tag size={15} />
+                <span>{t.tag}</span>
+                <em>{t.count}</em>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      <div className="mp-tools">
+        <button className="icon-btn" onClick={() => void importSongs(null).then((added) => added.length && setView({ kind: 'recent' }))} title="Add songs (or drop music files anywhere on this page)" data-mp-add-songs>
+          <FilePlus2 size={14} />
+        </button>
+        <button className={`icon-btn ${linkOpen ? 'mp-on' : ''}`} onClick={onSaveLink} title="Save an MP3 from a YouTube link" data-mp-save-link>
+          <Download size={14} />
+        </button>
+        <button className="icon-btn" onClick={() => openMusicDialog({ kind: 'tidy' })} title="Tidy my files: rename them from their details" data-mp-tidy>
+          <Sparkle size={14} />
+        </button>
+        <button className={`icon-btn ${view.kind === 'duplicates' ? 'mp-on' : ''}`} onClick={() => setView({ kind: 'duplicates' })} title="Find songs that are in your music twice" data-mp-nav="duplicates">
+          <Copy size={14} />
+        </button>
+      </div>
       <div className="mp-folder">
         <span title={folder}>{folder.split(/[\\/]/).pop()}</span>
         <button className="icon-btn" onClick={() => loadLocalLibrary(true)} disabled={loading} title="Look for new songs">
@@ -274,7 +373,7 @@ function ViewContent({ view, setView, songs, folder }: { view: View; setView: (v
     case 'album': {
       const a = albums.find((x) => x.key === view.key)
       if (!a) return <Gone setView={setView} />
-      return <SongView kicker="Album" title={a.name} sub={a.artist} art={a.art} songs={a.songs} setView={setView} folder={folder} showTrack />
+      return <SongView kicker="Album" title={a.name} sub={a.artist} art={a.art} songs={a.songs} setView={setView} folder={folder} showTrack album />
     }
     case 'artist': {
       const a = artists.find((x) => x.name === view.name)
@@ -291,6 +390,10 @@ function ViewContent({ view, setView, songs, folder }: { view: View; setView: (v
       const list = [...data.history].reverse().map((h) => byPath.get(h.path)).filter((s): s is LocalSong => !!s).slice(0, 300)
       return <SongView kicker="Your library" title="History" icon={<History size={42} />} songs={list} setView={setView} folder={folder} empty="Songs you play show up here." />
     }
+    case 'tag':
+      return <SongView kicker="Tag" title={view.tag} icon={<Tag size={42} />} songs={songsWithTag(songs, data, view.tag)} setView={setView} folder={folder} empty="No songs have this tag any more." />
+    case 'duplicates':
+      return <DuplicatesView songs={songs} />
     case 'playlist': {
       const p = data.playlists.find((x) => x.id === view.id)
       if (!p) return <Gone setView={setView} />
@@ -336,7 +439,7 @@ function CardGrid({ title, cards, round }: { title: string; cards: Card[]; round
         {shown.map((c) => (
           <div key={c.id} className="mp-card" onClick={c.open} data-mp-card={c.title}>
             <div className={`mp-card-art ${round ? 'round' : ''}`}>
-              {c.art ? <img src={localArtUrl(c.art)} alt="" loading="lazy" /> : round ? <Mic2 size={32} /> : <Disc3 size={32} />}
+              {c.art ? <img src={artUrl(c.art)} alt="" loading="lazy" /> : round ? <Mic2 size={32} /> : <Disc3 size={32} />}
               <button
                 className="mp-card-play"
                 onClick={(e) => {
@@ -383,18 +486,21 @@ interface SongViewProps {
   empty?: string
   showTrack?: boolean
   defaultSort?: SongSort
+  /** An album: its cover can be changed. */
+  album?: boolean
 }
 
-function SongView({ kicker, title, sub, art, icon, songs, setView, folder, empty, showTrack, defaultSort }: SongViewProps) {
+function SongView({ kicker, title, sub, art, icon, songs, setView, folder, empty, showTrack, defaultSort, album }: SongViewProps) {
   const stats = useMusicData((s) => s.data.stats)
+  const tags = useMusicData((s) => s.data.tags)
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<{ by: SongSort; desc: boolean } | null>(defaultSort ? { by: defaultSort, desc: true } : null)
-  const filtered = useMemo(() => filterSongs(songs, query), [songs, query])
+  const filtered = useMemo(() => filterSongs(songs, query, (s) => (tags[s.path] ?? []).join(' ')), [songs, query, tags])
   // Without a sort picked, the list keeps its own order (album tracks, most played, history…).
   const shown = useMemo(() => (sort ? sortSongsBy(filtered, sort.by, sort.desc, stats) : filtered), [filtered, sort, stats])
   return (
     <div className="mp-scroll">
-      <Header kicker={kicker} title={title} sub={sub} art={art} icon={icon} songs={shown} />
+      <Header kicker={kicker} title={title} sub={sub} art={art} icon={icon} songs={shown} editable={album ? songs : undefined} />
       <div className="mp-actions">
         <PlayButtons songs={shown} />
         <FindBox value={query} onChange={setQuery} placeholder="Find in this list" />
@@ -408,8 +514,9 @@ function SongView({ kicker, title, sub, art, icon, songs, setView, folder, empty
   )
 }
 
-function Header({ kicker, title, sub, art, icon, songs, onRename }: { kicker: string; title: string; sub?: string; art?: string; icon?: React.ReactNode; songs: LocalSong[]; onRename?: (name: string) => void }) {
+function Header({ kicker, title, sub, art, icon, songs, onRename, editable }: { kicker: string; title: string; sub?: string; art?: string; icon?: React.ReactNode; songs: LocalSong[]; onRename?: (name: string) => void; editable?: LocalSong[] }) {
   const [editing, setEditing] = useState(false)
+  const [coverOver, setCoverOver] = useState(false)
   const [name, setName] = useState(title)
   useEffect(() => setName(title), [title])
   const finish = (): void => {
@@ -419,7 +526,32 @@ function Header({ kicker, title, sub, art, icon, songs, onRename }: { kicker: st
   }
   return (
     <header className="mp-header">
-      <div className="mp-header-art">{art ? <img src={localArtUrl(art)} alt="" /> : (icon ?? <ListMusic size={42} />)}</div>
+      <div
+        className={`mp-header-art ${editable ? 'editable' : ''} ${coverOver ? 'drop' : ''}`}
+        onDragOver={(e) => {
+          if (!editable || !hasPicture(e)) return
+          e.preventDefault()
+          setCoverOver(true)
+        }}
+        onDragLeave={() => setCoverOver(false)}
+        onDrop={(e) => {
+          if (!editable) return
+          e.preventDefault()
+          setCoverOver(false)
+          const pic = droppedPicture(e)
+          if (pic) void setCover(editable, pic)
+        }}
+        onClick={() => editable && openMusicDialog({ kind: 'edit', songs: editable })}
+        title={editable ? 'Change the cover: drop a picture here, or press to edit the album' : undefined}
+        data-mp-header-art
+      >
+        {art ? <img src={artUrl(art)} alt="" /> : (icon ?? <ListMusic size={42} />)}
+        {editable && (
+          <span className="mp-header-art-edit">
+            <Pencil size={18} /> Edit
+          </span>
+        )}
+      </div>
       <div className="mp-header-text">
         <span className="mp-kicker">{kicker}</span>
         {editing ? (
@@ -505,7 +637,7 @@ function PlaylistView({ playlist, byPath, setView, folder }: { playlist: MusicPl
         />
         <FindBox value={query} onChange={setQuery} placeholder="Find in this playlist" />
       </div>
-      {missing > 0 && <p className="mp-note">{missing === 1 ? 'One song isn’t' : `${missing} songs aren’t`} in your music folder any more (moved, renamed or deleted), shown greyed out.</p>}
+      {missing > 0 && <p className="mp-note">{missing === 1 ? 'One song isn’t' : `${missing} songs aren’t`} in your music folder any more (moved, renamed or deleted), shown greyed out. Right-click one to find it again.</p>}
       {rows.length === 0 ? (
         <p className="mp-empty">{q ? 'Nothing found.' : 'Drag songs onto this playlist in the list on the left, or right-click songs → Add to playlist.'}</p>
       ) : (
@@ -551,6 +683,7 @@ function SongTable({ rows, setView, folder, sort, onSort, showTrack, playlist }:
   const [anchor, setAnchor] = useState<number | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const [dropAt, setDropAt] = useState<number | null>(null)
+  const [missingMenu, setMissingMenu] = useState<{ x: number; y: number; path: string; position?: number } | null>(null)
   const songs = rows.map((r) => r.song).filter((s): s is LocalSong => !!s)
 
   const selectedRows = rows.filter((r) => selected.has(r.key))
@@ -633,6 +766,12 @@ function SongTable({ rows, setView, folder, sort, onSort, showTrack, playlist }:
         )
       }
     ]
+    items.push({ custom: (close) => <TagMenu songs={list} onDone={close} /> })
+    items.push('separator')
+    items.push({ label: one ? 'Edit details…' : `Edit ${list.length} songs…`, icon: <Pencil size={14} />, onClick: () => openMusicDialog({ kind: 'edit', songs: list }) })
+    if (list.some((s) => !s.album || /^\d+\s*[-.]/.test(s.path.split('/').pop() ?? ''))) {
+      items.push({ label: 'Fill in from the file name', icon: <Wand2 size={14} />, onClick: () => void fillFromNames(list) })
+    }
     if (playlist) {
       const positions = selectedRows.map((r) => r.position).filter((p): p is number => p !== undefined)
       items.push({ label: 'Remove from this playlist', icon: <X size={14} />, danger: true, onClick: () => void removeFromPlaylist(playlist.id, positions) })
@@ -690,7 +829,10 @@ function SongTable({ rows, setView, folder, sort, onSort, showTrack, playlist }:
             onDoubleClick={() => play(i)}
             onContextMenu={(e) => {
               e.preventDefault()
-              if (!s) return
+              if (!s) {
+                if (r.path) setMissingMenu({ x: e.clientX, y: e.clientY, path: r.path, position: r.position })
+                return
+              }
               if (!selected.has(r.key)) {
                 setSelected(new Set([r.key]))
                 setAnchor(i)
@@ -724,7 +866,7 @@ function SongTable({ rows, setView, folder, sort, onSort, showTrack, playlist }:
               </button>
             </span>
             <span className="mp-col-title">
-              {!showTrack && <span className="mp-row-art">{s?.art ? <img src={localArtUrl(s.path)} alt="" loading="lazy" /> : <Music size={14} />}</span>}
+              {!showTrack && <span className="mp-row-art">{s?.art ? <img src={localArtUrl(s.path, s.added)} alt="" loading="lazy" /> : <Music size={14} />}</span>}
               <span className="mp-row-text">
                 <strong title={s?.title ?? r.path}>{s?.title ?? (r.path ?? '').split('/').pop()}</strong>
                 {s ? (
@@ -768,6 +910,19 @@ function SongTable({ rows, setView, folder, sort, onSort, showTrack, playlist }:
         )
       })}
       {menu && selectedSongs.length > 0 && <ContextMenu x={menu.x} y={menu.y} items={menuItems()} onClose={() => setMenu(null)} />}
+      {missingMenu && (
+        <ContextMenu
+          x={missingMenu.x}
+          y={missingMenu.y}
+          items={[
+            { label: 'Find it again…', icon: <Search size={14} />, onClick: () => openMusicDialog({ kind: 'relink', path: missingMenu.path }) },
+            ...(playlist && missingMenu.position !== undefined
+              ? [{ label: 'Remove from this playlist', icon: <X size={14} />, danger: true, onClick: () => void removeFromPlaylist(playlist.id, [missingMenu.position!]) }]
+              : [])
+          ]}
+          onClose={() => setMissingMenu(null)}
+        />
+      )}
     </div>
   )
 }
@@ -804,7 +959,7 @@ function NowPlayingPanel({ setView }: { setView: (v: View) => void }) {
     <aside className="mp-right" data-mp-now>
       {song ? (
         <>
-          <div className="mp-now-art">{song.art ? <img src={localArtUrl(song.path)} alt="" /> : <Music size={48} />}</div>
+          <div className="mp-now-art">{song.art ? <img src={localArtUrl(song.path, song.added)} alt="" /> : <Music size={48} />}</div>
           <div className="mp-now-text">
             <div>
               <strong title={song.title}>{song.title}</strong>
@@ -866,7 +1021,7 @@ function NowPlayingPanel({ setView }: { setView: (v: View) => void }) {
               title="Drag to change the order; double-click to play it now"
               data-mp-queue-song={s.title}
             >
-              <span className="mp-row-art">{s.art ? <img src={localArtUrl(s.path)} alt="" loading="lazy" /> : <Music size={13} />}</span>
+              <span className="mp-row-art">{s.art ? <img src={localArtUrl(s.path, s.added)} alt="" loading="lazy" /> : <Music size={13} />}</span>
               <span className="mp-row-text">
                 <strong>{s.title}</strong>
                 <span>{s.artist}</span>
@@ -909,7 +1064,7 @@ function PlayerBar({ setView }: { setView: (v: View) => void }) {
       <div className="mp-bar-song">
         {song ? (
           <>
-            <span className="mp-bar-art">{song.art ? <img src={localArtUrl(song.path)} alt="" /> : <Music size={18} />}</span>
+            <span className="mp-bar-art">{song.art ? <img src={localArtUrl(song.path, song.added)} alt="" /> : <Music size={18} />}</span>
             <span className="mp-row-text">
               <strong title={song.title}>{song.title}</strong>
               <button className="mp-link" onClick={() => setView({ kind: 'artist', name: song.artist || 'Unknown artist' })}>

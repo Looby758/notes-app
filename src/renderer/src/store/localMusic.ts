@@ -30,7 +30,37 @@ let audio: HTMLAudioElement | null = null
 /** The order you picked, kept so turning shuffle off goes back to it. */
 let ordered: LocalSong[] = []
 
+let listening = false
+
+/**
+ * A new list of your songs (after the folder changed, or details were written). Songs in Up next
+ * get their new details too; `moved` says which files now have another path.
+ */
+export function applyLibrary(library: LocalLibrary, moved: Record<string, string> = {}): void {
+  const byPath = new Map(library.songs.map((s) => [s.path, s]))
+  const fresh = (s: LocalSong): LocalSong => byPath.get(moved[s.path] ?? s.path) ?? s
+  const { queue, index } = useLocalMusic.getState()
+  const playingPath = queue[index]?.path
+  ordered = ordered.map(fresh)
+  useLocalMusic.setState({ library, queue: queue.map(fresh) })
+  // The song loaded now was moved: carry on from the same second in its new place.
+  const to = playingPath ? moved[playingPath] : undefined
+  if (to && audio) {
+    const a = audio
+    const at = a.currentTime
+    const wasPlaying = !a.paused
+    a.src = localSongUrl(to)
+    a.addEventListener('loadedmetadata', () => (a.currentTime = at), { once: true })
+    if (wasPlaying) void a.play().catch(() => undefined)
+  }
+  publish()
+}
+
 export async function loadLocalLibrary(fresh = false, choose = false): Promise<void> {
+  if (!listening) {
+    listening = true
+    window.api.onLocalMusicChanged((library) => applyLibrary(library))
+  }
   useLocalMusic.setState({ loading: true, error: null })
   try {
     const library = choose ? await window.api.localMusicChooseFolder() : await window.api.localMusicLibrary(fresh)
@@ -89,7 +119,7 @@ function publish(): void {
   const song = current()
   if (!song || !audio || !useMusic.getState().local) return
   const { shuffle, repeat } = useLocalMusic.getState()
-  const art = song.art ? localArtUrl(song.path) : undefined
+  const art = song.art ? localArtUrl(song.path, song.added) : undefined
   const state: MusicState = {
     source: 'local',
     playing: !audio.paused,

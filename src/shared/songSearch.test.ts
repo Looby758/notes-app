@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { firstVideoId, itunesSearchUrl, parseItunes, songKey, youtubeQuery } from './songSearch'
+import { firstVideoId, itunesSearchUrl, parseItunes, sameSong, songFromVideoTitle, songKey, youtubeQuery } from './songSearch'
 
 describe('song search', () => {
   it('builds the iTunes search address', () => {
@@ -32,5 +32,20 @@ describe('song search', () => {
   it('matches your copy despite small differences', () => {
     expect(songKey('The Beatles', 'Let It Be (Remastered 2009)')).toBe(songKey('Beatles', 'Let it be'))
     expect(songKey('Abba', 'SOS')).not.toBe(songKey('Abba', 'Waterloo'))
+  })
+})
+
+describe('songs from video titles', () => {
+  it('reads the artist and title, without the video words', () => {
+    expect(songFromVideoTitle('The Killers - Mr. Brightside (Official Music Video)')).toEqual({ artist: 'The Killers', title: 'Mr. Brightside' })
+    expect(songFromVideoTitle('Seether – Broken [HD] | Lyrics')).toEqual({ artist: 'Seether', title: 'Broken' })
+    expect(songFromVideoTitle('November Rain')).toEqual({ artist: '', title: 'November Rain' })
+    expect(songFromVideoTitle('Love (feat. Someone) - Remix')).toEqual({ artist: 'Love (feat. Someone)', title: 'Remix' })
+  })
+
+  it('matches the catalogue song', () => {
+    expect(sameSong({ artist: 'The Killers', title: 'Mr. Brightside' }, { artist: 'Killers', title: 'Mr Brightside' })).toBe(true)
+    expect(sameSong({ artist: 'Sydney Rose', title: 'Mr. Brightside' }, { artist: 'The Killers', title: 'Mr. Brightside' })).toBe(false)
+    expect(sameSong({ artist: 'Guns N’ Roses', title: 'November Rain' }, { artist: '', title: 'November Rain' })).toBe(true)
   })
 })

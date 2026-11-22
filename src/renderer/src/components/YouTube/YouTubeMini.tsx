@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { WebviewTag } from 'electron'
-import { ArrowLeft, House, Minus, Pin, PinOff, Scan, Search, X } from 'lucide-react'
+import { ArrowLeft, House, Minus, Music2, Pin, PinOff, Scan, Search, X } from 'lucide-react'
+import SaveMp3 from '../Music/SaveMp3'
 import { WEB_PARTITION } from '@shared/web'
 import { isYouTubeUrl, toYouTubeUrl, YOUTUBE_HOME, youTubeVideoId, youTubeWatchUrl } from '@shared/youtube'
 import type { YouTubeState } from '@shared/types'
@@ -38,6 +39,7 @@ export default function YouTubeMini() {
   const [url, setUrl] = useState('')
   const [typed, setTyped] = useState('')
   const [searching, setSearching] = useState(false)
+  const [mp3, setMp3] = useState(false)
   const [canGoBack, setCanGoBack] = useState(false)
   // Counts full page loads (each starts without the video-only CSS).
   const [loads, setLoads] = useState(0)
@@ -217,6 +219,15 @@ export default function YouTubeMini() {
         )}
         <button
           type="button"
+          className={`icon-btn ${mp3 ? 'active yt-on' : ''}`}
+          title="Save as MP3 to my music"
+          onClick={() => setMp3(!mp3)}
+          data-yt-save-mp3
+        >
+          <Music2 size={14} />
+        </button>
+        <button
+          type="button"
           className={`icon-btn ${videoOnly ? 'active yt-on' : ''}`}
           title={videoOnly ? 'Showing just the video (click to show the whole page)' : 'Show just the video'}
           onClick={toggleVideoOnly}
@@ -238,6 +249,7 @@ export default function YouTubeMini() {
           <X size={14} />
         </button>
       </form>
+      {mp3 && <SaveMp3 link={onVideo ? youTubeWatchUrl(youTubeVideoId(url)!, 0) : undefined} onClose={() => setMp3(false)} />}
       <div className="yt-body">
         {state && (
           // allowpopups lets links that open a new window reach main/browser.ts (they come back here through onWebOpen).
