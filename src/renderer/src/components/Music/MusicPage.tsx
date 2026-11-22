@@ -234,6 +234,11 @@ function Sidebar({ view, setView, folder, loading, onSaveLink, linkOpen }: { vie
   const tags = useMemo(() => allTags(data, present), [data, present])
   const likedCount = useMemo(() => Object.keys(data.liked).filter((p) => present.has(p)).length, [data, present])
   const [dropOn, setDropOn] = useState<string | null>(null)
+  const [listMenu, setListMenu] = useState<{ x: number; y: number; playlist: MusicPlaylist } | null>(null)
+  const listSongs = (p: MusicPlaylist): LocalSong[] => {
+    const byPath = new Map((songs ?? []).map((s) => [s.path, s]))
+    return p.songs.map((path) => byPath.get(path)).filter((s): s is LocalSong => !!s)
+  }
   const item = (v: View, icon: React.ReactNode, label: string, extra?: string) => (
     <button className={`mp-nav-item ${sameView(view, v) ? 'active' : ''}`} onClick={() => setView(v)} data-mp-nav={v.kind}>
       {icon}
@@ -283,6 +288,10 @@ function Sidebar({ view, setView, folder, loading, onSaveLink, linkOpen }: { vie
             }}
             onDragLeave={() => setDropOn(null)}
             onDrop={(e) => dropSongs(e, p.id)}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              setListMenu({ x: e.clientX, y: e.clientY, playlist: p })
+            }}
             title={`${p.name}: drop songs here to add them`}
             data-mp-playlist={p.name}
           >
@@ -322,6 +331,39 @@ function Sidebar({ view, setView, folder, loading, onSaveLink, linkOpen }: { vie
           <Copy size={14} />
         </button>
       </div>
+      {listMenu && (
+        <ContextMenu
+          x={listMenu.x}
+          y={listMenu.y}
+          onClose={() => setListMenu(null)}
+          items={[
+            { label: 'Play', icon: <Play size={14} />, onClick: () => void playLocal(listSongs(listMenu.playlist), 0) },
+            { label: 'Shuffle', icon: <Shuffle size={14} />, onClick: () => void playLocal(listSongs(listMenu.playlist), 'shuffle') },
+            { label: 'Add to Up next', icon: <ListEnd size={14} />, onClick: () => void addToQueue(listSongs(listMenu.playlist)) },
+            'separator',
+            {
+              label: 'Rename',
+              icon: <Pencil size={14} />,
+              onClick: () => {
+                renameOnOpen = listMenu.playlist.id
+                setView({ kind: 'playlist', id: listMenu.playlist.id })
+              }
+            },
+            {
+              label: 'Delete playlist',
+              icon: <Trash2 size={14} />,
+              danger: true,
+              onClick: () => {
+                const id = listMenu.playlist.id
+                void deletePlaylist(id).then((ok) => {
+                  if (ok) notify(`Deleted “${listMenu.playlist.name}”. Ctrl+Z brings it back.`, 'info')
+                  if (ok && view.kind === 'playlist' && view.id === id) setView({ kind: 'songs' })
+                })
+              }
+            }
+          ]}
+        />
+      )}
       <div className="mp-folder">
         <span title={folder}>{folder.split(/[\\/]/).pop()}</span>
         <button className="icon-btn" onClick={() => loadLocalLibrary(true)} disabled={loading} title="Look for new songs">
@@ -517,8 +559,17 @@ function SongView({ kicker, title, sub, art, icon, songs, setView, folder, empty
   )
 }
 
-function Header({ kicker, title, sub, art, icon, songs, onRename, editable }: { kicker: string; title: string; sub?: string; art?: string; icon?: React.ReactNode; songs: LocalSong[]; onRename?: (name: string) => void; editable?: LocalSong[] }) {
+/** A playlist to start renaming once it's open (Rename in its right-click menu). */
+let renameOnOpen: string | null = null
+
+function Header({ kicker, title, sub, art, icon, songs, onRename, editable, renameId }: { kicker: string; title: string; sub?: string; art?: string; icon?: React.ReactNode; songs: LocalSong[]; onRename?: (name: string) => void; editable?: LocalSong[]; renameId?: string }) {
   const [editing, setEditing] = useState(false)
+  useEffect(() => {
+    if (renameId && renameOnOpen === renameId) {
+      renameOnOpen = null
+      setEditing(true)
+    }
+  }, [renameId])
   const [coverOver, setCoverOver] = useState(false)
   const [name, setName] = useState(title)
   useEffect(() => setName(title), [title])
@@ -628,7 +679,7 @@ function PlaylistView({ playlist, byPath, setView, folder }: { playlist: MusicPl
   const art = songs.find((s) => s.art)?.path
   return (
     <div className="mp-scroll">
-      <Header kicker="Playlist" title={playlist.name} art={art} songs={songs} onRename={(name) => void renamePlaylist(playlist.id, name)} />
+      <Header kicker="Playlist" title={playlist.name} art={art} songs={songs} onRename={(name) => void renamePlaylist(playlist.id, name)} renameId={playlist.id} />
       <div className="mp-actions">
         <PlayButtons
           songs={songs}
