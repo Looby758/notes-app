@@ -7,6 +7,7 @@ import type { ComicOpened, ComicPreparing, ComicSettings, ComicShelf } from './c
 import type { WikiAnswer, WikiCheck, WikiHit, WikiInfo, WikiPageView, WikiPictureChoice, WikiSpoilerView } from './wiki'
 import type { WikiSpoilerSettings } from './wikiSpoilers'
 import type { Prefs } from './prefs'
+import type { SkyblockStatus, SkyblockSummary } from './skyblock'
 import type { AutofillProfile, Bookmark, HistoryHit, ImportedLogin, SitePermission, SiteSettings, WebDownload } from './browser'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
@@ -1161,6 +1162,24 @@ export interface NotesApi {
   gamesCovers(ids: string[]): Promise<Record<string, string>>
   /** A game started or stopped, or more time was counted. */
   onGamesChanged(callback: () => void): () => void
+  // SkyBlock session summary
+  skyblockStatus(): Promise<SkyblockStatus>
+  skyblockSessions(): Promise<SkyblockSummary[]>
+  /** Looks up the Minecraft name, checks the key with Hypixel (a blank key keeps the saved one) and saves both. */
+  skyblockSetup(input: { key?: string; player: string }): Promise<SkyblockStatus>
+  /** '' follows the profile you're on in game. */
+  skyblockSetProfile(id: string): Promise<SkyblockStatus>
+  skyblockSetLog(readLog: boolean, folder?: string): Promise<SkyblockStatus>
+  skyblockPickLogFolder(): Promise<SkyblockStatus>
+  skyblockForget(): Promise<SkyblockStatus>
+  skyblockStartNow(): Promise<SkyblockStatus>
+  skyblockEndNow(): Promise<SkyblockStatus>
+  skyblockDeleteSession(id: string): Promise<SkyblockSummary[]>
+  /** A session's card is ready (Minecraft closed and Hypixel caught up). */
+  onSkyblockSummary(callback: (summary: SkyblockSummary) => void): () => void
+  /** A card already shown got newer numbers from Hypixel. */
+  onSkyblockUpdated(callback: (summary: SkyblockSummary) => void): () => void
+  onSkyblockChanged(callback: () => void): () => void
   // Terminal tab
   /**
    * Starts command line `id` in `folder` (the notes folder when it's null or missing), or carries on

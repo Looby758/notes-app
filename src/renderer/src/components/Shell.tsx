@@ -63,6 +63,7 @@ import { EventDetails } from './Calendar/shared'
 import { CalendarOverlays } from './Calendar/edit'
 import Resizer from './Resizer'
 import UpdateToast from './UpdateToast'
+import SkyblockCard from './Games/SkyblockCard'
 import { DownloadPrompt } from './Web/Downloads'
 import { startBrowser, tabsByPage } from '../store/browser'
 import StartupNotices from './Notices/StartupNotices'
@@ -434,6 +435,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <CalendarOverlays />
       <Pet />
       <UpdateToast />
+      <SkyblockCard />
       <DownloadPrompt />
       <StartupNotices />
       <DeviceDrop />

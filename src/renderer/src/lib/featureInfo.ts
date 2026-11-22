@@ -64,7 +64,7 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'soundboard', name: 'Soundboard', blurb: 'Sounds with hotkeys and a voice changer, into Discord', group: 'Media', command: 'soundboard.open', keywords: 'sound effects meme mic discord voice changer robot deep chipmunk hotkey' },
   { id: 'youtube', name: 'YouTube', blurb: 'A mini window that floats on top', group: 'Media', command: 'youtube.open', keywords: 'video' },
 
-  { id: 'games', name: 'Games', blurb: 'Your Steam and other games', group: 'Play', command: 'games.open', keywords: 'steam epic play' },
+  { id: 'games', name: 'Games', blurb: 'Your Steam and other games', group: 'Play', command: 'games.open', keywords: 'steam epic play minecraft hypixel skyblock session summary coins per hour drops xp' },
   { id: 'mini-games', name: 'Mini games', blurb: 'Sudoku, Minesweeper, Nonograms, Jigsaw, Wordle, Solitaire, 2048 and Chess', group: 'Play', command: 'minigames.open', keywords: 'sudoku minesweeper nonogram picross griddler jigsaw puzzle photo wordle word guess walking dead solitaire klondike patience cards 2048 chess quick break' },
 
   { id: 'snip', name: 'Screen snip', blurb: 'Grab text from anywhere on screen', group: 'Tools', command: 'snip.start', keywords: 'ocr screenshot copy text translate' },
