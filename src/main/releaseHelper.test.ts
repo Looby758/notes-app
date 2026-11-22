@@ -75,11 +75,12 @@ beforeAll(async () => {
 })
 afterAll(() => rmSync(home, { recursive: true, force: true }))
 
-describe('release helper (with real git)', () => {
+// Real git and npm are slow to start on Windows (npm.cmd especially), so these get longer than vitest's 5 seconds.
+describe('release helper (with real git)', { timeout: 60_000 }, () => {
   let app: string, origin: string, other: string
   beforeEach(() => {
     ;({ app, origin, other } = newApp())
-  })
+  }, 60_000)
 
   it('checks a ready app, wants notes for the new version, writes them, and releases', async () => {
     let pre = await call<Preflight>('apps:preflight', app, 'minor')
