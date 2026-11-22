@@ -35,6 +35,7 @@ jobs:
         run: |
           sh scripts/make-mac-signing-cert.sh "$RUNNER_TEMP/cert"
           echo "::add-mask::$(cat "$RUNNER_TEMP/cert/MAC_SIGNING_CERT_PASSWORD.txt")"
+          echo "::add-mask::$(cat "$RUNNER_TEMP/cert/MAC_SIGNING_CERT.txt")"
           echo "MAC_SIGNING_CERT=$(cat "$RUNNER_TEMP/cert/MAC_SIGNING_CERT.txt")" >> "$GITHUB_ENV"
           echo "MAC_SIGNING_CERT_PASSWORD=$(cat "$RUNNER_TEMP/cert/MAC_SIGNING_CERT_PASSWORD.txt")" >> "$GITHUB_ENV"
 

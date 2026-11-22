@@ -29,10 +29,25 @@ function signWithCertificate(app, p12Base64, password) {
     sec('unlock-keychain', '-p', kcPass, keychain)
     sec('import', p12, '-k', keychain, '-P', password, '-T', '/usr/bin/codesign')
     sec('set-key-partition-list', '-S', 'apple-tool:,apple:,codesign:', '-s', '-k', kcPass, keychain)
-    // A self-made certificate isn't trusted by macOS, so it's listed without -v; take its fingerprint.
-    const found = sec('find-identity', '-p', 'codesigning', keychain).match(/\b([0-9A-F]{40})\b/)
-    if (!found) throw new Error('No code signing identity in MAC_SIGNING_CERT.')
-    execFileSync('codesign', ['--force', '--deep', '--keychain', keychain, '--sign', found[1], app], { stdio: 'inherit' })
+    // codesign only signs with a certificate this Mac trusts for code signing. A self-made one
+    // isn't, so trust it (on GitHub's Macs sudo needs no password; elsewhere it asks).
+    const certPem = `${dir}.pem`
+    writeFileSync(certPem, execFileSync('/usr/bin/security', ['find-certificate', '-p', '-c', 'Orbit Code Signing', keychain]))
+    try {
+      execFileSync('sudo', ['/usr/bin/security', 'add-trusted-cert', '-d', '-r', 'trustRoot', '-p', 'codeSign', '-k', '/Library/Keychains/System.keychain', certPem], { stdio: 'inherit' })
+    } finally {
+      rmSync(certPem, { force: true })
+    }
+    // codesign also looks for identities only in the keychains on the search list.
+    const before = sec('list-keychains', '-d', 'user').split('\n').map((l) => l.trim().replace(/^"|"$/g, '')).filter(Boolean)
+    sec('list-keychains', '-d', 'user', '-s', keychain, ...before)
+    try {
+      const found = sec('find-identity', '-v', '-p', 'codesigning', keychain).match(/\b([0-9A-F]{40})\b/)
+      if (!found) throw new Error('No code signing identity in MAC_SIGNING_CERT.')
+      execFileSync('codesign', ['--force', '--deep', '--keychain', keychain, '--sign', found[1], app], { stdio: 'inherit' })
+    } finally {
+      sec('list-keychains', '-d', 'user', '-s', ...before)
+    }
   } finally {
     try {
       sec('delete-keychain', keychain)
