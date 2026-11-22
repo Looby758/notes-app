@@ -17659,3 +17659,27 @@ button.board-add-picture:hover {
 .sb-past-open:hover {
   background: var(--bg-hover);
 }
+.sb-card-foot {
+  flex-wrap: wrap;
+}
+.sb-save-to {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-basis: 100%;
+  min-width: 0;
+  color: var(--text-muted);
+}
+.sb-save-to .select,
+.sb-save-to input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+}
+.sb-save-to input {
+  padding: 5px 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  color: var(--text);
+}

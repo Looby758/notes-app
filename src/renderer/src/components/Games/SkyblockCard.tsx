@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { create } from 'zustand'
-import { Coins, FilePlus2, Gem, Info, Sparkles, X } from 'lucide-react'
+import { Coins, FilePlus2, Folder, Gem, Info, Sparkles, X } from 'lucide-react'
+import type { FileNode } from '@shared/types'
 import { describeMinutes, MODE_NAMES, RATE_MIN_MINUTES, shortNumber, summaryAsNote, type SkyblockSummary } from '@shared/skyblock'
 import { useNoteIndex } from '../../store/noteIndex'
 import { useVault } from '../../store/vault'
@@ -11,12 +12,52 @@ import { freeNoteName } from '../../lib/chat'
 export const useSkyblockCard = create<{ summary: SkyblockSummary | null }>(() => ({ summary: null }))
 export const showSkyblockSummary = (summary: SkyblockSummary | null): void => useSkyblockCard.setState({ summary })
 
-async function saveAsNote(s: SkyblockSummary): Promise<void> {
+const DEFAULT_FOLDER = 'SkyBlock'
+const NEW_FOLDER = '\u0000new'
+const FOLDER_KEY = 'skyblock.noteFolder'
+
+/** The folder the last session was saved to (inside your notes; '' is the top). */
+function savedFolder(): string {
+  try {
+    const f = localStorage.getItem(FOLDER_KEY)
+    return f === null ? DEFAULT_FOLDER : f
+  } catch {
+    return DEFAULT_FOLDER
+  }
+}
+
+/** Every folder in your notes, as paths ('Games/SkyBlock'), leaving out hidden ones. */
+function foldersIn(nodes: FileNode[], out: string[] = []): string[] {
+  for (const n of nodes) {
+    if (n.type !== 'folder' || n.name.startsWith('.')) continue
+    out.push(n.path)
+    if (n.children) foldersIn(n.children, out)
+  }
+  return out
+}
+
+/** Takes out anything a folder name can't have, and slashes at either end. */
+const cleanFolder = (f: string): string =>
+  f
+    .replace(/\\/g, '/')
+    .split('/')
+    .map((p) => p.replace(/[:*?"<>|#^[\]]/g, '').trim())
+    .filter((p) => p && p !== '.' && p !== '..')
+    .join('/')
+
+async function saveAsNote(s: SkyblockSummary, folder: string): Promise<void> {
   const { title, body } = summaryAsNote(s)
   const { lookup } = useNoteIndex.getState()
-  const name = freeNoteName(title, (n) => lookup.has(`SkyBlock/${n}.md`))
+  const prefix = folder ? `${folder}/` : ''
+  const name = freeNoteName(title, (n) => lookup.has(`${prefix}${n}.md`))
   try {
-    await useVault.getState().createNoteAt(`SkyBlock/${name}.md`, body)
+    const created = await useVault.getState().createNoteAt(`${prefix}${name}.md`, body)
+    if (!created) return
+    try {
+      localStorage.setItem(FOLDER_KEY, folder)
+    } catch {
+      // remembered for now only
+    }
     showSkyblockSummary(null)
   } catch (err) {
     notify(err)
@@ -28,6 +69,17 @@ const sign = (n: number): string => `${n >= 0 ? '+' : ''}${shortNumber(n)}`
 /** The card that comes up when Minecraft closes: coins an hour, XP, rare drops and what you collected. */
 export default function SkyblockCard() {
   const s = useSkyblockCard((st) => st.summary)
+  const tree = useVault((st) => st.tree)
+  const [folder, setFolder] = useState(savedFolder)
+  const [newFolder, setNewFolder] = useState<string | null>(null)
+  const folders = useMemo(() => foldersIn(tree).sort((a, b) => a.localeCompare(b)), [tree])
+
+  // Each card starts from the folder used last time.
+  useEffect(() => {
+    if (!s) return
+    setFolder(savedFolder())
+    setNewFolder(null)
+  }, [s?.id])
 
   useEffect(() => {
     const offShow = window.api.onSkyblockSummary((summary) => showSkyblockSummary(summary))
@@ -168,7 +220,50 @@ export default function SkyblockCard() {
       )}
 
       <footer className="sb-card-foot">
-        <button className="btn" onClick={() => void saveAsNote(s)} data-skyblock-save>
+        <label className="sb-save-to" title="The folder in your notes the session is saved to">
+          <Folder size={13} />
+          <span>Save to</span>
+          {newFolder === null ? (
+            <select
+              className="select"
+              value={folder}
+              onChange={(e) => (e.target.value === NEW_FOLDER ? setNewFolder('') : setFolder(e.target.value))}
+              data-skyblock-folder
+            >
+              <option value="">Top of your notes</option>
+              {!folders.includes(folder) && folder && <option value={folder}>{folder}{folder === DEFAULT_FOLDER ? ' (new)' : ''}</option>}
+              {folders.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+              <option value={NEW_FOLDER}>New folder…</option>
+            </select>
+          ) : (
+            <input
+              autoFocus
+              value={newFolder}
+              placeholder="Folder name, e.g. Games/SkyBlock"
+              spellCheck={false}
+              onChange={(e) => setNewFolder(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  e.stopPropagation()
+                  setNewFolder(null)
+                } else if (e.key === 'Enter' && cleanFolder(newFolder)) {
+                  setFolder(cleanFolder(newFolder))
+                  setNewFolder(null)
+                }
+              }}
+              onBlur={() => {
+                if (cleanFolder(newFolder)) setFolder(cleanFolder(newFolder))
+                setNewFolder(null)
+              }}
+              data-skyblock-new-folder
+            />
+          )}
+        </label>
+        <button className="btn" onClick={() => void saveAsNote(s, newFolder !== null && cleanFolder(newFolder) ? cleanFolder(newFolder) : folder)} data-skyblock-save>
           <FilePlus2 size={13} /> Save as note
         </button>
         <button className="btn btn-primary" onClick={() => showSkyblockSummary(null)}>
