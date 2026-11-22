@@ -184,6 +184,9 @@ function SetupBox({ state, onDone }: { state: FileSendState; onDone: () => void 
             <div>
               <button className="btn" onClick={() => void window.api.fileSendOpen('signup')}>
                 <ExternalLink size={13} /> Open Cloudflare sign-up
+              </button>{' '}
+              <button className="btn" title="Only needed if Orbit asks: opening it once sets up your workers.dev name" onClick={() => void window.api.fileSendOpen('workers')}>
+                <ExternalLink size={13} /> Open Workers & Pages
               </button>
             </div>
           </li>

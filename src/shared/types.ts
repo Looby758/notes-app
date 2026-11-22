@@ -1583,7 +1583,7 @@ export interface NotesApi {
   /** Puts the intro server on your Cloudflare account with a key you made there. */
   fileSendSetUp(token: string): Promise<{ relay: boolean; relayNote?: string }>
   fileSendRelayOn(keyId?: string, apiToken?: string): Promise<void>
-  fileSendOpen(page: 'signup' | 'token' | 'turn'): Promise<void>
+  fileSendOpen(page: 'signup' | 'token' | 'turn' | 'workers'): Promise<void>
   fileSendPick(kind: 'files' | 'folder'): Promise<string[]>
   fileSendStart(paths: string[]): Promise<import('./fileSend').Transfer>
   fileSendReceive(code: string): Promise<import('./fileSend').Transfer>

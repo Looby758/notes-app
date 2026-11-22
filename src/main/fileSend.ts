@@ -812,7 +812,8 @@ export function setupFileSend(): void {
     const pages: Record<string, string> = {
       signup: 'https://dash.cloudflare.com/sign-up',
       token: TOKEN_PAGE,
-      turn: 'https://dash.cloudflare.com/?to=/:account/realtime/turn'
+      turn: 'https://dash.cloudflare.com/?to=/:account/realtime/turn',
+      workers: 'https://dash.cloudflare.com/?to=/:account/workers-and-pages'
     }
     if (pages[which]) void shell.openExternal(pages[which])
   })

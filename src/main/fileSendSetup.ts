@@ -174,20 +174,6 @@ export async function setUpServer(
   const account = accounts[0].id
   end(s, 'done', 'Key works')
 
-  s = step('Putting the intro server on your Cloudflare account…')
-  try {
-    await deployWorker(token, account)
-  } catch (err) {
-    end(s, 'failed', 'Couldn’t put the server on Cloudflare.')
-    const e = err as CfError
-    const said = `Cloudflare said: “${e.message}”${e.codes.length ? ` (code ${e.codes.join(', ')})` : ''}.`
-    if (e.status === 401 || e.status === 403) {
-      throw new Error(`${said} The key isn’t allowed to make Workers. Make a new key with the “Edit Cloudflare Workers” policy (step 2), with your account picked.`)
-    }
-    throw new Error(said)
-  }
-  end(s, 'done', 'Intro server is on your account')
-
   s = step('Giving it a web address…')
   let sub: string | undefined
   try {
@@ -207,8 +193,27 @@ export async function setUpServer(
   }
   if (!sub) {
     end(s, 'failed', 'Couldn’t get a web address.')
-    throw new Error('Cloudflare wouldn’t give the server a web address. Open Workers & Pages on Cloudflare once (it sets up your workers.dev name), then try again.')
+    throw new Error('Cloudflare wouldn’t give the server a web address. Press “Open Workers & Pages” in step 1 (opening it once sets up your workers.dev name), then press Set it up again.')
   }
+  end(s, 'done', 'Got a web address')
+
+  s = step('Putting the intro server on your Cloudflare account…')
+  try {
+    await deployWorker(token, account)
+  } catch (err) {
+    end(s, 'failed', 'Couldn’t put the server on Cloudflare.')
+    const e = err as CfError
+    const said = `Cloudflare said: “${e.message}”${e.codes.length ? ` (code ${e.codes.join(', ')})` : ''}.`
+    if (e.codes.includes(10063)) {
+      throw new Error('Cloudflare needs your account’s workers.dev name set up first. Press “Open Workers & Pages” in step 1 (opening it once sets it up), then press Set it up again.')
+    }
+    if (e.status === 401 || e.status === 403) {
+      throw new Error(`${said} The key isn’t allowed to make Workers. Make a new key with the “Edit Cloudflare Workers” policy (step 2), with your account picked.`)
+    }
+    throw new Error(said)
+  }
+  end(s, 'done', 'Intro server is on your account')
+
   await cf(token, 'POST', `/accounts/${account}/workers/scripts/${SCRIPT_NAME}/subdomain`, { enabled: true, previews_enabled: false }).catch(() => undefined)
   const address = `https://${SCRIPT_NAME}.${sub}.workers.dev`
   end(s, 'done', `Address: ${address.replace('https://', '')}`)
