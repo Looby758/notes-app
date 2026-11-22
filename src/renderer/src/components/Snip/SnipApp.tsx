@@ -34,6 +34,13 @@ const recall = (key: string): string => {
   }
 }
 const LANG_KEY = 'orbit.snip.readAs'
+
+/** The last two parts of a folder ("Pictures\Screenshots"), short enough for the hint. */
+const shortFolder = (folder: string): string => {
+  const parts = folder.split(/[\\/]+/).filter(Boolean)
+  const sep = folder.includes('\\') ? '\\' : '/'
+  return parts.length > 2 ? parts.slice(-2).join(sep) : folder
+}
 const TARGET_KEY = 'orbit.snip.translateTo'
 
 type Translation = { state: 'working' } | ({ state: 'done' } & SnipTranslation)
@@ -54,6 +61,8 @@ type Translation = { state: 'working' } | ({ state: 'done' } & SnipTranslation)
 export default function SnipApp() {
   const [image, setImage] = useState<{ scale: number } | null>(null)
   const [mode, setMode] = useState<'text' | 'picture'>('text')
+  /** Picture snip: the folder it's saved in too (none if saving is off). */
+  const [saveTo, setSaveTo] = useState<string | undefined>()
   const [start, setStart] = useState<{ x: number; y: number } | null>(null)
   const [box, setBox] = useState<Box | null>(null)
   const [done, setDone] = useState(false)
@@ -99,6 +108,7 @@ export default function SnipApp() {
       if (!shot || !canvas) return
       letGo()
       setMode(shot.mode === 'picture' ? 'picture' : 'text')
+      setSaveTo(shot.saveTo)
       canvas.width = shot.width
       canvas.height = shot.height
       const pixels = new ImageData(shot.width, shot.height)
@@ -440,7 +450,20 @@ export default function SnipApp() {
       )}
       {!box && image && (
         <div className="snip-hint" data-snip-hint>
-          {mode === 'picture' ? 'Drag a box round anything to copy it · Esc to cancel' : 'Drag a box round the text you want · Esc to cancel'}
+          {mode === 'picture' ? (
+            <>
+              Drag a box round anything to copy it
+              {saveTo && (
+                <>
+                  {' '}
+                  · Saved in <span className="snip-hint-folder" data-snip-save-to>{shortFolder(saveTo)}</span>
+                </>
+              )}{' '}
+              · Esc to cancel
+            </>
+          ) : (
+            'Drag a box round the text you want · Esc to cancel'
+          )}
         </div>
       )}
       {box && mode === 'picture' && box.w >= 4 && box.h >= 4 && (

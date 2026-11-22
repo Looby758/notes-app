@@ -18,3 +18,10 @@ export function snipModeFromArgv(argv: readonly string[]): SnipMode | null {
   if (args.includes(SNIP_PICTURE_FLAG)) return 'picture'
   return null
 }
+
+/** A saved picture snip's file name: when it was taken ("Snip 2026-11-22 09-05-07.png"), with (2), (3)… if that's taken. */
+export function snipFileName(at: Date, n = 1): string {
+  const two = (x: number): string => String(x).padStart(2, '0')
+  const stamp = `${at.getFullYear()}-${two(at.getMonth() + 1)}-${two(at.getDate())} ${two(at.getHours())}-${two(at.getMinutes())}-${two(at.getSeconds())}`
+  return `Snip ${stamp}${n > 1 ? ` (${n})` : ''}.png`
+}

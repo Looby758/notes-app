@@ -43,6 +43,9 @@ body.snip-window #root {
   pointer-events: none;
   animation: snip-in 200ms ease-out;
 }
+.snip-hint-folder {
+  font-weight: 600;
+}
 .snip-panel {
   position: absolute;
   width: 420px;

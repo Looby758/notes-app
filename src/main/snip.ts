@@ -1,6 +1,7 @@
-import { app, BrowserWindow, clipboard, desktopCapturer, globalShortcut, ipcMain, nativeImage, net, screen } from 'electron'
+import { app, BrowserWindow, clipboard, desktopCapturer, dialog, globalShortcut, ipcMain, nativeImage, net, screen, shell } from 'electron'
 import { createHash } from 'crypto'
 import { existsSync, mkdirSync, renameSync, writeFileSync } from 'fs'
+import { mkdir, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { hideCaptureWindow, loadRenderer } from './capture'
 import { detectScript, ocrLangDir, readPrintedText } from './handwriting'
@@ -8,7 +9,8 @@ import { GameRunningError, localAiState, localComplete } from './localAi'
 import { logError } from './log'
 import { isTarget, OCR_LANGS, ocrLangByCode, ocrLangSetting, ocrLangUrl, onlineTranslateUrl, parseTranslation, readerForScript, tidyReading, TRANSLATE_SYSTEM, translatePrompt } from '@shared/translate'
 import type { SnipReading, SnipTranslation } from '@shared/types'
-import type { SnipMode } from '@shared/snipLaunch'
+import { snipFileName, type SnipMode } from '@shared/snipLaunch'
+import type { Prefs } from '@shared/prefs'
 import { matchSources } from '@shared/snipDisplays'
 import { acceleratorLabel, IS_MAC, SYSTEM_NAME } from '@shared/platform'
 
@@ -62,6 +64,7 @@ let shortcutError: string | undefined
 interface Hooks {
   getMain: () => BrowserWindow | null
   showMain: () => void
+  prefs: () => Prefs
 }
 let hooks: Hooks
 
@@ -246,6 +249,45 @@ function showDrawn(w: BrowserWindow): void {
   setTimeout(() => !w.isDestroyed() && w.setOpacity(1), 250)
 }
 
+/** Where picture snips are saved: the folder you picked, or Pictures/Screenshots (where Windows keeps its own). */
+export function snipFolder(): string {
+  return hooks.prefs().snipFolder || join(app.getPath('pictures'), 'Screenshots')
+}
+
+/** Opens the snips folder in File Explorer / Finder (made first if it isn't there yet). */
+export async function openSnipFolder(): Promise<void> {
+  const folder = snipFolder()
+  await mkdir(folder, { recursive: true }).catch(() => undefined)
+  const err = await shell.openPath(folder)
+  if (err) logError('open snips folder', err)
+}
+
+/** The last picture snip saved this session (Settings → Show the last one). */
+let lastSaved: string | null = null
+
+/** Saves a picture snip as "Snip 2026-11-22 09-05-07.png" in the snips folder. */
+async function saveSnip(png: Buffer): Promise<void> {
+  const folder = snipFolder()
+  try {
+    await mkdir(folder, { recursive: true })
+    const at = new Date()
+    for (let n = 1; n < 100; n++) {
+      const file = join(folder, snipFileName(at, n))
+      try {
+        // 'wx': never writes over a file that's already there.
+        await writeFile(file, png, { flag: 'wx' })
+        lastSaved = file
+        return
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
+      }
+    }
+  } catch (err) {
+    logError('save snip', err)
+    hooks.getMain()?.webContents.send('snip:failed', `The snip was copied, but couldn’t be saved in ${folder}. Pick another folder in Settings → Summon bar & snip.`)
+  }
+}
+
 /** Ends the snip: its windows are hidden and emptied, ready for the next one. */
 function endSnip(): void {
   for (const w of openWins()) {
@@ -359,14 +401,30 @@ export function setupSnip(h: Hooks): void {
     if (!(png instanceof Uint8Array) || png.length > 80 * 1024 * 1024) return
     const image = nativeImage.createFromBuffer(Buffer.from(png))
     if (image.isEmpty()) return
-    // Straight onto the clipboard, quietly (no notification).
+    // Straight onto the clipboard, quietly (no notification)…
     clipboard.writeImage(image)
+    // …and saved in the snips folder (Settings → Summon bar & snip).
+    if (hooks.prefs().snipSave) void saveSnip(Buffer.from(png))
+  })
+  ipcMain.handle('snip:saveInfo', () => ({ save: hooks.prefs().snipSave, folder: snipFolder(), custom: !!hooks.prefs().snipFolder, last: lastSaved && existsSync(lastSaved) ? lastSaved : null }))
+  // Pick another folder: returns it (Settings saves it), or null if you cancelled.
+  ipcMain.handle('snip:pickFolder', async (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender)
+    const opts: Electron.OpenDialogOptions = { title: 'Save snips in', defaultPath: snipFolder(), buttonLabel: 'Save snips here', properties: ['openDirectory', 'createDirectory'] }
+    const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+    return r.canceled || !r.filePaths[0] ? null : r.filePaths[0]
+  })
+  ipcMain.handle('snip:openFolder', () => openSnipFolder())
+  ipcMain.handle('snip:showLast', () => {
+    if (lastSaved && existsSync(lastSaved)) shell.showItemInFolder(lastSaved)
   })
   ipcMain.handle('snip:status', () => ({ shortcut: registered ? acceleratorLabel(registered) : '', error: shortcutError }))
   // Each monitor's snip window gets the picture of its own monitor.
   ipcMain.handle('snip:image', (e) => {
     const shot = shots.get(e.sender.id)
-    return shot ? { bitmap: new Uint8Array(shot.bitmap.buffer, shot.bitmap.byteOffset, shot.bitmap.byteLength), width: shot.width, height: shot.height, scale: shot.scale, mode } : null
+    if (!shot) return null
+    const saveTo = mode === 'picture' && hooks.prefs().snipSave ? snipFolder() : undefined
+    return { bitmap: new Uint8Array(shot.bitmap.buffer, shot.bitmap.byteOffset, shot.bitmap.byteLength), width: shot.width, height: shot.height, scale: shot.scale, mode, saveTo }
   })
   // Its picture is drawn (still hidden): show it.
   ipcMain.handle('snip:drawn', (e) => {

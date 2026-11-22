@@ -926,6 +926,15 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'snip screenshot ocr text grab copy translate hotkey'
   },
   {
+    key: 'snipSave',
+    section: 'capture',
+    group: 'Screen snip',
+    type: 'toggle',
+    label: 'Save picture snips as files too',
+    description: 'Each picture snip is copied, ready to paste, and also saved as a PNG named after when you took it. Pick the folder at the bottom of this page.',
+    keywords: 'snip screenshot save folder location where saved png pictures screenshots'
+  },
+  {
     key: 'captureTarget',
     section: 'capture',
     group: 'Summon bar',

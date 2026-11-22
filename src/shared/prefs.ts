@@ -197,6 +197,10 @@ export interface Prefs {
   captureTimestamp: boolean
   /** System-wide shortcut for a screen snip (grab text from anywhere on screen); '' for none. */
   snipShortcut: string
+  /** A picture snip is saved as a file too, not just copied. */
+  snipSave: boolean
+  /** Where picture snips are saved: a full folder path on this computer, or '' for Pictures/Screenshots. */
+  snipFolder: string
   /** System-wide shortcut for "What's this song?" (listen to what's playing and find it); '' for none. */
   songIdShortcut: string
   /** Instant replay: keep the last few seconds of the screen ready to save (lib/replay.ts). */
@@ -350,6 +354,8 @@ export const DEFAULT_PREFS: Prefs = {
   captureTimestamp: true,
   captureRememberTarget: false,
   snipShortcut: IS_MAC ? 'Control+Alt+S' : 'Alt+Shift+S',
+  snipSave: true,
+  snipFolder: '',
   songIdShortcut: IS_MAC ? 'Control+Alt+W' : 'Alt+Shift+W',
   replayOn: false,
   replayShortcut: IS_MAC ? 'Control+Alt+R' : 'Alt+Shift+R',
@@ -447,6 +453,13 @@ const cleanFont = (v: unknown): string =>
  * A folder inside the vault, written with "/" ("" is the vault itself). Anything that could
  * point outside the vault or isn't a valid Windows name falls back to `fallback`.
  */
+/** A folder for picture snips: a full path (C:\…, \\server\…, /…), or '' for the usual one. */
+export function cleanSnipFolder(v: unknown): string {
+  if (typeof v !== 'string') return ''
+  const t = v.trim()
+  return t.length < 1000 && /^([a-zA-Z]:[\\/]|\\\\|\/)/.test(t) && !t.includes('\0') ? t : ''
+}
+
 export function cleanFolder(v: unknown, fallback: string): string {
   if (typeof v !== 'string') return fallback
   const parts = v.replace(/\\/g, '/').split('/').map((p) => p.trim()).filter(Boolean)
@@ -498,6 +511,7 @@ export function normalizePrefs(raw: unknown): Prefs {
   out.dailyFolder = cleanFolder(input.dailyFolder ?? DEFAULT_PREFS.dailyFolder, DEFAULT_PREFS.dailyFolder)
   out.videosFolder = cleanFolder(input.videosFolder ?? DEFAULT_PREFS.videosFolder, DEFAULT_PREFS.videosFolder)
   out.dailyTemplate = cleanFolder(input.dailyTemplate ?? '', '')
+  out.snipFolder = cleanSnipFolder(input.snipFolder)
   out.weekStart = Math.round(out.weekStart)
   // The format becomes a file path: it must contain a day and nothing Windows can't use in a name.
   if (

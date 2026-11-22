@@ -38,6 +38,8 @@ interface Hooks {
   prefs: () => Prefs
   /** Starts a screen snip (main/snip.ts): reading text, or copying a picture. */
   snip?: (mode?: SnipMode) => void
+  /** Opens the folder picture snips are saved in. */
+  openSnips?: () => void
 }
 let hooks: Hooks
 
@@ -146,6 +148,7 @@ function updateTrayMenu(): void {
       { label: `Summon bar${shortcut}`, click: openCapture },
       { label: 'Snip a picture (copy to paste anywhere)', click: () => void hooks.snip?.('picture') },
       { label: 'Snip text', click: () => void hooks.snip?.('text') },
+      { label: 'Open snips folder', click: () => void hooks.openSnips?.() },
       { label: 'Pop out an app…', click: () => openPopout() },
       { type: 'separator' },
       { label: 'Quit Orbit', click: () => app.quit() }

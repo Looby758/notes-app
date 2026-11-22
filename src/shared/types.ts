@@ -1008,9 +1008,16 @@ export interface NotesApi {
   snipTaskbar(): Promise<{ available: boolean; shortcut: boolean }>
   /** Shows the "Orbit Snip" shortcut in File Explorer (right-click → Pin to taskbar). */
   snipShowShortcut(): Promise<void>
+  /** Where picture snips are saved (the folder you picked, or Pictures/Screenshots), and the last one saved. */
+  snipSaveInfo(): Promise<{ save: boolean; folder: string; custom: boolean; last: string | null }>
+  /** Asks for a folder to save snips in. Null if you cancelled. */
+  snipPickFolder(): Promise<string | null>
+  snipOpenFolder(): Promise<void>
+  /** Shows the last saved snip in File Explorer / Finder. */
+  snipShowLast(): Promise<void>
   snipStatus(): Promise<{ shortcut: string; error?: string }>
   /** Snip window: the picture of its monitor (raw BGRA pixels), the snip's kind and the screen's scale factor. */
-  snipImage(): Promise<{ bitmap: Uint8Array; width: number; height: number; scale: number; mode: 'text' | 'picture' } | null>
+  snipImage(): Promise<{ bitmap: Uint8Array; width: number; height: number; scale: number; mode: 'text' | 'picture'; saveTo?: string } | null>
   /** Snip window: this snip's picture is drawn, so show the window. */
   snipDrawn(): Promise<void>
   /** Snip window: shown and painted, so it can be seen (it's see-through until then, so there's no flash). */

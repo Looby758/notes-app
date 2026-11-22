@@ -40,7 +40,7 @@ import { closeDiscordPopout, setupDiscordPopout } from './discordPopout'
 import { closeVideoWindow, setupVideoWindow } from './videoWindow'
 import { closeWebWindow, setupWebWindow } from './webWindow'
 import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
-import { applySnipShortcut, setupSnip, startSnip } from './snip'
+import { applySnipShortcut, openSnipFolder, setupSnip, startSnip } from './snip'
 import { setupSnipTaskbar } from './snipTaskbar'
 import { snipModeFromArgv } from '@shared/snipLaunch'
 import { applySongIdShortcut, setupSongId } from './songId'
@@ -1118,8 +1118,8 @@ app.whenReady().then(async () => {
   safely('Orbit sync', () => setupOrbitSync({ root: () => vault?.root ?? null, enabled: () => currentPrefs().syncOrbit, window: () => mainWindow, parts: orbitParts(themesChanged) }))
   mainWindow = createWindow()
   // The extras: if one of them fails on some computer, the app itself still works.
-  safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: (as) => void startSnip(as) }))
-  safely('screen snip', () => setupSnip({ getMain: () => mainWindow, showMain }))
+  safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: (as) => void startSnip(as), openSnips: () => void openSnipFolder() }))
+  safely('screen snip', () => setupSnip({ getMain: () => mainWindow, showMain, prefs: currentPrefs }))
   safely('taskbar snip', setupSnipTaskbar)
   // Started from the taskbar's "Orbit Snip" (or its jump list) while Orbit wasn't running.
   if (launchSnip) setTimeout(() => void startSnip(launchSnip), 300)

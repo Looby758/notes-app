@@ -2067,6 +2067,12 @@ body.capture-window {
   line-height: 1.6;
   color: var(--text-muted);
 }
+.snip-folder-path {
+  word-break: break-all;
+}
+.taskbar-snip .snip-last {
+  color: var(--text-muted);
+}
 .taskbar-snip-buttons {
   display: flex;
   gap: 8px;

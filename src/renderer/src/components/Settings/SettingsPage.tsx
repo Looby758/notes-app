@@ -4,7 +4,7 @@ import { checkForUpdates, useUpdates, watchUpdates } from '../../store/updates'
 import { checkSettingsNow, showWhatsNew } from '../../store/notices'
 import { DEFAULT_PREFS } from '@shared/prefs'
 import type { CaptureStatus } from '@shared/types'
-import { resetPrefs, usePrefs } from '../../store/prefs'
+import { resetPrefs, setPrefs, usePrefs } from '../../store/prefs'
 import BrowserSettings from '../Web/BrowserSettings'
 import { matchesSearch, SECTIONS, SETTINGS, type SectionId, type SettingDef } from '../../lib/settingsSchema'
 import { SettingControl } from './Controls'
@@ -117,6 +117,52 @@ function SnipShortcutStatus() {
       <button className="btn" onClick={() => void window.api.startSnip()}>
         Try it now
       </button>
+    </div>
+  )
+}
+
+/** Where picture snips are saved, with Change, Open folder and the last one saved. */
+function SnipSaving() {
+  const save = usePrefs((s) => s.prefs.snipSave)
+  const chosen = usePrefs((s) => s.prefs.snipFolder)
+  const [info, setInfo] = useState<{ save: boolean; folder: string; custom: boolean; last: string | null } | null>(null)
+  useEffect(() => {
+    const t = setTimeout(() => void window.api.snipSaveInfo().then(setInfo), 200)
+    return () => clearTimeout(t)
+  }, [save, chosen])
+  if (!info || !save) return null
+  const change = async (): Promise<void> => {
+    const folder = await window.api.snipPickFolder()
+    if (folder) setPrefs({ snipFolder: folder })
+  }
+  const lastName = info.last?.split(/[\\/]/).pop()
+  return (
+    <div className="capture-status taskbar-snip" data-snip-saving>
+      <p>
+        Picture snips are saved in <strong className="snip-folder-path" data-snip-folder>{info.folder}</strong>
+        {!info.custom && ' (the usual Screenshots folder)'}.
+      </p>
+      {info.last && (
+        <p className="snip-last">
+          Last one: {lastName}{' '}
+          <button className="link-btn" onClick={() => void window.api.snipShowLast()}>
+            Show it
+          </button>
+        </p>
+      )}
+      <div className="taskbar-snip-buttons">
+        <button className="btn" onClick={() => void change()} data-snip-change-folder>
+          Change folder…
+        </button>
+        <button className="btn" onClick={() => void window.api.snipOpenFolder()} data-snip-open-folder>
+          Open folder
+        </button>
+        {info.custom && (
+          <button className="btn" onClick={() => setPrefs({ snipFolder: '' })} title="Back to the Screenshots folder in Pictures">
+            Use the usual folder
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -382,6 +428,7 @@ export default function SettingsPage() {
                   {section === 'navigation' && <NavEditor />}
                   {section === 'capture' && <CaptureShortcutStatus />}
                   {section === 'capture' && <SnipShortcutStatus />}
+                  {section === 'capture' && <SnipSaving />}
                   {section === 'capture' && <TaskbarSnip />}
                   {section === 'ai' && <OfflineAiSettings />}
                   {section === 'ai' && <AiSettings />}
