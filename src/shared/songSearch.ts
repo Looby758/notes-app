@@ -69,7 +69,7 @@ const fold = (s: string): string =>
 /** A key that matches the same song in your library despite small differences ("(Remastered)", "The …"). */
 export const songKey = (artist: string, title: string): string => `${fold(artist)}|${fold(title)}`
 
-const NOISE = /\s*[([](?:[^)\]]*\b(?:official|video|audio|lyrics?|visuali[sz]er|hd|hq|4k|mv|clip|music video|full song|explicit)\b[^)\]]*)[)\]]/gi
+const NOISE = /\s*[([](?:[^)\]]*\b(?:official|video|audio|lyrics?|visuali[sz]er|hd|hq|4k|mv|clip|music video|full song|explicit|soundtrack|ost|from|theme)\b[^)\]]*)[)\]]/gi
 
 /** A video's title as a song: "Artist - Title (Official Video)" → Artist, Title. */
 export function songFromVideoTitle(videoTitle: string): { artist: string; title: string } {
@@ -93,4 +93,39 @@ export function sameSong(found: { artist: string; title: string }, want: { artis
   const fa = fold(found.artist)
   const wa = fold(want.artist)
   return !!fa && !!wa && (fa.includes(wa) || wa.includes(fa))
+}
+
+const HINT_SKIP = new Set(['official', 'video', 'audio', 'lyrics', 'lyric', 'music', 'soundtrack', 'from', 'the', 'feat', 'and', 'with', 'ost', 'version', 'theme', 'full', 'song', 'visualizer', 'visualiser'])
+
+/** Words in the video's title besides the song's own name ("Alan Wake 2 Soundtrack" → alan, wake). */
+function hintWords(videoTitle: string, title: string): string[] {
+  const own = new Set(title.toLowerCase().split(/[^a-z0-9]+/))
+  return [...new Set(videoTitle.toLowerCase().split(/[^a-z0-9]+/))].filter((w) => w.length >= 3 && !own.has(w) && !HINT_SKIP.has(w))
+}
+
+/**
+ * The catalogue song a video is of, or null when it can't be told. With the artist in the video's
+ * title, a song by that artist wins. Otherwise the other words in the video's title (like a game or
+ * film's name) have to show up in the song's artist or album, so a cover by someone else with the
+ * same title isn't picked.
+ */
+export function catalogueMatch(found: FoundTrack[], videoTitle: string): FoundTrack | null {
+  const want = songFromVideoTitle(videoTitle)
+  const exact = want.artist ? found.find((t) => sameSong(t, want)) : undefined
+  if (exact) return exact
+  // No artist, or one the catalogue doesn't know ("Alan Wake 2 OST"): go by the other words.
+  const hints = hintWords(videoTitle, want.title)
+  const titleOnly = { artist: '', title: want.title }
+  let best: FoundTrack | null = null
+  let bestScore = 0
+  for (const t of found) {
+    if (!sameSong(t, titleOnly)) continue
+    const where = `${t.artist} ${t.album}`.toLowerCase()
+    const score = hints.filter((w) => where.includes(w)).length
+    if (score > bestScore) {
+      best = t
+      bestScore = score
+    }
+  }
+  return best
 }

@@ -4,7 +4,7 @@ import { copyFile, rename, rm } from 'fs/promises'
 import { extname, join, relative, sep } from 'path'
 import type NodeID3 from 'node-id3'
 import { safeName } from '@shared/localMusic'
-import { itunesSearchUrl, parseItunes, sameSong, songFromVideoTitle, type FoundTrack } from '@shared/songSearch'
+import { catalogueMatch, itunesSearchUrl, parseItunes, songFromVideoTitle, type FoundTrack } from '@shared/songSearch'
 import type { MusicLinkProgress } from '@shared/types'
 import { downloadSoundTo } from './videoDownload'
 import { musicFolder, refreshLibrary } from './localMusic'
@@ -22,11 +22,11 @@ const tempFolder = (): string => join(app.getPath('temp'), 'orbit-music-links')
 const cancels = new Map<string, () => void>()
 
 /** The song in Apple's catalogue, if it's clearly the same one. */
-async function lookUp(want: { artist: string; title: string }): Promise<FoundTrack | null> {
+async function lookUp(videoTitle: string, want: { artist: string; title: string }): Promise<FoundTrack | null> {
   try {
-    const res = await net.fetch(itunesSearchUrl(`${want.artist} ${want.title}`, 8))
+    const res = await net.fetch(itunesSearchUrl(`${want.artist} ${want.title}`, 40))
     if (!res.ok) return null
-    return parseItunes(await res.json()).find((t) => sameSong(t, want)) ?? null
+    return catalogueMatch(parseItunes(await res.json()), videoTitle)
   } catch (err) {
     logError('looking up a downloaded song', err)
     return null
@@ -49,7 +49,7 @@ async function save(sender: WebContents, id: string, link: string): Promise<void
 
     tell({ stage: 'details', done: null, title: videoTitle })
     const guess = songFromVideoTitle(videoTitle)
-    const found = await lookUp(guess)
+    const found = await lookUp(videoTitle, guess)
     const song = {
       title: found?.title ?? guess.title,
       artist: found?.artist ?? guess.artist,

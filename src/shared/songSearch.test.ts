@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { firstVideoId, itunesSearchUrl, parseItunes, sameSong, songFromVideoTitle, songKey, youtubeQuery } from './songSearch'
+import { catalogueMatch, firstVideoId, itunesSearchUrl, parseItunes, sameSong, songFromVideoTitle, songKey, youtubeQuery } from './songSearch'
 
 describe('song search', () => {
   it('builds the iTunes search address', () => {
@@ -47,5 +47,21 @@ describe('songs from video titles', () => {
     expect(sameSong({ artist: 'The Killers', title: 'Mr. Brightside' }, { artist: 'Killers', title: 'Mr Brightside' })).toBe(true)
     expect(sameSong({ artist: 'Sydney Rose', title: 'Mr. Brightside' }, { artist: 'The Killers', title: 'Mr. Brightside' })).toBe(false)
     expect(sameSong({ artist: 'Guns N’ Roses', title: 'November Rain' }, { artist: '', title: 'November Rain' })).toBe(true)
+  })
+})
+
+describe('matching a video to the catalogue', () => {
+  const t = (artist: string, title: string, album: string) => ({ id: artist, artist, title, album, year: '', genre: '', durationMs: 0 })
+  const found = [t('John Duff', 'No One Left To Love', 'No One Left To Love - Single'), t('Alan Wake & ROOS + BERG', 'No One Left To Love', 'Alan Wake II – Chapter Songs'), t('Techno Nouveau', 'No One Left To Love', 'Until Now')]
+
+  it('uses the other words in the title to pick the right one', () => {
+    expect(catalogueMatch(found, 'No One Left to Love (Alan Wake 2 Soundtrack)')?.artist).toBe('Alan Wake & ROOS + BERG')
+    expect(catalogueMatch(found, 'Alan Wake 2 OST - No One Left to Love')?.artist).toBe('Alan Wake & ROOS + BERG')
+    expect(catalogueMatch(found, 'Someone Else - No One Left To Love')).toBeNull()
+  })
+
+  it('picks nothing rather than a guess', () => {
+    expect(catalogueMatch(found, 'No One Left To Love')).toBeNull()
+    expect(catalogueMatch(found, 'John Duff - No One Left To Love')?.album).toBe('No One Left To Love - Single')
   })
 })
