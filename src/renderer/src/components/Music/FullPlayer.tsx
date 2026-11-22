@@ -1,11 +1,12 @@
 import './fullPlayer.css'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { create } from 'zustand'
-import { AudioLines, ChevronDown, Expand, Heart, Mic2, Minimize, Music, Pause, Pencil, Play, Repeat, Repeat1, Search, Shuffle, SkipBack, SkipForward, SlidersHorizontal, Smartphone } from 'lucide-react'
+import { AudioLines, ChevronDown, Expand, Heart, ListMusic, Mic2, X, Minimize, Music, Pause, Pencil, Play, Repeat, Repeat1, Search, Shuffle, SkipBack, SkipForward, SlidersHorizontal, Smartphone } from 'lucide-react'
 import { formatTime } from '@shared/spotify'
 import { activeLine, parseLyrics, type Lyrics } from '@shared/lyrics'
 import { currentPosition, musicControl, musicSeek, useMusic } from '../../store/music'
-import { useLocalMusic } from '../../store/localMusic'
+import { clearUpNext, localJump, moveInQueue, removeFromQueue, useLocalMusic } from '../../store/localMusic'
+import { localArtUrl } from '@shared/localMusic'
 import { isLiked, toggleLike, useMusicData } from '../../store/musicData'
 import { setPrefs, usePrefs } from '../../store/prefs'
 import { notify } from '../../store/notify'
@@ -19,13 +20,18 @@ import { RemotePanel, SoundPanel } from './SoundPanel'
  * (lit up line by line when they have times), and the controls. Esc or the arrow at the top closes it.
  */
 
-export const useFullPlayer = create<{ open: boolean; lyrics: boolean }>(() => ({ open: false, lyrics: readLyricsPref() }))
+/** What shows beside the cover: the lyrics, Up next, or nothing. */
+type Side = 'lyrics' | 'queue' | null
 
-function readLyricsPref(): boolean {
+export const useFullPlayer = create<{ open: boolean; side: Side }>(() => ({ open: false, side: readSidePref() }))
+
+const SIDE_KEY = 'orbit.fullPlayerSide'
+function readSidePref(): Side {
   try {
-    return localStorage.getItem('orbit.fullPlayerLyrics') !== '0'
+    const v = localStorage.getItem(SIDE_KEY)
+    return v === 'queue' ? 'queue' : v === 'none' ? null : 'lyrics'
   } catch {
-    return true
+    return 'lyrics'
   }
 }
 
@@ -48,7 +54,7 @@ function Full() {
   const queue = useLocalMusic((s) => s.queue)
   const index = useLocalMusic((s) => s.index)
   const data = useMusicData((s) => s.data)
-  const showLyrics = useFullPlayer((s) => s.lyrics)
+  const side = useFullPlayer((s) => s.side)
   const visualiserOn = usePrefs((s) => s.prefs.musicVisualiser)
   const [panel, setPanel] = useState<'sound' | 'remote' | null>(null)
   const [screen, setScreen] = useState(!!document.fullscreenElement)
@@ -89,17 +95,18 @@ function Full() {
   const [scrub, setScrub] = useState<number | null>(null)
   const shown = scrub ?? pos
   const liked = song ? isLiked(data, song) : false
-  const setLyrics = (on: boolean): void => {
-    useFullPlayer.setState({ lyrics: on })
+  const setSide = (next: Side): void => {
+    useFullPlayer.setState({ side: next })
     try {
-      localStorage.setItem('orbit.fullPlayerLyrics', on ? '1' : '0')
+      localStorage.setItem(SIDE_KEY, next ?? 'none')
     } catch {
       // Only a convenience.
     }
   }
+  const toggleSide = (which: Exclude<Side, null>): void => setSide(side === which ? null : which)
 
   return (
-    <div className={`full-player ${showLyrics && song ? 'with-lyrics' : ''}`} ref={box} role="dialog" aria-label="Now playing" data-full-player>
+    <div className={`full-player ${side && song ? 'with-lyrics' : ''}`} ref={box} role="dialog" aria-label="Now playing" data-full-player>
       <div className="fp-backdrop" style={track?.art ? { backgroundImage: `url("${track.art}")` } : undefined} />
       <header className="fp-top">
         <button className="icon-btn" onClick={closeFullPlayer} title="Close (Esc)" data-fp-close>
@@ -131,7 +138,8 @@ function Full() {
             )}
           </div>
         </div>
-        {showLyrics && song && <LyricsPane path={song.path} title={song.title} artist={song.artist} positionMs={shown} />}
+        {side === 'lyrics' && song && <LyricsPane path={song.path} title={song.title} artist={song.artist} positionMs={shown} />}
+        {side === 'queue' && song && <UpNextPane />}
       </div>
 
       {state?.source === 'local' && visualiserOn && <Visualiser playing={playing} big className="fp-visualiser" />}
@@ -163,8 +171,13 @@ function Full() {
         <div className="fp-buttons">
           <div className="fp-left">
             {song && (
-              <button className={`icon-btn ${showLyrics ? 'fp-on' : ''}`} onClick={() => setLyrics(!showLyrics)} title={showLyrics ? 'Hide lyrics' : 'Show lyrics'} data-fp-lyrics>
+              <button className={`icon-btn ${side === 'lyrics' ? 'fp-on' : ''}`} onClick={() => toggleSide('lyrics')} title={side === 'lyrics' ? 'Hide lyrics' : 'Show lyrics'} data-fp-lyrics>
                 <Mic2 size={18} />
+              </button>
+            )}
+            {song && (
+              <button className={`icon-btn ${side === 'queue' ? 'fp-on' : ''}`} onClick={() => toggleSide('queue')} title={side === 'queue' ? 'Hide Up next' : 'Show Up next'} data-fp-queue>
+                <ListMusic size={18} />
               </button>
             )}
             {state?.source === 'local' && (
@@ -207,6 +220,85 @@ function Full() {
         {panel === 'sound' && <SoundPanel onClose={() => setPanel(null)} />}
         {panel === 'remote' && <RemotePanel onClose={() => setPanel(null)} />}
       </footer>
+    </div>
+  )
+}
+
+/** Up next beside the cover: click a song to play it now, × to take it out, drag to change the order. */
+function UpNextPane() {
+  const queue = useLocalMusic((s) => s.queue)
+  const index = useLocalMusic((s) => s.index)
+  const repeat = useLocalMusic((s) => s.repeat)
+  const next = queue.slice(index + 1, index + 201)
+  const [dropAt, setDropAt] = useState<number | null>(null)
+  const from = useRef<number | null>(null)
+  return (
+    <div className="fp-queue" data-fp-queue-pane>
+      <div className="fp-queue-head">
+        <h2>Up next</h2>
+        {next.length > 0 && (
+          <button className="link-btn" onClick={clearUpNext} data-fp-queue-clear>
+            Clear
+          </button>
+        )}
+      </div>
+      {next.length === 0 ? (
+        <p className="fp-queue-empty">{repeat === 'context' ? 'Your list starts again from the top after this song.' : 'Nothing after this song. Right-click songs on the Music page → Play next or Add to Up next.'}</p>
+      ) : (
+        <ol>
+          {next.map((s, i) => {
+            const at = index + 1 + i
+            return (
+              <li
+                key={`${s.path}:${at}`}
+                className={dropAt === at ? 'drop-above' : ''}
+                draggable
+                onDragStart={(e) => {
+                  from.current = at
+                  e.dataTransfer.effectAllowed = 'move'
+                  e.dataTransfer.setData('text/plain', s.title)
+                }}
+                onDragOver={(e) => {
+                  if (from.current === null) return
+                  e.preventDefault()
+                  setDropAt(at)
+                }}
+                onDragLeave={() => setDropAt(null)}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  if (from.current !== null) moveInQueue(from.current, at)
+                  from.current = null
+                  setDropAt(null)
+                }}
+                onDragEnd={() => {
+                  from.current = null
+                  setDropAt(null)
+                }}
+                onClick={() => void localJump(at)}
+                title="Click to play it now; drag to change the order"
+                data-fp-queue-song={s.title}
+              >
+                <span className="fp-queue-art">{s.art ? <img src={localArtUrl(s.path, s.added)} alt="" loading="lazy" /> : <Music size={16} />}</span>
+                <span className="fp-queue-text">
+                  <strong>{s.title}</strong>
+                  <span>{s.artist || 'Unknown artist'}</span>
+                </span>
+                <span className="fp-queue-time">{s.durationMs ? formatTime(s.durationMs) : ''}</span>
+                <button
+                  className="icon-btn"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removeFromQueue(at)
+                  }}
+                  title="Take it out of Up next"
+                >
+                  <X size={15} />
+                </button>
+              </li>
+            )
+          })}
+        </ol>
+      )}
     </div>
   )
 }
