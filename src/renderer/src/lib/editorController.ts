@@ -115,6 +115,8 @@ export const GROK_TAB = 'grok:'
 /** Claude (claude.ai), the same way as Grok: a tab, or floating over your notes (components/ChatSite). */
 export const CLAUDE_TAB = 'claude:'
 export const GAMES_TAB = 'games:'
+/** SkyBlock ironman goal planner (components/Games/SkyblockGoalsPage). */
+export const SKYBLOCK_GOALS_TAB = 'skyblock-goals:'
 /** The video player (components/Video); which video it shows is in store/videoPlayer. */
 export const VIDEO_TAB = 'video:'
 /** Browse the whole computer and Google Drive (components/Explorer). */

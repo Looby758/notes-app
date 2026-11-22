@@ -8,6 +8,7 @@ import type { WikiAnswer, WikiCheck, WikiHit, WikiInfo, WikiPageView, WikiPictur
 import type { WikiSpoilerSettings } from './wikiSpoilers'
 import type { Prefs } from './prefs'
 import type { SkyblockStatus, SkyblockSummary } from './skyblock'
+import type { SkyblockGoalsState, SkyblockItemHit } from './skyblockGoals'
 import type { AutofillProfile, Bookmark, HistoryHit, ImportedLogin, SitePermission, SiteSettings, WebDownload } from './browser'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
@@ -1189,7 +1190,9 @@ export interface NotesApi {
   skyblockStatus(): Promise<SkyblockStatus>
   skyblockSessions(): Promise<SkyblockSummary[]>
   /** Looks up the Minecraft name, checks the key with Hypixel (a blank key keeps the saved one) and saves both. */
-  skyblockSetup(input: { key?: string; player: string }): Promise<SkyblockStatus>
+  skyblockSetup(input: { key?: string; player: string; personal?: boolean }): Promise<SkyblockStatus>
+  /** The key is a Personal one (doesn't run out), not a 3-day developer key. */
+  skyblockSetPersonalKey(personal: boolean): Promise<SkyblockStatus>
   /** '' follows the profile you're on in game. */
   skyblockSetProfile(id: string): Promise<SkyblockStatus>
   skyblockSetLog(readLog: boolean, folder?: string): Promise<SkyblockStatus>
@@ -1203,6 +1206,17 @@ export interface NotesApi {
   /** A card already shown got newer numbers from Hypixel. */
   onSkyblockUpdated(callback: (summary: SkyblockSummary) => void): () => void
   onSkyblockChanged(callback: () => void): () => void
+  // SkyBlock ironman goal planner
+  /** `page`: the Goals page is open, so the item list is downloaded if there isn't one yet. */
+  skyblockGoalsState(page?: boolean): Promise<SkyblockGoalsState>
+  skyblockGoalsDownload(): Promise<SkyblockGoalsState>
+  /** Asks Hypixel for what you own now. */
+  skyblockGoalsRefresh(): Promise<SkyblockGoalsState>
+  skyblockGoalsSearch(query: string): Promise<SkyblockItemHit[]>
+  skyblockGoalsAdd(id: string, amount?: number): Promise<SkyblockGoalsState>
+  skyblockGoalsUpdate(id: string, change: { amount?: number; pinned?: boolean }): Promise<SkyblockGoalsState>
+  skyblockGoalsRemove(id: string): Promise<SkyblockGoalsState>
+  onSkyblockGoalsChanged(callback: () => void): () => void
   // Terminal tab
   /**
    * Starts command line `id` in `folder` (the notes folder when it's null or missing), or carries on

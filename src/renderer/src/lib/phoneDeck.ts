@@ -64,6 +64,7 @@ const FEATURE_EMOJI: Record<string, string> = {
   youtube: '📺',
   video: '🎞️',
   games: '🎮',
+  'skyblock-goals': '🎯',
   'mini-games': '🧩',
   snip: '✂️',
   explorer: '🗂️',

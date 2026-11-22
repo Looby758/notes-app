@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ExternalLink, FolderOpen, KeyRound, LogOut, Play, Square, Trash2 } from 'lucide-react'
+import { ExternalLink, FolderOpen, KeyRound, LogOut, Play, Square, Target, Trash2 } from 'lucide-react'
 import { describeMinutes, MODE_NAMES, shortNumber, type SkyblockStatus, type SkyblockSummary } from '@shared/skyblock'
 import { SYSTEM_NAME } from '@shared/platform'
 import { errorMessage } from '../../lib/paths'
 import { showSkyblockSummary } from './SkyblockCard'
+import { openSpecialTab, SKYBLOCK_GOALS_TAB } from '../../lib/editorController'
+import { keyWarning } from '@shared/skyblockGoals'
 
 const clean = (err: unknown): string => errorMessage(err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
 
@@ -91,6 +93,9 @@ export default function SkyblockSetup() {
             <button className="btn" onClick={() => setEditing(true)}>
               Change
             </button>
+            <button className="btn" onClick={() => openSpecialTab(SKYBLOCK_GOALS_TAB)} title="Plan crafting goals: the whole tree, what you have, what’s locked" data-skyblock-goals-open>
+              <Target size={12} /> Goal planner
+            </button>
           </div>
 
           <div className="sb-options">
@@ -106,6 +111,10 @@ export default function SkyblockSetup() {
                   </option>
                 ))}
               </select>
+            </label>
+            <label className="sb-check" title="Developer keys from the dashboard stop working after 3 days; Orbit warns a day before.">
+              <input type="checkbox" checked={status.personalKey} onChange={(e) => run(() => window.api.skyblockSetPersonalKey(e.target.checked))} data-skyblock-personal />
+              It’s a Personal key (doesn’t run out after 3 days)
             </label>
             <label className="sb-check">
               <input type="checkbox" checked={status.readLog} onChange={(e) => run(() => window.api.skyblockSetLog(e.target.checked))} />
@@ -179,6 +188,7 @@ export default function SkyblockSetup() {
         </>
       )}
 
+      {ready && keyWarning(status.keySavedAt, status.personalKey, Date.now()) && <p className="setting-warning">{keyWarning(status.keySavedAt, status.personalKey, Date.now())}</p>}
       {status.problem && <p className="setting-warning">{status.problem}</p>}
       {!status.canEncrypt && <p className="setting-warning">This computer can’t encrypt the key, so it can’t be saved.</p>}
       {error && <p className="setting-warning">{error}</p>}
