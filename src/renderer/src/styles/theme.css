@@ -13368,6 +13368,38 @@ body.reduce-motion .theme-loading-text {
   margin-top: 2px;
   color: var(--accent);
 }
+.clocks-head-buttons {
+  display: flex;
+  gap: 6px;
+}
+.clock-message {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 12.5px;
+}
+.clock-message-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+.clock-message.mood-good .clock-message-dot {
+  background: #3fb950;
+}
+.clock-message.mood-maybe .clock-message-dot {
+  background: #d29922;
+}
+.clock-message.mood-asleep .clock-message-dot {
+  background: #8b8fd9;
+}
+.clocks-home-row .clock-message {
+  margin: 0;
+  font-size: inherit;
+}
 .clocks-home-row {
   display: flex;
   align-items: center;
