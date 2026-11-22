@@ -2,6 +2,7 @@ import type { Prefs } from '@shared/prefs'
 import { CAPTURE_SHORTCUTS, RANGES, REPLAY_SHORTCUTS, SNIP_SHORTCUTS, SONG_ID_SHORTCUTS } from '@shared/prefs'
 import { acceleratorLabel, IS_MAC, showKeys, TRAY_NAME } from '@shared/platform'
 import { formatDate } from './dates'
+import { VISUALISER_STYLES } from '@shared/musicSound'
 
 /**
  * Every setting on the Settings page, described once. The page draws itself from this list,
@@ -693,6 +694,27 @@ export const SETTINGS: SettingDef[] = [
     label: 'Visualiser for your own music',
     description: 'Moving bars in the player while your own music files play (Spotify doesn’t let other apps see its sound). Also the bars button under the player.',
     keywords: 'music visualizer visualiser bars waves equaliser animation'
+  },
+  {
+    key: 'musicVisualiserStyle',
+    section: 'music',
+    group: 'Player',
+    type: 'choice',
+    options: VISUALISER_STYLES.map((s) => ({ value: s.id, label: s.label })),
+    label: 'Visualiser style',
+    description: 'Bars, a wave, mountains, a circle around the cover, or rows of lights. Clicking the visualiser also changes it.',
+    keywords: 'music visualizer visualiser style wave circle mountain lights dots spectrum'
+  },
+  {
+    key: 'musicCrossfade',
+    section: 'music',
+    group: 'Sound',
+    type: 'slider',
+    ...RANGES.musicCrossfade,
+    format: (v) => (v === 0 ? 'Off' : `${v} s`),
+    label: 'Crossfade between songs',
+    description: 'Your own music fades out at the end of each song while the next one fades in. Skipping a song still changes straight away.',
+    keywords: 'music crossfade fade gapless transition mix songs blend'
   },
 
   // ---------- Calendar ----------

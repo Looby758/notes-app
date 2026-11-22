@@ -387,6 +387,9 @@ const api: NotesApi = {
   mixerGet: () => ipcRenderer.invoke('mixer:get'),
   mixerVolume: (id, volume) => ipcRenderer.invoke('mixer:volume', id, volume),
   mixerMute: (id, muted) => ipcRenderer.invoke('mixer:mute', id, muted),
+  tasksGet: () => ipcRenderer.invoke('tasks:get'),
+  tasksEnd: (targets) => ipcRenderer.invoke('tasks:end', targets),
+  tasksReveal: (pid) => ipcRenderer.invoke('tasks:reveal', pid),
   soundboardGet: () => ipcRenderer.invoke('soundboard:get'),
   soundboardPick: () => ipcRenderer.invoke('soundboard:pick'),
   soundboardAddFiles: (paths) => ipcRenderer.invoke('soundboard:add-files', paths),
@@ -685,6 +688,10 @@ const api: NotesApi = {
     return () => ipcRenderer.removeListener('musicMini:command', handler)
   },
   musicMiniLayout: () => ipcRenderer.invoke('musicMini:layout'),
+  musicRemoteStatus: () => ipcRenderer.invoke('musicRemote:status'),
+  setMusicRemote: (on, fresh) => ipcRenderer.invoke('musicRemote:set', on, fresh),
+  localMusicLyrics: (path) => ipcRenderer.invoke('localMusic:lyrics', path),
+  localMusicSaveLyrics: (path, text) => ipcRenderer.invoke('localMusic:saveLyrics', path, text),
   setMusicMiniLayout: (layout) => ipcRenderer.invoke('musicMini:setLayout', layout),
   onMusicMiniLayout: (callback) => {
     const handler = (_e: unknown, layout: MusicMiniLayout): void => callback(layout)

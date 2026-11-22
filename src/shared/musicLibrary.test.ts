@@ -176,3 +176,28 @@ describe('Up next', () => {
     expect(queueRemove(['a', 'b', 'c'], 1, 1)).toEqual({ queue: ['a', 'b', 'c'], index: 1 })
   })
 })
+
+describe('plays by month', () => {
+  const t = (y: number, m: number, d: number): number => new Date(y, m - 1, d, 12).getTime()
+  it('counts each play in its month, kept past the history', () => {
+    let d = emptyMusicData()
+    d = applyMusicEdit(d, { kind: 'played', path: 'a', at: t(2026, 10, 30) })
+    d = applyMusicEdit(d, { kind: 'played', path: 'a', at: t(2026, 11, 1) })
+    d = applyMusicEdit(d, { kind: 'played', path: 'a', at: t(2026, 11, 2) })
+    expect(d.months).toEqual({ '2026-10': { a: 1 }, '2026-11': { a: 2 } })
+    const again = normalizeMusicData(JSON.parse(JSON.stringify({ ...d, history: [] })))
+    expect(again.months).toEqual(d.months)
+  })
+  it('starts them from the history for an older file', () => {
+    const old = { version: 1, history: [{ path: 'a', at: t(2026, 3, 1) }, { path: 'b', at: t(2026, 3, 9) }, { path: 'a', at: t(2026, 4, 1) }] }
+    expect(normalizeMusicData(old).months).toEqual({ '2026-03': { a: 1, b: 1 }, '2026-04': { a: 1 } })
+  })
+  it('follows moved songs and forgets deleted ones', () => {
+    let d = emptyMusicData()
+    d = applyMusicEdit(d, { kind: 'played', path: 'a', at: t(2026, 5, 1) })
+    d = applyMusicEdit(d, { kind: 'played', path: 'b', at: t(2026, 5, 2) })
+    expect(applyMusicEdit(d, { kind: 'renamePaths', map: { a: 'b' } }).months).toEqual({ '2026-05': { b: 2 } })
+    expect(applyMusicEdit(d, { kind: 'forgetSongs', paths: ['a'] }).months).toEqual({ '2026-05': { b: 1 } })
+    expect(normalizeMusicData({ months: { nonsense: { a: 1 }, '2026-05': { a: 'x', b: 2 } } }).months).toEqual({ '2026-05': { b: 2 } })
+  })
+})

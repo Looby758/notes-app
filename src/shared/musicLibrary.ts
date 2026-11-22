@@ -38,12 +38,35 @@ export interface MusicData {
   history: { path: string; at: number }[]
   /** Song path → your own tags ("gym", "chill"…). */
   tags: Record<string, string[]>
+  /**
+   * Plays by month, kept for good (the history only keeps the latest plays): "2026-11" → song path →
+   * plays that month. Listening stats for months and years come from here.
+   */
+  months: Record<string, Record<string, number>>
 }
 
 /** How many plays the history keeps. */
 export const HISTORY_LIMIT = 2000
 
-export const emptyMusicData = (): MusicData => ({ version: 1, playlists: [], liked: {}, ratings: {}, stats: {}, history: [], tags: {} })
+export const emptyMusicData = (): MusicData => ({ version: 1, playlists: [], liked: {}, ratings: {}, stats: {}, history: [], tags: {}, months: {} })
+
+/** The month a play counts in ("2026-11"), in the time zone of the device it was played on. */
+export function monthKey(at: number): string {
+  const d = new Date(at)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/
+
+/** Plays by month worked out from the history (for a file from before months were kept). */
+export function monthsFromHistory(history: { path: string; at: number }[]): Record<string, Record<string, number>> {
+  const out: Record<string, Record<string, number>> = {}
+  for (const h of history) {
+    const m = (out[monthKey(h.at)] ??= {})
+    m[h.path] = (m[h.path] ?? 0) + 1
+  }
+  return out
+}
 
 export type MusicEdit =
   | { kind: 'createPlaylist'; id: string; name: string; songs?: string[]; at: number }
@@ -106,12 +129,23 @@ export function normalizeMusicData(raw: unknown): MusicData {
       if (list.length) out.tags[k] = list
     }
   }
+  if (isRecord(raw.months)) {
+    for (const [month, songs] of Object.entries(raw.months)) {
+      if (!MONTH.test(month) || !isRecord(songs)) continue
+      const m: Record<string, number> = {}
+      for (const [path, n] of Object.entries(songs)) if (num(n) && n > 0) m[path] = Math.round(n)
+      if (Object.keys(m).length) out.months[month] = m
+    }
+  } else {
+    // Written before months were kept (or by an older copy of the app): start them from the history.
+    out.months = monthsFromHistory(out.history)
+  }
   return out
 }
 
 /** The data after one change (a new object; `data` is left as it was). */
 export function applyMusicEdit(data: MusicData, edit: MusicEdit): MusicData {
-  const d: MusicData = { ...data, playlists: data.playlists, liked: data.liked, ratings: data.ratings, stats: data.stats, history: data.history, tags: data.tags ?? {} }
+  const d: MusicData = { ...data, playlists: data.playlists, liked: data.liked, ratings: data.ratings, stats: data.stats, history: data.history, tags: data.tags ?? {}, months: data.months ?? {} }
   const updatePlaylist = (id: string, change: (p: MusicPlaylist) => MusicPlaylist): void => {
     d.playlists = data.playlists.map((p) => (p.id === id ? change(p) : p))
   }
@@ -164,6 +198,9 @@ export function applyMusicEdit(data: MusicData, edit: MusicEdit): MusicData {
       const old = data.stats[edit.path]
       d.stats = { ...data.stats, [edit.path]: { plays: (old?.plays ?? 0) + 1, lastPlayed: edit.at } }
       d.history = [...data.history, { path: edit.path, at: edit.at }].slice(-HISTORY_LIMIT)
+      const key = monthKey(edit.at)
+      const month = d.months[key] ?? {}
+      d.months = { ...d.months, [key]: { ...month, [edit.path]: (month[edit.path] ?? 0) + 1 } }
       break
     }
     case 'tag': {
@@ -190,6 +227,7 @@ export function applyMusicEdit(data: MusicData, edit: MusicEdit): MusicData {
       d.stats = keep(data.stats)
       d.tags = keep(d.tags)
       d.history = data.history.filter((h) => !gone.has(h.path))
+      d.months = Object.fromEntries(Object.entries(d.months).map(([m, songs]) => [m, keep(songs)]))
       break
     }
   }
@@ -215,6 +253,12 @@ function renamePaths(data: MusicData, map: Record<string, string>): MusicData {
   }
   const tags: Record<string, string[]> = {}
   for (const [p, list] of Object.entries(data.tags ?? {})) tags[to(p)] = [...new Set([...(tags[to(p)] ?? []), ...list])]
+  const months: Record<string, Record<string, number>> = {}
+  for (const [m, songs] of Object.entries(data.months ?? {})) {
+    const out: Record<string, number> = {}
+    for (const [p, n] of Object.entries(songs)) out[to(p)] = (out[to(p)] ?? 0) + n
+    months[m] = out
+  }
   return {
     ...data,
     playlists: data.playlists.map((p) => (p.songs.some((s) => s in map) ? { ...p, songs: p.songs.map(to) } : p)),
@@ -222,7 +266,8 @@ function renamePaths(data: MusicData, map: Record<string, string>): MusicData {
     ratings,
     stats,
     history: data.history.map((h) => (h.path in map ? { ...h, path: to(h.path) } : h)),
-    tags
+    tags,
+    months
   }
 }
 

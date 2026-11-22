@@ -1,11 +1,12 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
-import { existsSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'fs'
 import { readdir, stat } from 'fs/promises'
 import { extname, isAbsolute, join, relative, resolve, sep } from 'path'
 import { parseFile } from 'music-metadata'
 import { watch as chokidarWatch, type FSWatcher } from 'chokidar'
 import { guessFromName, LOCAL_AUDIO, LOCAL_LIMIT, sortSongs, type LocalLibrary, type LocalSong } from '@shared/localMusic'
 import { logError } from './log'
+import { looksTimed, lyricsPathFor } from '@shared/lyrics'
 
 /**
  * Your own music files (see shared/localMusic.ts). The folder you chose is kept in local-music.json in
@@ -217,7 +218,55 @@ export async function cover(path: string): Promise<{ data: Uint8Array; type: str
   return pic ? { data: pic.data, type: pic.format.includes('/') ? pic.format : `image/${pic.format}` } : null
 }
 
+/**
+ * A song's lyrics as text: from a .lrc or .txt file next to it (same name), or saved inside the file.
+ * Timed lyrics inside a file come back as .lrc lines.
+ */
+export async function lyrics(path: string): Promise<{ text: string; source: 'lrc' | 'txt' | 'tag' } | null> {
+  const full = musicFile(path)
+  if (!full) return null
+  for (const ext of ['lrc', 'txt'] as const) {
+    const side = musicFile(lyricsPathFor(path, ext))
+    if (side && existsSync(side)) return { text: readFileSync(side, 'utf8'), source: ext }
+  }
+  try {
+    const { common } = await parseFile(full, { duration: false, skipCovers: true })
+    for (const tag of common.lyrics ?? []) {
+      if (tag.syncText?.length && tag.syncText.some((l) => typeof l.timestamp === 'number')) {
+        const lrc = tag.syncText
+          .map((l) => {
+            const t = Math.max(0, l.timestamp ?? 0)
+            const m = Math.floor(t / 60000)
+            const sec = ((t % 60000) / 1000).toFixed(2).padStart(5, '0')
+            return `[${String(m).padStart(2, '0')}:${sec}]${l.text}`
+          })
+          .join('\n')
+        return { text: lrc, source: 'tag' }
+      }
+      if (tag.text?.trim()) return { text: tag.text, source: 'tag' }
+    }
+  } catch {
+    // No lyrics, then.
+  }
+  return null
+}
+
+/** Saves lyrics next to the song (timed ones as .lrc, plain as .txt); empty text removes them. */
+export function saveLyrics(path: string, text: string): void {
+  if (!musicFile(path)) throw new Error('That song isn’t in your music folder.')
+  const clean = text.replace(/\r\n?/g, '\n').trim()
+  const keep = clean ? (looksTimed(clean) ? 'lrc' : 'txt') : null
+  for (const ext of ['lrc', 'txt'] as const) {
+    const side = musicFile(lyricsPathFor(path, ext))
+    if (!side) continue
+    if (ext === keep) writeFileSync(side, `${clean}\n`, 'utf8')
+    else if (existsSync(side)) unlinkSync(side)
+  }
+}
+
 export function setupLocalMusic(): void {
+  ipcMain.handle('localMusic:lyrics', (_e, path: string) => lyrics(String(path)))
+  ipcMain.handle('localMusic:saveLyrics', (_e, path: string, text: string) => saveLyrics(String(path), String(text ?? '').slice(0, 200_000)))
   ipcMain.handle('localMusic:library', (_e, fresh?: boolean) => library(fresh === true))
   ipcMain.handle('localMusic:chooseFolder', async (e) => {
     const win = BrowserWindow.fromWebContents(e.sender)
