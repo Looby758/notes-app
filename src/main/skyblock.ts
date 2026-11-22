@@ -21,6 +21,7 @@ import {
   type SkyblockSummary
 } from '@shared/skyblock'
 import { logError } from './log'
+import { skyblockAddonReady } from './skyblockAddonFiles'
 
 /**
  * SkyBlock session summary. While Orbit is running (even with its window closed) it looks for
@@ -62,6 +63,10 @@ const dueAt = (p: Pending): number => Math.max(p.end + (FINISH_AFTER[p.attempt] 
 interface Stored {
   /** Encrypted. */
   apiKey?: string
+  /** When the key was pasted, for warning before a 3-day developer key runs out. */
+  keySavedAt?: number
+  /** A Personal key from Hypixel, which doesn't run out. */
+  personalKey?: boolean
   player: string
   uuid: string
   profileId: string
@@ -116,6 +121,8 @@ function status(): SkyblockStatus {
   const s = load()
   return {
     hasKey: !!s.apiKey,
+    keySavedAt: s.keySavedAt ?? null,
+    personalKey: !!s.personalKey,
     canEncrypt: safeStorage.isEncryptionAvailable(),
     player: s.player,
     uuid: s.uuid,
@@ -135,11 +142,28 @@ function broadcast(channel: string, ...args: unknown[]): void {
 
 const changed = (): void => broadcast('skyblock:changed')
 
+// ---------- for the goal planner (skyblockGoals.ts) ----------
+
+const profileListeners: ((body: unknown) => void)[] = []
+/** Called with every profiles answer from Hypixel, so the goal planner stays fresh without asking again. */
+export const onSkyblockProfiles = (fn: (body: unknown) => void): void => void profileListeners.push(fn)
+
+/** The key, who you are and the sessions so far, for the goal planner. */
+export function skyblockAccount(): { key: string | null; uuid: string; profileId: string; sessions: SkyblockSummary[]; playing: boolean; keySavedAt: number | null; personalKey: boolean } {
+  const s = load()
+  return { key: key(), uuid: s.uuid, profileId: s.profileId, sessions: s.sessions, playing: !!s.current, keySavedAt: s.keySavedAt ?? null, personalKey: !!s.personalKey }
+}
+
+export const skyblockProblem = (message: string): void => {
+  problem = message
+  changed()
+}
+
 // ---------- Hypixel and Mojang ----------
 
-class KeyRejected extends Error {}
+export class KeyRejected extends Error {}
 
-async function hypixel(path: string, apiKey: string | null): Promise<unknown> {
+export async function hypixel(path: string, apiKey: string | null): Promise<unknown> {
   let res: Response
   try {
     res = await net.fetch(API + path, { headers: apiKey ? { 'API-Key': apiKey } : {}, signal: AbortSignal.timeout(20_000) })
@@ -176,6 +200,7 @@ async function snapshot(): Promise<SkyblockSnapshot | null> {
   try {
     const body = await hypixel(`/v2/skyblock/profiles?uuid=${s.uuid}`, k)
     const snap = snapshotFromProfiles(body, s.uuid, s.profileId, Date.now())
+    for (const fn of profileListeners) fn(body)
     const choices = profileChoices(body)
     if (choices.length) s.profiles = choices
     problem = snap ? '' : 'Hypixel has no SkyBlock profile for you yet.'
@@ -392,7 +417,8 @@ function show(summary: SkyblockSummary): void {
 
 async function tick(): Promise<void> {
   const s = load()
-  if (!s.apiKey || !s.uuid) return
+  // Session summaries are part of the SkyBlock add-on: nothing runs until it's downloaded.
+  if (!s.apiKey || !s.uuid || !skyblockAddonReady()) return
   const open = await minecraftOpen()
   if (!open) waitForClose = false
   if (open && !s.current && !waitForClose) await begin(firstTick)
@@ -427,7 +453,7 @@ export function setupSkyblock(opts: { getMain: () => BrowserWindow | null }): vo
   ipcMain.handle('skyblock:status', () => status())
   ipcMain.handle('skyblock:sessions', () => load().sessions)
 
-  ipcMain.handle('skyblock:setup', async (_e, input: { key?: string; player: string }) => {
+  ipcMain.handle('skyblock:setup', async (_e, input: { key?: string; player: string; personal?: boolean }) => {
     const s = load()
     const name = String(input.player ?? '').trim()
     if (!/^[A-Za-z0-9_]{2,16}$/.test(name)) throw new Error('That doesn’t look like a Minecraft name (2 to 16 letters, numbers or _).')
@@ -446,7 +472,11 @@ export function setupSkyblock(opts: { getMain: () => BrowserWindow | null }): vo
     }
     const choices = profileChoices(body)
     if (!choices.length) throw new Error(`${player.name} has no SkyBlock profiles yet.`)
-    if (newKey) s.apiKey = safeStorage.encryptString(newKey).toString('base64')
+    if (newKey) {
+      s.apiKey = safeStorage.encryptString(newKey).toString('base64')
+      s.keySavedAt = Date.now()
+    }
+    if (typeof input.personal === 'boolean') s.personalKey = input.personal
     if (s.uuid !== player.id) s.profileId = ''
     s.player = player.name
     s.uuid = player.id
@@ -463,6 +493,13 @@ export function setupSkyblock(opts: { getMain: () => BrowserWindow | null }): vo
     const s = load()
     s.profileId = s.profiles.some((p) => p.id === id) ? id : ''
     save()
+    return status()
+  })
+
+  ipcMain.handle('skyblock:setPersonalKey', (_e, personal: boolean) => {
+    load().personalKey = !!personal
+    save()
+    changed()
     return status()
   })
 
@@ -486,6 +523,7 @@ export function setupSkyblock(opts: { getMain: () => BrowserWindow | null }): vo
   ipcMain.handle('skyblock:forget', () => {
     const s = load()
     delete s.apiKey
+    delete s.keySavedAt
     s.current = null
     s.pending = []
     problem = ''

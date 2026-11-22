@@ -97,6 +97,8 @@ import { TEST_COPY, TEST_COPY_FOLDER } from './testCopy'
 import { setupGames } from './games'
 import { setupGameCovers } from './gameCovers'
 import { setupSkyblock } from './skyblock'
+import { setupSkyblockGoals } from './skyblockGoals'
+import { setupSkyblockAddon, SKYBLOCK_TEX_SCHEME } from './skyblockAddon'
 import { applyIconOutsideApp, taskbarIcon } from './appIcon'
 import { broadcastThemes, loadImportedThemes, setupThemes, THEME_SCHEME, themeFilePath, themesDir } from './themes'
 import { CODE_SANDBOX_SCHEME, registerCodeSandbox } from './codeSandbox'
@@ -412,7 +414,8 @@ protocol.registerSchemesAsPrivileged([
   // corsEnabled: your own music plays through the Web Audio visualiser, which needs it.
   { scheme: 'vault', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
   CODE_SANDBOX_SCHEME,
-  THEME_SCHEME
+  THEME_SCHEME,
+  SKYBLOCK_TEX_SCHEME
 ])
 
 /** Your own music and soundboard clips go through the Web Audio visualiser, which needs this. */
@@ -730,6 +733,8 @@ function registerIpc(): void {
   setupGames()
   setupGameCovers()
   setupSkyblock({ getMain: () => mainWindow })
+  setupSkyblockGoals()
+  setupSkyblockAddon()
   setupTerminal(() => vault?.root ?? null)
   setupAppStudio()
   // The Mac asks once whether Notes may use the microphone.

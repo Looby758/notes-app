@@ -83,6 +83,10 @@ export interface SkyblockSummary {
 
 export interface SkyblockStatus {
   hasKey: boolean
+  /** When the key was pasted (null for keys saved before Orbit kept track). */
+  keySavedAt: number | null
+  /** It's a Personal key, which doesn't run out (developer keys last 3 days). */
+  personalKey: boolean
   canEncrypt: boolean
   player: string
   uuid: string

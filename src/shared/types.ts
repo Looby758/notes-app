@@ -8,6 +8,9 @@ import type { WikiAnswer, WikiCheck, WikiHit, WikiInfo, WikiPageView, WikiPictur
 import type { WikiSpoilerSettings } from './wikiSpoilers'
 import type { Prefs } from './prefs'
 import type { SkyblockStatus, SkyblockSummary } from './skyblock'
+import type { SkyblockGoalsState, SkyblockItemHit } from './skyblockGoals'
+import type { SbProfileView } from './skyblockProfile'
+import type { ItemIcon, SkyblockAddonState } from './skyblockTextures'
 import type { AutofillProfile, Bookmark, HistoryHit, ImportedLogin, SitePermission, SiteSettings, WebDownload } from './browser'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
@@ -562,7 +565,12 @@ export interface NotesApi {
   studioDefaultFolder(): Promise<string>
   studioPickFolder(): Promise<string | null>
   /** Starts a recording file in `folder` (null = Videos/Orbit Recordings). */
-  studioStart(folder: string | null, ext: 'mp4' | 'webm' | 'm4a', kind?: 'video' | 'voiceover' | 'take', take?: { script: string; index: number; title: string }): Promise<{ id: number; path: string }>
+  studioStart(
+    folder: string | null,
+    ext: 'mp4' | 'webm' | 'm4a',
+    kind?: 'video' | 'voiceover' | 'take',
+    take?: { script: string; index: number; title: string }
+  ): Promise<{ id: number; path: string }>
   /** A section take's sound (record by section), to play it back. */
   studioReadTake(path: string): Promise<Uint8Array>
   /** Joins section takes, in order, into "<script> voiceover (joined).wav" beside them; length in seconds. */
@@ -1253,7 +1261,9 @@ export interface NotesApi {
   skyblockStatus(): Promise<SkyblockStatus>
   skyblockSessions(): Promise<SkyblockSummary[]>
   /** Looks up the Minecraft name, checks the key with Hypixel (a blank key keeps the saved one) and saves both. */
-  skyblockSetup(input: { key?: string; player: string }): Promise<SkyblockStatus>
+  skyblockSetup(input: { key?: string; player: string; personal?: boolean }): Promise<SkyblockStatus>
+  /** The key is a Personal one (doesn't run out), not a 3-day developer key. */
+  skyblockSetPersonalKey(personal: boolean): Promise<SkyblockStatus>
   /** '' follows the profile you're on in game. */
   skyblockSetProfile(id: string): Promise<SkyblockStatus>
   skyblockSetLog(readLog: boolean, folder?: string): Promise<SkyblockStatus>
@@ -1267,6 +1277,58 @@ export interface NotesApi {
   /** A card already shown got newer numbers from Hypixel. */
   onSkyblockUpdated(callback: (summary: SkyblockSummary) => void): () => void
   onSkyblockChanged(callback: () => void): () => void
+  // SkyBlock ironman goal planner
+  /** `page`: the Goals page is open, so the item list is downloaded if there isn't one yet. */
+  skyblockGoalsState(page?: boolean): Promise<SkyblockGoalsState>
+  skyblockGoalsDownload(): Promise<SkyblockGoalsState>
+  /** The SkyBlock profile page: levels, gear, accessories, pets, collections and the rest. */
+  skyblockProfileView(): Promise<SbProfileView | null>
+  /** Your profile page: the view plus your profiles, history, "since last time" and milestones. */
+  skyblockProfilePage(): Promise<import('./skyblockMore').SbProfilePage | null>
+  /** Shows another of your profiles (goals, history and helpers follow it). */
+  skyblockProfileChoose(id: string): Promise<SkyblockGoalsState>
+  /** You've looked at this profile now ("since last time" starts again). */
+  skyblockProfileSeen(id: string): Promise<void>
+  /** Anyone's profile page by Minecraft name or id; `fresh` asks Hypixel again. */
+  skyblockPlayersLookup(who: string, profileId?: string, fresh?: boolean): Promise<import('./skyblockMore').SbProfilePage>
+  /** Players you've looked up or starred, with their last numbers. */
+  skyblockPlayersList(): Promise<import('./skyblockMore').SbFriend[]>
+  skyblockPlayersStar(uuid: string, on: boolean): Promise<import('./skyblockMore').SbFriend[]>
+  skyblockPlayersForget(uuid: string): Promise<import('./skyblockMore').SbFriend[]>
+  /** Looks every starred player up again for the friends board. */
+  skyblockPlayersRefreshStarred(): Promise<import('./skyblockMore').SbFriend[]>
+  /** Ironman helpers for the profile you're looking at. */
+  skyblockHelpers(): Promise<{
+    craftable: import('./skyblockMore').Craftable[]
+    mp: import('./skyblockMore').MpStep[]
+    minions: import('./skyblockMore').MinionStep[]
+  } | null>
+  /** The SkyBlock date, the next events and the mayor. */
+  skyblockCalendar(): Promise<{ now: import('./skyblockMore').SbDate; events: import('./skyblockMore').SbEvent[]; mayor: import('./skyblockMore').SbMayor | null }>
+  /** Asks Hypixel for what you own now. */
+  skyblockGoalsRefresh(): Promise<SkyblockGoalsState>
+  skyblockGoalsSearch(query: string): Promise<SkyblockItemHit[]>
+  skyblockGoalsAdd(id: string, amount?: number): Promise<SkyblockGoalsState>
+  skyblockGoalsUpdate(id: string, change: { amount?: number; pinned?: boolean }): Promise<SkyblockGoalsState>
+  skyblockGoalsRemove(id: string): Promise<SkyblockGoalsState>
+  onSkyblockGoalsChanged(callback: () => void): () => void
+  /** The SkyBlock add-on (everything SkyBlock is off until it's downloaded). */
+  skyblockAddonState(): Promise<SkyblockAddonState>
+  /** Downloads it, or changes its texture packs (best first). Resolves when done or stopped. */
+  skyblockAddonInstall(packs: string[]): Promise<SkyblockAddonState>
+  skyblockAddonCancel(): Promise<SkyblockAddonState>
+  skyblockAddonRemove(): Promise<SkyblockAddonState>
+  /** Use your own Minecraft pack (.zip, or a folder) under the SkyBlock packs. */
+  skyblockAddonPickVanilla(folder: boolean): Promise<SkyblockAddonState>
+  /** Use your own Minecraft pack from a path (a .zip or a pack folder), picked in Orbit's own file browser. */
+  skyblockAddonUseVanilla(path: string): Promise<SkyblockAddonState>
+  /** Minecraft's resource pack folders on this computer, for the file browser's shortcuts. */
+  skyblockAddonPackFolders(): Promise<import('./skyblockTextures').PackFolder[]>
+  /** Back to plain Minecraft's pictures under the SkyBlock packs. */
+  skyblockAddonClearVanilla(): Promise<SkyblockAddonState>
+  /** NEU item id → its picture. */
+  skyblockAddonIcons(): Promise<Record<string, ItemIcon>>
+  onSkyblockAddonChanged(callback: () => void): () => void
   // Terminal tab
   /**
    * Starts command line `id` in `folder` (the notes folder when it's null or missing), or carries on

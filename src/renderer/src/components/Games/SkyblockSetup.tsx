@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ExternalLink, FolderOpen, KeyRound, LogOut, Play, Square, Trash2 } from 'lucide-react'
+import { ExternalLink, FolderOpen, KeyRound, LogOut, Play, Square, Target, Trash2 } from 'lucide-react'
 import { describeMinutes, MODE_NAMES, shortNumber, type SkyblockStatus, type SkyblockSummary } from '@shared/skyblock'
 import { SYSTEM_NAME } from '@shared/platform'
 import { errorMessage } from '../../lib/paths'
 import { showSkyblockSummary } from './SkyblockCard'
+import { openSpecialTab, SKYBLOCK_GOALS_TAB } from '../../lib/editorController'
+import { keyWarning } from '@shared/skyblockGoals'
+import SkyblockAddonCard from './SkyblockAddonCard'
+import { useSkyblockAddon } from './SkyblockPic'
 
 const clean = (err: unknown): string => errorMessage(err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
 
@@ -11,7 +15,20 @@ const clean = (err: unknown): string => errorMessage(err).replace(/^Error invoki
  * The Games page's "SkyBlock" box: your Hypixel key and Minecraft name, which profile to follow,
  * whether to read Minecraft's chat log for rare drops, and the sessions so far.
  */
-export default function SkyblockSetup() {
+export default function SkyblockSetupGate() {
+  const addon = useSkyblockAddon()
+  if (!addon) return null
+  // Session summaries are part of the SkyBlock add-on, an optional download.
+  if (addon.state !== 'ready')
+    return (
+      <div className="games-covers sb-setup" data-skyblock-setup>
+        <SkyblockAddonCard />
+      </div>
+    )
+  return <SkyblockSetup />
+}
+
+function SkyblockSetup() {
   const [status, setStatus] = useState<SkyblockStatus | null>(null)
   const [sessions, setSessions] = useState<SkyblockSummary[]>([])
   const [key, setKey] = useState('')
@@ -57,9 +74,8 @@ export default function SkyblockSetup() {
   return (
     <div className="games-covers sb-setup" data-skyblock-setup>
       <p>
-        When Minecraft closes, Orbit shows a card for that SkyBlock session: coins an hour, XP, rare drops and what you collected. It takes your numbers from
-        Hypixel when Minecraft opens and again a couple of minutes after it closes (Hypixel needs that long to save them), so Orbit has to be running, even
-        just in the tray.
+        When Minecraft closes, Orbit shows a card for that SkyBlock session: coins an hour, XP, rare drops and what you collected. It takes your numbers from Hypixel when Minecraft
+        opens and again a couple of minutes after it closes (Hypixel needs that long to save them), so Orbit has to be running, even just in the tray.
       </p>
 
       {ready ? (
@@ -80,16 +96,36 @@ export default function SkyblockSetup() {
               )}
             </span>
             {status.session ? (
-              <button className="btn" disabled={busy} onClick={() => run(() => window.api.skyblockEndNow())} title="End the session now (Hypixel may need a couple of minutes to catch up)" data-skyblock-end>
+              <button
+                className="btn"
+                disabled={busy}
+                onClick={() => run(() => window.api.skyblockEndNow())}
+                title="End the session now (Hypixel may need a couple of minutes to catch up)"
+                data-skyblock-end
+              >
                 <Square size={12} /> End now
               </button>
             ) : (
-              <button className="btn" disabled={busy} onClick={() => run(() => window.api.skyblockStartNow())} title="If Orbit didn’t notice Minecraft, or you want to time just part of a session" data-skyblock-start>
+              <button
+                className="btn"
+                disabled={busy}
+                onClick={() => run(() => window.api.skyblockStartNow())}
+                title="If Orbit didn’t notice Minecraft, or you want to time just part of a session"
+                data-skyblock-start
+              >
                 <Play size={12} /> Start now
               </button>
             )}
             <button className="btn" onClick={() => setEditing(true)}>
               Change
+            </button>
+            <button
+              className="btn"
+              onClick={() => openSpecialTab(SKYBLOCK_GOALS_TAB)}
+              title="Plan crafting goals: the whole tree, what you have, what’s locked"
+              data-skyblock-goals-open
+            >
+              <Target size={12} /> Goal planner
             </button>
           </div>
 
@@ -106,6 +142,10 @@ export default function SkyblockSetup() {
                   </option>
                 ))}
               </select>
+            </label>
+            <label className="sb-check" title="Developer keys from the dashboard stop working after 3 days; Orbit warns a day before.">
+              <input type="checkbox" checked={status.personalKey} onChange={(e) => run(() => window.api.skyblockSetPersonalKey(e.target.checked))} data-skyblock-personal />
+              It’s a Personal key (doesn’t run out after 3 days)
             </label>
             <label className="sb-check">
               <input type="checkbox" checked={status.readLog} onChange={(e) => run(() => window.api.skyblockSetLog(e.target.checked))} />
@@ -134,8 +174,7 @@ export default function SkyblockSetup() {
               <button className="link-btn" onClick={() => window.open('https://developer.hypixel.net/dashboard')}>
                 developer.hypixel.net <ExternalLink size={11} />
               </button>
-              , sign in with your Hypixel forums account and copy your API key. A development key stops working after 3 days; for one that lasts, apply for a
-              Personal key there.
+              , sign in with your Hypixel forums account and copy your API key. A development key stops working after 3 days; for one that lasts, apply for a Personal key there.
             </li>
             <li>
               In SkyBlock, open <b>SkyBlock Menu → Settings → Personal → API Settings</b> and turn on Skills, Collections and Banking, or those parts stay blank.
@@ -149,7 +188,14 @@ export default function SkyblockSetup() {
             </label>
             <label>
               Hypixel API key{status.hasKey ? ' (blank keeps the saved one)' : ''}
-              <input type="password" value={key} onChange={(e) => setKey(e.target.value)} spellCheck={false} data-skyblock-key onKeyDown={(e) => e.key === 'Enter' && void run(() => window.api.skyblockSetup({ key, player }))} />
+              <input
+                type="password"
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+                spellCheck={false}
+                data-skyblock-key
+                onKeyDown={(e) => e.key === 'Enter' && void run(() => window.api.skyblockSetup({ key, player }))}
+              />
             </label>
             <div className="cal-client-actions">
               <button
@@ -173,12 +219,13 @@ export default function SkyblockSetup() {
             </div>
           </div>
           <p className="cal-note">
-            The key is checked with Hypixel, then stored encrypted on this computer using the protection built into {SYSTEM_NAME}. Your Minecraft name goes to
-            Mojang to find your player id, and that id goes to Hypixel. Nothing else leaves this computer.
+            The key is checked with Hypixel, then stored encrypted on this computer using the protection built into {SYSTEM_NAME}. Your Minecraft name goes to Mojang to find your
+            player id, and that id goes to Hypixel. Nothing else leaves this computer.
           </p>
         </>
       )}
 
+      {ready && keyWarning(status.keySavedAt, status.personalKey, Date.now()) && <p className="setting-warning">{keyWarning(status.keySavedAt, status.personalKey, Date.now())}</p>}
       {status.problem && <p className="setting-warning">{status.problem}</p>}
       {!status.canEncrypt && <p className="setting-warning">This computer can’t encrypt the key, so it can’t be saved.</p>}
       {error && <p className="setting-warning">{error}</p>}
