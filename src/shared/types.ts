@@ -24,6 +24,7 @@ import type { FoundTrack } from './songSearch'
 import type { SpotifyList } from './spotifyImport'
 import type { MixerState } from './mixer'
 import type { EndResult, EndTarget, TaskSnapshot } from './taskManager'
+import type { AppList, LeftoverScan, RemoveResult, RunResult } from './uninstaller'
 import type { MonitorAction, MonitorSaved, MonitorSetting, MonitorsStatus, MonitorTarget } from './monitors'
 import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
 import type { ClickerSettings, Macro, MacroHotkeys, MacroStatus } from './macros'
@@ -927,6 +928,21 @@ export interface NotesApi {
   tasksEnd(targets: EndTarget[]): Promise<EndResult>
   /** Shows a process's program file in File Explorer / Finder; false if its path isn't known. */
   tasksReveal(pid: number): Promise<boolean>
+  // Clean uninstaller (main/uninstaller.ts): remove an app, then what it left behind
+  /** The installed apps (Windows' uninstall list, or a Mac's Applications folders). */
+  uninstallList(): Promise<AppList>
+  /** Windows: runs the app's own uninstaller and waits for it to close. */
+  uninstallRun(id: string): Promise<RunResult>
+  /** The app has gone (its uninstall entry, or the .app). */
+  uninstallGone(id: string): Promise<boolean>
+  /** What the app left behind (and, on a Mac, the app itself), to look at before anything goes. */
+  uninstallScan(id: string): Promise<LeftoverScan>
+  /** Moves the chosen items from that list to the Recycle Bin / Bin (registry settings are saved to a .reg file first). */
+  uninstallRemove(scanId: string, ids: string[]): Promise<RemoveResult>
+  /** Mac: asks the app to quit; true once it has. */
+  uninstallQuit(id: string): Promise<boolean>
+  /** Shows a found file or folder in File Explorer / Finder. */
+  uninstallReveal(path: string): Promise<boolean>
   // Soundboard (main/soundboard.ts; the sound itself is played in lib/soundboard.ts)
   soundboardGet(): Promise<SoundboardStatus>
   /** Asks for sound files and adds a button for each. */

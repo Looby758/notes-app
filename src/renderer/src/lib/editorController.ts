@@ -98,6 +98,8 @@ export const MUSIC_TAB = 'music:'
 export const MIXER_TAB = 'mixer:'
 /** What's running, how much it uses, and ending it (components/TaskManager). */
 export const TASKS_TAB = 'tasks:'
+/** Removing an app and what it leaves behind (components/Uninstaller). */
+export const UNINSTALL_TAB = 'uninstall:'
 /** The download manager: a queue that pauses, carries on and can wait for the night (components/Downloads). */
 export const DOWNLOADS_TAB = 'downloads:'
 /** Scenes, webcam and screen recording (components/Studio). */

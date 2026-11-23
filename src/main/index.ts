@@ -69,6 +69,7 @@ import { cleanPrefsPart, prefsPart } from '@shared/orbitSync'
 import { setupMonitors, teardownMonitors } from './monitors'
 import { setupMixer, teardownMixer } from './mixer'
 import { setupTaskManager, teardownTaskManager } from './taskManager'
+import { setupUninstaller } from './uninstaller'
 import { applyDuckPrefs, setupMusicDuck } from './musicDuck'
 import { setupLive } from './live'
 import { explorerFile, setFileIndexOn, setupExplorer } from './explorer'
@@ -1128,6 +1129,7 @@ app.whenReady().then(async () => {
   safely('screen controls', setupMonitors)
   safely('volume mixer', setupMixer)
   safely('task manager', setupTaskManager)
+  safely('uninstaller', setupUninstaller)
   safely('music dipping', () => setupMusicDuck(currentPrefs))
   // A password copied from the vault isn't passed to the other computer.
   safely('mouse sharing', () => setupMouseShare(() => mainWindow, (text) => text === copiedSecret))
