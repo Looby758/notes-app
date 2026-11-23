@@ -12,6 +12,12 @@ export interface ReleaseNotes {
 /** Newest first. Add an entry with each release. */
 export const RELEASE_NOTES: readonly ReleaseNotes[] = [
   {
+    version: '1.13.3',
+    items: [
+      'Orbit Sync: test copies only read, and never call this PC "another computer"'
+    ]
+  },
+  {
     version: '1.13.2',
     items: [
       'Big file sender: send huge files to a friend with a code, or a Google Drive link',
