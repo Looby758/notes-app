@@ -1,15 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { quietPasskeys } from '@shared/passkeys'
 import { chromeInPage, firefoxOnGoogleSignIn, firefoxUserAgent, hintPlatform, isGoogleSignIn } from '@shared/web'
-import { windowSizedToPage } from '@shared/messages'
+import { needsPageSizedWindow, windowSizedToPage } from '@shared/messages'
 import { classifyField, profileValue, type AutofillProfile, type FieldKind } from '@shared/browser'
 
 /**
  * Runs in every web page (web tabs, private tabs, the messages hub) before
  * the site's own code, in a world of its own: the page can't see or call anything here.
  *
- * Everywhere, it stops passkey prompts popping up as pages load (see quietPasskeys) and gives the
- * window the page's own size (see windowSizedToPage). In web tabs it
+ * Everywhere, it stops passkey prompts popping up as pages load (see quietPasskeys), and on Discord
+ * gives the window the page's own size (see windowSizedToPage). In web tabs it
  * also:
  * - tells the tab when you're in a login or address form, so Orbit can offer to fill it in (it
  *   only ever fills a form when you pick that, never by itself), and when a login is sent, so
@@ -24,7 +24,8 @@ import { classifyField, profileValue, type AutofillProfile, type FieldKind } fro
 contextBridge.executeInMainWorld({ func: quietPasskeys })
 // The window's outer size is the page's own, so Discord doesn't take the app around the page for its
 // developer tools and drop your sign-in from its storage (see windowSizedToPage).
-contextBridge.executeInMainWorld({ func: windowSizedToPage })
+// Discord's pages only: anywhere else, Google's sign-in above all, it gives Orbit away as an app.
+if (needsPageSizedWindow(location.href)) contextBridge.executeInMainWorld({ func: windowSizedToPage })
 // Pages see Google Chrome (its brands and window.chrome), as the requests say (see chromeInPage).
 contextBridge.executeInMainWorld({ func: chromeInPage, args: [process.versions.chrome ?? '', hintPlatform(process.platform)] })
 // With "Sign in with Google as Firefox" on, Google's sign-in pages see the same Firefox the request

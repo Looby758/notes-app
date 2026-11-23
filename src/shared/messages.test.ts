@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { badgeText, isMessagesUrl, unreadFromTitle, windowSizedToPage } from './messages'
+import { badgeText, isMessagesUrl, needsPageSizedWindow, unreadFromTitle, windowSizedToPage } from './messages'
 
 describe('unreadFromTitle', () => {
   it('reads WhatsApp’s count', () => {
@@ -51,5 +51,18 @@ describe('windowSizedToPage', () => {
     expect(win.outerHeight - win.innerHeight).toBe(0)
     ;(win as unknown as { innerWidth: number }).innerWidth = 500
     expect(win.outerWidth).toBe(500)
+  })
+})
+
+describe('needsPageSizedWindow', () => {
+  it("is only Discord's pages, never Google's sign-in", () => {
+    expect(needsPageSizedWindow('https://discord.com/app')).toBe(true)
+    expect(needsPageSizedWindow('https://ptb.discord.com/channels/@me')).toBe(true)
+    expect(needsPageSizedWindow('https://discordapp.com/login')).toBe(true)
+    expect(needsPageSizedWindow('https://accounts.google.com/v3/signin/identifier')).toBe(false)
+    expect(needsPageSizedWindow('https://grok.com/')).toBe(false)
+    expect(needsPageSizedWindow('https://web.whatsapp.com/')).toBe(false)
+    expect(needsPageSizedWindow('https://notdiscord.com/')).toBe(false)
+    expect(needsPageSizedWindow('not a url')).toBe(false)
   })
 })
