@@ -68,7 +68,7 @@ export const ADDONS: AddonInfo[] = [
 
   // Media
   { id: 'music', name: 'Music', features: ['musiclibrary', 'music'], needs: ['link-tools'] },
-  { id: 'songid', name: 'What’s this song?', features: ['songid'] },
+  { id: 'songid', name: 'What’s this song?', features: ['songid'], needs: ['music'] },
   { id: 'video-player', name: 'Video player', features: ['video'], needs: ['video-tools'] },
   { id: 'comics', name: 'Comics', features: ['comics'] },
   { id: 'wiki', name: 'Wikis', features: ['wiki'] },

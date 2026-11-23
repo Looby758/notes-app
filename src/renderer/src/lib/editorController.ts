@@ -17,9 +17,11 @@ import {
   type PaneState
 } from '../store/editor'
 import { notify } from '../store/notify'
+import { useUI } from '../store/ui'
 import { usePrefs } from '../store/prefs'
 import type { Prefs } from '@shared/prefs'
 import { isWithin, replacePrefix } from './paths'
+import { notAddedText, tabFeature, tabOn } from './addons'
 import { noteLockState, onBeforeLock, openText, remapLock, sealText, useLock, type NoteLock } from './lock/session'
 import { currentHeadingIndex, extractHeadings } from './outline'
 import { flushBoards } from './boards'
@@ -877,12 +879,23 @@ export function newTab(pane = activePane()): void {
 
 /** Adds a tab after the current one in `pane` and switches to it. */
 function addTab(pane: string, id: string): void {
+  // A page from an add-on you haven't added doesn't open (Settings → Add-ons adds it).
+  if (!tabOn(id)) {
+    notify(notAddedText(tabFeature(id) ?? ''), 'info', { label: 'Add-ons', run: openAddons })
+    return
+  }
   const p = paneState(pane)
   const at = p.active ? p.tabs.indexOf(p.active) + 1 : p.tabs.length
   const tabs = [...p.tabs]
   tabs.splice(at, 0, id)
   updatePane(pane, { tabs })
   activateTab(id, pane)
+}
+
+/** Opens Settings → Add-ons. */
+export function openAddons(): void {
+  openSpecialTab(SETTINGS_TAB)
+  useUI.setState({ settingsSection: 'addons' })
 }
 
 /** Opens (or switches to) a special page like Settings. There's only ever one of each. */

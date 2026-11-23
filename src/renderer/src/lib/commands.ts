@@ -86,6 +86,7 @@ import { openGrokTab, toggleGrokFloat } from '../components/Grok/GrokPage'
 import { openSiteTab, toggleSiteFloat } from '../components/ChatSite/ChatSite'
 import { startSnip } from './snip'
 import { openMiniGames } from '../store/miniGames'
+import { commandOn } from './addons'
 import { changeNotesPassword, lockAllNow, lockFolder, lockNote, lockNoteOwn, removeLock } from './lock/actions'
 
 export interface Command {
@@ -506,9 +507,12 @@ export const commands: Command[] = [
 /** A command's current shortcut, taking your Settings into account. */
 export const shortcutFor = (cmd: Command): string | null => effectiveShortcut(cmd.id, cmd.shortcut)
 
+/** The commands you can use: core ones, and those of the add-ons you've added. */
+export const availableCommands = (): Command[] => commands.filter((c) => commandOn(c.id))
+
 /** The app-wide commands' shortcuts (so they also work while a web page has focus). */
 export function appShortcuts(): string[] {
-  return commands.flatMap((c) => {
+  return availableCommands().flatMap((c) => {
     const shortcut = c.scope === 'editor' ? null : shortcutFor(c)
     return shortcut ? [normalizeShortcut(shortcut)] : []
   })
@@ -516,12 +520,12 @@ export function appShortcuts(): string[] {
 
 /** The app-wide command bound to a shortcut like "Ctrl+W", if any. */
 export function commandForShortcut(shortcut: string): Command | undefined {
-  return commands.find((c) => c.scope !== 'editor' && normalizeShortcut(shortcutFor(c) ?? '') === shortcut)
+  return availableCommands().find((c) => c.scope !== 'editor' && normalizeShortcut(shortcutFor(c) ?? '') === shortcut)
 }
 
 /** The app-wide command (not an editor one) bound to this key press, if any. */
 export function commandForKey(e: KeyboardEvent): Command | undefined {
-  return commands.find((c) => {
+  return availableCommands().find((c) => {
     if (c.scope === 'editor') return false
     const shortcut = shortcutFor(c)
     return !!shortcut && matchesShortcut(e, shortcut)

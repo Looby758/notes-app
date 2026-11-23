@@ -15,6 +15,7 @@ import { splitFrontmatter } from './ai'
 import { noteTitle } from './paths'
 import { dayKey } from './dates'
 import { notify } from '../store/notify'
+import { featureOn, notAddedText } from './addons'
 import { toggleDiscord } from '../store/discord'
 
 /**
@@ -104,7 +105,8 @@ export function runDeck(id: string): void {
   const extra = DECK_EXTRAS.find((x) => x.id === id)
   if (extra) return extra.run()
   const f = featureById(id)
-  if (f) f.run()
+  if (f && !featureOn(f.id)) notify(notAddedText(f.id), 'info')
+  else if (f) f.run()
   else notify('That deck button isn’t in Orbit any more.', 'info')
 }
 
@@ -138,7 +140,7 @@ export function startPhoneSync(): () => void {
   const connected = (): boolean => usePhone.getState().connected > 0
 
   const pushDeck = (): void => {
-    const buttons = deckButtons(usePrefs.getState().prefs.phoneDeck)
+    const buttons = deckButtons(usePrefs.getState().prefs.phoneDeck.filter((id) => !featureById(id) || featureOn(id)))
     const json = JSON.stringify(buttons)
     if (json === lastDeck) return
     lastDeck = json
@@ -158,7 +160,7 @@ export function startPhoneSync(): () => void {
 
   pushDeck()
   const offs = [
-    usePrefs.subscribe((s, before) => s.prefs.phoneDeck !== before.prefs.phoneDeck && pushDeck()),
+    usePrefs.subscribe((s, before) => (s.prefs.phoneDeck !== before.prefs.phoneDeck || s.prefs.installedAddons !== before.prefs.installedAddons) && pushDeck()),
     usePhone.subscribe((s, before) => {
       if (s.connected > 0 && before.connected === 0) {
         lastScreen = ''

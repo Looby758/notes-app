@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEve
 import { CircleDot, PanelLeft, Pin, Search } from 'lucide-react'
 import { useUI } from '../../store/ui'
 import { usePrefs } from '../../store/prefs'
-import { FEATURE_GROUPS, FEATURES, toggleFeatureIn, type Feature, type FeaturePlace } from '../../lib/features'
+import { FEATURE_GROUPS, useFeatures, toggleFeatureIn, type Feature, type FeaturePlace } from '../../lib/features'
 import { commands, shortcutFor } from '../../lib/commands'
 import { fuzzyFilter } from '../../lib/fuzzy'
 import { showKeys } from '@shared/platform'
@@ -37,9 +37,10 @@ function LauncherScreen() {
   useEffect(() => setSelected(0), [query])
 
   const q = query.trim()
+  const features = useFeatures()
   const matches = useMemo(
-    () => (q ? fuzzyFilter(FEATURES, q, (f) => `${f.name} ${f.keywords ?? ''} ${f.group}`).map((m) => m.item) : FEATURES),
-    [q]
+    () => (q ? fuzzyFilter(features, q, (f) => `${f.name} ${f.keywords ?? ''} ${f.group}`).map((m) => m.item) : features),
+    [q, features]
   )
   // In group order when not searching, best match first when searching.
   const ordered = useMemo(() => (q ? matches : FEATURE_GROUPS.flatMap((g) => matches.filter((f) => f.group === g))), [q, matches])

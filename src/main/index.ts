@@ -100,6 +100,8 @@ import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
 import { setupAppStudio } from './appStudio'
 import { setupReleaseHelper } from './releaseHelper'
+import { addonsMaybeChanged, setupAddonGate, startsCoreOnly } from './addonGate'
+import { cleanInstalledAddons } from '@shared/addons'
 import { TEST_COPY, TEST_COPY_FOLDER, testCopyReadOnly, WINDOWS_APP_ID } from './testCopy'
 import { setupGames } from './games'
 import { setupGameCovers } from './gameCovers'
@@ -245,12 +247,14 @@ function appIconFile(prefs: Prefs): { id: string; file?: string } {
 
 /** Settings that live outside the app's windows: the capture shortcut, the app icon and starting at login. */
 function applySystemPrefs(prefs: Prefs): void {
-  applyCaptureShortcut(prefs.captureShortcut)
+  // System-wide shortcuts only for the add-ons you've added.
+  const added = (id: string): boolean => prefs.installedAddons.includes(id)
+  applyCaptureShortcut(added('summon-bar') ? prefs.captureShortcut : '')
   // The tray's "Snip after a delay" lists your own delay too.
   safely('tray menu', refreshTrayMenu)
-  applySnipShortcut(prefs.snipShortcut)
-  applySongIdShortcut(prefs.songIdShortcut)
-  applyReplayShortcut(prefs.replayOn ? prefs.replayShortcut : '')
+  applySnipShortcut(added('snip') ? prefs.snipShortcut : '')
+  applySongIdShortcut(added('songid') ? prefs.songIdShortcut : '')
+  applyReplayShortcut(prefs.replayOn && added('clips') ? prefs.replayShortcut : '')
   applyDuckPrefs()
   safely('app icon', () => applyAppIcon(prefs))
   // Only the installed app registers itself (in development it would register electron.exe).
@@ -348,6 +352,7 @@ function broadcastPrefs(prefs: Prefs): void {
     win.webContents.send('prefs:changed', prefs)
   }
   safely('system settings', () => applySystemPrefs(prefs))
+  safely('add-ons', addonsMaybeChanged)
   safely('whole PC search', () => applyFileIndex(prefs))
 }
 
@@ -400,6 +405,12 @@ function openVault(path: string | null): void {
   stopWatching()
   vault = path ? new Vault(path) : null
   if (!path) return
+  // Brand new Orbit, brand new notes folder: just the core to start with (add more in Settings → Add-ons).
+  if (startsCoreOnly(!!loadSettings().prefs, path)) {
+    const prefs = normalizePrefs({ installedAddons: [] })
+    saveSettings({ prefs })
+    broadcastPrefs(prefs)
+  }
   void shareComicProgress()
   void shareWikiProgress()
   syncOrbitSoon()
@@ -1034,6 +1045,11 @@ async function offerMoveToApplications(): Promise<boolean> {
 }
 
 app.whenReady().then(async () => {
+  // First, so every add-on's messages are checked (addonGate.ts).
+  setupAddonGate(() => {
+    const prefs = loadSettings().prefs as Partial<Prefs> | undefined
+    return cleanInstalledAddons(prefs?.installedAddons, prefs?.addonsSeen)
+  })
   // Ask everything's copy of recent emails, so it can answer without the internet (emailAsk.ts).
   setTimeout(() => void emailAsk.catchUp(), 60_000)
   setInterval(() => void emailAsk.catchUp(), 30 * 60_000)

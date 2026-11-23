@@ -16,6 +16,7 @@ import { setPreferredConvertFormat } from './convert/formats'
 import { describeSmart, parseSmart, validSmart, CONVERT_FORMATS, type ParseContext, type SmartAction } from './smartParse'
 import { formatPounds } from './money'
 import { errorMessage } from './paths'
+import { featureOn, notAddedText } from './addons'
 
 /** Runs smart commands (lib/smartParse.ts) in the main window: Ctrl+K, the launcher and the summon bar all end up here. */
 
@@ -25,7 +26,37 @@ export function smartContext(): ParseContext {
   return { categories: useMoney.getState().categories, features: featureNames }
 }
 
-export const parseCommand = (text: string): SmartAction | null => parseSmart(text, smartContext())
+/** The feature an action needs (its add-on must be added), or null when it's core. */
+function actionFeature(a: SmartAction): string | null {
+  switch (a.kind) {
+    case 'money':
+    case 'goal':
+      return 'money'
+    case 'event':
+      return 'calendar'
+    case 'videoIdea':
+      return 'videos'
+    case 'convert':
+      return 'convert'
+    case 'play':
+    case 'music':
+      return 'musiclibrary'
+    case 'open':
+      return a.feature
+    case 'web':
+      return 'web'
+    case 'ask':
+      return 'ask'
+    default:
+      return null
+  }
+}
+
+export const parseCommand = (text: string): SmartAction | null => {
+  const a = parseSmart(text, smartContext())
+  const feature = a && actionFeature(a)
+  return feature && !featureOn(feature) ? null : a
+}
 export const describeCommand = (a: SmartAction): string => describeSmart(a, smartContext())
 
 /** Opens Ctrl+K with some text already typed. */
@@ -35,6 +66,8 @@ export function openPalette(query = ''): void {
 
 /** Does what the action says. Returns a few words on what happened (for the summon bar), or throws. */
 export async function runSmart(a: SmartAction): Promise<string> {
+  const feature = actionFeature(a)
+  if (feature && !featureOn(feature)) throw new Error(notAddedText(feature))
   switch (a.kind) {
     case 'money': {
       await ensureMoney()

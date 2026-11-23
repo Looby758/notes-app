@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, RotateCcw, X } from 'lucide-react'
-import { commands, shortcutFor, type Command } from '../../lib/commands'
+import { availableCommands, commands, shortcutFor, type Command } from '../../lib/commands'
 import { findConflicts, RESERVED_SHORTCUTS, shortcutFromEvent } from '../../lib/shortcuts'
 import { setPrefs, setShortcut, usePrefs } from '../../store/prefs'
 import { IS_MAC, showKeys, SYSTEM_NAME } from '@shared/platform'
@@ -8,7 +8,7 @@ import { IS_MAC, showKeys, SYSTEM_NAME } from '@shared/platform'
 /** Commands whose name, group or current shortcut match a search. */
 export function matchingCommands(query: string): Command[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean)
-  return commands.filter((c) => {
+  return availableCommands().filter((c) => {
     const keys = shortcutFor(c) ?? ''
     const haystack = `${c.title} ${c.group} ${keys} ${keys && showKeys(keys)} shortcut key`.toLowerCase()
     return words.every((w) => haystack.includes(w))

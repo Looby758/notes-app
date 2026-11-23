@@ -57,6 +57,7 @@ import {
 } from './skyblockPlayers'
 import { hypixel, KeyRejected, onSkyblockProfiles, skyblockAccount } from './skyblock'
 import { logError } from './log'
+import { addonOn } from './addonGate'
 import { neuItemIcons, onAddonChanged, saveNeuPictures, skyblockAddonReady, slotIcon } from './skyblockAddonFiles'
 import { skinFromValue } from '@shared/skyblockTextures'
 
@@ -485,7 +486,7 @@ async function refreshProfile(): Promise<void> {
 export function setupSkyblockGoals(): void {
   // Every time the session summary asks Hypixel, the planner gets the same answer for free.
   onSkyblockProfiles((body) => {
-    if (skyblockAddonReady() && (anyGoals() || load().view)) takeProfiles(body)
+    if (addonOn('skyblock') && skyblockAddonReady() && (anyGoals() || load().view)) takeProfiles(body)
   })
 
   // Installed, removed or new packs: read the item list again and redraw the pictures.
@@ -501,7 +502,7 @@ export function setupSkyblockGoals(): void {
     () => {
       const acct = skyblockAccount()
       const p = load().profile
-      if (acct.playing && skyblockAddonReady() && (anyGoals() || load().view) && (!p || Date.now() - p.at > PLAY_REFRESH - 5000)) void refreshProfile()
+      if (addonOn('skyblock') && acct.playing && skyblockAddonReady() && (anyGoals() || load().view) && (!p || Date.now() - p.at > PLAY_REFRESH - 5000)) void refreshProfile()
     },
     Math.min(PLAY_REFRESH, 60_000)
   )

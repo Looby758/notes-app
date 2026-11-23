@@ -38,6 +38,7 @@ import {
   type DiscordStatus
 } from '@shared/discord'
 import { logError } from './log'
+import { addonOn, onAddonsChanged } from './addonGate'
 
 /**
  * Discord voice controls, through Discord's official local RPC socket (see shared/discord.ts).
@@ -475,6 +476,8 @@ function forgetSignIn(): void {
  * show its Authorize window; otherwise only a saved sign-in is used.
  */
 async function connect(interactive: boolean): Promise<void> {
+  // Discord voice is an add-on: without it Orbit never connects to Discord.
+  if (!addonOn('discord-voice')) return
   clearTimeout(retryTimer)
   const s = load()
   if (!hasApp()) return update({ ...EMPTY_DISCORD, canEncrypt: safeStorage.isEncryptionAvailable() })
@@ -726,6 +729,10 @@ export function setupDiscord(): void {
 
   // A saved sign-in connects quietly at start (and whenever Discord starts later).
   if (hasSignIn()) void connect(false)
+  onAddonsChanged(() => {
+    if (!addonOn('discord-voice')) teardownDiscord()
+    else if (hasSignIn() && !socket) void connect(false)
+  })
 }
 
 export function teardownDiscord(): void {

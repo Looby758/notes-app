@@ -23900,3 +23900,50 @@ img.tm-icon {
   align-items: center;
   gap: 6px;
 }
+
+/* Settings → Add-ons, and the page shown for an add-on that isn't added. */
+.addons-intro {
+  margin: 0 0 22px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.addons-count {
+  display: inline-block;
+  margin-top: 6px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.addon-needs {
+  color: var(--text-faint);
+}
+.addon-confirm {
+  color: var(--text) !important;
+}
+.addon-missing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  padding: 24px;
+  text-align: center;
+  color: var(--text-muted);
+}
+.addon-missing h2 {
+  margin: 6px 0 0;
+  color: var(--text);
+  font-size: 18px;
+}
+.addon-missing p {
+  margin: 0;
+  max-width: 42ch;
+}
+.addon-missing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}

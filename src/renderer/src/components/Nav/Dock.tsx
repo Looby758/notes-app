@@ -53,9 +53,10 @@ export function FeatureButton({ feature: f, place, index, className = 'icon-btn'
 /** The features you picked for the top bar (Settings → Finding features, or the pins in the launcher). */
 export function TopbarFeatures() {
   const ids = usePrefs((s) => s.prefs.topbarFeatures)
+  const installed = usePrefs((s) => s.prefs.installedAddons)
   return (
     <>
-      {featuresFor(ids).map((f, i) => (
+      {featuresFor(ids, installed).map((f, i) => (
         <FeatureButton key={f.id} feature={f} place="topbarFeatures" index={i} />
       ))}
     </>
@@ -66,10 +67,11 @@ export function TopbarFeatures() {
 export default function Dock() {
   const show = usePrefs((s) => s.prefs.showDock)
   const ids = usePrefs((s) => s.prefs.dockFeatures)
+  const installed = usePrefs((s) => s.prefs.installedAddons)
   if (!show) return null
   return (
     <nav className="dock" data-dock>
-      {featuresFor(ids).map((f, i) => (
+      {featuresFor(ids, installed).map((f, i) => (
         <FeatureButton key={f.id} feature={f} place="dockFeatures" index={i} className="dock-btn" />
       ))}
       <div className="dock-spacer" />

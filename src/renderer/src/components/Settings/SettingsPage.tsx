@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CalendarDays, Clapperboard, Compass, FileJson, MonitorSmartphone, Music, FolderCog, Info, Keyboard, Palette, PenLine, RefreshCw, RotateCcw, ScrollText, Search, ShieldCheck, Sparkles, X, Zap, Globe } from 'lucide-react'
+import { CalendarDays, Clapperboard, Compass, FileJson, MonitorSmartphone, Music, FolderCog, Info, Keyboard, Palette, PenLine, RefreshCw, RotateCcw, ScrollText, Search, ShieldCheck, Sparkles, X, Zap, Globe, Puzzle } from 'lucide-react'
 import { checkForUpdates, useUpdates, watchUpdates } from '../../store/updates'
 import { checkSettingsNow, showWhatsNew } from '../../store/notices'
 import { DEFAULT_PREFS } from '@shared/prefs'
@@ -10,6 +10,7 @@ import { matchesSearch, SECTIONS, SETTINGS, type SectionId, type SettingDef } fr
 import { SettingControl } from './Controls'
 import ShortcutsEditor, { matchingCommands } from './ShortcutsEditor'
 import CalendarSources from './CalendarSources'
+import AddonsSettings from './AddonsSettings'
 import SnippetsEditor from './SnippetsEditor'
 import PlaceholderHelp from './PlaceholderHelp'
 import RemindersSettings from './RemindersSettings'
@@ -24,6 +25,7 @@ import pkg from '../../../../../package.json'
 import { showKeys, TRAY_NAME } from '@shared/platform'
 
 const ICONS: Record<SectionId, typeof Palette> = {
+  addons: Puzzle,
   appearance: Palette,
   navigation: Compass,
   editor: PenLine,
@@ -37,6 +39,19 @@ const ICONS: Record<SectionId, typeof Palette> = {
   computers: MonitorSmartphone,
   shortcuts: Keyboard,
   about: Info
+}
+
+/** Sections that are only about add-ons: shown when at least one of them is added. */
+const SECTION_ADDONS: Partial<Record<SectionId, string[]>> = {
+  capture: ['summon-bar', 'snip'],
+  browser: ['web'],
+  music: ['music', 'songid'],
+  studio: ['studio', 'clips']
+}
+
+const sectionOn = (id: SectionId, installed: readonly string[]): boolean => {
+  const needs = SECTION_ADDONS[id]
+  return !needs || needs.some((a) => installed.includes(a))
 }
 
 const SNIPPET_WORDS = /^(snip|expan|text sh|abbrev|;)/i
@@ -337,6 +352,7 @@ export default function SettingsPage() {
   const [section, setSection] = useState<SectionId>('appearance')
   const [query, setQuery] = useState('')
   const prefs = usePrefs((s) => s.prefs) as unknown as Record<string, unknown>
+  const installed = usePrefs((s) => s.prefs.installedAddons)
   const search = useRef<HTMLInputElement>(null)
   const body = useRef<HTMLDivElement>(null)
 
@@ -353,7 +369,11 @@ export default function SettingsPage() {
   const q = query.trim()
   const sectionDefs = SETTINGS.filter((d) => d.section === section)
   const sectionModified = sectionDefs.filter((d) => isModified(d, prefs))
-  const results = q ? SETTINGS.filter((d) => matchesSearch(d, q)) : []
+  const results = q ? SETTINGS.filter((d) => sectionOn(d.section, installed) && matchesSearch(d, q)) : []
+  // Removing the add-on a section is about leaves it: go back to the first one.
+  useEffect(() => {
+    if (!sectionOn(section, installed)) setSection('appearance')
+  }, [section, installed])
 
   return (
     <div className="settings-page">
@@ -374,7 +394,7 @@ export default function SettingsPage() {
             </button>
           )}
         </div>
-        {SECTIONS.map(({ id, label }) => {
+        {SECTIONS.filter(({ id }) => sectionOn(id, installed)).map(({ id, label }) => {
           const Icon = ICONS[id]
           return (
             <button
@@ -411,7 +431,9 @@ export default function SettingsPage() {
                   </button>
                 )}
               </div>
-              {section === 'shortcuts' ? (
+              {section === 'addons' ? (
+                <AddonsSettings />
+              ) : section === 'shortcuts' ? (
                 <ShortcutsEditor query="" />
               ) : section === 'about' ? (
                 <>
@@ -424,13 +446,13 @@ export default function SettingsPage() {
                   {section === 'editor' && <SnippetsEditor />}
                   {section === 'calendar' && <RemindersSettings />}
                   {section === 'calendar' && <PlaceholderHelp />}
-                  {section === 'calendar' && <CalendarSources />}
+                  {section === 'calendar' && installed.includes('calendar') && <CalendarSources />}
                   {section === 'navigation' && <NavEditor />}
                   {section === 'capture' && <CaptureShortcutStatus />}
                   {section === 'capture' && <SnipShortcutStatus />}
                   {section === 'capture' && <SnipSaving />}
                   {section === 'capture' && <TaskbarSnip />}
-                  {section === 'ai' && <OfflineAiSettings />}
+                  {section === 'ai' && installed.includes('offline-ai') && <OfflineAiSettings />}
                   {section === 'ai' && <AiSettings />}
                   {section === 'music' && <MusicFolderSetting />}
                   {section === 'music' && <MusicSettings />}
