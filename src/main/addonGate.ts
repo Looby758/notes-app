@@ -27,7 +27,6 @@ const CHANNEL_ADDONS: Record<string, string> = {
   keyremap: 'keyremap',
   discord: 'discord-voice',
   fsend: 'filesender',
-  explorer: 'files',
   comics: 'comics',
   wiki: 'wiki',
   games: 'games',
@@ -58,16 +57,44 @@ const CHANNEL_ADDONS: Record<string, string> = {
   monitors: 'screens',
   mixer: 'mixer',
   tasks: 'task-manager',
-  convert: 'convert',
   weather: 'weather',
   messages: 'messages',
-  video: 'video-player',
   videoWindow: 'video-player',
   videoBin: 'video-player'
 }
 
+/**
+ * Single messages that differ from their group: parts other features share (picking a folder,
+ * dragging a file, a video's details, the video tools), or that core features ask about.
+ */
+const CHANNEL_OVERRIDES: Record<string, string | null> = {
+  // The Files page's whole-PC search; the rest of explorer: is shared (folder pickers, dragging files out).
+  'explorer:search': 'files',
+  'explorer:searchPc': 'files',
+  'explorer:indexStatus': 'files',
+  'explorer:reindex': 'files',
+  'explorer:tagged': 'files',
+  'explorer:folderSizes': 'files',
+  // The video tools (ffmpeg), shared by Clips, Studio, the video player and Convert files.
+  'convert:video': 'video-tools',
+  'convert:video-cancel': 'video-tools',
+  'convert:ffmpeg-get': 'video-tools',
+  // Asked by notes (autocomplete, meanings) to see whether offline AI is there.
+  'localAi:state': null,
+  // Closing any tab lets go of the messages page, added or not.
+  'messages:release': null,
+  // Sending a clip to a Discord channel (a webhook) is part of Clips, not Discord voice.
+  'discord:hooks': 'clips',
+  'discord:addHook': 'clips',
+  'discord:removeHook': 'clips',
+  'discord:send': 'clips',
+  // Opening a recordings folder, from Clips as well as the Studio.
+  'studio:openFolder': null
+}
+
 /** The add-on a message belongs to, or null for a core one. */
 export function addonForChannel(channel: string): string | null {
+  if (channel in CHANNEL_OVERRIDES) return CHANNEL_OVERRIDES[channel]
   const i = channel.indexOf(':')
   return i > 0 ? (CHANNEL_ADDONS[channel.slice(0, i)] ?? null) : null
 }

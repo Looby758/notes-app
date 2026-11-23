@@ -73,7 +73,8 @@ export default function ComicReader({ id, onClose }: { id: string; onClose: () =
   const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
   const [scan, setScan] = useState<Scan | null>(null)
   const [pop, setPop] = useState<null | 'chapters' | 'music'>(null)
-  const spotify = usePrefs((s) => s.prefs.musicSpotify)
+  // Music while reading comes with the Music add-on.
+  const spotify = usePrefs((s) => s.prefs.musicSpotify && s.prefs.installedAddons.includes('music'))
   const [zen, setZen] = useState(false)
   const [zenStart, setZenStart] = useState(0)
   const [now, setNow] = useState(Date.now())
@@ -292,8 +293,8 @@ export default function ComicReader({ id, onClose }: { id: string; onClose: () =
     setZenStart(Date.now())
     setQuiet('comics', true)
     void window.api.setFullScreen(true)
-    // Zen mode's music is a Spotify playlist, so nothing's offered with Spotify turned off.
-    if (!usePrefs.getState().prefs.musicSpotify) return
+    // Zen mode's music is a Spotify playlist, so nothing's offered with Spotify turned off (or without Music).
+    if (!usePrefs.getState().prefs.musicSpotify || !usePrefs.getState().prefs.installedAddons.includes('music')) return
     if (settings.playlist) playPlaylist(settings.playlist)
     else setPop('music')
   }

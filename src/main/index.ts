@@ -358,7 +358,8 @@ function broadcastPrefs(prefs: Prefs): void {
 
 /** Whole PC search's list of files (Settings → Files), with its progress sent to every window. */
 function applyFileIndex(prefs: Prefs): void {
-  setFileIndexOn(prefs.filesWholePcSearch, app.getPath('userData'), (status) => {
+  // The whole-PC file list comes with the Files add-on.
+  setFileIndexOn(prefs.filesWholePcSearch && prefs.installedAddons.includes('files'), app.getPath('userData'), (status) => {
     for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send('explorer:indexStatus', status)
   })
 }

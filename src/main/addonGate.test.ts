@@ -32,11 +32,19 @@ describe('add-on messages', () => {
     expect(addonForChannel('cal:events')).toBe('calendar')
     expect(addonForChannel('prefs:get')).toBeNull()
     expect(addonForChannel('fs:read')).toBeNull()
+    // Shared parts stay core; only the Files page's own search belongs to Files.
+    expect(addonForChannel('explorer:startDrag')).toBeNull()
+    expect(addonForChannel('explorer:searchPc')).toBe('files')
+    expect(addonForChannel('convert:heic')).toBeNull()
+    expect(addonForChannel('convert:video')).toBe('video-tools')
+    expect(addonForChannel('video:inVault')).toBeNull()
+    expect(addonForChannel('localAi:state')).toBeNull()
+    expect(addonForChannel('localAi:install')).toBe('offline-ai')
   })
 
   it('only names add-ons that exist', async () => {
     const { ADDON_IDS: ids } = await import('@shared/addons')
-    for (const channel of ['skyblock', 'macros', 'keyremap', 'discord', 'fsend', 'explorer', 'cal', 'music', 'dm', 'vdl', 'clips', 'screen', 'cam', 'studio', 'term', 'apps', 'localAi', 'monitors', 'tasks', 'weather', 'video']) {
+    for (const channel of ['skyblock', 'macros', 'keyremap', 'discord', 'fsend', 'cal', 'music', 'dm', 'vdl', 'clips', 'screen', 'cam', 'studio', 'term', 'apps', 'localAi', 'monitors', 'tasks', 'weather', 'videoWindow']) {
       expect(ids, channel).toContain(addonForChannel(`${channel}:x`))
     }
   })

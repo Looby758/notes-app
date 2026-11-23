@@ -107,6 +107,7 @@ const STATUS_LABEL: Record<SaveStatus, string> = {
 
 export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
   const musicOn = useAddonOn('music')
+  const skyblockOn = useAddonOn('skyblock')
   useBugReports()
   const leftOpen = useUI((s) => s.leftOpen)
   const rightOpen = useUI((s) => s.rightOpen)
@@ -445,7 +446,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <CalendarOverlays />
       <Pet />
       <UpdateToast />
-      <SkyblockCard />
+      {skyblockOn && <SkyblockCard />}
       <DownloadPrompt />
       <StartupNotices />
       <DeviceDrop />
