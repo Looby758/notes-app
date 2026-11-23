@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { quietPasskeys } from '@shared/passkeys'
-import { chromeInPage, firefoxOnGoogleSignIn, firefoxUserAgent, hintPlatform, isGoogleSignIn } from '@shared/web'
+import { firefoxOnGoogleSignIn, firefoxUserAgent, isGoogleSignIn } from '@shared/web'
 import { needsPageSizedWindow, windowSizedToPage } from '@shared/messages'
 import { classifyField, profileValue, type AutofillProfile, type FieldKind } from '@shared/browser'
 
@@ -26,8 +26,6 @@ contextBridge.executeInMainWorld({ func: quietPasskeys })
 // developer tools and drop your sign-in from its storage (see windowSizedToPage).
 // Discord's pages only: anywhere else, Google's sign-in above all, it gives Orbit away as an app.
 if (needsPageSizedWindow(location.href)) contextBridge.executeInMainWorld({ func: windowSizedToPage })
-// Pages see Google Chrome (its brands and window.chrome), as the requests say (see chromeInPage).
-contextBridge.executeInMainWorld({ func: chromeInPage, args: [process.versions.chrome ?? '', hintPlatform(process.platform)] })
 // With "Sign in with Google as Firefox" on, Google's sign-in pages see the same Firefox the request
 // said (see firefoxOnGoogleSignIn). Only Google's sign-in pages ask.
 if (isGoogleSignIn(location.href) && ipcRenderer.sendSync('web:googleAsFirefox') === true) {
