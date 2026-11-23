@@ -1,9 +1,9 @@
-import { PoundSterling } from 'lucide-react'
+import { AlertTriangle, PoundSterling } from 'lucide-react'
 import { useMoney, useMoneyView } from '../../store/money'
 import { netWorth } from '../../lib/moneyAccounts'
 import { dayOf } from '../../lib/money'
 import { iouHeadline } from './MoneyAccounts'
-import { formatPounds, monthName, monthOf, monthTotals } from '../../lib/money'
+import { budgetState, formatPounds, monthName, monthOf, monthTotals } from '../../lib/money'
 import { MONEY_TAB, openSpecialTab } from '../../lib/editorController'
 import { HomeBox } from '../Home/HomePage'
 import Private from '../Streamer/Private'
@@ -12,6 +12,8 @@ import { useRecurring } from './MoneyPlans'
 /** The Home page's "spending this month" box: nothing until the money tracker has something in it. */
 export default function MoneyHomeCard() {
   const entries = useMoney((s) => s.entries)
+  const categories = useMoney((s) => s.categories)
+  const budgets = useMoney((s) => s.budgets)
   const nextBill = useRecurring().find((r) => !r.income)
   const balance = useMoney((s) => s.balance)
   const accounts = useMoney((s) => s.accounts)
@@ -25,6 +27,10 @@ export default function MoneyHomeCard() {
   if (!entries.length && !nw.any && !iou) return null
   const month = monthOf(new Date())
   const totals = monthTotals(entries, month)
+  const warnings = categories
+    .filter((c) => !c.income && budgets[c.id])
+    .map((c) => ({ cat: c, spent: totals.byCategory.get(c.id) ?? 0, budget: budgets[c.id] }))
+    .filter((x) => budgetState(x.spent, x.budget) !== 'ok')
   return (
     <HomeBox
       icon={<PoundSterling size={15} />}
@@ -64,6 +70,21 @@ export default function MoneyHomeCard() {
           💸 <Private>{iou.text}</Private>
         </button>
       )}
+      {warnings.map(({ cat, spent, budget }) => (
+        <div key={cat.id} className={`money-home-warn budget-${budgetState(spent, budget)}`}>
+          <AlertTriangle size={12} />
+          {cat.name}:{' '}
+          {spent > budget ? (
+            <>
+              <Private>{formatPounds(spent - budget)}</Private> over budget
+            </>
+          ) : (
+            <>
+              only <Private>{formatPounds(budget - spent)}</Private> left
+            </>
+          )}
+        </div>
+      ))}
     </HomeBox>
   )
 }

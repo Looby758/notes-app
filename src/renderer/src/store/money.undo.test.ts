@@ -69,69 +69,26 @@ describe('accounts, net worth and IOUs', () => {
   })
 })
 
-describe('budgets', () => {
+describe('budget lines', () => {
   beforeEach(async () => {
     await loadMoney()
     history.clear()
   })
 
-  it('changes a budget from this month on, keeping earlier months, and undoes', async () => {
-    const { setBudget } = await import('./money')
-    const { limitFor } = await import('../lib/moneyBudget')
-    const { addMonths, monthOf } = await import('../lib/money')
-    const now = monthOf(new Date())
-    setBudget('groceries', 20000, addMonths(now, -3))
-    setBudget('groceries', 25000)
-    const s = useMoney.getState()
-    expect(s.budgets.groceries).toBe(25000)
-    expect(limitFor(s, 'groceries', addMonths(now, -1))).toBe(20000)
-    expect(limitFor(s, 'groceries', now)).toBe(25000)
+  it('adds, changes and removes lines, and undoes each', async () => {
+    const { addBudgetLines, updateBudgetLine, deleteBudgetLine } = await import('./money')
+    const [netflix] = addBudgetLines([{ name: 'Netflix', amount: 1099, income: false, interval: 'monthly' }])
+    updateBudgetLine(netflix.id, { amount: 1299 })
+    expect(useMoney.getState().budgetLines[0].amount).toBe(1299)
+    deleteBudgetLine(netflix.id)
+    expect(useMoney.getState().budgetLines).toEqual([])
+    expect(await history.undo()).toBe('Removed “Netflix” from your budget')
     await history.undo()
-    expect(useMoney.getState().budgets.groceries).toBe(20000)
-    setBudget('groceries', 0)
-    expect(useMoney.getState().budgets.groceries).toBeUndefined()
-    expect(limitFor(useMoney.getState(), 'groceries', addMonths(now, -1))).toBe(20000)
-  })
-
-  it('sets one month on its own, rollover and suggested budgets as single steps', async () => {
-    const { setBudgets, setMonthBudget, setRollover } = await import('./money')
-    setBudgets({ groceries: 20000, fun: 5000 })
-    expect(useMoney.getState().budgets).toEqual({ groceries: 20000, fun: 5000 })
-    setMonthBudget('fun', '2030-12', 9000)
-    expect(useMoney.getState().budget.months).toEqual({ '2030-12': { fun: 9000 } })
-    setMonthBudget('fun', '2030-12', null)
-    expect(useMoney.getState().budget.months).toEqual({})
-    setRollover('groceries', '2026-10')
-    expect(useMoney.getState().budget.rollover).toEqual({ groceries: '2026-10' })
-    await history.undo()
-    expect(useMoney.getState().budget.rollover).toEqual({})
-    // Setting a month's amount and going back to the usual one a moment later undo together.
-    await history.undo()
-    expect(await history.undo()).toBe('Set 2 budgets')
-    expect(useMoney.getState().budgets).toEqual({})
-  })
-
-  it('forgets a deleted category’s budget settings', async () => {
-    const { addCategory, deleteCategory, setBudget, setRollover } = await import('./money')
-    addCategory({ name: 'Pets', color: '#123456' })
-    const id = useMoney.getState().categories.at(-1)!.id
-    setBudget(id, 3000)
-    setRollover(id, '2026-01')
-    deleteCategory(id)
-    const { budget, budgets } = useMoney.getState()
-    expect(budgets[id]).toBeUndefined()
-    expect(budget.history[id]).toBeUndefined()
-    expect(budget.rollover[id]).toBeUndefined()
-  })
-
-  it('says when something you add takes a budget nearly to its limit', async () => {
-    const { setBudget, addEntry } = await import('./money')
-    const { useNotify } = await import('./notify')
-    const { dayOf } = await import('../lib/money')
-    setBudget('groceries', 10000)
-    addEntry({ date: dayOf(new Date()), amount: 8500, note: 'Big shop', category: 'groceries', income: false })
-    expect(useNotify.getState().message).toBe('Groceries: only £15.00 left this month')
-    addEntry({ date: dayOf(new Date()), amount: 2000, note: 'More', category: 'groceries', income: false })
-    expect(useNotify.getState().message).toBe('Groceries is £5.00 over budget')
+    expect(useMoney.getState().budgetLines[0].amount).toBe(1099)
+    addBudgetLines([
+      { name: 'Wages', amount: 200000, income: true, interval: 'monthly' },
+      { name: 'Spotify', amount: 1199, income: false, interval: 'monthly' }
+    ])
+    expect(await history.undo()).toBe('Added 2 lines to your budget')
   })
 })

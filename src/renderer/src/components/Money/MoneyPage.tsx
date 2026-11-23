@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { ChevronLeft, ChevronRight, Cpu, Loader2, Pencil, Plus, PoundSterling, Trash2, Upload, X } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, ChevronRight, Cpu, Loader2, Pencil, Plus, PoundSterling, Trash2, Upload, X } from 'lucide-react'
 import Private from '../Streamer/Private'
 import {
   addCategory,
@@ -7,6 +7,7 @@ import {
   deleteCategory,
   deleteEntry,
   importEntries,
+  setBudget,
   updateCategory,
   updateEntry,
   useMoney,
@@ -14,6 +15,7 @@ import {
 } from '../../store/money'
 import {
   addMonths,
+  budgetState,
   CATEGORY_COLORS,
   dayOf,
   detectColumns,
@@ -40,7 +42,7 @@ import { addHomeCard } from '../../lib/home'
 import { readWorkbook } from '../../lib/sheets'
 import { statementFromPdf } from '../../lib/pdfStatement'
 import MoneyHomeCard from './MoneyHomeCard'
-import BudgetView, { BudgetBars, BudgetHomeCard } from './MoneyBudget'
+import BudgetView, { BudgetHomeCard } from './MoneyBudget'
 import MoneyPlans, { AskMoney, ForecastCard } from './MoneyPlans'
 import { IousView, NetWorthView } from './MoneyAccounts'
 import EmptyArt from '../Motion/EmptyArt'
@@ -48,7 +50,7 @@ import { refreshAiStatus, useAi } from '../../store/ai'
 import { errorMessage } from '../../lib/paths'
 
 addHomeCard({ id: 'money', order: 25, title: 'Spending this month', Card: MoneyHomeCard })
-addHomeCard({ id: 'budget', order: 25.5, title: 'Budget this month', Card: BudgetHomeCard })
+addHomeCard({ id: 'budget', order: 25.5, title: 'Budget', Card: BudgetHomeCard })
 
 type View = 'overview' | 'budget' | 'entries' | 'plans' | 'accounts' | 'ious' | 'import' | 'budgets'
 const VIEWS: [View, string][] = [
@@ -59,7 +61,7 @@ const VIEWS: [View, string][] = [
   ['accounts', 'Net worth'],
   ['ious', 'IOUs'],
   ['import', 'Import statement'],
-  ['budgets', 'Categories']
+  ['budgets', 'Budgets & categories']
 ]
 
 /** "12.50" typed into a box → pence (always positive), or null. */
@@ -97,20 +99,20 @@ export default function MoneyPage() {
               ))}
             </div>
           </header>
-          {(view === 'overview' || view === 'entries' || view === 'budget') && (
+          {(view === 'overview' || view === 'entries') && (
             <>
               <EntryForm key={editing?.id ?? 'new'} editing={editing} done={() => setEditing(null)} month={month} />
               <MonthNav month={month} setMonth={setMonth} />
             </>
           )}
-          {view === 'overview' && <Overview month={month} setMonth={setMonth} showBudgets={() => setView('budget')} />}
-          {view === 'budget' && <BudgetView month={month} />}
+          {view === 'overview' && <Overview month={month} setMonth={setMonth} showBudgets={() => setView('budgets')} />}
+          {view === 'budget' && <BudgetView />}
           {view === 'entries' && <Entries month={month} edit={setEditing} />}
           {view === 'plans' && <MoneyPlans />}
           {view === 'accounts' && <NetWorthView />}
           {view === 'ious' && <IousView />}
           {view === 'import' && <Import done={() => setView('entries')} />}
-          {view === 'budgets' && <Budgets showBudget={() => setView('budget')} />}
+          {view === 'budgets' && <Budgets />}
         </div>
       </div>
     </Private>
@@ -229,9 +231,11 @@ function EntryForm({ editing, done, month }: { editing: MoneyEntry | null; done:
 function Overview({ month, setMonth, showBudgets }: { month: string; setMonth: (m: string) => void; showBudgets: () => void }) {
   const entries = useMoney((s) => s.entries)
   const categories = useMoney((s) => s.categories)
+  const budgets = useMoney((s) => s.budgets)
   const totals = useMemo(() => monthTotals(entries, month), [entries, month])
   const left = totals.received - totals.spent
   const spending = categories.filter((c) => !c.income)
+  const budgeted = spending.filter((c) => budgets[c.id])
   const byAmount = spending
     .map((c) => ({ cat: c, spent: totals.byCategory.get(c.id) ?? 0 }))
     .filter((x) => x.spent > 0)
@@ -267,7 +271,49 @@ function Overview({ month, setMonth, showBudgets }: { month: string; setMonth: (
 
       <section className="money-section">
         <h3>Budgets</h3>
-        <BudgetBars month={month} showBudget={showBudgets} />
+        {budgeted.length ? (
+          <ul className="money-budgets">
+            {budgeted.map((c) => {
+              const spent = totals.byCategory.get(c.id) ?? 0
+              const budget = budgets[c.id]
+              const state = budgetState(spent, budget)
+              return (
+                <li key={c.id} className={`budget-${state}`}>
+                  <div className="money-budget-row">
+                    <span className="money-swatch" style={{ background: c.color }} />
+                    <span className="money-budget-name">{c.name}</span>
+                    <span className="money-budget-figures">
+                      {formatPounds(spent)} of {formatPounds(budget)}
+                    </span>
+                  </div>
+                  <div className="money-budget-bar" title={`${Math.round((spent / budget) * 100)}% of your ${c.name} budget`}>
+                    <div style={{ width: `${Math.min(100, (spent / budget) * 100)}%` }} />
+                  </div>
+                  <div className="money-budget-left">
+                    {state === 'over' ? (
+                      <>
+                        <AlertTriangle size={12} /> {formatPounds(spent - budget)} over budget
+                      </>
+                    ) : (
+                      <>
+                        {state === 'near' && <AlertTriangle size={12} />} {formatPounds(budget - spent)} left
+                        {state === 'near' && ' (nearly used up)'}
+                      </>
+                    )}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        ) : (
+          <p className="money-hint">
+            No budgets yet.{' '}
+            <button className="link-button" onClick={showBudgets}>
+              Set a monthly budget for each category
+            </button>{' '}
+            to see how you're doing here.
+          </p>
+        )}
       </section>
 
       <section className="money-section">
@@ -755,25 +801,24 @@ function Import({ done }: { done: () => void }) {
   )
 }
 
-function Budgets({ showBudget }: { showBudget: () => void }) {
+function Budgets() {
   const categories = useMoney((s) => s.categories)
+  const budgets = useMoney((s) => s.budgets)
   const spending = categories.filter((c) => !c.income)
   const incoming = categories.filter((c) => c.income)
+  const total = spending.reduce((n, c) => n + (budgets[c.id] ?? 0), 0)
 
   return (
     <>
       <section className="money-section">
-        <h3>Spending categories</h3>
+        <h3>Spending categories and monthly budgets</h3>
         <p className="money-hint">
-          Monthly limits for each category are on the{' '}
-          <button className="link-button" onClick={showBudget}>
-            Budget
-          </button>{' '}
-          tab.
+          Leave a budget empty if you don't want one for that category.
+          {total > 0 && ` Your budgets add up to ${formatPounds(total)} a month.`}
         </p>
         <ul className="money-cats">
           {spending.map((c) => (
-            <CategoryRow key={c.id} cat={c} />
+            <CategoryRow key={c.id} cat={c} budget={budgets[c.id]} />
           ))}
         </ul>
         <NewCategory income={false} />
@@ -791,8 +836,9 @@ function Budgets({ showBudget }: { showBudget: () => void }) {
   )
 }
 
-function CategoryRow({ cat }: { cat: MoneyCategory }) {
+function CategoryRow({ cat, budget }: { cat: MoneyCategory; budget?: number }) {
   const [name, setName] = useState(cat.name)
+  const [amount, setAmount] = useState(penceText(budget))
   const fixed = cat.id === OTHER || cat.id === OTHER_INCOME
   return (
     <li>
@@ -811,6 +857,26 @@ function CategoryRow({ cat }: { cat: MoneyCategory }) {
         onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
         aria-label="Category name"
       />
+      {!cat.income && (
+        <label className="money-amount">
+          <span>£</span>
+          <input
+            className="text-input"
+            inputMode="decimal"
+            placeholder="No budget"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            onBlur={() => {
+              const p = typedPence(amount) ?? 0
+              if (p !== (budget ?? 0)) setBudget(cat.id, p)
+              setAmount(penceText(p))
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+            aria-label={`Monthly budget for ${cat.name}`}
+          />
+          <span className="money-hint">a month</span>
+        </label>
+      )}
       {!fixed && (
         <button
           className="icon-btn"

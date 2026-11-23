@@ -48,29 +48,20 @@ export interface MoneyData {
   netWorth: NetWorthPoint[]
   /** Who owes you money and who you owe ("Sam: £8.50 for the takeaway"). */
   ious: Iou[]
-  /** The budget tracker: rollover, changes over time, one-month amounts and when to warn. `budgets` stays the amount for now. */
-  budget: BudgetSettings
+  /** Your budget, typed in line by line: each thing coming in or going out, and how often. */
+  budgetLines: BudgetLine[]
 }
 
-export interface BudgetSettings {
-  /** Warn when this share of a budget is used: 0.8 is 80%. */
-  warnAt: number
-  /**
-   * Categories whose leftover (or overspend) carries into the next month: category id → the first
-   * month ("YYYY-MM") whose leftover counts.
-   */
-  rollover: Record<string, string>
-  /**
-   * How each category's monthly budget changed over time, oldest first: [from month, pence], where 0
-   * is no budget. Past months keep the amount they had, so changing a budget doesn't rewrite history.
-   */
-  history: Record<string, [string, number][]>
-  /** Amounts for one month only: month → category id → pence (0 is no budget that month). */
-  months: Record<string, Record<string, number>>
+export interface BudgetLine {
+  id: string
+  /** What it is: "Netflix", "Rent", "Wages". */
+  name: string
+  /** Pence, always positive. */
+  amount: number
+  /** Money coming in rather than going out. */
+  income: boolean
+  interval: RepeatInterval
 }
-
-export const DEFAULT_WARN_AT = 0.8
-export const emptyBudget = (): BudgetSettings => ({ warnAt: DEFAULT_WARN_AT, rollover: {}, history: {}, months: {} })
 
 export type AccountKind = 'current' | 'savings' | 'cash' | 'credit' | 'other'
 
@@ -168,7 +159,7 @@ export const DEFAULT_CATEGORIES: MoneyCategory[] = [
   { id: OTHER_INCOME, name: 'Other income', color: GREY, income: true }
 ]
 
-export const emptyMoney = (): MoneyData => ({ categories: DEFAULT_CATEGORIES.map((c) => ({ ...c })), entries: [], budgets: {}, rules: {}, goals: [], notRecurring: [], subscriptions: [], cancelled: {}, balance: null, accounts: [], netWorth: [], ious: [], budget: emptyBudget() })
+export const emptyMoney = (): MoneyData => ({ categories: DEFAULT_CATEGORIES.map((c) => ({ ...c })), entries: [], budgets: {}, rules: {}, goals: [], notRecurring: [], subscriptions: [], cancelled: {}, balance: null, accounts: [], netWorth: [], ious: [], budgetLines: [] })
 
 /** Reads money.json, keeping whatever is usable from a damaged or older file. */
 export function readMoney(text: string | null): MoneyData {
@@ -295,38 +286,41 @@ export function readMoney(text: string | null): MoneyData {
         ...(isDay(x.settled) ? { settled: x.settled } : {})
       }))
   }
-  if (r.budget && typeof r.budget === 'object') data.budget = readBudget(r.budget as Record<string, unknown>)
+  if (Array.isArray(r.budgetLines)) {
+    data.budgetLines = (r.budgetLines as Record<string, unknown>[])
+      .filter((x) => !!x && typeof x.id === 'string' && typeof x.name === 'string' && Number.isFinite(x.amount))
+      .map((x) => ({
+        id: x.id as string,
+        name: (x.name as string).slice(0, 80),
+        amount: Math.abs(Math.round(x.amount as number)),
+        income: !!x.income,
+        interval: x.interval === 'weekly' || x.interval === 'yearly' ? x.interval : 'monthly'
+      }))
+  }
   return data
 }
 
-const isMonth = (m: unknown): m is string => typeof m === 'string' && /^\d{4}-\d{2}$/.test(m)
-const isPence = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0
+/** A budget line's amount as a monthly figure (a weekly £10 is about £43.33 a month). */
+export const lineMonthly = (line: Pick<BudgetLine, 'amount' | 'interval'>): number =>
+  Math.round(line.interval === 'weekly' ? (line.amount * 52) / 12 : line.interval === 'yearly' ? line.amount / 12 : line.amount)
 
-function readBudget(b: Record<string, unknown>): BudgetSettings {
-  const out = emptyBudget()
-  if (typeof b.warnAt === 'number' && b.warnAt >= 0.3 && b.warnAt < 1) out.warnAt = b.warnAt
-  if (b.rollover && typeof b.rollover === 'object') {
-    for (const [k, v] of Object.entries(b.rollover as Record<string, unknown>)) if (isMonth(v)) out.rollover[k] = v
+export interface BudgetTotals {
+  /** Pence a month. */
+  income: number
+  out: number
+  /** income - out: what's left over each month (negative when you plan to spend more than comes in). */
+  left: number
+}
+
+/** Adds up the budget as monthly figures. */
+export function budgetTotals(lines: BudgetLine[]): BudgetTotals {
+  let income = 0
+  let out = 0
+  for (const l of lines) {
+    if (l.income) income += lineMonthly(l)
+    else out += lineMonthly(l)
   }
-  if (b.history && typeof b.history === 'object') {
-    for (const [k, v] of Object.entries(b.history as Record<string, unknown>)) {
-      if (!Array.isArray(v)) continue
-      const steps = v
-        .filter((x): x is [string, number] => Array.isArray(x) && isMonth(x[0]) && isPence(x[1]))
-        .map(([m, p]): [string, number] => [m, Math.round(p)])
-        .sort((a, b) => a[0].localeCompare(b[0]))
-      if (steps.length) out.history[k] = steps
-    }
-  }
-  if (b.months && typeof b.months === 'object') {
-    for (const [m, cats] of Object.entries(b.months as Record<string, unknown>)) {
-      if (!isMonth(m) || !cats || typeof cats !== 'object') continue
-      const one: Record<string, number> = {}
-      for (const [k, v] of Object.entries(cats as Record<string, unknown>)) if (isPence(v)) one[k] = Math.round(v)
-      if (Object.keys(one).length) out.months[m] = one
-    }
-  }
-  return out
+  return { income, out, left: income - out }
 }
 
 export const newId = (): string => Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
@@ -447,10 +441,10 @@ export function monthTotals(entries: MoneyEntry[], month: string): MonthTotals {
 
 export type BudgetState = 'ok' | 'near' | 'over'
 
-/** Over the budget, or close to it (`warnAt` of it or more, 80% unless you changed it). */
-export function budgetState(spent: number, budget: number, warnAt = DEFAULT_WARN_AT): BudgetState {
+/** Over the budget, or close to it (80% or more). */
+export function budgetState(spent: number, budget: number): BudgetState {
   if (spent > budget) return 'over'
-  if (spent > 0 && spent >= budget * warnAt) return 'near'
+  if (spent >= budget * 0.8) return 'near'
   return 'ok'
 }
 
