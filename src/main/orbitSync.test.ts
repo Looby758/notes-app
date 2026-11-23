@@ -39,7 +39,7 @@ async function computer(name: string, readOnly = false): Promise<Computer> {
     root: () => notes,
     enabled: () => true,
     window: () => null,
-    readOnly,
+    readOnly: () => readOnly,
     parts: {
       settings: { kind: 'value', read: () => c.value, write: (v) => (c.value = v) },
       themes: { kind: 'folder', folder: () => c.themes, reload: () => undefined }
