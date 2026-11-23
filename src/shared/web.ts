@@ -111,39 +111,48 @@ export function firefoxOnGoogleSignIn(agent: string): void {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Looking like Google Chrome
+// Looking like Chromium, the same everywhere
 
 /**
- * Electron says "Chrome/136" in its browser name, but sends none of the "client hints" real Chrome
- * sends with every secure request (which browser, what version, on what), and tells pages it's plain
- * "Chromium" with an empty `window.chrome`. Google's sign-in treats that mismatch as a browser built
- * into an app: "This browser or app may not be secure". So web pages get what Google Chrome sends.
+ * Electron says "Chrome/136" in its browser name but sends none of the "client hints" Chromium sends
+ * with every secure request (which browser, what version, on what). Those are added here, saying
+ * exactly what the page's own `navigator.userAgentData` says: plain Chromium.
+ *
+ * They used to say "Google Chrome", with the page's own code patched to match. But that patch only
+ * reaches a page's top frame: frames inside it (Google's own "Sign in with Google" button and
+ * sign-in checks run in frames) still said plain "Chromium" with an empty `window.chrome`, while
+ * their requests said "Google Chrome". That mismatch is what Google looks for in browsers built into
+ * apps: "This browser or app may not be secure". Nothing is patched in the page any more, so every
+ * frame and every request tells the same story.
  */
 
-/** The platform name Chrome's client hints use. */
+/** The platform name Chromium's client hints use. */
 export function hintPlatform(platform: string): string {
   return platform === 'darwin' ? 'macOS' : platform === 'win32' ? 'Windows' : platform === 'linux' ? 'Linux' : 'Unknown'
 }
 
-/** Chrome's brand list for a version ("136.0.7103.177"): with `full`, the full versions. */
-export function chromeBrands(version: string, full = false): { brand: string; version: string }[] {
+/**
+ * Chromium's own brand list for a version ("136.0.7103.177"), in its own order, as the page's
+ * `navigator.userAgentData.brands` has it (with `full`, the full versions). Chromium makes up the
+ * "Not A Brand" entry and the order from the major version, the same way each time.
+ */
+export function chromiumBrands(version: string, full = false): { brand: string; version: string }[] {
   const major = version.split('.')[0] || '0'
-  const v = full ? version : major
-  return [
-    { brand: 'Chromium', version: v },
-    { brand: 'Google Chrome', version: v },
-    { brand: 'Not.A/Brand', version: full ? '99.0.0.0' : '99' }
-  ]
+  const seed = Number(major) || 0
+  const chars = [' ', '(', ':', '-', '.', '/', ')', ';', '=', '?', '_']
+  const greaseVersion = ['8', '99', '24'][seed % 3]
+  const grease = { brand: `Not${chars[seed % 11]}A${chars[(seed + 1) % 11]}Brand`, version: full ? `${greaseVersion}.0.0.0` : greaseVersion }
+  const chromium = { brand: 'Chromium', version: full ? version : major }
+  return seed % 2 === 0 ? [grease, chromium] : [chromium, grease]
 }
 
 const brandHeader = (brands: { brand: string; version: string }[]): string => brands.map((b) => `"${b.brand}";v="${b.version}"`).join(', ')
 
 /**
- * The client hints Google Chrome sends with a secure request: the usual three always, and the
- * fuller ones a site asked for (Accept-CH) only when Chromium already sends them (it fills those in
- * itself, just with the wrong brands, which are put right here). Headers already there are corrected.
+ * The client hints Chromium sends with a secure request: the usual three always, and the full
+ * version list only when Chromium already sends it. Headers already there are put right.
  */
-export function chromeHints(headers: Record<string, string>, version: string, platform: string): Record<string, string> {
+export function chromiumHints(headers: Record<string, string>, version: string, platform: string): Record<string, string> {
   const out = { ...headers }
   const find = (name: string): string | undefined => Object.keys(out).find((k) => k.toLowerCase() === name)
   const set = (name: string, value: string): void => {
@@ -151,89 +160,11 @@ export function chromeHints(headers: Record<string, string>, version: string, pl
     if (have && have !== name) delete out[have]
     out[name] = value
   }
-  set('sec-ch-ua', brandHeader(chromeBrands(version)))
+  set('sec-ch-ua', brandHeader(chromiumBrands(version)))
   if (!find('sec-ch-ua-mobile')) set('sec-ch-ua-mobile', '?0')
   if (!find('sec-ch-ua-platform')) set('sec-ch-ua-platform', `"${hintPlatform(platform)}"`)
-  if (find('sec-ch-ua-full-version-list')) set('sec-ch-ua-full-version-list', brandHeader(chromeBrands(version, true)))
+  if (find('sec-ch-ua-full-version-list')) set('sec-ch-ua-full-version-list', brandHeader(chromiumBrands(version, true)))
   return out
-}
-
-/**
- * Runs in each web page before the site's own code (src/preload/web.ts): the page sees Google
- * Chrome's brands, and a `window.chrome` like Chrome's. Self-contained: it's copied into the page.
- */
-export function chromeInPage(version: string, platform: string): void {
-  const major = version.split('.')[0] || '0'
-  const brands = [
-    { brand: 'Chromium', version: major },
-    { brand: 'Google Chrome', version: major },
-    { brand: 'Not.A/Brand', version: '99' }
-  ]
-  const fullList = [
-    { brand: 'Chromium', version },
-    { brand: 'Google Chrome', version },
-    { brand: 'Not.A/Brand', version: '99.0.0.0' }
-  ]
-  const proto = (window as { NavigatorUAData?: { prototype: object } }).NavigatorUAData?.prototype as
-    | { getHighEntropyValues?: (hints: string[]) => Promise<Record<string, unknown>> }
-    | undefined
-  if (proto) {
-    try {
-      Object.defineProperty(proto, 'brands', { get: () => brands.map((b) => ({ ...b })), configurable: true })
-      Object.defineProperty(proto, 'platform', { get: () => platform, configurable: true })
-      const high = proto.getHighEntropyValues
-      if (high) {
-        proto.getHighEntropyValues = function (this: unknown, hints: string[]) {
-          return high.call(this, hints).then((v) => ({
-            ...v,
-            brands: brands.map((b) => ({ ...b })),
-            platform,
-            ...(hints.includes('fullVersionList') ? { fullVersionList: fullList.map((b) => ({ ...b })) } : {}),
-            ...(hints.includes('uaFullVersion') ? { uaFullVersion: version } : {})
-          }))
-        }
-      }
-    } catch {
-      // leave it
-    }
-  }
-  // Chrome gives every page window.chrome with app, csi and loadTimes; Electron's is empty.
-  const w = window as { chrome?: Record<string, unknown> }
-  const chrome = (w.chrome ??= {})
-  if (!chrome.app) {
-    chrome.app = {
-      isInstalled: false,
-      InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' },
-      RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' },
-      getDetails: () => null,
-      getIsInstalled: () => false,
-      runningState: () => 'cannot_run'
-    }
-  }
-  if (!chrome.csi) {
-    const start = performance.timeOrigin
-    chrome.csi = () => ({ onloadT: Math.round(start + performance.now()), pageT: performance.now(), startE: Math.round(start), tran: 15 })
-  }
-  if (!chrome.loadTimes) {
-    chrome.loadTimes = () => {
-      const t = performance.timeOrigin / 1000
-      return {
-        commitLoadTime: t,
-        connectionInfo: 'h2',
-        finishDocumentLoadTime: t,
-        finishLoadTime: t,
-        firstPaintAfterLoadTime: 0,
-        firstPaintTime: t,
-        navigationType: 'Other',
-        npnNegotiatedProtocol: 'h2',
-        requestTime: t,
-        startLoadTime: t,
-        wasAlternateProtocolAvailable: false,
-        wasFetchedViaSpdy: true,
-        wasNpnNegotiated: true
-      }
-    }
-  }
 }
 
 /**
