@@ -8453,6 +8453,14 @@ a.passwords-text:hover {
   gap: 12px;
   margin-bottom: 18px;
 }
+.money-head .segmented {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+.money-head .segmented button {
+  flex: none;
+  white-space: nowrap;
+}
 .money-head h2 {
   display: flex;
   align-items: center;
@@ -8935,6 +8943,72 @@ a.passwords-text:hover {
 }
 .money-home-warn.budget-over svg {
   color: #f97066;
+}
+
+/* ---------- budget, line by line ---------- */
+.money-lines {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.money-lines li,
+.money-new-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.money-lines .money-line-name,
+.money-new-line .money-line-name {
+  flex: 1;
+  min-width: 120px;
+}
+.money-lines .money-amount,
+.money-new-line .money-amount {
+  flex: none;
+}
+.money-lines .money-amount input,
+.money-new-line .money-amount input {
+  width: 100px;
+}
+.money-lines .select.money-line-interval,
+.money-new-line .select.money-line-interval {
+  flex: none;
+  width: 110px;
+}
+.money-line-monthly {
+  flex: none;
+  width: 120px;
+}
+.money-new-line .btn {
+  flex: none;
+  width: 148px;
+  justify-content: center;
+}
+.money-line-monthly {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.money-line-total {
+  margin-left: 10px;
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.money-line-share {
+  --budget-color: var(--accent);
+  margin: 4px 0 8px;
+}
+.money-line-share.over {
+  --budget-color: #f97066;
+}
+.money-line-share .money-budget-bar {
+  margin-bottom: 4px;
+}
+.money-line-share .money-hint {
+  font-size: 12.5px;
 }
 
 /* ---------- file converter ---------- */

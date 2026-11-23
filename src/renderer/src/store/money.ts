@@ -9,6 +9,7 @@ import {
   OTHER_INCOME,
   type Account,
   type Balance,
+  type BudgetLine,
   type Iou,
   type ManualSubscription,
   type MoneyCategory,
@@ -53,11 +54,11 @@ function persist(): void {
     return
   }
   writing = true
-  const { categories, entries, budgets, rules, goals, notRecurring, subscriptions, cancelled, balance, accounts, netWorth, ious } = useMoney.getState()
+  const { categories, entries, budgets, rules, goals, notRecurring, subscriptions, cancelled, balance, accounts, netWorth, ious, budgetLines } = useMoney.getState()
   window.api
     .writeAppData(
       FILE,
-      JSON.stringify({ categories, entries, budgets, rules, goals, notRecurring, subscriptions, cancelled, balance, accounts, netWorth, ious }, null, 2)
+      JSON.stringify({ categories, entries, budgets, rules, goals, notRecurring, subscriptions, cancelled, balance, accounts, netWorth, ious, budgetLines }, null, 2)
     )
     .catch(notify)
     .finally(() => {
@@ -323,6 +324,25 @@ export function deleteIou(id: string): Iou | undefined {
 export function markReminded(ids: string[]): void {
   const set = new Set(ids)
   write({ ious: useMoney.getState().ious.map((i) => (set.has(i.id) ? { ...i, reminded: i.remind } : i)) })
+}
+
+// ---------- your budget, line by line ----------
+
+export function addBudgetLines(lines: Omit<BudgetLine, 'id'>[]): BudgetLine[] {
+  const made = lines.map((l) => ({ ...l, id: newId() }))
+  save({ budgetLines: [...useMoney.getState().budgetLines, ...made] }, made.length === 1 ? `Added ${named(made[0].name, 'a line')} to your budget` : `Added ${made.length} lines to your budget`)
+  return made
+}
+
+export function updateBudgetLine(id: string, change: Partial<Omit<BudgetLine, 'id'>>): void {
+  const line = useMoney.getState().budgetLines.find((l) => l.id === id)
+  save({ budgetLines: useMoney.getState().budgetLines.map((l) => (l.id === id ? { ...l, ...change } : l)) }, `Changed ${named(line?.name, 'a budget line')}`, `line:${id}:${Object.keys(change).sort().join(',')}`)
+}
+
+export function deleteBudgetLine(id: string): void {
+  const line = useMoney.getState().budgetLines.find((l) => l.id === id)
+  if (!line) return
+  save({ budgetLines: useMoney.getState().budgetLines.filter((l) => l.id !== id) }, `Removed ${named(line.name, 'a line')} from your budget`)
 }
 
 /** Which part of the Money page to show next time it opens (a reminder opens IOUs). */

@@ -68,3 +68,27 @@ describe('accounts, net worth and IOUs', () => {
     expect(useMoney.getState().ious[0].settled).toBeUndefined()
   })
 })
+
+describe('budget lines', () => {
+  beforeEach(async () => {
+    await loadMoney()
+    history.clear()
+  })
+
+  it('adds, changes and removes lines, and undoes each', async () => {
+    const { addBudgetLines, updateBudgetLine, deleteBudgetLine } = await import('./money')
+    const [netflix] = addBudgetLines([{ name: 'Netflix', amount: 1099, income: false, interval: 'monthly' }])
+    updateBudgetLine(netflix.id, { amount: 1299 })
+    expect(useMoney.getState().budgetLines[0].amount).toBe(1299)
+    deleteBudgetLine(netflix.id)
+    expect(useMoney.getState().budgetLines).toEqual([])
+    expect(await history.undo()).toBe('Removed “Netflix” from your budget')
+    await history.undo()
+    expect(useMoney.getState().budgetLines[0].amount).toBe(1099)
+    addBudgetLines([
+      { name: 'Wages', amount: 200000, income: true, interval: 'monthly' },
+      { name: 'Spotify', amount: 1199, income: false, interval: 'monthly' }
+    ])
+    expect(await history.undo()).toBe('Added 2 lines to your budget')
+  })
+})

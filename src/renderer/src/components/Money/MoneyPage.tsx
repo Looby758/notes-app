@@ -42,6 +42,7 @@ import { addHomeCard } from '../../lib/home'
 import { readWorkbook } from '../../lib/sheets'
 import { statementFromPdf } from '../../lib/pdfStatement'
 import MoneyHomeCard from './MoneyHomeCard'
+import BudgetView, { BudgetHomeCard } from './MoneyBudget'
 import MoneyPlans, { AskMoney, ForecastCard } from './MoneyPlans'
 import { IousView, NetWorthView } from './MoneyAccounts'
 import EmptyArt from '../Motion/EmptyArt'
@@ -49,16 +50,18 @@ import { refreshAiStatus, useAi } from '../../store/ai'
 import { errorMessage } from '../../lib/paths'
 
 addHomeCard({ id: 'money', order: 25, title: 'Spending this month', Card: MoneyHomeCard })
+addHomeCard({ id: 'budget', order: 25.5, title: 'Budget', Card: BudgetHomeCard })
 
-type View = 'overview' | 'entries' | 'plans' | 'accounts' | 'ious' | 'import' | 'budgets'
+type View = 'overview' | 'budget' | 'entries' | 'plans' | 'accounts' | 'ious' | 'import' | 'budgets'
 const VIEWS: [View, string][] = [
   ['overview', 'This month'],
+  ['budget', 'Budget'],
   ['entries', 'Spending log'],
   ['plans', 'Goals & bills'],
   ['accounts', 'Net worth'],
   ['ious', 'IOUs'],
   ['import', 'Import statement'],
-  ['budgets', 'Budgets & categories']
+  ['budgets', 'Categories']
 ]
 
 /** "12.50" typed into a box → pence (always positive), or null. */
@@ -103,6 +106,7 @@ export default function MoneyPage() {
             </>
           )}
           {view === 'overview' && <Overview month={month} setMonth={setMonth} showBudgets={() => setView('budgets')} />}
+          {view === 'budget' && <BudgetView />}
           {view === 'entries' && <Entries month={month} edit={setEditing} />}
           {view === 'plans' && <MoneyPlans />}
           {view === 'accounts' && <NetWorthView />}
