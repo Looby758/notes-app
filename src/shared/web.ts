@@ -180,6 +180,19 @@ export function isGoogleRejection(url: string): boolean {
   }
 }
 
+/**
+ * What Google's sign-in pages are told the browser is: the plain browser name with Orbit's own name
+ * on the end ("… Chrome/136.0.0.0 Safari/537.36 Orbit/1.13.6"), the way Edge or Opera add theirs.
+ *
+ * Google turns away a browser that says it's plain Google Chrome but isn't ("This browser or app may
+ * not be secure"), whatever version it claims, and nowadays turns away Firefox's name from Chromium
+ * too. A Chromium browser that names itself gets through. Checked against Google's real sign-in in
+ * Electron 36: the plain name and Firefox's were refused every time, this one got through.
+ */
+export function googleSignInAgent(agent: string, appVersion: string): string {
+  return `${agent} Orbit/${appVersion}`
+}
+
 /** Firefox's browser name on this kind of computer. */
 export function firefoxUserAgent(platform: string): string {
   const system =

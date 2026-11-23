@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { displayUrl, firefoxOnGoogleSignIn, firefoxUserAgent, isGoogleSignIn, isWebUrl, plainUserAgent, toWebUrl } from './web'
-import { chromiumBrands, chromiumHints, hintPlatform, isGoogleRejection } from './web'
+import { chromiumBrands, chromiumHints, googleSignInAgent, hintPlatform, isGoogleRejection } from './web'
 
 describe('toWebUrl', () => {
   it('opens addresses', () => {
@@ -146,5 +146,12 @@ describe('looking like Chromium', () => {
     expect(some['sec-ch-ua']).not.toContain('Google Chrome')
     expect(some['sec-ch-ua-full-version-list']).toBe('"Not.A/Brand";v="99.0.0.0", "Chromium";v="136.0.7103.177"')
     expect(some['sec-ch-ua-platform']).toBe('"Windows"')
+  })
+})
+
+describe('googleSignInAgent', () => {
+  it("names Orbit after the plain browser name, so Google doesn't take it for a fake Chrome", () => {
+    const plain = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
+    expect(googleSignInAgent(plain, '1.13.6')).toBe(`${plain} Orbit/1.13.6`)
   })
 })
