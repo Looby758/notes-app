@@ -60,6 +60,22 @@ export function badgeText(count: number): string {
 }
 
 /**
+ * Whether a page needs windowSizedToPage: only Discord's own pages. Everywhere else the window keeps
+ * its real outer size. A window whose outer size is exactly the page's, reported by a script's
+ * getter rather than the browser's own, is what Google's sign-in looks for in browsers built into
+ * apps and automated ones: with it on every page, Google went back to "This browser or app may not
+ * be secure".
+ */
+export function needsPageSizedWindow(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase()
+    return ['discord.com', 'discordapp.com'].some((d) => host === d || host.endsWith(`.${d}`))
+  } catch {
+    return false
+  }
+}
+
+/**
  * Runs in each web page before the site's own code (src/preload/web.ts): the window's outer size is
  * the page's own size, as in a browser window with nothing around the page.
  *
