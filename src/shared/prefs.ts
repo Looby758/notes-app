@@ -2,6 +2,7 @@ import { allThemes } from './themes'
 import { IS_MAC } from './platform'
 import { cleanClocks, type WorldClock } from './worldClock'
 import { cleanCountdowns, type Countdown } from './countdown'
+import { ADDON_IDS, cleanInstalledAddons } from './addons'
 import { cleanEq, CROSSFADE_MAX, DEFAULT_EQ, VISUALISER_STYLES, type MusicEq, type VisualiserStyle } from './musicSound'
 
 /**
@@ -256,6 +257,13 @@ export interface Prefs {
   /** Holding the middle mouse button opens a ring of these features under the pointer. */
   radialMiddleClick: boolean
   radialFeatures: string[]
+  /**
+   * The add-ons you've added (shared/addons.ts). Saved in the notes folder with the rest of
+   * Settings, so they follow your notes to another computer. Missing (Orbit from before add-ons) means all of them.
+   */
+  installedAddons: string[]
+  /** Every add-on Orbit knew about when installedAddons was saved, so ones that come in an update aren't missed. */
+  addonsSeen: string[]
   /** Buttons on the phone's Deck tab: feature ids, and a few phone-only actions (lib/phoneDeck.ts). */
   phoneDeck: string[]
   /** Ctrl+K: if no built-in pattern understands a sentence, offer to ask the AI (never sent without asking). */
@@ -406,6 +414,8 @@ export const DEFAULT_PREFS: Prefs = {
   dockFeatures: ['home', 'today', 'calendar', 'email', 'messages', 'money', 'chat', 'ask', 'explorer', 'convert', 'music', 'games'],
   radialMiddleClick: true,
   radialFeatures: ['today', 'new-note', 'calendar', 'money', 'music', 'email', 'snip', 'ask'],
+  installedAddons: [...ADDON_IDS],
+  addonsSeen: [...ADDON_IDS],
   smartCommandsAi: true,
   filesWholePcSearch: true,
   phoneDeck: ['play-pause', 'next-song', 'previous-song', 'today', 'new-note', 'snip', 'streamer', 'lock-all', 'zen', 'money', 'calendar', 'messages'],
@@ -567,6 +577,8 @@ export function normalizePrefs(raw: unknown): Prefs {
   out.countdowns = cleanCountdowns(input.countdowns)
   out.musicEq = cleanEq(input.musicEq)
   out.musicCrossfade = Math.round(out.musicCrossfade)
+  out.installedAddons = cleanInstalledAddons(input.installedAddons, input.addonsSeen)
+  out.addonsSeen = [...ADDON_IDS]
   for (const k of ['topbarFeatures', 'dockFeatures', 'radialFeatures', 'phoneDeck'] as const) {
     out[k] = input[k] === undefined ? [...DEFAULT_PREFS[k]] : renameFeatures(cleanIds(input[k]))
   }
