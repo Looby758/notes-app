@@ -23946,4 +23946,154 @@ img.tm-icon {
   justify-content: center;
   gap: 8px;
   margin-top: 10px;
+
+/* ---- Uninstaller (components/Uninstaller) ---- */
+.un-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.un-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.un-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 80px 90px auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+}
+.un-row:first-child {
+  border-top: none;
+}
+.un-row:hover {
+  background: var(--bg-hover);
+}
+.un-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+.un-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.un-name strong {
+  font-weight: 500;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.un-name span {
+  font-size: 12px;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.un-size,
+.un-date {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.un-row .btn.un-go {
+  opacity: 0;
+}
+.un-row:hover .btn.un-go,
+.un-row .btn.un-go:focus-visible {
+  opacity: 1;
+}
+.btn.un-go:hover {
+  border-color: #f87171;
+  color: #f87171;
+}
+.un-card {
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-panel);
+}
+.un-card > p {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.un-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.un-card-head h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.un-group h4 {
+  margin: 14px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+.un-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.un-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 0;
+}
+.un-item label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+.un-path {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+.un-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+.un-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.un-failed {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  font-family: var(--font-mono);
 }

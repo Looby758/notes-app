@@ -43,6 +43,7 @@ import {
   SCREENS_TAB,
   MIXER_TAB,
   TASKS_TAB,
+  UNINSTALL_TAB,
   MUSIC_TAB,
   DOWNLOADS_TAB,
   STUDIO_TAB,
@@ -101,6 +102,7 @@ import PublishingPage from '../Publishing/PublishingPage'
 import ScreensPage from '../Screens/ScreensPage'
 import MixerPage from '../Mixer/MixerPage'
 import TaskManagerPage from '../TaskManager/TaskManagerPage'
+import UninstallerPage from '../Uninstaller/UninstallerPage'
 import MusicPage from '../Music/MusicPage'
 import StudioPage from '../Studio/StudioPage'
 import AppStudioPage from '../AppStudio/AppStudioPage'
@@ -265,6 +267,7 @@ export default function Pane({ pane }: { pane: string }) {
         {shown === SCREENS_TAB && <ScreensPage />}
         {shown === MIXER_TAB && <MixerPage />}
         {shown === TASKS_TAB && <TaskManagerPage />}
+        {shown === UNINSTALL_TAB && <UninstallerPage />}
         {shown === MUSIC_TAB && <MusicPage />}
         {shown === DOWNLOADS_TAB && <DownloadsPage />}
         {shown === STUDIO_TAB && <StudioPage />}
