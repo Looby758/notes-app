@@ -194,7 +194,8 @@ describe('the app’s What’s new list', () => {
     new Function('module', 'exports', js)(mod, mod.exports)
     const notes = mod.exports.RELEASE_NOTES as { version: string; items: string[] }[]
     expect(notes[0]).toEqual({ version: '9.9.9', items })
-    expect(notes[1].version).toBe('1.13.0')
+    // The newest entry already there comes next, whatever it is by now.
+    expect(notes[1].version).toBe(notesVersions(real)[0])
     // Indented like the entries already there.
     expect(out).toContain("\n  {\n    version: '9.9.9',\n    items: [\n      'Releases: checks before releasing',")
   })
