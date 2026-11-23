@@ -10,6 +10,12 @@ import { basename, dirname, join, resolve } from 'path'
 export const TEST_COPY = !app.isPackaged
 
 /**
+ * Windows groups taskbar buttons by this id: a test copy has its own, so it gets its own button
+ * instead of stacking under your real Orbit.
+ */
+export const WINDOWS_APP_ID = TEST_COPY ? 'com.notesapp.desktop.testcopy' : 'com.notesapp.desktop'
+
+/**
  * App Studio's test copies of Orbit (a pull request's version, in "notes-app-test-copies/<branch>")
  * each get a data folder of their own, so several can run side by side.
  */

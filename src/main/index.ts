@@ -100,7 +100,7 @@ import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
 import { setupAppStudio } from './appStudio'
 import { setupReleaseHelper } from './releaseHelper'
-import { TEST_COPY, TEST_COPY_FOLDER, testCopyReadOnly } from './testCopy'
+import { TEST_COPY, TEST_COPY_FOLDER, testCopyReadOnly, WINDOWS_APP_ID } from './testCopy'
 import { setupGames } from './games'
 import { setupGameCovers } from './gameCovers'
 import { setupSkyblock } from './skyblock'
@@ -134,7 +134,7 @@ app.setPath('userData', join(app.getPath('appData'), TEST_COPY ? TEST_COPY_FOLDE
 app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns')
 
 // Windows shows notifications under this app id (it matches the installer's).
-if (process.platform === 'win32') app.setAppUserModelId(TEST_COPY ? 'com.notesapp.desktop.testcopy' : 'com.notesapp.desktop')
+if (process.platform === 'win32') app.setAppUserModelId(WINDOWS_APP_ID)
 
 // Only one copy of Notes runs; starting it again just brings the window back.
 if (!app.requestSingleInstanceLock()) {
