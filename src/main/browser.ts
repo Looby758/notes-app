@@ -517,7 +517,11 @@ function broadcast(channel: string, value: unknown): void {
 /** The same walled-off setup for the web tabs' storage and the private tabs'. */
 function setupWebSession(ses: Session, isPrivate: boolean, preload: { type: 'frame'; filePath: string }): void {
   ses.registerPreloadScript(preload)
-  ses.setUserAgent(plainUserAgent(ses.getUserAgent()))
+  // Web tabs name Orbit after the plain browser name, everywhere: Google's sign-in refuses a browser
+  // that passes itself off as plain Chrome (see googleSignInAgent), and a sign-in that hears two
+  // different names (the site's page and Google's pop-up) loops back to "Choose an account". The
+  // messages hub keeps the plain name (WhatsApp wants it).
+  ses.setUserAgent(googleSignInAgent(plainUserAgent(ses.getUserAgent()), app.getVersion()))
   ses.setPermissionRequestHandler((wc, permission, callback, details) => permissionRequest(wc, permission, details as { requestingUrl?: string; mediaTypes?: string[] }, callback))
   ses.setPermissionCheckHandler((wc, permission, origin, details) => permissionCheck(wc, permission, origin, details as { mediaType?: string }))
   // Secure requests carry the "client hints" Chromium sends (which browser, version, on what), the
@@ -875,7 +879,10 @@ export function guardPage(page: WebContents, host: () => WebContents | null, { a
       return
     }
     if (isGoogleRejection(url)) {
-      if (triedAsFirefox || asFirefox() || !signInStart) return
+      // Only when the "as Firefox" setting is off: retried as Firefox, once. Google has since started
+      // refusing Firefox's name from Chromium too, so this is off unless ORBIT_RETRY_AS_FIREFOX is set:
+      // switching names mid sign-in also sends Grok's "Sign in with Google" back to "Choose an account".
+      if (!process.env.ORBIT_RETRY_AS_FIREFOX || triedAsFirefox || asFirefox() || !signInStart) return
       triedAsFirefox = true
       retryAsFirefox = { page: page.id, until: Date.now() + 15 * 60_000 }
       page.setUserAgent(SIGN_IN_AGENT)

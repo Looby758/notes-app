@@ -153,5 +153,6 @@ describe('googleSignInAgent', () => {
   it("names Orbit after the plain browser name, so Google doesn't take it for a fake Chrome", () => {
     const plain = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
     expect(googleSignInAgent(plain, '1.13.6')).toBe(`${plain} Orbit/1.13.6`)
+    expect(googleSignInAgent(googleSignInAgent(plain, '1.13.6'), '1.13.6')).toBe(`${plain} Orbit/1.13.6`)
   })
 })
