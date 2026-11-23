@@ -12,6 +12,12 @@ export interface ReleaseNotes {
 /** Newest first. Add an entry with each release. */
 export const RELEASE_NOTES: readonly ReleaseNotes[] = [
   {
+    version: '1.13.5',
+    items: [
+      'Fix Google sign-in still saying "This browser or app may not be secure" on the Mac'
+    ]
+  },
+  {
     version: '1.13.4',
     items: [
       'Fix Google sign-in saying "This browser or app may not be secure" again'
