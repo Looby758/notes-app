@@ -1,7 +1,7 @@
 import { execFile, spawn } from 'child_process'
 import { createHash } from 'crypto'
 import { accessSync, constants, createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
-import { dirname, join, resolve } from 'path'
+import { dirname, join, posix } from 'path'
 import { promisify } from 'util'
 
 /**
@@ -49,7 +49,8 @@ export function releaseFileUrl(file: string, version: string, repo: string, test
 
 /** The .app folder Orbit is running from (…/Orbit.app/Contents/MacOS/Orbit → …/Orbit.app). */
 export function appBundleOf(execPath: string): string | undefined {
-  const bundle = resolve(execPath, '..', '..', '..')
+  // A macOS path, so posix even when the tests run on Windows (resolve would add a drive letter).
+  const bundle = posix.dirname(posix.dirname(posix.dirname(execPath)))
   return /\.app$/i.test(bundle) ? bundle : undefined
 }
 
