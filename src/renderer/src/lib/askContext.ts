@@ -1,4 +1,5 @@
 import type { CalEvent } from '@shared/types'
+import { budgetMonth } from './moneyBudget'
 import { formatPounds, monthName, monthTotals, addMonths, type MoneyData } from './money'
 import { allRecurring, forecastMonth, monthlyCost } from './moneyInsights'
 import { iouLeft, netWorth, openIous } from './moneyAccounts'
@@ -31,8 +32,12 @@ export function moneyContext(data: MoneyData, today: string, question: string, b
     const cats = [...t.byCategory].sort((a, b) => b[1] - a[1]).map(([c, p]) => `${name(c)} ${formatPounds(p)}`)
     out.push(`${monthName(m)}${i === 0 ? ' (so far)' : ''}: in ${formatPounds(t.received)}, out ${formatPounds(t.spent)}. ${cats.join(', ')}`)
   }
-  const budgets = Object.entries(data.budgets).map(([c, p]) => `${name(c)} ${formatPounds(p)}/month`)
-  if (budgets.length) out.push(`Budgets: ${budgets.join(', ')}`)
+  const b = budgetMonth(data, month, today)
+  const budgets = b.rows.map(
+    (r) =>
+      `${name(r.cat.id)} ${formatPounds(r.limit)}/month${r.carry ? ` (${r.carry > 0 ? '+' : '-'}${formatPounds(Math.abs(r.carry))} rolled over)` : ''}: ${formatPounds(r.spent)} spent, ${r.left >= 0 ? `${formatPounds(r.left)} left` : `${formatPounds(-r.left)} over`}`
+  )
+  if (budgets.length) out.push(`Budgets for ${monthName(month)}: ${budgets.join('; ')}. About ${formatPounds(b.perDay ?? 0)} a day left to stay within them.`)
   for (const g of data.goals) out.push(`Savings goal: ${g.name}, ${formatPounds(g.saved)} of ${formatPounds(g.target)}${g.due ? ` by ${g.due}` : ''}`)
   const recurring = allRecurring(data, today)
   for (const r of recurring) out.push(`Repeating ${r.income ? 'income' : 'payment'}: ${r.name}, ${formatPounds(r.amount)} ${r.interval} (about ${formatPounds(monthlyCost(r))} a month)${r.manual ? ', added by hand' : ''}${r.last ? `, last ${r.last}` : ''}, next ${r.next}`)

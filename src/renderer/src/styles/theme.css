@@ -8937,6 +8937,144 @@ a.passwords-text:hover {
   color: #f97066;
 }
 
+/* ---------- budget tracker ---------- */
+.money-budget-bar {
+  position: relative;
+}
+.money-budget-pace {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--text-muted);
+  opacity: 0.75;
+}
+.money-budgets li.budget-ahead.budget-ok {
+  --budget-color: #e0b030;
+}
+.budget-ahead .money-budget-left svg {
+  color: #f5a524;
+}
+.money-budget-list .money-budget-row .icon-btn {
+  margin: -4px -4px -4px 0;
+}
+.money-budget-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.money-budget-carry {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.money-budget-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-panel);
+}
+.money-budget-editor .money-amount input {
+  width: 90px;
+}
+.money-budget-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.money-budget-none {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.money-budget-none li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.money-budget-none li:last-child {
+  border-bottom: none;
+}
+.money-budget-none .money-budget-row {
+  margin-bottom: 0;
+}
+.money-budget-none .link-button {
+  margin-left: 10px;
+}
+.money-budget-history {
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.money-budget-history th {
+  padding: 3px 8px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-align: center;
+}
+.money-budget-history tbody th {
+  text-align: left;
+  color: var(--text);
+  white-space: nowrap;
+}
+.money-budget-history td {
+  padding: 3px 8px;
+  text-align: center;
+}
+.money-budget-cell {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: var(--bg-raised);
+}
+.money-budget-cell.budget-ok {
+  background: #199e70;
+}
+.money-budget-cell.budget-near {
+  background: #f5a524;
+}
+.money-budget-cell.budget-over {
+  background: #f97066;
+}
+.money-budget-warn-at .select {
+  display: inline-block;
+  width: auto;
+  max-width: 90px;
+  margin: 0 4px;
+}
+.money-budget-home {
+  --budget-color: var(--accent);
+}
+.money-budget-home.budget-near {
+  --budget-color: #f5a524;
+}
+.money-budget-home.budget-over {
+  --budget-color: #f97066;
+}
+.money-budget-home .money-budget-bar {
+  margin: 8px 0 2px;
+}
+button.money-home-warn {
+  width: 100%;
+  text-align: left;
+  color: var(--text);
+}
+.money-home-warn.budget-ahead svg {
+  color: #f5a524;
+}
+
 /* ---------- file converter ---------- */
 .pane-body > .convert-page {
   flex: 1;

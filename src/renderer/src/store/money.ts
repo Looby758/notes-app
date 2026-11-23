@@ -20,6 +20,8 @@ import {
 import { notify } from './notify'
 import { recordUndo } from '../lib/undo'
 import { netWorth, recordNetWorth } from '../lib/moneyAccounts'
+import { budgetMonth, budgetWarnings, limitFor, withBudgetFrom } from '../lib/moneyBudget'
+import { formatPounds, monthOf } from '../lib/money'
 
 /**
  * The money tracker. Saved in the vault (.notesapp/money.json) so it follows your notes to other
@@ -53,11 +55,11 @@ function persist(): void {
     return
   }
   writing = true
-  const { categories, entries, budgets, rules, goals, notRecurring, subscriptions, cancelled, balance, accounts, netWorth, ious } = useMoney.getState()
+  const { categories, entries, budgets, rules, goals, notRecurring, subscriptions, cancelled, balance, accounts, netWorth, ious, budget } = useMoney.getState()
   window.api
     .writeAppData(
       FILE,
-      JSON.stringify({ categories, entries, budgets, rules, goals, notRecurring, subscriptions, cancelled, balance, accounts, netWorth, ious }, null, 2)
+      JSON.stringify({ categories, entries, budgets, rules, goals, notRecurring, subscriptions, cancelled, balance, accounts, netWorth, ious, budget }, null, 2)
     )
     .catch(notify)
     .finally(() => {
@@ -99,11 +101,41 @@ function learn(rules: Record<string, string>, entry: MoneyEntry, category: strin
   return key ? { ...rules, [key]: category } : rules
 }
 
+/**
+ * Runs a change to the entries and, if it pushed this month's budgets nearer (or over) their limit,
+ * says so at the bottom of the sidebar.
+ */
+function withBudgetCheck(change: () => void): void {
+  const today = dayOf(new Date())
+  const month = today.slice(0, 7)
+  const before = budgetMonth(useMoney.getState(), month, today)
+  change()
+  const worse = budgetWarnings(before, budgetMonth(useMoney.getState(), month, today))
+  if (!worse.length) return
+  const text = worse
+    .map((r) => (r.state === 'over' ? `${r.cat.name} is ${formatPounds(-r.left)} over budget` : `${r.cat.name}: only ${formatPounds(r.left)} left this month`))
+    .join(' · ')
+  notify(text, 'info', { label: 'See budget', run: () => {
+      useMoneyView.setState({ view: 'budget' })
+      void import('../lib/editorController').then((m) => m.openSpecialTab(m.MONEY_TAB))
+    }
+  })
+}
+
 export function addEntry(entry: Omit<MoneyEntry, 'id'>): void {
+  if (!entry.income && entry.date.startsWith(monthOf(new Date()))) return withBudgetCheck(() => addEntryNow(entry))
+  addEntryNow(entry)
+}
+
+function addEntryNow(entry: Omit<MoneyEntry, 'id'>): void {
   save({ entries: [...useMoney.getState().entries, { ...entry, id: newId() }] }, `Added ${named(entry.note, 'an entry')}`)
 }
 
 export function updateEntry(id: string, change: Partial<Omit<MoneyEntry, 'id'>>): void {
+  withBudgetCheck(() => updateEntryNow(id, change))
+}
+
+function updateEntryNow(id: string, change: Partial<Omit<MoneyEntry, 'id'>>): void {
   const { entries, rules } = useMoney.getState()
   const old = entries.find((e) => e.id === id)
   if (!old) return
@@ -123,15 +155,67 @@ export function deleteEntry(id: string): MoneyEntry | undefined {
 
 /** Adds statement rows; the categories you chose are remembered for those shops. */
 export function importEntries(rows: Omit<MoneyEntry, 'id'>[], picked: Record<string, string>): void {
-  const { entries, rules } = useMoney.getState()
-  save({ entries: [...entries, ...rows.map((r) => ({ ...r, id: newId() }))], rules: { ...rules, ...picked } }, `Imported ${rows.length} ${rows.length === 1 ? 'entry' : 'entries'}`)
+  withBudgetCheck(() => {
+    const { entries, rules } = useMoney.getState()
+    save({ entries: [...entries, ...rows.map((r) => ({ ...r, id: newId() }))], rules: { ...rules, ...picked } }, `Imported ${rows.length} ${rows.length === 1 ? 'entry' : 'entries'}`)
+  })
 }
 
-export function setBudget(category: string, pence: number): void {
-  const budgets = { ...useMoney.getState().budgets }
-  if (pence > 0) budgets[category] = pence
+/**
+ * Sets a category's monthly budget (0 for none) from `from` on (this month unless given). Earlier
+ * months keep the budget they had. A one-month amount for a later month stays as it is.
+ */
+export function setBudget(category: string, pence: number, from = monthOf(new Date())): void {
+  const state = useMoney.getState()
+  const history = withBudgetFrom(state, category, pence, from)
+  const budget = { ...state.budget, history }
+  // `budgets` stays the amount for this month, for older versions of Orbit and the rest of Money.
+  const budgets = { ...state.budgets }
+  const now = limitFor({ budgets: state.budgets, budget: { ...budget, months: {} } }, category, monthOf(new Date()))
+  if (now > 0) budgets[category] = now
   else delete budgets[category]
-  save({ budgets }, 'Changed a budget', `budget:${category}`)
+  save({ budgets, budget }, 'Changed a budget', `budget:${category}:${from}`)
+}
+
+/** Sets several budgets at once (suggested ones, say), from this month on, as one undo step. */
+export function setBudgets(amounts: Record<string, number>): void {
+  const month = monthOf(new Date())
+  let { budgets, budget } = useMoney.getState()
+  for (const [category, pence] of Object.entries(amounts)) {
+    budget = { ...budget, history: withBudgetFrom({ budgets, budget }, category, pence, month) }
+    budgets = { ...budgets }
+    if (pence > 0) budgets[category] = pence
+    else delete budgets[category]
+  }
+  const n = Object.keys(amounts).length
+  save({ budgets, budget }, `Set ${n} ${n === 1 ? 'budget' : 'budgets'}`)
+}
+
+/** A different budget for just one month (pence, 0 for none that month), or null to go back to the usual one. */
+export function setMonthBudget(category: string, month: string, pence: number | null): void {
+  const { budget } = useMoney.getState()
+  const { [category]: _old, ...rest } = budget.months[month] ?? {}
+  const one = pence === null ? rest : { ...rest, [category]: Math.max(0, Math.round(pence)) }
+  const months = { ...budget.months }
+  if (Object.keys(one).length) months[month] = one
+  else delete months[month]
+  save({ budget: { ...budget, months } }, pence === null ? 'Went back to the usual budget' : 'Changed a budget for one month', `budget:${category}:${month}:once`)
+}
+
+/**
+ * Turns rollover on or off for a category. On, the leftover (or overspend) of each month from
+ * `from` on carries into the next.
+ */
+export function setRollover(category: string, from: string | null): void {
+  const { budget } = useMoney.getState()
+  const { [category]: _old, ...rest } = budget.rollover
+  save({ budget: { ...budget, rollover: from ? { ...rest, [category]: from } : rest } }, from ? 'Turned on rollover' : 'Turned off rollover')
+}
+
+/** When budgets count as nearly used up: 0.8 is 80%. */
+export function setBudgetWarnAt(warnAt: number): void {
+  const { budget } = useMoney.getState()
+  save({ budget: { ...budget, warnAt } }, 'Changed when budgets warn you', 'budget:warnAt')
 }
 
 export function addCategory(category: Omit<MoneyCategory, 'id'>): void {
@@ -146,15 +230,18 @@ export function updateCategory(id: string, change: Partial<Omit<MoneyCategory, '
 /** Deletes a category; its entries move to Other (or Other income). */
 export function deleteCategory(id: string): void {
   if (id === OTHER || id === OTHER_INCOME) return
-  const { categories, entries, budgets, rules } = useMoney.getState()
+  const { categories, entries, budgets, rules, budget } = useMoney.getState()
   const cat = categories.find((c) => c.id === id)
   if (!cat) return
   const to = cat.income ? OTHER_INCOME : OTHER
   const { [id]: _gone, ...rest } = budgets
+  const without = <T,>(rec: Record<string, T>): Record<string, T> => Object.fromEntries(Object.entries(rec).filter(([k]) => k !== id))
+  const months = Object.fromEntries(Object.entries(budget.months).map(([m, one]) => [m, without(one)]).filter(([, one]) => Object.keys(one).length))
   save({
     categories: categories.filter((c) => c.id !== id),
     entries: entries.map((e) => (e.category === id ? { ...e, category: to } : e)),
     budgets: rest,
+    budget: { ...budget, rollover: without(budget.rollover), history: without(budget.history), months },
     rules: Object.fromEntries(Object.entries(rules).filter(([, v]) => v !== id))
   }, `Deleted the ${named(cat.name, 'unnamed')} category`)
 }
