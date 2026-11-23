@@ -26,6 +26,8 @@ import {
 } from '@shared/releaseCheck'
 import { appInfo, github, GitHubError, token, validRepo } from './appStudio'
 import { logError } from './log'
+import { findTool, hasNvm, toolEnv } from './toolPath'
+import { npmMissingText } from '@shared/toolPath'
 
 /**
  * App Studio's release helper, in the main process so it can read what git and npm say instead of
@@ -40,29 +42,43 @@ interface Ran {
   ok: boolean
   /** stdout and stderr together. */
   out: string
+  /** npm isn't anywhere Orbit (or the Terminal) would look. */
+  npmMissing?: boolean
 }
 
 /**
  * Runs git or npm in a folder. Git never stops to ask for a password here (it would wait forever
  * with no one to answer): it fails, and the sign-in fix asks in a terminal instead.
  */
-function run(folder: string, tool: 'git' | 'npm', args: string[], opts: { timeout?: number; interactive?: boolean } = {}): Promise<Ran> {
-  const env: NodeJS.ProcessEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0', FORCE_COLOR: '0', NO_COLOR: '1', CI: 'true' }
+async function run(folder: string, tool: 'git' | 'npm', args: string[], opts: { timeout?: number; interactive?: boolean } = {}): Promise<Ran> {
+  // The PATH the Terminal would have, so npm (and the node it needs) is found even when Orbit was
+  // opened from the Dock or Finder.
+  const env = await toolEnv({ GIT_TERMINAL_PROMPT: '0', FORCE_COLOR: '0', NO_COLOR: '1', CI: 'true' })
   if (!opts.interactive) env.GCM_INTERACTIVE = 'never'
   // npm.cmd only runs through the shell on Windows, which joins the arguments with spaces, so any
   // with a space are quoted. They're all fixed here, never typed in.
   const viaShell = tool === 'npm' && WINDOWS
-  const cmd = tool === 'npm' ? (WINDOWS ? 'npm.cmd' : 'npm') : 'git'
+  let cmd = tool === 'npm' ? (WINDOWS ? 'npm.cmd' : 'npm') : 'git'
+  if (tool === 'npm' && !WINDOWS) {
+    const found = await findTool('npm')
+    if (!found) return { ok: false, out: 'spawn npm ENOENT', npmMissing: true }
+    cmd = found
+  }
   const argv = viaShell ? args.map((a) => (/\s/.test(a) ? `"${a}"` : a)) : args
   return new Promise((done) => {
     execFile(cmd, argv, { cwd: folder, timeout: opts.timeout ?? 60_000, windowsHide: true, maxBuffer: 32 * 1024 * 1024, shell: viaShell, env }, (err, stdout, stderr) => {
       let out = [String(stdout ?? ''), String(stderr ?? '')].filter((s) => s.trim()).join('\n')
+      const missing = !!err && tool === 'npm' && ((err as NodeJS.ErrnoException).code === 'ENOENT' || /'npm(\.cmd)?' is not recognized/i.test(out))
       if (err && (err as NodeJS.ErrnoException).code === 'ENOENT') out += `\nspawn ${cmd} ENOENT`
       if (err && err.killed) out += '\nIt took too long and was stopped.'
-      done({ ok: !err, out })
+      done({ ok: !err, out, npmMissing: missing })
     })
   })
 }
+
+/** npm couldn't be found anywhere: what to do, for this computer. */
+const npmMissing = (id: CheckId, out: string): Check => check(id, 'fail', npmMissingText(process.platform, { nvm: hasNvm() }), { output: out })
+const npmProblem = (): Problem => ({ title: 'Orbit couldn’t find npm', detail: npmMissingText(process.platform, { nvm: hasNvm() }), fixes: [] })
 
 const gitOut = async (folder: string, args: string[]): Promise<string | null> => {
   const r = await run(folder, 'git', args, { timeout: 15_000 })
@@ -251,11 +267,13 @@ async function runTests(folder: string): Promise<Check> {
   if (scripts.typecheck) {
     const r = await run(folder, 'npm', ['run', 'typecheck'], { timeout: 10 * 60_000 })
     output += r.out
+    if (r.npmMissing) return npmMissing('tests', r.out)
     if (!r.ok) return fromProblem('tests', explainProblem(r.out, { windows: WINDOWS, source: 'tests' }), r.out)
   }
   if (hasTests) {
     const r = await run(folder, 'npm', ['test'], { timeout: 15 * 60_000 })
     output += '\n' + r.out
+    if (r.npmMissing) return npmMissing('tests', r.out)
     if (!r.ok) return fromProblem('tests', explainProblem(r.out, { windows: WINDOWS, source: 'tests' }), r.out)
     const count = /Tests\s+(\d+) passed/.exec(r.out)?.[1]
     return check('tests', 'pass', `${scripts.typecheck ? 'The type check and ' : ''}${count ? `all ${count} tests` : 'the tests'} passed.`.replace(/^t/, 'T'), { output: lastLines(output, 30) })
@@ -272,7 +290,7 @@ async function release(folder: string, bump: VersionBump, expected: string): Pro
   const tag = `v${next}`
   const ctx = { windows: WINDOWS, tag, main }
   const version = await run(folder, 'npm', ['version', bump, '-m', 'Release %s'], { timeout: 120_000 })
-  if (!version.ok) return { ok: false, step: 'version', problem: explainProblem(version.out, ctx), output: lastLines(version.out, 60) }
+  if (!version.ok) return { ok: false, step: 'version', problem: version.npmMissing ? npmProblem() : explainProblem(version.out, ctx), output: lastLines(version.out, 60) }
   const push = await run(folder, 'git', ['push', '--atomic', '--follow-tags', 'origin', `HEAD:refs/heads/${main}`], { timeout: 180_000, interactive: true })
   if (!push.ok) {
     const p = explainProblem(push.out, ctx)

@@ -3,8 +3,10 @@ import { execFile } from 'child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'path'
 import { copyFolderName, githubRepo, isDownloadFile, isGitHubImage, parseAudit, parseOutdated, TOKEN_NOT_ALLOWED, type HealthReport, type BugReport, type AppInfo, type TestCopy, type GitHubStatus, type MergedPull, type PullRequest, type Release } from '@shared/appStudio'
+import { npmMissingText } from '@shared/toolPath'
 import { appNameProblem, appSlug, starterFiles, STARTERS, type MadeApp, type NewApp } from '@shared/appStarters'
 import { logError } from './log'
+import { findTool, toolEnv } from './toolPath'
 import { TEST_COPY } from './testCopy'
 
 /**
@@ -424,13 +426,17 @@ async function fetchImage(url: string): Promise<{ bytes: Uint8Array; type: strin
 }
 
 /** Runs npm in a folder; its output either way (npm outdated and npm audit exit with 1 when they find something). */
-function npm(folder: string, args: string[]): Promise<{ out: string; err: string; missing: boolean }> {
+async function npm(folder: string, args: string[]): Promise<{ out: string; err: string; missing: boolean }> {
+  // Found where the Terminal would find it, even when Orbit was opened from the Dock or Finder.
+  const env = await toolEnv()
+  const found = process.platform === 'win32' ? 'npm.cmd' : await findTool('npm')
+  if (!found) return { out: '', err: 'spawn npm ENOENT', missing: true }
   return new Promise((done) => {
     execFile(
-      process.platform === 'win32' ? 'npm.cmd' : 'npm',
+      found,
       args,
       // npm.cmd only runs through the shell on Windows; the arguments are fixed, never typed in.
-      { cwd: folder, timeout: 120_000, windowsHide: true, maxBuffer: 16 * 1024 * 1024, shell: process.platform === 'win32' },
+      { cwd: folder, timeout: 120_000, windowsHide: true, maxBuffer: 16 * 1024 * 1024, shell: process.platform === 'win32', env },
       (err, stdout, stderr) => {
         const missing = !!err && ((err as NodeJS.ErrnoException).code === 'ENOENT' || /not recognized|not found/i.test(String(stderr)))
         done({ out: String(stdout ?? ''), err: String(stderr || ''), missing: missing && !String(stdout ?? '').trim() })
@@ -448,7 +454,7 @@ async function health(folder: string): Promise<HealthReport> {
     npm(folder, ['outdated', '--json', '--long']),
     hasLock ? npm(folder, ['audit', '--json']) : Promise.resolve({ out: '', err: '', missing: false })
   ])
-  if (outdated.missing) throw new Error('npm isn’t installed on this computer (it comes with Node.js).')
+  if (outdated.missing) throw new Error(npmMissingText(process.platform))
   if (!hasLock) problems.push('There’s no package-lock.json, so npm can’t check for security problems. Run npm install once to make one.')
   else if (!audit.out.trim()) problems.push(`npm couldn’t check for security problems${/ENOTFOUND|ETIMEDOUT|network/i.test(audit.err) ? ' (no internet?)' : ''}.`)
   if (!existsSync(join(folder, 'node_modules'))) problems.push('The packages aren’t installed yet (no node_modules), so “now” shows as not installed.')
