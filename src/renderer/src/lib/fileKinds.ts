@@ -6,6 +6,7 @@ import { isComicBookFile } from '@shared/comics'
 import { shelveComicFile } from '../store/comics'
 import { isArchiveFile } from '@shared/archive'
 import { showInFiles } from '../store/filesReveal'
+import { featureOn } from './addons'
 import { isTextFile } from '@shared/textFiles'
 
 /** What kind of file something in the notes folder is, and how Notes opens it. */
@@ -40,11 +41,12 @@ export const vaultUrl = (path: string): string => `vault://local/${path.split('/
  * anything else only opens in another app after Orbit asks.
  */
 export function openAttachment(path: string, opts: { newTab?: boolean; pane?: string } = {}): void {
-  if (isComicBookFile(path)) void shelveComicFile(path, true)
-  else if (fileKind(path) === 'video') queueVaultVideo(path)
+  // Comics, videos and zips go to their add-on; without it they open in another app (after asking), like other files.
+  if (isComicBookFile(path) && featureOn('comics')) void shelveComicFile(path, true)
+  else if (fileKind(path) === 'video' && featureOn('video')) queueVaultVideo(path)
   // Zips, RARs and 7z files show what's inside in the Files tab; nothing is unpacked.
-  else if (isArchiveFile(path)) window.api.videoInVault(path).then(showInFiles).catch(notify)
-  else if (fileKind(path) === 'other') window.api.openFile(path, true).catch(notify)
+  else if (isArchiveFile(path) && featureOn('explorer')) window.api.videoInVault(path).then(showInFiles).catch(notify)
+  else if (fileKind(path) === 'other' || isComicBookFile(path) || isArchiveFile(path) || fileKind(path) === 'video') window.api.openFile(path, true).catch(notify)
   else openFileTab(path, opts)
 }
 

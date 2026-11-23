@@ -15,6 +15,7 @@ import { mixerSet, mixerSlide, mixerState } from './mixer'
 import { currentWifi } from './wifi'
 import { loadSettings, saveSettings } from './settings'
 import { logError } from './log'
+import { addonOn } from './addonGate'
 
 /**
  * Your phone, paired: scan one QR code and the phone gets a page (it can go on the Home Screen)
@@ -278,5 +279,5 @@ export function setupPhonePair(
   })
   ipcMain.handle('phone:notify', (_e, title: string, body: string) => phoneNotify(String(title), String(body)))
   // A phone paired before reconnects as soon as Notes is open again.
-  if (loadSettings().phoneToken) pair().catch((err) => logError('phone link', err))
+  if (loadSettings().phoneToken && addonOn('phone')) pair().catch((err) => logError('phone link', err))
 }

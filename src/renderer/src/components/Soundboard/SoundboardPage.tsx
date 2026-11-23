@@ -16,6 +16,7 @@ import {
 import { IS_MAC } from '@shared/platform'
 import { setSoundboard, useSoundboard, type RepeatPress } from '../../store/soundboard'
 import { useMusic } from '../../store/music'
+import { useAddonOn } from '../../lib/addons'
 import { callLevel, micLevel, playClip, setBoardStatus, stopAll, stopClip } from '../../lib/soundboard'
 import FromLink from './FromLink'
 
@@ -566,9 +567,12 @@ function VoiceChanger() {
 }
 
 function MusicToCall() {
+  const musicAdded = useAddonOn('music')
   const musicOn = useSoundboard((s) => s.musicOn)
   const musicVolume = useSoundboard((s) => s.musicVolume)
   const spotify = useMusic((s) => !s.local && !!s.state)
+  // Your music comes from the Music add-on.
+  if (!musicAdded) return null
   return (
     <Box title="Music into the call" icon={<Music size={13} />}>
       <Toggle checked={musicOn} onChange={(on) => setSoundboard({ musicOn: on })}>

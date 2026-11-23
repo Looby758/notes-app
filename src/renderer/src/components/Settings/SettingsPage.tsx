@@ -46,7 +46,62 @@ const SECTION_ADDONS: Partial<Record<SectionId, string[]>> = {
   capture: ['summon-bar', 'snip'],
   browser: ['web'],
   music: ['music', 'songid'],
-  studio: ['studio', 'clips']
+  studio: ['studio', 'clips', 'discord-voice']
+}
+
+/** Single settings that belong to an add-on: hidden when it isn't added. Settings not listed are core. */
+const SETTING_ADDONS: Partial<Record<string, string>> = {
+  gameLaunchAnimation: 'games',
+  gameAnimatedCovers: 'games',
+  streamerMode: 'streamer',
+  streamerHideNotes: 'streamer',
+  streamerHideNames: 'streamer',
+  handwritingReader: 'sketch',
+  focusMinutes: 'zen',
+  focusRounds: 'zen',
+  breakMinutes: 'zen',
+  longBreakMinutes: 'zen',
+  timerChime: 'zen',
+  timerAlwaysVisible: 'zen',
+  timerLeaveZen: 'zen',
+  openLinksInApp: 'web',
+  googleSignInAsFirefox: 'web',
+  videosFolder: 'video-projects',
+  filesWholePcSearch: 'files',
+  randomIncludeDaily: 'random-note',
+  musicSpotify: 'music',
+  musicSongPopup: 'music',
+  musicVisualiser: 'music',
+  musicVisualiserStyle: 'music',
+  musicCrossfade: 'music',
+  songIdShortcut: 'songid',
+  weatherHome: 'weather',
+  weatherCalendar: 'weather',
+  captureShortcut: 'summon-bar',
+  captureTarget: 'summon-bar',
+  captureHeading: 'summon-bar',
+  captureInbox: 'summon-bar',
+  captureTimestamp: 'summon-bar',
+  captureRememberTarget: 'summon-bar',
+  snipShortcut: 'snip',
+  snipDelay: 'snip',
+  snipSave: 'snip',
+  replayOn: 'clips',
+  replayShortcut: 'clips',
+  replaySeconds: 'clips',
+  replayQuality: 'clips',
+  replaySound: 'clips',
+  replayMic: 'clips',
+  discordPopoutPrompt: 'discord-voice',
+  duckMusic: 'discord-voice',
+  duckWhenITalk: 'discord-voice',
+  duckSpotify: 'discord-voice',
+  duckOrbit: 'discord-voice'
+}
+
+const settingOn = (d: SettingDef, installed: readonly string[]): boolean => {
+  const addon = SETTING_ADDONS[d.key]
+  return sectionOn(d.section, installed) && (!addon || installed.includes(addon))
 }
 
 const sectionOn = (id: SectionId, installed: readonly string[]): boolean => {
@@ -367,9 +422,9 @@ export default function SettingsPage() {
   useEffect(() => body.current?.scrollTo({ top: 0 }), [section])
 
   const q = query.trim()
-  const sectionDefs = SETTINGS.filter((d) => d.section === section)
+  const sectionDefs = SETTINGS.filter((d) => d.section === section && settingOn(d, installed))
   const sectionModified = sectionDefs.filter((d) => isModified(d, prefs))
-  const results = q ? SETTINGS.filter((d) => sectionOn(d.section, installed) && matchesSearch(d, q)) : []
+  const results = q ? SETTINGS.filter((d) => settingOn(d, installed) && matchesSearch(d, q)) : []
   // Removing the add-on a section is about leaves it: go back to the first one.
   useEffect(() => {
     if (!sectionOn(section, installed)) setSection('appearance')

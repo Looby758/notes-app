@@ -932,6 +932,11 @@ export function openExplorerTab(dir?: string, { beside = false }: { beside?: boo
  * a new pane on the right.
  */
 export function openWebTab(url = '', { beside = false, privately = false }: { beside?: boolean; privately?: boolean } = {}): void {
+  // Without the Web browser add-on, a page opens in your usual browser instead.
+  if (url && !tabOn('web:')) {
+    window.open(url)
+    return
+  }
   if (privately) {
     const id = webId(true)
     setWebPage(id, { url, title: '' })

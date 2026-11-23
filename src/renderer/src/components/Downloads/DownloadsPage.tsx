@@ -53,6 +53,7 @@ import { insertIntoActiveNote, openFileTab } from '../../lib/editorController'
 import { openDownload } from '../Web/Downloads'
 import FolderPicker from '../Web/FolderPicker'
 import { SaveTo, SetupBox } from './videoParts'
+import { addonOn } from '../../lib/addons'
 
 /**
  * The download manager tab: paste links and they download a few at a time, in order. Each one can
@@ -124,7 +125,7 @@ async function addToMusic(d: DmItem): Promise<void> {
 function openItem(d: DmItem): void {
   if (!d.path) return
   if (d.kind === 'video') {
-    if (d.quality === 'audio') openFileTab(d.path)
+    if (d.quality === 'audio' || !addonOn('video-player')) openFileTab(d.path)
     else openVaultVideo(d.path)
     return
   }
@@ -205,7 +206,7 @@ function QueueItem({ d, state, first, last }: { d: DmItem; state: DmState; first
                 <FileInput size={14} />
               </button>
             )}
-            {isSong(d.path) && (
+            {isSong(d.path) && addonOn('music') && (
               <button className="icon-btn" title="Add to my music (copies it into your music folder)" onClick={() => void addToMusic(d)} data-dm-to-music>
                 <Music2 size={14} />
               </button>

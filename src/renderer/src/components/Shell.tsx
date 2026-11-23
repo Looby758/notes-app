@@ -84,7 +84,7 @@ import Private from './Streamer/Private'
 import DeviceDrop from './Share/DeviceDrop'
 import { startReminders, stopReminders } from '../lib/reminderScheduler'
 import { MONEY_IOU_LINK, startIouReminders, stopIouReminders } from '../lib/iouReminders'
-import { useAddonOn, useInstalledAddons } from '../lib/addons'
+import { addonOn, useAddonOn, useInstalledAddons } from '../lib/addons'
 import { useMoneyView } from '../store/money'
 
 interface Props {
@@ -108,6 +108,9 @@ const STATUS_LABEL: Record<SaveStatus, string> = {
 export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
   const musicOn = useAddonOn('music')
   const skyblockOn = useAddonOn('skyblock')
+  const grokOn = useAddonOn('grok')
+  const claudeOn = useAddonOn('claude')
+  const sketchOn = useAddonOn('sketch')
   useBugReports()
   const leftOpen = useUI((s) => s.leftOpen)
   const rightOpen = useUI((s) => s.rightOpen)
@@ -144,7 +147,6 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     initEditor(vault)
     const stopHistory = startNavHistory()
     void startReminders()
-    startIouReminders()
     // (The test notification from Settings has no note to open.) An IOU reminder opens Money → IOUs.
     const offReminder = window.api.onReminderOpen((path, line) => {
       if (path === MONEY_IOU_LINK) {
@@ -156,10 +158,9 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     const offOpenFile = window.api.onOpenFile(openFromComputer)
     void window.api.takeOpenedFiles().then((paths) => paths.forEach(openFromComputer))
     const offVoice = window.api.onVoiceStart(() => useUI.setState({ voiceOpen: true }))
-    const offSketch = window.api.onSketchStart(() => useUI.setState({ sketch: { path: null } }))
+    const offSketch = window.api.onSketchStart(() => addonOn('sketch') && useUI.setState({ sketch: { path: null } }))
     const offFormat = startFormatMenu()
     const offDictionary = startDictionary()
-    const offPhone = startPhone()
     // Mouse sharing: the other computer started pairing (show the code), or sent a file over.
     const offSharePair = window.api.onShareOpenSettings(() => {
       openSpecialTab(SETTINGS_TAB)
@@ -198,16 +199,24 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       offSketch()
       offFormat()
       offDictionary()
-      offPhone()
       offSharePair()
       offShareFile()
       offSnips()
       offReplay()
       offDuck()
       stopReminders()
-      stopIouReminders()
     }
   }, [vault])
+
+  // Your phone, and money reminders (IOUs), only with their add-ons.
+  const phoneOn = useAddonOn('phone')
+  useEffect(() => (phoneOn ? startPhone() : undefined), [phoneOn])
+  const moneyOn = useAddonOn('money')
+  useEffect(() => {
+    if (!moneyOn) return
+    startIouReminders()
+    return stopIouReminders
+  }, [moneyOn])
 
   // Soundboard hotkeys work from any app, so the sound side starts with the window (and reopens the mic if it was left on).
   // Only with the Soundboard add-on.
@@ -451,13 +460,13 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <StartupNotices />
       <DeviceDrop />
       {musicOn && <MusicPlayer />}
-      <GrokFloat />
-      <ChatSiteFloat site="claude" />
+      {grokOn && <GrokFloat />}
+      {claudeOn && <ChatSiteFloat site="claude" />}
       <RecordingBar />
       <ZenBar />
       <VoiceRecorder />
       <DefinitionCard />
-      <SketchPad />
+      {sketchOn && <SketchPad />}
       <PictureEditor />
       <Screensaver />
     </div>

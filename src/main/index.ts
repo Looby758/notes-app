@@ -101,7 +101,7 @@ import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
 import { setupAppStudio } from './appStudio'
 import { setupReleaseHelper } from './releaseHelper'
-import { addonsMaybeChanged, setupAddonGate, startsCoreOnly } from './addonGate'
+import { addonOn, addonsMaybeChanged, setupAddonGate, startsCoreOnly } from './addonGate'
 import { cleanInstalledAddons } from '@shared/addons'
 import { TEST_COPY, TEST_COPY_FOLDER, testCopyReadOnly, WINDOWS_APP_ID } from './testCopy'
 import { setupGames } from './games'
@@ -647,7 +647,8 @@ function createWindow(): BrowserWindow {
         else
           items.push(
             { label: 'Record a voice note…', click: () => win.webContents.send('voice:start') },
-            { label: 'Draw a sketch…', click: () => win.webContents.send('sketch:start') },
+            // Sketching is an add-on.
+            ...(addonOn('sketch') ? [{ label: 'Draw a sketch…', click: () => win.webContents.send('sketch:start') }] : []),
             { type: 'separator' }
           )
       }

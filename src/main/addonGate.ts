@@ -57,6 +57,7 @@ const CHANNEL_ADDONS: Record<string, string> = {
   monitors: 'screens',
   mixer: 'mixer',
   tasks: 'task-manager',
+  uninstall: 'uninstaller',
   weather: 'weather',
   messages: 'messages',
   videoWindow: 'video-player',
@@ -89,7 +90,9 @@ const CHANNEL_OVERRIDES: Record<string, string | null> = {
   'discord:removeHook': 'clips',
   'discord:send': 'clips',
   // Opening a recordings folder, from Clips as well as the Studio.
-  'studio:openFolder': null
+  'studio:openFolder': null,
+  // The "Test copy" badge asks App Studio's part whether this is a test copy.
+  'apps:isTestCopy': null
 }
 
 /** The add-on a message belongs to, or null for a core one. */

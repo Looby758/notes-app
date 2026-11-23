@@ -9,6 +9,7 @@ import { answerParts } from '../../lib/ai'
 import { openAiSettings } from './AiSettings'
 import EmptyArt from '../Motion/EmptyArt'
 import OnlineOffer from './OnlineOffer'
+import { useInstalledAddons } from '../../lib/addons'
 
 const EXAMPLES = ['What’s on this week?', 'How much did I spend on takeaways last month?', 'Any emails I need to reply to?', 'What’s still on my to-do lists?']
 
@@ -21,10 +22,14 @@ const SOURCE_LABELS: { key: keyof AskSources; label: string }[] = [
 /** Which of your things Ask everything may look at (notes always). */
 function Sources() {
   const sources = useAi((s) => s.sources)
+  // Email, calendar and money are add-ons (each key is its add-on's id): only offer the added ones.
+  const installed = useInstalledAddons()
+  const shown = SOURCE_LABELS.filter((x) => installed.includes(x.key))
+  if (!shown.length) return null
   return (
     <div className="ai-sources" data-ask-sources>
-      <span>Looks at your notes{SOURCE_LABELS.some((x) => sources[x.key]) ? ' and' : ''}:</span>
-      {SOURCE_LABELS.map(({ key, label }) => (
+      <span>Looks at your notes{shown.some((x) => sources[x.key]) ? ' and' : ''}:</span>
+      {shown.map(({ key, label }) => (
         <label key={key} className={`ai-source ${sources[key] ? 'on' : ''}`}>
           <input type="checkbox" checked={sources[key]} onChange={(e) => setAskSource(key, e.target.checked)} />
           {label}

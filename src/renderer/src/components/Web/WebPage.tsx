@@ -52,6 +52,7 @@ import { loadInWebTab, setWebPage, useWeb, webviews } from '../../store/web'
 import { addBookmark, setSite, tabsByPage, updateBookmark, useBrowser } from '../../store/browser'
 import { notify } from '../../store/notify'
 import { sendToPhone } from '../../store/phone'
+import { addonOn } from '../../lib/addons'
 import { setPrefs, usePrefs } from '../../store/prefs'
 import { useVault } from '../../store/vault'
 import { useNoteIndex } from '../../store/noteIndex'
@@ -607,9 +608,11 @@ export default function WebPage({ tab, hidden, autoFocus }: { tab: string; hidde
             <AppWindow size={14} />
           </button>
         )}
+{addonOn('phone') && (
         <button type="button" className="icon-btn" title="Send to phone (scan a QR code)" disabled={!url} onClick={() => sendToPhone({ kind: 'link', url, title: pageTitle })}>
           <Smartphone size={14} />
         </button>
+        )}
         <div className="web-menu-wrap" onMouseDown={(e) => e.stopPropagation()}>
           <button type="button" className={`icon-btn ${menu ? 'active' : ''}`} title="More" onClick={() => setMenu(!menu)} data-web-more>
             <MoreHorizontal size={15} />

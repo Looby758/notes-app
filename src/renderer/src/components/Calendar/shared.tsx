@@ -104,6 +104,7 @@ export function ItemRow({ item, compact = false }: { item: DatedItem; compact?: 
 
 /** Loads Google/link events for [from, to) and returns all external events by day, with bills and paydays from Money. */
 const NOTHING = new Map<string, ExternalItem[]>()
+const NO_ITEMS: ExternalItem[] = []
 
 export function useExternalRange(from: Date, to: Date): Map<string, ExternalItem[]> {
   const fromKey = from.getTime()
@@ -115,8 +116,13 @@ export function useExternalRange(from: Date, to: Date): Map<string, ExternalItem
     if (calendarOn) ensureRange(new Date(fromKey), new Date(toKey))
   }, [fromKey, toKey, generation, calendarOn])
   const byDay = useExternal((s) => s.byDay)
-  const bills = useBillItems(from, to)
-  const uploads = useUploadItems(from, to)
+  // Bills and paydays need Money; upload days need Video projects.
+  const moneyOn = useAddonOn('money')
+  const videosOn = useAddonOn('video-projects')
+  const allBills = useBillItems(from, to)
+  const allUploads = useUploadItems(from, to)
+  const bills = moneyOn ? allBills : NO_ITEMS
+  const uploads = videosOn ? allUploads : NO_ITEMS
   return useMemo(() => {
     if (!calendarOn) return NOTHING
     if (!bills.length && !uploads.length) return byDay

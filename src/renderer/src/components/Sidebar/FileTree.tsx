@@ -213,7 +213,7 @@ export default function FileTree() {
             : [{ label: 'Lock folder', icon: <Lock size={15} />, onClick: () => lockFolder(node.path) } as MenuItem]),
       { label: 'Rename', icon: <Pencil size={15} />, onClick: () => startRename(node.path) },
       { label: `Show in ${FILE_MANAGER}`, icon: <FolderSearch size={15} />, onClick: () => window.api.reveal(node.path) },
-      ...(node.type === 'folder' || isLocked(node.path)
+      ...(node.type === 'folder' || isLocked(node.path) || !addonOn('phone')
         ? []
         : [{ label: 'Send to phone…', icon: <Smartphone size={15} />, onClick: () => sendToPhone({ kind: 'file', path: node.path }) } as MenuItem]),
       ...(node.type === 'attachment' ? [] : [{ label: 'Export…', icon: <FileDown size={15} />, onClick: () => openExport(node.path, node.type === 'folder') } as MenuItem]),

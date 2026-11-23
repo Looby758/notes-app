@@ -94,6 +94,7 @@ import FileIcon from '../FileIcon'
 import { sendToDevice, useDropTargets } from '../Share/DeviceDrop'
 import { isVideoFile } from '@shared/videoPlayer'
 import { queueVideo } from '../../store/videoPlayer'
+import { addonOn } from '../../lib/addons'
 import { archiveFolderName, isArchiveFile } from '@shared/archive'
 import { releaseOnUnmount } from '../../lib/media'
 import ArchivePreview, { CompressDialog } from './ArchivePreview'
@@ -529,12 +530,12 @@ export default function ExplorerPage({ autoFocus, tab = EXPLORER_TAB }: { autoFo
     if (entry.isDir) return go(entry.path)
     // Opening a file never kicks off something unexpected.
     // Videos (anywhere on the computer) go in the video player's Up next, without playing.
-    if (isVideoFile(entry.name)) return queueVideo(entry.path)
+    if (isVideoFile(entry.name) && addonOn('video-player')) return queueVideo(entry.path)
     // Notes and files in the notes folder open here, in a tab of their own.
     if (entry.vaultPath && /\.md$/i.test(entry.name)) return openNote(entry.vaultPath, { newTab: true })
     if (entry.vaultPath && fileKind(entry.vaultPath) !== 'other') return openFileTab(entry.vaultPath, { newTab: true })
     // Comics go on Orbit's comic shelf (without opening the comic).
-    if (isComicBookFile(entry.name)) return void shelveComicFile(entry.path)
+    if (isComicBookFile(entry.name) && addonOn('comics')) return void shelveComicFile(entry.path)
     // Zips, RARs and 7z files show what's inside on the right; nothing is unpacked until you press Extract.
     if (isArchiveFile(entry.name)) {
       pickOnly(entry.path)

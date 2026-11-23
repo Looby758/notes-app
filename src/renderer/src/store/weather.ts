@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { create } from 'zustand'
 import type { WeatherPlace, WeatherState } from '@shared/weather'
+import { useAddonOn } from '../lib/addons'
 
 /**
  * Your town's forecast, shared by the Home page and the calendar. The main process does the
@@ -30,7 +31,10 @@ let timer: ReturnType<typeof setInterval> | null = null
 const onFocus = (): void => void refresh()
 
 /** Loads the forecast while something on screen shows it, and keeps it up to date. */
-export function useForecast(on = true): WeatherState & { loaded: boolean } {
+export function useForecast(wanted = true): WeatherState & { loaded: boolean } {
+  // Weather is an add-on: without it nothing asks for a forecast, and nothing shows one.
+  const added = useAddonOn('weather')
+  const on = wanted && added
   useEffect(() => {
     if (!on) return
     void refresh()
@@ -46,7 +50,10 @@ export function useForecast(on = true): WeatherState & { loaded: boolean } {
       }
     }
   }, [on])
-  return useWeather()
+  const state = useWeather()
+  return added ? state : NO_WEATHER
 }
+
+const NO_WEATHER: WeatherState & { loaded: boolean } = { place: null, forecast: null, loaded: true }
 
 export const retryWeather = (): Promise<void> => refresh(true)

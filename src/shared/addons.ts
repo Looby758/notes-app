@@ -82,6 +82,7 @@ export const ADDONS: AddonInfo[] = [
   // Tools
   { id: 'snip', name: 'Screen snip', features: ['snip', 'snip-picture'] },
   { id: 'task-manager', name: 'Task manager', features: ['tasks'] },
+  { id: 'uninstaller', name: 'Uninstaller', features: ['uninstall'] },
   { id: 'mixer', name: 'Volume mixer', features: ['mixer'] },
   { id: 'screens', name: 'Screens', features: ['screens'] },
   { id: 'files', name: 'Files', features: ['explorer'] },
