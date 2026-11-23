@@ -8453,6 +8453,14 @@ a.passwords-text:hover {
   gap: 12px;
   margin-bottom: 18px;
 }
+.money-head .segmented {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+.money-head .segmented button {
+  flex: none;
+  white-space: nowrap;
+}
 .money-head h2 {
   display: flex;
   align-items: center;

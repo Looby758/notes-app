@@ -61,7 +61,7 @@ const VIEWS: [View, string][] = [
   ['accounts', 'Net worth'],
   ['ious', 'IOUs'],
   ['import', 'Import statement'],
-  ['budgets', 'Budgets & categories']
+  ['budgets', 'Categories']
 ]
 
 /** "12.50" typed into a box → pence (always positive), or null. */
