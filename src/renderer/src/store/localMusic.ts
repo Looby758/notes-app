@@ -174,8 +174,32 @@ function publish(): void {
   }
   useMusic.setState({ state, at: Date.now() })
   if ('mediaSession' in navigator) {
-    navigator.mediaSession.metadata = new MediaMetadata({ title: song.title, artist: song.artist, album: song.album, artwork: art ? [{ src: art }] : [] })
-    navigator.mediaSession.playbackState = audio.paused ? 'paused' : 'playing'
+    const session = navigator.mediaSession
+    const m = session.metadata
+    // Only a new song gets new details, so the system's Now Playing doesn't reload the cover every few seconds.
+    if (!m || m.title !== song.title || m.artist !== song.artist || m.album !== song.album || (m.artwork[0]?.src ?? '') !== (art ?? '')) {
+      session.metadata = new MediaMetadata({ title: song.title, artist: song.artist, album: song.album, artwork: art ? [{ src: art }] : [] })
+    }
+    session.playbackState = audio.paused ? 'paused' : 'playing'
+    // The progress bar in the Mac's Now Playing and Windows' media overlay.
+    const duration = state.track!.durationMs / 1000
+    try {
+      if (duration > 0) session.setPositionState({ duration, position: Math.min(duration, Math.max(0, audio.currentTime)), playbackRate: audio.playbackRate || 1 })
+    } catch {
+      // A position past the end while the next song loads; the next update puts it right.
+    }
+  }
+}
+
+/** Tells the system nothing of yours is playing any more (Now Playing / media overlay go back to other apps). */
+function clearMediaSession(): void {
+  if (!('mediaSession' in navigator)) return
+  navigator.mediaSession.metadata = null
+  navigator.mediaSession.playbackState = 'none'
+  try {
+    navigator.mediaSession.setPositionState()
+  } catch {
+    // Nothing to clear.
   }
 }
 
@@ -247,6 +271,12 @@ export function localToggle(): void {
   const a = player()
   if (a.paused) void a.play().catch((err) => useMusic.setState({ error: errorMessage(err) }))
   else a.pause()
+}
+
+export function localPlay(): void {
+  endCrossfade()
+  const a = player()
+  if (a.paused) void a.play().catch((err) => useMusic.setState({ error: errorMessage(err) }))
 }
 
 export function localPause(): void {
@@ -687,19 +717,26 @@ export function stopLocal(): void {
   // Emptied, not just paused, so the song's file isn't held open (Windows would say Orbit is using it).
   unloadMedia(audio)
   useMusic.setState({ local: false })
+  clearMediaSession()
 }
 
-// The keyboard's play/pause and skip keys (and the system's media controls).
+// The keyboard's play/pause and skip keys, and the system's media controls (the Mac's Now Playing,
+// Windows' media overlay, headphone buttons). main/mediaKeys.ts also catches the keys system-wide.
 if (typeof navigator !== 'undefined' && 'mediaSession' in navigator) {
-  const handlers: [MediaSessionAction, () => void][] = [
-    ['play', localToggle],
+  const SKIP_S = 10
+  const handlers: [MediaSessionAction, (details: MediaSessionActionDetails) => void][] = [
+    ['play', localPlay],
     ['pause', localPause],
+    ['stop', localPause],
     ['nexttrack', () => void localNext()],
-    ['previoustrack', () => void localPrevious()]
+    ['previoustrack', () => void localPrevious()],
+    ['seekto', (d) => d.seekTime !== undefined && localSeek(d.seekTime * 1000)],
+    ['seekbackward', (d) => localSeek(Math.max(0, (audio?.currentTime ?? 0) - (d.seekOffset ?? SKIP_S)) * 1000)],
+    ['seekforward', (d) => localSeek(((audio?.currentTime ?? 0) + (d.seekOffset ?? SKIP_S)) * 1000)]
   ]
   for (const [action, run] of handlers) {
     try {
-      navigator.mediaSession.setActionHandler(action, () => useMusic.getState().local && run())
+      navigator.mediaSession.setActionHandler(action, (details) => useMusic.getState().local && run(details))
     } catch {
       // Not every action is supported everywhere.
     }
