@@ -17,6 +17,7 @@ import {
   readyToRelease,
   recoveryActions,
   type BuildStatus,
+  mainStatusText,
   type Check
 } from './releaseCheck'
 
@@ -245,5 +246,18 @@ describe('after the release: GitHub’s build', () => {
         { name: 'Build (Mac)', status: 'in_progress', conclusion: null }
       ])
     ).toBe('Create draft release ✓ · Windows failed (Run npm test) · Mac building…')
+  })
+})
+
+describe('mainStatusText', () => {
+  const base = { main: 'main', branch: 'main', onMain: true, dirty: 0, linked: true, behind: 0, ahead: 0 }
+  it('says how the folder compares with GitHub’s main', () => {
+    expect(mainStatusText(base)).toBe('This folder’s main matches GitHub’s main.')
+    expect(mainStatusText({ ...base, behind: 3 })).toBe('This folder’s main is 3 commits behind GitHub’s main.')
+    expect(mainStatusText({ ...base, behind: 1, ahead: 2 })).toBe('This folder’s main is 1 commit behind GitHub’s main, and has 2 commits GitHub doesn’t.')
+    expect(mainStatusText({ ...base, ahead: 1 })).toBe('This folder’s main has everything on GitHub’s main, plus 1 commit that isn’t on GitHub yet.')
+    expect(mainStatusText({ ...base, branch: 'feature', onMain: false, behind: 2 })).toBe('This folder’s main is 2 commits behind GitHub’s main.')
+    expect(mainStatusText({ ...base, linked: false })).toMatch(/isn’t linked to GitHub/)
+    expect(mainStatusText({ ...base, problem: 'Couldn’t check GitHub.' })).toBe('Couldn’t check GitHub.')
   })
 })

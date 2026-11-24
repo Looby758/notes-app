@@ -1,6 +1,6 @@
 import type { MadeApp, NewApp } from './appStarters'
 import type { AppInfo, BugReport, GitHubStatus, HealthReport, MergedPull, PullRequest, Release, TestCopy, VersionBump } from './appStudio'
-import type { BuildStatus, Check, FixResult, Preflight, ReleaseResult } from './releaseCheck'
+import type { BuildStatus, Check, FixResult, MainStatus, Preflight, ReleaseResult } from './releaseCheck'
 import type { DriveSpace, ExplorerEntry, ExplorerPlace, PasteMode, PcIndexStatus } from './explorer'
 import type { FileTagStore, TagColour } from './fileTags'
 import type { BinListing } from './recycleBin'
@@ -1479,6 +1479,10 @@ export interface NotesApi {
   appsRelease(folder: string, bump: VersionBump, expected: string): Promise<ReleaseResult>
   /** One of the release helper's one-click fixes (put-away, switch-main, pull, finish-push, delete-tag, retag). */
   appsReleaseFix(folder: string, fix: string, tag?: string): Promise<FixResult>
+  /** Fetches GitHub's main and says how far this app's folder is behind (or ahead of) it. Rejects with "busy" while a release job runs. */
+  appsMainStatus(folder: string): Promise<MainStatus>
+  /** Switches to main (if on another branch, with nothing uncommitted) and pulls GitHub's latest main. Never throws changes away. */
+  appsGetLatestMain(folder: string): Promise<FixResult>
   /** Adds "What's new" notes for a version to the app's list in its code, and commits them. */
   appsWriteNotes(folder: string, version: string, items: string[]): Promise<FixResult>
   /** What GitHub's build of a release tag is doing, and why it failed. */
