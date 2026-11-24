@@ -17934,6 +17934,43 @@ button.board-add-picture:hover {
   flex: 1;
   min-width: 0;
 }
+/* Releases: "Latest main" (how far behind GitHub's main, and the button that gets it) */
+.release-latest {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, #e5a50a 14%, transparent);
+  font-size: 12.5px;
+}
+.release-latest-ok {
+  background: color-mix(in srgb, #2ea043 12%, transparent);
+}
+.release-latest-problem {
+  background: color-mix(in srgb, #e5534b 12%, transparent);
+}
+.release-latest-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.release-latest-line > span {
+  flex: 1;
+  min-width: 0;
+}
+.release-latest-line > svg {
+  flex-shrink: 0;
+}
+.release-latest-ok .release-latest-line > svg {
+  color: #2ea043;
+}
+.release-latest-line .release-warning-btn {
+  margin-left: 0;
+}
+.release-latest-result {
+  color: var(--text);
+}
 .release-warning svg {
   flex-shrink: 0;
 }

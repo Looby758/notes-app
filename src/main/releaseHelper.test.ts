@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Check, FixResult, Preflight, ReleaseResult } from '@shared/releaseCheck'
+import type { Check, FixResult, MainStatus, Preflight, ReleaseResult } from '@shared/releaseCheck'
 
 /**
  * The release helper against real git repositories: an app folder cloned from a bare "GitHub" in
@@ -144,6 +144,83 @@ describe('release helper (with real git)', { timeout: 60_000 }, () => {
     expect((await call<FixResult>('apps:releaseFix', app, 'pull')).ok).toBe(true)
     pre = await call<Preflight>('apps:preflight', app, 'patch')
     expect(byId(pre, 'latest').state).toBe('pass')
+  })
+
+  describe('Get latest main', () => {
+    const mergeOnGitHub = (name: string, text = 'from a pull request'): void => {
+      writeFileSync(join(other, name), text)
+      git(other, 'add', '-A')
+      git(other, 'commit', '-qm', `Merged ${name}`)
+      git(other, 'push', '-q', 'origin', 'main')
+    }
+
+    it('says how far behind main is, and gets it', async () => {
+      expect(await call<MainStatus>('apps:mainStatus', app)).toMatchObject({ onMain: true, linked: true, behind: 0, ahead: 0 })
+      mergeOnGitHub('a.txt')
+      mergeOnGitHub('b.txt')
+      expect(await call<MainStatus>('apps:mainStatus', app)).toMatchObject({ onMain: true, behind: 2, ahead: 0 })
+      const r = await call<FixResult>('apps:getLatestMain', app)
+      expect(r).toMatchObject({ ok: true, message: 'Got 2 new commits from GitHub’s main.' })
+      expect(git(app, 'rev-parse', 'HEAD')).toBe(git(origin, 'rev-parse', 'main'))
+      expect((await call<FixResult>('apps:getLatestMain', app)).message).toBe('Already up to date with GitHub’s main.')
+    })
+
+    it('keeps changed files that the new commits don’t touch', async () => {
+      mergeOnGitHub('a.txt')
+      writeFileSync(join(app, 'mine.txt'), 'not committed')
+      const r = await call<FixResult>('apps:getLatestMain', app)
+      expect(r.ok).toBe(true)
+      expect(r.message).toMatch(/Your changed file is still here/)
+      expect(readFileSync(join(app, 'mine.txt'), 'utf8')).toBe('not committed')
+    })
+
+    it('stops, changing nothing, when the new commits touch a changed file', async () => {
+      mergeOnGitHub('clash.txt', 'GitHub’s')
+      writeFileSync(join(app, 'clash.txt'), 'mine')
+      const head = git(app, 'rev-parse', 'HEAD')
+      const r = await call<FixResult>('apps:getLatestMain', app)
+      expect(r.ok).toBe(false)
+      expect(git(app, 'rev-parse', 'HEAD')).toBe(head)
+      expect(readFileSync(join(app, 'clash.txt'), 'utf8')).toBe('mine')
+    })
+
+    it('switches from another branch to main and gets it', async () => {
+      git(app, 'checkout', '-qb', 'feature')
+      mergeOnGitHub('a.txt')
+      expect(await call<MainStatus>('apps:mainStatus', app)).toMatchObject({ onMain: false, branch: 'feature', behind: 1 })
+      const r = await call<FixResult>('apps:getLatestMain', app)
+      expect(r).toMatchObject({ ok: true, message: 'Switched from feature to main. Got 1 new commit from GitHub’s main.' })
+      expect(git(app, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('main')
+      expect(git(app, 'rev-parse', 'HEAD')).toBe(git(origin, 'rev-parse', 'main'))
+    })
+
+    it('won’t switch branches with changed files', async () => {
+      git(app, 'checkout', '-qb', 'feature')
+      writeFileSync(join(app, 'wip.txt'), 'work in progress')
+      const r = await call<FixResult>('apps:getLatestMain', app)
+      expect(r.ok).toBe(false)
+      expect(r.message).toMatch(/Nothing was changed/)
+      expect(git(app, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('feature')
+      expect(readFileSync(join(app, 'wip.txt'), 'utf8')).toBe('work in progress')
+    })
+
+    it('puts this computer’s own commits on top when main has moved on', async () => {
+      mergeOnGitHub('a.txt')
+      writeFileSync(join(app, 'local.txt'), 'here')
+      git(app, 'add', '-A')
+      git(app, 'commit', '-qm', 'Local work')
+      expect(await call<MainStatus>('apps:mainStatus', app)).toMatchObject({ behind: 1, ahead: 1 })
+      const r = await call<FixResult>('apps:getLatestMain', app)
+      expect(r.ok).toBe(true)
+      expect(git(app, 'log', '--format=%s', '-2').split('\n')).toEqual(['Local work', 'Merged a.txt'])
+      expect(await call<MainStatus>('apps:mainStatus', app)).toMatchObject({ behind: 0, ahead: 1 })
+    })
+
+    it('says when the folder isn’t on GitHub', async () => {
+      git(app, 'remote', 'remove', 'origin')
+      expect(await call<MainStatus>('apps:mainStatus', app)).toMatchObject({ linked: false })
+      expect((await call<FixResult>('apps:getLatestMain', app)).ok).toBe(false)
+    })
   })
 
   it('explains a push turned away during the release, and finishes it once sorted', async () => {

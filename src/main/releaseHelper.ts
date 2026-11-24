@@ -21,6 +21,7 @@ import {
   type FixId,
   type Preflight,
   type FixResult,
+  type MainStatus,
   type Problem,
   type ReleaseResult
 } from '@shared/releaseCheck'
@@ -342,6 +343,72 @@ async function pullLatest(folder: string, main: string, dirty: boolean): Promise
   return { ok: true, message: `Got the latest from GitHub and put ${ahead === 1 ? 'the commit' : `the ${ahead} commits`} from this computer on top${moving.length ? ` (${moving.join(', ')} moved with ${ahead === 1 ? 'it' : 'them'})` : ''}.` }
 }
 
+/**
+ * How the folder compares with GitHub's main: fetched fresh, then counted against the folder's own
+ * main (the branch a release is made from), whichever branch it's on now.
+ */
+async function mainStatus(folder: string): Promise<MainStatus> {
+  const info = await appInfo(folder)
+  if (!info.ok || info.error) throw new Error(info.error ?? 'Orbit couldn’t read this app’s folder.')
+  const main = info.mainBranch ?? 'main'
+  const base = { main, branch: info.branch, onMain: info.branch === main, dirty: info.changedFiles ?? 0, behind: 0, ahead: 0 }
+  if ((await gitOut(folder, ['remote', 'get-url', 'origin'])) === null) return { ...base, linked: false }
+  const fetched = await run(folder, 'git', ['fetch', 'origin', main], { timeout: 90_000 })
+  if (!fetched.ok) {
+    const p = explainProblem(fetched.out, { windows: WINDOWS, main })
+    return { ...base, linked: true, problem: `Couldn’t check GitHub: ${p.title}. ${p.detail}`, output: lastLines(fetched.out, 40) }
+  }
+  // Off main, the folder's own main is what a switch would land on (or nothing yet, when it's
+  // never been checked out here: then all of GitHub's main is new).
+  const ref = base.onMain ? 'HEAD' : (await gitOut(folder, ['rev-parse', '--verify', '--quiet', `refs/heads/${main}`])) ? main : null
+  if (!ref) {
+    const count = Number(await gitOut(folder, ['rev-list', '--count', `origin/${main}`])) || 0
+    return { ...base, linked: true, behind: count }
+  }
+  const ab = aheadBehind(await gitOut(folder, ['rev-list', '--left-right', '--count', `${ref}...origin/${main}`]))
+  if (!ab) return { ...base, linked: true, problem: `Couldn’t compare with GitHub’s ${main}.` }
+  return { ...base, linked: true, ...ab }
+}
+
+/**
+ * The "Get latest main" button: puts the folder on main (when it's on another branch) and brings
+ * in everything on GitHub's main, so a release is made from what's really there. Changed files are
+ * never thrown away: on another branch it won't switch with them (they'd come along to main), and
+ * on main git itself refuses if the new commits touch them.
+ */
+async function getLatestMain(folder: string): Promise<FixResult> {
+  const info = await appInfo(folder)
+  if (!info.ok || info.error) throw new Error(info.error ?? 'Orbit couldn’t read this app’s folder.')
+  const main = info.mainBranch ?? 'main'
+  const dirty = info.changedFiles ?? 0
+  if ((await gitOut(folder, ['remote', 'get-url', 'origin'])) === null) return { ok: false, message: 'This app’s folder isn’t linked to GitHub, so there’s no main to get.' }
+  const files = dirty === 1 ? '1 file has' : `${dirty} files have`
+  let switched = ''
+  if (info.branch !== main) {
+    if (dirty)
+      return {
+        ok: false,
+        message: `${files} changed on ${info.branch ?? 'this branch'}. Commit them or put them away first, so they stay with that branch and don’t come along to ${main}. Nothing was changed.`,
+        problem: { title: 'Changed files on another branch', detail: 'Commit them or put them away first.', fixes: ['put-away'] }
+      }
+    const fetched = await run(folder, 'git', ['fetch', 'origin', main], { timeout: 120_000, interactive: true })
+    if (!fetched.ok) return failed(fetched, { main })
+    const co = await run(folder, 'git', ['checkout', main])
+    if (!co.ok) return failed(co, { main })
+    switched = `Switched from ${info.branch ?? 'the detached commit'} to ${main}. `
+  }
+  const before = await gitOut(folder, ['rev-parse', 'HEAD'])
+  const pulled = await pullLatest(folder, main, !!dirty)
+  if (!pulled.ok) return switched ? { ...pulled, message: switched + pulled.message } : pulled
+  const after = await gitOut(folder, ['rev-parse', 'HEAD'])
+  const came = before && after && before !== after ? Number(await gitOut(folder, ['rev-list', '--count', `${before}..${after}`])) || 0 : 0
+  const ahead = aheadBehind(await gitOut(folder, ['rev-list', '--left-right', '--count', `HEAD...origin/${main}`]))
+  if (ahead?.behind) return { ok: false, message: `${switched}Something stopped git getting all of GitHub’s ${main}: it’s still ${ahead.behind} behind.` }
+  if (pulled.message.includes('on top')) return { ...pulled, message: switched + pulled.message }
+  const got = came ? `Got ${came === 1 ? '1 new commit' : `${came} new commits`} from GitHub’s ${main}.` : `Already up to date with GitHub’s ${main}.`
+  return { ok: true, message: `${switched}${got}${dirty ? ` Your ${dirty === 1 ? 'changed file is' : `${dirty} changed files are`} still here.` : ''}` }
+}
+
 /** One of the one-click fixes. */
 async function fix(folder: string, id: string, arg: string): Promise<FixResult> {
   const info = await appInfo(folder)
@@ -519,6 +586,17 @@ export function setupReleaseHelper(): void {
   ipcMain.handle('apps:releaseFix', (_e, folder: unknown, id: unknown, arg: unknown) => {
     if (!validFolder(folder) || typeof id !== 'string') throw new Error('Not allowed')
     return once(folder, () => fix(folder, id, typeof arg === 'string' ? arg : ''))
+  })
+  // Not under once() (it's only a look), but it waits its turn behind a release job, so their
+  // fetches don't trip over each other.
+  ipcMain.handle('apps:mainStatus', (_e, folder: unknown) => {
+    if (!validFolder(folder)) throw new Error('Not allowed')
+    if (busy.has(folder)) throw new Error('busy')
+    return mainStatus(folder)
+  })
+  ipcMain.handle('apps:getLatestMain', (_e, folder: unknown) => {
+    if (!validFolder(folder)) throw new Error('Not allowed')
+    return once(folder, () => getLatestMain(folder))
   })
   ipcMain.handle('apps:writeNotes', (_e, folder: unknown, version: unknown, items: unknown) => {
     if (!validFolder(folder) || typeof version !== 'string' || !/^\d+\.\d+\.\d+$/.test(version) || !Array.isArray(items)) throw new Error('Not allowed')
