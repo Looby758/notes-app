@@ -322,6 +322,42 @@ describe('release helper (with real git)', { timeout: 60_000 }, () => {
     expect(byId(pre, 'tag').state).toBe('pass')
   })
 
+  it('counts from the last real release after giving up on a version, and can use its number again', async () => {
+    git(app, 'tag', '-a', 'v1.0.0', '-m', 'Release 1.0.0')
+    git(app, 'push', '-q', 'origin', 'v1.0.0')
+    await call('apps:writeNotes', app, '1.1.0', ['New things'])
+    expect((await call<ReleaseResult>('apps:release', app, 'minor', '1.1.0')).ok).toBe(true)
+    // Its build fails, so it's given up: the tag goes, package.json still says 1.1.0.
+    expect((await call<FixResult>('apps:releaseFix', app, 'delete-tag', 'v1.1.0')).ok).toBe(true)
+    expect(JSON.parse(readFileSync(join(app, 'package.json'), 'utf8')).version).toBe('1.1.0')
+
+    expect(await call<Preflight>('apps:preflight', app, 'patch')).toMatchObject({ next: '1.0.1', tag: 'v1.0.1' })
+    expect(await call<Preflight>('apps:preflight', app, 'major')).toMatchObject({ next: '2.0.0' })
+    const pre = await call<Preflight>('apps:preflight', app, 'minor')
+    expect(pre).toMatchObject({ version: '1.1.0', next: '1.1.0', tag: 'v1.1.0' })
+    expect(byId(pre, 'tag').state).toBe('pass')
+    expect(byId(pre, 'unfinished').state).toBe('pass')
+
+    const again = await call<ReleaseResult>('apps:release', app, 'minor', '1.1.0')
+    expect(again).toMatchObject({ ok: true, tag: 'v1.1.0' })
+    expect(remoteTags(origin)).toEqual(['v1.0.0', 'v1.1.0'])
+    expect(git(origin, 'rev-parse', 'v1.1.0^{commit}')).toBe(git(origin, 'rev-parse', 'main'))
+    // Released for real now, so the next one counts from it.
+    expect(await call<Preflight>('apps:preflight', app, 'minor')).toMatchObject({ next: '1.2.0' })
+  })
+
+  it('can release a fix for the last real version after giving up on a bigger one', async () => {
+    git(app, 'tag', '-a', 'v1.0.0', '-m', 'Release 1.0.0')
+    git(app, 'push', '-q', 'origin', 'v1.0.0')
+    await call('apps:writeNotes', app, '1.1.0', ['New things'])
+    expect((await call<ReleaseResult>('apps:release', app, 'minor', '1.1.0')).ok).toBe(true)
+    expect((await call<FixResult>('apps:releaseFix', app, 'delete-tag', 'v1.1.0')).ok).toBe(true)
+    await call('apps:writeNotes', app, '1.0.1', ['A fix'])
+    expect(await call<ReleaseResult>('apps:release', app, 'patch', '1.0.1')).toMatchObject({ ok: true, tag: 'v1.0.1' })
+    expect(JSON.parse(readFileSync(join(app, 'package.json'), 'utf8')).version).toBe('1.0.1')
+    expect(git(origin, 'log', '-1', '--format=%s', 'main')).toBe('Release 1.0.1')
+  })
+
   it('moves a release’s tag to a fix and pushes it, so GitHub builds again', async () => {
     await call('apps:writeNotes', app, '1.0.1', ['A fix'])
     expect((await call<ReleaseResult>('apps:release', app, 'patch', '1.0.1')).ok).toBe(true)

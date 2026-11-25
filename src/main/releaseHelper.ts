@@ -2,7 +2,7 @@ import { ipcMain, net, shell } from 'electron'
 import { execFile } from 'child_process'
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { isAbsolute, join, relative } from 'path'
-import { bumpVersion, VERSION_BUMPS, type VersionBump } from '@shared/appStudio'
+import { bumpVersion, releaseBase, VERSION_BUMPS, type VersionBump } from '@shared/appStudio'
 import {
   addNotesEntry,
   aheadBehind,
@@ -142,6 +142,15 @@ export function findNotesFile(folder: string): string | null {
   return found.length ? relative(folder, found[0]).replace(/\\/g, '/') : null
 }
 
+/**
+ * The version a release counts up from: package.json's, unless that one was never released (its
+ * release was given up), then the newest that was. Tags here and on GitHub both count.
+ */
+async function baseVersion(folder: string, version: string, there: Set<string> | null): Promise<string> {
+  const here = ((await gitOut(folder, ['tag', '--list', 'v*'])) ?? '').split('\n')
+  return releaseBase(version, [...here, ...(there ?? [])])
+}
+
 /** Tags on GitHub (from git, with the app's own sign-in), or null when it couldn't ask. */
 async function remoteTags(folder: string): Promise<Set<string> | null> {
   const r = await run(folder, 'git', ['ls-remote', '--tags', 'origin'], { timeout: 60_000 })
@@ -169,14 +178,15 @@ async function preflight(folder: string, bump: VersionBump): Promise<Preflight> 
   if (!info.ok || info.error) throw new Error(info.error ?? 'Orbit couldn’t read this app’s folder.')
   const version = info.version
   if (!version) throw new Error('Orbit bumps the version in package.json, so it can only release apps that have one.')
-  const next = bumpVersion(version, bump)
+  const hasOrigin = (await gitOut(folder, ['remote', 'get-url', 'origin'])) !== null
+  const tagsThere = hasOrigin ? await remoteTags(folder) : new Set<string>()
+  const next = bumpVersion(await baseVersion(folder, version, tagsThere), bump)
   if (!next) throw new Error(`The version in package.json (${version}) isn’t a plain number like 1.2.3, so Orbit can’t work out the next one.`)
   const tag = `v${next}`
   const main = info.mainBranch ?? 'main'
   const ctx = { windows: WINDOWS, tag, main }
   const checks: Check[] = []
   const onMain = info.branch === main
-  const hasOrigin = (await gitOut(folder, ['remote', 'get-url', 'origin'])) !== null
 
   const changed = info.changedFiles ?? 0
   checks.push(
@@ -201,8 +211,7 @@ async function preflight(folder: string, bump: VersionBump): Promise<Preflight> 
     }
   }
 
-  const [tagsThere, localNow, localNext] = await Promise.all([
-    hasOrigin ? remoteTags(folder) : Promise.resolve(new Set<string>()),
+  const [localNow, localNext] = await Promise.all([
     gitOut(folder, ['tag', '--list', `v${version}`]),
     gitOut(folder, ['tag', '--list', tag])
   ])
@@ -310,11 +319,13 @@ async function release(folder: string, bump: VersionBump, expected: string): Pro
   const info = await appInfo(folder)
   nameApp(folder, info.repo)
   const main = info.mainBranch ?? 'main'
-  const next = info.version ? bumpVersion(info.version, bump) : null
+  const hasOrigin = (await gitOut(folder, ['remote', 'get-url', 'origin'])) !== null
+  const next = info.version ? bumpVersion(await baseVersion(folder, info.version, hasOrigin ? await remoteTags(folder) : null), bump) : null
   if (next !== expected) throw new Error('The version changed since the check. Check again.')
   const tag = `v${next}`
   const ctx = { windows: WINDOWS, tag, main }
-  const version = await run(folder, 'npm', ['version', bump, '-m', 'Release %s'], { timeout: 120_000 })
+  // The number itself rather than "minor": after a given-up release it can be the one package.json already says.
+  const version = await run(folder, 'npm', ['version', next, ...(next === info.version ? ['--allow-same-version'] : []), '-m', 'Release %s'], { timeout: 120_000 })
   if (!version.ok) return { ok: false, step: 'version', problem: version.npmMissing ? npmProblem() : explainProblem(version.out, ctx), output: lastLines(version.out, 60) }
   const push = await run(folder, 'git', ['push', '--atomic', '--follow-tags', 'origin', `HEAD:refs/heads/${main}`], { timeout: 180_000, interactive: true })
   if (!push.ok) {

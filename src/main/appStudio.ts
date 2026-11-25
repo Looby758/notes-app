@@ -212,12 +212,13 @@ export async function appInfo(folder: string): Promise<AppInfo> {
   const releaseWorkflow = hasReleaseWorkflow(folder)
   const inside = await git(folder, ['rev-parse', '--is-inside-work-tree'])
   if (inside !== 'true') return { ok: true, version, buildScripts, hasTests, releaseWorkflow, error: inside === null && !(await git(folder, ['--version'])) ? 'Git isn’t installed on this computer.' : 'This folder isn’t a git repository.' }
-  const [branch, last, changes, remote, originHead] = await Promise.all([
+  const [branch, last, changes, remote, originHead, tags] = await Promise.all([
     git(folder, ['rev-parse', '--abbrev-ref', 'HEAD']),
     git(folder, ['log', '-1', '--format=%s%x1f%cI%x1f%an']),
     git(folder, ['status', '--porcelain']),
     git(folder, ['remote', 'get-url', 'origin']),
-    git(folder, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])
+    git(folder, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD']),
+    git(folder, ['tag', '--list', 'v*'])
   ])
   const mainBranch = originHead?.replace(/^origin\//, '') || ((await git(folder, ['rev-parse', '--verify', '--quiet', 'refs/heads/master'])) && !(await git(folder, ['rev-parse', '--verify', '--quiet', 'refs/heads/main'])) ? 'master' : 'main')
   const [subject, date, author] = (last ?? '').split('\x1f')
@@ -232,7 +233,8 @@ export async function appInfo(folder: string): Promise<AppInfo> {
     mainBranch,
     buildScripts,
     hasTests,
-    releaseWorkflow
+    releaseWorkflow,
+    versionTags: (tags ?? '').split('\n').filter((t) => /^v\d+\.\d+\.\d+$/.test(t))
   }
 }
 

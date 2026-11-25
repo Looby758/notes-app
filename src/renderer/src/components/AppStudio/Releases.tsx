@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ClipboardCopy, Check, Download, EyeOff, Eye, Undo2, GitBranch, ArrowDownToLine, ExternalLink, Hammer, Loader2, RefreshCw, Rocket, Sparkles, Tag, Upload, Wand2 } from 'lucide-react'
-import { boardKey, bumpVersion, rollbackVersion, countText, describeChange, downloadsByPlatform, downloadsSince, isTokenPermissionError, changelogSource, notesTarget, plainChangelog, timeAgo, VERSION_BUMPS, type Release, type VersionBump } from '@shared/appStudio'
+import { boardKey, bumpVersion, releaseBase, rollbackVersion, countText, describeChange, downloadsByPlatform, downloadsSince, isTokenPermissionError, changelogSource, notesTarget, plainChangelog, timeAgo, VERSION_BUMPS, type Release, type VersionBump } from '@shared/appStudio'
 import { useTerminals, type TerminalProject } from '../../store/terminals'
 import { refreshApps, setSection, useAppStudio } from '../../store/appStudio'
 import { downloadDay, lastRelease, loadReleases, putRelease, setNotes, setReleasesApp, totalDownloads, useAppReleases } from '../../store/appReleases'
@@ -291,7 +291,9 @@ function RollBack({ release, project, repo, releases }: { release: Release; proj
 function NextRelease({ project, releases, appKey, repo }: { project: TerminalProject; releases: Release[]; appKey: string; repo?: string }) {
   const info = useAppStudio((s) => s.info[project.folder])
   const [bump, setBump] = useState<VersionBump>('minor')
-  const version = info?.version
+  // Counted from the last version that was really released, so a given-up one is free to use again.
+  const version = info?.version ? releaseBase(info.version, [...(info.versionTags ?? []), ...releases.filter((r) => !r.draft).map((r) => r.tag)]) : undefined
+  const givenUp = !!version && version !== info?.version
   const next = version ? bumpVersion(version, bump) : null
   const last = lastRelease(releases)
   const dirty = (info?.changedFiles ?? 0) > 0
@@ -303,7 +305,7 @@ function NextRelease({ project, releases, appKey, repo }: { project: TerminalPro
         <h3>Next release</h3>
       </div>
       <div className="appstudio-card-line muted">
-        {version ? <>Now v{version}</> : <>No version in package.json</>}
+        {version ? <>Now v{version}{givenUp && <> (package.json still says {info?.version}, which wasn’t released)</>}</> : <>No version in package.json</>}
         {last && (
           <>
             {' '}

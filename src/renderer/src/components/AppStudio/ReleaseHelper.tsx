@@ -439,7 +439,7 @@ const RECOVERY_HINTS: Record<RecoveryId, string> = {
   'write-notes': 'Adds the notes to the app’s code and commits them. Then build again.',
   rerun: 'For a failure by chance (a download that timed out). The same code is built again.',
   retag: 'Once the fix is committed: moves the tag to the latest commit and pushes it, so GitHub builds that instead',
-  'give-up': 'Deletes the draft release and the tag. The next release uses the next number.'
+  'give-up': 'Deletes the draft release and the tag. The next release can use this number again.'
 }
 
 /**
