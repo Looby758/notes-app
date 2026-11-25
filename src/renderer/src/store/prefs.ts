@@ -8,7 +8,8 @@ import { recordUndo } from '../lib/undo'
 import { SETTINGS } from '../lib/settingsSchema'
 
 /** Your Settings. The main process stores them in settings.json and checks every value. */
-export const usePrefs = create<{ prefs: Prefs }>(() => ({ prefs: DEFAULT_PREFS }))
+// Until your settings arrive, no add-on counts as added, so none starts up early only to be turned away.
+export const usePrefs = create<{ prefs: Prefs }>(() => ({ prefs: { ...DEFAULT_PREFS, installedAddons: [] } }))
 
 /** Changes not yet sent to the main process (sliders send many in a row). */
 let pending: Partial<Prefs> = {}

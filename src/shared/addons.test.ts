@@ -95,3 +95,16 @@ describe('saved settings', () => {
     expect(normalizePrefs(fromFolder).installedAddons).toEqual(ADDON_IDS)
   })
 })
+
+describe('the store’s details', async () => {
+  const { ADDON_ABOUT, ADDON_CATEGORIES } = await import('./addonDetails')
+  const shown = ADDONS.filter((a) => !a.helper).map((a) => a.id)
+  it('has a description for every add-on it shows', () => {
+    for (const id of shown) expect(ADDON_ABOUT[id], id).toBeTruthy()
+    for (const id of Object.keys(ADDON_ABOUT)) expect(shown, id).toContain(id)
+  })
+  it('puts every add-on it shows in exactly one category', () => {
+    const listed = ADDON_CATEGORIES.flatMap((c) => c.addons)
+    expect([...listed].sort()).toEqual([...shown].sort())
+  })
+})

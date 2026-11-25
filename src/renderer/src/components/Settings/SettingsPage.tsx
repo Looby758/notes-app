@@ -467,7 +467,7 @@ export default function SettingsPage() {
       </nav>
 
       <div className="settings-body" ref={body}>
-        <div className="settings-content">
+        <div className={`settings-content${!q && section === 'addons' ? ' settings-content-wide' : ''}`}>
           {q ? (
             <>
               <h2>Results for “{q}”</h2>
