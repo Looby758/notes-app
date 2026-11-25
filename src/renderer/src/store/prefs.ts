@@ -67,11 +67,15 @@ export function setPrefsQuietly(patch: Partial<Prefs>): void {
   usePrefs.setState((s) => ({ prefs: { ...s.prefs, ...patch } }))
   pending = { ...pending, ...patch }
   clearTimeout(timer)
-  timer = setTimeout(() => {
+  const flush = (): void => {
     const send = pending
     pending = {}
     window.api.setPrefs(send).then((prefs) => usePrefs.setState({ prefs: { ...prefs, ...pending } }))
-  }, 150)
+  }
+  // Adding or removing an add-on goes over straight away: its page opens at once, and Orbit's main
+  // part has to know it's added before that page asks it for anything.
+  if ('installedAddons' in patch) flush()
+  else timer = setTimeout(flush, 150)
 }
 
 export function resetPrefs(keys: (keyof Prefs)[]): void {
