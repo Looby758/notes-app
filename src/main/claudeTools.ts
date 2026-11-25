@@ -804,7 +804,7 @@ function studioMoreTools(server: McpServer, deps: ToolDeps): void {
   })
   windowTool(server, deps, 'get_latest_code', {
     title: 'Get the latest code',
-    description: 'Gets the latest main branch from GitHub into the app’s folder on this computer.',
+    description: 'Gets the latest main branch from GitHub into the app’s folder on this computer, then installs any new packages (npm install) when package.json or the lock file changed or a package is missing.',
     inputSchema: { app },
     write: true,
     timeoutMs: 5 * 60_000

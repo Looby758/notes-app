@@ -1531,8 +1531,10 @@ export interface NotesApi {
   appsReleaseFix(folder: string, fix: string, tag?: string): Promise<FixResult>
   /** Fetches GitHub's main and says how far this app's folder is behind (or ahead of) it. Rejects with "busy" while a release job runs. */
   appsMainStatus(folder: string): Promise<MainStatus>
-  /** Switches to main (if on another branch, with nothing uncommitted) and pulls GitHub's latest main. Never throws changes away. */
+  /** Switches to main (if on another branch, with nothing uncommitted), pulls GitHub's latest main, then runs npm install when the packages changed or are missing. Never throws changes away. */
   appsGetLatestMain(folder: string): Promise<FixResult>
+  /** What Get latest main is doing now ("Getting GitHub's main…", "Installing the new packages…"). */
+  onLatestMainStep(callback: (step: { folder: string; text: string }) => void): () => void
   /** Adds "What's new" notes for a version to the app's list in its code, and commits them. */
   appsWriteNotes(folder: string, version: string, items: string[]): Promise<FixResult>
   /** What GitHub's build of a release tag is doing, and why it failed. */

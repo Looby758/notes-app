@@ -18171,7 +18171,24 @@ button.board-add-picture:hover {
   margin-left: 0;
 }
 .release-latest-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
   color: var(--text);
+}
+.release-latest-result > span {
+  flex: 1;
+  min-width: 0;
+}
+.release-latest-result > svg {
+  flex-shrink: 0;
+}
+.release-latest-result-ok > svg {
+  color: #2ea043;
+}
+.release-latest-result > details {
+  flex-basis: 100%;
 }
 .release-warning svg {
   flex-shrink: 0;

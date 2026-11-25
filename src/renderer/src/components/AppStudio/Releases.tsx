@@ -360,6 +360,7 @@ function LatestMain({ project }: { project: TerminalProject }) {
   const [status, setStatus] = useState<MainStatus | null>(null)
   const [looking, setLooking] = useState(false)
   const [pulling, setPulling] = useState(false)
+  const [pullStep, setPullStep] = useState<string | null>(null)
   const [result, setResult] = useState<{ ok: boolean; text: string; output?: string } | null>(null)
   const ask = useRef(0)
   const main = info?.mainBranch ?? 'main'
@@ -387,7 +388,11 @@ function LatestMain({ project }: { project: TerminalProject }) {
 
   const getLatest = async (): Promise<void> => {
     setPulling(true)
+    setPullStep(null)
     setResult(null)
+    const stop = window.api.onLatestMainStep((s) => {
+      if (s.folder === project.folder) setPullStep(s.text)
+    })
     try {
       const r = await window.api.appsGetLatestMain(project.folder)
       setResult({ ok: r.ok, text: r.message, output: r.output })
@@ -396,7 +401,9 @@ function LatestMain({ project }: { project: TerminalProject }) {
     } catch (err) {
       setResult({ ok: false, text: errorMessage(err) })
     } finally {
+      stop()
       setPulling(false)
+      setPullStep(null)
       await refreshApps()
       void look()
     }
@@ -410,8 +417,8 @@ function LatestMain({ project }: { project: TerminalProject }) {
   const title = blocked
     ? `Commit or put away the ${dirty === 1 ? 'changed file' : `${dirty} changed files`} first, so ${dirty === 1 ? 'it stays' : 'they stay'} on ${info?.branch}`
     : offMain
-      ? `Runs git checkout ${main}, then gets everything on GitHub’s ${main}. Nothing is thrown away.`
-      : `Gets everything on GitHub’s ${main} (git pull). Changed files are kept; if the new commits touch them, git stops and nothing changes.`
+      ? `Runs git checkout ${main}, gets everything on GitHub’s ${main}, then installs any new packages (npm install). Nothing is thrown away.`
+      : `Gets everything on GitHub’s ${main} (git pull), then installs any new packages (npm install). Changed files are kept; if the new commits touch them, git stops and nothing changes.`
 
   return (
     <div className={`release-latest${upToDate ? ' release-latest-ok' : ''}${status?.problem ? ' release-latest-problem' : ''}`}>
@@ -439,12 +446,17 @@ function LatestMain({ project }: { project: TerminalProject }) {
           {pulling ? <Loader2 size={13} className="spin" /> : <ArrowDownToLine size={13} />} {pulling ? 'Getting it…' : label}
         </button>
       </div>
-      {result && !result.ok && (
+      {pulling && pullStep && (
         <div className="release-latest-result">
-          <span>{result.text}</span>
-          {result.output?.trim() && (
-            <details className="release-details">
-              <summary>Show what git said</summary>
+          <Loader2 size={13} className="spin" /> <span>{pullStep}</span>
+        </div>
+      )}
+      {result && (
+        <div className={`release-latest-result${result.ok ? ' release-latest-result-ok' : ''}`}>
+          {result.ok && <Check size={13} />} <span>{result.text}</span>
+          {!result.ok && result.output?.trim() && (
+            <details className="release-details" open={/npm/.test(result.text)}>
+              <summary>{/npm|packages/.test(result.text) ? 'Show what npm said' : 'Show what git said'}</summary>
               <pre>{result.output}</pre>
             </details>
           )}

@@ -123,11 +123,11 @@ export function sawMainStatus(folder: string, result: MainStatus): void {
   recordStudioError(folder, 'git', 'Checking GitHub’s main', title, detail, result.output ?? '')
 }
 
-export function sawFix(folder: string, what: string, result: FixResult): void {
+export function sawFix(folder: string, what: string, result: FixResult, kind: StudioErrorKind = 'git'): void {
   remember(folder, { fix: { at: now(), what, result } })
   if (result.ok) return
   const { title, detail } = result.problem ? { title: result.problem.title, detail: result.problem.detail } : split(result.message)
-  recordStudioError(folder, 'git', what, title, detail, result.output ?? '')
+  recordStudioError(folder, kind, what, title, detail, result.output ?? '')
 }
 
 /** Something the release helper couldn't do at all (it threw). */

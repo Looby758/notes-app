@@ -100,14 +100,15 @@ export function redactSecrets(text: string): string {
 
 // ---------- App Studio's problems ----------
 
-export type StudioErrorKind = 'preflight' | 'tests' | 'release' | 'build' | 'git'
+export type StudioErrorKind = 'preflight' | 'tests' | 'release' | 'build' | 'git' | 'packages'
 
 export const STUDIO_ERROR_KINDS: Record<StudioErrorKind, string> = {
   preflight: 'Checks before a release',
   tests: 'Tests',
   release: 'Making the release',
   build: 'GitHub’s build',
-  git: 'Git'
+  git: 'Git',
+  packages: 'Installing packages'
 }
 
 export interface StudioError {
