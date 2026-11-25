@@ -49,6 +49,8 @@ interface UIState {
   launcherOpen: boolean
   /** The radial menu, open at this point on screen. */
   radial: { x: number; y: number } | null
+  /** Settings, open as a panel over whatever page you're on. */
+  settingsOpen: boolean
   /** Asks Settings to switch to this section (e.g. from a "Set up" button elsewhere). */
   settingsSection: string | null
   /** What the Export dialog exports: a note, or a folder ('' = every note). */
@@ -97,6 +99,7 @@ export const useUI = create<UIState>(() => ({
   paletteQuery: '',
   launcherOpen: false,
   radial: null,
+  settingsOpen: false,
   settingsSection: null,
   exportTarget: null,
   bulkAction: 'move',

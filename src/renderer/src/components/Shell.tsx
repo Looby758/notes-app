@@ -52,6 +52,7 @@ import EditorArea from './Editor/EditorArea'
 import LayoutMenu from './Editor/LayoutMenu'
 import RightPanel from './Panels/RightPanel'
 import Modals from './Picker/Modals'
+import SettingsDialog from './Settings/SettingsDialog'
 import LockDialog from './Lock/LockDialog'
 import SendToPhone from './Phone/SendToPhone'
 import { startPhone } from '../store/phone'
@@ -271,7 +272,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setMenuOpen(false)
       // Esc leaves zen mode (unless it's closing something else first).
-      if (e.key === 'Escape' && useUI.getState().zen && !useUI.getState().modal && !e.defaultPrevented) {
+      if (e.key === 'Escape' && useUI.getState().zen && !useUI.getState().modal && !useUI.getState().settingsOpen && !e.defaultPrevented) {
         toggleZen()
         return
       }
@@ -431,6 +432,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       </footer>
 
       <Modals />
+      <SettingsDialog />
       <Launcher />
       <RadialMenu />
       <LockDialog />
