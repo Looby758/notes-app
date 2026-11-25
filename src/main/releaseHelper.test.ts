@@ -232,6 +232,9 @@ describe('release helper (with real git)', { timeout: 60_000 }, () => {
 
     it('installs new packages after getting main, saying what it’s doing', async () => {
       addPackageOnGitHub()
+      // Started from npm run on a computer whose npm settings list allowed scripts: newer npm
+      // (12+) refuses project installs when that comes in as an environment variable.
+      process.env.npm_config_allow_scripts = 'esbuild'
       const steps: string[] = []
       const sender = { isDestroyed: () => false, send: (_c: string, s: { text: string }) => steps.push(s.text) }
       const r = await Promise.resolve(handlers.get('apps:getLatestMain')!({ sender }, app) as Promise<FixResult>)
@@ -240,6 +243,12 @@ describe('release helper (with real git)', { timeout: 60_000 }, () => {
       expect(steps).toEqual(['Getting GitHub’s main…', 'Installing the new packages (npm install)…'])
       // Nothing new and nothing missing: no install.
       expect((await call<FixResult>('apps:getLatestMain', app)).message).toBe('Already up to date with GitHub’s main.')
+      delete process.env.npm_config_allow_scripts
+    })
+
+    it('doesn’t pass an inherited allow-scripts setting on to npm', async () => {
+      const { withoutNpmFlags } = await import('./releaseHelper')
+      expect(withoutNpmFlags({ npm_config_allow_scripts: 'esbuild', NPM_CONFIG_ALLOW_SCRIPTS: 'x', npm_config_registry: 'r', PATH: 'p' })).toEqual({ npm_config_registry: 'r', PATH: 'p' })
     })
 
     it('installs packages an earlier get left out, even when already up to date', async () => {
