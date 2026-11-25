@@ -17,7 +17,6 @@ import {
   type PaneState
 } from '../store/editor'
 import { notify } from '../store/notify'
-import { useUI } from '../store/ui'
 import { usePrefs } from '../store/prefs'
 import type { Prefs } from '@shared/prefs'
 import { isWithin, replacePrefix } from './paths'
@@ -102,6 +101,8 @@ export const MIXER_TAB = 'mixer:'
 export const TASKS_TAB = 'tasks:'
 /** Removing an app and what it leaves behind (components/Uninstaller). */
 export const UNINSTALL_TAB = 'uninstall:'
+/** Add-ons: browse, add and remove parts of Orbit (components/Settings/AddonsSettings, its own page). */
+export const ADDONS_TAB = 'addons:'
 /** The download manager: a queue that pauses, carries on and can wait for the night (components/Downloads). */
 export const DOWNLOADS_TAB = 'downloads:'
 /** Scenes, webcam and screen recording (components/Studio). */
@@ -896,8 +897,7 @@ function addTab(pane: string, id: string): void {
 
 /** Opens Settings → Add-ons. */
 export function openAddons(): void {
-  openSpecialTab(SETTINGS_TAB)
-  useUI.setState({ settingsSection: 'addons' })
+  openSpecialTab(ADDONS_TAB)
 }
 
 /** Opens (or switches to) a special page like Settings. There's only ever one of each. */

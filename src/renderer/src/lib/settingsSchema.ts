@@ -10,7 +10,6 @@ import { VISUALISER_STYLES } from '@shared/musicSound'
  */
 
 export type SectionId =
-  | 'addons'
   | 'appearance'
   | 'navigation'
   | 'editor'
@@ -1131,7 +1130,6 @@ export const SETTINGS: SettingDef[] = [
 
 export const SECTIONS: { id: SectionId; label: string }[] = [
   { id: 'appearance', label: 'Appearance' },
-  { id: 'addons', label: 'Add-ons' },
   { id: 'navigation', label: 'Finding features' },
   { id: 'editor', label: 'Editor' },
   { id: 'files', label: 'Files' },

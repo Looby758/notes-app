@@ -23902,14 +23902,37 @@ img.tm-icon {
 }
 
 /* Settings → Add-ons (a store: categories, their add-ons, and the one picked), and the page shown for an add-on that isn't added. */
-.settings-content-wide {
-  max-width: 1240px;
+.addons-page {
   container: addon-page / inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px;
+  overflow-y: auto;
+}
+.addons-page-head h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 22px;
+  font-weight: 700;
+}
+.addons-page-head p {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 .addon-store {
   display: grid;
   grid-template-columns: 175px 265px minmax(0, 1fr);
-  height: calc(100vh - 170px);
+  flex: 1;
   min-height: 460px;
   border: 1px solid var(--border);
   border-radius: var(--radius);

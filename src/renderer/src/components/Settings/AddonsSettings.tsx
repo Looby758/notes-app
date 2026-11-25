@@ -202,6 +202,21 @@ function Details({ addon: a, installed, removing, setRemoving }: { addon: AddonI
   )
 }
 
+/** The Add-ons page (its own tab): a heading, a line on what add-ons are, and the store. */
+export function AddonsPage() {
+  return (
+    <div className="addons-page" data-addons-page>
+      <header className="addons-page-head">
+        <h1>
+          <Puzzle size={20} /> Add-ons
+        </h1>
+        <p>Notes, to-do lists, Home, search and Settings are always here. Add whatever else you want; an add-on you haven’t added is hidden everywhere and never runs.</p>
+      </header>
+      <AddonsSettings />
+    </div>
+  )
+}
+
 /** Shown in place of a page whose add-on isn't added (a tab left open, or a link to it). */
 export function AddonMissing({ addon: id }: { addon: string }) {
   const addon = addonById(id)

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CalendarDays, Clapperboard, Compass, FileJson, MonitorSmartphone, Music, FolderCog, Info, Keyboard, Palette, PenLine, RefreshCw, RotateCcw, ScrollText, Search, ShieldCheck, Sparkles, X, Zap, Globe, Puzzle } from 'lucide-react'
+import { CalendarDays, Clapperboard, Compass, FileJson, MonitorSmartphone, Music, FolderCog, Info, Keyboard, Palette, PenLine, RefreshCw, RotateCcw, ScrollText, Search, ShieldCheck, Sparkles, X, Zap, Globe } from 'lucide-react'
 import { checkForUpdates, useUpdates, watchUpdates } from '../../store/updates'
 import { checkSettingsNow, showWhatsNew } from '../../store/notices'
 import { DEFAULT_PREFS } from '@shared/prefs'
@@ -10,7 +10,6 @@ import { matchesSearch, SECTIONS, SETTINGS, type SectionId, type SettingDef } fr
 import { SettingControl } from './Controls'
 import ShortcutsEditor, { matchingCommands } from './ShortcutsEditor'
 import CalendarSources from './CalendarSources'
-import AddonsSettings from './AddonsSettings'
 import SnippetsEditor from './SnippetsEditor'
 import PlaceholderHelp from './PlaceholderHelp'
 import RemindersSettings from './RemindersSettings'
@@ -25,7 +24,6 @@ import pkg from '../../../../../package.json'
 import { showKeys, TRAY_NAME } from '@shared/platform'
 
 const ICONS: Record<SectionId, typeof Palette> = {
-  addons: Puzzle,
   appearance: Palette,
   navigation: Compass,
   editor: PenLine,
@@ -467,7 +465,7 @@ export default function SettingsPage() {
       </nav>
 
       <div className="settings-body" ref={body}>
-        <div className={`settings-content${!q && section === 'addons' ? ' settings-content-wide' : ''}`}>
+        <div className="settings-content">
           {q ? (
             <>
               <h2>Results for “{q}”</h2>
@@ -486,9 +484,7 @@ export default function SettingsPage() {
                   </button>
                 )}
               </div>
-              {section === 'addons' ? (
-                <AddonsSettings />
-              ) : section === 'shortcuts' ? (
+              {section === 'shortcuts' ? (
                 <ShortcutsEditor query="" />
               ) : section === 'about' ? (
                 <>

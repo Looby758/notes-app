@@ -9,7 +9,7 @@
  */
 
 /** Features every Orbit has. They're never add-ons. */
-export const CORE_FEATURES = ['home', 'today', 'new-note', 'search', 'reading', 'todo', 'settings'] as const
+export const CORE_FEATURES = ['home', 'today', 'new-note', 'search', 'reading', 'todo', 'settings', 'addons'] as const
 
 export interface AddonInfo {
   /** Stable id, saved in settings. */

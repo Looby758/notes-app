@@ -4,7 +4,7 @@ import { useEditor } from '../../store/editor'
 import { usePrefs } from '../../store/prefs'
 import { addonOfFeature, hasFeature } from '@shared/addons'
 import { tabFeature, tabOn } from '../../lib/addons'
-import { AddonMissing } from '../Settings/AddonsSettings'
+import { AddonMissing, AddonsPage } from '../Settings/AddonsSettings'
 import {
   focusPane,
   fileOfTab,
@@ -44,6 +44,7 @@ import {
   MIXER_TAB,
   TASKS_TAB,
   UNINSTALL_TAB,
+  ADDONS_TAB,
   MUSIC_TAB,
   DOWNLOADS_TAB,
   STUDIO_TAB,
@@ -268,6 +269,7 @@ export default function Pane({ pane }: { pane: string }) {
         {shown === MIXER_TAB && <MixerPage />}
         {shown === TASKS_TAB && <TaskManagerPage />}
         {shown === UNINSTALL_TAB && <UninstallerPage />}
+        {shown === ADDONS_TAB && <AddonsPage />}
         {shown === MUSIC_TAB && <MusicPage />}
         {shown === DOWNLOADS_TAB && <DownloadsPage />}
         {shown === STUDIO_TAB && <StudioPage />}
