@@ -58,6 +58,7 @@ async function run(folder: string, tool: 'git' | 'npm', args: string[], opts: { 
   // opened from the Dock or Finder.
   const env = await toolEnv({ GIT_TERMINAL_PROMPT: '0', FORCE_COLOR: '0', NO_COLOR: '1', CI: 'true' })
   if (!opts.interactive) env.GCM_INTERACTIVE = 'never'
+  if (tool === 'npm') withoutNpmFlags(env)
   // npm.cmd only runs through the shell on Windows, which joins the arguments with spaces, so any
   // with a space are quoted. They're all fixed here, never typed in.
   const viaShell = tool === 'npm' && WINDOWS
@@ -77,6 +78,19 @@ async function run(folder: string, tool: 'git' | 'npm', args: string[], opts: { 
       done({ ok: !err, out, npmMissing: missing })
     })
   })
+}
+
+/**
+ * Takes out the settings a parent npm passes down as environment variables when Orbit (or its
+ * tests) was started with npm run. Newer npm counts an inherited allow-scripts setting as if it was
+ * typed on the command line and refuses to install in a project with it (EALLOWSCRIPTS), so it's
+ * removed, and npm reads the app's own .npmrc and package.json instead.
+ */
+export function withoutNpmFlags(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  for (const key of Object.keys(env)) {
+    if (/^npm_config_allow[-_]scripts$/i.test(key)) delete env[key]
+  }
+  return env
 }
 
 /** npm couldn't be found anywhere: what to do, for this computer. */
