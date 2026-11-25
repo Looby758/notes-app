@@ -373,16 +373,21 @@ function PullCard({ pull, canAct }: { pull: PullRequest; canAct: boolean }) {
     }
     setBusy(true)
     try {
-      if (what === 'merge') await window.api.appsMerge(pull.repo, pull.number)
-      else await window.api.appsClose(pull.repo, pull.number)
+      let done = `Closed #${pull.number}.`
+      if (what === 'merge') {
+        const { markedReady } = await window.api.appsMerge(pull.repo, pull.number)
+        done = markedReady ? `Marked #${pull.number} ready for review and merged it into ${pull.base}.` : `Merged #${pull.number} into ${pull.base}.`
+      } else await window.api.appsClose(pull.repo, pull.number)
       dropPull(pull.repo, pull.number)
-      notify(what === 'merge' ? `Merged #${pull.number} into ${pull.base}.` : `Closed #${pull.number}.`, 'info')
+      notify(done, 'info')
       void refreshApps()
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       if (isTokenPermissionError(message)) setTokenProblem(message.replace(/^Error invoking remote method '[^']+': (\w*Error: )?/, ''))
       else notify(err)
       setConfirm(null)
+      // A draft may have been marked ready before the merge failed; show it as it is now.
+      if (what === 'merge' && pull.draft) void refreshApps()
     } finally {
       setBusy(false)
     }
@@ -392,7 +397,11 @@ function PullCard({ pull, canAct }: { pull: PullRequest; canAct: boolean }) {
     <article className="appstudio-pull">
       <div className="appstudio-pull-top">
         <span className="appstudio-chip">{project?.name ?? pull.repo}</span>
-        {pull.draft && <span className="appstudio-chip muted">Draft</span>}
+        {pull.draft && (
+          <span className="appstudio-chip draft" title="Claude opens pull requests as drafts. GitHub won’t merge a draft, so Merge here marks it ready for review first, then merges it.">
+            Draft
+          </span>
+        )}
         <span className="muted">
           #{pull.number} · by {pull.author} · updated {timeAgo(pull.updatedAt)}
         </span>
@@ -448,12 +457,12 @@ function PullCard({ pull, canAct }: { pull: PullRequest; canAct: boolean }) {
         <button
           className={`btn${confirm === 'merge' ? ' btn-primary appstudio-confirm' : ''}`}
           disabled={busy || !canAct}
-          title={canAct ? `Merge into ${pull.base}` : 'Connect GitHub (above) to merge from here'}
+          title={canAct ? (pull.draft ? `It’s a draft: marks it ready for review on GitHub, then merges it into ${pull.base}` : `Merge into ${pull.base}`) : 'Connect GitHub (above) to merge from here'}
           onClick={() => void act('merge')}
           onBlur={() => confirm === 'merge' && !busy && setConfirm(null)}
         >
           {busy && confirm === 'merge' ? <Loader2 size={14} className="spin" /> : <GitMerge size={14} />}
-          {confirm === 'merge' ? `Merge into ${pull.base}?` : 'Merge'}
+          {busy && confirm === 'merge' ? 'Merging…' : confirm === 'merge' ? (pull.draft ? `Mark ready and merge into ${pull.base}?` : `Merge into ${pull.base}?`) : 'Merge'}
         </button>
         <button
           className={`btn${confirm === 'close' ? ' appstudio-confirm-danger' : ''}`}
