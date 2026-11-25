@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { ExternalLink, Headphones, HeadphoneOff, History, Loader2, LogOut, Mic, MicOff, PictureInPicture2, RefreshCw, Trash2, Volume2 } from 'lucide-react'
+import { BarChart3, ExternalLink, Headphones, HeadphoneOff, History, Loader2, LogOut, Mic, MicOff, PictureInPicture2, RefreshCw, Trash2, Volume2 } from 'lucide-react'
 import { DISCORD_REDIRECT, memberState, validClientId, type VoiceMember } from '@shared/discord'
 import { cleanError, toggleDiscord, useDiscord, watchDiscord } from '../../store/discord'
 import { notify } from '../../store/notify'
 import { addHomeCard } from '../../lib/home'
 import { openSpecialTab, DISCORD_TAB } from '../../lib/editorController'
 import { HomeBox } from '../Home/HomePage'
-import { CallHistory } from './VoicePopout'
+import { CallHistory, CallStatsView } from './VoicePopout'
 
 addHomeCard({ id: 'discord-voice', order: 24, title: 'Discord voice', Card: DiscordHomeCard })
 
@@ -39,6 +39,14 @@ export default function DiscordVoicePage() {
         {(stage === 'connecting' || stage === 'authorizing') && <Waiting authorizing={stage === 'authorizing'} />}
         {stage === 'no-discord' && <NoDiscord />}
         {stage === 'ready' && <Channel />}
+        {stage !== 'setup' && (
+          <section className="dc-card">
+            <h3 className="dc-history-head">
+              <BarChart3 size={15} /> Call stats
+            </h3>
+            <CallStatsView wide />
+          </section>
+        )}
         {stage !== 'setup' && (
           <section className="dc-card">
             <h3 className="dc-history-head">

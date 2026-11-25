@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { badgeText, isMessagesUrl, unreadFromTitle } from './messages'
+import { badgeText, isMessagesUrl, needsPageSizedWindow, unreadFromTitle, windowSizedToPage } from './messages'
 
 describe('unreadFromTitle', () => {
   it('reads WhatsApp’s count', () => {
@@ -40,5 +40,29 @@ describe('badgeText', () => {
     expect(badgeText(0)).toBe('')
     expect(badgeText(7)).toBe('7')
     expect(badgeText(150)).toBe('99+')
+  })
+})
+
+describe('windowSizedToPage', () => {
+  it('makes the outer size the page size, so Discord does not think its developer tools are open', () => {
+    const win = { innerWidth: 900, innerHeight: 700, outerWidth: 1400, outerHeight: 760 } as unknown as Window
+    windowSizedToPage(win)
+    expect(win.outerWidth - win.innerWidth).toBe(0)
+    expect(win.outerHeight - win.innerHeight).toBe(0)
+    ;(win as unknown as { innerWidth: number }).innerWidth = 500
+    expect(win.outerWidth).toBe(500)
+  })
+})
+
+describe('needsPageSizedWindow', () => {
+  it("is only Discord's pages, never Google's sign-in", () => {
+    expect(needsPageSizedWindow('https://discord.com/app')).toBe(true)
+    expect(needsPageSizedWindow('https://ptb.discord.com/channels/@me')).toBe(true)
+    expect(needsPageSizedWindow('https://discordapp.com/login')).toBe(true)
+    expect(needsPageSizedWindow('https://accounts.google.com/v3/signin/identifier')).toBe(false)
+    expect(needsPageSizedWindow('https://grok.com/')).toBe(false)
+    expect(needsPageSizedWindow('https://web.whatsapp.com/')).toBe(false)
+    expect(needsPageSizedWindow('https://notdiscord.com/')).toBe(false)
+    expect(needsPageSizedWindow('not a url')).toBe(false)
   })
 })

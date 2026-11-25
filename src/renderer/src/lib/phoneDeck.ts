@@ -15,6 +15,7 @@ import { splitFrontmatter } from './ai'
 import { noteTitle } from './paths'
 import { dayKey } from './dates'
 import { notify } from '../store/notify'
+import { featureOn, notAddedText } from './addons'
 import { toggleDiscord } from '../store/discord'
 
 /**
@@ -61,14 +62,16 @@ const FEATURE_EMOJI: Record<string, string> = {
   music: '🎵',
   songid: '👂',
   comics: '📚',
-  youtube: '📺',
   video: '🎞️',
   games: '🎮',
+  'skyblock-goals': '🎯',
   'mini-games': '🧩',
   snip: '✂️',
+  'snip-picture': '🖼️',
   explorer: '🗂️',
   convert: '🔄',
   studio: '🎬',
+  appstudio: '🛠️',
   clips: '🎞️',
   replay: '⏪',
   soundboard: '🔊',
@@ -80,7 +83,7 @@ const FEATURE_EMOJI: Record<string, string> = {
 }
 
 // Features that are toggles or run in the background: pressing them shouldn't pull Orbit to the front.
-const QUIET = new Set(['music', 'reading', 'streamer', 'capture', 'snip', 'youtube', 'phone', 'replay'])
+const QUIET = new Set(['reading', 'streamer', 'capture', 'snip', 'snip-picture', 'phone', 'replay'])
 
 /** Everything that can go on the deck, for Settings. */
 export const DECK_CHOICES = [
@@ -102,7 +105,8 @@ export function runDeck(id: string): void {
   const extra = DECK_EXTRAS.find((x) => x.id === id)
   if (extra) return extra.run()
   const f = featureById(id)
-  if (f) f.run()
+  if (f && !featureOn(f.id)) notify(notAddedText(f.id), 'info')
+  else if (f) f.run()
   else notify('That deck button isn’t in Orbit any more.', 'info')
 }
 
@@ -136,7 +140,7 @@ export function startPhoneSync(): () => void {
   const connected = (): boolean => usePhone.getState().connected > 0
 
   const pushDeck = (): void => {
-    const buttons = deckButtons(usePrefs.getState().prefs.phoneDeck)
+    const buttons = deckButtons(usePrefs.getState().prefs.phoneDeck.filter((id) => !featureById(id) || featureOn(id)))
     const json = JSON.stringify(buttons)
     if (json === lastDeck) return
     lastDeck = json
@@ -156,7 +160,7 @@ export function startPhoneSync(): () => void {
 
   pushDeck()
   const offs = [
-    usePrefs.subscribe((s, before) => s.prefs.phoneDeck !== before.prefs.phoneDeck && pushDeck()),
+    usePrefs.subscribe((s, before) => (s.prefs.phoneDeck !== before.prefs.phoneDeck || s.prefs.installedAddons !== before.prefs.installedAddons) && pushDeck()),
     usePhone.subscribe((s, before) => {
       if (s.connected > 0 && before.connected === 0) {
         lastScreen = ''

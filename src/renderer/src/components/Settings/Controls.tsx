@@ -133,7 +133,11 @@ function TextInput({ def, value }: { def: Extract<SettingDef, { type: 'text' }>;
         onBlur={commit}
         onKeyDown={(e) => {
           if (e.key === 'Enter') commit()
-          if (e.key === 'Escape') setDraft(value)
+          if (e.key === 'Escape') {
+            // Undo the typing, and keep Settings open (SettingsDialog closes on an Escape nobody used).
+            e.preventDefault()
+            setDraft(value)
+          }
         }}
         aria-label={def.label}
       />
@@ -162,7 +166,11 @@ function FolderInput({ def, value }: { def: Extract<SettingDef, { type: 'folder'
         onBlur={commit}
         onKeyDown={(e) => {
           if (e.key === 'Enter') commit()
-          if (e.key === 'Escape') setDraft(value)
+          if (e.key === 'Escape') {
+            // Undo the typing, and keep Settings open (SettingsDialog closes on an Escape nobody used).
+            e.preventDefault()
+            setDraft(value)
+          }
         }}
         aria-label={def.label}
       />

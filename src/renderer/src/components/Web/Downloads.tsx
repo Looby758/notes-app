@@ -14,21 +14,23 @@ import { shelveComicFile } from '../../store/comics'
 import { describeSize } from '../../lib/convert/formats'
 import { openWebTab } from '../../lib/editorController'
 import FolderPicker from './FolderPicker'
+import { addonOn } from '../../lib/addons'
 
 /** Opens a finished download inside Orbit where it can (pictures, PDFs, videos, comics, zips…). */
 export function openDownload(d: WebDownload): void {
   if (!d.path) return
-  if (isVideoFile(d.name)) {
+  // Each kind opens in its add-on when that's added, otherwise in its usual app.
+  if (isVideoFile(d.name) && addonOn('video-player')) {
     queueVideo(d.path)
     notify('Added to the video player’s Up next.', 'info')
     return
   }
-  if (isComicBookFile(d.name)) {
+  if (isComicBookFile(d.name) && addonOn('comics')) {
     void shelveComicFile(d.path)
     return
   }
   // Pictures, PDFs, sound, text and zips show in the Files tab's preview.
-  if (previewKind(d.name) !== 'none' || isArchiveFile(d.name)) return showInFiles(d.path)
+  if (addonOn('files') && (previewKind(d.name) !== 'none' || isArchiveFile(d.name))) return showInFiles(d.path)
   window.api.explorerOpen(d.path, true).catch(notify)
 }
 

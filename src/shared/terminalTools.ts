@@ -176,7 +176,7 @@ export function addToHistory(history: string[], command: string, max = 300): str
 }
 
 /** Files that, when a pull changes them, mean `npm install` is needed. */
-const PACKAGE_FILES = ['package.json', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml']
+export const PACKAGE_FILES = ['package.json', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml']
 
 /**
  * The "Get latest and run" button's command line: pull the latest code, install packages only if

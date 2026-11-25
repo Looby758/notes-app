@@ -21,6 +21,7 @@ import {
 } from '@shared/soundboard'
 import { SYSTEM_NAME } from '@shared/platform'
 import { logError } from './log'
+import { addonOn, onAddonsChanged } from './addonGate'
 
 /**
  * The soundboard's main-process side: the clips (copied into Orbit's folder, listed in board.json)
@@ -67,7 +68,8 @@ const errorKey = (a: SoundboardAction): string => (a.kind === 'clip' ? a.id : a.
 
 /** Makes the registered hotkeys match the board: frees ones no longer used, takes new ones. */
 function applyHotkeys(): void {
-  const wanted = boardHotkeys(board)
+  // Soundboard hotkeys come with the Soundboard add-on.
+  const wanted = addonOn('soundboard') ? boardHotkeys(board) : new Map<string, never>()
   for (const [accel] of registered) {
     if (!wanted.has(accel)) {
       globalShortcut.unregister(accel)
@@ -155,9 +157,25 @@ function addFiles(paths: string[]): { status: SoundboardStatus; skipped: string[
   return { status: changed(), skipped }
 }
 
+/**
+ * Adds one sound file as a button called `name` (the soundboard's "From a link": the part you
+ * picked, cut from a video's sound). The file is copied, so the caller can delete it after.
+ */
+export function addSoundFile(path: string, name: string): { status: SoundboardStatus; skipped: string[] } {
+  const before = board.clips.length
+  const res = addFiles([path])
+  const label = name.trim().slice(0, 60)
+  if (board.clips.length > before && label) {
+    board = { ...board, clips: board.clips.map((c, i) => (i === board.clips.length - 1 ? { ...c, name: label } : c)) }
+    return { status: changed(), skipped: res.skipped }
+  }
+  return res
+}
+
 export function setupSoundboard(): void {
   load()
   applyHotkeys()
+  onAddonsChanged(applyHotkeys)
 
   ipcMain.handle('soundboard:get', () => status())
   // The Discord voice pop-out's buttons: the main window (which makes the sound) plays them.

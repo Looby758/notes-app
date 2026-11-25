@@ -2,6 +2,8 @@ import { StateField, type EditorState, type Range } from '@codemirror/state'
 import { Decoration, EditorView, WidgetType, type DecorationSet } from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
 import { parseSongLine, type SongCard } from '@shared/songLinks'
+import { featureOn, notAddedText } from '../../lib/addons'
+import { notify } from '../../store/notify'
 import { playSongTarget } from '../../store/music'
 
 /**
@@ -72,6 +74,7 @@ class SongWidget extends WidgetType {
     card.append(art, text, actions)
     card.addEventListener('mousedown', (e) => {
       e.preventDefault()
+      if (!featureOn('musiclibrary')) return notify(notAddedText('musiclibrary'), 'info')
       void playSongTarget(song.target)
     })
     return card

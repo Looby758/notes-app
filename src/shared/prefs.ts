@@ -2,6 +2,8 @@ import { allThemes } from './themes'
 import { IS_MAC } from './platform'
 import { cleanClocks, type WorldClock } from './worldClock'
 import { cleanCountdowns, type Countdown } from './countdown'
+import { ADDON_IDS, cleanInstalledAddons } from './addons'
+import { cleanEq, CROSSFADE_MAX, DEFAULT_EQ, VISUALISER_STYLES, type MusicEq, type VisualiserStyle } from './musicSound'
 
 /**
  * Everything you can customise in Settings. Stored in settings.json under "prefs", which you can
@@ -34,10 +36,18 @@ export interface Prefs {
   gameAnimatedCovers: 'always' | 'hover' | 'off'
   /** Which app icon design to use (taskbar / Dock / window). */
   appIcon: string
+  /** Spotify's parts of the music player (playlists, search, your account…). Off hides them all and only your own music files are used. */
+  musicSpotify: boolean
   /** A pop-up with the song's name and picture when the music player moves on to a new song. */
   musicSongPopup: boolean
   /** Moving bars in the music player while your own music files play. */
   musicVisualiser: boolean
+  /** What the visualiser looks like (shared/musicSound.ts). */
+  musicVisualiserStyle: VisualiserStyle
+  /** Seconds each song fades into the next one (your own music); 0 is off. */
+  musicCrossfade: number
+  /** The equaliser for your own music. */
+  musicEq: MusicEq
   /** Soft clicks and whooshes as you use the app (lib/sounds.ts). */
   interfaceSounds: boolean
   /** How loud they are, 0 to 1. */
@@ -197,6 +207,12 @@ export interface Prefs {
   captureTimestamp: boolean
   /** System-wide shortcut for a screen snip (grab text from anywhere on screen); '' for none. */
   snipShortcut: string
+  /** A picture snip is saved as a file too, not just copied. */
+  snipSave: boolean
+  /** Seconds to wait before a picture snip freezes the screen (0: straight away), so you can hover over something first. */
+  snipDelay: number
+  /** Where picture snips are saved: a full folder path on this computer, or '' for Pictures/Screenshots. */
+  snipFolder: string
   /** System-wide shortcut for "What's this song?" (listen to what's playing and find it); '' for none. */
   songIdShortcut: string
   /** Instant replay: keep the last few seconds of the screen ready to save (lib/replay.ts). */
@@ -212,8 +228,19 @@ export interface Prefs {
   replayMic: boolean
   /** Joining a Discord voice call shows a small note in the corner offering the voice pop-out (it goes away by itself). */
   discordPopoutPrompt: boolean
+  /** Turn your music down while friends talk in a Discord call, then back up (main/musicDuck.ts). */
+  duckMusic: boolean
+  /** How loud the music goes while they talk, as a fraction of its normal volume (0.1–0.8). */
+  duckLevel: number
+  /** Dip it while you talk too, not only friends. */
+  duckWhenITalk: boolean
+  /** Which music: Spotify (its own app) and Orbit's own music player. */
+  duckSpotify: boolean
+  duckOrbit: boolean
   /** Closing the window keeps Notes running in the tray (so quick capture still works). */
   closeToTray: boolean
+  /** Clicking the tray icon: open Orbit, or snip a picture (copied, ready to paste anywhere). */
+  trayClick: 'open' | 'snip'
   launchAtStartup: boolean
 
   /** Look for a newer version on GitHub now and then. */
@@ -230,10 +257,20 @@ export interface Prefs {
   /** Holding the middle mouse button opens a ring of these features under the pointer. */
   radialMiddleClick: boolean
   radialFeatures: string[]
+  /**
+   * The add-ons you've added (shared/addons.ts). Saved in the notes folder with the rest of
+   * Settings, so they follow your notes to another computer. Missing (Orbit from before add-ons) means all of them.
+   */
+  installedAddons: string[]
+  /** Every add-on Orbit knew about when installedAddons was saved, so ones that come in an update aren't missed. */
+  addonsSeen: string[]
   /** Buttons on the phone's Deck tab: feature ids, and a few phone-only actions (lib/phoneDeck.ts). */
   phoneDeck: string[]
   /** Ctrl+K: if no built-in pattern understands a sentence, offer to ask the AI (never sent without asking). */
   smartCommandsAi: boolean
+
+  /** Whole PC search in the Files tab: Orbit keeps a list of every file name on the computer, so results show as you type. */
+  filesWholePcSearch: boolean
 
   /** Shortcut overrides by command id: a shortcut like "Ctrl+Shift+K", or null for none. */
   shortcuts: Record<string, string | null>
@@ -258,8 +295,12 @@ export const DEFAULT_PREFS: Prefs = {
   gameLaunchAnimation: true,
   gameAnimatedCovers: 'always',
   appIcon: 'default',
+  musicSpotify: true,
   musicSongPopup: true,
   musicVisualiser: true,
+  musicVisualiserStyle: 'bars',
+  musicCrossfade: 0,
+  musicEq: DEFAULT_EQ,
   interfaceSounds: true,
   interfaceSoundsVolume: 0.5,
   screensaver: true,
@@ -345,6 +386,9 @@ export const DEFAULT_PREFS: Prefs = {
   captureTimestamp: true,
   captureRememberTarget: false,
   snipShortcut: IS_MAC ? 'Control+Alt+S' : 'Alt+Shift+S',
+  snipSave: true,
+  snipDelay: 0,
+  snipFolder: '',
   songIdShortcut: IS_MAC ? 'Control+Alt+W' : 'Alt+Shift+W',
   replayOn: false,
   replayShortcut: IS_MAC ? 'Control+Alt+R' : 'Alt+Shift+R',
@@ -353,18 +397,27 @@ export const DEFAULT_PREFS: Prefs = {
   replaySound: true,
   replayMic: false,
   discordPopoutPrompt: true,
+  duckMusic: true,
+  duckLevel: 0.3,
+  duckWhenITalk: true,
+  duckSpotify: true,
+  duckOrbit: true,
   closeToTray: true,
+  trayClick: 'open',
   launchAtStartup: false,
 
   checkForUpdates: true,
   syncOrbit: true,
 
-  topbarFeatures: ['home', 'today', 'calendar', 'email', 'messages', 'money', 'music', 'phone'],
+  topbarFeatures: ['home', 'today', 'calendar', 'email', 'messages', 'money', 'musiclibrary', 'phone'],
   showDock: true,
-  dockFeatures: ['home', 'today', 'calendar', 'email', 'messages', 'money', 'chat', 'ask', 'explorer', 'convert', 'music', 'games'],
+  dockFeatures: ['home', 'today', 'calendar', 'email', 'messages', 'money', 'chat', 'ask', 'explorer', 'convert', 'musiclibrary', 'games'],
   radialMiddleClick: true,
-  radialFeatures: ['today', 'new-note', 'calendar', 'money', 'music', 'email', 'snip', 'ask'],
+  radialFeatures: ['today', 'new-note', 'calendar', 'money', 'musiclibrary', 'email', 'snip', 'ask'],
+  installedAddons: [...ADDON_IDS],
+  addonsSeen: [...ADDON_IDS],
   smartCommandsAi: true,
+  filesWholePcSearch: true,
   phoneDeck: ['play-pause', 'next-song', 'previous-song', 'today', 'new-note', 'snip', 'streamer', 'lock-all', 'zen', 'money', 'calendar', 'messages'],
 
   shortcuts: {}
@@ -386,7 +439,10 @@ export const RANGES = {
   autoLockMinutes: { min: 0, max: 120, step: 5 },
   screensaverMinutes: { min: 1, max: 60, step: 1 },
   replaySeconds: { min: 10, max: 120, step: 5 },
-  scriptWpm: { min: 80, max: 250, step: 5 }
+  snipDelay: { min: 0, max: 30, step: 1 },
+  duckLevel: { min: 0.1, max: 0.8, step: 0.05 },
+  scriptWpm: { min: 80, max: 250, step: 5 },
+  musicCrossfade: { min: 0, max: CROSSFADE_MAX, step: 1 }
 } as const
 
 const CHOICES = {
@@ -396,6 +452,7 @@ const CHOICES = {
   gameAnimatedCovers: ['always', 'hover', 'off'],
   timeFormat: ['24h', '12h'],
   captureTarget: ['daily', 'inbox'],
+  trayClick: ['open', 'snip'],
   typewriterDimUnit: ['paragraph', 'line'],
   graphStyle: ['neighbourhood', 'constellation'],
   handwritingReader: ['auto', 'ai', 'offline'],
@@ -407,7 +464,8 @@ const CHOICES = {
   songIdShortcut: IS_MAC ? ['Control+Alt+W', 'Control+Shift+W', 'Alt+Shift+W', ''] : ['Alt+Shift+W', 'Control+Alt+W', 'Super+Shift+W', ''],
   // F-keys too: they work in games, where Alt or Ctrl combinations may do something else.
   replayShortcut: IS_MAC ? ['Control+Alt+R', 'Control+Shift+R', 'F9', 'F10', ''] : ['Alt+Shift+R', 'Control+Shift+R', 'Alt+F9', 'F9', 'F10', ''],
-  replayQuality: ['720p30', '1080p30', '1080p60']
+  replayQuality: ['720p30', '1080p30', '1080p60'],
+  musicVisualiserStyle: VISUALISER_STYLES.map((v) => v.id)
 } as const
 
 /** Shortcuts offered for saving an instant replay (system-wide). */
@@ -426,8 +484,8 @@ export const CAPTURE_SHORTCUTS = CHOICES.captureShortcut
 const cleanIds = (v: unknown): string[] =>
   Array.isArray(v) ? [...new Set(v.filter((id): id is string => typeof id === 'string' && /^[a-z0-9-]{1,40}$/.test(id)))].slice(0, 50) : []
 
-/** Features that were folded into another one: Sudoku and Minesweeper now live in Mini games. */
-const RENAMED_FEATURES: Record<string, string> = { sudoku: 'mini-games', minesweeper: 'mini-games' }
+/** Features that were folded into another one: Sudoku and Minesweeper now live in Mini games, the video downloader in Downloads, the small corner music player in the Music page. */
+const RENAMED_FEATURES: Record<string, string> = { sudoku: 'mini-games', minesweeper: 'mini-games', downloader: 'downloads', music: 'musiclibrary' }
 const renameFeatures = (ids: string[]): string[] => [...new Set(ids.map((id) => RENAMED_FEATURES[id] ?? id))]
 
 const isHex = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)
@@ -439,6 +497,13 @@ const cleanFont = (v: unknown): string =>
  * A folder inside the vault, written with "/" ("" is the vault itself). Anything that could
  * point outside the vault or isn't a valid Windows name falls back to `fallback`.
  */
+/** A folder for picture snips: a full path (C:\…, \\server\…, /…), or '' for the usual one. */
+export function cleanSnipFolder(v: unknown): string {
+  if (typeof v !== 'string') return ''
+  const t = v.trim()
+  return t.length < 1000 && /^([a-zA-Z]:[\\/]|\\\\|\/)/.test(t) && !t.includes('\0') ? t : ''
+}
+
 export function cleanFolder(v: unknown, fallback: string): string {
   if (typeof v !== 'string') return fallback
   const parts = v.replace(/\\/g, '/').split('/').map((p) => p.trim()).filter(Boolean)
@@ -483,13 +548,14 @@ export function normalizePrefs(raw: unknown): Prefs {
     out.spellcheckLanguage = input.spellcheckLanguage
   }
   out.tabSize = Math.round(out.tabSize)
-  for (const k of ['focusMinutes', 'breakMinutes', 'longBreakMinutes', 'focusRounds', 'autoLockMinutes', 'replaySeconds', 'scriptWpm'] as const) out[k] = Math.round(out[k])
+  for (const k of ['focusMinutes', 'breakMinutes', 'longBreakMinutes', 'focusRounds', 'autoLockMinutes', 'replaySeconds', 'scriptWpm', 'snipDelay'] as const) out[k] = Math.round(out[k])
   out.attachmentFolder = cleanFolder(input.attachmentFolder ?? DEFAULT_PREFS.attachmentFolder, DEFAULT_PREFS.attachmentFolder)
   out.webClipFolder = cleanFolder(input.webClipFolder ?? DEFAULT_PREFS.webClipFolder, DEFAULT_PREFS.webClipFolder)
   out.templatesFolder = cleanFolder(input.templatesFolder ?? DEFAULT_PREFS.templatesFolder, DEFAULT_PREFS.templatesFolder)
   out.dailyFolder = cleanFolder(input.dailyFolder ?? DEFAULT_PREFS.dailyFolder, DEFAULT_PREFS.dailyFolder)
   out.videosFolder = cleanFolder(input.videosFolder ?? DEFAULT_PREFS.videosFolder, DEFAULT_PREFS.videosFolder)
   out.dailyTemplate = cleanFolder(input.dailyTemplate ?? '', '')
+  out.snipFolder = cleanSnipFolder(input.snipFolder)
   out.weekStart = Math.round(out.weekStart)
   // The format becomes a file path: it must contain a day and nothing Windows can't use in a name.
   if (
@@ -509,6 +575,10 @@ export function normalizePrefs(raw: unknown): Prefs {
   out.homeHidden = cleanIds(input.homeHidden)
   out.worldClocks = cleanClocks(input.worldClocks)
   out.countdowns = cleanCountdowns(input.countdowns)
+  out.musicEq = cleanEq(input.musicEq)
+  out.musicCrossfade = Math.round(out.musicCrossfade)
+  out.installedAddons = cleanInstalledAddons(input.installedAddons, input.addonsSeen)
+  out.addonsSeen = [...ADDON_IDS]
   for (const k of ['topbarFeatures', 'dockFeatures', 'radialFeatures', 'phoneDeck'] as const) {
     out[k] = input[k] === undefined ? [...DEFAULT_PREFS[k]] : renameFeatures(cleanIds(input[k]))
   }

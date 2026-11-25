@@ -101,8 +101,97 @@ export function firefoxOnGoogleSignIn(agent: string): void {
   define('userAgent', agent)
   define('appVersion', agent.replace(/^Mozilla\//, ''))
   define('vendor', '')
-  // Firefox has no userAgentData (Chrome's "which browser am I" details).
+  // Firefox has no userAgentData (Chrome's "which browser am I" details), and no window.chrome.
   define('userAgentData', undefined)
+  try {
+    delete (window as { chrome?: unknown }).chrome
+  } catch {
+    // leave it
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Looking like Chromium, the same everywhere
+
+/**
+ * Electron says "Chrome/136" in its browser name but sends none of the "client hints" Chromium sends
+ * with every secure request (which browser, what version, on what). Those are added here, saying
+ * exactly what the page's own `navigator.userAgentData` says: plain Chromium.
+ *
+ * They used to say "Google Chrome", with the page's own code patched to match. But that patch only
+ * reaches a page's top frame: frames inside it (Google's own "Sign in with Google" button and
+ * sign-in checks run in frames) still said plain "Chromium" with an empty `window.chrome`, while
+ * their requests said "Google Chrome". That mismatch is what Google looks for in browsers built into
+ * apps: "This browser or app may not be secure". Nothing is patched in the page any more, so every
+ * frame and every request tells the same story.
+ */
+
+/** The platform name Chromium's client hints use. */
+export function hintPlatform(platform: string): string {
+  return platform === 'darwin' ? 'macOS' : platform === 'win32' ? 'Windows' : platform === 'linux' ? 'Linux' : 'Unknown'
+}
+
+/**
+ * Chromium's own brand list for a version ("136.0.7103.177"), in its own order, as the page's
+ * `navigator.userAgentData.brands` has it (with `full`, the full versions). Chromium makes up the
+ * "Not A Brand" entry and the order from the major version, the same way each time.
+ */
+export function chromiumBrands(version: string, full = false): { brand: string; version: string }[] {
+  const major = version.split('.')[0] || '0'
+  const seed = Number(major) || 0
+  const chars = [' ', '(', ':', '-', '.', '/', ')', ';', '=', '?', '_']
+  const greaseVersion = ['8', '99', '24'][seed % 3]
+  const grease = { brand: `Not${chars[seed % 11]}A${chars[(seed + 1) % 11]}Brand`, version: full ? `${greaseVersion}.0.0.0` : greaseVersion }
+  const chromium = { brand: 'Chromium', version: full ? version : major }
+  return seed % 2 === 0 ? [grease, chromium] : [chromium, grease]
+}
+
+const brandHeader = (brands: { brand: string; version: string }[]): string => brands.map((b) => `"${b.brand}";v="${b.version}"`).join(', ')
+
+/**
+ * The client hints Chromium sends with a secure request: the usual three always, and the full
+ * version list only when Chromium already sends it. Headers already there are put right.
+ */
+export function chromiumHints(headers: Record<string, string>, version: string, platform: string): Record<string, string> {
+  const out = { ...headers }
+  const find = (name: string): string | undefined => Object.keys(out).find((k) => k.toLowerCase() === name)
+  const set = (name: string, value: string): void => {
+    const have = find(name)
+    if (have && have !== name) delete out[have]
+    out[name] = value
+  }
+  set('sec-ch-ua', brandHeader(chromiumBrands(version)))
+  if (!find('sec-ch-ua-mobile')) set('sec-ch-ua-mobile', '?0')
+  if (!find('sec-ch-ua-platform')) set('sec-ch-ua-platform', `"${hintPlatform(platform)}"`)
+  if (find('sec-ch-ua-full-version-list')) set('sec-ch-ua-full-version-list', brandHeader(chromiumBrands(version, true)))
+  return out
+}
+
+/**
+ * Google's "Couldn't sign you in: This browser or app may not be secure" page, which it shows
+ * after you type your email when it decides the browser is one built into an app.
+ */
+export function isGoogleRejection(url: string): boolean {
+  if (!isGoogleSignIn(url)) return false
+  try {
+    return /\/signin\/(.*\/)?(rejected|deniedsigninrejected)\b/i.test(new URL(url).pathname)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * What web tabs (and Google's sign-in pages anywhere) are told the browser is: the plain browser name with Orbit's own name
+ * on the end ("… Chrome/136.0.0.0 Safari/537.36 Orbit/1.13.6"), the way Edge or Opera add theirs.
+ *
+ * Google turns away a browser that says it's plain Google Chrome but isn't ("This browser or app may
+ * not be secure"), whatever version it claims, and nowadays turns away Firefox's name from Chromium
+ * too. A Chromium browser that names itself gets through. Checked against Google's real sign-in in
+ * Electron 36: the plain name and Firefox's were refused every time, this one got through.
+ */
+export function googleSignInAgent(agent: string, appVersion: string): string {
+  const named = ` Orbit/${appVersion}`
+  return agent.endsWith(named) ? agent : `${agent}${named}`
 }
 
 /** Firefox's browser name on this kind of computer. */

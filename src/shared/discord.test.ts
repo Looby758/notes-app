@@ -29,6 +29,12 @@ import {
   restorePlace,
   upsertMessage,
   CHAT_KEEP,
+  callStats,
+  presenceTotals,
+  setCallNote,
+  statHours,
+  trackPresence,
+  weekStart,
   type CallRecord
 } from './discord'
 
@@ -275,5 +281,82 @@ describe('mentions in the chat', () => {
   })
   it('leaves plain text alone', () => {
     expect(chatParts('no codes <here>', look)).toEqual([{ text: 'no codes <here>' }])
+  })
+})
+
+describe('call notes', () => {
+  const call = (over: Partial<CallRecord> = {}): CallRecord => ({ id: 'a', channel: 'General', server: null, start: 0, end: 60_000, people: ['Sam'], ...over })
+  it('keeps a short call when it has a note', () => {
+    expect(addCall([], call({ end: 5_000 }))).toEqual([])
+    expect(addCall([], call({ end: 5_000, note: 'ask about Friday' }))).toHaveLength(1)
+    expect(addCall([], call({ end: 5_000, note: '   ' }))).toEqual([])
+  })
+  it('sets, changes and removes a past call’s note', () => {
+    const list = [call(), call({ id: 'b' })]
+    const withNote = setCallNote(list, 'b', 'bring up the trip')
+    expect(withNote[1].note).toBe('bring up the trip')
+    expect(withNote[0].note).toBeUndefined()
+    expect('note' in setCallNote(withNote, 'b', '  ')[1]).toBe(false)
+  })
+  it('keeps notes and time-together through saving', () => {
+    const saved = cleanCalls(JSON.parse(JSON.stringify([call({ note: 'hi', with: { Sam: 30_000, Bad: -1 } as Record<string, number> })])))
+    expect(saved[0].note).toBe('hi')
+    expect(saved[0].with).toEqual({ Sam: 30_000 })
+    expect(cleanCalls([{ ...call(), note: 5, with: 'x' }])[0]).toEqual(call())
+  })
+})
+
+describe('time with each person', () => {
+  it('counts only while they’re in the call', () => {
+    let p = trackPresence({}, ['Sam', 'Alex'], 0)
+    p = trackPresence(p, ['Sam'], 10_000) // Alex leaves
+    p = trackPresence(p, ['Sam', 'Alex'], 20_000) // and comes back
+    expect(presenceTotals(p, 30_000)).toEqual({ Sam: 30_000, Alex: 20_000 })
+  })
+})
+
+describe('call stats', () => {
+  // Wednesday 18 Nov 2026, 12:00 local time.
+  const now = new Date(2026, 10, 18, 12).getTime()
+  const at = (d: number, h: number): number => new Date(2026, 10, d, h).getTime()
+  const H = 3_600_000
+  it('starts the week on Monday', () => {
+    expect(new Date(weekStart(now))).toEqual(new Date(2026, 10, 16))
+    expect(new Date(weekStart(at(22, 23)))).toEqual(new Date(2026, 10, 16))
+  })
+  it('adds up hours a week and who you call most', () => {
+    const calls: CallRecord[] = [
+      { id: '1', channel: 'a', server: null, start: at(17, 20), end: at(17, 22), people: ['Sam', 'Alex'], with: { Sam: 2 * H, Alex: H / 2 } },
+      { id: '2', channel: 'a', server: null, start: at(10, 20), end: at(10, 21), people: ['Sam'] },
+      { id: '3', channel: 'a', server: null, start: at(12, 20), end: at(12, 23), people: ['Jo'] }
+    ]
+    const s = callStats(calls, now)
+    expect(s.weeks).toHaveLength(8)
+    expect(s.thisWeek).toBe(2 * H)
+    expect(s.lastWeek).toBe(4 * H)
+    // The first week with a call was last week: (4 + 2) / 2.
+    expect(s.average).toBe(3 * H)
+    expect(s.people.map((p) => [p.name, p.calls, p.ms])).toEqual([
+      ['Sam', 2, 3 * H],
+      ['Jo', 1, 3 * H],
+      ['Alex', 1, H / 2]
+    ])
+    expect(s.totalCalls).toBe(3)
+    expect(s.totalMs).toBe(6 * H)
+  })
+  it('splits a call over Sunday midnight between the two weeks', () => {
+    const s = callStats([{ id: '1', channel: 'a', server: null, start: at(15, 23), end: at(16, 1), people: [] }], now)
+    expect(s.thisWeek).toBe(H)
+    expect(s.lastWeek).toBe(H)
+  })
+  it('is empty with no calls', () => {
+    const s = callStats([], now)
+    expect([s.thisWeek, s.average, s.people.length]).toEqual([0, 0, 0])
+  })
+  it('words hours simply', () => {
+    expect(statHours(0)).toBe('0 h')
+    expect(statHours(45 * 60_000)).toBe('45 min')
+    expect(statHours(3.5 * H)).toBe('3.5 h')
+    expect(statHours(12.4 * H)).toBe('12 h')
   })
 })

@@ -57,6 +57,7 @@ import { fileKind, openAttachment, openExternally, vaultUrl } from '../../lib/fi
 import { openNote, splitPane } from '../../lib/editorController'
 import { findNode, noteTitle } from '../../lib/paths'
 import { looksLikeSketch, useSketchVersions } from '../../lib/sketch'
+import { useAddonOn } from '../../lib/addons'
 import { fuzzyFilter } from '../../lib/fuzzy'
 import { getDrag, setDrag } from '../../lib/dnd'
 import { useLock } from '../../lib/lock/session'
@@ -90,6 +91,7 @@ type Menu = { x: number; y: number; items: MenuItem[] }
 
 /** A canvas board: an endless space of notes, pictures, sketches and sticky notes, joined by arrows. */
 export default function CanvasBoard({ path }: { path: string }) {
+  const sketchOn = useAddonOn('sketch')
   const [board, setBoard] = useState<Board | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
   const [view, setView] = useState<View>(() => savedViews.get(path) ?? { x: 0, y: 0, zoom: 1 })
@@ -672,7 +674,7 @@ export default function CanvasBoard({ path }: { path: string }) {
         ...(card.type === 'group' ? [{ label: 'Rename group', icon: <Type size={15} />, onClick: () => openCard(card) }] : []),
         ...(card.type === 'file' || card.type === 'link' ? [{ label: 'Open', icon: <FileText size={15} />, onClick: () => openCard(card) }] : []),
         ...(isNote ? [{ label: 'Open to the right', icon: <FileText size={15} />, onClick: () => openCard(card, true) }] : []),
-        ...(card.type === 'file' && looksLikeSketch(card.file)
+        ...(card.type === 'file' && sketchOn && looksLikeSketch(card.file)
           ? [{ label: 'Edit sketch', icon: <Pencil size={15} />, onClick: () => useUI.setState({ sketch: { path: card.file } }) }]
           : []),
         ...(card.type === 'file' && !isNote
@@ -722,7 +724,7 @@ export default function CanvasBoard({ path }: { path: string }) {
         { label: 'Add a sticky note here', icon: <StickyNote size={15} />, onClick: () => addSticky(at) },
         { label: 'Add a note…', icon: <FileText size={15} />, onClick: () => setPicking({ at, free: false }) },
         { label: 'Add a picture…', icon: <ImagePlus size={15} />, onClick: () => void addPicture(at) },
-        { label: 'Draw a sketch…', icon: <Pencil size={15} />, onClick: () => drawSketch(at) },
+        ...(sketchOn ? [{ label: 'Draw a sketch…', icon: <Pencil size={15} />, onClick: () => drawSketch(at) }] : []),
         { label: 'Add a group here', icon: <Group size={15} />, onClick: () => addGroup(at) }
       ]
     }
@@ -840,7 +842,7 @@ export default function CanvasBoard({ path }: { path: string }) {
             <button key={id} className="canvas-swatch" style={{ background: c }} title="Colour" onClick={() => setColour(id)} />
           ))}
           <span className="canvas-bar-gap" />
-          {single?.type === 'file' && looksLikeSketch(single.file) && (
+          {single?.type === 'file' && sketchOn && looksLikeSketch(single.file) && (
             <button className="icon-btn" title="Edit sketch" onClick={() => useUI.setState({ sketch: { path: single.file } })}>
               <Pencil size={15} />
             </button>
@@ -866,9 +868,11 @@ export default function CanvasBoard({ path }: { path: string }) {
         <button className="icon-btn" title="Add a picture" onClick={() => void addPicture(middle(), true)}>
           <ImagePlus size={16} />
         </button>
-        <button className="icon-btn" title="Draw a sketch" onClick={() => drawSketch(middle(), true)}>
-          <Pencil size={16} />
-        </button>
+        {sketchOn && (
+          <button className="icon-btn" title="Draw a sketch" onClick={() => drawSketch(middle(), true)}>
+            <Pencil size={16} />
+          </button>
+        )}
         <button className="icon-btn" title="Add a group (a box to keep cards together)" onClick={() => addGroup(middle(), true)}>
           <Group size={16} />
         </button>

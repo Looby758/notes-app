@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { Download, X } from 'lucide-react'
 import { useUpdates, watchUpdates } from '../store/updates'
 
-/** A small card in the corner when a new version is ready (Windows) or out (Mac). */
+/** A small card in the corner when a new version is ready, or out but has to be downloaded by hand. */
 export default function UpdateToast() {
   const status = useUpdates((s) => s.status)
   const dismissed = useUpdates((s) => s.dismissed)

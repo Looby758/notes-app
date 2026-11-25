@@ -1,0 +1,391 @@
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
+import { Frown, RotateCcw, Trophy, Undo2 } from 'lucide-react'
+import { addTile, biggest, canMove, GOAL, newBoard, SIZE, slide, slideTiles, tileId, tilesOf, type Direction, type Tile } from '../../lib/game2048'
+import { loadRecords, saveGame, type GameRecord } from '../../lib/gameStats'
+import { formatTime } from '../../lib/sudoku'
+import { celebrate } from '../../lib/celebrate'
+import { playSound } from '../../lib/gameSound'
+import GameStats from './GameStats'
+import { useGameKeys } from './useGameKeys'
+
+interface Game {
+  board: number[]
+  score: number
+  moves: number
+  seconds: number
+  /** Reached 2048 (the win is counted once; you can keep going after). */
+  reached: boolean
+  over: boolean
+  /** Already counted in the stats. */
+  counted: boolean
+  /** The board before the last move, for one undo. */
+  before: { board: number[]; score: number } | null
+  /** Squares that just appeared or joined, for the little pop. */
+  fresh: number[]
+}
+
+// The game and best score live on this computer only (not in the notes folder): it's just for fun.
+const GAME_KEY = 'notesapp.2048.game'
+const BEST_KEY = 'notesapp.2048.best'
+const STATS_ID = '2048'
+
+function loadGame(): Game | null {
+  try {
+    const g = JSON.parse(localStorage.getItem(GAME_KEY) ?? 'null') as Game | null
+    return g && Array.isArray(g.board) && g.board.length === 16 ? g : null
+  } catch {
+    return null
+  }
+}
+
+const fresh = (): Game => ({ board: newBoard(), score: 0, moves: 0, seconds: 0, reached: false, over: false, counted: false, before: null, fresh: [] })
+
+const KEYS: Record<string, Direction> = {
+  ArrowUp: 'up',
+  ArrowDown: 'down',
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+  w: 'up',
+  s: 'down',
+  a: 'left',
+  d: 'right'
+}
+
+/** Counts a number up to its new value over a moment, so the score rolls rather than jumps. */
+function useCountUp(value: number): number {
+  const [shown, setShown] = useState(value)
+  const from = useRef(value)
+  useEffect(() => {
+    const start = performance.now()
+    const begin = from.current
+    if (begin === value || value < begin) {
+      from.current = value
+      setShown(value)
+      return
+    }
+    let raf = 0
+    const step = (now: number): void => {
+      const t = Math.min(1, (now - start) / 650)
+      const v = Math.round(begin + (value - begin) * (1 - (1 - t) ** 3))
+      from.current = v
+      setShown(v)
+      if (t < 1) raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [value])
+  return shown
+}
+
+/** 2048: slide the tiles so matching numbers join, and try to make a 2048 tile. */
+export default function Game2048Page() {
+  const [game, setGame] = useState<Game>(() => loadGame() ?? fresh())
+  const [best, setBest] = useState<number>(() => Number(localStorage.getItem(BEST_KEY)) || 0)
+  const [record, setRecord] = useState<GameRecord | undefined>(() => loadRecords()[STATS_ID])
+  const [showWin, setShowWin] = useState(false)
+  const [tiles, setTiles] = useState<Tile[]>(() => tilesOf(game.board))
+  const [bump, setBump] = useState<Direction | null>(null)
+  const [gain, setGain] = useState<{ n: number; key: number } | null>(null)
+  const [lastDir, setLastDir] = useState<Direction | null>(null)
+  // Show-off moments: several joins in one move, a new biggest tile, beating your best.
+  const [combo, setCombo] = useState<{ n: number; key: number } | null>(null)
+  const [milestone, setMilestone] = useState<{ value: number; key: number } | null>(null)
+  const [newBest, setNewBest] = useState(false)
+  const bestAtStart = useRef(best)
+  const shownScore = useCountUp(game.score)
+  const board = useRef<HTMLDivElement>(null)
+  const page = useRef<HTMLDivElement>(null)
+  const swipe = useRef<{ x: number; y: number } | null>(null)
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(GAME_KEY, JSON.stringify(game))
+    } catch {
+      // Not remembered; it still plays.
+    }
+  }, [game])
+  useEffect(() => board.current?.focus(), [])
+
+  useEffect(() => {
+    if (game.score <= best) return
+    if (bestAtStart.current > 0 && !newBest) setNewBest(true)
+    setBest(game.score)
+    try {
+      localStorage.setItem(BEST_KEY, String(game.score))
+    } catch {
+      // Not remembered.
+    }
+  }, [game.score, best])
+
+  // The clock starts with the first move and keeps running even when you click away.
+  const running = game.moves > 0 && !game.over
+  useEffect(() => {
+    if (!running) return
+    const tick = setInterval(() => {
+      setGame((g) => (g.over ? g : { ...g, seconds: g.seconds + 1 }))
+    }, 1000)
+    return () => clearInterval(tick)
+  }, [running])
+
+  // Count the game once: a win the moment 2048 appears, a loss when the board locks up first.
+  useEffect(() => {
+    if (game.counted) return
+    if (game.reached) {
+      setRecord(saveGame(STATS_ID, true, game.seconds))
+      setShowWin(true)
+      celebrate('big')
+      setGame((g) => ({ ...g, counted: true }))
+    } else if (game.over) {
+      setRecord(saveGame(STATS_ID, false))
+      setGame((g) => ({ ...g, counted: true }))
+    }
+  }, [game.reached, game.over, game.counted, game.seconds])
+
+  // The latest game and tiles, so quick key presses each build on the one before.
+  const gameRef = useRef(game)
+  gameRef.current = game
+  const tilesRef = useRef(tiles)
+  tilesRef.current = tiles
+
+  // Tiles that slid into another one disappear once they've arrived.
+  useEffect(() => {
+    if (!tiles.some((t) => t.gone)) return
+    const t = setTimeout(() => setTiles((ts) => ts.filter((x) => !x.gone)), 330)
+    return () => clearTimeout(t)
+  }, [tiles])
+
+  const go = (dir: Direction): void => {
+    const g = gameRef.current
+    if (g.over) return
+    const s = slide(g.board, dir)
+    if (!s.moved) {
+      // Nothing can move that way: a little nudge says so.
+      setBump(null)
+      requestAnimationFrame(() => setBump(dir))
+      playSound('wall')
+      return
+    }
+    const { board: next, at } = addTile(s.board)
+    const moved = slideTiles(tilesRef.current, dir).tiles
+    const ts = [...moved, { id: tileId(), value: next[at], at, isNew: true }]
+    const ng: Game = {
+      ...g,
+      board: next,
+      score: g.score + s.gained,
+      moves: g.moves + 1,
+      reached: g.reached || biggest(next) >= GOAL,
+      over: !canMove(next),
+      before: { board: g.board, score: g.score },
+      fresh: []
+    }
+    gameRef.current = ng
+    tilesRef.current = ts
+    setGame(ng)
+    setTiles(ts)
+    setBump(null)
+    setLastDir(dir)
+    if (s.gained) setGain({ n: s.gained, key: ng.moves })
+    const joins = moved.filter((t) => t.merged).length
+    if (joins >= 2) setCombo({ n: joins, key: ng.moves })
+    const top = biggest(next)
+    const milestoneHit = top > biggest(g.board) && top >= 128
+    if (milestoneHit) setMilestone({ value: top, key: ng.moves })
+    // Each join rings at a pitch that climbs with the tile's value; plain slides just whoosh.
+    const joined = moved.filter((t) => t.merged).map((t) => t.value)
+    if (joined.length) playSound('merge', Math.max(...joined))
+    else playSound('slide')
+    if (joins >= 2) playSound('combo', joins - 1, 0.07)
+    if (milestoneHit && top < GOAL) playSound('unit', undefined, 0.12)
+    if (ng.over && !ng.reached) playSound('lose', undefined, 0.3)
+  }
+
+  const undo = (): void => {
+    const g = gameRef.current
+    if (!g.before || g.over) return
+    playSound('erase')
+    setGame({ ...g, board: g.before.board, score: g.before.score, before: null, fresh: [] })
+    setTiles(tilesOf(g.before.board))
+  }
+
+  const restart = (): void => {
+    // Leaving a game you'd made a start on counts as a loss, like giving up.
+    if (!game.counted && game.moves > 0) setRecord(saveGame(STATS_ID, false))
+    const g = fresh()
+    setGame(g)
+    setTiles(tilesOf(g.board).map((t) => ({ ...t, isNew: true })))
+    setShowWin(false)
+    playSound('deal')
+    setGain(null)
+    setCombo(null)
+    setMilestone(null)
+    setNewBest(false)
+    bestAtStart.current = best
+    board.current?.focus()
+  }
+
+  const onKey = (e: KeyboardEvent): void => {
+    if (e.ctrlKey || e.metaKey || e.altKey) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        undo()
+      }
+      return
+    }
+    const dir = KEYS[e.key] ?? KEYS[e.key.toLowerCase()]
+    if (dir) {
+      e.preventDefault()
+      setShowWin(false)
+      go(dir)
+    } else if (e.key.toLowerCase() === 'n') {
+      e.preventDefault()
+      restart()
+    } else if (e.key.toLowerCase() === 'u') {
+      e.preventDefault()
+      undo()
+    }
+  }
+  useGameKeys(page, onKey)
+
+  // Swipe with the mouse or a touch screen.
+  const onDown = (e: PointerEvent): void => {
+    swipe.current = { x: e.clientX, y: e.clientY }
+  }
+  const onUp = (e: PointerEvent): void => {
+    const s = swipe.current
+    swipe.current = null
+    if (!s) return
+    const dx = e.clientX - s.x
+    const dy = e.clientY - s.y
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 30) return
+    go(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up')
+  }
+
+  return (
+    <div className="sudoku-page g2048-page" data-2048-page>
+      <div className="sudoku-inner g2048-inner" ref={page}>
+        <header className="sudoku-head">
+          <h2>
+            <span className="g2048-logo">2048</span>
+          </h2>
+          <div className="g2048-scores">
+            <div>
+              <span>Score</span>
+              <strong data-2048-score={game.score}>{shownScore}</strong>
+              {gain && (
+                <em key={gain.key} className="g2048-gain">
+                  +{gain.n}
+                </em>
+              )}
+            </div>
+            <div className={newBest ? 'beaten' : ''}>
+              <span>{newBest ? 'New best!' : 'Best'}</span>
+              <strong>{best}</strong>
+            </div>
+          </div>
+        </header>
+
+        <div className="sudoku-status">
+          <span className="sudoku-time" title="How long you've been playing this game">
+            {formatTime(game.seconds)}
+          </span>
+          {record?.bestTime !== undefined && (
+            <span className="sudoku-best" title="Your fastest 2048 tile">
+              <Trophy size={13} /> Best {formatTime(record.bestTime)}
+            </span>
+          )}
+          <span className="mines-tools">
+            <button className="sudoku-tool" onClick={undo} disabled={!game.before || game.over} title="Take back the last move (U or Ctrl+Z)">
+              <Undo2 size={15} /> Undo
+            </button>
+            <button className="sudoku-tool" onClick={restart} title="Start a new game (N)">
+              <RotateCcw size={15} /> New
+            </button>
+          </span>
+        </div>
+
+        <div
+          ref={board}
+          className={`g2048-board ${bump ? `bump-${bump}` : ''} ${game.reached ? 'reached' : ''}`}
+          tabIndex={0}
+          role="grid"
+          aria-label="2048 board. Use the arrow keys to slide the tiles."
+          onPointerDown={onDown}
+          onPointerUp={onUp}
+          data-2048-board
+        >
+          {game.board.map((_, i) => (
+            <div key={i} className="g2048-cell" />
+          ))}
+          <div className="g2048-tiles">
+            {tiles.map((t) => (
+              <div
+                key={t.id}
+                className={[
+                  'g2048-tile',
+                  `t${t.value > 2048 ? 'big' : t.value}`,
+                  t.value >= 1024 ? 'wide' : '',
+                  t.value >= 128 ? 'glow' : '',
+                  t.merged ? 'merged' : '',
+                  t.isNew ? 'new' : '',
+                  t.gone ? 'gone' : '',
+                  // Two names for the same squash, so it plays again on every move.
+                  t.slid && lastDir ? `slid-${lastDir} p${game.moves % 2}` : ''
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                style={{ '--r': Math.floor(t.at / SIZE), '--c': t.at % SIZE } as CSSProperties}
+                data-tile={t.gone ? undefined : t.value}
+              >
+                <div className="g2048-face">{t.value}</div>
+                {t.merged && (
+                  <>
+                    <span className="g2048-ring" />
+                    {[...Array(t.value >= 64 ? 10 : 6).keys()].map((i, _, all) => (
+                      <span key={i} className="g2048-spark" style={{ '--a': `${(360 / all.length) * i + 15}deg` } as CSSProperties} />
+                    ))}
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+          {combo && (
+            <div key={`c${combo.key}`} className="g2048-combo" aria-hidden="true">
+              Combo ×{combo.n}
+            </div>
+          )}
+          {milestone && (
+            <div key={`m${milestone.key}`} className={`g2048-milestone t${milestone.value > 2048 ? 'big' : milestone.value}`} aria-hidden="true">
+              {milestone.value}
+            </div>
+          )}
+          {(game.over || showWin) && (
+            <div className={`sudoku-won g2048-result ${game.over ? 'lost' : 'won'}`} data-2048-result>
+              {game.over && !game.reached ? <Frown size={30} /> : <Trophy size={30} />}
+              <strong>{game.over ? (game.reached ? 'No moves left' : 'Game over') : 'You made 2048!'}</strong>
+              <span>
+                {game.over ? `Score ${game.score}` : `${formatTime(game.seconds)}${record?.bestTime === game.seconds ? ' · your best yet' : ''}`}
+              </span>
+              <div className="g2048-result-buttons">
+                {!game.over && (
+                  <button className="btn" onClick={() => (setShowWin(false), board.current?.focus())}>
+                    Keep going
+                  </button>
+                )}
+                <button className="btn btn-primary" onClick={restart}>
+                  Play again
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <GameStats title="2048" record={record} />
+
+        <p className="sudoku-help">
+          Slide the tiles with the arrow keys (or W A S D, or swipe). Two tiles with the same number join into one. Make a 2048 tile to win, then keep going for a
+          higher score if you like. Undo takes back your last move. Starting a new game before this one ends counts as a loss.
+        </p>
+      </div>
+    </div>
+  )
+}

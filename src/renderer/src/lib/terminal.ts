@@ -5,6 +5,7 @@ import '@xterm/xterm/css/xterm.css'
 import { useEditor } from '../store/editor'
 import { commandForKey, type Command } from './commands'
 import { openSpecialTab, TERMINAL_TAB } from './editorController'
+import { commitAllCommand, copyRunCommand, newUserRunCommand, releaseCommand, rollbackCommand, stashCommand, switchBranchCommand, tryBranchCommand, type VersionBump } from '@shared/appStudio'
 import { IS_MAC } from '@shared/platform'
 import { commandLabel, findFiles, isErrorLine, keepsRunning, latestAndRunCommand, LineTracker, resolveFrom, runCommandOf } from '@shared/terminalTools'
 import {
@@ -519,8 +520,89 @@ export function endFind(): void {
  */
 export function getLatestAndRun(project: TerminalProject): void {
   const run = runCommandOf(project.commands)
-  const line = latestAndRunCommand(!IS_MAC && /win/i.test(navigator.platform), run)
   rememberCommand('git pull')
+  runInAppTerminal(project, latestAndRunCommand(IS_WINDOWS, run))
+}
+
+/**
+ * App Studio's "Try as a new user" for Orbit: gets the latest and starts it as if nobody had used
+ * Orbit on this computer (nothing saved, only the core add-ons), in a terminal of its own.
+ */
+export function runAsNewUser(project: TerminalProject): void {
+  const run = newUserRunCommand(IS_WINDOWS, runCommandOf(project.commands))
+  rememberCommand('git pull')
+  runInAppTerminal(project, latestAndRunCommand(IS_WINDOWS, run), run, `${project.name} · new user`)
+}
+
+/** App Studio's "Try it": switches the app to a pull request's branch, gets its latest, and starts it. */
+export function tryBranch(project: TerminalProject, branch: string): void {
+  rememberCommand(`git checkout ${branch}`)
+  runInAppTerminal(project, tryBranchCommand(IS_WINDOWS, branch, runCommandOf(project.commands)))
+}
+
+/** App Studio's release button: bumps the version, commits and tags it, and pushes, in the project's own terminal. */
+export function releaseApp(project: TerminalProject, bump: VersionBump, test = false): void {
+  runProjectCommand(project, releaseCommand(IS_WINDOWS, bump, test))
+}
+
+/**
+ * Runs a test copy of a project (a pull request's version, in a folder of its own): in the copy's
+ * own terminal (made if needed, started fresh), gets the branch's latest, installs if needed, and
+ * starts it. Restart afterwards just starts it again.
+ */
+export function runTestCopy(project: TerminalProject, path: string, branch: string, label: string, newUser = false): void {
+  const run = newUser ? newUserRunCommand(IS_WINDOWS, runCommandOf(project.commands)) : runCommandOf(project.commands)
+  rememberCommand(`git checkout ${branch}`)
+  const line = copyRunCommand(IS_WINDOWS, branch, run)
+  const existing = useTerminals.getState().terminals.find((t) => t.folder === path && t.command === run)
+  if (existing) {
+    setActiveTerminal(existing.id)
+    openSpecialTab(TERMINAL_TAB)
+    const s = sessions.get(existing.id)
+    if (s) {
+      restartTerminal(existing.id)
+      s.pending = line
+    } else pendingFor.set(existing.id, line)
+    return
+  }
+  const t = addTerminal({ name: `${project.name} · ${label}${newUser ? ' · new user' : ''}`, folder: path, command: run })
+  openSpecialTab(TERMINAL_TAB)
+  queueMicrotask(() => {
+    const s = sessions.get(t.id)
+    if (s) s.pending = line
+    else pendingFor.set(t.id, line)
+  })
+}
+
+/** Closes a test copy's terminals (ending the app running from it), so its folder can be removed. */
+export function closeCopyTerminals(path: string): void {
+  for (const t of useTerminals.getState().terminals) if (t.folder === path) closeTerminal(t.id)
+}
+
+/** Releases an earlier release's code as a new version, in the project's own terminal. */
+export function rollBack(project: TerminalProject, goodTag: string, newVersion: string): void {
+  runProjectCommand(project, rollbackCommand(IS_WINDOWS, goodTag, newVersion))
+}
+
+/** Puts the project's uncommitted changes aside (a git stash), in its own terminal. */
+export function stashChanges(project: TerminalProject): void {
+  runProjectCommand(project, stashCommand())
+}
+
+/** Commits all the project's changes, in its own terminal. */
+export function commitChanges(project: TerminalProject, message: string): void {
+  runProjectCommand(project, commitAllCommand(IS_WINDOWS, message))
+}
+
+/** Switches the project to a branch (main, for a release) and gets its latest, in the project's own terminal. */
+export function switchBranch(project: TerminalProject, branch: string): void {
+  runProjectCommand(project, switchBranchCommand(IS_WINDOWS, branch))
+}
+
+const IS_WINDOWS = !IS_MAC && /win/i.test(navigator.platform)
+
+/** Types a command line into the project's app terminal (made if needed, started fresh), and shows it. */
+function runInAppTerminal(project: TerminalProject, line: string, run = runCommandOf(project.commands), name?: string): void {
   const existing = useTerminals.getState().terminals.find((t) => t.projectId === project.id && t.command === run)
   if (existing) {
     setActiveTerminal(existing.id)
@@ -533,7 +615,7 @@ export function getLatestAndRun(project: TerminalProject): void {
     return
   }
   const t = addTerminal({
-    name: `${project.name} · ${commandLabel(run).replace(/^(npm|pnpm|yarn|bun) (run )?/, '')}`,
+    name: name ?? `${project.name} · ${commandLabel(run).replace(/^(npm|pnpm|yarn|bun) (run )?/, '')}`,
     folder: project.folder,
     projectId: project.id,
     command: run

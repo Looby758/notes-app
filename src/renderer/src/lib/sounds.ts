@@ -1,5 +1,6 @@
 import { usePrefs } from '../store/prefs'
 import { useUI } from '../store/ui'
+import { soundSettings } from './gameSound'
 
 /**
  * Soft interface sounds: a click for buttons, a whoosh when panels and dialogs slide in or out,
@@ -93,7 +94,8 @@ export function startInterfaceSounds(): void {
     'click',
     (e) => {
       const el = (e.target as Element | null)?.closest?.(CLICKABLE)
-      if (el && !(el as HTMLButtonElement).disabled) playSound('click')
+      // Mini games make their own sounds (with their own on/off switch), so they don't click as well.
+      if (el && !(el as HTMLButtonElement).disabled && !(soundSettings().on && el.closest('.minigames-page.playing'))) playSound('click')
     },
     true
   )

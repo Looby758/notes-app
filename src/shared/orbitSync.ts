@@ -1,7 +1,7 @@
 import type { Prefs } from './prefs'
 
 /**
- * Orbit synced everywhere: your settings, Home layout, themes, soundboard and calendar links are
+ * Orbit synced everywhere: your settings, Home layout, themes, soundboard, macros and calendar links are
  * kept in the notes folder (.notesapp/orbit/), so they follow it to your other computers through
  * Google Drive, like money, passwords, stars and flashcards already do.
  *
@@ -12,7 +12,7 @@ import type { Prefs } from './prefs'
  * - both, differently: you're asked which version to keep.
  */
 
-export type OrbitPart = 'themes' | 'settings' | 'home' | 'soundboard' | 'calendar'
+export type OrbitPart = 'themes' | 'settings' | 'home' | 'soundboard' | 'macros' | 'calendar'
 
 /** In the order they're synced: themes first, so settings that pick an imported theme can find it. */
 export const ORBIT_PARTS: { id: OrbitPart; label: string }[] = [
@@ -20,11 +20,12 @@ export const ORBIT_PARTS: { id: OrbitPart; label: string }[] = [
   { id: 'settings', label: 'Settings' },
   { id: 'home', label: 'Home layout' },
   { id: 'soundboard', label: 'Soundboard' },
+  { id: 'macros', label: 'Macros' },
   { id: 'calendar', label: 'Calendar links' }
 ]
 
 /** Settings that belong to one computer (its screen, its startup), so each keeps its own. */
-export const DEVICE_PREFS: readonly (keyof Prefs)[] = ['zoom', 'launchAtStartup', 'closeToTray', 'syncOrbit']
+export const DEVICE_PREFS: readonly (keyof Prefs)[] = ['zoom', 'launchAtStartup', 'closeToTray', 'syncOrbit', 'snipFolder']
 
 /** The Home page's layout, synced (and asked about) separately from the rest of Settings. */
 export const HOME_PREFS: readonly (keyof Prefs)[] = ['homeOnStart', 'homeOrder', 'homeHidden', 'worldClocks', 'countdowns', 'weatherHome']

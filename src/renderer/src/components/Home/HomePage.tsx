@@ -14,6 +14,8 @@ import { IS_MAC, showKeys } from '@shared/platform'
 import { noteTitle, parentOf } from '../../lib/paths'
 import { DayList, ExternalStatus, useExternalRange, useItemsByDay } from '../Calendar/shared'
 import { useAllCards, useDueCount } from '../Flashcards/FlashcardsPage'
+import { homeBoxOn } from '../../lib/addons'
+import { useAddonOn } from '../../lib/addons'
 import { WeatherHomeBox } from '../Weather/Weather'
 
 /** The current time, updated every minute (so the date and greeting roll over at midnight). */
@@ -52,14 +54,17 @@ function TodayBox({ now }: { now: Date }) {
   const external = useExternalRange(start, new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1))
   const local = (byDay.get(today) ?? []).filter((i) => i.kind !== 'daily')
   const ext = external.get(today) ?? []
+  const calendarOn = useAddonOn('calendar')
   return (
     <HomeBox
       icon={<CalendarDays size={15} />}
       title="Today"
       action={
-        <button className="link-button home-box-action" onClick={() => openSpecialTab(CALENDAR_TAB)}>
-          Calendar
-        </button>
+        calendarOn && (
+          <button className="link-button home-box-action" onClick={() => openSpecialTab(CALENDAR_TAB)}>
+            Calendar
+          </button>
+        )
       }
     >
       {local.length + ext.length === 0 ? <p className="home-empty">Nothing planned for today.</p> : <DayList local={local} external={ext} />}
@@ -155,6 +160,7 @@ export default function HomePage() {
   const now = useNow()
   const order = usePrefs((s) => s.prefs.homeOrder)
   const hidden = usePrefs((s) => s.prefs.homeHidden)
+  const installed = usePrefs((s) => s.prefs.installedAddons)
   const [editing, setEditing] = useState(false)
   const boxes = arrangeHome(
     [
@@ -163,7 +169,10 @@ export default function HomePage() {
       { id: 'flashcards', order: 30, title: 'Flashcards', node: <FlashcardsBox /> },
       { id: 'recent', order: 40, title: 'Recent notes', node: <RecentBox /> },
       ...homeCards().map(({ id, order, title, Card }) => ({ id, order, title, node: <Card /> }))
-    ].sort((a, b) => a.order - b.order),
+    ]
+      // Boxes from add-ons you haven't added aren't on Home (lib/addons.ts).
+      .filter((b) => homeBoxOn(b.id, installed))
+      .sort((a, b) => a.order - b.order),
     order
   )
 

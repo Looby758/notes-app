@@ -7,9 +7,8 @@ import { loadSettings, saveSettings } from './settings'
 
 /**
  * A web tab's page in a window of its own ("Pop out into its own window"), so YouTube (or any site)
- * can go full screen on one screen while you carry on using Orbit on the other. Unlike the YouTube
- * mini window it doesn't float on top or hide the rest of the page: it's an ordinary window with
- * the whole site in it, walled off like the web tabs (same storage, so you stay signed in).
+ * can go full screen on one screen while you carry on using Orbit on the other. It's an ordinary
+ * window (it doesn't float on top) with the whole site in it, walled off like the web tabs (same storage, so you stay signed in).
  */
 
 let webWin: BrowserWindow | null = null

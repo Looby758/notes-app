@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 
 export type MenuItem =
   | { label: string; icon?: ReactNode; danger?: boolean; onClick: () => void }
+  /** Something of its own in the menu, like a row of colour tags; `close` shuts the menu. */
+  | { custom: (close: () => void) => ReactNode }
   | 'separator'
 
 interface Props {
@@ -53,6 +55,10 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
       {items.map((item, i) =>
         item === 'separator' ? (
           <div key={i} className="menu-sep" />
+        ) : 'custom' in item ? (
+          <div key={i} className="menu-custom">
+            {item.custom(onClose)}
+          </div>
         ) : (
           <button
             key={i}

@@ -73,6 +73,8 @@ export default function ComicReader({ id, onClose }: { id: string; onClose: () =
   const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
   const [scan, setScan] = useState<Scan | null>(null)
   const [pop, setPop] = useState<null | 'chapters' | 'music'>(null)
+  // Music while reading comes with the Music add-on.
+  const spotify = usePrefs((s) => s.prefs.musicSpotify && s.prefs.installedAddons.includes('music'))
   const [zen, setZen] = useState(false)
   const [zenStart, setZenStart] = useState(0)
   const [now, setNow] = useState(Date.now())
@@ -291,6 +293,8 @@ export default function ComicReader({ id, onClose }: { id: string; onClose: () =
     setZenStart(Date.now())
     setQuiet('comics', true)
     void window.api.setFullScreen(true)
+    // Zen mode's music is a Spotify playlist, so nothing's offered with Spotify turned off (or without Music).
+    if (!usePrefs.getState().prefs.musicSpotify || !usePrefs.getState().prefs.installedAddons.includes('music')) return
     if (settings.playlist) playPlaylist(settings.playlist)
     else setPop('music')
   }
@@ -622,9 +626,9 @@ export default function ComicReader({ id, onClose }: { id: string; onClose: () =
         <span className="comic-divider" />
         {zen && (
           <>
-            <button className="icon-btn" onClick={() => setPop(pop === 'music' ? null : 'music')} title={settings.playlist ? `Music: ${settings.playlist.name}` : 'Pick music'} data-comic-music-btn>
+            {spotify && <button className="icon-btn" onClick={() => setPop(pop === 'music' ? null : 'music')} title={settings.playlist ? `Music: ${settings.playlist.name}` : 'Pick music'} data-comic-music-btn>
               <Music2 size={15} />
-            </button>
+            </button>}
             <button className={`icon-btn ${hud ? 'active' : ''}`} onClick={toggleHud} title="Reading timer and pages read today (T)">
               <Timer size={15} />
             </button>

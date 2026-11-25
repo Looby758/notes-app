@@ -81,7 +81,8 @@ let heldOpen = false
 
 function Ring({ at }: { at: { x: number; y: number } }) {
   const ids = usePrefs((s) => s.prefs.radialFeatures)
-  const features = useMemo(() => featuresFor(ids).slice(0, 12), [ids])
+  const installed = usePrefs((s) => s.prefs.installedAddons)
+  const features = useMemo(() => featuresFor(ids, installed).slice(0, 12), [ids, installed])
   const [hover, setHover] = useState(-1)
   const hoverRef = useRef(-1)
   hoverRef.current = hover

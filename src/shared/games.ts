@@ -111,6 +111,47 @@ export function steamLibraryFolders(vdfText: string): string[] {
   return out
 }
 
+/** A Steam game Steam is downloading or updating, from its appmanifest_<id>.acf. */
+export interface SteamDownload {
+  appId: string
+  name: string
+  /** downloading: going now. paused: paused in Steam. waiting: in Steam's queue (or waiting for its update hours). */
+  state: 'downloading' | 'paused' | 'waiting'
+  downloaded: number
+  /** 0 when Steam hasn't worked it out yet. */
+  total: number
+}
+
+// Steam's StateFlags: 2 update required, 4 fully installed, 256 update running, 512 update paused,
+// 1024 update started, 1048576 downloading, 2097152 staging, 4194304 committing.
+const UPDATE_REQUIRED = 2
+const UPDATE_RUNNING = 256
+const UPDATE_PAUSED = 512
+const DOWNLOADING = 1048576 | 2097152 | 4194304
+
+/** What Steam is doing with a game, from its manifest; null when it isn't downloading anything. */
+export function steamDownloadFromManifest(acfText: string): SteamDownload | null {
+  const state = section(parseVdf(acfText).appstate)
+  if (!state) return null
+  const appId = typeof state.appid === 'string' ? state.appid : ''
+  const name = typeof state.name === 'string' && state.name ? state.name : `Steam game ${appId}`
+  const flags = Number(state.stateflags) || 0
+  const num = (k: string): number => Number(typeof state[k] === 'string' ? state[k] : 0) || 0
+  const total = num('bytestodownload')
+  const downloaded = Math.min(num('bytesdownloaded'), total || Infinity)
+  if (!/^\d+$/.test(appId)) return null
+  const busy = flags & (UPDATE_REQUIRED | UPDATE_RUNNING | UPDATE_PAUSED | DOWNLOADING)
+  if (!busy) return null
+  const s: SteamDownload['state'] = flags & UPDATE_PAUSED ? 'paused' : flags & (UPDATE_RUNNING | DOWNLOADING) ? 'downloading' : 'waiting'
+  return { appId, name, state: s, downloaded, total }
+}
+
+/** The game's number in a Steam link (store page, steam://install/…, SteamDB), or null. */
+export function steamAppIdFromLink(link: string): string | null {
+  const m = /^(?:https?:\/\/)?(?:store\.steampowered\.com\/app|steamdb\.info\/app|steamcommunity\.com\/app)\/(\d+)/i.exec(link.trim()) ?? /^steam:\/\/(?:install|store|run|rungameid)\/(\d+)/i.exec(link.trim())
+  return m ? m[1] : null
+}
+
 export interface SteamApp {
   appId: string
   name: string
@@ -194,6 +235,90 @@ export const epicLaunchUrl = (g: Pick<EpicGame, 'appName' | 'namespace' | 'itemI
   g.namespace && g.itemId
     ? `com.epicgames.launcher://apps/${encodeURIComponent(`${g.namespace}:${g.itemId}:${g.appName}`)}?action=launch&silent=true`
     : `com.epicgames.launcher://apps/${encodeURIComponent(g.appName)}?action=launch&silent=true`
+
+/**
+ * A game the Epic Games Launcher is installing or updating, from its manifest. Epic doesn't write
+ * its progress anywhere Orbit can read, so the progress is the game's folder filling up against
+ * the size Epic says it will be (for an update, just what's been downloaded so far).
+ */
+export interface EpicDownload {
+  appName: string
+  name: string
+  /** install: a new game. update: a game that's already there getting a patch. */
+  kind: 'install' | 'update'
+  /** downloading: its folder grew in the last little while. waiting: paused, or behind another one in Epic's queue. */
+  state: 'downloading' | 'waiting'
+  downloaded: number
+  /** 0 when the size isn't known (updates). */
+  total: number
+}
+
+/** Where an Epic download is happening, before its folder is measured. */
+export interface EpicPending {
+  appName: string
+  name: string
+  kind: EpicDownload['kind']
+  installLocation: string
+  /** Where Epic puts the pieces while downloading (inside the game's folder, under .egstore). */
+  stagingLocation: string
+  total: number
+}
+
+/**
+ * An Epic download from a manifest: one in Manifests/Pending (Epic's list of installs and updates
+ * that haven't finished), or one in Manifests that's marked as not fully installed. Null otherwise.
+ */
+export function epicPendingFromManifest(jsonText: string, inPendingFolder: boolean): EpicPending | null {
+  let m: Record<string, unknown>
+  try {
+    m = JSON.parse(jsonText)
+  } catch {
+    return null
+  }
+  if (!m || typeof m !== 'object') return null
+  const str = (k: string): string => (typeof m[k] === 'string' ? (m[k] as string) : '')
+  const appName = str('AppName')
+  const installLocation = str('InstallLocation')
+  if (!appName || !installLocation) return null
+  const incomplete = m.bIsIncompleteInstall === true
+  if (!inPendingFolder && !incomplete) return null
+  const size = Number(m.InstallSize)
+  return {
+    appName,
+    name: str('DisplayName') || appName,
+    // A pending manifest for a game that's already fully there is an update.
+    kind: incomplete ? 'install' : 'update',
+    installLocation,
+    stagingLocation: str('StagingLocation') || `${installLocation.replace(/[\\/]+$/, '')}/.egstore/bps`,
+    total: incomplete && Number.isFinite(size) && size > 0 ? size : 0
+  }
+}
+
+/** What's remembered about an Epic download between looks. */
+export interface EpicSeen {
+  bytes: number
+  /** When the bytes last went up. */
+  grewAt: number
+  /** When the bytes were last measured. */
+  at: number
+  speed?: number
+}
+
+/** Epic flushes in bursts, so a folder that hasn't grown for this long counts as paused or queued. */
+export const EPIC_STALL_MS = 45_000
+
+/** Works out an Epic download's state and speed from this measurement and the last one. */
+export function epicProgress(prev: EpicSeen | undefined, bytes: number, now: number): { seen: EpicSeen; state: EpicDownload['state']; speed?: number } {
+  if (!prev) return { seen: { bytes, grewAt: 0, at: now }, state: 'waiting' }
+  if (bytes > prev.bytes && now > prev.at) {
+    const speed = ((bytes - prev.bytes) * 1000) / (now - prev.at)
+    return { seen: { bytes, grewAt: now, at: now, speed }, state: 'downloading', speed }
+  }
+  const going = prev.grewAt > 0 && now - prev.grewAt < EPIC_STALL_MS
+  // Between bursts the last speed stands; once it's stalled there's no speed.
+  const seen = { bytes, grewAt: prev.grewAt, at: now, speed: going ? prev.speed : undefined }
+  return { seen, state: going ? 'downloading' : 'waiting', speed: seen.speed }
+}
 
 // ---------- Mac apps ----------
 

@@ -47,9 +47,35 @@ let handlers: Partial<Record<OrbitPart, PartHandler>> = {}
 let getRoot: () => string | null = () => null
 let enabled: () => boolean = () => true
 let getWindow: () => BrowserWindow | null = () => null
+/**
+ * A test copy of Orbit (see testCopy.ts) on your real notes folder only ever reads: it may take in
+ * your real settings, themes and so on, but never writes to the notes folder or asks which version
+ * to keep, so nothing done in a test copy can replace what your real Orbit syncs. On a separate test
+ * vault it syncs normally, so you can see what it would write.
+ */
+let isReadOnly: () => boolean = () => false
 
 const sha = (data: string | Buffer): string => createHash('sha256').update(data).digest('hex')
 const deviceName = (): string => hostname().replace(/\.local$/i, '') || 'another computer'
+
+/** Whether a version in the notes folder came from this same computer (another copy of Orbit on it). */
+export const sameComputer = (device: string, here: string = deviceName()): boolean => device.trim().toLowerCase() === here.trim().toLowerCase()
+
+/** The "which version?" question's wording. The other version may be from this same computer (another copy of Orbit on it, such as a test copy), so it's never called "another computer" then. */
+export function whichVersionText(label: string, remote: Pick<OrbitManifest, 'device'>, when: string, here: string = deviceName()): { message: string; detail: string; buttons: string[] } {
+  if (sameComputer(remote.device, here)) {
+    return {
+      message: `${label} changed here and in another copy of Orbit on this computer.`,
+      detail: `The other copy changed it ${when}. Which version should Orbit keep? The other one is replaced.`,
+      buttons: ['Keep this copy’s', 'Keep the other copy’s', 'Decide later']
+    }
+  }
+  return {
+    message: `${label} changed on this computer and on ${remote.device}.`,
+    detail: `${remote.device} changed it ${when}. Which version should Orbit keep on both computers? The other one is replaced.`,
+    buttons: ['Keep this computer’s', `Keep ${remote.device}’s`, 'Decide later']
+  }
+}
 
 // ---- what this computer remembers ----
 
@@ -158,6 +184,7 @@ async function writeAtomic(file: string, data: string | Buffer): Promise<void> {
 
 /** Puts this computer's version in the notes folder: files first, then the list that points at them. */
 async function push(root: string, part: OrbitPart, h: PartHandler, local: Local): Promise<void> {
+  if (isReadOnly()) throw new Error('a test copy of Orbit never writes synced settings')
   const manifest: OrbitManifest = { version: 1, hash: local.hash, device: deviceName(), updated: Date.now() }
   if (h.kind === 'value') {
     if (local.hash !== null) manifest.value = local.value
@@ -255,9 +282,7 @@ async function askWhich(label: string, remote: OrbitManifest): Promise<'local' |
   const options = {
     type: 'question' as const,
     title: 'Which version do you want to keep?',
-    message: `${label} changed on this computer and on ${remote.device}.`,
-    detail: `${remote.device} changed it ${when}. Which version should Orbit keep on both computers? The other one is replaced.`,
-    buttons: ['Keep this computer’s', `Keep ${remote.device}’s`, 'Decide later'],
+    ...whichVersionText(label, remote, when),
     defaultId: 0,
     cancelId: 2,
     noLink: true
@@ -275,6 +300,8 @@ async function syncPart(root: string, part: OrbitPart, label: string, h: PartHan
   const local = await readLocal(h)
   const agreed = loadState()[root]?.[part]
   let step = decideSync(local.hash, remote?.hash, agreed)
+  // A test copy only takes things in: it never puts its version in the notes folder, or asks.
+  if (isReadOnly() && (step === 'push' || step === 'ask')) return
 
   if (step === 'ask' && remote) {
     const key = `${root}|${part}|${local.hash}|${remote.hash}`
@@ -345,7 +372,10 @@ export function setupOrbitSync(options: {
   enabled: () => boolean
   window: () => BrowserWindow | null
   parts: Partial<Record<OrbitPart, PartHandler>>
+  /** A test copy on your real notes folder: only take things in, never write to it (see isReadOnly above). */
+  readOnly?: () => boolean
 }): void {
+  isReadOnly = options.readOnly ?? (() => false)
   getRoot = options.root
   enabled = options.enabled
   getWindow = options.window

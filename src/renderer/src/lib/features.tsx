@@ -1,6 +1,7 @@
-import { useSyncExternalStore, type ComponentType } from 'react'
+import { useMemo, useSyncExternalStore, type ComponentType } from 'react'
 import type { Prefs } from '@shared/prefs'
 import {
+  Send,
   Ear,
   ArrowRightLeft,
   FilePen,
@@ -23,6 +24,8 @@ import {
   HardDrive,
   House,
   KeyRound,
+  Keyboard,
+  Repeat2,
   Layers,
   Images,
   Clock,
@@ -33,11 +36,13 @@ import {
   MessagesSquare,
   Monitor,
   SlidersVertical,
-  MonitorPlay,
+  Activity,
+  PackageX,
+  Puzzle,
   MonitorUp,
   MousePointerClick,
   Moon,
-  Music,
+  Music2,
   Orbit,
   PoundSterling,
   Scan,
@@ -49,21 +54,25 @@ import {
   Webcam,
   Zap,
   Headphones,
-  CloudDownload,
   History,
   Scissors,
+  Crop,
   Bot,
+  Asterisk,
   Video,
+  Hammer,
+  ArrowDownToLine,
+  Target,
   type LucideIcon
 } from 'lucide-react'
 import { openGrokTab } from '../components/Grok/GrokPage'
-import { useGrok } from '../store/grok'
+import { openSiteTab } from '../components/ChatSite/ChatSite'
+import { useChatSites, useGrok } from '../store/grok'
 import { openMiniGames } from '../store/miniGames'
 import { useVault } from '../store/vault'
 import { setPrefs, usePrefs } from '../store/prefs'
 import { showSearch, toggleZen, useUI } from '../store/ui'
 import { toggleStreamerMode } from '../store/streamer'
-import { toggleMusic, useMusic } from '../store/music'
 import { showAndFindSong, useSongId } from '../store/songId'
 import { sendToPhone, usePhone } from '../store/phone'
 import { openAsk } from '../store/ai'
@@ -76,11 +85,15 @@ import {
   COMICS_TAB,
   WIKI_TAB,
   CONVERT_TAB,
+  FILESENDER_TAB,
   PDF_EDITOR_TAB,
   STUDIO_TAB,
+  APPSTUDIO_TAB,
   CLIPS_TAB,
   VIDEOS_TAB,
   SOUNDBOARD_TAB,
+  MACROS_TAB,
+  KEYREMAP_TAB,
   DISCORD_TAB,
   EMAIL_TAB,
   EXPLORER_TAB,
@@ -94,10 +107,15 @@ import {
   MESSAGES_TAB,
   CLOCKS_TAB,
   COUNTDOWNS_TAB,
+  SKYBLOCK_GOALS_TAB,
   PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
-  DOWNLOADER_TAB,
+  TASKS_TAB,
+  UNINSTALL_TAB,
+  ADDONS_TAB,
+  MUSIC_TAB,
+  DOWNLOADS_TAB,
   MONEY_TAB,
   PASSWORDS_TAB,
   SETTINGS_TAB,
@@ -107,6 +125,7 @@ import {
 } from './editorController'
 import { FeatureBadge } from '../components/Nav/badges'
 import { FEATURE_INFO, type FeatureInfo } from './featureInfo'
+import { hasFeature } from '@shared/addons'
 
 /**
  * Every feature of the app in one list, so the top bar, the dock, the radial menu and the
@@ -186,6 +205,9 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   publishing: { icon: Upload, run: () => openSpecialTab(PUBLISHING_TAB) },
   screens: { icon: Monitor, run: () => openSpecialTab(SCREENS_TAB) },
   mixer: { icon: SlidersVertical, run: () => openSpecialTab(MIXER_TAB) },
+  tasks: { icon: Activity, run: () => openSpecialTab(TASKS_TAB) },
+  uninstall: { icon: PackageX, run: () => openSpecialTab(UNINSTALL_TAB) },
+  addons: { icon: Puzzle, run: () => openSpecialTab(ADDONS_TAB) },
   screenshots: { icon: Images, run: () => openSpecialTab(SCREENSHOTS_TAB) },
   timeline: { icon: Clock, run: () => openSpecialTab(TIMELINE_TAB) },
   flashcards: { icon: Layers, run: () => openSpecialTab(FLASHCARDS_TAB), badge: () => <FeatureBadge id="flashcards" /> },
@@ -209,20 +231,23 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   web: { icon: Globe, run: () => openWebTab('', { beside: true }) },
   chat: { icon: MessageSquare, run: () => openSpecialTab(CHAT_TAB) },
   grok: { icon: Bot, run: openGrokTab, useActive: () => useGrok((s) => s.floating) },
+  claude: { icon: Asterisk, run: () => openSiteTab('claude'), useActive: () => useChatSites((s) => s.claude.floating) },
   ask: { icon: Sparkles, run: () => openAsk() },
-  music: { icon: Music, run: toggleMusic, useActive: () => useMusic((s) => s.open) },
+  musiclibrary: { icon: Music2, run: () => openSpecialTab(MUSIC_TAB) },
   songid: { icon: Ear, run: showAndFindSong, useActive: () => useSongId((s) => s.phase === 'listening' || s.phase === 'thinking') },
   video: { icon: Film, run: () => openSpecialTab(VIDEO_TAB) },
   comics: { icon: LibraryBig, run: () => openSpecialTab(COMICS_TAB) },
   wiki: { icon: Library, run: () => openSpecialTab(WIKI_TAB) },
-  youtube: { icon: MonitorPlay, run: () => void window.api.openYouTube() },
   games: { icon: Gamepad2, run: () => openSpecialTab(GAMES_TAB) },
+  'skyblock-goals': { icon: Target, run: () => openSpecialTab(SKYBLOCK_GOALS_TAB) },
   'mini-games': { icon: Joystick, run: () => openMiniGames(null) },
   snip: { icon: Scan, run: () => void startSnip() },
+  'snip-picture': { icon: Crop, run: () => void startSnip('picture') },
   explorer: { icon: HardDrive, run: () => openSpecialTab(EXPLORER_TAB) },
   convert: { icon: ArrowRightLeft, run: () => openSpecialTab(CONVERT_TAB) },
+  filesender: { icon: Send, run: () => openSpecialTab(FILESENDER_TAB) },
   'pdf-editor': { icon: FilePen, run: () => openSpecialTab(PDF_EDITOR_TAB) },
-  downloader: { icon: CloudDownload, run: () => openSpecialTab(DOWNLOADER_TAB) },
+  downloads: { icon: ArrowDownToLine, run: () => openSpecialTab(DOWNLOADS_TAB) },
   'offline-ai': {
     icon: Cpu,
     run: () => {
@@ -231,12 +256,15 @@ const BEHAVIOUR: Record<string, Behaviour> = {
     }
   },
   studio: { icon: Clapperboard, run: () => openSpecialTab(STUDIO_TAB) },
+  appstudio: { icon: Hammer, run: () => openSpecialTab(APPSTUDIO_TAB) },
   clips: { icon: Scissors, run: () => openSpecialTab(CLIPS_TAB) },
   videos: { icon: Video, run: () => openSpecialTab(VIDEOS_TAB) },
   replay: { icon: History, run: () => void import('./replay').then((m) => m.saveReplay()), useActive: () => usePrefs((s) => s.prefs.replayOn) },
   soundboard: { icon: AudioLines, run: () => openSpecialTab(SOUNDBOARD_TAB) },
   'discord-voice': { icon: Headphones, run: () => openSpecialTab(DISCORD_TAB) },
   terminal: { icon: SquareTerminal, run: () => openSpecialTab(TERMINAL_TAB) },
+  macros: { icon: Keyboard, run: () => openSpecialTab(MACROS_TAB) },
+  keyremap: { icon: Repeat2, run: () => openSpecialTab(KEYREMAP_TAB) },
   streamer: { icon: Eye, run: toggleStreamerMode, useActive: () => usePrefs((s) => s.prefs.streamerMode) },
   settings: { icon: Settings, run: () => openSpecialTab(SETTINGS_TAB) }
 }
@@ -247,8 +275,15 @@ const BY_ID = new Map(FEATURES.map((f) => [f.id, f]))
 
 export const featureById = (id: string): Feature | undefined => BY_ID.get(id)
 
-/** The features for a list of ids from settings, skipping any that no longer exist. */
-export const featuresFor = (ids: readonly string[]): Feature[] => ids.map((id) => BY_ID.get(id)).filter((f): f is Feature => !!f)
+/** The features for a list of ids from settings, skipping any that no longer exist or whose add-on isn't added. */
+export const featuresFor = (ids: readonly string[], installed: readonly string[] = usePrefs.getState().prefs.installedAddons): Feature[] =>
+  ids.map((id) => BY_ID.get(id)).filter((f): f is Feature => !!f && hasFeature(f.id, installed))
+
+/** Every feature that's here: core ones, and those of the add-ons you've added. Redraws when add-ons change. */
+export function useFeatures(): Feature[] {
+  const installed = usePrefs((s) => s.prefs.installedAddons)
+  return useMemo(() => FEATURES.filter((f) => hasFeature(f.id, installed)), [installed])
+}
 
 /** Opens the launcher (every feature, grouped, type to filter). */
 export const openLauncher = (): void => useUI.setState({ launcherOpen: true })

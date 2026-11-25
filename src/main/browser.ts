@@ -16,7 +16,7 @@ import {
   type Session,
   type WebContents
 } from 'electron'
-import { firefoxUserAgent, isGoogleSignIn, isWebUrl, plainUserAgent, searchUrl, WEB_PARTITION } from '@shared/web'
+import { chromiumHints, firefoxUserAgent, googleSignInAgent, isGoogleRejection, isGoogleSignIn, isWebUrl, plainUserAgent, searchUrl, WEB_PARTITION } from '@shared/web'
 import { isMessagesUrl, MESSAGES_PARTITION } from '@shared/messages'
 import { shortcutFromEvent } from '@shared/shortcuts'
 import { isAdRequest, PAGE_AD_CSS, YOUTUBE_AD_CSS, YOUTUBE_AD_SCRIPT } from '@shared/adblock'
@@ -91,7 +91,25 @@ const SIGN_IN_AGENT = firefoxUserAgent(process.platform)
 
 /** Whether Google's sign-in pages are told "Firefox" (the "Sign in with Google as Firefox" setting). */
 let asFirefox: () => boolean = () => false
-const firefoxFor = (url: string): boolean => isGoogleSignIn(url) && asFirefox()
+
+/**
+ * A sign-in Google refused ("This browser or app may not be secure") is tried again as Firefox
+ * (Google has since started refusing that too from Chromium, see googleSignInAgent). That lasts for that one sign-in: until its page leaves Google's sign-in
+ * pages (signed in), closes, or 15 minutes pass. Only a fresh sign-in needs it: once you're signed
+ * in, picking your account ("Choose an account", as Grok's "Sign in with Google" does) works as
+ * plain Chromium, and as Firefox it can loop back to "Choose an account".
+ */
+let retryAsFirefox: { page: number; until: number } | null = null
+const retrying = (): boolean => !!retryAsFirefox && Date.now() < retryAsFirefox.until
+const firefoxNow = (): boolean => asFirefox() || retrying()
+const firefoxFor = (url: string): boolean => isGoogleSignIn(url) && firefoxNow()
+
+/**
+ * The browser name a page at `url` is given: on Google's sign-in pages Orbit names itself (see
+ * googleSignInAgent), or Firefox with the setting on; everywhere else the plain one (`plain`).
+ */
+const agentFor = (url: string, plain: string): string =>
+  firefoxFor(url) ? SIGN_IN_AGENT : isGoogleSignIn(url) ? googleSignInAgent(plain, app.getVersion()) : plain
 
 export interface BrowserDeps {
   /** Streamer mode is on: sites (and WhatsApp and Discord) don't pop up notifications. */
@@ -499,13 +517,19 @@ function broadcast(channel: string, value: unknown): void {
 /** The same walled-off setup for the web tabs' storage and the private tabs'. */
 function setupWebSession(ses: Session, isPrivate: boolean, preload: { type: 'frame'; filePath: string }): void {
   ses.registerPreloadScript(preload)
-  ses.setUserAgent(plainUserAgent(ses.getUserAgent()))
+  // Web tabs name Orbit after the plain browser name, everywhere: Google's sign-in refuses a browser
+  // that passes itself off as plain Chrome (see googleSignInAgent), and a sign-in that hears two
+  // different names (the site's page and Google's pop-up) loops back to "Choose an account". The
+  // messages hub keeps the plain name (WhatsApp wants it).
+  ses.setUserAgent(googleSignInAgent(plainUserAgent(ses.getUserAgent()), app.getVersion()))
   ses.setPermissionRequestHandler((wc, permission, callback, details) => permissionRequest(wc, permission, details as { requestingUrl?: string; mediaTypes?: string[] }, callback))
   ses.setPermissionCheckHandler((wc, permission, origin, details) => permissionCheck(wc, permission, origin, details as { mediaType?: string }))
+  // Secure requests carry the "client hints" Chromium sends (which browser, version, on what), the
+  // same as the page itself says: see chromiumHints.
   // With "Sign in with Google as Firefox" on, Google's sign-in pages (every one the sign-in passes
-  // through, see isGoogleSignIn) hear "Firefox", without the Chrome-only hints that would give it away.
+  // through, see isGoogleSignIn) hear "Firefox" instead, without the Chrome-only hints.
   ses.webRequest.onBeforeSendHeaders({ urls: ['https://*/*'] }, (details, callback) => {
-    if (!firefoxFor(details.url)) return callback({})
+    if (!firefoxFor(details.url)) return callback({ requestHeaders: chromiumHints(details.requestHeaders, process.versions.chrome, process.platform) })
     const headers = Object.fromEntries(Object.entries(details.requestHeaders).filter(([name]) => !/^sec-ch-ua/i.test(name)))
     callback({ requestHeaders: { ...headers, 'User-Agent': SIGN_IN_AGENT } })
   })
@@ -526,6 +550,9 @@ function setupWebSession(ses: Session, isPrivate: boolean, preload: { type: 'fra
 
 export function setupBrowser(options: BrowserDeps): void {
   deps = options
+  // Anything that doesn't get a browser name of its own (a pop-up, a window opened from a page) gets
+  // the plain one, never Electron's: no "Electron/36" or "Orbit/1.11" for a site to see.
+  app.userAgentFallback = plainUserAgent(app.userAgentFallback)
   asFirefox = options.googleAsFirefox ?? (() => false)
   downloads = loadDownloads()
 
@@ -610,7 +637,7 @@ export function setupBrowser(options: BrowserDeps): void {
     if (host && !host.isDestroyed()) host.send('web:mouseNav', page.id, dir)
   })
   ipcMain.on('web:googleAsFirefox', (e) => {
-    e.returnValue = asFirefox()
+    e.returnValue = firefoxNow()
   })
   ipcMain.on('web:shortcuts', (_e, list: unknown) => {
     appShortcuts = new Set(Array.isArray(list) ? list.filter((s): s is string => typeof s === 'string') : [])
@@ -693,7 +720,7 @@ export function setupBrowser(options: BrowserDeps): void {
   ipcMain.handle('web:permissionAnswer', (_e, id: string, allow: boolean) => answerAsk(String(id), allow === true))
 }
 
-/** Each web page gets the ad blocker's CSS; YouTube (in a web tab or the mini window) its script too. */
+/** Each web page gets the ad blocker's CSS; YouTube its script too. */
 export function blockAds(page: WebContents): void {
   page.on('dom-ready', () => {
     if (page.session !== webSession() && page.session !== privateSession()) return
@@ -817,7 +844,9 @@ export function guardPage(page: WebContents, host: () => WebContents | null, { a
         // "Choose an account" each time you pick one.
         createWindow: (options) => {
           const popup = new BrowserWindow(options)
-          if (firefoxFor(url)) popup.webContents.setUserAgent(SIGN_IN_AGENT)
+          // A new window starts with Electron's own browser name: it gets the one its first page
+          // should have (see agentFor) before that page loads.
+          popup.webContents.setUserAgent(agentFor(url, popup.webContents.session.getUserAgent()))
           return popup.webContents
         }
       }
@@ -830,11 +859,42 @@ export function guardPage(page: WebContents, host: () => WebContents | null, { a
 
   // Google's sign-in pages see "Firefox" from the page's side too (the request side is in setupWebSession).
   const browserName = (url: string): void => {
-    const agent = firefoxFor(url) ? SIGN_IN_AGENT : page.session.getUserAgent()
+    const agent = agentFor(url, page.session.getUserAgent())
     if (page.getUserAgent() !== agent) page.setUserAgent(agent)
   }
   page.on('did-start-navigation', (details) => {
     if (details.isMainFrame && !details.isSameDocument) browserName(details.url)
+  })
+
+  // Google refusing the sign-in: start it again as Firefox (see retryAsFirefox). Where this page's
+  // sign-in began is kept, to go back to.
+  let signInStart: string | null = null
+  let triedAsFirefox = false
+  const watchSignIn = (url: string): void => {
+    if (!isGoogleSignIn(url)) {
+      // Back on the site: signed in (or gone elsewhere), so the next sign-in starts fresh.
+      if (retryAsFirefox?.page === page.id) retryAsFirefox = null
+      signInStart = null
+      triedAsFirefox = false
+      return
+    }
+    if (isGoogleRejection(url)) {
+      // Only when the "as Firefox" setting is off: retried as Firefox, once. Google has since started
+      // refusing Firefox's name from Chromium too, so this is off unless ORBIT_RETRY_AS_FIREFOX is set:
+      // switching names mid sign-in also sends Grok's "Sign in with Google" back to "Choose an account".
+      if (!process.env.ORBIT_RETRY_AS_FIREFOX || triedAsFirefox || asFirefox() || !signInStart) return
+      triedAsFirefox = true
+      retryAsFirefox = { page: page.id, until: Date.now() + 15 * 60_000 }
+      page.setUserAgent(SIGN_IN_AGENT)
+      void page.loadURL(signInStart).catch((err) => logError('Google sign-in as Firefox', err))
+      return
+    }
+    signInStart ??= url
+  }
+  page.on('did-navigate', (_e, url) => watchSignIn(url))
+  page.on('did-navigate-in-page', (_e, url, isMainFrame) => isMainFrame && watchSignIn(url))
+  page.once('destroyed', () => {
+    if (retryAsFirefox?.page === page.id) retryAsFirefox = null
   })
 
   // Only web pages: an email link goes to your email app, and anything else (files, other apps) is refused.

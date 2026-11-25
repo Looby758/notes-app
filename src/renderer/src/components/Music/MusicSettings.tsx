@@ -1,15 +1,17 @@
 import './music.css'
 import { useEffect, useState } from 'react'
-import { Check, ChevronDown, Copy, Ear, ExternalLink, LogOut, Music } from 'lucide-react'
+import { Check, ChevronDown, Copy, Ear, ExternalLink, FolderOpen, LogOut, Music } from 'lucide-react'
 import type { SongIdStatus } from '@shared/songId'
 import { usePrefs } from '../../store/prefs'
-import { refreshMusicStatus, setMusicOpen, useMusic } from '../../store/music'
+import { refreshMusicStatus, useMusic } from '../../store/music'
 import { errorMessage } from '../../lib/paths'
+import { loadLocalLibrary, useLocalMusic } from '../../store/localMusic'
 import { IS_MAC, SYSTEM_NAME } from '@shared/platform'
 
 /** Settings → Music: what the player can do straight away, and connecting your Spotify account. */
 export default function MusicSettings() {
   const status = useMusic((s) => s.status)
+  const spotify = usePrefs((s) => s.prefs.musicSpotify)
   const [clientId, setClientId] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -37,22 +39,21 @@ export default function MusicSettings() {
     run(async () => {
       await window.api.musicSetClient(clientId)
       await window.api.musicConnect()
-      setMusicOpen(true)
     })
 
-  if (!status) return null
+  if (!status || !spotify) return null
   const open = (url: string) => () => window.open(url)
   return (
     <section className="settings-group cal-sources" data-section="music">
       <h3>Spotify</h3>
       <p className="cal-sources-intro">
-        The music player sits in the bottom-left corner: show or hide it with <Music size={12} /> at the top. It shows what’s
-        playing, with play/pause, skip, shuffle, repeat and volume.
+        Spotify shows in the Home page’s <Music size={12} /> Now playing box, with play/pause, skip, shuffle, repeat and volume,
+        and your media keys control it too.
       </p>
       {status.appControl && (
         <p className="cal-sources-intro">
           On a Mac it works straight away with the Spotify app, no sign-in needed. The first time, macOS asks whether Notes may
-          control Spotify: press <strong>OK</strong>. You can also paste a Spotify link into the player to play it.
+          control Spotify: press <strong>OK</strong>.
         </p>
       )}
       <p className="cal-sources-intro">
@@ -178,7 +179,7 @@ export function SongIdSettings() {
     <section className="settings-group cal-sources" data-section="song-id">
       <h3>What’s this song?</h3>
       <p className="cal-sources-intro">
-        Hear a song in a video, game or stream? Press <Ear size={12} /> in the music player (or{' '}
+        Hear a song in a video, game or stream? Open <Ear size={12} /> What’s this song? on the Music page (or{' '}
         {status.shortcut ? <kbd>{status.shortcut}</kbd> : 'Ctrl+K → “What’s this song?”'}). Orbit listens for 10 seconds,
         {IS_MAC ? ' through the microphone,' : ''} sends the clip to <strong>AudD</strong> (a song-recognition service) and shows the
         song, ready to add to one of your Spotify playlists. Nothing is recorded until you press it.
@@ -220,6 +221,58 @@ export function SongIdSettings() {
         </div>
       )}
       {status.shortcutError && <p className="setting-warning">{status.shortcutError}</p>}
+      {error && <p className="setting-warning">{error}</p>}
+    </section>
+  )
+}
+
+/** Settings → Music: which folder your songs are in (your computer's Music folder unless you choose one). */
+export function MusicFolderSetting() {
+  const library = useLocalMusic((s) => s.library)
+  const loading = useLocalMusic((s) => s.loading)
+  const error = useLocalMusic((s) => s.error)
+  useEffect(() => {
+    if (!useLocalMusic.getState().library) void loadLocalLibrary()
+  }, [])
+  const useDefault = async (): Promise<void> => {
+    useLocalMusic.setState({ loading: true, error: null })
+    try {
+      useLocalMusic.setState({ library: await window.api.localMusicDefaultFolder() })
+    } catch (err) {
+      useLocalMusic.setState({ error: errorMessage(err) })
+    } finally {
+      useLocalMusic.setState({ loading: false })
+    }
+  }
+  const count = library?.songs.length ?? 0
+  return (
+    <section className="settings-group cal-sources" data-section="music-folder">
+      <h3>Music folder</h3>
+      <p className="cal-sources-intro">
+        The folder your MP3s are in, for example your Google Drive music folder. Folders inside it are included. Your playlists,
+        liked songs and play counts are kept beside them, in <code>orbit-music.json</code>, so they go wherever the folder goes.
+      </p>
+      <div className="cal-connected mp-folder-row">
+        <FolderOpen size={15} />
+        <span className="mp-folder-path" title={library?.folder ?? ''} data-music-folder>
+          {library?.folder ?? (library ? 'No folder chosen yet' : 'Looking…')}
+          {library?.folder && (
+            <em>
+              {' '}
+              · {loading ? 'reading…' : `${count} song${count === 1 ? '' : 's'}`}
+              {!library.chosen && ' · your computer’s Music folder'}
+            </em>
+          )}
+        </span>
+        <button className="btn btn-primary" disabled={loading} onClick={() => void loadLocalLibrary(false, true)} data-music-folder-choose>
+          Choose…
+        </button>
+        {library?.chosen && (
+          <button className="btn" disabled={loading} onClick={() => void useDefault()} title="Go back to your computer’s Music folder" data-music-folder-default>
+            Use default
+          </button>
+        )}
+      </div>
       {error && <p className="setting-warning">{error}</p>}
     </section>
   )

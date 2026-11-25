@@ -2,7 +2,9 @@ import { useUI, showSearch } from '../store/ui'
 import { usePrefs } from '../store/prefs'
 import { notify } from '../store/notify'
 import { addEntry, addGoal, ensureMoney, useMoney } from '../store/money'
-import { musicControl, musicPlay, setMusicOpen } from '../store/music'
+import { musicControl, musicPlay } from '../store/music'
+import { loadLocalLibrary, playLocal, useLocalMusic } from '../store/localMusic'
+import { filterSongs } from '@shared/localMusic'
 import { useVault } from '../store/vault'
 import { askEverything } from '../store/ai'
 import { addIdea, ensureVideos } from '../store/videos'
@@ -14,6 +16,7 @@ import { setPreferredConvertFormat } from './convert/formats'
 import { describeSmart, parseSmart, validSmart, CONVERT_FORMATS, type ParseContext, type SmartAction } from './smartParse'
 import { formatPounds } from './money'
 import { errorMessage } from './paths'
+import { featureOn, notAddedText } from './addons'
 
 /** Runs smart commands (lib/smartParse.ts) in the main window: Ctrl+K, the launcher and the summon bar all end up here. */
 
@@ -23,7 +26,37 @@ export function smartContext(): ParseContext {
   return { categories: useMoney.getState().categories, features: featureNames }
 }
 
-export const parseCommand = (text: string): SmartAction | null => parseSmart(text, smartContext())
+/** The feature an action needs (its add-on must be added), or null when it's core. */
+function actionFeature(a: SmartAction): string | null {
+  switch (a.kind) {
+    case 'money':
+    case 'goal':
+      return 'money'
+    case 'event':
+      return 'calendar'
+    case 'videoIdea':
+      return 'videos'
+    case 'convert':
+      return 'convert'
+    case 'play':
+    case 'music':
+      return 'musiclibrary'
+    case 'open':
+      return a.feature
+    case 'web':
+      return 'web'
+    case 'ask':
+      return 'ask'
+    default:
+      return null
+  }
+}
+
+export const parseCommand = (text: string): SmartAction | null => {
+  const a = parseSmart(text, smartContext())
+  const feature = a && actionFeature(a)
+  return feature && !featureOn(feature) ? null : a
+}
 export const describeCommand = (a: SmartAction): string => describeSmart(a, smartContext())
 
 /** Opens Ctrl+K with some text already typed. */
@@ -33,6 +66,8 @@ export function openPalette(query = ''): void {
 
 /** Does what the action says. Returns a few words on what happened (for the summon bar), or throws. */
 export async function runSmart(a: SmartAction): Promise<string> {
+  const feature = actionFeature(a)
+  if (feature && !featureOn(feature)) throw new Error(notAddedText(feature))
   switch (a.kind) {
     case 'money': {
       await ensureMoney()
@@ -71,6 +106,14 @@ export async function runSmart(a: SmartAction): Promise<string> {
       openSpecialTab(CONVERT_TAB)
       return `Converter set to ${a.format.toUpperCase()}`
     case 'play': {
+      if (!usePrefs.getState().prefs.musicSpotify) {
+        // Spotify turned off: look through your own music instead.
+        if (!useLocalMusic.getState().library) await loadLocalLibrary()
+        const songs = filterSongs(useLocalMusic.getState().library?.songs ?? [], a.query)
+        if (!songs.length) throw new Error(`Nothing in your music matches “${a.query}”.`)
+        await playLocal(songs, 0)
+        return songs.length === 1 ? `Playing ${songs[0].title}` : `Playing ${songs.length} songs matching “${a.query}”`
+      }
       let results
       try {
         results = await window.api.musicSearch(a.query)
@@ -79,7 +122,6 @@ export async function runSmart(a: SmartAction): Promise<string> {
       }
       const pick = results.tracks[0] ?? results.playlists[0] ?? results.albums[0]
       if (!pick) throw new Error(`Nothing found on Spotify for “${a.query}”.`)
-      setMusicOpen(true)
       if (!(await musicPlay(pick.uri))) throw new Error('Spotify didn’t start playing. Open Spotify on this computer and try again.')
       return `Playing ${pick.name}${pick.detail ? ` – ${pick.detail}` : ''}`
     }

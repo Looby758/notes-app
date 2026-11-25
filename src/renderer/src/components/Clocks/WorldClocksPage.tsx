@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, ArrowLeft, ArrowRight, Check, Clock, Globe2, MapPin, Moon, Pencil, Plus, RotateCcw, Sun, Sunrise, Sunset, Trash2, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ArrowRight, Check, Clock, Globe2, MapPin, Moon, Pencil, Plus, RotateCcw, Sun, Sunrise, Sunset, Trash2, User, UserPlus, X } from 'lucide-react'
 import { setPrefs, usePrefs } from '../../store/prefs'
 import { notify } from '../../store/notify'
 import { addHomeCard } from '../../lib/home'
@@ -12,6 +12,7 @@ import {
   cityOfZone,
   clockId,
   clockText,
+  clockTitle,
   dayText,
   differenceText,
   durationText,
@@ -19,6 +20,8 @@ import {
   lastChange,
   localZone,
   MAX_CLOCKS,
+  messageTime,
+  nextGoodTime,
   nextChange,
   nextGapChange,
   offsetMinutes,
@@ -59,18 +62,18 @@ const useTwelve = (): boolean => usePrefs((s) => s.prefs.timeFormat === '12h')
 const useClocks = (): WorldClock[] => usePrefs((s) => s.prefs.worldClocks)
 const saveClocks = (clocks: WorldClock[]): void => setPrefs({ worldClocks: clocks })
 
-/** Adds a place unless it's already there; returns whether it was added. */
-function addClock(label: string, zone: string): boolean {
+/** Adds a place (or a friend, with `person`) unless it's already there; returns whether it was added. */
+function addClock(label: string, zone: string, person?: string): boolean {
   const clocks = usePrefs.getState().prefs.worldClocks
   if (clocks.length >= MAX_CLOCKS) {
     notify(`That’s the most clocks there’s room for (${MAX_CLOCKS}). Remove one first.`)
     return false
   }
-  if (clocks.some((c) => c.zone === zone && c.label === label)) {
-    notify(`${label} is already on your clocks.`, 'info')
+  if (clocks.some((c) => c.zone === zone && c.label === label && (c.person ?? '') === (person ?? ''))) {
+    notify(`${person || label} is already on your clocks.`, 'info')
     return false
   }
-  saveClocks([...clocks, { id: clockId(), label, zone }])
+  saveClocks([...clocks, { id: clockId(), label, zone, ...(person ? { person } : {}) }])
   return true
 }
 
@@ -121,7 +124,8 @@ function ClockCard({ clock, home, at, now: realNow, planning, index, count }: Ca
   const isHere = !clock
   const t = timeIn(zone, at)
   const [renaming, setRenaming] = useState(false)
-  const [name, setName] = useState(clock?.label ?? '')
+  const [name, setName] = useState(clock ? clockTitle(clock) : '')
+  const friend = !!clock?.person
 
   // Clock changes are worked out from the real now, not a planned time, and only once a minute.
   const minute = Math.floor(realNow.getTime() / 60_000)
@@ -133,8 +137,9 @@ function ClockCard({ clock, home, at, now: realNow, planning, index, count }: Ca
     return { next, last, gap }
   }, [zone, home, isHere, minute])
 
-  const label = clock?.label ?? 'Here'
-  const place = cityOfZone(zone)
+  const label = clock ? clockTitle(clock) : 'Here'
+  // For a friend, the place is where they are (as it was picked); for a place, its time zone city.
+  const place = friend && clock ? clock.label : cityOfZone(zone)
   const move = (to: number): void => {
     const clocks = [...usePrefs.getState().prefs.worldClocks]
     const [c] = clocks.splice(index, 1)
@@ -143,15 +148,22 @@ function ClockCard({ clock, home, at, now: realNow, planning, index, count }: Ca
   }
   const rename = (): void => {
     const label = name.trim()
-    if (clock && label) saveClocks(usePrefs.getState().prefs.worldClocks.map((c) => (c.id === clock.id ? { ...c, label: label.slice(0, 60) } : c)))
+    if (clock && label)
+      saveClocks(
+        usePrefs
+          .getState()
+          .prefs.worldClocks.map((c) => (c.id === clock.id ? (c.person ? { ...c, person: label.slice(0, 40) } : { ...c, label: label.slice(0, 60) }) : c))
+      )
     setRenaming(false)
   }
   const day = isHere ? null : relativeDay(zone, home, at)
   const abbr = zoneAbbreviation(zone, at)
   const offset = offsetText(offsetMinutes(zone, at))
+  const message = friend ? messageTime(t) : null
+  const goodFrom = friend ? nextGoodTime(zone, at) : null
 
   return (
-    <article className={`clock-card part-${partOfDay(t.hour)} ${isHere ? 'here' : ''}`} data-clock={clock?.id ?? 'here'}>
+    <article className={`clock-card part-${partOfDay(t.hour)} ${isHere ? 'here' : ''} ${friend ? 'friend' : ''}`} data-clock={clock?.id ?? 'here'}>
       <Face hour={t.hour} minute={t.minute} second={t.second} showSeconds={!planning && motion !== 'off'} />
       <div className="clock-body">
         <header className="clock-name">
@@ -167,10 +179,10 @@ function ClockCard({ clock, home, at, now: realNow, planning, index, count }: Ca
                 className="text-input"
                 autoFocus
                 value={name}
-                maxLength={60}
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Escape' && setRenaming(false)}
-                aria-label="Name for this clock"
+                maxLength={friend ? 40 : 60}
+                aria-label={friend ? 'Friend’s name' : 'Name for this clock'}
               />
               <button className="icon-btn" type="submit" title="Save name">
                 <Check size={13} />
@@ -179,6 +191,7 @@ function ClockCard({ clock, home, at, now: realNow, planning, index, count }: Ca
           ) : (
             <h3 title={zone}>
               {isHere && <MapPin size={13} />}
+              {friend && <User size={13} />}
               {label}
             </h3>
           )}
@@ -220,6 +233,15 @@ function ClockCard({ clock, home, at, now: realNow, planning, index, count }: Ca
         <div className="clock-time" data-clock-time>
           {clockText(t, twelve)}
         </div>
+        {message && (
+          <p className={`clock-message mood-${message.mood}`} data-clock-message={message.mood}>
+            <span className="clock-message-dot" aria-hidden />
+            <span>
+              {message.text}
+              {goodFrom && ` · good from ${clockText(timeIn(home, goodFrom), twelve)} your time`}
+            </span>
+          </p>
+        )}
         <p className="clock-day">
           <DayIcon hour={t.hour} />
           <span>
@@ -254,7 +276,9 @@ const gapWords = (minutes: number): string =>
 const SUGGESTIONS = ['New York', 'Los Angeles', 'Tokyo', 'Sydney', 'Dubai', 'Paris', 'Delhi', 'Toronto']
 
 /** Adding a place: well-known places as you type, and any town in the world from the map search. */
-function AddPlace({ onClose }: { onClose: () => void }) {
+function AddPlace({ onClose, friend = false }: { onClose: () => void; friend?: boolean }) {
+  const [person, setPerson] = useState('')
+  const personInput = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
   const [towns, setTowns] = useState<Place[]>([])
   const [searching, setSearching] = useState(false)
@@ -289,10 +313,25 @@ function AddPlace({ onClose }: { onClose: () => void }) {
     }
   }, [query])
 
+  /** A friend needs a name before a place can be picked for them. */
+  const who = (): string | null | undefined => {
+    if (!friend) return undefined
+    const name = person.trim().slice(0, 40)
+    if (!name) {
+      notify('Type your friend’s name first.', 'info')
+      personInput.current?.focus()
+      return null
+    }
+    return name
+  }
   const pick = (p: ClockPlace): void => {
-    if (addClock(p.name, p.zone)) onClose()
+    const name = who()
+    if (name === null) return
+    if (addClock(p.name, p.zone, name)) onClose()
   }
   const pickTown = async (p: Place): Promise<void> => {
+    const name = who()
+    if (name === null) return
     const key = `${p.lat},${p.lon}`
     setAdding(key)
     const zone = await window.api.zoneAt(p.lat, p.lon).catch(() => null)
@@ -301,23 +340,42 @@ function AddPlace({ onClose }: { onClose: () => void }) {
       setError(`Couldn’t find the time zone for ${p.name}. Check you’re online, or try a nearby city.`)
       return
     }
-    if (addClock(p.name, zone)) onClose()
+    if (addClock(p.name, zone, name)) onClose()
   }
 
   return (
-    <div className="clock-add" data-clock-add>
+    <div className="clock-add" data-clock-add={friend ? 'friend' : 'place'}>
+      {friend && (
+        <div className="clock-add-row">
+          <input
+            ref={personInput}
+            className="text-input"
+            autoFocus
+            value={person}
+            maxLength={40}
+            onChange={(e) => setPerson(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') onClose()
+              if (e.key === 'Enter') input.current?.focus()
+            }}
+            placeholder="Friend’s name, e.g. Sam"
+            aria-label="Friend’s name"
+            data-clock-person
+          />
+        </div>
+      )}
       <div className="clock-add-row">
         <input
           ref={input}
           className="text-input"
-          autoFocus
+          autoFocus={!friend}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Escape') onClose()
             if (e.key === 'Enter' && quick[0]) pick(quick[0])
           }}
-          placeholder="A city, town or country, e.g. New York"
+          placeholder={friend ? 'Where they live: a city, town or country' : 'A city, town or country, e.g. New York'}
           aria-label="Place to add"
         />
         <button className="icon-btn" onClick={onClose} title="Close">
@@ -376,7 +434,7 @@ export default function WorldClocksPage() {
   const clocks = useClocks()
   const twelve = useTwelve()
   const real = useTicking(1000)
-  const [adding, setAdding] = useState(false)
+  const [adding, setAdding] = useState<false | 'place' | 'friend'>(false)
   // Planner: quarter-hours from the current quarter-hour, or null for now.
   const [plan, setPlan] = useState<number | null>(null)
   const home = localZone()
@@ -393,15 +451,20 @@ export default function WorldClocksPage() {
             <Globe2 size={18} /> World clocks
           </h2>
           {!adding && (
-            <button className="btn btn-primary" onClick={() => setAdding(true)} data-clock-add-button>
-              <Plus size={14} /> Add a place
-            </button>
+            <div className="clocks-head-buttons">
+              <button className="btn" onClick={() => setAdding('friend')} data-clock-add-friend>
+                <UserPlus size={14} /> Add a friend
+              </button>
+              <button className="btn btn-primary" onClick={() => setAdding('place')} data-clock-add-button>
+                <Plus size={14} /> Add a place
+              </button>
+            </div>
           )}
         </header>
         <p className="clocks-intro">
           Every clock follows its own place’s daylight saving, so when the UK’s clocks go back and somewhere else’s change on another day, the times here are still right.
         </p>
-        {adding && <AddPlace onClose={() => setAdding(false)} />}
+        {adding && <AddPlace key={adding} friend={adding === 'friend'} onClose={() => setAdding(false)} />}
 
         <div className="clocks-planner" data-clock-planner>
           <Clock size={14} />
@@ -431,7 +494,8 @@ export default function WorldClocksPage() {
         </div>
         {clocks.length === 0 && !adding && (
           <p className="clocks-empty">
-            Add the places you care about (friends, family, a game server, a match kick-off) to see their time at a glance. They show on Home too.
+            Add the places you care about (a game server, a match kick-off) to see their time at a glance, or add a friend to see if it’s a good time to message
+            them. They show on Home too.
           </p>
         )}
       </div>
@@ -460,16 +524,24 @@ function ClocksHomeCard() {
         {clocks.slice(0, 6).map((c) => {
           const t = timeIn(c.zone, now)
           const day = relativeDay(c.zone, home, now)
+          const message = c.person ? messageTime(t) : null
           return (
-            <li key={c.id} className="clocks-home-row" title={`${cityOfZone(c.zone)} · ${zoneAbbreviation(c.zone, now)}`}>
+            <li key={c.id} className="clocks-home-row" title={`${c.person ? `${c.label} · ` : ''}${cityOfZone(c.zone)} · ${zoneAbbreviation(c.zone, now)}`}>
               <span className={`clocks-home-icon part-${partOfDay(t.hour)}`}>
                 <DayIcon hour={t.hour} />
               </span>
-              <span className="home-row-title">{c.label}</span>
-              <span className="home-row-folder">
-                {day !== 'Today' && `${day} · `}
-                {differenceText(c.zone, home, now).replace(' as you', '')}
-              </span>
+              <span className="home-row-title">{clockTitle(c)}</span>
+              {message ? (
+                <span className={`home-row-folder clock-message mood-${message.mood}`}>
+                  <span className="clock-message-dot" aria-hidden />
+                  {message.text}
+                </span>
+              ) : (
+                <span className="home-row-folder">
+                  {day !== 'Today' && `${day} · `}
+                  {differenceText(c.zone, home, now).replace(' as you', '')}
+                </span>
+              )}
               <strong className="clocks-home-time">{clockText(t, twelve)}</strong>
             </li>
           )

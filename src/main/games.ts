@@ -7,6 +7,8 @@ import { basename, extname, join } from 'path'
 import {
   addPlay,
   epicGameFromManifest,
+  epicPendingFromManifest,
+  type EpicPending,
   epicLaunchUrl,
   isBackgroundProgram,
   isInside,
@@ -29,10 +31,13 @@ import {
   type GameSource,
   type GamesList,
   type PlayRecord,
-  type SteamPlaytime
+  type SteamPlaytime,
+  steamDownloadFromManifest,
+  type SteamDownload
 } from '@shared/games'
 import { IS_MAC } from '@shared/platform'
 import { logError } from './log'
+import { addonOn } from './addonGate'
 
 /**
  * The games launcher: finds the games installed on this computer (Steam, Epic, and on a Mac any
@@ -189,6 +194,59 @@ async function findSteam(): Promise<{ games: Found[]; installed: boolean }> {
     }
   }
   return { games, installed: true }
+}
+
+/** The games Steam is downloading or updating right now, from its manifests (all its libraries). */
+export async function steamDownloads(): Promise<SteamDownload[]> {
+  let root: string | null = null
+  for (const r of steamRoots()) if (await exists(join(r, 'steamapps'))) {
+    root = r
+    break
+  }
+  if (!root) return []
+  const libraries = new Set([root])
+  try {
+    for (const l of steamLibraryFolders(await readFile(join(root, 'steamapps', 'libraryfolders.vdf'), 'utf8'))) libraries.add(l)
+  } catch {
+    // only the main library
+  }
+  const out: SteamDownload[] = []
+  for (const lib of libraries) {
+    const apps = join(lib, 'steamapps')
+    for (const file of await list(apps)) {
+      if (!/^appmanifest_\d+\.acf$/i.test(file)) continue
+      try {
+        const d = steamDownloadFromManifest(await readFile(join(apps, file), 'utf8'))
+        if (d && !out.some((o) => o.appId === d.appId)) out.push(d)
+      } catch {
+        // Steam is writing it right now
+      }
+    }
+  }
+  return out
+}
+
+/**
+ * The games the Epic Games Launcher is installing or updating, from Manifests/Pending (installs
+ * and updates it hasn't finished) and from manifests marked as not fully installed.
+ */
+export async function epicDownloads(): Promise<EpicPending[]> {
+  const out: EpicPending[] = []
+  for (const dir of epicManifestDirs()) {
+    const pendingDir = join(dir, 'Pending')
+    for (const [folder, pending] of [[pendingDir, true], [dir, false]] as const) {
+      for (const file of await list(folder)) {
+        if (!file.toLowerCase().endsWith('.item')) continue
+        try {
+          const d = epicPendingFromManifest(await readFile(join(folder, file), 'utf8'), pending)
+          if (d && !out.some((o) => o.appName === d.appName)) out.push(d)
+        } catch {
+          // Epic is writing it right now
+        }
+      }
+    }
+  }
+  return out
 }
 
 /** The .app a Mac game's program sits in, for its icon. */
@@ -432,6 +490,8 @@ function broadcast(): void {
 }
 
 async function tick(): Promise<void> {
+  // Counting time played comes with the Games add-on.
+  if (!addonOn('games')) return
   if (Date.now() - lastScan > 30 * 60_000) await scan().catch((err) => logError('finding games', err))
   if (!found.length) return
   const programs = await runningPrograms()

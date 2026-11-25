@@ -117,6 +117,37 @@ describe('UndoHistory', () => {
   })
 })
 
+describe('UndoHistory.undoIfLatest', () => {
+  it('undoes the step while it is still the last one', async () => {
+    const h = new UndoHistory()
+    const undo = vi.fn()
+    const step = { label: 'Deleted “Plan”', undo, redo: vi.fn() }
+    h.record(step)
+    expect(await h.undoIfLatest(step)).toBe('Deleted “Plan”')
+    expect(undo).toHaveBeenCalledOnce()
+  })
+  it('leaves things alone once something else was done', async () => {
+    const h = new UndoHistory()
+    const undo = vi.fn()
+    const step = { label: 'Deleted “Plan”', undo, redo: vi.fn() }
+    h.record(step)
+    const later = vi.fn()
+    h.record({ label: 'Starred', undo: later, redo: vi.fn() })
+    expect(await h.undoIfLatest(step)).toBeNull()
+    expect(undo).not.toHaveBeenCalled()
+    expect(later).not.toHaveBeenCalled()
+  })
+  it('does nothing twice', async () => {
+    const h = new UndoHistory()
+    const undo = vi.fn()
+    const step = { label: 'Deleted “Plan”', undo, redo: vi.fn() }
+    h.record(step)
+    await h.undoIfLatest(step)
+    expect(await h.undoIfLatest(step)).toBeNull()
+    expect(undo).toHaveBeenCalledOnce()
+  })
+})
+
 describe('undoKey', () => {
   const key = (k: string, mods: { ctrl?: boolean; meta?: boolean; shift?: boolean; alt?: boolean } = {}) => ({
     key: k,

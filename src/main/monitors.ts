@@ -28,6 +28,7 @@ import {
   type MonitorTarget
 } from '@shared/monitors'
 import { logError } from './log'
+import { addonOn, onAddonsChanged } from './addonGate'
 
 /**
  * Screen controls: brightness, contrast and input switching, sent down the cable over DDC/CI so
@@ -144,7 +145,11 @@ function startHelper(): ChildProcessWithoutNullStreams {
       }
     }
   })
-  child.stderr.on('data', (d: Buffer) => logError('screen controls', new Error(d.toString().trim())))
+  child.stderr.on('data', (d: Buffer) => {
+    // PowerShell reports its own progress on stderr as '#< CLIXML ...'; that isn't an error.
+    const text = d.toString().trim()
+    if (text && !text.startsWith('#< CLIXML')) logError('screen controls', new Error(text))
+  })
   child.on('error', (err) => logError('screen controls', err))
   child.on('exit', () => {
     if (helper === child) helper = null
@@ -376,6 +381,8 @@ function applyHotkeys(): void {
   for (const accel of registered.keys()) globalShortcut.unregister(accel)
   registered.clear()
   for (const k of Object.keys(hotkeyErrors)) delete hotkeyErrors[k]
+  // Screen hotkeys come with the Screens add-on.
+  if (!addonOn('screens')) return
   for (const h of saved.hotkeys) {
     const accel = normalizeAccelerator(h.keys)
     if (!accel) continue
@@ -421,6 +428,7 @@ function changedSaved(next: unknown): MonitorsStatus {
 export function setupMonitors(): void {
   load()
   applyHotkeys()
+  onAddonsChanged(applyHotkeys)
   ipcMain.handle('monitors:get', async () => {
     if (screens.length === 0 && !state.problem) await rescan()
     return status()

@@ -1,6 +1,6 @@
 import { CalendarDays, FilePlus, FolderPlus, FolderTree, GitCompare, Hash, LayoutDashboard, Search } from 'lucide-react'
 import { useVault } from '../../store/vault'
-import { useNotify } from '../../store/notify'
+import { dismissNotify, useNotify } from '../../store/notify'
 import { showSidebarView, useUI, type SidebarView } from '../../store/ui'
 import FileTree from './FileTree'
 import StarredSection from './StarredSection'
@@ -14,6 +14,7 @@ import { showKeys } from '@shared/platform'
 import { newBoard } from '../../lib/boards'
 import ThemePicture from '../Theme/ThemePicture'
 import { dailyPath, openToday } from '../../lib/daily'
+import { useAddonOn } from '../../lib/addons'
 import { findNode } from '../../lib/paths'
 
 const VIEWS: { id: SidebarView; title: string; icon: typeof Search }[] = [
@@ -23,9 +24,11 @@ const VIEWS: { id: SidebarView; title: string; icon: typeof Search }[] = [
 ]
 
 export default function Sidebar() {
+  const boardsOn = useAddonOn('canvas-board')
   const view = useUI((s) => s.sidebarView)
   const error = useNotify((s) => s.message)
   const kind = useNotify((s) => s.kind)
+  const action = useNotify((s) => s.action)
   const { newNote, newFolder } = useVault.getState()
 
   return (
@@ -50,9 +53,11 @@ export default function Sidebar() {
             <button className="icon-btn" title={`New note (${showKeys('Ctrl+N')})`} onClick={() => newNote()}>
               <FilePlus size={15} />
             </button>
-            <button className="icon-btn" title="New canvas board" onClick={() => newBoard()}>
-              <LayoutDashboard size={15} />
-            </button>
+            {boardsOn && (
+              <button className="icon-btn" title="New canvas board" onClick={() => newBoard()}>
+                <LayoutDashboard size={15} />
+              </button>
+            )}
             <button className="icon-btn" title={`New folder (${showKeys('Ctrl+Shift+N')})`} onClick={() => newFolder()}>
               <FolderPlus size={15} />
             </button>
@@ -70,7 +75,22 @@ export default function Sidebar() {
       {view === 'search' && <SearchPane />}
       {view === 'tags' && <TagsPane />}
       {view !== 'tags' && <BulkBar />}
-      {error && <div className={`toast ${kind}`}>{error}</div>}
+      {error && (
+        <div className={`toast ${kind}${action ? ' with-action' : ''}`}>
+          <span>{error}</span>
+          {action && (
+            <button
+              className="toast-action"
+              onClick={() => {
+                dismissNotify()
+                action.run()
+              }}
+            >
+              {action.label}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

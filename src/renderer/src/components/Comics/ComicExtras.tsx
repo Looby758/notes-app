@@ -19,7 +19,8 @@ export function lastDest(): Dest | null {
   }
 }
 
-function useDestLabel(): (d: Dest | null) => string {
+/** How a place to save to is named in the note picker (also used by the video player). */
+export function useDestLabel(): (d: Dest | null) => string {
   const prefs = usePrefs((s) => s.prefs)
   return (d) => {
     const kind = d?.kind ?? prefs.captureTarget

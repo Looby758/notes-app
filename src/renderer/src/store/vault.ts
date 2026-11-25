@@ -4,6 +4,7 @@ import { loadSnippets } from './snippets'
 import { loadSavedSearches } from './savedSearches'
 import { loadScreenshots, remapScreenshots } from './screenshots'
 import { loadTimeline } from './timeline'
+import { loadAppBoard } from './appBoard'
 import { fixFileLinks } from '../lib/fileLinks'
 import { fixBoardLinks } from '../lib/boards'
 import { create } from 'zustand'
@@ -23,7 +24,8 @@ import { loadMoney } from './money'
 import { followMovedVideosFolder, loadVideos, remapVideos } from './videos'
 import { forgetTranscripts } from './transcripts'
 import { loadLockedFolders, putBackLockedFolders, remapLockedFolders, removeLockedFoldersWithin, useLockedFolders } from '../lib/lock/folders'
-import { history, recordUndo, undoChanged } from '../lib/undo'
+import { history, recordUndo, undoChanged, UNDO_KEY } from '../lib/undo'
+import type { UndoStep } from '../lib/undoHistory'
 import type { CardProgress } from '../lib/flashcards'
 
 interface VaultState {
@@ -195,16 +197,27 @@ export const useVault = create<VaultState>((set, get) => {
 
   /** Undo for a delete: only for what went into Orbit's bin (a huge folder on another drive goes straight to the Bin). */
   const recordDelete = async (paths: string[], extras: Extras): Promise<void> => {
+    if (!paths.length) return
     const held = await window.api.undoHeld(paths, true).catch(() => [] as string[])
-    if (!held.length) return
+    // Nothing asks before a delete any more, so say what happened (with an Undo button when it can be undone).
+    if (!held.length) return notify(`Moved ${itemsLabel(paths)} to the ${TRASH_NAME}.`, 'info')
     let at = held
-    recordUndo({
+    const step: UndoStep = {
       label: `Deleted ${itemsLabel(held)}`,
       undo: async () => {
         at = await bringBack(at, extras)
       },
       redo: () => putAway(at),
       forget: (done) => done && void window.api.undoRelease(at, true)
+    }
+    recordUndo(step)
+    notify(step.label, 'info', {
+      label: 'Undo',
+      run: () =>
+        void history
+          .undoIfLatest(step)
+          .then((label) => notify(label ? `Undone: ${label}` : `Something else was changed since. Use ${UNDO_KEY} to step back.`, 'info'))
+          .catch(notify)
     })
   }
 
@@ -239,6 +252,7 @@ export const useVault = create<VaultState>((set, get) => {
       void loadSavedSearches()
       void loadScreenshots()
       void loadTimeline()
+      void loadAppBoard()
       loadStarred()
       void loadFlashcards()
       void loadPublishing()

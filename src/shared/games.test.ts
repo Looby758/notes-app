@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  steamAppIdFromLink,
+  steamDownloadFromManifest,
   addPlay,
   newestRobloxVersion,
   stripGames,
@@ -9,6 +11,9 @@ import {
   describeLastPlayed,
   describePlayed,
   epicGameFromManifest,
+  epicPendingFromManifest,
+  epicProgress,
+  EPIC_STALL_MS,
   epicLaunchUrl,
   isInside,
   macGameFromPlist,
@@ -280,5 +285,93 @@ describe('what counts as playing', () => {
     expect(isNotAGame('Wallpaper Engine')).toBe(true)
     expect(isNotAGame('Steamworks Common Redistributables')).toBe(true)
     expect(isNotAGame('Rocket League')).toBe(false)
+  })
+})
+
+describe('Steam downloads', () => {
+  const acf = (flags: number, got = 500, total = 2000): string =>
+    `"AppState"\n{\n\t"appid"\t\t"1172470"\n\t"name"\t\t"Apex Legends"\n\t"StateFlags"\t\t"${flags}"\n\t"BytesToDownload"\t\t"${total}"\n\t"BytesDownloaded"\t\t"${got}"\n}`
+  it('reads what Steam is doing with a game', () => {
+    expect(steamDownloadFromManifest(acf(4))).toBeNull()
+    expect(steamDownloadFromManifest(acf(1026))).toEqual({ appId: '1172470', name: 'Apex Legends', state: 'waiting', downloaded: 500, total: 2000 })
+    expect(steamDownloadFromManifest(acf(1030 | 256))?.state).toBe('downloading')
+    expect(steamDownloadFromManifest(acf(4 | 2 | 512))?.state).toBe('paused')
+  })
+  it('finds the game in Steam links', () => {
+    expect(steamAppIdFromLink('https://store.steampowered.com/app/1172470/Apex_Legends/')).toBe('1172470')
+    expect(steamAppIdFromLink('steam://install/620')).toBe('620')
+    expect(steamAppIdFromLink('https://example.com/app/5')).toBeNull()
+  })
+})
+
+describe('Epic downloads', () => {
+  // Shaped like a real Manifests/*.item, with made-up values.
+  const item = (extra: Record<string, unknown> = {}): string =>
+    JSON.stringify({
+      FormatVersion: 0,
+      AppName: 'Sugar',
+      DisplayName: 'Rocket League',
+      InstallLocation: 'C:\\Program Files\\Epic Games\\rocketleague',
+      StagingLocation: 'C:\\Program Files\\Epic Games\\rocketleague/.egstore/bps',
+      InstallSize: 30_000_000_000,
+      bIsIncompleteInstall: false,
+      AppCategories: ['public', 'games', 'applications'],
+      ...extra
+    })
+
+  it('reads a new game being installed', () => {
+    expect(epicPendingFromManifest(item({ bIsIncompleteInstall: true }), true)).toEqual({
+      appName: 'Sugar',
+      name: 'Rocket League',
+      kind: 'install',
+      installLocation: 'C:\\Program Files\\Epic Games\\rocketleague',
+      stagingLocation: 'C:\\Program Files\\Epic Games\\rocketleague/.egstore/bps',
+      total: 30_000_000_000
+    })
+    // Marked unfinished in the main Manifests folder counts too.
+    expect(epicPendingFromManifest(item({ bIsIncompleteInstall: true }), false)?.kind).toBe('install')
+  })
+
+  it('reads an update to a game that is already there, without a size', () => {
+    const d = epicPendingFromManifest(item(), true)!
+    expect(d.kind).toBe('update')
+    expect(d.total).toBe(0)
+  })
+
+  it('leaves finished games and broken files alone', () => {
+    expect(epicPendingFromManifest(item(), false)).toBeNull()
+    expect(epicPendingFromManifest('{', true)).toBeNull()
+    expect(epicPendingFromManifest('null', true)).toBeNull()
+    expect(epicPendingFromManifest(JSON.stringify({ AppName: 'X' }), true)).toBeNull()
+  })
+
+  it('works out the staging folder when Epic leaves it out', () => {
+    expect(epicPendingFromManifest(item({ StagingLocation: undefined, InstallLocation: '/Users/Shared/Epic Games/Fortnite/' }), true)?.stagingLocation).toBe(
+      '/Users/Shared/Epic Games/Fortnite/.egstore/bps'
+    )
+  })
+
+  it('tells downloading from paused or queued by whether the folder grows', () => {
+    const first = epicProgress(undefined, 1000, 0)
+    expect(first.state).toBe('waiting')
+    const grew = epicProgress(first.seen, 11_000, 10_000)
+    expect(grew.state).toBe('downloading')
+    expect(grew.speed).toBe(1000)
+    // Epic writes in bursts: a quiet look soon after keeps it downloading at the last speed.
+    const quiet = epicProgress(grew.seen, 11_000, 20_000)
+    expect(quiet).toMatchObject({ state: 'downloading', speed: 1000 })
+    // Quiet for long enough: paused, or behind another game in Epic's queue.
+    const stalled = epicProgress(quiet.seen, 11_000, 10_000 + EPIC_STALL_MS)
+    expect(stalled.state).toBe('waiting')
+    expect(stalled.speed).toBeUndefined()
+  })
+
+  it('never shows a queued game as downloading', () => {
+    let seen = epicProgress(undefined, 500, 0).seen
+    for (const t of [10_000, 20_000, 30_000]) {
+      const p = epicProgress(seen, 500, t)
+      expect(p.state).toBe('waiting')
+      seen = p.seen
+    }
   })
 })

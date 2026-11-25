@@ -169,3 +169,120 @@ export function parseRange(header: string | null, size: number): { start: number
   }
   return start >= size || start > end ? 'bad' : { start, end }
 }
+
+// ---------- clips sorted by game ----------
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/**
+ * A game's name as a folder name: nothing Windows or a Mac can't use in a name, no dots or spaces
+ * at the ends, not too long. '' when nothing is left.
+ */
+export function cleanFolderName(name: string): string {
+  const clean = String(name ?? '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^[.\s]+|[.\s]+$/g, '')
+    .slice(0, 60)
+    .trim()
+  // Names Windows keeps for itself.
+  return /^(con|prn|aux|nul|com\d|lpt\d)$/i.test(clean) ? `${clean} clips` : clean
+}
+
+/**
+ * A replay saved while a game was running: "SkyBlock 21 Nov 23.10.mp4". Shown as
+ * "SkyBlock 21 Nov 23:10" (see clipTitle): a colon can't be in a file name on Windows.
+ */
+export function gameClipName(game: string, date: Date, ext: string): string {
+  const p = (n: number): string => String(n).padStart(2, '0')
+  return `${cleanFolderName(game) || 'Game'} ${date.getDate()} ${MONTHS[date.getMonth()]} ${p(date.getHours())}.${p(date.getMinutes())}.${ext}`
+}
+
+/** What a clip is called in the list: its file name without the type, with "23.10" shown as "23:10". */
+export function clipTitle(fileName: string): string {
+  const base = fileName.replace(/\.\w+$/, '')
+  return base.replace(/^(.+ \d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)) (\d{2})\.(\d{2})(?=$| )/, '$1 $2:$3')
+}
+
+/** The name of an edited copy of a clip: "SkyBlock 21 Nov 23.10 (edit).mp4". */
+export function editedClipName(fileName: string): string {
+  return `${fileName.replace(/\.\w+$/, '').replace(/ \(edit\)( \(\d+\))?$/, '')} (edit).mp4`
+}
+
+/**
+ * What Orbit remembers about the recordings folder, kept in it as ".orbit-clips.json" (so it moves
+ * with the folder): which sub-folders are clip folders (Orbit made them, so a Studio take folder
+ * isn't mistaken for one), which game goes in which folder (renaming "Minecraft" to "SkyBlock"
+ * keeps new clips going there), and the starred clips.
+ */
+export interface ClipsMeta {
+  /** Sub-folder names that hold clips. */
+  folders: string[]
+  /** A game's name (as the Games page knows it) → its folder. */
+  games: Record<string, string>
+  /** Starred clips, as "Folder/file.mp4" or "file.mp4" (top of the folder). */
+  favourites: string[]
+}
+
+export const EMPTY_CLIPS_META: ClipsMeta = { folders: [], games: {}, favourites: [] }
+
+/** Reads .orbit-clips.json, fixing anything missing or wrong instead of failing. */
+export function cleanClipsMeta(raw: unknown): ClipsMeta {
+  const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
+  const folders = Array.isArray(o.folders) ? [...new Set(o.folders.filter((f): f is string => typeof f === 'string').map(cleanFolderName).filter(Boolean))] : []
+  const games: Record<string, string> = {}
+  if (o.games && typeof o.games === 'object') {
+    for (const [game, folder] of Object.entries(o.games as Record<string, unknown>)) {
+      const f = typeof folder === 'string' ? cleanFolderName(folder) : ''
+      if (game && f && folders.includes(f)) games[game.slice(0, 120)] = f
+    }
+  }
+  const favourites = Array.isArray(o.favourites) ? [...new Set(o.favourites.filter((f): f is string => typeof f === 'string' && !!clipRelPath(f)))] : []
+  return { folders, games, favourites }
+}
+
+/**
+ * A clip's place in the recordings folder ("file.mp4" or "Folder/file.mp4"), or null for anything
+ * else (deeper, "..", a backslash): only these can be played, changed or starred.
+ */
+export function clipRelPath(rel: string): string | null {
+  if (typeof rel !== 'string' || rel.includes('\\')) return null
+  const parts = rel.split('/')
+  if (parts.length > 2 || parts.some((p) => !p || p === '.' || p === '..')) return null
+  if (parts.length === 2 && cleanFolderName(parts[0]) !== parts[0]) return null
+  return isClipFile(parts[parts.length - 1]) ? rel : null
+}
+
+/** The folder a game's replays go in: the one it was given, or one named after it. */
+export function folderForGame(meta: ClipsMeta, game: string): string {
+  return meta.games[game] ?? (cleanFolderName(game) || 'Game')
+}
+
+/** Remembers a game's folder (made the first time one of its replays is saved). */
+export function withGameFolder(meta: ClipsMeta, game: string, folder: string): ClipsMeta {
+  return { ...meta, folders: meta.folders.includes(folder) ? meta.folders : [...meta.folders, folder], games: { ...meta.games, [game]: folder } }
+}
+
+/** Stars or unstars a clip. */
+export function withFavourite(meta: ClipsMeta, rel: string, on: boolean): ClipsMeta {
+  const rest = meta.favourites.filter((f) => f !== rel)
+  return { ...meta, favourites: on ? [...rest, rel] : rest }
+}
+
+/** A folder was renamed: its games, stars and name follow it. */
+export function withRenamedFolder(meta: ClipsMeta, from: string, to: string): ClipsMeta {
+  const games: Record<string, string> = {}
+  for (const [g, f] of Object.entries(meta.games)) games[g] = f === from ? to : f
+  return {
+    folders: [...new Set(meta.folders.map((f) => (f === from ? to : f)))],
+    games,
+    favourites: meta.favourites.map((f) => (f.startsWith(`${from}/`) ? `${to}/${f.slice(from.length + 1)}` : f))
+  }
+}
+
+/** A clip moved (to another folder, or ''), so its star moves with it. */
+export function withMovedClip(meta: ClipsMeta, from: string, to: string): ClipsMeta {
+  return { ...meta, favourites: meta.favourites.map((f) => (f === from ? to : f)) }
+}

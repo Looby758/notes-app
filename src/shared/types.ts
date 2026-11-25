@@ -1,19 +1,35 @@
 import type { SpokenWord, TranscribeProgress, TranscriberState } from './transcribe'
-import type { ExplorerEntry, ExplorerPlace, PasteMode } from './explorer'
+import type { MadeApp, NewApp } from './appStarters'
+import type { AppInfo, BugReport, GitHubStatus, HealthReport, MergedPull, PullRequest, Release, TestCopy, VersionBump } from './appStudio'
+import type { BuildStatus, Check, FixResult, MainStatus, Preflight, ReleaseResult } from './releaseCheck'
+import type { DriveSpace, ExplorerEntry, ExplorerPlace, PasteMode, PcIndexStatus } from './explorer'
+import type { FileTagStore, TagColour } from './fileTags'
+import type { BinListing } from './recycleBin'
 import type { ArchiveEntry } from './archive'
 import type { ComicOpened, ComicPreparing, ComicSettings, ComicShelf } from './comics'
 import type { WikiAnswer, WikiCheck, WikiHit, WikiInfo, WikiPageView, WikiPictureChoice, WikiSpoilerView } from './wiki'
 import type { WikiSpoilerSettings } from './wikiSpoilers'
 import type { Prefs } from './prefs'
+import type { SkyblockStatus, SkyblockSummary } from './skyblock'
+import type { SkyblockGoalsState, SkyblockItemHit } from './skyblockGoals'
+import type { SbProfileView } from './skyblockProfile'
+import type { ItemIcon, SkyblockAddonState } from './skyblockTextures'
 import type { AutofillProfile, Bookmark, HistoryHit, ImportedLogin, SitePermission, SiteSettings, WebDownload } from './browser'
 import type { DictionaryEntry } from './dictionary'
 import type { Sheet } from './sheet'
 import type { Place } from './places'
 import type { WeatherPlace, WeatherState } from './weather'
-import type { LocalLibrary } from './localMusic'
+import type { LocalLibrary, SongTagPatch } from './localMusic'
+import type { MusicData, MusicEdit } from './musicLibrary'
+import type { FoundTrack } from './songSearch'
+import type { SpotifyList } from './spotifyImport'
 import type { MixerState } from './mixer'
+import type { EndResult, EndTarget, TaskSnapshot } from './taskManager'
+import type { AppList, LeftoverScan, RemoveResult, RunResult } from './uninstaller'
 import type { MonitorAction, MonitorSaved, MonitorSetting, MonitorsStatus, MonitorTarget } from './monitors'
 import type { BoardHotkeys, SoundboardAction, SoundboardStatus, SoundClip } from './soundboard'
+import type { ClickerSettings, Macro, MacroHotkeys, MacroStatus } from './macros'
+import type { RemapRule, RemapSet, RemapStatus } from './keyRemap'
 import type { CallRecord, DiscordStatus, SavedPlace } from './discord'
 import type { WifiNetwork } from './wifi'
 import type { MusicAction, MusicDevice, MusicItem, MusicQueue, MusicSearchResults, MusicState, MusicStatus } from './spotify'
@@ -41,14 +57,10 @@ export interface Settings {
   toldAboutTray?: boolean
   /** Mac: you chose not to be asked again about moving Notes into Applications. */
   keepOutsideApplications?: boolean
-  /** The YouTube mini window: where it was left, what was playing, and how it was set. */
-  youtubeWindow?: WindowBounds
-  youtubeUrl?: string
-  youtubePinned?: boolean
-  youtubeVideoOnly?: boolean
   /** The floating mini music player: where it was left, and whether it was showing. */
   musicMiniWindow?: WindowBounds
   musicMiniOpen?: boolean
+  musicMiniLayout?: MusicMiniLayout
   /** The pop-out window (any app, floating on top): where it was left, and how see-through it was. */
   popoutWindow?: WindowBounds
   popoutOpacity?: number
@@ -61,6 +73,10 @@ export interface Settings {
   /** The paired phone's link (its token, and the port it was on), so the phone reconnects by itself. */
   phoneToken?: string
   phonePort?: number
+  /** The music phone remote: whether it's on, and its link's token (so a phone that has it keeps working). */
+  musicRemote?: boolean
+  musicRemoteToken?: string
+  musicRemotePort?: number
   /** One mouse, two computers: whether it's on, the paired computer, and how it's set up. */
   mouseShare?: ShareSaved
   /** Screens between the two computers: which of this computer's screens goes on the other one ('' = worked out). */
@@ -167,10 +183,24 @@ export interface MusicMiniState {
   state: MusicState | null
   /** When `state` arrived (for the progress bar). */
   at: number
+  /** Your own music: the next few songs. */
+  upNext?: MusicMiniSong[]
 }
 
-/** A button pressed in the floating mini player, for the notes window to carry out. */
-export type MusicMiniCommand = { action: MusicAction } | { seek: number }
+export interface MusicMiniSong {
+  title: string
+  artist: string
+  art?: string
+}
+
+/** What the mini player shows under the song (each can be hidden). */
+export interface MusicMiniLayout {
+  visualiser: boolean
+  upNext: boolean
+}
+
+/** A button pressed in the floating mini player, for the notes window to carry out. `jump` plays the song that many places into Up next (0 is the next one); `volume` is 0–100 (from the phone remote). */
+export type MusicMiniCommand = { action: MusicAction } | { seek: number } | { jump: number } | { volume: number }
 
 export interface CaptureStatus {
   /** e.g. "Win+Shift+N", or '' if none is set or it couldn't be registered. */
@@ -190,8 +220,8 @@ export interface UpdateStatus {
   percent?: number
   error?: string
   /**
-   * On a Mac, updates can only install themselves in apps signed with a paid Apple certificate, so
-   * Notes offers to open the download page instead.
+   * The update can't install itself (e.g. a Mac copy running from the disk image, or one macOS
+   * wouldn't let replace itself), so Orbit offers to open the download page instead.
    */
   manual?: boolean
   /** Why checking is off, e.g. "Updates are checked in the installed app only." */
@@ -223,6 +253,23 @@ export interface CalEvent {
   location?: string
   /** "Open in Google Calendar" link, if there is one. */
   url?: string
+  /** Google events: which calendar and event they are, for changing them from Orbit. */
+  google?: { calendarId: string; eventId: string; editable: boolean; recurring: boolean; description?: string }
+}
+
+/** An event to make or change in Google Calendar. Times are local wall-clock times in `timeZone`. */
+export interface GoogleEventInput {
+  title: string
+  /** All day: the first day and the day after the last ("2026-11-21", "2026-11-22"). */
+  allDay: boolean
+  /** All day: a day key. Timed: "2026-11-21T09:00:00" (local, no offset). */
+  start: string
+  end: string
+  timeZone: string
+  location?: string
+  description?: string
+  /** RRULE / EXDATE lines for a repeating event (only when making one). */
+  recurrence?: string[]
 }
 
 export interface CalendarSourcesStatus {
@@ -234,7 +281,9 @@ export interface CalendarSourcesStatus {
     email?: string
     /** e.g. "Sign-in expired, connect again". */
     error?: string
-    calendars: { id: string; name: string; color: string; enabled: boolean }[]
+    calendars: { id: string; name: string; color: string; enabled: boolean; writable: boolean }[]
+    /** The sign-in lets Orbit add and change events (sign-ins from before 1.13 only read them). */
+    canEdit: boolean
   }
   feeds: { id: string; name: string; color: string; error?: string }[]
   /** False if the system can't encrypt the saved sign-in (then connecting is refused). */
@@ -350,6 +399,23 @@ export interface TranscribeResult {
   fileSize: number
 }
 
+/**
+ * What the snip read. `lang`: the extra reader it used ('' for English only). `detected`: the
+ * alphabet it spotted (with "Detect automatically"). `need`: readers that would read it, when
+ * none is downloaded yet (then `text` is empty).
+ */
+export interface SnipReading {
+  text: string
+  lang?: string
+  detected?: string
+  need?: string[]
+}
+
+/** The screen snip's offline translation, or why there isn't one (`problem`). */
+export type SnipTranslation =
+  | { from: string; text: string; problem?: undefined; error?: undefined }
+  | { problem: 'missing' | 'downloading' | 'unsupported' | 'game' | 'failed'; error: string }
+
 export interface LocalAiState {
   state: 'missing' | 'downloading' | 'ready' | 'unsupported'
   /** While downloading: which part, and how far (0–1). */
@@ -412,14 +478,6 @@ export interface AiChat {
   messages: AiChatMessage[]
 }
 
-export interface YouTubeState {
-  url: string
-  /** Where to start a video popped out from another website, in seconds. */
-  startAt?: number
-  pinned: boolean
-  videoOnly: boolean
-}
-
 /** Something shared with a phone over the local Wi-Fi: `url` goes in the QR code. */
 export interface PhoneShare {
   token: string
@@ -428,6 +486,15 @@ export interface PhoneShare {
 }
 
 /** The paired phone's QR address, and how many phones have its page open now. */
+export interface MusicRemoteStatus {
+  on: boolean
+  /** The address to open on the phone (and put in the QR code). */
+  url: string | null
+  /** Phones with the remote open now. */
+  connected: number
+  error?: string
+}
+
 export interface PhonePairing {
   url: string
   connected: number
@@ -531,7 +598,12 @@ export interface NotesApi {
   studioDefaultFolder(): Promise<string>
   studioPickFolder(): Promise<string | null>
   /** Starts a recording file in `folder` (null = Videos/Orbit Recordings). */
-  studioStart(folder: string | null, ext: 'mp4' | 'webm' | 'm4a', kind?: 'video' | 'voiceover' | 'take', take?: { script: string; index: number; title: string }): Promise<{ id: number; path: string }>
+  studioStart(
+    folder: string | null,
+    ext: 'mp4' | 'webm' | 'm4a',
+    kind?: 'video' | 'voiceover' | 'take',
+    take?: { script: string; index: number; title: string }
+  ): Promise<{ id: number; path: string }>
   /** A section take's sound (record by section), to play it back. */
   studioReadTake(path: string): Promise<Uint8Array>
   /** Joins section takes, in order, into "<script> voiceover (joined).wav" beside them; length in seconds. */
@@ -562,8 +634,17 @@ export interface NotesApi {
   onReplaySave(callback: () => void): () => void
   /** Main window: open this clip in the clip editor (a click on the "Replay saved" notification). */
   onClipsOpen(callback: (path: string) => void): () => void
+  /** Music dipping (main/musicDuck.ts): turn Orbit's own music to this level (1 = normal) while friends talk in Discord. */
+  onMusicDuck(callback: (level: number) => void): () => void
   /** The videos in the recordings folder, newest first. */
   clipsList(folder: string | null): Promise<ClipInfo[]>
+  /** The game folders in the recordings folder, and which game goes in which. */
+  clipsMeta(folder: string | null): Promise<import('./clips').ClipsMeta>
+  clipsStar(folder: string | null, path: string, on: boolean): Promise<void>
+  /** Moves a clip into a game folder ('' for the top of the recordings folder); makes the folder if it's new. Resolves to its new path. */
+  clipsMove(folder: string | null, path: string, to: string): Promise<string>
+  /** Renames a game folder; that game's future replays go to the new name. */
+  clipsRenameFolder(folder: string | null, from: string, to: string): Promise<void>
   /** Makes a trimmed (and maybe captioned) copy; resolves to the new file. */
   clipsExport(folder: string | null, request: import('./clips').ClipExport): Promise<{ path: string; size: number }>
   clipsCancel(): Promise<void>
@@ -713,24 +794,6 @@ export interface NotesApi {
   /** The mouse's back (-1) or forward (1) button was pressed in a web page (by its web contents id). */
   onWebMouseNav(callback: (contentsId: number, dir: 1 | -1) => void): () => void
 
-  // The YouTube mini window
-  /**
-   * Opens the floating YouTube window (or brings it back), playing `url` if given: a YouTube link,
-   * or any web page with a video on it, played from `seconds` in.
-   */
-  openYouTube(url?: string, seconds?: number): Promise<void>
-  /** In the mini window: what to show first, and how you left it set. */
-  youTubeState(): Promise<YouTubeState>
-  /** In the mini window: the page showing now, so it carries on there next time. */
-  rememberYouTube(url: string): Promise<void>
-  /** In the mini window: float over other windows, or not. */
-  pinYouTube(on: boolean): Promise<void>
-  /** In the mini window: show only the video on a video's page, or the whole YouTube page. */
-  setYouTubeVideoOnly(on: boolean): Promise<void>
-  minimizeYouTube(): Promise<void>
-  closeYouTube(): Promise<void>
-  /** In the mini window: play this page (opened from the notes window). */
-  onYouTubeLoad(callback: (url: string, seconds: number) => void): () => void
   /**
    * Opens a web page in a window of its own, which can go full screen on another screen while Orbit
    * carries on; its video starts `seconds` in.
@@ -741,7 +804,7 @@ export interface NotesApi {
   updateStatus(): Promise<UpdateStatus>
   /** Looks for a newer version now. */
   checkForUpdates(): Promise<UpdateStatus>
-  /** Restarts into a downloaded update (Windows), or opens the download page (Mac). */
+  /** Restarts into a downloaded update, or opens the download page when it can't install itself. */
   installUpdate(): Promise<void>
   /** What's new since this computer last opened Orbit (empty when nothing is). */
   whatsNewPending(): Promise<import('./whatsNew').ReleaseNotes[]>
@@ -800,6 +863,25 @@ export interface NotesApi {
   /** Takes a finished or failed download off the list (the file stays). */
   forgetVideoDownload(id: number): Promise<void>
 
+  // Download manager (main/downloadManager.ts)
+  /** The queue, its settings, and whether it's night. Starts sending changes to onDownloadsState. */
+  downloadsState(): Promise<import('./downloadManager').DmState>
+  onDownloadsState(callback: (state: import('./downloadManager').DmState) => void): () => void
+  /** Adds links to the end of the queue (video pages go to the video downloader when their turn comes). */
+  downloadsAdd(request: import('./downloadManager').DmAddRequest): Promise<import('./downloadManager').DmItem[]>
+  downloadsAct(id: string, action: 'pause' | 'resume' | 'retry' | 'remove' | 'now' | 'tonight' | 'up' | 'down' | 'top'): Promise<void>
+  downloadsAll(action: 'pause' | 'resume' | 'clear'): Promise<void>
+  downloadsSettings(patch: Partial<import('./downloadManager').DmSettings>): Promise<import('./downloadManager').DmState>
+  /** What Steam is downloading or updating (read from its files), with a speed when it's going. */
+  steamDownloads(): Promise<(import('./games').SteamDownload & { speed?: number })[]>
+  /** Opens Steam's install window for a game (Steam asks which drive). */
+  steamInstall(appId: string): Promise<void>
+  steamOpenDownloads(): Promise<void>
+  /** What the Epic Games Launcher is installing or updating (measured from the game's folder), with a speed when it's going. */
+  epicDownloads(): Promise<(import('./games').EpicDownload & { speed?: number })[]>
+  /** Opens the Epic Games Launcher, where its downloads are paused and reordered. */
+  epicOpenDownloads(): Promise<void>
+
   // Video player
   /** What's in a video (its tracks need the video helper, ffmpeg) and the subtitle files beside it. */
   videoInfo(path: string): Promise<VideoInfo>
@@ -808,6 +890,8 @@ export interface NotesApi {
   /** Where a stream that copies the picture from `at` really starts (the keyframe before). */
   videoKeyframe(path: string, at: number, fileStart: number): Promise<number>
   /** Stops a page's live video stream. */
+  /** The picture `at` seconds into a video, as PNG bytes (needs the video helper). */
+  videoFrame(path: string, at: number): Promise<Uint8Array>
   stopVideoStream(session: string): Promise<void>
   /** The video player closed this video: everything reading it stops, so it can be deleted or moved. */
   releaseVideo(path: string): Promise<void>
@@ -848,6 +932,28 @@ export interface NotesApi {
   /** Sets an app's volume (0 to 100); 'master' is the whole computer. False if it didn't take. */
   mixerVolume(id: string, volume: number): Promise<boolean>
   mixerMute(id: string, muted: boolean): Promise<boolean>
+  // Task manager (main/taskManager.ts): what's running, and ending it
+  /** Every program running, with its processes' CPU, memory and disk use, and the whole computer's. */
+  tasksGet(): Promise<TaskSnapshot>
+  /** Ends these processes (each is checked to still be the same program first). */
+  tasksEnd(targets: EndTarget[]): Promise<EndResult>
+  /** Shows a process's program file in File Explorer / Finder; false if its path isn't known. */
+  tasksReveal(pid: number): Promise<boolean>
+  // Clean uninstaller (main/uninstaller.ts): remove an app, then what it left behind
+  /** The installed apps (Windows' uninstall list, or a Mac's Applications folders). */
+  uninstallList(): Promise<AppList>
+  /** Windows: runs the app's own uninstaller and waits for it to close. */
+  uninstallRun(id: string): Promise<RunResult>
+  /** The app has gone (its uninstall entry, or the .app). */
+  uninstallGone(id: string): Promise<boolean>
+  /** What the app left behind (and, on a Mac, the app itself), to look at before anything goes. */
+  uninstallScan(id: string): Promise<LeftoverScan>
+  /** Moves the chosen items from that list to the Recycle Bin / Bin (registry settings are saved to a .reg file first). */
+  uninstallRemove(scanId: string, ids: string[]): Promise<RemoveResult>
+  /** Mac: asks the app to quit; true once it has. */
+  uninstallQuit(id: string): Promise<boolean>
+  /** Shows a found file or folder in File Explorer / Finder. */
+  uninstallReveal(path: string): Promise<boolean>
   // Soundboard (main/soundboard.ts; the sound itself is played in lib/soundboard.ts)
   soundboardGet(): Promise<SoundboardStatus>
   /** Asks for sound files and adds a button for each. */
@@ -860,9 +966,49 @@ export interface NotesApi {
   soundboardMove(id: string, to: number): Promise<SoundboardStatus>
   soundboardOpenLink(which: 'cable' | 'blackhole'): Promise<void>
   soundboardShowFolder(): Promise<void>
+  /** From a link: downloads a video's sound (YouTube, TikTok…) to pick a part from. `id` is the caller's own, to match progress to it. */
+  soundLinkFetch(id: string, link: string): Promise<{ title: string; bytes: Uint8Array; name: string }>
+  /** Cuts the picked part (seconds) of a fetched sound and adds it to the board as a button. */
+  soundLinkMake(id: string, start: number, end: number, name: string): Promise<{ status: SoundboardStatus; skipped: string[] }>
+  /** Stops a download, or throws away a fetched sound. */
+  soundLinkForget(id: string): Promise<void>
+  onSoundLinkProgress(callback: (id: string, done: number | null) => void): () => void
   /** A soundboard hotkey was pressed (anywhere, even in a game). */
   onSoundboardHotkey(callback: (action: SoundboardAction) => void): () => void
   onSoundboardChanged(callback: (status: SoundboardStatus) => void): () => void
+  // Macro recorder and auto-clicker (main/macros.ts; the timing is done by a helper process)
+  macrosGet(): Promise<MacroStatus>
+  /** Starts recording a new macro, or stops (and keeps it). */
+  macrosRecord(): Promise<MacroStatus>
+  macrosPlay(id: string): Promise<MacroStatus>
+  /** Stops recording, playing or the auto-clicker. Held keys and buttons are let go of. */
+  macrosStop(): Promise<MacroStatus>
+  macrosClicker(on: boolean): Promise<MacroStatus>
+  macrosUpdate(id: string, patch: Partial<Pick<Macro, 'name' | 'hotkey' | 'repeat' | 'times' | 'speed' | 'mouse'>>): Promise<MacroStatus>
+  macrosRemove(id: string): Promise<MacroStatus>
+  /** The macro the Play hotkey plays. */
+  macrosSetCurrent(id: string): Promise<MacroStatus>
+  macrosSettings(patch: { hotkeys?: Partial<MacroHotkeys>; clicker?: Partial<ClickerSettings>; skipLeadingWait?: boolean }): Promise<MacroStatus>
+  /** Clears the last error and play report. */
+  macrosDismiss(): Promise<void>
+  /** Where the pointer is now (for the auto-clicker's spot). */
+  macrosPointer(): Promise<{ x: number; y: number }>
+  onMacrosChanged(callback: (status: MacroStatus) => void): () => void
+  // Key remapper (main/keyRemap.ts; the remapping is done by a helper process)
+  keyRemapGet(): Promise<RemapStatus>
+  /** Every remap on or off at once (only you ever switch this). */
+  keyRemapSetOn(on: boolean): Promise<RemapStatus>
+  keyRemapSetHotkey(accel: string): Promise<RemapStatus>
+  /** A set of remaps for one app or game, by its program's name. */
+  keyRemapAddSet(app: string, name?: string): Promise<RemapStatus>
+  keyRemapUpdateSet(id: string, patch: Partial<Pick<RemapSet, 'name' | 'app' | 'on'>>): Promise<RemapStatus>
+  keyRemapRemoveSet(id: string): Promise<RemapStatus>
+  /** Adds a remap (no id, or an unknown one) or changes one. */
+  keyRemapSaveRule(setId: string, rule: Partial<RemapRule>): Promise<RemapStatus>
+  keyRemapRemoveRule(setId: string, ruleId: string): Promise<RemapStatus>
+  /** Pauses remaps while the page picks a key, so you can press the real one. */
+  keyRemapHold(on: boolean): Promise<void>
+  onKeyRemapChanged(callback: (status: RemapStatus) => void): () => void
 
   // Discord voice controls (main/discord.ts, through Discord's official local RPC)
   discordGet(): Promise<DiscordStatus>
@@ -893,6 +1039,12 @@ export interface NotesApi {
   discordCalls(): Promise<CallRecord[]>
   discordRemoveCall(id: string): Promise<CallRecord[]>
   discordClearCalls(): Promise<CallRecord[]>
+  /** The note for the call going on now (typed on the pop-out; saved with the call in the history). */
+  discordNote(): Promise<string>
+  discordSetNote(text: string, channelId: string): Promise<void>
+  /** Changes (or, with empty text, removes) a past call's note. */
+  discordSetCallNote(id: string, text: string): Promise<CallRecord[]>
+  onDiscordNote(callback: (text: string) => void): () => void
   onDiscordCalls(callback: (calls: CallRecord[]) => void): () => void
   /** The Discord voice pop-out (its own window, for a second screen): opens it or brings it back. */
   openDiscordPopout(): Promise<void>
@@ -912,18 +1064,58 @@ export interface NotesApi {
   openRobloxDownload(): Promise<void>
 
   // Screen snip (main/snip.ts)
-  /** Takes a picture of the screen under the pointer and opens the snip window over it. */
-  startSnip(): Promise<void>
+  /**
+   * Takes a picture of every monitor and opens a snip window over each one. 'picture' copies the
+   * box as a picture as soon as you let go; 'text' (the default) reads the text in it.
+   */
+  startSnip(mode?: 'text' | 'picture', delay?: number): Promise<void>
+  /** Snip window: this picture goes on the clipboard (closes the snip). */
+  snipCopyPicture(png: Uint8Array): Promise<void>
+  /** Windows: whether the taskbar snip is there ("Orbit Snip" in the Start menu, and the jump list). */
+  snipTaskbar(): Promise<{ available: boolean; shortcut: boolean }>
+  /** Shows the "Orbit Snip" shortcut in File Explorer (right-click → Pin to taskbar). */
+  snipShowShortcut(): Promise<void>
+  /** Where picture snips are saved (the folder you picked, or Pictures/Screenshots), and the last one saved. */
+  snipSaveInfo(): Promise<{ save: boolean; folder: string; custom: boolean; last: string | null }>
+  /** Asks for a folder to save snips in. Null if you cancelled. */
+  snipPickFolder(): Promise<string | null>
+  snipOpenFolder(): Promise<void>
+  /** Shows the last saved snip in File Explorer / Finder. */
+  snipShowLast(): Promise<void>
   snipStatus(): Promise<{ shortcut: string; error?: string }>
-  /** Snip window: the picture of the screen (PNG) and the screen's scale factor. */
-  snipImage(): Promise<{ png: Uint8Array; scale: number } | null>
-  /** Snip window: the text in part of the picture (read offline). */
-  snipRead(png: Uint8Array): Promise<string>
+  /** Snip window: the picture of its monitor (raw BGRA pixels), the snip's kind and the screen's scale factor. */
+  snipImage(): Promise<{ bitmap: Uint8Array; width: number; height: number; scale: number; mode: 'text' | 'picture'; saveTo?: string } | null>
+  /** Snip window: this snip's picture is drawn, so show the window. */
+  snipDrawn(): Promise<void>
+  /** Snip window: shown and painted, so it can be seen (it's see-through until then, so there's no flash). */
+  snipPainted(): Promise<void>
+  /** Snip window: a new snip has a picture for this monitor. */
+  onSnipNew(callback: () => void): () => void
+  /** Snip window: it's on screen now (still see-through until snipPainted). */
+  onSnipVisible(callback: () => void): () => void
+  /** Snip window: the snip ended and this window was hidden, ready for the next one. */
+  onSnipReset(callback: () => void): () => void
+  /** Snip window: the text in part of the picture (read offline), with an extra language reader if it's downloaded, or 'auto' to pick one. */
+  snipRead(png: Uint8Array, lang?: string): Promise<SnipReading>
+  /** Snip window: which extra language readers are downloaded (codes from OCR_LANGS). */
+  snipOcrLangs(): Promise<string[]>
+  /** Snip window: downloads one extra language reader (a couple of MB, checked before it's used). */
+  snipGetOcrLang(code: string): Promise<{ ok: true } | { error: string }>
+  /** Snip window: translates the text with the offline AI. Never goes online. */
+  snipTranslate(text: string, target: string): Promise<SnipTranslation>
   snipClose(): Promise<void>
+  /** Snip window: a box was started here, so the snip windows on other monitors clear theirs. */
+  snipBoxing(): Promise<void>
+  /** Snip window: a box was started on another monitor, so clear this one's. */
+  onSnipClear(callback: () => void): () => void
+  /** The snip's "Report bug": this picture of the boxed part of the screen goes to App Studio as a new bug. */
+  snipReportBug(png: Uint8Array): Promise<void>
+  /** A bug reported from the screen snip, with its picture (App Studio opens it). */
+  onAppStudioBug(callback: (png: Uint8Array) => void): () => void
   /** Snip window: what to do with the text (closes the snip). */
-  snipSend(action: 'copy' | 'note' | 'web' | 'translate' | 'ask', text: string): Promise<void>
-  /** Main window: snipped text to save in today's note or ask the AI about. */
-  onSnipText(callback: (action: 'note' | 'ask', text: string) => void): () => void
+  snipSend(action: 'copy' | 'note' | 'web' | 'translate-online' | 'ask' | 'setup-ai', text: string, target?: string): Promise<void>
+  /** Main window: snipped text to save in today's note or ask the AI about, or "set up the offline AI". */
+  onSnipText(callback: (action: 'note' | 'ask' | 'setup-ai', text: string) => void): () => void
   onSnipFailed(callback: (message: string) => void): () => void
   openCapture(): Promise<void>
   closeCapture(): Promise<void>
@@ -949,6 +1141,11 @@ export interface NotesApi {
   removeCalendarFeed(id: string): Promise<CalendarSourcesStatus>
   /** Events between two instants from every enabled calendar (cached ones if offline). */
   fetchCalendarEvents(from: string, to: string): Promise<{ events: CalEvent[]; errors: string[]; offline: boolean }>
+  /** Makes an event in one of your Google calendars. */
+  googleCreateEvent(calendarId: string, event: GoogleEventInput): Promise<void>
+  /** Changes a Google event (a repeating one's single day, when that's the one given). */
+  googleUpdateEvent(calendarId: string, eventId: string, event: Partial<GoogleEventInput>): Promise<void>
+  googleDeleteEvent(calendarId: string, eventId: string): Promise<void>
   // Email (Gmail, using the Google sign-in above)
   emailStatus(): Promise<GoogleAuthStatus>
   /** Signs in to Google in your browser, asking for email access too. */
@@ -1021,10 +1218,65 @@ export interface NotesApi {
   /** Mini player → notes window. */
   sendMusicMiniCommand(command: MusicMiniCommand): void
   onMusicMiniCommand(callback: (command: MusicMiniCommand) => void): () => void
+  /** What the mini player shows under the song, and news of changes (both windows hear it). */
+  musicMiniLayout(): Promise<MusicMiniLayout>
+  /** The music phone remote (main/musicRemote.ts): whether it's on and its address; `fresh` makes a new address (the old one stops working). */
+  musicRemoteStatus(): Promise<MusicRemoteStatus>
+  setMusicRemote(on: boolean, fresh?: boolean): Promise<MusicRemoteStatus>
+  /** A song's lyrics (from a .lrc/.txt file next to it, or inside it), and saving them next to it. */
+  localMusicLyrics(path: string): Promise<{ text: string; source: 'lrc' | 'txt' | 'tag' } | null>
+  localMusicSaveLyrics(path: string, text: string): Promise<void>
+  setMusicMiniLayout(layout: MusicMiniLayout): Promise<void>
+  onMusicMiniLayout(callback: (layout: MusicMiniLayout) => void): () => void
+  /** The visualiser's bars (0–100 each), notes window → mini player. */
+  pushMusicMiniLevels(levels: number[]): void
+  onMusicMiniLevels(callback: (levels: number[]) => void): () => void
   /** Your own music files; `fresh` looks through the folder again. */
   localMusicLibrary(fresh?: boolean): Promise<LocalLibrary>
   /** Asks which folder your music is in, then lists it. */
   localMusicChooseFolder(): Promise<LocalLibrary>
+  /** Goes back to the computer's own Music folder. */
+  localMusicDefaultFolder(): Promise<LocalLibrary>
+  /** Songs were added, changed or removed in the music folder. */
+  onLocalMusicChanged(callback: (library: LocalLibrary) => void): () => void
+  /** Writes details into the songs (MP3s); each song gets its own changes. */
+  musicTagsEdit(changes: { path: string; patch: SongTagPatch }[]): Promise<MusicFileResult>
+  /** Fills empty details from the file names ("01 - Artist - Title.mp3"). */
+  musicTagsFillFromNames(paths: string[]): Promise<MusicFileResult>
+  /** Sets the cover of these songs from a picture file or an https link. */
+  musicTagsSetCover(paths: string[], source: { file?: string; url?: string }): Promise<MusicFileResult>
+  /** Covers found online for an album (Apple's free catalogue). */
+  musicTagsFindCovers(artist: string, album: string): Promise<{ url: string; album: string; artist: string }[]>
+  /** Asks for a picture file; null if cancelled. */
+  musicTagsChooseImage(): Promise<string | null>
+  /** Copies music files (full paths) into the music folder. */
+  localMusicImport(files: string[]): Promise<MusicImportResult>
+  /** Asks which music files to add, then copies them in; null if cancelled. */
+  localMusicChooseImport(): Promise<MusicImportResult | null>
+  /** Renames or moves songs inside the music folder. */
+  localMusicMove(moves: { from: string; to: string }[]): Promise<{ library: LocalLibrary; done: { from: string; to: string }[]; failed: string[] }>
+  /** Puts songs in the Recycle Bin / Bin. */
+  localMusicTrash(paths: string[]): Promise<LocalLibrary>
+  /** Each song's sound quality (kbps) and size, for choosing which copy to keep. */
+  localMusicQuality(paths: string[]): Promise<Record<string, { bitrate: number; size: number }>>
+  /** Downloads a link's sound as an MP3 into the music folder; returns the job's id (progress comes through onMusicLinkProgress). */
+  musicLinkSave(link: string, known?: FoundTrack): Promise<string>
+  musicLinkCancel(id: string): Promise<void>
+  onMusicLinkProgress(callback: (progress: MusicLinkProgress) => void): () => void
+  /** Any song (Apple's free iTunes Search), for the Music page's Search. */
+  songSearch(query: string): Promise<FoundTrack[]>
+  /** New songs by artists like your favourites (shared/musicDiscover.ts). */
+  songDiscover(seeds: { name: string; weight: number }[]): Promise<import('./musicDiscover').DiscoverGroup[]>
+  /** A public Spotify playlist or album's songs, from its link (no sign-in; the first 100). */
+  spotifyList(link: string): Promise<SpotifyList>
+  /** A song's YouTube video (`exact` false: YouTube's search for it instead). */
+  songYouTube(artist: string, title: string): Promise<{ url: string; exact: boolean }>
+  /** Playlists, liked songs, ratings and play counts for your own music (orbit-music.json in the music folder). */
+  musicDataGet(): Promise<MusicData>
+  /** Makes changes to it and saves them; returns it afterwards. */
+  musicDataEdit(edits: MusicEdit[]): Promise<MusicData>
+  /** It changed (here, in another window, or from the phone through Google Drive). */
+  onMusicDataChanged(callback: (data: MusicData) => void): () => void
   // Your playlists (`uri` is spotify:playlist:…; songs only for playlists you can edit)
   musicPlaylistSongs(uri: string): Promise<MusicItem[]>
   /** Makes a private playlist. */
@@ -1117,6 +1369,78 @@ export interface NotesApi {
   gamesCovers(ids: string[]): Promise<Record<string, string>>
   /** A game started or stopped, or more time was counted. */
   onGamesChanged(callback: () => void): () => void
+  // SkyBlock session summary
+  skyblockStatus(): Promise<SkyblockStatus>
+  skyblockSessions(): Promise<SkyblockSummary[]>
+  /** Looks up the Minecraft name, checks the key with Hypixel (a blank key keeps the saved one) and saves both. */
+  skyblockSetup(input: { key?: string; player: string; personal?: boolean }): Promise<SkyblockStatus>
+  /** The key is a Personal one (doesn't run out), not a 3-day developer key. */
+  skyblockSetPersonalKey(personal: boolean): Promise<SkyblockStatus>
+  /** '' follows the profile you're on in game. */
+  skyblockSetProfile(id: string): Promise<SkyblockStatus>
+  skyblockSetLog(readLog: boolean, folder?: string): Promise<SkyblockStatus>
+  skyblockPickLogFolder(): Promise<SkyblockStatus>
+  skyblockForget(): Promise<SkyblockStatus>
+  skyblockStartNow(): Promise<SkyblockStatus>
+  skyblockEndNow(): Promise<SkyblockStatus>
+  skyblockDeleteSession(id: string): Promise<SkyblockSummary[]>
+  /** A session's card is ready (Minecraft closed and Hypixel caught up). */
+  onSkyblockSummary(callback: (summary: SkyblockSummary) => void): () => void
+  /** A card already shown got newer numbers from Hypixel. */
+  onSkyblockUpdated(callback: (summary: SkyblockSummary) => void): () => void
+  onSkyblockChanged(callback: () => void): () => void
+  // SkyBlock ironman goal planner
+  /** `page`: the Goals page is open, so the item list is downloaded if there isn't one yet. */
+  skyblockGoalsState(page?: boolean): Promise<SkyblockGoalsState>
+  skyblockGoalsDownload(): Promise<SkyblockGoalsState>
+  /** The SkyBlock profile page: levels, gear, accessories, pets, collections and the rest. */
+  skyblockProfileView(): Promise<SbProfileView | null>
+  /** Your profile page: the view plus your profiles, history, "since last time" and milestones. */
+  skyblockProfilePage(): Promise<import('./skyblockMore').SbProfilePage | null>
+  /** Shows another of your profiles (goals, history and helpers follow it). */
+  skyblockProfileChoose(id: string): Promise<SkyblockGoalsState>
+  /** You've looked at this profile now ("since last time" starts again). */
+  skyblockProfileSeen(id: string): Promise<void>
+  /** Anyone's profile page by Minecraft name or id; `fresh` asks Hypixel again. */
+  skyblockPlayersLookup(who: string, profileId?: string, fresh?: boolean): Promise<import('./skyblockMore').SbProfilePage>
+  /** Players you've looked up or starred, with their last numbers. */
+  skyblockPlayersList(): Promise<import('./skyblockMore').SbFriend[]>
+  skyblockPlayersStar(uuid: string, on: boolean): Promise<import('./skyblockMore').SbFriend[]>
+  skyblockPlayersForget(uuid: string): Promise<import('./skyblockMore').SbFriend[]>
+  /** Looks every starred player up again for the friends board. */
+  skyblockPlayersRefreshStarred(): Promise<import('./skyblockMore').SbFriend[]>
+  /** Ironman helpers for the profile you're looking at. */
+  skyblockHelpers(): Promise<{
+    craftable: import('./skyblockMore').Craftable[]
+    mp: import('./skyblockMore').MpStep[]
+    minions: import('./skyblockMore').MinionStep[]
+  } | null>
+  /** The SkyBlock date, the next events and the mayor. */
+  skyblockCalendar(): Promise<{ now: import('./skyblockMore').SbDate; events: import('./skyblockMore').SbEvent[]; mayor: import('./skyblockMore').SbMayor | null }>
+  /** Asks Hypixel for what you own now. */
+  skyblockGoalsRefresh(): Promise<SkyblockGoalsState>
+  skyblockGoalsSearch(query: string): Promise<SkyblockItemHit[]>
+  skyblockGoalsAdd(id: string, amount?: number): Promise<SkyblockGoalsState>
+  skyblockGoalsUpdate(id: string, change: { amount?: number; pinned?: boolean }): Promise<SkyblockGoalsState>
+  skyblockGoalsRemove(id: string): Promise<SkyblockGoalsState>
+  onSkyblockGoalsChanged(callback: () => void): () => void
+  /** The SkyBlock add-on (everything SkyBlock is off until it's downloaded). */
+  skyblockAddonState(): Promise<SkyblockAddonState>
+  /** Downloads it, or changes its texture packs (best first). Resolves when done or stopped. */
+  skyblockAddonInstall(packs: string[]): Promise<SkyblockAddonState>
+  skyblockAddonCancel(): Promise<SkyblockAddonState>
+  skyblockAddonRemove(): Promise<SkyblockAddonState>
+  /** Use your own Minecraft pack (.zip, or a folder) under the SkyBlock packs. */
+  skyblockAddonPickVanilla(folder: boolean): Promise<SkyblockAddonState>
+  /** Use your own Minecraft pack from a path (a .zip or a pack folder), picked in Orbit's own file browser. */
+  skyblockAddonUseVanilla(path: string): Promise<SkyblockAddonState>
+  /** Minecraft's resource pack folders on this computer, for the file browser's shortcuts. */
+  skyblockAddonPackFolders(): Promise<import('./skyblockTextures').PackFolder[]>
+  /** Back to plain Minecraft's pictures under the SkyBlock packs. */
+  skyblockAddonClearVanilla(): Promise<SkyblockAddonState>
+  /** NEU item id → its picture. */
+  skyblockAddonIcons(): Promise<Record<string, ItemIcon>>
+  onSkyblockAddonChanged(callback: () => void): () => void
   // Terminal tab
   /**
    * Starts command line `id` in `folder` (the notes folder when it's null or missing), or carries on
@@ -1137,6 +1461,68 @@ export interface NotesApi {
   terminalHome(): Promise<string>
   /** Opens a project's folder in File Explorer / Finder, or in VS Code. */
   terminalOpenIn(folder: string, where: 'files' | 'vscode'): Promise<void>
+  // App Studio
+  /** Whether a GitHub token is saved (and whose it is). */
+  appsGithubStatus(): Promise<GitHubStatus>
+  /** Whether this is a test copy (started from Orbit's code), with its own settings and data. */
+  appsIsTestCopy(): Promise<boolean>
+  /** Checks a GitHub token with GitHub, then saves it encrypted. */
+  appsSetToken(token: string): Promise<GitHubStatus>
+  appsClearToken(): Promise<GitHubStatus>
+  /** What git and package.json say about an app's folder. */
+  appsInfo(folder: string): Promise<AppInfo>
+  /** Open pull requests on these GitHub repositories ("owner/name"), newest first; errors by repository. */
+  appsPulls(repos: string[]): Promise<{ pulls: PullRequest[]; errors: Record<string, string> }>
+  /** A repository's releases, newest first (drafts too, when the token can see them). */
+  appsReleases(repo: string): Promise<Release[]>
+  /** Pull requests merged after `since` (or recently, without it). */
+  appsMerged(repo: string, since?: string): Promise<MergedPull[]>
+  /** Puts notes on the release for a tag (making a draft release if there isn't one). Needs GitHub connected. */
+  appsSetReleaseNotes(repo: string, tag: string, body: string, title: string): Promise<Release>
+  /** The AI helper writes "What's new" notes from changelogSource(). */
+  aiWhatsNew(source: string): Promise<string>
+  /** An app's test copies (git worktrees in "<app>-test-copies" beside it). */
+  appsCopies(folder: string): Promise<TestCopy[]>
+  /** Makes a test copy with a branch's latest (or finds it); its folder. */
+  appsAddCopy(folder: string, branch: string): Promise<string>
+  appsRemoveCopy(folder: string, path: string): Promise<void>
+  /** Whether pull requests are open, merged or closed. */
+  appsPullStates(repo: string, numbers: number[]): Promise<Record<number, 'open' | 'merged' | 'closed'>>
+  /** Downloads a picture from a pull request's description. */
+  appsFetchImage(url: string): Promise<{ bytes: Uint8Array; type: string }>
+  /** Marks a release as a pre-release, so it isn't the latest and apps that update themselves skip it (or back again). */
+  appsSetPrerelease(repo: string, tag: string, prerelease: boolean): Promise<Release>
+  /** Starts a new app from a starter: its folder, files, git repository and (if asked) GitHub repository. */
+  appsCreateApp(req: NewApp): Promise<MadeApp>
+  /** The open issues on an app's repository: bug reports from people using it. */
+  appsIssues(repo: string): Promise<BugReport[]>
+  /** Closes an issue on GitHub, with a comment first if one is given. */
+  appsCloseIssue(repo: string, number: number, comment?: string): Promise<void>
+  /** Checks an app's npm packages: newer versions, and known security problems (npm outdated and npm audit). */
+  appsHealth(folder: string): Promise<HealthReport>
+  /** The quick checks before releasing an app (git, the version, the What's new notes, GitHub). The tests come from appsReleaseTests. */
+  appsPreflight(folder: string, bump: VersionBump): Promise<Preflight>
+  /** Runs the app's type check and tests, as GitHub's build would. */
+  appsReleaseTests(folder: string): Promise<Check>
+  /** Releases the app: npm version, then pushes the commit and tag. `expected` is the version the checks were for. */
+  appsRelease(folder: string, bump: VersionBump, expected: string): Promise<ReleaseResult>
+  /** One of the release helper's one-click fixes (put-away, switch-main, pull, finish-push, delete-tag, retag). */
+  appsReleaseFix(folder: string, fix: string, tag?: string): Promise<FixResult>
+  /** Fetches GitHub's main and says how far this app's folder is behind (or ahead of) it. Rejects with "busy" while a release job runs. */
+  appsMainStatus(folder: string): Promise<MainStatus>
+  /** Switches to main (if on another branch, with nothing uncommitted) and pulls GitHub's latest main. Never throws changes away. */
+  appsGetLatestMain(folder: string): Promise<FixResult>
+  /** Adds "What's new" notes for a version to the app's list in its code, and commits them. */
+  appsWriteNotes(folder: string, version: string, items: string[]): Promise<FixResult>
+  /** What GitHub's build of a release tag is doing, and why it failed. */
+  appsBuildStatus(folder: string, repo: string, tag: string): Promise<BuildStatus>
+  /** Runs a build's failed jobs again on GitHub. */
+  appsRerunBuild(repo: string, runId: number): Promise<void>
+  /** Windows: opens Settings → For developers (Developer Mode). */
+  appsOpenDeveloperSettings(): Promise<void>
+  /** Merges a pull request, marking a draft ready for review first. */
+  appsMerge(repo: string, number: number): Promise<{ markedReady: boolean }>
+  appsClose(repo: string, number: number): Promise<void>
   /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */
   aiChat(messages: AiChatMessage[], engine?: AiEngine): Promise<AiReply>
   /** Saved chats, kept in the settings folder on this computer. */
@@ -1237,6 +1623,37 @@ export interface NotesApi {
   dropTargets(): Promise<DropTarget[]>
   onDropTargets(callback: (targets: DropTarget[]) => void): () => void
   dropSend(target: DropTarget['id'], paths: string[]): Promise<string>
+  /** Big file sender (main/fileSend.ts): sends with a code, and Google Drive links. */
+  fileSendState(): Promise<import('./fileSend').FileSendState>
+  onFileSendState(callback: (state: import('./fileSend').FileSendState) => void): () => void
+  fileSendSetServer(address: string): Promise<{ relay: boolean }>
+  /** Puts the intro server on your Cloudflare account with a key you made there. */
+  fileSendSetUp(token: string): Promise<{ relay: boolean; relayNote?: string }>
+  fileSendRelayOn(keyId?: string, apiToken?: string): Promise<void>
+  fileSendOpen(page: 'signup' | 'token' | 'turn' | 'workers'): Promise<void>
+  fileSendPick(kind: 'files' | 'folder'): Promise<string[]>
+  fileSendStart(paths: string[]): Promise<import('./fileSend').Transfer>
+  fileSendReceive(code: string): Promise<import('./fileSend').Transfer>
+  /** Accept a receive; `chooseFolder` asks where first (otherwise Downloads). Resolves where to start. */
+  fileSendAccept(id: string, chooseFolder: boolean): Promise<import('./fileSend').Position>
+  fileSendCancel(id: string): Promise<void>
+  fileSendForget(id: string): Promise<void>
+  fileSendResume(id: string): Promise<void>
+  fileSendReveal(id: string): Promise<void>
+  fileSendDrive(paths: string[]): Promise<import('./fileSend').DriveShare>
+  fileSendDriveConnect(): Promise<void>
+  fileSendDriveRemove(id: string): Promise<void>
+  fileSendDriveForget(id: string): Promise<void>
+  /** The WebRTC side of the big file sender (renderer lib/fileSendEngine.ts). */
+  onFileSendEvent(callback: (event: { id: string; kind: 'peer' | 'signal' | 'gone' | 'stop'; ice?: RTCIceServer[]; signal?: import('./fileSend').FsSignal }) => void): () => void
+  fileSendSignal(id: string, signal: import('./fileSend').FsSignal): Promise<void>
+  fileSendUpdate(id: string, patch: { status?: import('./fileSend').TransferStatus; route?: import('./fileSend').Route; done?: number; error?: string }): Promise<void>
+  fileSendManifest(id: string): Promise<import('./fileSend').Manifest | null>
+  fileSendGotManifest(id: string, manifest: unknown): Promise<import('./fileSend').Position | null>
+  fileSendStarted(id: string, pos: unknown): Promise<import('./fileSend').Position | null>
+  fileSendDeclined(id: string): Promise<void>
+  fileSendRead(id: string, index: number, offset: number, length: number): Promise<Uint8Array>
+  fileSendWrite(id: string, data: Uint8Array): Promise<{ done: number; finished: boolean }>
   /** The phone webcam (Windows): turn it on/off, its status and settings, and a live preview of the phone's frames. */
   camStatus(): Promise<CamStatus>
   camOn(): Promise<CamStatus>
@@ -1278,6 +1695,8 @@ export interface NotesApi {
 
   // File explorer tab (full paths on this computer)
   explorerPlaces(): Promise<ExplorerPlace[]>
+  /** How full each drive in the Drives list is, by its path (null when it couldn't be read). */
+  explorerDriveSpace(): Promise<Record<string, DriveSpace | null>>
   explorerList(dir: string): Promise<ExplorerEntry[]>
   /** The start of a text file, for its preview. */
   explorerReadText(path: string): Promise<string>
@@ -1294,6 +1713,37 @@ export interface NotesApi {
   explorerTrash(paths: string[]): Promise<string[]>
   /** Finds names under a folder and all its subfolders. */
   explorerSearch(dir: string, query: string, showHidden: boolean): Promise<ExplorerEntry[]>
+  /** Whole PC search: every file and folder on the computer whose name has each word, best first. */
+  explorerSearchPc(query: string, showHidden: boolean): Promise<{ entries: ExplorerEntry[]; status: PcIndexStatus; system: boolean }>
+  /** How Whole PC search's list of files is getting on (`everything`: the Everything app's helper is installed). */
+  explorerIndexStatus(): Promise<PcIndexStatus & { everything: boolean; wanted: boolean }>
+  onExplorerIndexStatus(callback: (status: PcIndexStatus) => void): () => void
+  /** The folders shown now: their total sizes come in through onExplorerFolderSize (`fresh`: count again). */
+  explorerFolderSizes(paths: string[], fresh?: boolean): Promise<void>
+  /** A folder's size (`complete` false while still counting); null when it couldn't be read. */
+  onExplorerFolderSize(callback: (e: { path: string; size: { bytes: number; files: number; folders: number; complete: boolean; counting?: boolean } | null }) => void): () => void
+  /** Walks the drives again now. */
+  explorerReindex(): Promise<void>
+  /** Everything with this colour tag (that's still there). */
+  explorerTagged(colour: TagColour): Promise<ExplorerEntry[]>
+  // The Recycle Bin / Bin (Files tab)
+  binList(): Promise<BinListing>
+  /** Puts items back where they came from; returns where each went. */
+  binRestore(ids: string[]): Promise<string[]>
+  /** Deletes for good; returns how many. */
+  binDelete(ids: string[]): Promise<number>
+  binEmpty(): Promise<number>
+  /** The system's own Recycle Bin / Bin window. */
+  binOpenSystem(): Promise<void>
+  /** Mac: Privacy & Security → Full Disk Access, so Orbit can look in the Bin. */
+  binMacPrivacy(): Promise<void>
+  // Colour tags and favourite folders (Files tab)
+  tagsGet(): Promise<FileTagStore>
+  tagsSet(paths: string[], colour: TagColour, on: boolean): Promise<void>
+  /** Names a colour ("School"); an empty name goes back to the colour's own. */
+  tagsLabel(colour: TagColour, label: string): Promise<void>
+  tagsFavourites(paths: string[]): Promise<void>
+  onTagsChanged(callback: (store: FileTagStore) => void): () => void
   // Comic book reader
   comicsShelf(): Promise<ComicShelf>
   /** Adds comic files (asks which, when no paths are given). */
@@ -1455,6 +1905,8 @@ export interface VideoDownloadRequest {
   quality: import('./videoDownload').DownloadQuality
   /** The folder to save it in, inside the notes folder ('' for the top level). Made if it isn't there. */
   folder: string
+  /** From the download manager's queue. */
+  manager?: boolean
 }
 
 /** One video being downloaded from a link (or done, or failed). */
@@ -1474,6 +1926,8 @@ export interface VideoDownload {
   size?: number
   error?: string
   startedAt: number
+  /** Started by the download manager's queue (it shows it there itself). */
+  manager?: boolean
 }
 
 /** Whether ffmpeg (downloaded only when asked, for converting videos and streaming) is on this computer. */
@@ -1483,6 +1937,14 @@ export interface ClipInfo {
   path: string
   size: number
   modified: number
+  /** Its place in the recordings folder: "file.mp4", or "SkyBlock/file.mp4" in a game's folder. */
+  rel: string
+  /** The game folder it's in ('' at the top of the recordings folder). */
+  folder: string
+  /** What the list calls it ("SkyBlock 21 Nov 23:10"). */
+  title: string
+  /** Starred. */
+  favourite: boolean
 }
 
 export interface FfmpegState {
@@ -1529,4 +1991,33 @@ export interface VideoConvertRequest {
   /** The caption bar as a PNG, exactly `gif.width` pixels wide. */
   captionPng?: Uint8Array
   captionHeight?: number
+}
+
+export interface MusicFileResult {
+  library: LocalLibrary
+  /** Songs that couldn't be changed, with why. */
+  failed: { path: string; why: string }[]
+}
+
+export interface MusicImportResult {
+  library: LocalLibrary
+  /** Where the new songs are in the music folder. */
+  added: string[]
+  /** Files that weren't music, or couldn't be copied. */
+  skipped: string[]
+}
+
+/** How "Save MP3 to my music" is getting on. */
+export interface MusicLinkProgress {
+  id: string
+  stage: 'downloading' | 'details' | 'done' | 'error' | 'cancelled'
+  /** 0–1 while known. */
+  done?: number | null
+  title?: string
+  artist?: string
+  /** Where the song is in the music folder (done). */
+  path?: string
+  /** Its details came from Apple's catalogue (done). */
+  matched?: boolean
+  error?: string
 }

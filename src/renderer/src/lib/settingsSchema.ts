@@ -2,6 +2,7 @@ import type { Prefs } from '@shared/prefs'
 import { CAPTURE_SHORTCUTS, RANGES, REPLAY_SHORTCUTS, SNIP_SHORTCUTS, SONG_ID_SHORTCUTS } from '@shared/prefs'
 import { acceleratorLabel, IS_MAC, showKeys, TRAY_NAME } from '@shared/platform'
 import { formatDate } from './dates'
+import { VISUALISER_STYLES } from '@shared/musicSound'
 
 /**
  * Every setting on the Settings page, described once. The page draws itself from this list,
@@ -618,6 +619,15 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'attachments images audio pdf files hide show tree'
   },
   {
+    key: 'filesWholePcSearch',
+    section: 'files',
+    group: 'Files tab',
+    type: 'toggle',
+    label: 'Whole PC search',
+    description: 'Orbit keeps a list of the name of every file on this computer (not what’s in them), so searching the whole PC in the Files tab shows results as you type. The list is made in the background and kept up to date as files change. Turning this off deletes nothing but stops the list being kept.',
+    keywords: 'search everything whole pc computer find file index spotlight instant'
+  },
+  {
     key: 'randomIncludeDaily',
     section: 'files',
     group: 'Random note',
@@ -649,6 +659,15 @@ export const SETTINGS: SettingDef[] = [
 
   // ---------- Music ----------
   {
+    key: 'musicSpotify',
+    section: 'music',
+    group: 'Player',
+    type: 'toggle',
+    label: 'Show Spotify features',
+    description: 'Turn off if you only play your own music files: Orbit hides Spotify in the Now playing box and stops checking Spotify.',
+    keywords: 'spotify hide remove off own music files mp3 local'
+  },
+  {
     key: 'musicSongPopup',
     section: 'music',
     group: 'Player',
@@ -664,7 +683,7 @@ export const SETTINGS: SettingDef[] = [
     type: 'choice',
     options: SONG_ID_SHORTCUTS.map((value) => ({ value, label: value ? acceleratorLabel(value) : 'Off' })),
     label: 'Shortcut',
-    description: 'Works in any app, even a full-screen game: Orbit listens for 10 seconds and tells you the song, then you can add it to a playlist from the music player. Also Ctrl+K → “What’s this song?”.',
+    description: 'Works in any app, even a full-screen game: Orbit listens for 10 seconds and tells you the song, then you can add it to a playlist from the Music page. Also Ctrl+K → “What’s this song?”.',
     keywords: 'whats this song identify recognise recognize shazam music hotkey game stream video'
   },
   {
@@ -673,8 +692,29 @@ export const SETTINGS: SettingDef[] = [
     group: 'Player',
     type: 'toggle',
     label: 'Visualiser for your own music',
-    description: 'Moving bars in the player while your own music files play (Spotify doesn’t let other apps see its sound). Also the bars button under the player.',
+    description: 'Moving bars in the full-screen player and the floating mini player while your own music files play (Spotify doesn’t let other apps see its sound).',
     keywords: 'music visualizer visualiser bars waves equaliser animation'
+  },
+  {
+    key: 'musicVisualiserStyle',
+    section: 'music',
+    group: 'Player',
+    type: 'choice',
+    options: VISUALISER_STYLES.map((s) => ({ value: s.id, label: s.label })),
+    label: 'Visualiser style',
+    description: 'Bars, a wave, mountains, a circle around the cover, or rows of lights. Clicking the visualiser also changes it.',
+    keywords: 'music visualizer visualiser style wave circle mountain lights dots spectrum'
+  },
+  {
+    key: 'musicCrossfade',
+    section: 'music',
+    group: 'Sound',
+    type: 'slider',
+    ...RANGES.musicCrossfade,
+    format: (v) => (v === 0 ? 'Off' : `${v} s`),
+    label: 'Crossfade between songs',
+    description: 'Your own music fades out at the end of each song while the next one fades in. Skipping a song still changes straight away.',
+    keywords: 'music crossfade fade gapless transition mix songs blend'
   },
 
   // ---------- Calendar ----------
@@ -787,7 +827,7 @@ export const SETTINGS: SettingDef[] = [
     type: 'toggle',
     label: 'Sign in with Google as Firefox',
     description:
-      'Leave this off unless Google refuses to sign you in with “This browser or app may not be secure” (in Grok, a web tab or Messages). On, Google’s sign-in pages are told this is Firefox, but that can send “Sign in with Google” back to “Choose an account” each time.',
+      'Leave this off: when Google refuses to sign you in (“This browser or app may not be secure”), Orbit already tries that sign-in again as Firefox by itself. On, Google’s sign-in pages are always told this is Firefox, which can send “Sign in with Google” (in Grok) back to “Choose an account” each time.',
     keywords: 'google sign in login log in account chooser loop grok firefox browser not secure web tab'
   },
 
@@ -907,6 +947,50 @@ export const SETTINGS: SettingDef[] = [
     keywords: 'discord voice call pop out popout second monitor screen notification join vc'
   },
   {
+    key: 'duckMusic',
+    section: 'studio',
+    group: 'Discord voice',
+    type: 'toggle',
+    label: 'Turn music down while people talk',
+    description: 'In a Discord call, your music dips while someone else is speaking and comes back up a moment after they stop. Needs Discord connected in Orbit.',
+    keywords: 'duck ducking dip lower music volume spotify discord talk speaking friends mixer auto'
+  },
+  {
+    key: 'duckLevel',
+    section: 'studio',
+    group: 'Discord voice',
+    type: 'slider',
+    ...RANGES.duckLevel,
+    format: pct,
+    label: 'Music volume while they talk',
+    keywords: 'duck dip level how quiet'
+  },
+  {
+    key: 'duckWhenITalk',
+    section: 'studio',
+    group: 'Discord voice',
+    type: 'toggle',
+    label: 'Dip it when I talk too',
+    description: 'Not only while friends talk: also while Discord is sending your voice.',
+    keywords: 'duck dip my voice me talking speaking'
+  },
+  {
+    key: 'duckSpotify',
+    section: 'studio',
+    group: 'Discord voice',
+    type: 'toggle',
+    label: 'Dip Spotify',
+    keywords: 'duck spotify'
+  },
+  {
+    key: 'duckOrbit',
+    section: 'studio',
+    group: 'Discord voice',
+    type: 'toggle',
+    label: 'Dip Orbit’s own music',
+    keywords: 'duck music player own songs'
+  },
+  {
     key: 'snipShortcut',
     section: 'capture',
     group: 'Screen snip',
@@ -915,6 +999,26 @@ export const SETTINGS: SettingDef[] = [
     label: 'Shortcut',
     description: 'Drag a box round text anywhere on screen to copy it, save it, search it, translate it or ask the AI about it. Read on this computer.',
     keywords: 'snip screenshot ocr text grab copy translate hotkey'
+  },
+  {
+    key: 'snipDelay',
+    section: 'capture',
+    group: 'Screen snip',
+    type: 'slider',
+    ...RANGES.snipDelay,
+    format: (v) => (v ? `${v} s` : 'Off'),
+    label: 'Wait before a picture snip',
+    description: 'Counts down before the screen freezes, so you can hover over something first (open a menu, show a tooltip). Off snips straight away. The taskbar and tray menus also have Snip after 3, 5 or 10 seconds for one-offs.',
+    keywords: 'snip delay timer wait countdown seconds hover menu tooltip screenshot later'
+  },
+  {
+    key: 'snipSave',
+    section: 'capture',
+    group: 'Screen snip',
+    type: 'toggle',
+    label: 'Save picture snips as files too',
+    description: 'Each picture snip is copied, ready to paste, and also saved as a PNG named after when you took it. Pick the folder at the bottom of this page.',
+    keywords: 'snip screenshot save folder location where saved png pictures screenshots'
   },
   {
     key: 'captureTarget',
@@ -970,6 +1074,24 @@ export const SETTINGS: SettingDef[] = [
       : 'So quick capture works any time. Quit from the tray icon’s menu.',
     keywords: 'tray menu bar background minimize system'
   },
+  // A Mac's menu bar icon always opens its menu on a click, so this is Windows only.
+  ...(IS_MAC
+    ? []
+    : [
+        {
+          key: 'trayClick',
+          section: 'capture',
+          group: 'Tray',
+          type: 'choice',
+          options: [
+            { value: 'open', label: 'Opens Orbit' },
+            { value: 'snip', label: 'Snips a picture' }
+          ],
+          label: 'Clicking the tray icon',
+          description: 'Snips a picture: drag a box round anything and it’s copied, ready to paste anywhere. Right-click the icon for everything else, including Open Orbit.',
+          keywords: 'tray click snip snipping tool screenshot taskbar picture clipboard'
+        } satisfies SettingDef
+      ]),
   {
     key: 'launchAtStartup',
     section: 'capture',

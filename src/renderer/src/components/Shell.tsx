@@ -16,6 +16,10 @@ import { notify } from '../store/notify'
 import { useEditor, type SaveStatus } from '../store/editor'
 import { useNoteIndex } from '../store/noteIndex'
 import { setPrefs, usePrefs } from '../store/prefs'
+import { useTerminals } from '../store/terminals'
+import { setSection, useAppStudio } from '../store/appStudio'
+import { reportBugFromSnip } from '../store/appBoard'
+import { boardKey } from '@shared/appStudio'
 import { showSearch, toggleZen, useUI } from '../store/ui'
 import { countNotes, parentOf } from '../lib/paths'
 import { FILE_MANAGER, IS_MAC, showKeys } from '@shared/platform'
@@ -26,6 +30,8 @@ import {
   isNoteTab,
   openNote,
   openSpecialTab,
+  APPSTUDIO_TAB,
+  MONEY_TAB,
   openWebTab,
   activateTab,
   refreshEmbeds,
@@ -46,23 +52,28 @@ import EditorArea from './Editor/EditorArea'
 import LayoutMenu from './Editor/LayoutMenu'
 import RightPanel from './Panels/RightPanel'
 import Modals from './Picker/Modals'
+import SettingsDialog from './Settings/SettingsDialog'
 import LockDialog from './Lock/LockDialog'
 import SendToPhone from './Phone/SendToPhone'
 import { startPhone } from '../store/phone'
 import { watchSnips } from '../lib/snip'
 import { watchReplay } from '../lib/replay'
+import { localDuck } from '../store/localMusic'
 import { startFormatMenu } from '../lib/formatMenu'
 import { startDictionary } from '../lib/dictionary'
 import { EventDetails } from './Calendar/shared'
+import { CalendarOverlays } from './Calendar/edit'
 import Resizer from './Resizer'
 import UpdateToast from './UpdateToast'
+import SkyblockCard from './Games/SkyblockCard'
 import { DownloadPrompt } from './Web/Downloads'
 import { startBrowser, tabsByPage } from '../store/browser'
 import StartupNotices from './Notices/StartupNotices'
 import Screensaver from './Screensaver/Screensaver'
 import Pet from './Motion/Pet'
-import MusicPlayer from './Music/MusicPlayer'
+import MusicHost from './Music/MusicHost'
 import { GrokFloat } from './Grok/GrokPage'
+import { ChatSiteFloat } from './ChatSite/ChatSite'
 import RecordingBar from './Studio/RecordingBar'
 import ZenBar, { StatusTimer } from './ZenBar'
 import VoiceRecorder from './VoiceRecorder'
@@ -73,6 +84,9 @@ import { toggleStreamerMode } from '../store/streamer'
 import Private from './Streamer/Private'
 import DeviceDrop from './Share/DeviceDrop'
 import { startReminders, stopReminders } from '../lib/reminderScheduler'
+import { MONEY_IOU_LINK, startIouReminders, stopIouReminders } from '../lib/iouReminders'
+import { addonOn, useAddonOn, useInstalledAddons } from '../lib/addons'
+import { useMoneyView } from '../store/money'
 
 interface Props {
   vault: string
@@ -93,6 +107,12 @@ const STATUS_LABEL: Record<SaveStatus, string> = {
 }
 
 export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
+  const musicOn = useAddonOn('music')
+  const skyblockOn = useAddonOn('skyblock')
+  const grokOn = useAddonOn('grok')
+  const claudeOn = useAddonOn('claude')
+  const sketchOn = useAddonOn('sketch')
+  useBugReports()
   const leftOpen = useUI((s) => s.leftOpen)
   const rightOpen = useUI((s) => s.rightOpen)
   const leftWidth = useUI((s) => s.leftWidth)
@@ -128,16 +148,20 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     initEditor(vault)
     const stopHistory = startNavHistory()
     void startReminders()
-    // (The test notification from Settings has no note to open.)
-    const offReminder = window.api.onReminderOpen((path, line) => path && openNote(path, { line }))
+    // (The test notification from Settings has no note to open.) An IOU reminder opens Money → IOUs.
+    const offReminder = window.api.onReminderOpen((path, line) => {
+      if (path === MONEY_IOU_LINK) {
+        useMoneyView.setState({ view: 'ious' })
+        openSpecialTab(MONEY_TAB)
+      } else if (path) openNote(path, { line })
+    })
     // "Open in Orbit" from File Explorer / Finder: any that came in while Orbit was starting, then each new one.
     const offOpenFile = window.api.onOpenFile(openFromComputer)
     void window.api.takeOpenedFiles().then((paths) => paths.forEach(openFromComputer))
     const offVoice = window.api.onVoiceStart(() => useUI.setState({ voiceOpen: true }))
-    const offSketch = window.api.onSketchStart(() => useUI.setState({ sketch: { path: null } }))
+    const offSketch = window.api.onSketchStart(() => addonOn('sketch') && useUI.setState({ sketch: { path: null } }))
     const offFormat = startFormatMenu()
     const offDictionary = startDictionary()
-    const offPhone = startPhone()
     // Mouse sharing: the other computer started pairing (show the code), or sent a file over.
     const offSharePair = window.api.onShareOpenSettings(() => {
       openSpecialTab(SETTINGS_TAB)
@@ -146,6 +170,8 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     const offShareFile = window.api.onShareReceived(({ title }) => notify(`${title}. It’s in Downloads.`, 'info'))
     const offSnips = watchSnips()
     const offReplay = watchReplay()
+    // Friends talking in Discord: your own music dips (main/musicDuck.ts).
+    const offDuck = window.api.onMusicDuck(localDuck)
     const offChanged = window.api.onVaultChanged((paths) => {
       useVault.getState().refresh(paths)
       handleExternalChanges(paths)
@@ -174,17 +200,30 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       offSketch()
       offFormat()
       offDictionary()
-      offPhone()
       offSharePair()
       offShareFile()
       offSnips()
       offReplay()
+      offDuck()
       stopReminders()
     }
   }, [vault])
 
-  // Soundboard hotkeys work from any app, so the sound side starts with the window (and reopens the mic if it was left on).
+  // Your phone, and money reminders (IOUs), only with their add-ons.
+  const phoneOn = useAddonOn('phone')
+  useEffect(() => (phoneOn ? startPhone() : undefined), [phoneOn])
+  const moneyOn = useAddonOn('money')
   useEffect(() => {
+    if (!moneyOn) return
+    startIouReminders()
+    return stopIouReminders
+  }, [moneyOn])
+
+  // Soundboard hotkeys work from any app, so the sound side starts with the window (and reopens the mic if it was left on).
+  // Only with the Soundboard add-on.
+  const soundboardOn = useAddonOn('soundboard')
+  useEffect(() => {
+    if (!soundboardOn) return
     let off: (() => void) | undefined
     let gone = false
     void import('../lib/soundboard').then((m) => {
@@ -194,7 +233,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       gone = true
       off?.()
     }
-  }, [])
+  }, [soundboardOn])
 
   // Keep the tree's highlight on the note being edited.
   useEffect(() => {
@@ -248,7 +287,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setMenuOpen(false)
       // Esc leaves zen mode (unless it's closing something else first).
-      if (e.key === 'Escape' && useUI.getState().zen && !useUI.getState().modal && !e.defaultPrevented) {
+      if (e.key === 'Escape' && useUI.getState().zen && !useUI.getState().modal && !useUI.getState().settingsOpen && !e.defaultPrevented) {
         toggleZen()
         return
       }
@@ -264,7 +303,8 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
   // The same shortcuts while a web page has focus (the page gets every other key), and links the
   // page opens in a new window go to a new web tab.
   const shortcutPrefs = usePrefs((s) => s.prefs.shortcuts)
-  useEffect(() => window.api.setWebShortcuts(appShortcuts()), [shortcutPrefs])
+  const installed = useInstalledAddons()
+  useEffect(() => window.api.setWebShortcuts(appShortcuts()), [shortcutPrefs, installed])
   useEffect(() => {
     const offShortcut = window.api.onWebShortcut((shortcut) => commandForShortcut(shortcut)?.run())
     const offOpen = window.api.onWebOpen((url, privately) => openWebTab(url, { privately }))
@@ -376,6 +416,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       </div>
 
       <footer className="statusbar">
+        <TestCopyBadge />
         {/* The folder's path usually has your name in it. */}
         <Private>
           <span title={streamer ? undefined : vault}>{vault}</span>
@@ -407,25 +448,64 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       </footer>
 
       <Modals />
+      <SettingsDialog />
       <Launcher />
       <RadialMenu />
       <LockDialog />
       <SendToPhone />
       <EventDetails />
+      <CalendarOverlays />
       <Pet />
       <UpdateToast />
+      {skyblockOn && <SkyblockCard />}
       <DownloadPrompt />
       <StartupNotices />
       <DeviceDrop />
-      <MusicPlayer />
-      <GrokFloat />
+      {musicOn && <MusicHost />}
+      {grokOn && <GrokFloat />}
+      {claudeOn && <ChatSiteFloat site="claude" />}
       <RecordingBar />
       <ZenBar />
       <VoiceRecorder />
       <DefinitionCard />
-      <SketchPad />
+      {sketchOn && <SketchPad />}
       <PictureEditor />
       <Screensaver />
     </div>
+  )
+}
+
+/** "Test copy" in the status bar, so a copy started from Orbit's code is never mistaken for the real one. */
+function TestCopyBadge() {
+  const [test, setTest] = useState(false)
+  useEffect(() => {
+    window.api
+      .appsIsTestCopy()
+      .then((t) => {
+        setTest(t)
+        if (t) document.title = 'Orbit (test copy)'
+      })
+      .catch(() => undefined)
+  }, [])
+  return test ? (
+    <span className="statusbar-testcopy" title="Started from Orbit’s code: it has its own settings and notes, separate from your normal Orbit">
+      Test copy
+    </span>
+  ) : null
+}
+
+/** Bugs reported from the screen snip ("Report bug") open on App Studio's board. */
+function useBugReports(): void {
+  useEffect(
+    () =>
+      window.api.onAppStudioBug((png) => {
+        const project = useTerminals.getState().projects[0]
+        const info = project ? useAppStudio.getState().info[project.folder] : undefined
+        void reportBugFromSnip(png, usePrefs.getState().prefs.attachmentFolder, project ? boardKey({ name: project.name, repo: info?.repo }) : null, () => {
+          openSpecialTab(APPSTUDIO_TAB)
+          setSection('board')
+        })
+      }),
+    []
   )
 }

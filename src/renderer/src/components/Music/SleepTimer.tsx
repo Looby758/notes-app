@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Check, Moon } from 'lucide-react'
+import { Check, Moon, X } from 'lucide-react'
 import { formatTime } from '@shared/spotify'
 import { setSleepTimer, sleepLeft, useMusic } from '../../store/music'
 
@@ -17,18 +17,18 @@ function useCountdown(): number | null {
   return sleepLeft()
 }
 
-/** The moon in the player: shows how long is left when the timer is on. */
+/** The moon on the Music page's bar: shows how long is left when the timer is on. */
 export function SleepButton({ open, onClick }: { open: boolean; onClick: () => void }) {
   const sleep = useMusic((s) => s.sleep)
   const left = useCountdown()
   return (
     <button
-      className={`icon-btn music-shuffle music-sleep ${sleep ? 'active' : ''} ${open ? 'open' : ''}`}
+      className={`icon-btn music-sleep ${sleep || open ? 'mp-on' : ''}`}
       onClick={onClick}
       title={sleep ? (left === null ? 'Pausing at the end of this song' : `Pausing in ${formatTime(left)}`) : 'Sleep timer'}
       data-music-sleep
     >
-      <Moon size={13} />
+      <Moon size={16} />
       {left !== null && <span>{Math.ceil(left / 60_000)}m</span>}
     </button>
   )
@@ -55,7 +55,6 @@ export function SleepTimer({ onPicked }: { onPicked: () => void }) {
   )
   return (
     <>
-      <h4 className="music-panel-heading">Sleep timer</h4>
       <p className="music-panel-note music-sleep-status">
         {!sleep ? 'Pause the music after a while.' : left === null ? 'Pausing when this song ends.' : `Pausing in ${formatTime(left)}.`}
       </p>
@@ -65,5 +64,20 @@ export function SleepTimer({ onPicked }: { onPicked: () => void }) {
         {sleep && option('Turn off', null, false)}
       </ul>
     </>
+  )
+}
+
+/** The sleep timer as a pop-up over the Music page's bar (like Sound). */
+export function SleepPanel({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="sound-panel" role="dialog" aria-label="Sleep timer" data-sleep-panel onKeyDown={(e) => e.key === 'Escape' && onClose()}>
+      <div className="sound-head">
+        <h3>Sleep timer</h3>
+        <button className="icon-btn" onClick={onClose} title="Close">
+          <X size={15} />
+        </button>
+      </div>
+      <SleepTimer onPicked={onClose} />
+    </div>
   )
 }

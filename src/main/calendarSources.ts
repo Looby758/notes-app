@@ -3,26 +3,31 @@ import { createHash, randomBytes } from 'crypto'
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { createServer, type Server } from 'http'
 import { join } from 'path'
-import type { CalEvent, CalendarSourcesStatus, GoogleAuthStatus } from '@shared/types'
+import type { CalEvent, CalendarSourcesStatus, GoogleAuthStatus, GoogleEventInput } from '@shared/types'
 import { parseIcs } from '@shared/ics'
 import { onSettingsReset } from './settingsHealth'
 
 /**
- * Read-only calendars: Google Calendar (you sign in with Google in your browser) and calendar
+ * Calendars: Google Calendar (you sign in with Google in your browser) and calendar
  * links (.ics, e.g. Google's "secret address in iCal format"). Sign-ins and links are stored
  * encrypted with Windows' own protection (Electron safeStorage), never in plain text.
  *
  * Google sign-in uses the standard desktop flow: your browser opens Google's page, you approve,
  * and Google sends a one-time code to a temporary address on this computer (127.0.0.1). The app
- * only asks for read-only access to your calendars and your Google Sheets (so .gsheet files in the
+ * asks to read your calendars and add/change their events (calendar links stay read-only), to
+ * read your Google Sheets (so .gsheet files in the
  * notes folder can be shown, see googleSheets.ts), plus access to Gmail once you turn on the Email
  * page (see email.ts), which shares this sign-in.
  */
 
 export const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly'
-const SCOPE = `https://www.googleapis.com/auth/calendar.readonly ${SHEETS_SCOPE} openid email`
+/** Add, change and delete events (not calendars themselves, or their sharing). */
+export const EVENTS_SCOPE = 'https://www.googleapis.com/auth/calendar.events'
+const SCOPE = `https://www.googleapis.com/auth/calendar.readonly ${EVENTS_SCOPE} ${SHEETS_SCOPE} openid email`
 /** Read, label, archive and send email (not delete forever). */
 export const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.modify'
+/** Only the files Orbit itself puts in your Drive (the big file sender's links), nothing else there. */
+export const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
 // Overridable for tests, which point these at a local fake Google server.
 const AUTH_URL = process.env.NOTES_GOOGLE_AUTH_URL ?? 'https://accounts.google.com/o/oauth2/v2/auth'
 const TOKEN_URL = process.env.NOTES_GOOGLE_TOKEN_URL ?? 'https://oauth2.googleapis.com/token'
@@ -42,9 +47,12 @@ interface Stored {
   scopes?: string
   /** You turned on the Email page, so signing in again asks for Gmail too. */
   gmail?: boolean
+  /** You made a Drive link in the big file sender, so signing in again asks for that too. */
+  drive?: boolean
   /** Google calendars you've switched off. */
   disabled: string[]
-  calendars: { id: string; name: string; color: string }[]
+  /** `writable`: you own the calendar or can change its events. */
+  calendars: { id: string; name: string; color: string; writable?: boolean }[]
   feeds: { id: string; name: string; color: string; url: string /* encrypted */ }[]
 }
 
@@ -98,7 +106,8 @@ export function status(): CalendarSourcesStatus {
       connected: !!s.refreshToken,
       email: s.email,
       error: googleError,
-      calendars: s.calendars.map((c) => ({ ...c, enabled: !s.disabled.includes(c.id) }))
+      calendars: s.calendars.map((c) => ({ ...c, writable: !!c.writable, enabled: !s.disabled.includes(c.id) })),
+      canEdit: !!s.refreshToken && canEdit()
     },
     feeds: s.feeds.map(({ id, name, color }) => ({ id, name, color, error: feedErrors.get(id) })),
     canEncrypt: safeStorage.isEncryptionAvailable()
@@ -207,13 +216,16 @@ export function authStatus(): GoogleAuthStatus {
   }
 }
 
+/** The sign-in lets Orbit add and change events (ones from before that was possible don't). */
+export const canEdit = (): boolean => (load().scopes ?? '').split(' ').includes(EVENTS_SCOPE)
+
 export const hasGmail = (): boolean => (load().scopes ?? '').split(' ').includes(GMAIL_SCOPE)
 
 /**
  * Signs in to Google in your browser. `withGmail` also asks for email access (from the Email page);
  * once you've allowed it, signing in again from Settings keeps asking for it.
  */
-export async function connect(withGmail = false): Promise<CalendarSourcesStatus> {
+export async function connect(withGmail = false, withDrive = false): Promise<CalendarSourcesStatus> {
   const s = load()
   if (!safeStorage.isEncryptionAvailable()) throw new Error('Windows can’t protect a saved sign-in on this computer, so Google can’t be connected.')
   if (!s.clientId || !s.clientSecret) throw new Error('Add your Google client ID and secret first.')
@@ -228,7 +240,7 @@ export async function connect(withGmail = false): Promise<CalendarSourcesStatus>
       client_id: s.clientId,
       redirect_uri: redirect,
       response_type: 'code',
-      scope: withGmail || s.gmail ? `${SCOPE} ${GMAIL_SCOPE}` : SCOPE,
+      scope: [SCOPE, withGmail || s.gmail ? GMAIL_SCOPE : '', withDrive || s.drive ? DRIVE_FILE_SCOPE : ''].filter(Boolean).join(' '),
       code_challenge: challenge,
       code_challenge_method: 'S256',
       state,
@@ -261,13 +273,15 @@ export async function connect(withGmail = false): Promise<CalendarSourcesStatus>
     s.email = emailFromIdToken(tokens.id_token)
     s.scopes = typeof tokens.scope === 'string' ? tokens.scope : undefined
     if (withGmail) s.gmail = true
+    if (withDrive) s.drive = true
     accessToken = { token: String(tokens.access_token), expires: Date.now() + Number(tokens.expires_in ?? 3600) * 1000 }
     googleError = undefined
     save()
     if (withGmail && !hasGmail()) throw new Error('Google didn’t give Notes access to your email. Connect again and tick the Gmail box.')
+    if (withDrive && !(s.scopes ?? '').split(' ').includes(DRIVE_FILE_SCOPE)) throw new Error('Google didn’t give Orbit access to Drive. Connect again and tick the Drive box.')
     // Connecting from the Email page shouldn't fail just because the calendar isn't set up.
     await refreshCalendarList().catch((err) => {
-      if (!withGmail) throw err
+      if (!withGmail && !withDrive) throw err
     })
     return status()
   } finally {
@@ -285,6 +299,7 @@ export async function disconnect(): Promise<CalendarSourcesStatus> {
   s.email = undefined
   s.scopes = undefined
   s.gmail = undefined
+  s.drive = undefined
   s.calendars = []
   accessToken = null
   googleError = undefined
@@ -348,7 +363,8 @@ async function refreshCalendarList(): Promise<void> {
   s.calendars = items.map((c) => ({
     id: String(c.id),
     name: String(c.summaryOverride ?? c.summary ?? c.id),
-    color: String(c.backgroundColor ?? '#5ea8ff')
+    color: String(c.backgroundColor ?? '#5ea8ff'),
+    writable: c.accessRole === 'owner' || c.accessRole === 'writer'
   }))
   save()
 }
@@ -367,6 +383,8 @@ interface GoogleEvent {
   summary?: string
   location?: string
   htmlLink?: string
+  description?: string
+  recurringEventId?: string
   start?: { date?: string; dateTime?: string }
   end?: { date?: string; dateTime?: string }
 }
@@ -400,13 +418,88 @@ async function googleEvents(from: string, to: string): Promise<CalEvent[]> {
           start: allDay ? e.start.date! : new Date(e.start.dateTime!).toISOString(),
           end: allDay ? (e.end?.date ?? e.start.date!) : new Date(e.end?.dateTime ?? e.start.dateTime!).toISOString(),
           location: e.location,
-          url: e.htmlLink
+          url: e.htmlLink,
+          google: {
+            calendarId: cal.id,
+            eventId: e.id,
+            editable: !!cal.writable && canEdit(),
+            recurring: !!e.recurringEventId,
+            ...(e.description ? { description: e.description } : {})
+          }
         })
       }
       pageToken = page.nextPageToken as string | undefined
     } while (pageToken)
   }
   return out
+}
+
+// ---------- changing Google events ----------
+
+async function googleSend(method: 'POST' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<Record<string, unknown>> {
+  if (!canEdit()) throw new Error('Orbit can only read your Google Calendar so far. Press Reconnect in Settings → Calendar and allow it to change events.')
+  const token = await getAccessToken()
+  if (!token) throw new Error(googleError ?? 'Not connected to Google.')
+  const res = await net.fetch(API_URL + path, {
+    method,
+    headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    ...(body ? { body: JSON.stringify(body) } : {})
+  })
+  if (res.status === 403) throw new Error('Google says you can’t change events in that calendar.')
+  if (res.status === 404 || res.status === 410) throw new Error('That event isn’t in Google Calendar any more.')
+  if (!res.ok) throw new Error(`Google Calendar said ${res.status}.`)
+  return method === 'DELETE' ? {} : ((await res.json()) as Record<string, unknown>)
+}
+
+/** Our event fields → Google's (only the ones given, so a PATCH leaves the rest alone). */
+export function toGoogleBody(e: Partial<GoogleEventInput>): Record<string, unknown> {
+  const body: Record<string, unknown> = {}
+  if (e.title !== undefined) body.summary = e.title
+  if (e.location !== undefined) body.location = e.location
+  if (e.description !== undefined) body.description = e.description
+  if (e.start !== undefined && e.end !== undefined) {
+    // Setting one of date/dateTime means clearing the other, or Google refuses the change.
+    body.start = e.allDay ? { date: e.start, dateTime: null } : { dateTime: e.start, timeZone: e.timeZone, date: null }
+    body.end = e.allDay ? { date: e.end, dateTime: null } : { dateTime: e.end, timeZone: e.timeZone, date: null }
+  }
+  if (e.recurrence?.length) body.recurrence = e.recurrence
+  return body
+}
+
+function checkCalendar(calendarId: string): void {
+  const cal = load().calendars.find((c) => c.id === calendarId)
+  if (!cal) throw new Error('That Google calendar isn’t connected.')
+  if (!cal.writable) throw new Error(`You can only look at “${cal.name}”, not change it.`)
+}
+
+function checkInput(e: Partial<GoogleEventInput>, creating: boolean): void {
+  if (creating && !e.title?.trim()) throw new Error('Give the event a name.')
+  if ((e.start === undefined) !== (e.end === undefined)) throw new Error('An event needs both a start and an end.')
+  if (e.start !== undefined && e.end !== undefined) {
+    const shape = e.allDay ? /^\d{4}-\d{2}-\d{2}$/ : /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/
+    if (!shape.test(e.start) || !shape.test(e.end)) throw new Error('That date or time isn’t right.')
+    if (e.end <= e.start) throw new Error('The event has to end after it starts.')
+    if (!e.allDay && !e.timeZone) throw new Error('Missing time zone.')
+  }
+}
+
+export async function createEvent(calendarId: string, event: GoogleEventInput): Promise<void> {
+  checkCalendar(calendarId)
+  checkInput(event, true)
+  await googleSend('POST', `/calendars/${encodeURIComponent(calendarId)}/events`, toGoogleBody(event))
+}
+
+export async function updateEvent(calendarId: string, eventId: string, event: Partial<GoogleEventInput>): Promise<void> {
+  checkCalendar(calendarId)
+  checkInput(event, false)
+  // Changing the repeat of an existing event isn't offered (Google's own page does that best).
+  const { recurrence: _ignored, ...change } = event
+  await googleSend('PATCH', `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`, toGoogleBody(change))
+}
+
+export async function deleteEvent(calendarId: string, eventId: string): Promise<void> {
+  checkCalendar(calendarId)
+  await googleSend('DELETE', `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`)
 }
 
 // ---------- calendar links (.ics) ----------
