@@ -1,0 +1,29 @@
+{
+  "//": "Add-ons that are separate downloads rather than part of Orbit. Each one's code is everything its entry reaches inside the folders and files listed in own; anything else it uses must come from Orbit (src/shared/addonHostModules.json). Build with: npm run build-addon -- <id>",
+  "mini-games": {
+    "entry": "src/renderer/src/components/MiniGames/MiniGamesPage.tsx",
+    "own": [
+      "src/renderer/src/components/MiniGames/",
+      "src/renderer/src/components/Sudoku/",
+      "src/renderer/src/components/Minesweeper/",
+      "src/renderer/src/lib/sudoku.ts",
+      "src/renderer/src/lib/celebrate.ts",
+      "src/renderer/src/lib/minesweeper.ts",
+      "src/renderer/src/lib/nonogram.ts",
+      "src/renderer/src/lib/jigsaw.ts",
+      "src/renderer/src/lib/wordle.ts",
+      "src/renderer/src/lib/wordleWords.ts",
+      "src/renderer/src/lib/wordleWalkingDead.ts",
+      "src/renderer/src/lib/wordSearch.ts",
+      "src/renderer/src/lib/wordSearchWords.ts",
+      "src/renderer/src/lib/gameStats.ts",
+      "src/renderer/src/lib/hangman.ts",
+      "src/renderer/src/lib/breakout.ts",
+      "src/renderer/src/lib/blackjack.ts",
+      "src/renderer/src/lib/game2048.ts",
+      "src/renderer/src/lib/chess.ts",
+      "src/renderer/src/lib/chessPieces.ts",
+      "src/renderer/src/lib/solitaire.ts"
+    ]
+  }
+}

@@ -24364,6 +24364,11 @@ img.tm-icon {
   min-height: 36px;
   justify-content: center;
 }
+.addon-download-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
 .addon-picture {
   display: grid;
   place-items: center;

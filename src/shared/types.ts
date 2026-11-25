@@ -566,6 +566,10 @@ export interface NotesApi {
   importTheme(): Promise<{ theme?: Theme; error?: string; canceled?: boolean }>
   removeTheme(id: string): Promise<void>
   onThemesChanged(callback: (themes: Theme[]) => void): () => void
+  /** Add-ons that are separate downloads: where each one's download is up to (main/addonFiles.ts). */
+  addonFileStates(): Promise<Record<string, import('./addonPackages').AddonFileState>>
+  retryAddonDownload(id: string): Promise<void>
+  onAddonFilesChanged(callback: (states: Record<string, import('./addonPackages').AddonFileState>) => void): () => void
   /** Shows notes.log (problems Notes ran into) in File Explorer / Finder. */
   showLog(): Promise<void>
   /** Puts the window into (or out of) full screen. */

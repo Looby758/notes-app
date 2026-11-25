@@ -1,0 +1,11 @@
+{
+  "//": "What Orbit lends to add-ons it downloads: each key is the name a downloaded add-on asks for, and each value is the module it gets. They share these with Orbit (one React, one pet, one mini games store) rather than bringing their own copies. scripts/build-addon.mjs reads this, and lib/addonHost.ts provides them. Changing what one of these exports means building the add-ons again.",
+  "modules": {
+    "react": "react",
+    "react_jsx_runtime": "react/jsx-runtime",
+    "lib_pet": "src/renderer/src/lib/pet.ts",
+    "lib_gameSound": "src/renderer/src/lib/gameSound.ts",
+    "lib_motion": "src/renderer/src/lib/motion.ts",
+    "store_miniGames": "src/renderer/src/store/miniGames.ts"
+  }
+}

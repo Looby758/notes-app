@@ -102,6 +102,9 @@ export function addonForChannel(channel: string): string | null {
   return i > 0 ? (CHANNEL_ADDONS[channel.slice(0, i)] ?? null) : null
 }
 
+/** The add-ons added on this computer. */
+export const addedAddons = (): readonly string[] => installed()
+
 /** Whether an add-on is added on this computer. */
 export const addonOn = (id: string): boolean => installed().includes(id)
 

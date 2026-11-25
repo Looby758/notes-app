@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Check, CloudSun, Network, PenLine, Puzzle, Search, StickyNote, type LucideIcon } from 'lucide-react'
 import { ADDONS, addAddon, addonById, neededBy, removeAddon, type AddonInfo } from '@shared/addons'
 import { ADDON_ABOUT, ADDON_CATEGORIES } from '@shared/addonDetails'
+import { ADDON_PACKAGES } from '@shared/addonPackages'
+import { useAddonFile } from '../../store/addonFiles'
 import { FEATURE_INFO } from '../../lib/featureInfo'
 import { featureById } from '../../lib/features'
 import { setPrefs, usePrefs } from '../../store/prefs'
@@ -161,6 +163,7 @@ function Details({ addon: a, installed, removing, setRemoving }: { addon: AddonI
           </button>
         )}
       </div>
+      {ADDON_PACKAGES[a.id] && <DownloadNote id={a.id} on={on} />}
       {removing && (
         <p className="addon-confirm">
           Removing {a.name} also removes {list(users.map(nameOf))}, which need it.{' '}
@@ -237,5 +240,30 @@ export function AddonMissing({ addon: id }: { addon: string }) {
         </button>
       </div>
     </div>
+  )
+}
+
+const kb = (bytes: number): string => (bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`)
+
+/** For an add-on that's a separate download: its size, or how its download is going. */
+function DownloadNote({ id, on }: { id: string; on: boolean }) {
+  const file = useAddonFile(id)
+  const size = kb(ADDON_PACKAGES[id].size)
+  let text = `A ${size} download when you add it.`
+  if (on && file?.state === 'downloading') text = `Downloading… ${kb(file.received)} of ${kb(file.total)}`
+  else if (on && file?.state === 'failed') text = `Couldn’t download it: ${file.error}.`
+  else if (on && file?.state === 'ready') text = `Downloaded (${size}).`
+  return (
+    <p className="addon-download-note" data-addon-download={file?.state ?? 'missing'}>
+      {text}
+      {on && file?.state === 'failed' && (
+        <>
+          {' '}
+          <button className="btn" onClick={() => void window.api.retryAddonDownload(id)}>
+            Try again
+          </button>
+        </>
+      )}
+    </p>
   )
 }

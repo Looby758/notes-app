@@ -103,6 +103,7 @@ import { setupTerminal } from './terminal'
 import { setupAppStudio } from './appStudio'
 import { setupReleaseHelper } from './releaseHelper'
 import { addonOn, addonsMaybeChanged, setupAddonGate, startsCoreOnly } from './addonGate'
+import { ADDON_FILES_SCHEME, setupAddonFiles } from './addonFiles'
 import { cleanInstalledAddons } from '@shared/addons'
 import { TEST_COPY, TEST_COPY_FOLDER, testCopyReadOnly, WINDOWS_APP_ID } from './testCopy'
 import { setupGames } from './games'
@@ -442,7 +443,8 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'vault', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
   CODE_SANDBOX_SCHEME,
   THEME_SCHEME,
-  SKYBLOCK_TEX_SCHEME
+  SKYBLOCK_TEX_SCHEME,
+  ADDON_FILES_SCHEME
 ])
 
 /** Your own music and soundboard clips go through the Web Audio visualiser, which needs this. */
@@ -1084,6 +1086,7 @@ app.whenReady().then(async () => {
       ALLOWED_PERMISSIONS.has(permission) || (permission === 'media' && ((details as { mediaType?: string }).mediaType === 'audio' || isAppPage(wc)))
   )
   registerVaultProtocol()
+  safely('add-on downloads', setupAddonFiles)
   registerCodeSandbox()
   registerIpc()
   setupOpenInOrbit(() => mainWindow, showMain)

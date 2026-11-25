@@ -11,9 +11,10 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "build:win": "npm run typecheck && npm test && electron-vite build && electron-builder --win --publish never",
-    "build:mac": "npm run typecheck && npm test && electron-vite build && electron-builder --mac --publish never",
-    "pack-theme": "node scripts/pack-theme.cjs"
+    "build:win": "npm run typecheck && npm test && node scripts/build-addon.mjs --check && electron-vite build && electron-builder --win --publish never",
+    "build:mac": "npm run typecheck && npm test && node scripts/build-addon.mjs --check && electron-vite build && electron-builder --mac --publish never",
+    "pack-theme": "node scripts/pack-theme.cjs",
+    "build-addon": "node scripts/build-addon.mjs"
   },
   "//": "Only the main process's runtime packages go in dependencies; everything the renderer uses is bundled by Vite, so it lives in devDependencies and stays out of the installer.",
   "dependencies": {

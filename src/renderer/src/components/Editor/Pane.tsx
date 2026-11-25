@@ -93,7 +93,7 @@ import ConvertPage from '../Convert/ConvertPage'
 import FileSenderPage from '../FileSender/FileSenderPage'
 import DownloadsPage from '../Downloads/DownloadsPage'
 import PdfEditorPage from '../PdfEditor/PdfEditorPage'
-import MiniGamesPage from '../MiniGames/MiniGamesPage'
+import AddonView from '../AddonView'
 import ComicsPage from '../Comics/ComicsPage'
 import WikiPage from '../Wiki/WikiPage'
 import WorldClocksPage from '../Clocks/WorldClocksPage'
@@ -260,7 +260,7 @@ export default function Pane({ pane }: { pane: string }) {
         {shown === PDF_EDITOR_TAB && <PdfEditorPage />}
         {shown === COMICS_TAB && <ComicsPage />}
         {shown === WIKI_TAB && <WikiPage />}
-        {shown === MINIGAMES_TAB && <MiniGamesPage />}
+        {shown === MINIGAMES_TAB && <AddonView id="mini-games" />}
         {shown === CLOCKS_TAB && <WorldClocksPage />}
         {shown === COUNTDOWNS_TAB && <CountdownsPage />}
         {shown === SKYBLOCK_GOALS_TAB && <SkyblockGoalsPage />}

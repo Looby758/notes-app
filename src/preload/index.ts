@@ -31,6 +31,9 @@ const api: NotesApi = {
     ipcRenderer.on('themes:changed', handler)
     return () => ipcRenderer.removeListener('themes:changed', handler)
   },
+  addonFileStates: () => ipcRenderer.invoke('addonFiles:states'),
+  retryAddonDownload: (id) => ipcRenderer.invoke('addonFiles:retry', id),
+  onAddonFilesChanged: (callback) => on('addonFiles:changed', callback),
   showLog: () => ipcRenderer.invoke('app:showLog'),
   setFullScreen: (on) => ipcRenderer.invoke('app:fullscreen', on),
   showReminder: (r) => ipcRenderer.invoke('reminder:show', r),
