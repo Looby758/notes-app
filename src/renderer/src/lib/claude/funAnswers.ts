@@ -1,5 +1,7 @@
 import { compactJson } from '@shared/claudeHelpers'
 import type { ComicShelfItem } from '@shared/comics'
+import { findGame } from '@shared/gameMatch'
+import { sortGames, type Game, type GameSort, type GameSource } from '@shared/games'
 import { loadRecords, winPercent } from '../gameStats'
 import { MINI_GAME_IDS, openMiniGames, type MiniGameId } from '../../store/miniGames'
 import { readComic } from '../../store/comics'
@@ -65,27 +67,87 @@ async function readScreenshotFor(args: Args): Promise<string> {
 
 const hours = (s: number): string => (s >= 3600 ? `${(s / 3600).toFixed(1)} h` : `${Math.round(s / 60)} min`)
 
-async function gamesFor(): Promise<string> {
+const LAUNCHERS: Record<GameSource, string> = { steam: 'Steam', epic: 'Epic Games', roblox: 'Roblox', app: 'app', added: 'added by you' }
+const SOURCE_WORDS: Record<string, GameSource> = { steam: 'steam', epic: 'epic', 'epic games': 'epic', roblox: 'roblox', app: 'app', apps: 'app', 'mac app': 'app', added: 'added' }
+
+/** One game as Claude reads it, with its id (to start exactly that one). */
+function gameLine(g: Game): string {
+  const bits = [g.running ? 'playing now' : '', `${hours(g.played)} in all`, g.playedWeek ? `${hours(g.playedWeek)} this week` : '', g.lastPlayed ? `last played ${when(g.lastPlayed)}` : 'never played in Orbit', g.hidden ? 'hidden on the Games page' : '']
+  return `${g.name} [${LAUNCHERS[g.source]}] (id ${g.id}): ${bits.filter(Boolean).join(', ')}`
+}
+
+async function gamesFor(args: Args): Promise<string> {
+  const { games, steam, epic } = await window.api.gamesList(args.rescan === true)
+  const source = SOURCE_WORDS[str(args.launcher).toLowerCase().trim()]
+  if (str(args.launcher) && !source) throw new Error('The launcher has to be steam, epic, roblox, app or added.')
+  const by: GameSort = args.sort === 'most' || args.sort === 'name' ? args.sort : 'recent'
+  const limit = Math.min(500, Math.max(1, num(args.limit, 100)))
+  const list = sortGames(
+    games.filter((g) => (args.hidden === true || !g.hidden) && (!source || g.source === source)),
+    by
+  )
+  const notes = [!steam ? 'Steam isn’t installed on this computer.' : '', !epic ? 'The Epic Games Launcher isn’t installed on this computer.' : ''].filter(Boolean)
+  const hiddenCount = games.filter((g) => g.hidden).length
+  if (!list.length) return [source ? `No ${LAUNCHERS[source]} games found.` : 'No games found on this computer.', ...notes, 'Games installed since Orbit last looked show up with rescan: true. Any other game can be added on the Games page (Add a game).'].join(' ')
+  const week = games.reduce((sum, g) => sum + g.playedWeek, 0)
+  const head = `${list.length} game${list.length === 1 ? '' : 's'}${source ? ` from ${LAUNCHERS[source]}` : ''}, ${by === 'recent' ? 'last played first' : by === 'most' ? 'most played first' : 'A to Z'} (playing now always first). ${hours(week)} played this week in all.${hiddenCount && args.hidden !== true ? ` ${hiddenCount} hidden on the Games page (hidden: true shows them).` : ''}`
+  const lines = list.slice(0, limit).map(gameLine)
+  if (list.length > limit) lines.push(`…and ${list.length - limit} more.`)
+  return [[head, ...notes].join(' '), '', ...lines].join('\n')
+}
+
+/** The list of names, for asking which one. */
+const nameList = (games: Game[]): string => games.map((g) => `${g.name} [${LAUNCHERS[g.source]}] (id ${g.id})`).join('; ')
+
+/** The game Claude means, or a clear message (never a guess): by id from a list, or by name. */
+async function theGame(args: Args): Promise<Game> {
   const { games } = await window.api.gamesList(false)
-  const shown = games.filter((g) => !g.hidden)
-  if (!shown.length) return 'No games found on this computer.'
-  return shown
-    .sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))
-    .map((g) => `${g.name} (${g.source})${g.running ? ', playing now' : ''}: ${hours(g.played)} in all, ${hours(g.playedWeek)} this week${g.lastPlayed ? `, last played ${when(g.lastPlayed)}` : ''}`)
-    .join('\n')
+  const want = str(args.id).trim() || str(args.game).trim()
+  if (!want) throw new Error('Say which game (its name, or its id from list_games or search_games).')
+  let m = findGame(games, want)
+  if (m.kind === 'none' && !m.close.length) {
+    // Maybe it was installed since Orbit last looked.
+    const fresh = await window.api.gamesList(true)
+    m = findGame(fresh.games, want)
+  }
+  if (m.kind === 'one') return m.game
+  if (m.kind === 'several') throw new Error(`More than one game fits “${want}”: ${nameList(m.games)}. Ask the user which one, then use its id. Nothing was started.`)
+  if (m.close.length) throw new Error(`There’s no game called “${want}”, so nothing was started. Did they mean ${nameList(m.close)}? Check with the user, then use the id.`)
+  throw new Error(`There’s no game called “${want}” on the Games page, so nothing was started. If it’s installed, it can be added on the Games page (Add a game).`)
+}
+
+async function searchGamesFor(args: Args): Promise<string> {
+  const want = str(args.query).trim()
+  if (!want) throw new Error('Say what to look for.')
+  const { games } = await window.api.gamesList(false)
+  const m = findGame(games, want)
+  if (m.kind === 'one') return `One game fits “${want}”${m.how === 'initials' ? ' (by its initials)' : ''}:\n${gameLine(m.game)}`
+  if (m.kind === 'several') return `${m.games.length} games fit “${want}” equally well, so ask which:\n${m.games.map(gameLine).join('\n')}`
+  if (m.close.length) return `No game is called “${want}”. The closest (not a sure match):\n${m.close.map(gameLine).join('\n')}`
+  return `No game like “${want}” on the Games page.`
 }
 
 async function playGameFor(args: Args): Promise<string> {
-  const { games } = await window.api.gamesList(false)
-  const g = pickOne(
-    games.filter((x) => !x.hidden),
-    str(args.game),
-    (x) => x.name,
-    'game'
-  )
+  const g = await theGame(args)
+  if (g.running) return `${g.name} is already running.`
   const problem = await window.api.gamesPlay(g.id)
   if (problem) throw new Error(problem)
-  return `Starting ${g.name}.`
+  const via = g.source === 'steam' ? ' through Steam' : g.source === 'epic' ? ' through the Epic Games Launcher' : ''
+  return `Starting ${g.name}${via}. It can take a moment to open.`
+}
+
+async function hideGameFor(args: Args): Promise<string> {
+  const g = await theGame(args)
+  const hide = args.hidden !== false
+  if (g.hidden === hide) return `${g.name} is already ${hide ? 'hidden' : 'shown'} on the Games page.`
+  await window.api.gamesSetHidden(g.id, hide)
+  return hide ? `Hid ${g.name} from the Games page (it can still be started by its whole name).` : `${g.name} is back on the Games page.`
+}
+
+async function showGameFolderFor(args: Args): Promise<string> {
+  const g = await theGame(args)
+  await window.api.gamesReveal(g.id)
+  return `Showed where ${g.name} is installed (${g.path}).`
 }
 
 const MINI_NAMES: Record<MiniGameId, string> = {
@@ -204,7 +266,10 @@ export const FUN_ANSWERS: Record<string, Answer> = {
   find_screenshots: findScreenshotsFor,
   read_screenshot: readScreenshotFor,
   list_games: gamesFor,
+  search_games: searchGamesFor,
   play_game: playGameFor,
+  hide_game: hideGameFor,
+  show_game_folder: showGameFolderFor,
   mini_game_stats: miniStatsFor,
   open_mini_game: openMiniGameFor,
   skyblock_profile: skyblockProfileFor,

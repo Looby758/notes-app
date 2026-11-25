@@ -607,6 +607,8 @@ export function setupGames(): void {
     s.hidden = s.hidden.filter((h) => h !== id)
     if (hide) s.hidden.push(id)
     saveStore()
+    // So an open Games page shows it (Claude Desktop can hide games too).
+    broadcast()
   })
 
   ipcMain.handle('games:add', async (event) => {

@@ -137,7 +137,7 @@ export function orbitMcpServer(d: ToolDeps = deps()): McpServer {
     { name: 'orbit', version: app.getVersion?.() ?? '1.0.0' },
     {
       instructions:
-        'Orbit is the user’s notes app, and much more. These tools read and change what’s in it, for whichever parts the user switched on: notes and mind maps, calendar, reminders, weather and a morning briefing, money, flashcards, files and screenshots, music (moods, a DJ, routines), videos, the task manager, the Home page, themes and focus mode, games, SkyBlock and comics, Discord, the phone, Orbit’s web browser, wikis and dictionary, clipboard history, App Studio and email. open_page opens any of Orbit’s pages. Passwords, locked notes and keys are never available.'
+        'Orbit is the user’s notes app, and much more. These tools read and change what’s in it, for whichever parts the user switched on: notes and mind maps, calendar, reminders, weather and a morning briefing, money, flashcards, files and screenshots, music (moods, a DJ, routines), videos, the task manager, the Home page, themes and focus mode, games (finding and starting Steam, Epic and other games; ask the user when a name fits more than one), SkyBlock and comics, Discord, the phone, Orbit’s web browser, wikis and dictionary, clipboard history, App Studio and email. open_page opens any of Orbit’s pages. Passwords, locked notes and keys are never available.'
     }
   )
   registerOrbitTools(mcp, d)

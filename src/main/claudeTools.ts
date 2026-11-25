@@ -1135,8 +1135,41 @@ function lookTools(server: McpServer, deps: ToolDeps): void {
 // ---------- Games, SkyBlock and comics ----------
 
 function gamesTools(server: McpServer, deps: ToolDeps): void {
-  windowTool(server, deps, 'list_games', { title: 'Games', description: 'The games on the computer, with time played in all and this week, and when each was last played.', inputSchema: {} })
-  windowTool(server, deps, 'play_game', { title: 'Start a game', description: 'Starts one of the computer’s games.', inputSchema: { game: z.string().min(1) }, write: true })
+  const which = {
+    game: z.string().optional().describe('The game’s name, as the user says it (“Minecraft”, “GTA 5”)'),
+    id: z.string().optional().describe('The game’s id from list_games or search_games: use it once the user has said which, so exactly that game is used')
+  }
+  windowTool(server, deps, 'list_games', {
+    title: 'Games',
+    description:
+      'The games on the Games page (Steam, Epic Games, Roblox, apps and ones the user added), each with its launcher, id, whether it’s running, time played in all and this week, and when it was last played. Sort by recent (default, so the first ones are the recently played), most or name.',
+    inputSchema: {
+      sort: z.enum(['recent', 'most', 'name']).optional(),
+      launcher: z.enum(['steam', 'epic', 'roblox', 'app', 'added']).optional().describe('Only games from this launcher'),
+      hidden: z.boolean().optional().describe('Include games hidden on the Games page'),
+      rescan: z.boolean().optional().describe('Look for newly installed games first (slower)'),
+      limit: z.number().int().min(1).max(500).optional()
+    }
+  })
+  windowTool(server, deps, 'search_games', {
+    title: 'Find a game',
+    description: 'Finds the game the user means by name: the one that fits, the several that fit equally well, or the nearest names when none fits. Starts nothing.',
+    inputSchema: { query: z.string().min(1) }
+  })
+  windowTool(server, deps, 'play_game', {
+    title: 'Start a game',
+    description:
+      'Starts a game from the Games page, through Steam or the Epic Games Launcher when it’s from there. Only starts a game the name clearly means (the whole name, the same words, or initials like “GTA 5”): if several fit, or only part of a name does, nothing starts and the choices come back, so ask the user, then pass the id.',
+    inputSchema: which,
+    write: true
+  })
+  windowTool(server, deps, 'hide_game', {
+    title: 'Hide or show a game',
+    description: 'Hides a game from the Games page (hidden: false shows it again). Nothing is uninstalled.',
+    inputSchema: { ...which, hidden: z.boolean().optional().describe('false to show it again (default true)') },
+    write: true
+  })
+  windowTool(server, deps, 'show_game_folder', { title: 'Show a game’s folder', description: 'Opens the folder a game is installed in.', inputSchema: which, write: true })
   windowTool(server, deps, 'mini_game_stats', { title: 'Mini game scores', description: 'Orbit’s mini games: games played and won, win streaks and best times.', inputSchema: {} })
   windowTool(server, deps, 'open_mini_game', {
     title: 'Open a mini game',
