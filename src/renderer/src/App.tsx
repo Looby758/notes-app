@@ -12,6 +12,7 @@ import StartupLogo from './components/Motion/StartupLogo'
 import { openVideo } from './store/videoPlayer'
 import { useAddonOn } from './lib/addons'
 import { startFileSend } from './store/fileSend'
+import { answerClaude } from './lib/claudeAnswers'
 
 export default function App() {
   // undefined = still loading, null = no vault chosen yet
@@ -53,6 +54,9 @@ export default function App() {
       }),
     []
   )
+
+  // Claude Desktop's questions (Settings → AI → Claude Desktop) are answered here, where everything is loaded.
+  useEffect(() => answerClaude(), [])
 
   // A video handed back from the video window ("Back into Orbit") carries on in the player tab.
   useEffect(() => window.api.onVideoWindow((event, path) => event === 'popIn' && openVideo(path)), [])

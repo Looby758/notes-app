@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { existsSync } from 'fs'
-import { copyFile, mkdir, rm, writeFile } from 'fs/promises'
-import { join } from 'path'
+import { copyFile, mkdir, readFile, rm, stat, writeFile } from 'fs/promises'
+import { basename, dirname, extname, isAbsolute, join } from 'path'
 import type { ExportData, SaveFormat } from '@shared/types'
 import { convertedPath } from './converter'
 
@@ -31,6 +31,17 @@ const FILTERS: Record<SaveFormat, Electron.FileFilter> = {
 let lastFolder: string | null = null
 /** Only files Notes itself exported can be revealed. */
 const exported = new Set<string>()
+
+const MAX_CONVERT_BYTES = 500 * 1024 * 1024
+
+/** `name` in `folder`, or "name (2).ext" and so on when that's taken: nothing is ever written over. */
+function freeName(folder: string, name: string): string {
+  const ext = extname(name)
+  const stem = name.slice(0, name.length - ext.length)
+  let path = join(folder, name)
+  for (let n = 2; existsSync(path); n++) path = join(folder, `${stem} (${n})${ext}`)
+  return path
+}
 
 /** Writes an exported file: its text or bytes, or a converted video copied from where it waits. */
 async function put(path: string, data: ExportData): Promise<void> {
@@ -94,6 +105,22 @@ export function setupExport(): void {
     lastFolder = parent
     exported.add(folder)
     return folder
+  })
+
+  // Claude Desktop's convert_file: reads the file to convert, and saves the result beside it.
+  ipcMain.handle('export:readForConvert', async (_e, path: unknown) => {
+    if (typeof path !== 'string' || !isAbsolute(path)) throw new Error('Give the file’s full path.')
+    const info = await stat(path).catch(() => null)
+    if (!info?.isFile()) throw new Error('That file isn’t there.')
+    if (info.size > MAX_CONVERT_BYTES) throw new Error('That file is too big to convert here (the most is 500 MB).')
+    return new Uint8Array(await readFile(path))
+  })
+  ipcMain.handle('export:beside', async (_e, original: unknown, name: unknown, data: ExportData) => {
+    if (typeof original !== 'string' || !isAbsolute(original) || typeof name !== 'string') throw new Error('No file to save beside.')
+    const target = freeName(dirname(original), basename(name).replace(/[\\/:*?"<>|]+/g, '-') || 'converted')
+    await put(target, data)
+    exported.add(target)
+    return target
   })
 
   ipcMain.handle('export:show', (_e, path: string) => {

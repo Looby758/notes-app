@@ -132,6 +132,22 @@ export function playNext(): boolean {
   return true
 }
 
+/** What Claude Desktop can ask the video that's playing to do (the player answers in a sentence). */
+export interface VideoCommand {
+  action: 'status' | 'play' | 'pause' | 'forward' | 'back' | 'seek' | 'restart' | 'speed' | 'volume' | 'mute' | 'unmute' | 'fullscreen' | 'exit_fullscreen'
+  value?: number
+}
+let commandHandler: ((c: VideoCommand) => string) | null = null
+/** The open player takes Claude's commands while it's open. */
+export function onVideoCommand(handler: (c: VideoCommand) => string): () => void {
+  commandHandler = handler
+  return () => {
+    if (commandHandler === handler) commandHandler = null
+  }
+}
+/** Gives the open player a command; null if no video is open in this window. */
+export const videoCommand = (c: VideoCommand): string | null => (commandHandler ? commandHandler(c) : null)
+
 /** Back to the list of videos. */
 export const closeVideo = (): void => useVideoPlayer.setState({ current: null })
 

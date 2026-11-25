@@ -77,6 +77,11 @@ export interface Settings {
   musicRemote?: boolean
   musicRemoteToken?: string
   musicRemotePort?: number
+  /** The Claude Desktop connection (main/claudeDesktop.ts): whether it's on, its secret (encrypted), its port, and which parts of Orbit it can see. */
+  claudeDesktop?: boolean
+  claudeDesktopToken?: string
+  claudeDesktopPort?: number
+  claudeDesktopAreas?: Partial<Record<import('./claudeDesktop').ClaudeArea, boolean>>
   /** One mouse, two computers: whether it's on, the paired computer, and how it's set up. */
   mouseShare?: ShareSaved
   /** Screens between the two computers: which of this computer's screens goes on the other one ('' = worked out). */
@@ -576,6 +581,8 @@ export interface NotesApi {
   /** Asks for a theme file and imports it. */
   importTheme(): Promise<{ theme?: Theme; error?: string; canceled?: boolean }>
   removeTheme(id: string): Promise<void>
+  /** Makes a theme from colours (theme.json fields) and an optional background picture (a file path or https address); resolves with it. */
+  makeTheme(manifest: Record<string, unknown>, picture?: string): Promise<import('./themes').Theme>
   onThemesChanged(callback: (themes: Theme[]) => void): () => void
   /** Shows notes.log (problems Notes ran into) in File Explorer / Finder. */
   showLog(): Promise<void>
@@ -831,6 +838,10 @@ export interface NotesApi {
   exportFiles(folderName: string, files: { name: string; data: ExportData }[]): Promise<string | null>
   /** Shows a file in File Explorer / Finder. */
   showExported(path: string): Promise<void>
+  /** A file's bytes (a full path, up to 500 MB), for converting it (Claude Desktop's convert_file). */
+  readForConvert(path: string): Promise<Uint8Array>
+  /** Saves a converted file in the same folder as `original`, never over another file; resolves with where. */
+  saveBeside(original: string, name: string, data: ExportData): Promise<string>
 
   // File converter
   /** An iPhone photo (HEIC/HEIF) as plain pixels: RGBA, 4 bytes a pixel. */
@@ -1223,6 +1234,16 @@ export interface NotesApi {
   /** The music phone remote (main/musicRemote.ts): whether it's on and its address; `fresh` makes a new address (the old one stops working). */
   musicRemoteStatus(): Promise<MusicRemoteStatus>
   setMusicRemote(on: boolean, fresh?: boolean): Promise<MusicRemoteStatus>
+  /** The Claude Desktop connection (main/claudeDesktop.ts). */
+  claudeDesktopStatus(): Promise<import('./claudeDesktop').ClaudeDesktopStatus>
+  setClaudeDesktop(on: boolean): Promise<import('./claudeDesktop').ClaudeDesktopStatus>
+  setClaudeArea(area: import('./claudeDesktop').ClaudeArea, on: boolean): Promise<import('./claudeDesktop').ClaudeDesktopStatus>
+  connectClaudeDesktop(): Promise<import('./claudeDesktop').ConnectResult>
+  disconnectClaudeDesktop(): Promise<import('./claudeDesktop').ClaudeDesktopStatus>
+  newClaudeDesktopToken(): Promise<import('./claudeDesktop').ClaudeDesktopStatus>
+  /** Claude Desktop asking something the window answers (renderer/lib/claudeAnswers.ts). */
+  onClaudeAsk(callback: (ask: { id: number; name: string; args: Record<string, unknown> }) => void): () => void
+  claudeAnswer(id: number, ok: boolean, value: string): void
   /** A song's lyrics (from a .lrc/.txt file next to it, or inside it), and saving them next to it. */
   localMusicLyrics(path: string): Promise<{ text: string; source: 'lrc' | 'txt' | 'tag' } | null>
   localMusicSaveLyrics(path: string, text: string): Promise<void>

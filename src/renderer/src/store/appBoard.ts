@@ -123,6 +123,16 @@ export function moveItem(id: string, column: BoardColumn, before?: string): void
   persist()
 }
 
+/** Changes a card's words or kind (Claude Desktop's edit_card). Returns the card as it is now. */
+export function updateItem(id: string, patch: Partial<Pick<BoardItem, 'title' | 'details' | 'kind'>>): BoardItem | null {
+  const item = useAppBoard.getState().items.find((i) => i.id === id)
+  if (!item) return null
+  const next = { ...item, ...patch, updated: now() }
+  useAppBoard.setState((s) => ({ items: s.items.map((i) => (i.id === id ? next : i)) }))
+  persist()
+  return next
+}
+
 export function deleteItem(id: string): void {
   useAppBoard.setState((s) => ({ items: s.items.filter((i) => i.id !== id), picked: s.picked.filter((p) => p !== id), editing: s.editing?.id === id ? null : s.editing }))
   persist()

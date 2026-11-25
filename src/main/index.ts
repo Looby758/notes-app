@@ -36,6 +36,7 @@ import * as spotify from './spotify'
 import * as localMusic from './localMusic'
 import { setupMusicData } from './musicData'
 import { setupMusicRemote } from './musicRemote'
+import { setupClaudeDesktop } from './claudeDesktop'
 import { setupSongSearch } from './songSearch'
 import { setupMusicTags } from './musicTags'
 import { setupMusicFromLink } from './musicFromLink'
@@ -1130,6 +1131,7 @@ app.whenReady().then(async () => {
   safely('Opera GX import', setupOperaImport)
   safely('Music mini player', () => setupMusicMini(currentPrefs, () => mainWindow))
   safely('music phone remote', setupMusicRemote)
+  safely('Claude Desktop connection', () => setupClaudeDesktop(() => mainWindow, (text) => text === copiedSecret))
   safely('keyboard media keys', setupMediaKeys)
   safely('pop-out window', () => setupPopout(currentPrefs))
   safely('export', setupExport)

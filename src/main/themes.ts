@@ -110,6 +110,48 @@ export async function importTheme(file: string): Promise<Theme> {
   return themes.find((t) => t.id === theme.id) ?? theme
 }
 
+/**
+ * A theme made by Claude Desktop (make_theme): colours, and a picture behind every page from a
+ * file on this computer or a web address. Saved like an imported theme, so it can be removed the same way.
+ */
+export async function makeTheme(manifest: Record<string, unknown>, picture?: string): Promise<Theme> {
+  let bytes: Buffer | null = null
+  let ext = ''
+  if (picture) {
+    if (/^https:\/\//i.test(picture)) {
+      const res = await net.fetch(picture)
+      if (!res.ok) throw new Error(`Couldn’t download the picture (${res.status}).`)
+      const type = (res.headers.get('content-type') ?? '').toLowerCase()
+      ext = type.includes('png') ? '.png' : type.includes('webp') ? '.webp' : type.includes('gif') ? '.gif' : type.includes('jpeg') || type.includes('jpg') ? '.jpg' : extname(new URL(picture).pathname).toLowerCase()
+      bytes = Buffer.from(await res.arrayBuffer())
+    } else {
+      ext = extname(picture).toLowerCase()
+      bytes = readFileSync(picture)
+    }
+    if (!PICTURE_TYPES.includes(ext)) throw new Error('The picture has to be a PNG, JPG, WebP or GIF.')
+    if (bytes.length > MAX_FILE_BYTES) throw new Error('That picture is too big (over 25 MB).')
+  }
+  const file = bytes ? `pictures/background${ext}` : null
+  const full = { ...manifest, format: 1, ...(file ? { pictures: { all: { file, position: 'center' } } } : {}) }
+  const result = readThemeManifest(full, (path) => path === file)
+  if ('error' in result) throw new Error(result.error)
+  const slug = slugOf(result.theme.id)
+  const target = join(themesDir(), slug)
+  const temp = join(themesDir(), `.${slug}-${Date.now()}`)
+  mkdirSync(join(temp, 'pictures'), { recursive: true })
+  try {
+    if (bytes && file) writeFileSync(join(temp, ...file.split('/')), bytes)
+    writeFileSync(join(temp, 'theme.json'), JSON.stringify(full, null, 2), 'utf8')
+    rmSync(target, { recursive: true, force: true })
+    renameSync(temp, target)
+  } catch (err) {
+    rmSync(temp, { recursive: true, force: true })
+    throw err
+  }
+  loadImportedThemes()
+  return themes.find((t) => t.id === result.theme.id) ?? result.theme
+}
+
 export function removeTheme(id: string): void {
   if (!id.startsWith(IMPORTED_PREFIX)) return
   const slug = slugOf(id)
@@ -168,6 +210,11 @@ export function setupThemes(onChange: (removed?: string) => void): void {
       logError('theme import', err)
       return { error: err instanceof Error ? err.message : String(err) }
     }
+  })
+  ipcMain.handle('themes:make', async (_e, manifest: Record<string, unknown>, picture?: string) => {
+    const theme = await makeTheme(manifest && typeof manifest === 'object' ? manifest : {}, typeof picture === 'string' && picture ? picture : undefined)
+    onChange()
+    return theme
   })
   ipcMain.handle('themes:remove', (_e, id: string) => {
     removeTheme(id)

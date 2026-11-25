@@ -26,6 +26,7 @@ const api: NotesApi = {
   listThemes: () => ipcRenderer.invoke('themes:list'),
   importTheme: () => ipcRenderer.invoke('themes:import'),
   removeTheme: (id) => ipcRenderer.invoke('themes:remove', id),
+  makeTheme: (manifest, picture) => ipcRenderer.invoke('themes:make', manifest, picture),
   onThemesChanged: (callback) => {
     const handler = (_e: unknown, themes: Parameters<typeof callback>[0]): void => callback(themes)
     ipcRenderer.on('themes:changed', handler)
@@ -249,6 +250,8 @@ const api: NotesApi = {
   exportFile: (name, format, data) => ipcRenderer.invoke('export:file', name, format, data),
   exportFiles: (folderName, files) => ipcRenderer.invoke('export:files', folderName, files),
   showExported: (path) => ipcRenderer.invoke('export:show', path),
+  readForConvert: (path) => ipcRenderer.invoke('export:readForConvert', path),
+  saveBeside: (original, name, data) => ipcRenderer.invoke('export:beside', original, name, data),
   decodeHeic: (data) => ipcRenderer.invoke('convert:heic', data),
   comicsShelf: () => ipcRenderer.invoke('comics:shelf'),
   comicsAdd: (paths) => ipcRenderer.invoke('comics:add', paths),
@@ -686,6 +689,18 @@ const api: NotesApi = {
   musicMiniLayout: () => ipcRenderer.invoke('musicMini:layout'),
   musicRemoteStatus: () => ipcRenderer.invoke('musicRemote:status'),
   setMusicRemote: (on, fresh) => ipcRenderer.invoke('musicRemote:set', on, fresh),
+  claudeDesktopStatus: () => ipcRenderer.invoke('claude:status'),
+  setClaudeDesktop: (on) => ipcRenderer.invoke('claude:set', on),
+  setClaudeArea: (area, on) => ipcRenderer.invoke('claude:setArea', area, on),
+  connectClaudeDesktop: () => ipcRenderer.invoke('claude:connect'),
+  disconnectClaudeDesktop: () => ipcRenderer.invoke('claude:disconnect'),
+  newClaudeDesktopToken: () => ipcRenderer.invoke('claude:newToken'),
+  onClaudeAsk: (callback) => {
+    const handler = (_e: unknown, ask: { id: number; name: string; args: Record<string, unknown> }): void => callback(ask)
+    ipcRenderer.on('claude:ask', handler)
+    return () => ipcRenderer.removeListener('claude:ask', handler)
+  },
+  claudeAnswer: (id, ok, value) => ipcRenderer.send('claude:answer', id, ok, value),
   localMusicLyrics: (path) => ipcRenderer.invoke('localMusic:lyrics', path),
   localMusicSaveLyrics: (path, text) => ipcRenderer.invoke('localMusic:saveLyrics', path, text),
   setMusicMiniLayout: (layout) => ipcRenderer.invoke('musicMini:setLayout', layout),

@@ -3,7 +3,7 @@ import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { gunzip } from 'zlib'
 import { promisify } from 'util'
-import { lookUp, readDictionary, type DictionaryData } from '@shared/dictionary'
+import { lookUp, POS_NAMES, readDictionary, type DictionaryData } from '@shared/dictionary'
 import type { MenuWord } from '@shared/types'
 import { logError } from './log'
 
@@ -64,4 +64,18 @@ export function setupDictionary(): void {
     menuWord = word && typeof word.word === 'string' ? { word: word.word.slice(0, 60), editable: !!word.editable } : null
     event.returnValue = null
   })
+}
+
+/** A word's meanings as text, for Claude Desktop's define_word. */
+export async function defineWord(word: string): Promise<string> {
+  const data = await load()
+  if (!data) throw new Error('Orbit’s dictionary couldn’t be loaded.')
+  const entry = lookUp(data, word)
+  if (!entry) return `“${word}” isn’t in Orbit’s dictionary.`
+  const senses = entry.senses.slice(0, 12).map((s, i) => {
+    const ex = s.examples[0] ? ` (“${s.examples[0]}”)` : ''
+    const syn = s.synonyms.length ? ` Also: ${s.synonyms.slice(0, 6).map((x) => x.word).join(', ')}.` : ''
+    return `${i + 1}. ${POS_NAMES[s.pos]}: ${s.definition}${ex}.${syn}`
+  })
+  return `${entry.lemma}${entry.lemma !== entry.word ? ` (from “${entry.word}”)` : ''}\n${senses.join('\n')}`
 }
