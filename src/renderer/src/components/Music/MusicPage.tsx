@@ -39,12 +39,15 @@ import {
   BarChart3,
   Maximize2,
   SlidersHorizontal,
-  Smartphone
+  Smartphone,
+  Lightbulb,
+  Radio
 } from 'lucide-react'
 import ListeningStats from './ListeningStats'
 import { openFullPlayer } from './FullPlayer'
 import { RemotePanel, SoundPanel } from './SoundPanel'
 import { filterSongs, localArtUrl, plainText, type LocalSong } from '@shared/localMusic'
+import { recommendSongs, songsLike } from '@shared/musicRecommend'
 import { formatTime } from '@shared/spotify'
 import {
   albumsOf,
@@ -114,6 +117,7 @@ type View =
   | { kind: 'liked' }
   | { kind: 'recent' }
   | { kind: 'most' }
+  | { kind: 'recommended' }
   | { kind: 'history' }
   | { kind: 'stats' }
   | { kind: 'playlist'; id: string }
@@ -277,6 +281,7 @@ function Sidebar({ view, setView, folder, loading, onSaveLink, linkOpen }: { vie
         {item({ kind: 'albums' }, <Disc3 size={16} />, 'Albums')}
         {item({ kind: 'artists' }, <Mic2 size={16} />, 'Artists')}
         {item({ kind: 'liked' }, <Heart size={16} />, 'Liked songs', likedCount ? String(likedCount) : undefined)}
+        {item({ kind: 'recommended' }, <Lightbulb size={16} />, 'Recommended')}
         {item({ kind: 'recent' }, <Sparkles size={16} />, 'Recently added')}
         {item({ kind: 'most' }, <TrendingUp size={16} />, 'Most played')}
         {item({ kind: 'history' }, <History size={16} />, 'History')}
@@ -447,6 +452,8 @@ function ViewContent({ view, setView, songs, folder }: { view: View; setView: (v
       return <SongView kicker="Your library" title="Recently added" icon={<Sparkles size={42} />} songs={recentlyAdded(songs)} setView={setView} folder={folder} defaultSort="added" />
     case 'most':
       return <SongView kicker="Your library" title="Most played" icon={<TrendingUp size={42} />} songs={mostPlayed(songs, data.stats)} setView={setView} folder={folder} empty="Songs you play show up here, counted after 30 seconds." />
+    case 'recommended':
+      return <RecommendedView songs={songs} setView={setView} folder={folder} />
     case 'history': {
       const list = [...data.history].reverse().map((h) => byPath.get(h.path)).filter((s): s is LocalSong => !!s).slice(0, 300)
       return <SongView kicker="Your library" title="History" icon={<History size={42} />} songs={list} setView={setView} folder={folder} empty="Songs you play show up here." />
@@ -703,6 +710,60 @@ function PlayButtons({ songs, extra }: { songs: LocalSong[]; extra?: React.React
   )
 }
 
+/** Plays a song and then songs that go with it (a song radio). */
+function playLike(song: LocalSong): void {
+  const { data } = useMusicData.getState()
+  const songs = useLocalMusic.getState().library?.songs ?? []
+  void playLocal([song, ...songsLike(song, data, songs, { now: Date.now(), seed: Date.now() })], 0)
+}
+
+/**
+ * Songs from your music picked from how you listen (shared/musicRecommend.ts). The list stays put
+ * while you play from it (plays would otherwise reshuffle it) until you press New picks.
+ */
+function RecommendedView({ songs, setView, folder }: { songs: LocalSong[]; setView: (v: View) => void; folder: string }) {
+  const loaded = useMusicData((s) => s.loaded)
+  const [seed, setSeed] = useState(() => Math.floor(Date.now() / 3_600_000))
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<{ by: SongSort; desc: boolean } | null>(null)
+  const stats = useMusicData((s) => s.data.stats)
+  const recs = useMemo(
+    () => (loaded ? recommendSongs(useMusicData.getState().data, songs, { now: Date.now(), seed, limit: 50 }) : []),
+    [loaded, songs, seed]
+  )
+  const shown = useMemo(() => {
+    const keep = new Set(filterSongs(recs.map((r) => r.song), query))
+    const found = recs.filter((r) => keep.has(r.song))
+    if (!sort) return found
+    const reasons = new Map(found.map((r) => [r.song, r.reason]))
+    return sortSongsBy(found.map((r) => r.song), sort.by, sort.desc, stats).map((song) => ({ song, reason: reasons.get(song) ?? '' }))
+  }, [recs, query, sort, stats])
+  const list = shown.map((r) => r.song)
+  const hasPlays = useMusicData((s) => s.data.history.length > 0 || Object.keys(s.data.liked).length > 0)
+  return (
+    <div className="mp-scroll">
+      <Header kicker="Made for you" title="Recommended" sub="From your own music, picked from what you play, like and rate" icon={<Lightbulb size={42} />} songs={list} />
+      <div className="mp-actions">
+        <PlayButtons
+          songs={list}
+          extra={
+            <button className="btn mp-add-songs mp-new-picks" onClick={() => setSeed((n) => n + 1)} title="A fresh set of recommendations" data-mp-new-picks>
+              <RefreshCw size={14} /> New picks
+            </button>
+          }
+        />
+        <FindBox value={query} onChange={setQuery} placeholder="Find in this list" />
+      </div>
+      {!hasPlays && recs.length > 0 && <p className="mp-note">Play, like and rate some songs and these get more like you. For now, here are some to try.</p>}
+      {shown.length === 0 ? (
+        <p className="mp-empty">{query ? 'Nothing found.' : 'Add some music and recommendations show up here.'}</p>
+      ) : (
+        <SongTable rows={shown.map((r, i) => ({ song: r.song, key: `${r.song.path}:${i}`, note: r.reason }))} setView={setView} folder={folder} sort={sort} onSort={setSort} />
+      )}
+    </div>
+  )
+}
+
 function PlaylistView({ playlist, byPath, setView, folder }: { playlist: MusicPlaylist; byPath: Map<string, LocalSong>; setView: (v: View) => void; folder: string }) {
   const entries = playlistSongs(playlist, byPath)
   const songs = entries.map((e) => e.song).filter((s): s is LocalSong => !!s)
@@ -766,6 +827,8 @@ interface Row {
   /** Where it is in the playlist (playlist views only). */
   position?: number
   path?: string
+  /** A line under the artist (why a song is recommended). */
+  note?: string
 }
 
 interface TableProps {
@@ -835,6 +898,7 @@ function SongTable({ rows, setView, folder, sort, onSort, showTrack, playlist }:
       { label: 'Play', icon: <Play size={14} />, onClick: () => playLocal(list, 0) },
       { label: 'Play next', icon: <ListStart size={14} />, onClick: () => void playNext(list) },
       { label: 'Add to Up next', icon: <ListEnd size={14} />, onClick: () => void addToQueue(list) },
+      ...(one ? [{ label: 'Play songs like this', icon: <Radio size={14} />, onClick: () => playLike(one) }] : []),
       'separator',
       { label: allLiked ? 'Remove from Liked songs' : 'Add to Liked songs', icon: <Heart size={14} />, onClick: () => void toggleLike(list) },
       {
@@ -995,6 +1059,7 @@ function SongTable({ rows, setView, folder, sort, onSort, showTrack, playlist }:
                 ) : (
                   <span>Not in your music folder</span>
                 )}
+                {r.note && <em className="mp-row-note">{r.note}</em>}
               </span>
             </span>
             <span className="mp-col-album">
@@ -1148,7 +1213,59 @@ function NowPlayingPanel({ setView }: { setView: (v: View) => void }) {
           )
         })}
       </ul>
+      {song && <UpNextSuggestions song={song} />}
     </aside>
+  )
+}
+
+/** A few songs that go with what's playing, to add to Up next with one press. */
+function UpNextSuggestions({ song }: { song: LocalSong }) {
+  const songs = useLocalMusic((s) => s.library?.songs)
+  const queue = useLocalMusic((s) => s.queue)
+  const index = useLocalMusic((s) => s.index)
+  const [seed, setSeed] = useState(1)
+  const [hidden, setHidden] = useState(false)
+  // Songs just played or coming up soon (playing a whole album or all your songs queues everything, so not the whole queue).
+  const queued = useMemo(() => new Set(queue.slice(Math.max(0, index - 5), index + 11).map((s) => s.path)), [queue, index])
+  // Worked out again only for a new song (not on every play counted), so the list doesn't jump about.
+  const pool = useMemo(
+    () => songsLike(song, useMusicData.getState().data, songs ?? [], { now: Date.now(), seed, limit: 20 }),
+    [song.path, songs, seed]
+  )
+  const picks = pool.filter((s) => !queued.has(s.path)).slice(0, 4)
+  if (!picks.length) return null
+  return (
+    <div className="mp-suggest" data-mp-suggest>
+      <div className="mp-queue-head">
+        <h3>Suggested</h3>
+        <span>
+          {!hidden && (
+            <button className="icon-btn" onClick={() => setSeed((n) => n + 1)} title="Other suggestions" data-mp-suggest-more>
+              <RefreshCw size={13} />
+            </button>
+          )}
+          <button className="link-btn" onClick={() => setHidden(!hidden)}>
+            {hidden ? 'Show' : 'Hide'}
+          </button>
+        </span>
+      </div>
+      {!hidden && (
+        <ul className="mp-queue">
+          {picks.map((s) => (
+            <li key={s.path} onDoubleClick={() => void addToQueue([s])} title="Double-click or press + to add it to Up next" data-mp-suggest-song={s.title}>
+              <span className="mp-row-art">{s.art ? <img src={localArtUrl(s.path, s.added)} alt="" loading="lazy" /> : <Music size={13} />}</span>
+              <span className="mp-row-text">
+                <strong>{s.title}</strong>
+                <span>{s.artist}</span>
+              </span>
+              <button className="icon-btn" onClick={() => void addToQueue([s])} title="Add to Up next" data-mp-suggest-add>
+                <Plus size={14} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 
