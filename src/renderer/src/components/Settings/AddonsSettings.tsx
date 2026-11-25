@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Check, CloudSun, Network, PenLine, Puzzle, Search, StickyNote, type LucideIcon } from 'lucide-react'
 import { ADDONS, addAddon, addonById, neededBy, removeAddon, type AddonInfo } from '@shared/addons'
-import { ADDON_ABOUT, ADDON_CATEGORIES } from '@shared/addonDetails'
+import { ADDON_ABOUT, ADDON_CATEGORIES, ADDON_HOW } from '@shared/addonDetails'
 import { FEATURE_INFO } from '../../lib/featureInfo'
 import { featureById } from '../../lib/features'
 import { setPrefs, usePrefs } from '../../store/prefs'
@@ -182,6 +182,19 @@ function Details({ addon: a, installed, removing, setRemoving }: { addon: AddonI
         )}
       </div>
       <p className="addon-about">{ADDON_ABOUT[a.id] ?? blurbOf(a)}</p>
+      {ADDON_HOW[a.id] && (
+        <section className="addon-how" aria-label="How it works">
+          <h4>How it works</h4>
+          <ul>
+            {ADDON_HOW[a.id].map(([lead, text]) => (
+              <li key={lead}>
+                <strong>{lead}</strong>
+                <span>{text}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {(needs.length > 0 || usedBy.length > 0) && (
         <div className="addon-facts">
           {needs.length > 0 && (

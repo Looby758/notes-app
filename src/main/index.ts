@@ -16,7 +16,7 @@ import {
   webContents,
   type MenuItemConstructorOptions
 } from 'electron'
-import { existsSync, statSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'fs'
 import { readFile } from 'fs/promises'
 import * as fsp from 'fs/promises'
 import { basename, extname, isAbsolute, join, relative } from 'path'
@@ -104,7 +104,7 @@ import { setupAppStudio } from './appStudio'
 import { setupReleaseHelper } from './releaseHelper'
 import { addonOn, addonsMaybeChanged, setupAddonGate, startsCoreOnly } from './addonGate'
 import { cleanInstalledAddons } from '@shared/addons'
-import { TEST_COPY, TEST_COPY_FOLDER, testCopyReadOnly, WINDOWS_APP_ID } from './testCopy'
+import { NEW_USER_TEST, newUserNotesFolder, TEST_COPY, TEST_COPY_FOLDER, testCopyReadOnly, WINDOWS_APP_ID } from './testCopy'
 import { setupGames } from './games'
 import { setupGameCovers } from './gameCovers'
 import { setupSkyblock } from './skyblock'
@@ -144,6 +144,20 @@ if (process.platform === 'win32') app.setAppUserModelId(WINDOWS_APP_ID)
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
+  // "Try as a new user" (App Studio): start from nothing every time, with an empty notes folder to
+  // pick. Only once this copy holds the lock (kept in the same folder), so a running one isn't wiped.
+  if (NEW_USER_TEST) {
+    const data = app.getPath('userData')
+    for (const name of existsSync(data) ? readdirSync(data) : []) {
+      if (name.startsWith('Singleton')) continue
+      try {
+        rmSync(join(data, name), { recursive: true, force: true })
+      } catch (err) {
+        console.error('Couldn’t clear a new-user test’s', name, err)
+      }
+    }
+    mkdirSync(newUserNotesFolder(), { recursive: true })
+  }
   // "Open in Orbit" from File Explorer while Orbit is running starts a second copy, which hands the file over here.
   app.on('second-instance', (_e, argv) => {
     // The taskbar's "Orbit Snip" or jump list: just snip, without bringing the window up.
@@ -519,7 +533,7 @@ function createWindow(): BrowserWindow {
     minHeight: 480,
     show: false,
     backgroundColor: BG,
-    ...(TEST_COPY ? { title: 'Orbit (test copy)' } : {}),
+    ...(TEST_COPY ? { title: NEW_USER_TEST ? 'Orbit (test copy, new user)' : 'Orbit (test copy)' } : {}),
     ...(IS_MAC
       ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 14, y: 12 } }
       : {
@@ -794,8 +808,9 @@ function registerIpc(): void {
   ipcMain.handle('vault:pick', async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)!
     const result = await dialog.showOpenDialog(win, {
-      title: 'Choose a folder for your notes',
+      title: NEW_USER_TEST ? 'Choose a folder for your notes (this new-user test starts in an empty one)' : 'Choose a folder for your notes',
       buttonLabel: 'Use this folder',
+      ...(NEW_USER_TEST ? { defaultPath: newUserNotesFolder() } : {}),
       properties: ['openDirectory', 'createDirectory', 'promptToCreate']
     })
     if (result.canceled || result.filePaths.length === 0) return null

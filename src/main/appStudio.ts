@@ -1,13 +1,13 @@
 import { app, ipcMain, net, safeStorage } from 'electron'
 import { execFile } from 'child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'fs'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'path'
 import { copyFolderName, githubRepo, isDownloadFile, isGitHubImage, parseAudit, parseOutdated, TOKEN_NOT_ALLOWED, readyForReviewError, mergeAfterReadyError, mergeBlockedReason, mergeFailedMessage, type Mergeability, type GraphQLError, type HealthReport, type BugReport, type AppInfo, type TestCopy, type GitHubStatus, type MergedPull, type PullRequest, type Release } from '@shared/appStudio'
 import { npmMissingText } from '@shared/toolPath'
 import { appNameProblem, appSlug, starterFiles, STARTERS, type MadeApp, type NewApp } from '@shared/appStarters'
 import { logError } from './log'
 import { findTool, toolEnv } from './toolPath'
-import { TEST_COPY } from './testCopy'
+import { copyDataFolders, TEST_COPY } from './testCopy'
 
 /**
  * App Studio's side of things: what git knows about each app's folder, and its pull requests on
@@ -168,12 +168,30 @@ async function addCopy(folder: string, branch: string): Promise<string> {
   return path
 }
 
+/** Whether a folder holds Orbit's own code (its package is "notesapp"). */
+function isOrbitFolder(folder: string): boolean {
+  try {
+    return (JSON.parse(readFileSync(join(folder, 'package.json'), 'utf8')) as { name?: string }).name === 'notesapp'
+  } catch {
+    return false
+  }
+}
+
 async function removeCopy(folder: string, path: string): Promise<void> {
   if (!inside(copiesDir(folder), path)) throw new Error('Not allowed')
+  const orbit = isOrbitFolder(path)
   const done = await gitLong(folder, ['worktree', 'remove', '--force', path])
   await gitLong(folder, ['worktree', 'prune'])
   if (!done.ok && existsSync(path)) {
     throw new Error(/busy|denied|permission|in use/i.test(done.err) ? 'Some of its files are in use. Close the app running from this copy first.' : `Git couldn’t remove it: ${done.err.split('\n').pop()}`)
+  }
+  // A copy of Orbit keeps its settings and saved data in a folder of its own in app data.
+  for (const data of orbit ? copyDataFolders(path) : []) {
+    try {
+      rmSync(data, { recursive: true, force: true })
+    } catch (err) {
+      logError('remove a test copy’s data', err)
+    }
   }
 }
 

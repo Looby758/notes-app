@@ -22,7 +22,27 @@ export const WINDOWS_APP_ID = TEST_COPY ? 'com.notesapp.desktop.testcopy' : 'com
 const copyOf = (dir: string): string | null => (/-test-copies$/.test(basename(dirname(dir))) ? basename(dir) : null)
 const copy = TEST_COPY ? copyOf(app.getAppPath()) : null
 
-export const TEST_COPY_FOLDER = copy ? `Orbit Test Copy (${copy})` : 'Orbit Test Copy'
+/**
+ * App Studio's "Try as a new user": a test copy started with ORBIT_NEW_USER=1 pretends nobody has
+ * used Orbit on this computer. It gets a data folder of its own that's emptied every time it starts,
+ * so it opens on the welcome screen with nothing saved, and starts with only the core add-ons. Only
+ * a test copy can do this; your installed Orbit ignores it.
+ */
+export const NEW_USER_TEST = TEST_COPY && process.env.ORBIT_NEW_USER === '1'
+
+export const TEST_COPY_FOLDER = (copy ? `Orbit Test Copy (${copy})` : 'Orbit Test Copy') + (NEW_USER_TEST ? ' (new user)' : '')
+
+/**
+ * Where a test copy made by App Studio (the folder at `copyPath`) keeps its settings and data: its
+ * own folder, and the one for trying it as a new user. Removing the copy removes these too.
+ */
+export function copyDataFolders(copyPath: string): string[] {
+  const name = basename(copyPath)
+  return [`Orbit Test Copy (${name})`, `Orbit Test Copy (${name}) (new user)`].map((f) => join(app.getPath('appData'), f))
+}
+
+/** In a new-user test, an empty notes folder for the folder picker to start in (so it can't pick your real one by accident). */
+export const newUserNotesFolder = (): string => join(app.getPath('userData'), 'Notes')
 
 /** The notes folder your installed Orbit uses, read from its own settings, or null if it can't be found. */
 export function realOrbitVault(): string | null {
