@@ -115,6 +115,7 @@ There's no secret to copy. The sign-in is stored encrypted, like the Google one,
 Also under the player:
 
 - **Floating mini player** (the picture-in-picture button, or Ctrl+K → *Music: floating mini player*): a small window with the song, play/pause and skip that stays on top of your other apps. Drag it anywhere; it comes back where you left it, and reopens with Notes if it was showing.
+- **Keyboard media keys**: play/pause, next and previous on your keyboard control your own music, even when another app is in front. Orbit only holds the keys while your music is playing (or for 10 minutes after you pause it), so Spotify and your browser get them back the rest of the time. The song, cover and progress also show in the Mac's Now Playing and Windows' media overlay. On a Mac, catching the keys in every app needs Accessibility (the same permission macros use).
 - **Add to note** (the notebook button): puts the song that's playing into the note you're writing, as a card with its picture. Click the card to play the song (Spotify songs and your own files both work); click **Edit** to see the link.
 - A **"Now playing" pop-up** in the top corner when the next song starts. Turn it off in Settings → Music.
 
