@@ -17,7 +17,7 @@ export const ADDON_CATEGORIES: { name: string; addons: string[] }[] = [
 /**
  * What each add-on is, in a few sentences, for its page on the Add-ons page (the store later).
  * Every add-on the store shows has one (addons.test.ts checks). Pictures are in
- * renderer/public/addons/<id>.webp.
+ * renderer/public/addons/<id>.webp, made by scripts/addon-pictures.mjs (a new add-on needs an entry there).
  */
 export const ADDON_ABOUT: Record<string, string> = {
   // Notes
