@@ -2,7 +2,7 @@ import { app, ipcMain, net, safeStorage } from 'electron'
 import { execFile } from 'child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'path'
-import { copyFolderName, githubRepo, isDownloadFile, isGitHubImage, parseAudit, parseOutdated, TOKEN_NOT_ALLOWED, type HealthReport, type BugReport, type AppInfo, type TestCopy, type GitHubStatus, type MergedPull, type PullRequest, type Release } from '@shared/appStudio'
+import { copyFolderName, githubRepo, isDownloadFile, isGitHubImage, parseAudit, parseOutdated, TOKEN_NOT_ALLOWED, readyForReviewError, mergeAfterReadyError, type GraphQLError, type HealthReport, type BugReport, type AppInfo, type TestCopy, type GitHubStatus, type MergedPull, type PullRequest, type Release } from '@shared/appStudio'
 import { npmMissingText } from '@shared/toolPath'
 import { appNameProblem, appSlug, starterFiles, STARTERS, type MadeApp, type NewApp } from '@shared/appStarters'
 import { logError } from './log'
@@ -392,6 +392,34 @@ async function setPrerelease(repo: string, tag: string, prerelease: boolean): Pr
   return toRelease(await github<ApiRelease>(`/repos/${repo}/releases/${found.id}`, { method: 'PATCH', body: { prerelease, make_latest: prerelease ? 'false' : 'true' }, doing: 'change releases', needs: 'Contents' }))
 }
 
+/**
+ * Merges a pull request. GitHub won't merge a draft, so a draft is marked ready for review first
+ * (that's only in GitHub's GraphQL API), then merged. Says whether it had to do that.
+ */
+async function merge(repo: string, number: number): Promise<{ markedReady: boolean }> {
+  const pull = await github<{ node_id: string; draft?: boolean; state: string; merged_at: string | null }>(`/repos/${repo}/pulls/${number}`)
+  if (pull.merged_at) return { markedReady: false }
+  if (pull.state !== 'open') throw new GitHubError(`#${number} was closed on GitHub, so it can’t be merged.`, 409)
+  let markedReady = false
+  if (pull.draft) {
+    const res = await github<{ errors?: GraphQLError[] }>('/graphql', {
+      method: 'POST',
+      body: { query: 'mutation($id: ID!) { markPullRequestReadyForReview(input: { pullRequestId: $id }) { pullRequest { isDraft } } }', variables: { id: pull.node_id } },
+      doing: 'mark pull requests ready for review',
+      needs: 'Pull requests'
+    })
+    if (res?.errors?.length) throw new GitHubError(readyForReviewError(res.errors, repo), 403)
+    markedReady = true
+  }
+  try {
+    await github(`/repos/${repo}/pulls/${number}/merge`, { method: 'PUT', body: { merge_method: 'merge' }, doing: 'merge pull requests', needs: 'Pull requests and Contents' })
+  } catch (err) {
+    if (!markedReady) throw err
+    throw new GitHubError(mergeAfterReadyError(err instanceof Error ? err.message : String(err)), err instanceof GitHubError ? err.status : 0)
+  }
+  return { markedReady }
+}
+
 /** Whether each pull request is still open, was merged, or was closed without merging. */
 async function pullStates(repo: string, numbers: number[]): Promise<Record<number, 'open' | 'merged' | 'closed'>> {
   const out: Record<number, 'open' | 'merged' | 'closed'> = {}
@@ -582,7 +610,7 @@ export function setupAppStudio(): void {
     if (!validRepo(repo) || typeof number !== 'number') throw new Error('Not allowed')
     needToken()
     try {
-      await github(`/repos/${repo}/pulls/${number}/merge`, { method: 'PUT', body: { merge_method: 'merge' }, doing: 'merge pull requests', needs: 'Pull requests and Contents' })
+      return await merge(repo, number)
     } catch (err) {
       logError('app studio merge', err)
       throw err
