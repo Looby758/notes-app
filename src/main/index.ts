@@ -24,7 +24,7 @@ import type { AiAskTurn, AiExtraContext, AiChat, AiChatMessage, AiEngine, AiNote
 import type { MusicAction } from '@shared/spotify'
 import { normalizePrefs, type Prefs } from '@shared/prefs'
 import { activeThemeId, getTheme } from '@shared/themes'
-import { loadSettings, saveSettings, settingsFile, watchSettingsFile } from './settings'
+import { hadSettingsAtStart, loadSettings, saveSettings, settingsFile, watchSettingsFile } from './settings'
 import { Vault } from './vault'
 import { startWatching, stopWatching } from './watcher'
 import * as calendars from './calendarSources'
@@ -102,7 +102,9 @@ import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
 import { setupAppStudio } from './appStudio'
 import { setupReleaseHelper } from './releaseHelper'
-import { TEST_COPY, TEST_COPY_FOLDER } from './testCopy'
+import { addonOn, addonsMaybeChanged, setupAddonGate, startsCoreOnly } from './addonGate'
+import { cleanInstalledAddons } from '@shared/addons'
+import { TEST_COPY, TEST_COPY_FOLDER, testCopyReadOnly, WINDOWS_APP_ID } from './testCopy'
 import { setupGames } from './games'
 import { setupGameCovers } from './gameCovers'
 import { setupSkyblock } from './skyblock'
@@ -136,7 +138,7 @@ app.setPath('userData', join(app.getPath('appData'), TEST_COPY ? TEST_COPY_FOLDE
 app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns')
 
 // Windows shows notifications under this app id (it matches the installer's).
-if (process.platform === 'win32') app.setAppUserModelId(TEST_COPY ? 'com.notesapp.desktop.testcopy' : 'com.notesapp.desktop')
+if (process.platform === 'win32') app.setAppUserModelId(WINDOWS_APP_ID)
 
 // Only one copy of Notes runs; starting it again just brings the window back.
 if (!app.requestSingleInstanceLock()) {
@@ -247,12 +249,14 @@ function appIconFile(prefs: Prefs): { id: string; file?: string } {
 
 /** Settings that live outside the app's windows: the capture shortcut, the app icon and starting at login. */
 function applySystemPrefs(prefs: Prefs): void {
-  applyCaptureShortcut(prefs.captureShortcut)
+  // System-wide shortcuts only for the add-ons you've added.
+  const added = (id: string): boolean => prefs.installedAddons.includes(id)
+  applyCaptureShortcut(added('summon-bar') ? prefs.captureShortcut : '')
   // The tray's "Snip after a delay" lists your own delay too.
   safely('tray menu', refreshTrayMenu)
-  applySnipShortcut(prefs.snipShortcut)
-  applySongIdShortcut(prefs.songIdShortcut)
-  applyReplayShortcut(prefs.replayOn ? prefs.replayShortcut : '')
+  applySnipShortcut(added('snip') ? prefs.snipShortcut : '')
+  applySongIdShortcut(added('songid') ? prefs.songIdShortcut : '')
+  applyReplayShortcut(prefs.replayOn && added('clips') ? prefs.replayShortcut : '')
   applyDuckPrefs()
   safely('app icon', () => applyAppIcon(prefs))
   // Only the installed app registers itself (in development it would register electron.exe).
@@ -350,12 +354,14 @@ function broadcastPrefs(prefs: Prefs): void {
     win.webContents.send('prefs:changed', prefs)
   }
   safely('system settings', () => applySystemPrefs(prefs))
+  safely('add-ons', addonsMaybeChanged)
   safely('whole PC search', () => applyFileIndex(prefs))
 }
 
 /** Whole PC search's list of files (Settings → Files), with its progress sent to every window. */
 function applyFileIndex(prefs: Prefs): void {
-  setFileIndexOn(prefs.filesWholePcSearch, app.getPath('userData'), (status) => {
+  // The whole-PC file list comes with the Files add-on.
+  setFileIndexOn(prefs.filesWholePcSearch && prefs.installedAddons.includes('files'), app.getPath('userData'), (status) => {
     for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send('explorer:indexStatus', status)
   })
 }
@@ -398,10 +404,22 @@ function orbitParts(themesChanged: () => void): Record<'settings' | 'home' | 'th
   }
 }
 
+/** A new Orbit is set to the core once only (switching to another new folder later keeps your choices). */
+let coreStartDone = false
+
 function openVault(path: string | null): void {
   stopWatching()
   vault = path ? new Vault(path) : null
   if (!path) return
+  // Brand new Orbit, brand new notes folder: just the core to start with (add more on the Add-ons page).
+  // "New" is decided by what was on this computer when Orbit started, so anything saved since (like
+  // a colour picked on the welcome screen) doesn't count. Anyone who already used Orbit keeps theirs.
+  if (startsCoreOnly(hadSettingsAtStart() && !!loadSettings().prefs, path) && !coreStartDone) {
+    coreStartDone = true
+    const prefs = normalizePrefs({ installedAddons: [] })
+    saveSettings({ prefs })
+    broadcastPrefs(prefs)
+  }
   void shareComicProgress()
   void shareWikiProgress()
   syncOrbitSoon()
@@ -636,7 +654,8 @@ function createWindow(): BrowserWindow {
         else
           items.push(
             { label: 'Record a voice note…', click: () => win.webContents.send('voice:start') },
-            { label: 'Draw a sketch…', click: () => win.webContents.send('sketch:start') },
+            // Sketching is an add-on.
+            ...(addonOn('sketch') ? [{ label: 'Draw a sketch…', click: () => win.webContents.send('sketch:start') }] : []),
             { type: 'separator' }
           )
       }
@@ -1036,6 +1055,11 @@ async function offerMoveToApplications(): Promise<boolean> {
 }
 
 app.whenReady().then(async () => {
+  // First, so every add-on's messages are checked (addonGate.ts).
+  setupAddonGate(() => {
+    const prefs = loadSettings().prefs as Partial<Prefs> | undefined
+    return cleanInstalledAddons(prefs?.installedAddons, prefs?.addonsSeen)
+  })
   // Ask everything's copy of recent emails, so it can answer without the internet (emailAsk.ts).
   setTimeout(() => void emailAsk.catchUp(), 60_000)
   setInterval(() => void emailAsk.catchUp(), 30 * 60_000)
@@ -1118,7 +1142,7 @@ app.whenReady().then(async () => {
   safely('wikis', () => setupWiki(() => vault))
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))
-  safely('Orbit sync', () => setupOrbitSync({ root: () => vault?.root ?? null, enabled: () => currentPrefs().syncOrbit, window: () => mainWindow, parts: orbitParts(themesChanged), readOnly: TEST_COPY }))
+  safely('Orbit sync', () => setupOrbitSync({ root: () => vault?.root ?? null, enabled: () => currentPrefs().syncOrbit, window: () => mainWindow, parts: orbitParts(themesChanged), readOnly: () => testCopyReadOnly(vault?.root ?? null) }))
   mainWindow = createWindow()
   // The extras: if one of them fails on some computer, the app itself still works.
   safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: (as, delay) => void startSnip(as, delay), openSnips: () => void openSnipFolder() }))

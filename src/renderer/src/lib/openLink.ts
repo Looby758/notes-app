@@ -8,13 +8,15 @@ import { parseWikiInner } from './links'
 import { songTarget } from '@shared/songLinks'
 import { playSongTarget } from '../store/music'
 import { findNode, parentOf, resolveRelative } from './paths'
+import { featureOn } from './addons'
 import { openAttachment } from './fileKinds'
 
 /** Opens a markdown link clicked in a note: web links in a web tab (or the browser), relative links as notes. */
 export function openLink(href: string, fromNote: string): void {
   // Spotify and your own music play in the music player.
   const song = songTarget(href)
-  if (song) {
+  // (Without the Music add-on a Spotify link opens like any other web link.)
+  if (song && featureOn('musiclibrary')) {
     void playSongTarget(song)
     return
   }

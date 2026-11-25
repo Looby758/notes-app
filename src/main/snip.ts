@@ -7,6 +7,7 @@ import { hideCaptureWindow, loadRenderer } from './capture'
 import { detectScript, ocrLangDir, readPrintedText } from './handwriting'
 import { GameRunningError, localAiState, localComplete } from './localAi'
 import { logError } from './log'
+import { addonOn } from './addonGate'
 import { isTarget, OCR_LANGS, ocrLangByCode, ocrLangSetting, ocrLangUrl, onlineTranslateUrl, parseTranslation, readerForScript, tidyReading, TRANSLATE_SYSTEM, translatePrompt } from '@shared/translate'
 import type { SnipReading, SnipTranslation } from '@shared/types'
 import { cleanSnipDelay, snipFileName, type SnipMode } from '@shared/snipLaunch'
@@ -78,6 +79,8 @@ let starting = false
  * (seconds) overrides that, e.g. "Snip after a delay → 5 seconds" from the tray.
  */
 export async function startSnip(as: SnipMode = 'text', delay?: number): Promise<void> {
+  // Screen snip is an add-on: no snipping (shortcut, tray, taskbar or jump list) unless it's added.
+  if (!addonOn('snip')) return
   // Pressed again while counting down: snip now.
   if (countdown) {
     finishCountdown()

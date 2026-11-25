@@ -14,6 +14,7 @@ import { showKeys } from '@shared/platform'
 import { newBoard } from '../../lib/boards'
 import ThemePicture from '../Theme/ThemePicture'
 import { dailyPath, openToday } from '../../lib/daily'
+import { useAddonOn } from '../../lib/addons'
 import { findNode } from '../../lib/paths'
 
 const VIEWS: { id: SidebarView; title: string; icon: typeof Search }[] = [
@@ -23,6 +24,7 @@ const VIEWS: { id: SidebarView; title: string; icon: typeof Search }[] = [
 ]
 
 export default function Sidebar() {
+  const boardsOn = useAddonOn('canvas-board')
   const view = useUI((s) => s.sidebarView)
   const error = useNotify((s) => s.message)
   const kind = useNotify((s) => s.kind)
@@ -51,9 +53,11 @@ export default function Sidebar() {
             <button className="icon-btn" title={`New note (${showKeys('Ctrl+N')})`} onClick={() => newNote()}>
               <FilePlus size={15} />
             </button>
-            <button className="icon-btn" title="New canvas board" onClick={() => newBoard()}>
-              <LayoutDashboard size={15} />
-            </button>
+            {boardsOn && (
+              <button className="icon-btn" title="New canvas board" onClick={() => newBoard()}>
+                <LayoutDashboard size={15} />
+              </button>
+            )}
             <button className="icon-btn" title={`New folder (${showKeys('Ctrl+Shift+N')})`} onClick={() => newFolder()}>
               <FolderPlus size={15} />
             </button>

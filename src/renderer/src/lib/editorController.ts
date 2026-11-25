@@ -21,6 +21,7 @@ import { useUI } from '../store/ui'
 import { usePrefs } from '../store/prefs'
 import type { Prefs } from '@shared/prefs'
 import { isWithin, replacePrefix } from './paths'
+import { notAddedText, tabFeature, tabOn } from './addons'
 import { noteLockState, onBeforeLock, openText, remapLock, sealText, useLock, type NoteLock } from './lock/session'
 import { currentHeadingIndex, extractHeadings } from './outline'
 import { flushBoards } from './boards'
@@ -101,6 +102,8 @@ export const MIXER_TAB = 'mixer:'
 export const TASKS_TAB = 'tasks:'
 /** Removing an app and what it leaves behind (components/Uninstaller). */
 export const UNINSTALL_TAB = 'uninstall:'
+/** Add-ons: browse, add and remove parts of Orbit (components/Settings/AddonsSettings, its own page). */
+export const ADDONS_TAB = 'addons:'
 /** The download manager: a queue that pauses, carries on and can wait for the night (components/Downloads). */
 export const DOWNLOADS_TAB = 'downloads:'
 /** Scenes, webcam and screen recording (components/Studio). */
@@ -880,12 +883,22 @@ export function newTab(pane = activePane()): void {
 
 /** Adds a tab after the current one in `pane` and switches to it. */
 function addTab(pane: string, id: string): void {
+  // A page from an add-on you haven't added doesn't open (the Add-ons page adds it).
+  if (!tabOn(id)) {
+    notify(notAddedText(tabFeature(id) ?? ''), 'info', { label: 'Add-ons', run: openAddons })
+    return
+  }
   const p = paneState(pane)
   const at = p.active ? p.tabs.indexOf(p.active) + 1 : p.tabs.length
   const tabs = [...p.tabs]
   tabs.splice(at, 0, id)
   updatePane(pane, { tabs })
   activateTab(id, pane)
+}
+
+/** Opens the Add-ons page. */
+export function openAddons(): void {
+  openSpecialTab(ADDONS_TAB)
 }
 
 /** Opens (or switches to) a special page like Settings. There's only ever one of each. */
@@ -925,6 +938,11 @@ export function openExplorerTab(dir?: string, { beside = false }: { beside?: boo
  * a new pane on the right.
  */
 export function openWebTab(url = '', { beside = false, privately = false }: { beside?: boolean; privately?: boolean } = {}): void {
+  // Without the Web browser add-on, a page opens in your usual browser instead.
+  if (url && !tabOn('web:')) {
+    window.open(url)
+    return
+  }
   if (privately) {
     const id = webId(true)
     setWebPage(id, { url, title: '' })

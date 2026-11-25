@@ -4,6 +4,7 @@ import { createHash } from 'crypto'
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { logError } from './log'
+import { TEST_COPY, WINDOWS_APP_ID } from './testCopy'
 
 /**
  * The app icon you picked, beyond the running window: on Windows the Start menu, desktop and
@@ -124,15 +125,18 @@ export function applyIconOutsideApp(id: string, file: string): string | null {
 /**
  * Windows: the taskbar button shows the icon stored on the window's "relaunch" details (the same
  * place pinning reads from), not the window's own icon, so the picked icon goes there too.
- * Windows only uses that icon when a relaunch command is set alongside it.
+ * Windows only uses that icon when a relaunch command is set alongside it. The app id must be the
+ * same one Orbit started with (a test copy has its own), or Windows moves the window under the
+ * other Orbit's taskbar button.
  */
 export function taskbarIcon(win: BrowserWindow, icon: string): void {
   if (process.platform !== 'win32' || win.isDestroyed()) return
   win.setAppDetails({
-    appId: 'com.notesapp.desktop',
+    appId: WINDOWS_APP_ID,
     appIconPath: icon,
     appIconIndex: 0,
-    relaunchCommand: `"${process.execPath}"`,
-    relaunchDisplayName: 'Orbit'
+    // A test copy runs as Electron with its code folder, so relaunching needs both.
+    relaunchCommand: TEST_COPY ? `"${process.execPath}" "${app.getAppPath()}"` : `"${process.execPath}"`,
+    relaunchDisplayName: TEST_COPY ? 'Orbit (test copy)' : 'Orbit'
   })
 }

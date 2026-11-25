@@ -5,7 +5,7 @@ import { useVault } from '../../store/vault'
 import { usePrefs } from '../../store/prefs'
 import { refreshAiStatus, useAi, usesOffline } from '../../store/ai'
 import { getNoteText } from '../../store/noteIndex'
-import { commands, shortcutFor } from '../../lib/commands'
+import { availableCommands, shortcutFor } from '../../lib/commands'
 import { projectCommands } from '../../lib/terminal'
 import { fuzzyFilter } from '../../lib/fuzzy'
 import { errorMessage, isWithin, noteTitle, notePaths } from '../../lib/paths'
@@ -184,7 +184,7 @@ function CommandPalette({ close }: { close: () => void }) {
   const items = useMemo<PickerItem[]>(() => {
     const q = query.trim()
     const smart = q.includes(' ') || /\d/.test(q) ? parseCommand(q) : null
-    const matches = fuzzyFilter([...commands, ...projectCommands()], query, (c) => c.title).map(({ item: c, positions }) => ({
+    const matches = fuzzyFilter([...availableCommands(), ...projectCommands()], query, (c) => c.title).map(({ item: c, positions }) => ({
       id: c.id,
       icon: <CommandIcon size={14} />,
       label: <Highlighted text={c.title} positions={positions} />,

@@ -48,11 +48,12 @@ let getRoot: () => string | null = () => null
 let enabled: () => boolean = () => true
 let getWindow: () => BrowserWindow | null = () => null
 /**
- * A test copy of Orbit (see testCopy.ts) only ever reads: it may take in your real settings, themes
- * and so on, but never writes to the notes folder or asks which version to keep, so nothing done
- * in a test copy can replace what your real Orbit syncs.
+ * A test copy of Orbit (see testCopy.ts) on your real notes folder only ever reads: it may take in
+ * your real settings, themes and so on, but never writes to the notes folder or asks which version
+ * to keep, so nothing done in a test copy can replace what your real Orbit syncs. On a separate test
+ * vault it syncs normally, so you can see what it would write.
  */
-let readOnly = false
+let isReadOnly: () => boolean = () => false
 
 const sha = (data: string | Buffer): string => createHash('sha256').update(data).digest('hex')
 const deviceName = (): string => hostname().replace(/\.local$/i, '') || 'another computer'
@@ -183,7 +184,7 @@ async function writeAtomic(file: string, data: string | Buffer): Promise<void> {
 
 /** Puts this computer's version in the notes folder: files first, then the list that points at them. */
 async function push(root: string, part: OrbitPart, h: PartHandler, local: Local): Promise<void> {
-  if (readOnly) throw new Error('a test copy of Orbit never writes synced settings')
+  if (isReadOnly()) throw new Error('a test copy of Orbit never writes synced settings')
   const manifest: OrbitManifest = { version: 1, hash: local.hash, device: deviceName(), updated: Date.now() }
   if (h.kind === 'value') {
     if (local.hash !== null) manifest.value = local.value
@@ -300,7 +301,7 @@ async function syncPart(root: string, part: OrbitPart, label: string, h: PartHan
   const agreed = loadState()[root]?.[part]
   let step = decideSync(local.hash, remote?.hash, agreed)
   // A test copy only takes things in: it never puts its version in the notes folder, or asks.
-  if (readOnly && (step === 'push' || step === 'ask')) return
+  if (isReadOnly() && (step === 'push' || step === 'ask')) return
 
   if (step === 'ask' && remote) {
     const key = `${root}|${part}|${local.hash}|${remote.hash}`
@@ -371,10 +372,10 @@ export function setupOrbitSync(options: {
   enabled: () => boolean
   window: () => BrowserWindow | null
   parts: Partial<Record<OrbitPart, PartHandler>>
-  /** A test copy: only take things in, never write to the notes folder (see readOnly above). */
-  readOnly?: boolean
+  /** A test copy on your real notes folder: only take things in, never write to it (see isReadOnly above). */
+  readOnly?: () => boolean
 }): void {
-  readOnly = options.readOnly ?? false
+  isReadOnly = options.readOnly ?? (() => false)
   getRoot = options.root
   enabled = options.enabled
   getWindow = options.window

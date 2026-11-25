@@ -30,6 +30,7 @@ import {
 import { hotkeyLabel, normalizeAccelerator } from '@shared/soundboard'
 import { IS_MAC, SYSTEM_NAME } from '@shared/platform'
 import { logError } from './log'
+import { addonOn, onAddonsChanged } from './addonGate'
 import { accessibilityHelp, inputAllowed } from './shareInput'
 import { onRemapsChanged, remappedKeyIds } from './keyRemap'
 
@@ -80,6 +81,8 @@ function save(): void {
 }
 
 function problem(): string | null {
+  // Failsafe: without the Macros add-on nothing records, plays or clicks.
+  if (!addonOn('macros')) return 'Macros isn’t added. Add it on the Add-ons page.'
   if (!SUPPORTED) return 'Macros and the auto-clicker work on Windows and on a Mac.'
   if (IS_MAC && !inputAllowed(false)) return accessibilityHelp()
   return null
@@ -1130,6 +1133,7 @@ let used = false
 const lastPress = new Map<string, number>()
 
 function runHotkey(action: HotkeyAction): void {
+  if (!addonOn('macros')) return
   const key = errorKey(action)
   const now = Date.now()
   if (now - (lastPress.get(key) ?? 0) < 350) return
@@ -1157,7 +1161,7 @@ const errorKey = (a: HotkeyAction): string => (a.kind === 'macro' ? a.id : a.kin
 
 function wantedHotkeys(): Map<string, HotkeyAction> {
   const out = new Map<string, HotkeyAction>()
-  if (!used || !SUPPORTED) return out
+  if (!used || !SUPPORTED || !addonOn('macros')) return out
   for (const m of data.macros) if (m.hotkey) out.set(m.hotkey, { kind: 'macro', id: m.id })
   const h = data.hotkeys
   if (h.clicker) out.set(h.clicker, { kind: 'clicker' })
@@ -1240,6 +1244,12 @@ export function setupMacros(): void {
     if (!IS_MAC && activity.kind === 'recording') winWrite(`recskip ${remappedKeyIds().join(',') || '-'}`)
   })
   used = existsSync(dataFile())
+  // Removing the add-on stops anything playing or recording at once, and lets go of its hotkeys.
+  onAddonsChanged(() => {
+    if (!addonOn('macros')) stopAll()
+    applyHotkeys()
+    broadcast()
+  })
   // Hotkeys (and the helper) after the handlers below, so the page always works even if they fail.
   setTimeout(() => {
     try {

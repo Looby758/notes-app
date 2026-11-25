@@ -19,11 +19,23 @@ function legacySettingsFile(): string {
   return join(app.getPath('appData'), 'notesapp', 'settings.json')
 }
 
+let foundAtStart: boolean | undefined
+
+/**
+ * Whether Orbit had settings on this computer when it started (read once, the first time settings
+ * are loaded). False means a brand new Orbit, even after the welcome screen saves something.
+ */
+export function hadSettingsAtStart(): boolean {
+  loadSettings()
+  return foundAtStart ?? true
+}
+
 export function loadSettings(): Settings {
   if (cache) return cache
   try {
     // A test copy starts fresh rather than picking up the very old settings.
     const file = existsSync(settingsFile()) || TEST_COPY ? settingsFile() : legacySettingsFile()
+    foundAtStart ??= existsSync(file)
     cache = existsSync(file) ? { ...defaults, ...JSON.parse(readFileSync(file, 'utf8')) } : { ...defaults }
   } catch {
     cache = { ...defaults }

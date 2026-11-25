@@ -17,6 +17,7 @@ import { EventWeather } from '../Weather/Weather'
 import type { CalEvent } from '@shared/types'
 import { describeRepeat, repeatChoices, type RepeatRule } from '@shared/repeat'
 import { canEditGoogle, deleteGoogle, updateGoogle, type EventTarget } from '../../lib/calendarEdit'
+import { useAddonOn } from '../../lib/addons'
 import { allowGoogleEditing, openCalendarSettings, showEventMenu, startDayDrag, useCalendarStatus, useWritableCalendars } from './edit'
 
 /**
@@ -102,22 +103,33 @@ export function ItemRow({ item, compact = false }: { item: DatedItem; compact?: 
 }
 
 /** Loads Google/link events for [from, to) and returns all external events by day, with bills and paydays from Money. */
+const NOTHING = new Map<string, ExternalItem[]>()
+const NO_ITEMS: ExternalItem[] = []
+
 export function useExternalRange(from: Date, to: Date): Map<string, ExternalItem[]> {
   const fromKey = from.getTime()
   const toKey = to.getTime()
   const generation = useExternal((s) => s.generation)
+  // Linked calendars, bills and upload days come with the Calendar add-on.
+  const calendarOn = useAddonOn('calendar')
   useEffect(() => {
-    ensureRange(new Date(fromKey), new Date(toKey))
-  }, [fromKey, toKey, generation])
+    if (calendarOn) ensureRange(new Date(fromKey), new Date(toKey))
+  }, [fromKey, toKey, generation, calendarOn])
   const byDay = useExternal((s) => s.byDay)
-  const bills = useBillItems(from, to)
-  const uploads = useUploadItems(from, to)
+  // Bills and paydays need Money; upload days need Video projects.
+  const moneyOn = useAddonOn('money')
+  const videosOn = useAddonOn('video-projects')
+  const allBills = useBillItems(from, to)
+  const allUploads = useUploadItems(from, to)
+  const bills = moneyOn ? allBills : NO_ITEMS
+  const uploads = videosOn ? allUploads : NO_ITEMS
   return useMemo(() => {
+    if (!calendarOn) return NOTHING
     if (!bills.length && !uploads.length) return byDay
     const merged = new Map(byDay)
     for (const item of [...bills, ...uploads]) merged.set(item.date, [item, ...(merged.get(item.date) ?? [])])
     return merged
-  }, [byDay, bills, uploads])
+  }, [byDay, bills, uploads, calendarOn])
 }
 
 const VIDEO_EVENT = 'videos:'
@@ -189,7 +201,8 @@ function useBillItems(from: Date, to: Date): ExternalItem[] {
 export function ExternalStatus() {
   const errors = useExternal((s) => s.errors)
   const offline = useExternal((s) => s.offline)
-  if (!errors.length && !offline) return null
+  const calendarOn = useAddonOn('calendar')
+  if (!calendarOn || (!errors.length && !offline)) return null
   return (
     <div className="cal-ext-status" title={errors.join('\n')}>
       {offline ? 'Offline: showing saved calendar events.' : errors[0]}

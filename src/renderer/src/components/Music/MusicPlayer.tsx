@@ -60,6 +60,7 @@ import { SongPopup } from './SongPopup'
 import { FullPlayer, openFullPlayer } from './FullPlayer'
 import { SongFinder } from './SongFinder'
 import { useSongId, watchSongIdShortcut } from '../../store/songId'
+import { useAddonOn } from '../../lib/addons'
 import { setPrefs, usePrefs } from '../../store/prefs'
 import { addHomeCard } from '../../lib/home'
 import MusicHomeCard from './MusicHomeCard'
@@ -86,7 +87,8 @@ const setUp = (): void => {
 export default function MusicPlayer() {
   const open = useMusic((s) => s.open)
   useEffect(() => startMusic(), [])
-  useEffect(() => watchSongIdShortcut(), [])
+  const songIdOn = useAddonOn('songid')
+  useEffect(() => (songIdOn ? watchSongIdShortcut() : undefined), [songIdOn])
   return (
     <>
       <SongPopup />
@@ -196,6 +198,8 @@ function Player() {
   const toggleTab = (t: Tab): void => setTab(tab === t ? null : t)
   // Ctrl+K or the system-wide shortcut asked for "What's this song?".
   const showFind = useSongId((s) => s.showAsk)
+  // "What's this song?" is its own add-on.
+  const songIdOn = useAddonOn('songid')
   useEffect(() => {
     if (showFind === shownFindAsk) return
     shownFindAsk = showFind
@@ -229,16 +233,18 @@ function Player() {
             <button className={tab === 'local' ? 'active' : ''} onClick={() => setTab('local')} data-music-tab="local">
               My music
             </button>
-            <button className={tab === 'find' ? 'active' : ''} onClick={() => setTab('find')} title="What’s this song? Listen to a video, game or stream and find the song" data-music-tab="find">
-              <Ear size={13} />
-            </button>
+            {songIdOn && (
+              <button className={tab === 'find' ? 'active' : ''} onClick={() => setTab('find')} title="What’s this song? Listen to a video, game or stream and find the song" data-music-tab="find">
+                <Ear size={13} />
+              </button>
+            )}
             {spotify && (
               <button className={tab === 'link' ? 'active' : ''} onClick={() => setTab('link')} title="Play a Spotify link">
                 <Link2 size={13} />
               </button>
             )}
           </div>
-          {tab === 'find' ? (
+          {tab === 'find' && songIdOn ? (
             <SongFinder />
           ) : tab === 'link' ? (
             <LinkBox />

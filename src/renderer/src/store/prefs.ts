@@ -8,7 +8,8 @@ import { recordUndo } from '../lib/undo'
 import { SETTINGS } from '../lib/settingsSchema'
 
 /** Your Settings. The main process stores them in settings.json and checks every value. */
-export const usePrefs = create<{ prefs: Prefs }>(() => ({ prefs: DEFAULT_PREFS }))
+// Until your settings arrive, no add-on counts as added, so none starts up early only to be turned away.
+export const usePrefs = create<{ prefs: Prefs }>(() => ({ prefs: { ...DEFAULT_PREFS, installedAddons: [] } }))
 
 /** Changes not yet sent to the main process (sliders send many in a row). */
 let pending: Partial<Prefs> = {}
@@ -67,11 +68,15 @@ export function setPrefsQuietly(patch: Partial<Prefs>): void {
   usePrefs.setState((s) => ({ prefs: { ...s.prefs, ...patch } }))
   pending = { ...pending, ...patch }
   clearTimeout(timer)
-  timer = setTimeout(() => {
+  const flush = (): void => {
     const send = pending
     pending = {}
     window.api.setPrefs(send).then((prefs) => usePrefs.setState({ prefs: { ...prefs, ...pending } }))
-  }, 150)
+  }
+  // Adding or removing an add-on goes over straight away: its page opens at once, and Orbit's main
+  // part has to know it's added before that page asks it for anything.
+  if ('installedAddons' in patch) flush()
+  else timer = setTimeout(flush, 150)
 }
 
 export function resetPrefs(keys: (keyof Prefs)[]): void {

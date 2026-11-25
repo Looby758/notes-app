@@ -11,6 +11,7 @@ import { cover, musicFolder } from './localMusic'
 import { loadSettings, saveSettings } from './settings'
 import type { MusicRemoteStatus } from '@shared/types'
 import { logError } from './log'
+import { addonOn } from './addonGate'
 
 /**
  * The music phone remote (shared/musicRemote.ts): a page on the Wi-Fi that controls the music
@@ -181,5 +182,5 @@ export function setupMusicRemote(): void {
     }
   })
   // On last time Orbit was open: on again (the phone's saved link keeps working).
-  if (loadSettings().musicRemote) start().catch((err) => logError('music remote', err))
+  if (loadSettings().musicRemote && addonOn('music')) start().catch((err) => logError('music remote', err))
 }

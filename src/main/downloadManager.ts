@@ -30,6 +30,7 @@ import { epicDownloads, steamDownloads } from './games'
 import { epicProgress, type EpicDownload, type EpicSeen, type SteamDownload } from '@shared/games'
 import { countFolder } from './folderSize/count'
 import { logError } from './log'
+import { addonOn } from './addonGate'
 
 /**
  * The download manager: a queue of downloads that run a few at a time, pause and carry on where
@@ -291,6 +292,8 @@ function stop(item: DmItem, status: DmItem['status']): void {
 }
 
 function pump(): void {
+  // Queued and overnight downloads only run with the Downloads add-on.
+  if (!addonOn('downloads')) return
   const night = isNight(new Date(), settings.nightStart, settings.nightEnd)
   for (const id of pauseForMorning(items, night, settings.pauseAtNightEnd)) {
     const item = items.find((i) => i.id === id)

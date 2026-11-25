@@ -37,6 +37,7 @@ import {
 } from '@shared/games'
 import { IS_MAC } from '@shared/platform'
 import { logError } from './log'
+import { addonOn } from './addonGate'
 
 /**
  * The games launcher: finds the games installed on this computer (Steam, Epic, and on a Mac any
@@ -489,6 +490,8 @@ function broadcast(): void {
 }
 
 async function tick(): Promise<void> {
+  // Counting time played comes with the Games add-on.
+  if (!addonOn('games')) return
   if (Date.now() - lastScan > 30 * 60_000) await scan().catch((err) => logError('finding games', err))
   if (!found.length) return
   const programs = await runningPrograms()

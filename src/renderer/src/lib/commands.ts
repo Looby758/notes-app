@@ -34,6 +34,7 @@ import {
   MIXER_TAB,
   TASKS_TAB,
   UNINSTALL_TAB,
+  ADDONS_TAB,
   MUSIC_TAB,
   DOWNLOADS_TAB,
   STUDIO_TAB,
@@ -87,6 +88,7 @@ import { openGrokTab, toggleGrokFloat } from '../components/Grok/GrokPage'
 import { openSiteTab, toggleSiteFloat } from '../components/ChatSite/ChatSite'
 import { startSnip } from './snip'
 import { openMiniGames } from '../store/miniGames'
+import { commandOn } from './addons'
 import { changeNotesPassword, lockAllNow, lockFolder, lockNote, lockNoteOwn, removeLock } from './lock/actions'
 
 export interface Command {
@@ -437,6 +439,7 @@ export const commands: Command[] = [
   { id: 'video.open', group: 'Navigation', title: 'Video player (play any video, MKV, AVI…)', run: () => openSpecialTab(VIDEO_TAB) },
   { id: 'mixer.open', group: 'Navigation', title: 'Volume mixer (a volume for each app)', run: () => openSpecialTab(MIXER_TAB) },
   { id: 'tasks.open', group: 'Navigation', title: 'Task manager (what’s running, CPU and memory, end a stuck app)', run: () => openSpecialTab(TASKS_TAB) },
+  { id: 'addons.open', group: 'Navigation', title: 'Add-ons (add or remove parts of Orbit)', run: () => openSpecialTab(ADDONS_TAB) },
   { id: 'uninstall.open', group: 'Navigation', title: 'Uninstaller (remove an app and everything it leaves behind)', run: () => openSpecialTab(UNINSTALL_TAB) },
   { id: 'screens.open', group: 'Navigation', title: 'Screens (monitor brightness, contrast and input)', run: () => openSpecialTab(SCREENS_TAB) },
   { id: 'screens.brighter', group: 'Navigation', title: 'Make every screen brighter', run: () => void window.api.monitorAction('all', { kind: 'brightness', mode: 'up', amount: 10 }) },
@@ -508,9 +511,12 @@ export const commands: Command[] = [
 /** A command's current shortcut, taking your Settings into account. */
 export const shortcutFor = (cmd: Command): string | null => effectiveShortcut(cmd.id, cmd.shortcut)
 
+/** The commands you can use: core ones, and those of the add-ons you've added. */
+export const availableCommands = (): Command[] => commands.filter((c) => commandOn(c.id))
+
 /** The app-wide commands' shortcuts (so they also work while a web page has focus). */
 export function appShortcuts(): string[] {
-  return commands.flatMap((c) => {
+  return availableCommands().flatMap((c) => {
     const shortcut = c.scope === 'editor' ? null : shortcutFor(c)
     return shortcut ? [normalizeShortcut(shortcut)] : []
   })
@@ -518,12 +524,12 @@ export function appShortcuts(): string[] {
 
 /** The app-wide command bound to a shortcut like "Ctrl+W", if any. */
 export function commandForShortcut(shortcut: string): Command | undefined {
-  return commands.find((c) => c.scope !== 'editor' && normalizeShortcut(shortcutFor(c) ?? '') === shortcut)
+  return availableCommands().find((c) => c.scope !== 'editor' && normalizeShortcut(shortcutFor(c) ?? '') === shortcut)
 }
 
 /** The app-wide command (not an editor one) bound to this key press, if any. */
 export function commandForKey(e: KeyboardEvent): Command | undefined {
-  return commands.find((c) => {
+  return availableCommands().find((c) => {
     if (c.scope === 'editor') return false
     const shortcut = shortcutFor(c)
     return !!shortcut && matchesShortcut(e, shortcut)

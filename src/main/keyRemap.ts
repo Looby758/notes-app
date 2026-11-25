@@ -28,6 +28,7 @@ import { acceleratorCodes } from '@shared/macros'
 import { hotkeyLabel, normalizeAccelerator } from '@shared/soundboard'
 import { IS_MAC, SYSTEM_NAME } from '@shared/platform'
 import { logError } from './log'
+import { addonOn, onAddonsChanged } from './addonGate'
 import { accessibilityHelp, inputAllowed } from './shareInput'
 
 /**
@@ -610,7 +611,7 @@ function frontChanged(app: FrontApp): void {
 /** Starts the helper if there's anything to remap (or the page is open), and gives it the remaps. */
 let wanted = false
 function apply(): void {
-  if (!SUPPORTED || stopping) return
+  if (!SUPPORTED || stopping || !addonOn('keyremap')) return
   if (!wanted && !hasRules()) return
   if (IS_MAC) {
     if (macRun) macApply()
@@ -680,6 +681,14 @@ export function reloadKeyRemaps(): void {
 
 export function setupKeyRemap(): void {
   load()
+  // Removing the add-on puts every key back at once; adding it again starts remapping again.
+  onAddonsChanged(() => {
+    if (!addonOn('keyremap')) teardownKeyRemap()
+    else if (stopping) {
+      stopping = false
+      apply()
+    }
+  })
   if (IS_MAC) macClear()
   // After the handlers below, so the page always works even if the helper fails.
   setTimeout(() => {

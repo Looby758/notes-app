@@ -9,6 +9,7 @@ import { errorMessage, noteTitle } from '../lib/paths'
 import { isLockedText } from '../lib/lock/crypto'
 import { calendarContext, moneyContext } from '../lib/askContext'
 import { dayOf } from '../lib/money'
+import { addonOn } from '../lib/addons'
 import { ensureMoney, useMoney } from './money'
 
 /** The AI helper: the summary / tidy-up dialog for a note, and the "Ask my notes" conversation. */
@@ -185,7 +186,9 @@ export async function setAiEngine(use: AiEngine): Promise<void> {
 
 /** Money, calendar and email as text for the AI, for the sources that are switched on. Anything unavailable is skipped. */
 async function gatherContext(question: string, engine?: AiEngine): Promise<{ money?: string; calendar?: string; email?: string }> {
-  const { sources } = useAi.getState()
+  // Each source also needs its add-on (Money, Calendar, Email).
+  const { sources: picked } = useAi.getState()
+  const sources = { ...picked, money: picked.money && addonOn('money'), calendar: picked.calendar && addonOn('calendar'), email: picked.email && addonOn('email') }
   const today = dayOf(new Date())
   const out: { money?: string; calendar?: string; email?: string } = {}
   const jobs: Promise<void>[] = []

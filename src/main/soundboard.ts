@@ -21,6 +21,7 @@ import {
 } from '@shared/soundboard'
 import { SYSTEM_NAME } from '@shared/platform'
 import { logError } from './log'
+import { addonOn, onAddonsChanged } from './addonGate'
 
 /**
  * The soundboard's main-process side: the clips (copied into Orbit's folder, listed in board.json)
@@ -67,7 +68,8 @@ const errorKey = (a: SoundboardAction): string => (a.kind === 'clip' ? a.id : a.
 
 /** Makes the registered hotkeys match the board: frees ones no longer used, takes new ones. */
 function applyHotkeys(): void {
-  const wanted = boardHotkeys(board)
+  // Soundboard hotkeys come with the Soundboard add-on.
+  const wanted = addonOn('soundboard') ? boardHotkeys(board) : new Map<string, never>()
   for (const [accel] of registered) {
     if (!wanted.has(accel)) {
       globalShortcut.unregister(accel)
@@ -173,6 +175,7 @@ export function addSoundFile(path: string, name: string): { status: SoundboardSt
 export function setupSoundboard(): void {
   load()
   applyHotkeys()
+  onAddonsChanged(applyHotkeys)
 
   ipcMain.handle('soundboard:get', () => status())
   // The Discord voice pop-out's buttons: the main window (which makes the sound) plays them.

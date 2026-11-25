@@ -89,5 +89,6 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'keyremap', name: 'Key remapper', blurb: 'Make any key another key or a shortcut, everywhere or just in one game', group: 'Tools', command: 'keyremap.open', keywords: 'remap rebind bind keys keyboard swap caps lock shortcut hotkey game per game layout disable key' },
   { id: 'terminal', name: 'Terminal', blurb: 'Command lines, with run buttons for your apps', group: 'Tools', command: 'terminal.open', keywords: 'shell cmd powershell npm git dev run projects eclipse' },
   { id: 'streamer', name: 'Streamer mode', blurb: 'Blur private things while sharing', group: 'Tools', command: 'view.streamer', keywords: 'privacy blur stream obs' },
+  { id: 'addons', name: 'Add-ons', blurb: 'Add or remove parts of Orbit', group: 'Tools', command: 'addons.open', keywords: 'add-ons addons add on store extensions plugins features install remove apps' },
   { id: 'settings', name: 'Settings', blurb: 'Make Orbit yours', group: 'Tools', command: 'settings', keywords: 'preferences options' }
 ]

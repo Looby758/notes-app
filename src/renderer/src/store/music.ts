@@ -57,6 +57,8 @@ let watchers = 0
 
 /** Keeps "now playing" fresh until the returned function is called. */
 export function watchMusic(): () => void {
+  // Nothing to watch without the Music add-on.
+  if (!usePrefs.getState().prefs.installedAddons.includes('music')) return () => undefined
   watchers++
   void refreshMusic()
   return () => {

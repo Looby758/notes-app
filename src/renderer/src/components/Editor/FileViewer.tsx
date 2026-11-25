@@ -12,6 +12,7 @@ import { useUI } from '../../store/ui'
 import SheetView from './SheetView'
 import TextFileEditor from './TextFileEditor'
 import { openVaultVideo } from '../../store/videoPlayer'
+import { addonOn, useAddonOn } from '../../lib/addons'
 import { releaseOnUnmount } from '../../lib/media'
 
 /** Notes that show or link to `path` (by its file name, as embeds are written). */
@@ -54,7 +55,9 @@ export default function FileViewer({ path }: { path: string }) {
   const notes = useMemo(() => usedIn(path), [path, version])
   const [actualSize, setActualSize] = useState(false)
   const [failed, setFailed] = useState(false)
-  const isSketch = useIsSketch(path)
+  // Without the Sketching add-on a sketch is just a picture (edited in the picture editor).
+  const sketchOn = useAddonOn('sketch')
+  const isSketch = useIsSketch(path) && sketchOn
   // Closing the tab lets go of the file, so it can be deleted or moved straight away.
   useEffect(() => () => void window.api.releaseFile(path).catch(() => undefined), [path])
 
@@ -74,12 +77,12 @@ export default function FileViewer({ path }: { path: string }) {
             <SquarePen size={13} /> Edit picture
           </button>
         )}
-        {kind === 'pdf' && (
+        {kind === 'pdf' && addonOn('pdf-editor') && (
           <button className="btn btn-primary" onClick={() => void openInPdfEditor(name, vaultUrl(path)).catch(notify)} title="Sign it, fill it in, or change its pages" data-edit-pdf>
             <FilePen size={13} /> Edit PDF
           </button>
         )}
-        {kind === 'video' && (
+        {kind === 'video' && addonOn('video-player') && (
           <button className="btn btn-primary" onClick={() => openVaultVideo(path)}>
             <Film size={13} /> Play in the video player
           </button>

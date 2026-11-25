@@ -21,6 +21,7 @@ import {
   type SkyblockSummary
 } from '@shared/skyblock'
 import { logError } from './log'
+import { addonOn, onAddonsChanged } from './addonGate'
 import { skyblockAddonReady } from './skyblockAddonFiles'
 
 /**
@@ -359,6 +360,8 @@ let finishTimer: ReturnType<typeof setTimeout> | null = null
 function scheduleFinish(): void {
   if (finishTimer) clearTimeout(finishTimer)
   finishTimer = null
+  // Without the add-on nothing waits to finish (it carries on if it's added again).
+  if (!addonOn('skyblock')) return
   const s = load()
   if (!s.pending.length) return
   const due = Math.min(...s.pending.map(dueAt))
@@ -417,7 +420,8 @@ function show(summary: SkyblockSummary): void {
 
 async function tick(): Promise<void> {
   const s = load()
-  // Session summaries are part of the SkyBlock add-on: nothing runs until it's downloaded.
+  // Session summaries are part of the SkyBlock add-on: nothing runs unless it's added and downloaded.
+  if (!addonOn('skyblock')) return
   if (!s.apiKey || !s.uuid || !skyblockAddonReady()) return
   const open = await minecraftOpen()
   if (!open) waitForClose = false
@@ -449,6 +453,7 @@ export function setupSkyblock(opts: { getMain: () => BrowserWindow | null }): vo
   // A session that was waiting when Orbit closed carries on.
   scheduleFinish()
   scheduleTick(15_000)
+  onAddonsChanged(() => scheduleFinish())
 
   ipcMain.handle('skyblock:status', () => status())
   ipcMain.handle('skyblock:sessions', () => load().sessions)

@@ -7,6 +7,7 @@ import { useStreamerOn } from '../../store/streamer'
 import { useMotion } from '../../lib/motion'
 import { dayKey, formatDate } from '../../lib/dates'
 import { WeatherIcon } from '../Weather/Weather'
+import { useAddonOn } from '../../lib/addons'
 import './screensaver.css'
 
 /** How long it takes to fade away once you're back (screensaver.css matches it). */
@@ -194,7 +195,8 @@ function NowPlaying() {
   const state = useMusic((s) => s.state)
   const at = useMusic((s) => s.at)
   const usable = local || (!!status && (status.appControl || status.connected))
-  useEffect(() => (usable ? watchMusic() : undefined), [usable])
+  const musicOn = useAddonOn('music')
+  useEffect(() => (usable && musicOn ? watchMusic() : undefined), [usable, musicOn])
   // Re-draw each second so the progress bar moves between updates.
   const [, tick] = useState(0)
   const playing = !!state?.playing

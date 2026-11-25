@@ -8,6 +8,7 @@ import { CLAUDE_TAB, closeTab, GROK_TAB, openSpecialTab } from '../../lib/editor
 import { paneWithTab } from '../../store/editor'
 import { setSiteFloating, setSiteRect, setSiteUrl, useChatSites } from '../../store/grok'
 import { webviews } from '../../store/web'
+import { addonOn } from '../../lib/addons'
 
 /**
  * Chat bots inside Orbit (Grok, Claude): the real site in a walled-off web page (main/browser.ts
@@ -65,6 +66,11 @@ export interface SiteSent {
  * how many files went in (the rest should be copied across by hand).
  */
 export async function sendToSite(site: ChatSiteId, url: string, text: string, files: SiteFile[] = []): Promise<SiteSent> {
+  // Claude and Grok are add-ons: without this one, the page opens in your browser instead (the text is pasted by hand).
+  if (!addonOn(site)) {
+    window.open(url)
+    return { typed: false, attached: 0 }
+  }
   if (!useChatSites.getState()[site].floating) openSiteTab(site)
   const view = await waitFor(() => shown.get(site)?.[0] ?? null, 8000)
   if (!view) return { typed: false, attached: 0 }

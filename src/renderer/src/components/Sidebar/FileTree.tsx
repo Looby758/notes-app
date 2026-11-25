@@ -52,6 +52,7 @@ import { lockFolder, lockNote, openLockedFolder, removeFolderLock, removeLock } 
 import { lockedFolderOf, useLockedFolders } from '../../lib/lock/folders'
 import { motionLevel, slideFrom, snapshot, usePresence } from '../../lib/motion'
 import EmptyArt from '../Motion/EmptyArt'
+import { addonOn } from '../../lib/addons'
 import StarIcon from '../Theme/StarIcon'
 
 const INDENT = 14
@@ -151,7 +152,7 @@ export default function FileTree() {
   const menuItems = (node: FileNode | null): MenuItem[] => {
     const create: MenuItem[] = [
       { label: 'New note', icon: <FilePlus size={15} />, onClick: () => newNote(node?.path ?? '') },
-      { label: 'New canvas board', icon: <LayoutDashboard size={15} />, onClick: () => newBoard(node?.path ?? '') },
+      ...(addonOn('canvas-board') ? [{ label: 'New canvas board', icon: <LayoutDashboard size={15} />, onClick: () => newBoard(node?.path ?? '') }] : []),
       { label: 'New spreadsheet', icon: <Sheet size={15} />, onClick: () => newSpreadsheet(node?.path ?? '') },
       { label: 'New folder', icon: <FolderPlus size={15} />, onClick: () => newFolder(node?.path ?? '') }
     ]
@@ -212,7 +213,7 @@ export default function FileTree() {
             : [{ label: 'Lock folder', icon: <Lock size={15} />, onClick: () => lockFolder(node.path) } as MenuItem]),
       { label: 'Rename', icon: <Pencil size={15} />, onClick: () => startRename(node.path) },
       { label: `Show in ${FILE_MANAGER}`, icon: <FolderSearch size={15} />, onClick: () => window.api.reveal(node.path) },
-      ...(node.type === 'folder' || isLocked(node.path)
+      ...(node.type === 'folder' || isLocked(node.path) || !addonOn('phone')
         ? []
         : [{ label: 'Send to phone…', icon: <Smartphone size={15} />, onClick: () => sendToPhone({ kind: 'file', path: node.path }) } as MenuItem]),
       ...(node.type === 'attachment' ? [] : [{ label: 'Export…', icon: <FileDown size={15} />, onClick: () => openExport(node.path, node.type === 'folder') } as MenuItem]),

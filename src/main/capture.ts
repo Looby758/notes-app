@@ -5,6 +5,7 @@ import { activeThemeId, getTheme } from '@shared/themes'
 import type { Prefs } from '@shared/prefs'
 import { SNIP_DELAYS, type SnipMode } from '@shared/snipLaunch'
 import { openPopout } from './popout'
+import { addonOn } from './addonGate'
 import { acceleratorLabel, IS_MAC, SYSTEM_NAME } from '@shared/platform'
 
 /**
@@ -92,6 +93,7 @@ function createCaptureWindow(): BrowserWindow {
 
 /** Shows quick capture near the top of the screen you're on, ready to type. */
 export function openCapture(): void {
+  if (!addonOn('summon-bar')) return
   captureWin ??= createCaptureWindow()
   const win = captureWin
   const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea
@@ -160,11 +162,16 @@ function updateTrayMenu(): void {
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: 'Open Orbit', click: () => hooks.showMain() },
-      { label: `Summon bar${shortcut}`, click: openCapture },
-      { label: 'Snip a picture (copy to paste anywhere)', click: () => void hooks.snip?.('picture') },
-      { label: 'Snip after a delay', submenu: delayItems() },
-      { label: 'Snip text', click: () => void hooks.snip?.('text') },
-      { label: 'Open snips folder', click: () => void hooks.openSnips?.() },
+      // The summon bar and snips are add-ons: left out of the menu when they aren't added.
+      ...(addonOn('summon-bar') ? [{ label: `Summon bar${shortcut}`, click: openCapture }] : []),
+      ...(addonOn('snip')
+        ? [
+            { label: 'Snip a picture (copy to paste anywhere)', click: () => void hooks.snip?.('picture') },
+            { label: 'Snip after a delay', submenu: delayItems() },
+            { label: 'Snip text', click: () => void hooks.snip?.('text') },
+            { label: 'Open snips folder', click: () => void hooks.openSnips?.() }
+          ]
+        : []),
       { label: 'Pop out an app…', click: () => openPopout() },
       { type: 'separator' },
       { label: 'Quit Orbit', click: () => app.quit() }

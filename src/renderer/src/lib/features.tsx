@@ -1,4 +1,4 @@
-import { useSyncExternalStore, type ComponentType } from 'react'
+import { useMemo, useSyncExternalStore, type ComponentType } from 'react'
 import type { Prefs } from '@shared/prefs'
 import {
   Send,
@@ -38,6 +38,7 @@ import {
   SlidersVertical,
   Activity,
   PackageX,
+  Puzzle,
   MonitorUp,
   MousePointerClick,
   Moon,
@@ -114,6 +115,7 @@ import {
   MIXER_TAB,
   TASKS_TAB,
   UNINSTALL_TAB,
+  ADDONS_TAB,
   MUSIC_TAB,
   DOWNLOADS_TAB,
   MONEY_TAB,
@@ -125,6 +127,7 @@ import {
 } from './editorController'
 import { FeatureBadge } from '../components/Nav/badges'
 import { FEATURE_INFO, type FeatureInfo } from './featureInfo'
+import { hasFeature } from '@shared/addons'
 
 /**
  * Every feature of the app in one list, so the top bar, the dock, the radial menu and the
@@ -206,6 +209,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   mixer: { icon: SlidersVertical, run: () => openSpecialTab(MIXER_TAB) },
   tasks: { icon: Activity, run: () => openSpecialTab(TASKS_TAB) },
   uninstall: { icon: PackageX, run: () => openSpecialTab(UNINSTALL_TAB) },
+  addons: { icon: Puzzle, run: () => openSpecialTab(ADDONS_TAB) },
   screenshots: { icon: Images, run: () => openSpecialTab(SCREENSHOTS_TAB) },
   timeline: { icon: Clock, run: () => openSpecialTab(TIMELINE_TAB) },
   flashcards: { icon: Layers, run: () => openSpecialTab(FLASHCARDS_TAB), badge: () => <FeatureBadge id="flashcards" /> },
@@ -274,8 +278,15 @@ const BY_ID = new Map(FEATURES.map((f) => [f.id, f]))
 
 export const featureById = (id: string): Feature | undefined => BY_ID.get(id)
 
-/** The features for a list of ids from settings, skipping any that no longer exist. */
-export const featuresFor = (ids: readonly string[]): Feature[] => ids.map((id) => BY_ID.get(id)).filter((f): f is Feature => !!f)
+/** The features for a list of ids from settings, skipping any that no longer exist or whose add-on isn't added. */
+export const featuresFor = (ids: readonly string[], installed: readonly string[] = usePrefs.getState().prefs.installedAddons): Feature[] =>
+  ids.map((id) => BY_ID.get(id)).filter((f): f is Feature => !!f && hasFeature(f.id, installed))
+
+/** Every feature that's here: core ones, and those of the add-ons you've added. Redraws when add-ons change. */
+export function useFeatures(): Feature[] {
+  const installed = usePrefs((s) => s.prefs.installedAddons)
+  return useMemo(() => FEATURES.filter((f) => hasFeature(f.id, installed)), [installed])
+}
 
 /** Opens the launcher (every feature, grouped, type to filter). */
 export const openLauncher = (): void => useUI.setState({ launcherOpen: true })

@@ -27,6 +27,8 @@ interface SlashItem {
   keywords: string
   section: 'Script' | 'Format' | 'Insert' | 'Placeholders' | 'Templates'
   detail?: string
+  /** The add-on this item comes with (shared/addons.ts); left out when it isn't added. */
+  addon?: string
   /** Replaces the typed "/query" (from..to) with this item. */
   apply: (view: EditorView, from: number, to: number) => void
 }
@@ -167,6 +169,7 @@ const ITEMS: SlashItem[] = [
     label: 'Sketch',
     keywords: 'draw drawing handwriting pen doodle diagram picture',
     section: 'Insert',
+    addon: 'sketch',
     detail: 'draw',
     apply: (view, from, to) => {
       view.dispatch({ changes: { from, to, insert: '' } })
@@ -330,7 +333,9 @@ export function slashCompletions(ctx: CompletionContext): CompletionResult | nul
   const items = script
     ? [...SCRIPT_ITEMS, ...ITEMS, ...(inTemplate ? placeholderItems() : []), ...templateItems()]
     : [...ITEMS, ...SCRIPT_ITEMS, ...(inTemplate ? placeholderItems() : []), ...templateItems()]
-  const ranked = query.trim() ? rank(items, query.trim()) : items
+  const installed = usePrefs.getState().prefs.installedAddons
+  const added = items.filter((it) => !it.addon || installed.includes(it.addon))
+  const ranked = query.trim() ? rank(added, query.trim()) : added
   // In a script, the markers come first.
   const order = (section: SlashItem['section']): number => (script && section === 'Script' ? -1 : SECTION_ORDER[section])
   if (ranked.length === 0) return null

@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { useEditor } from '../../store/editor'
+import { usePrefs } from '../../store/prefs'
+import { addonOfFeature, hasFeature } from '@shared/addons'
+import { tabFeature, tabOn } from '../../lib/addons'
+import { AddonMissing, AddonsPage } from '../Settings/AddonsSettings'
 import {
   focusPane,
   fileOfTab,
@@ -40,6 +44,7 @@ import {
   MIXER_TAB,
   TASKS_TAB,
   UNINSTALL_TAB,
+  ADDONS_TAB,
   MUSIC_TAB,
   DOWNLOADS_TAB,
   STUDIO_TAB,
@@ -139,7 +144,17 @@ export default function Pane({ pane }: { pane: string }) {
   const lockedNote = useLock((s) => isNoteTab(active) && needsUnlock(active, s))
   const streamerHidden = useNoteHidden(isNoteTab(active) && !lockedNote ? active : null)
   const showingNote = isNoteTab(active) && !lockedNote && !streamerHidden
-  const mindMap = useUI((s) => showingNote && isMindMap(s, pane, active))
+  const installed = usePrefs((s) => s.prefs.installedAddons)
+  const mindMap = useUI((s) => showingNote && isMindMap(s, pane, active)) && installed.includes('mind-map')
+  // A page (or canvas board) from an add-on that isn't added shows how to add it instead.
+  const missingFeature = tabFeature(active)
+  const missing =
+    missingFeature && !hasFeature(missingFeature, installed)
+      ? addonOfFeature(missingFeature)
+      : isFileTab(active) && isBoard(active) && !installed.includes('canvas-board')
+        ? 'canvas-board'
+        : null
+  const shown = missing ? null : active
 
   useEffect(() => mountPane(pane, host.current!), [pane])
 
@@ -210,61 +225,64 @@ export default function Pane({ pane }: { pane: string }) {
         {streamerHidden && <NoteCover key={active} path={active!} autoFocus={isActivePane} />}
         {lockedNote && <LockScreen key={active} path={active!} autoFocus={isActivePane} />}
         {isFileTab(active) &&
+          !missing &&
           (isBoard(active) ? (
             <CanvasBoard key={active} path={fileOfTab(active)} />
           ) : (
             <FileViewer key={active} path={fileOfTab(active)} />
           ))}
         {isBlankTab(active) && <NewTabPage key={active} autoFocus={isActivePane} />}
+        {missing && <AddonMissing addon={missing} />}
         {/* Web pages stay loaded while you look at another tab, like in a browser. */}
-        {tabs?.filter(isWebTab).map((t) => <WebPage key={t} tab={t} hidden={t !== active} autoFocus={isActivePane} />)}
+        {tabs?.filter((t) => isWebTab(t) && tabOn(t, installed)).map((t) => <WebPage key={t} tab={t} hidden={t !== active} autoFocus={isActivePane} />)}
         {/* So do WhatsApp and Discord, so their unread counts keep coming in. */}
-        {tabs?.includes(MESSAGES_TAB) && <MessagesPage hidden={active !== MESSAGES_TAB} autoFocus={isActivePane} />}
+        {tabs?.includes(MESSAGES_TAB) && tabOn(MESSAGES_TAB, installed) && <MessagesPage hidden={active !== MESSAGES_TAB} autoFocus={isActivePane} />}
         {/* And Grok, so a chat isn't lost by looking at a note. */}
-        {tabs?.includes(GROK_TAB) && <GrokPage hidden={active !== GROK_TAB} autoFocus={isActivePane} />}
-        {tabs?.includes(CLAUDE_TAB) && <ChatSitePage site="claude" hidden={active !== CLAUDE_TAB} autoFocus={isActivePane} />}
-        {active === SETTINGS_TAB && <SettingsPage />}
-        {active === CALENDAR_TAB && <CalendarPage />}
-        {active === GRAPH_TAB && <GraphPage />}
-        {active === REPLACE_TAB && <ReplacePage />}
-        {active === CONFLICTS_TAB && <ConflictsPage />}
-        {active === AI_TAB && <AiPage autoFocus={isActivePane} />}
-        {active === CHAT_TAB && <ChatPage autoFocus={isActivePane} />}
-        {active === FLASHCARDS_TAB && <FlashcardsPage />}
-        {active === SCREENSHOTS_TAB && <ScreenshotsPage />}
-        {active === TIMELINE_TAB && <TimelinePage />}
-        {active === TERMINAL_TAB && <TerminalPage />}
-        {active === PASSWORDS_TAB && <PasswordsPage autoFocus={isActivePane} />}
-        {active === EMAIL_TAB && <EmailPage />}
+        {tabs?.includes(GROK_TAB) && tabOn(GROK_TAB, installed) && <GrokPage hidden={active !== GROK_TAB} autoFocus={isActivePane} />}
+        {tabs?.includes(CLAUDE_TAB) && tabOn(CLAUDE_TAB, installed) && <ChatSitePage site="claude" hidden={active !== CLAUDE_TAB} autoFocus={isActivePane} />}
+        {shown === SETTINGS_TAB && <SettingsPage />}
+        {shown === CALENDAR_TAB && <CalendarPage />}
+        {shown === GRAPH_TAB && <GraphPage />}
+        {shown === REPLACE_TAB && <ReplacePage />}
+        {shown === CONFLICTS_TAB && <ConflictsPage />}
+        {shown === AI_TAB && <AiPage autoFocus={isActivePane} />}
+        {shown === CHAT_TAB && <ChatPage autoFocus={isActivePane} />}
+        {shown === FLASHCARDS_TAB && <FlashcardsPage />}
+        {shown === SCREENSHOTS_TAB && <ScreenshotsPage />}
+        {shown === TIMELINE_TAB && <TimelinePage />}
+        {shown === TERMINAL_TAB && <TerminalPage />}
+        {shown === PASSWORDS_TAB && <PasswordsPage autoFocus={isActivePane} />}
+        {shown === EMAIL_TAB && <EmailPage />}
         {(active === HOME_TAB || !active) && <HomePage />}
-        {active === MONEY_TAB && <MoneyPage />}
-        {active === CONVERT_TAB && <ConvertPage />}
-        {active === FILESENDER_TAB && <FileSenderPage />}
-        {active === PDF_EDITOR_TAB && <PdfEditorPage />}
-        {active === COMICS_TAB && <ComicsPage />}
-        {active === WIKI_TAB && <WikiPage />}
-        {active === MINIGAMES_TAB && <MiniGamesPage />}
-        {active === CLOCKS_TAB && <WorldClocksPage />}
-        {active === COUNTDOWNS_TAB && <CountdownsPage />}
-        {active === SKYBLOCK_GOALS_TAB && <SkyblockGoalsPage />}
-        {active === PUBLISHING_TAB && <PublishingPage />}
-        {active === SCREENS_TAB && <ScreensPage />}
-        {active === MIXER_TAB && <MixerPage />}
-        {active === TASKS_TAB && <TaskManagerPage />}
-        {active === UNINSTALL_TAB && <UninstallerPage />}
-        {active === MUSIC_TAB && <MusicPage />}
-        {active === DOWNLOADS_TAB && <DownloadsPage />}
-        {active === STUDIO_TAB && <StudioPage />}
-        {active === APPSTUDIO_TAB && <AppStudioPage />}
-        {active === CLIPS_TAB && <ClipsPage />}
-        {active === VIDEOS_TAB && <VideosPage />}
-        {active === SOUNDBOARD_TAB && <SoundboardPage />}
-        {active === MACROS_TAB && <MacrosPage />}
-        {active === KEYREMAP_TAB && <KeyRemapPage />}
-        {active === DISCORD_TAB && <DiscordVoicePage />}
-        {active === GAMES_TAB && <GamesPage />}
-        {active === VIDEO_TAB && <VideoPage autoFocus={isActivePane} />}
-        {isExplorerTab(active) && <ExplorerPage key={active} tab={active} autoFocus={isActivePane} />}
+        {shown === MONEY_TAB && <MoneyPage />}
+        {shown === CONVERT_TAB && <ConvertPage />}
+        {shown === FILESENDER_TAB && <FileSenderPage />}
+        {shown === PDF_EDITOR_TAB && <PdfEditorPage />}
+        {shown === COMICS_TAB && <ComicsPage />}
+        {shown === WIKI_TAB && <WikiPage />}
+        {shown === MINIGAMES_TAB && <MiniGamesPage />}
+        {shown === CLOCKS_TAB && <WorldClocksPage />}
+        {shown === COUNTDOWNS_TAB && <CountdownsPage />}
+        {shown === SKYBLOCK_GOALS_TAB && <SkyblockGoalsPage />}
+        {shown === PUBLISHING_TAB && <PublishingPage />}
+        {shown === SCREENS_TAB && <ScreensPage />}
+        {shown === MIXER_TAB && <MixerPage />}
+        {shown === TASKS_TAB && <TaskManagerPage />}
+        {shown === UNINSTALL_TAB && <UninstallerPage />}
+        {shown === ADDONS_TAB && <AddonsPage />}
+        {shown === MUSIC_TAB && <MusicPage />}
+        {shown === DOWNLOADS_TAB && <DownloadsPage />}
+        {shown === STUDIO_TAB && <StudioPage />}
+        {shown === APPSTUDIO_TAB && <AppStudioPage />}
+        {shown === CLIPS_TAB && <ClipsPage />}
+        {shown === VIDEOS_TAB && <VideosPage />}
+        {shown === SOUNDBOARD_TAB && <SoundboardPage />}
+        {shown === MACROS_TAB && <MacrosPage />}
+        {shown === KEYREMAP_TAB && <KeyRemapPage />}
+        {shown === DISCORD_TAB && <DiscordVoicePage />}
+        {shown === GAMES_TAB && <GamesPage />}
+        {shown === VIDEO_TAB && <VideoPage autoFocus={isActivePane} />}
+        {isExplorerTab(shown) && <ExplorerPage key={shown} tab={shown} autoFocus={isActivePane} />}
         {zone && <div className={`drop-zone ${zone}`} />}
       </div>
     </div>

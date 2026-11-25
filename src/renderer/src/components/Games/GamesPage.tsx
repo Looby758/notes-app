@@ -8,6 +8,7 @@ import CoversSetup from './CoversSetup'
 import SkyblockSetup from './SkyblockSetup'
 import { usePrefs } from '../../store/prefs'
 import { notify } from '../../store/notify'
+import { useAddonOn } from '../../lib/addons'
 import { useMotion } from '../../lib/motion'
 
 const SOURCE_NAMES: Record<GameSource, string> = { steam: 'Steam', epic: 'Epic Games', roblox: 'Roblox', app: IS_MAC ? 'Mac app' : 'App', added: 'Added by you' }
@@ -46,6 +47,8 @@ export default function GamesPage() {
   const [covers, setCovers] = useState<Record<string, string>>({})
   const [coversOpen, setCoversOpen] = useState(false)
   const [skyblockOpen, setSkyblockOpen] = useState(false)
+  // SkyBlock session cards come with the SkyBlock add-on.
+  const skyblockOn = useAddonOn('skyblock')
 
   const load = useCallback(async (rescan: boolean) => {
     if (rescan) setRefreshing(true)
@@ -166,9 +169,11 @@ export default function GamesPage() {
             <button className={`btn ${coversOpen ? 'active' : ''}`} onClick={() => setCoversOpen(!coversOpen)} title="Covers that move, from SteamGridDB" data-games-covers>
               <Sparkles size={14} /> Animated covers
             </button>
-            <button className={`btn ${skyblockOpen ? 'active' : ''}`} onClick={() => setSkyblockOpen(!skyblockOpen)} title="A summary card for each Hypixel SkyBlock session" data-games-skyblock>
-              <Pickaxe size={14} /> SkyBlock
-            </button>
+            {skyblockOn && (
+              <button className={`btn ${skyblockOpen ? 'active' : ''}`} onClick={() => setSkyblockOpen(!skyblockOpen)} title="A summary card for each Hypixel SkyBlock session" data-games-skyblock>
+                <Pickaxe size={14} /> SkyBlock
+              </button>
+            )}
             <button className="btn" onClick={() => void add()} title={IS_MAC ? 'Pick a game from Applications that isn’t on the list' : 'Pick a game that isn’t on the list'} data-games-add>
               <Plus size={14} /> Add a game
             </button>
@@ -187,7 +192,7 @@ export default function GamesPage() {
           />
         )}
 
-        {skyblockOpen && <SkyblockSetup />}
+        {skyblockOpen && skyblockOn && <SkyblockSetup />}
 
         {games.length > 0 && (
           <div className="games-tools">

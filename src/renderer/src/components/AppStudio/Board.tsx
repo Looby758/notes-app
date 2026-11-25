@@ -28,6 +28,7 @@ import { vaultUrl } from '../../lib/fileKinds'
 import { pictureAsPng } from '../../lib/boardPictures'
 import { closeReport, useAppReports } from '../../store/appReports'
 import Reports from './Reports'
+import { addonOn, useAddonOn } from '../../lib/addons'
 
 /** An app as the board sees it: its name, repository (if on GitHub) and the key its items are saved under. */
 interface BoardApp {
@@ -387,6 +388,7 @@ function Editor({ item, apps, onCopy, onSend }: { item: BoardItem; apps: BoardAp
     }
   }
 
+  const sketchOn = useAddonOn('sketch')
   const sketch = (): void => useUI.setState({ sketch: { path: null, onSaved: addPicture } })
 
   return (
@@ -465,10 +467,12 @@ function Editor({ item, apps, onCopy, onSend }: { item: BoardItem; apps: BoardAp
               </div>
             </figure>
           ))}
-          <button className="board-add-picture" onClick={sketch} title="Draw a rough layout of a screen">
-            <PenLine size={16} />
-            Sketch a screen
-          </button>
+          {sketchOn && (
+            <button className="board-add-picture" onClick={sketch} title="Draw a rough layout of a screen">
+              <PenLine size={16} />
+              Sketch a screen
+            </button>
+          )}
           <div className="board-add-picture muted" title="Copy a picture, then paste it into the details box">
             <ImageIcon size={16} />
             Paste a picture into the details
@@ -553,7 +557,7 @@ function ClaudeLinkDialog({ app, link, sending, onClose, onSave }: { app: BoardA
         />
         {!ok && <p className="appstudio-error">That isn’t a claude.ai link.</p>}
         <div className="board-editor-actions">
-          <button className="btn" onClick={() => openSiteTab('claude')} title="Open Claude in Orbit to find the project">
+          <button className="btn" onClick={() => (addonOn('claude') ? openSiteTab('claude') : window.open('https://claude.ai/projects'))} title="Open Claude to find the project">
             <ExternalLink size={14} /> Open Claude
           </button>
           {onProject && current !== url && (
