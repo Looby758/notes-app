@@ -12,6 +12,12 @@ export interface ReleaseNotes {
 /** Newest first. Add an entry with each release. */
 export const RELEASE_NOTES: readonly ReleaseNotes[] = [
   {
+    version: '1.15.1',
+    items: [
+      'Ask Claude Desktop to find, start, hide or show your games by name (like "GTA 5")'
+    ]
+  },
+  {
     version: '1.15.0',
     items: [
       'Let Claude Desktop look at Orbit (App Studio errors, notes, calendar and more)',
