@@ -24,7 +24,7 @@ import type { AiAskTurn, AiExtraContext, AiChat, AiChatMessage, AiEngine, AiNote
 import type { MusicAction } from '@shared/spotify'
 import { normalizePrefs, type Prefs } from '@shared/prefs'
 import { activeThemeId, getTheme } from '@shared/themes'
-import { loadSettings, saveSettings, settingsFile, watchSettingsFile } from './settings'
+import { hadSettingsAtStart, loadSettings, saveSettings, settingsFile, watchSettingsFile } from './settings'
 import { Vault } from './vault'
 import { startWatching, stopWatching } from './watcher'
 import * as calendars from './calendarSources'
@@ -102,7 +102,7 @@ import { setupTerminal } from './terminal'
 import { setupAppStudio } from './appStudio'
 import { setupReleaseHelper } from './releaseHelper'
 import { addonOn, addonsMaybeChanged, setupAddonGate, startsCoreOnly } from './addonGate'
-import { cleanInstalledAddons, NEW_ORBIT_STARTS_CORE_ONLY } from '@shared/addons'
+import { cleanInstalledAddons } from '@shared/addons'
 import { TEST_COPY, TEST_COPY_FOLDER, testCopyReadOnly, WINDOWS_APP_ID } from './testCopy'
 import { setupGames } from './games'
 import { setupGameCovers } from './gameCovers'
@@ -403,13 +403,18 @@ function orbitParts(themesChanged: () => void): Record<'settings' | 'home' | 'th
   }
 }
 
+/** A new Orbit is set to the core once only (switching to another new folder later keeps your choices). */
+let coreStartDone = false
+
 function openVault(path: string | null): void {
   stopWatching()
   vault = path ? new Vault(path) : null
   if (!path) return
   // Brand new Orbit, brand new notes folder: just the core to start with (add more in Settings → Add-ons).
-  // Off for now (shared/addons.ts): new Orbits get every add-on until the store has real downloads.
-  if (NEW_ORBIT_STARTS_CORE_ONLY && startsCoreOnly(!!loadSettings().prefs, path)) {
+  // "New" is decided by what was on this computer when Orbit started, so anything saved since (like
+  // a colour picked on the welcome screen) doesn't count. Anyone who already used Orbit keeps theirs.
+  if (startsCoreOnly(hadSettingsAtStart() && !!loadSettings().prefs, path) && !coreStartDone) {
+    coreStartDone = true
     const prefs = normalizePrefs({ installedAddons: [] })
     saveSettings({ prefs })
     broadcastPrefs(prefs)
