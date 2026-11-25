@@ -856,6 +856,7 @@ const api: NotesApi = {
   appsReleaseFix: (folder, fix, tag) => ipcRenderer.invoke('apps:releaseFix', folder, fix, tag),
   appsMainStatus: (folder) => ipcRenderer.invoke('apps:mainStatus', folder),
   appsGetLatestMain: (folder) => ipcRenderer.invoke('apps:getLatestMain', folder),
+  onLatestMainStep: (callback) => on('apps:latestMainStep', callback),
   appsWriteNotes: (folder, version, items) => ipcRenderer.invoke('apps:writeNotes', folder, version, items),
   appsBuildStatus: (folder, repo, tag) => ipcRenderer.invoke('apps:buildStatus', folder, repo, tag),
   appsRerunBuild: (repo, runId) => ipcRenderer.invoke('apps:rerunBuild', repo, runId),

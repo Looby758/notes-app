@@ -1,6 +1,6 @@
 import { ipcMain, net, shell } from 'electron'
 import { execFile } from 'child_process'
-import { readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { isAbsolute, join, relative } from 'path'
 import { bumpVersion, VERSION_BUMPS, type VersionBump } from '@shared/appStudio'
 import {
@@ -387,7 +387,56 @@ async function mainStatus(folder: string): Promise<MainStatus> {
  * never thrown away: on another branch it won't switch with them (they'd come along to main), and
  * on main git itself refuses if the new commits touch them.
  */
-async function getLatestMain(folder: string): Promise<FixResult> {
+/** The files that say which packages an app needs: when any of these change, npm install is due. */
+const PACKAGE_FILES = ['package.json', 'package-lock.json', 'npm-shrinkwrap.json']
+
+/** Packages package.json asks for that aren't in node_modules (none when it has no package.json). */
+export function missingPackages(folder: string): string[] {
+  let pkg: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> }
+  try {
+    pkg = JSON.parse(readFileSync(join(folder, 'package.json'), 'utf8'))
+  } catch {
+    return []
+  }
+  const names = [...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.devDependencies ?? {})]
+  return names.filter((name) => !existsSync(join(folder, 'node_modules', name, 'package.json')))
+}
+
+/** Get latest main results where git was fine and npm install failed (kept as packages problems in the error history). */
+const installFailed = new WeakSet<FixResult>()
+
+/** What Get latest main is doing now, for the button to show. */
+type Step = (text: string) => void
+
+/**
+ * Runs npm install after Get latest main when the new code needs it: package.json or the lock
+ * file changed, or a package it asks for isn't installed (an earlier get didn't install it).
+ * Returns null when there was nothing to install.
+ */
+async function installIfNeeded(folder: string, from: string | null, step: Step): Promise<{ ok: boolean; text: string; output?: string; problem?: Problem } | null> {
+  if (!existsSync(join(folder, 'package.json'))) return null
+  const changed = from ? ((await gitOut(folder, ['diff', '--name-only', from, 'HEAD', '--', ...PACKAGE_FILES])) ?? '').split('\n').filter(Boolean) : []
+  const missing = missingPackages(folder)
+  if (!changed.length && !missing.length) return null
+  step('Installing the new packages (npm install)…')
+  const r = await run(folder, 'npm', ['install', '--no-audit', '--no-fund'], { timeout: 15 * 60_000 })
+  if (r.npmMissing) return { ok: false, text: npmMissingText(process.platform, { nvm: hasNvm() }), output: lastLines(r.out, 80), problem: npmProblem() }
+  if (!r.ok) {
+    const locked = /\b(EPERM|EBUSY|resource busy or locked)\b/.test(r.out)
+    const detail = locked
+      ? 'A file npm needed to replace is in use. Close the app if it’s running from this folder (npm run dev), then press Get latest main again to finish installing.'
+      : 'The code is up to date, but the new packages aren’t installed, so it may not build. Look at what npm said, then press Get latest main again to try the install again.'
+    return { ok: false, text: `Installing the new packages failed. ${detail}`, output: lastLines(r.out, 80), problem: { title: 'Installing the new packages failed', detail, fixes: [] } }
+  }
+  const still = missingPackages(folder)
+  if (still.length) {
+    const detail = `npm finished, but ${still.slice(0, 5).join(', ')}${still.length > 5 ? ` and ${still.length - 5} more` : ''} still ${still.length === 1 ? 'isn’t' : 'aren’t'} in node_modules.`
+    return { ok: false, text: `Installing the new packages didn’t finish. ${detail}`, output: lastLines(r.out, 80), problem: { title: 'Installing the new packages didn’t finish', detail, fixes: [] } }
+  }
+  return { ok: true, text: 'Installed the new packages.' }
+}
+
+async function getLatestMain(folder: string, step: Step = () => undefined): Promise<FixResult> {
   const info = await appInfo(folder)
   nameApp(folder, info.repo)
   if (!info.ok || info.error) throw new Error(info.error ?? 'Orbit couldn’t read this app’s folder.')
@@ -395,6 +444,8 @@ async function getLatestMain(folder: string): Promise<FixResult> {
   const dirty = info.changedFiles ?? 0
   if ((await gitOut(folder, ['remote', 'get-url', 'origin'])) === null) return { ok: false, message: 'This app’s folder isn’t linked to GitHub, so there’s no main to get.' }
   const files = dirty === 1 ? '1 file has' : `${dirty} files have`
+  const start = await gitOut(folder, ['rev-parse', 'HEAD'])
+  step(`Getting GitHub’s ${main}…`)
   let switched = ''
   if (info.branch !== main) {
     if (dirty)
@@ -416,9 +467,17 @@ async function getLatestMain(folder: string): Promise<FixResult> {
   const came = before && after && before !== after ? Number(await gitOut(folder, ['rev-list', '--count', `${before}..${after}`])) || 0 : 0
   const ahead = aheadBehind(await gitOut(folder, ['rev-list', '--left-right', '--count', `HEAD...origin/${main}`]))
   if (ahead?.behind) return { ok: false, message: `${switched}Something stopped git getting all of GitHub’s ${main}: it’s still ${ahead.behind} behind.` }
-  if (pulled.message.includes('on top')) return { ...pulled, message: switched + pulled.message }
-  const got = came ? `Got ${came === 1 ? '1 new commit' : `${came} new commits`} from GitHub’s ${main}.` : `Already up to date with GitHub’s ${main}.`
-  return { ok: true, message: `${switched}${got}${dirty ? ` Your ${dirty === 1 ? 'changed file is' : `${dirty} changed files are`} still here.` : ''}` }
+  const got = pulled.message.includes('on top')
+    ? pulled.message
+    : `${came ? `Got ${came === 1 ? '1 new commit' : `${came} new commits`} from GitHub’s ${main}.` : `Already up to date with GitHub’s ${main}.`}${dirty ? ` Your ${dirty === 1 ? 'changed file is' : `${dirty} changed files are`} still here.` : ''}`
+  const installed = await installIfNeeded(folder, start, step)
+  if (!installed) return { ok: true, message: switched + got }
+  if (!installed.ok) {
+    const r: FixResult = { ok: false, message: `${switched}${got} ${installed.text}`, problem: installed.problem, output: installed.output }
+    installFailed.add(r)
+    return r
+  }
+  return { ok: true, message: `${switched}${got} ${installed.text}` }
 }
 
 /** One of the one-click fixes. */
@@ -653,10 +712,14 @@ export function setupReleaseHelper(): void {
     if (busy.has(folder)) throw new Error('busy')
     return mainStatus(folder).then((r) => (sawMainStatus(folder, r), r))
   })
-  ipcMain.handle('apps:getLatestMain', (_e, folder: unknown) => {
+  ipcMain.handle('apps:getLatestMain', (e, folder: unknown) => {
     if (!validFolder(folder)) throw new Error('Not allowed')
-    return once(folder, () => getLatestMain(folder)).then(
-      (r) => (sawFix(folder, 'Get latest main', r), r),
+    const step: Step = (text) => {
+      const sender = e?.sender
+      if (sender && !sender.isDestroyed()) sender.send('apps:latestMainStep', { folder, text })
+    }
+    return once(folder, () => getLatestMain(folder, step)).then(
+      (r) => (installFailed.delete(r) ? sawFix(folder, 'Get latest main: npm install', r, 'packages') : sawFix(folder, 'Get latest main', r), r),
       (err) => {
         sawFailure(folder, 'git', 'Get latest main', err)
         throw err

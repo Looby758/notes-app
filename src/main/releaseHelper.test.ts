@@ -1,5 +1,5 @@
 import { execFileSync } from 'child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -214,6 +214,53 @@ describe('release helper (with real git)', { timeout: 60_000 }, () => {
       expect(r.ok).toBe(true)
       expect(git(app, 'log', '--format=%s', '-2').split('\n')).toEqual(['Local work', 'Merged a.txt'])
       expect(await call<MainStatus>('apps:mainStatus', app)).toMatchObject({ behind: 0, ahead: 1 })
+    })
+
+    /** Merges a package.json on GitHub that needs a local package (so it installs offline), with any extra scripts. */
+    const addPackageOnGitHub = (scripts: Record<string, string> = {}): void => {
+      mkdirSync(join(other, 'lib'), { recursive: true })
+      writeFileSync(join(other, 'lib', 'package.json'), JSON.stringify({ name: 'demo-lib', version: '1.0.0' }))
+      writeFileSync(join(other, '.gitignore'), 'node_modules\npackage-lock.json\n')
+      const pkg = JSON.parse(readFileSync(join(other, 'package.json'), 'utf8'))
+      pkg.dependencies = { 'demo-lib': 'file:./lib' }
+      Object.assign(pkg.scripts, scripts)
+      writeFileSync(join(other, 'package.json'), JSON.stringify(pkg, null, 2) + '\n')
+      git(other, 'add', '-A')
+      git(other, 'commit', '-qm', 'New package')
+      git(other, 'push', '-q', 'origin', 'main')
+    }
+
+    it('installs new packages after getting main, saying what it’s doing', async () => {
+      addPackageOnGitHub()
+      const steps: string[] = []
+      const sender = { isDestroyed: () => false, send: (_c: string, s: { text: string }) => steps.push(s.text) }
+      const r = await Promise.resolve(handlers.get('apps:getLatestMain')!({ sender }, app) as Promise<FixResult>)
+      expect(r).toMatchObject({ ok: true, message: 'Got 1 new commit from GitHub’s main. Installed the new packages.' })
+      expect(existsSync(join(app, 'node_modules', 'demo-lib', 'package.json'))).toBe(true)
+      expect(steps).toEqual(['Getting GitHub’s main…', 'Installing the new packages (npm install)…'])
+      // Nothing new and nothing missing: no install.
+      expect((await call<FixResult>('apps:getLatestMain', app)).message).toBe('Already up to date with GitHub’s main.')
+    })
+
+    it('installs packages an earlier get left out, even when already up to date', async () => {
+      addPackageOnGitHub()
+      git(app, 'pull', '-q', 'origin', 'main')
+      const r = await call<FixResult>('apps:getLatestMain', app)
+      expect(r).toMatchObject({ ok: true, message: 'Already up to date with GitHub’s main. Installed the new packages.' })
+      expect(existsSync(join(app, 'node_modules', 'demo-lib', 'package.json'))).toBe(true)
+    })
+
+    it('says when installing the new packages fails, with what npm said, and keeps it in the error history', async () => {
+      addPackageOnGitHub({ postinstall: 'node -e "console.error(\'native build broke\');process.exit(1)"' })
+      const r = await call<FixResult>('apps:getLatestMain', app)
+      expect(r.ok).toBe(false)
+      expect(r.message).toMatch(/^Got 1 new commit from GitHub’s main\. Installing the new packages failed\./)
+      expect(r.output).toMatch(/native build broke/)
+      // The code still came in.
+      expect(git(app, 'rev-parse', 'HEAD')).toBe(git(origin, 'rev-parse', 'main'))
+      const { studioErrors } = await import('./studioErrors')
+      const latest = studioErrors().find((e) => e.folder === app)
+      expect(latest).toMatchObject({ kind: 'packages', step: 'Get latest main: npm install', title: 'Installing the new packages failed' })
     })
 
     it('says when the folder isn’t on GitHub', async () => {
