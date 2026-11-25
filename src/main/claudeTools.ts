@@ -398,7 +398,7 @@ function musicTools(server: McpServer, deps: ToolDeps): void {
   })
   windowTool(server, deps, 'get_playlist', {
     title: 'A playlist’s songs',
-    description: 'The songs in one playlist (title, artist, album, genre). Use it to recommend songs like the ones in it. "Liked" gives the liked songs.',
+    description: 'The songs in one playlist, numbered (title, artist, album, genre). Use it to recommend songs like the ones in it. "Liked" gives the liked songs.',
     inputSchema: { playlist: z.string().min(1).describe('The playlist’s name') }
   })
   windowTool(server, deps, 'find_songs', {
@@ -435,6 +435,111 @@ function musicTools(server: McpServer, deps: ToolDeps): void {
     },
     write: true,
     timeoutMs: 90_000
+  })
+  windowTool(server, deps, 'remove_from_playlist', {
+    title: 'Take songs out of a playlist',
+    description: 'Takes songs out of a playlist (the songs stay in the user’s music). Give song names, or their numbers from get_playlist.',
+    inputSchema: {
+      playlist: z.string().min(1),
+      songs: z.array(z.string().min(1)).max(200).optional().describe('Songs, like "Lost Boys by Phoebe Bridgers"'),
+      numbers: z.array(z.number().int().min(1)).max(200).optional().describe('Their numbers from get_playlist')
+    },
+    write: true
+  })
+  windowTool(server, deps, 'move_in_playlist', {
+    title: 'Move a song in a playlist',
+    description: 'Moves one song to a new place in a playlist (1 is the top). Give its name or its number from get_playlist.',
+    inputSchema: { playlist: z.string().min(1), song: z.string().optional(), number: z.number().int().min(1).optional(), to: z.number().int().min(1) },
+    write: true
+  })
+  windowTool(server, deps, 'rename_playlist', {
+    title: 'Rename a playlist',
+    description: 'Gives a playlist a new name.',
+    inputSchema: { playlist: z.string().min(1), name: z.string().min(1).max(100) },
+    write: true
+  })
+  windowTool(server, deps, 'delete_playlist', {
+    title: 'Delete a playlist',
+    description: 'Deletes a playlist. The songs in it stay in the user’s music. Check with the user first.',
+    inputSchema: { playlist: z.string().min(1) },
+    write: true
+  })
+  windowTool(server, deps, 'get_queue', {
+    title: 'Up next',
+    description: 'The songs in Up next, numbered, after the one playing now.',
+    inputSchema: {}
+  })
+  windowTool(server, deps, 'queue_songs', {
+    title: 'Add to Up next',
+    description: 'Adds songs from the user’s music to Up next: at the end, or straight after this song with next true.',
+    inputSchema: { songs: z.array(z.string().min(1)).min(1).max(200).describe('Songs, like "Lost Boys by Phoebe Bridgers"'), next: z.boolean().optional() },
+    write: true
+  })
+  windowTool(server, deps, 'remove_from_queue', {
+    title: 'Take songs out of Up next',
+    description: 'Takes one song out of Up next (by its number from get_queue or its name), or clears it with all true.',
+    inputSchema: { number: z.number().int().min(1).optional(), song: z.string().optional(), all: z.boolean().optional() },
+    write: true
+  })
+  windowTool(server, deps, 'music_settings', {
+    title: 'Volume, shuffle, loop and more',
+    description: 'Changes how the music plays: shuffle, loop, volume (0 to 100), jump to a point in the song, or a sleep timer (minutes, "end_of_song", or "off").',
+    inputSchema: {
+      shuffle: z.boolean().optional(),
+      loop: z.enum(['off', 'song', 'all']).optional(),
+      volume: z.number().min(0).max(100).optional(),
+      seek_seconds: z.number().min(0).optional().describe('Jump to this many seconds into the song'),
+      sleep: z.union([z.number().int().min(1).max(600), z.enum(['end_of_song', 'off'])]).optional().describe('Stop the music after this many minutes, at the end of this song, or "off"')
+    },
+    write: true
+  })
+  windowTool(server, deps, 'like_songs', {
+    title: 'Like songs',
+    description: 'Likes songs (adds them to Liked), or unlikes them with liked false.',
+    inputSchema: { songs: z.array(z.string().min(1)).min(1).max(200).describe('Songs, like "Lost Boys by Phoebe Bridgers"'), liked: z.boolean().optional() },
+    write: true
+  })
+  windowTool(server, deps, 'rate_song', {
+    title: 'Rate a song',
+    description: 'Gives a song 1 to 5 stars, or 0 to clear the rating.',
+    inputSchema: { song: z.string().min(1), stars: z.number().int().min(0).max(5) },
+    write: true
+  })
+  windowTool(server, deps, 'tag_songs', {
+    title: 'Tag songs',
+    description: 'Puts a tag (like "gym" or "sad") on songs, or takes it off with remove true. Find tagged songs with search_my_music.',
+    inputSchema: { songs: z.array(z.string().min(1)).min(1).max(200).describe('Songs, like "Lost Boys by Phoebe Bridgers"'), tag: z.string().min(1).max(40), remove: z.boolean().optional() },
+    write: true
+  })
+  windowTool(server, deps, 'search_my_music', {
+    title: 'Search my music',
+    description: 'Searches the user’s own music by words (title, artist, album, genre) or by tag, with ratings, likes and tags.',
+    inputSchema: { query: z.string().optional(), tag: z.string().optional() }
+  })
+  windowTool(server, deps, 'music_stats', {
+    title: 'Most played and recently added',
+    description: 'The user’s most played songs, recently added songs and how much music they have.',
+    inputSchema: { limit: z.number().int().min(1).max(50).optional() }
+  })
+  windowTool(server, deps, 'edit_song', {
+    title: 'Fix a song’s details',
+    description: 'Changes a song’s title, artist, album, year or genre (saved in the file).',
+    inputSchema: {
+      song: z.string().min(1),
+      title: z.string().max(200).optional(),
+      artist: z.string().max(200).optional(),
+      album: z.string().max(200).optional(),
+      year: z.string().max(10).optional(),
+      genre: z.string().max(100).optional()
+    },
+    write: true
+  })
+  windowTool(server, deps, 'delete_songs', {
+    title: 'Delete songs',
+    description: 'Deletes songs from the user’s music folder (they go to the Recycle Bin or Bin, and out of every playlist). Orbit asks the user to confirm first. To only take a song out of one playlist, use remove_from_playlist.',
+    inputSchema: { songs: z.array(z.string().min(1)).min(1).max(200).describe('Songs, like "Lost Boys by Phoebe Bridgers"') },
+    write: true,
+    timeoutMs: 120_000
   })
 }
 

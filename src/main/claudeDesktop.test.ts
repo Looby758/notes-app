@@ -106,7 +106,7 @@ describe('safety', () => {
   it('marks everything but the few changes as read-only', async () => {
     const tools = (await (await connect()).listTools()).tools
     const writes = tools.filter((t) => t.annotations?.readOnlyHint === false).map((t) => t.name)
-    expect(writes.sort()).toEqual(['add_calendar_event', 'add_card', 'add_countdown', 'add_flashcards', 'add_to_note', 'add_to_playlist', 'control_music', 'create_note', 'create_playlist', 'delete_note', 'download_song', 'edit_note', 'move_note', 'play_music', 'rename_note', 'update_card'])
+    expect(writes.sort()).toEqual(['add_calendar_event', 'add_card', 'add_countdown', 'add_flashcards', 'add_to_note', 'add_to_playlist', 'control_music', 'create_note', 'create_playlist', 'delete_note', 'delete_playlist', 'delete_songs', 'download_song', 'edit_note', 'edit_song', 'like_songs', 'move_in_playlist', 'move_note', 'music_settings', 'play_music', 'queue_songs', 'rate_song', 'remove_from_playlist', 'remove_from_queue', 'rename_note', 'rename_playlist', 'tag_songs', 'update_card'])
   })
 
   it('blanks out secrets in what the window answers', async () => {

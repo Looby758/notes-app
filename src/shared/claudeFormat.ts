@@ -213,20 +213,38 @@ export function matchSongs(songs: readonly LocalSong[], search: string): LocalSo
 
 /**
  * The one song Claude means ("Lost Boys", "Lost Boys by Phoebe Bridgers", "Phoebe Bridgers - Lost
- * Boys"): an exact title (and artist, when given) first, else the only match. Null when there's
- * none, or it can't tell which.
+ * Boys"). When an artist is given, only that artist's song counts: a song with the same name by
+ * someone else is a different song. Null when there's none, or it can't tell which.
  */
 export function pickSong(songs: readonly LocalSong[], want: string): LocalSong | null {
   const norm = (s: string): string => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
   const text = want.trim()
-  const parts = /^(.+?)\s+by\s+(.+)$/i.exec(text) ?? /^(.+?)\s+-\s+(.+)$/.exec(text)
-  const tries: { title: string; artist?: string }[] = [{ title: text }]
-  if (parts) tries.unshift({ title: parts[1], artist: parts[2] }, { title: parts[2], artist: parts[1] })
-  for (const t of tries) {
-    const exact = songs.filter((s) => norm(s.title) === norm(t.title) && (!t.artist || norm(s.artist).includes(norm(t.artist))))
-    if (exact.length >= 1) return exact[0]
+  if (!text) return null
+  const artistOk = (song: LocalSong, artist: string): boolean => {
+    const a = norm(song.artist)
+    const w = norm(artist)
+    return !!a && !!w && (a.includes(w) || w.includes(a) || w.split(' ').filter((x) => x.length > 2).every((x) => a.includes(x)))
   }
-  const loose = matchSongs(songs, text.replace(/\s+by\s+|\s+-\s+/gi, ' '))
+  const parts = /^(.+?)\s+by\s+(.+)$/i.exec(text) ?? /^(.+?)\s+-\s+(.+)$/.exec(text)
+  if (parts) {
+    for (const [title, artist] of [
+      [parts[1], parts[2]],
+      [parts[2], parts[1]]
+    ]) {
+      const hit = songs.find((s) => norm(s.title) === norm(title) && artistOk(s, artist))
+      if (hit) return hit
+    }
+  }
+  // The whole thing as a title ("No One Left To Love", or a title that has " - " in it).
+  const titled = songs.filter((s) => norm(s.title) === norm(text))
+  if (titled.length === 1 || (titled.length > 1 && titled.every((s) => norm(s.artist) === norm(titled[0].artist)))) return titled[0]
+  if (titled.length > 1 || parts) return null
+  // Every word somewhere in the title, artist or album, and only one song like that.
+  const words = norm(text).split(' ').filter(Boolean)
+  const loose = songs.filter((s) => {
+    const hay = norm(`${s.title} ${s.artist} ${s.album}`)
+    return words.every((w) => hay.includes(w))
+  })
   return loose.length === 1 ? loose[0] : null
 }
 

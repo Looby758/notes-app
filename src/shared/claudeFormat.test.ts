@@ -122,6 +122,14 @@ describe('pickSong', () => {
     expect(pickSong(songs, 'Bohemian Rhapsody')).toBeNull()
   })
 
+  it('never settles for a different song that only shares a word', () => {
+    const lib = [...songs, song('FUNK ESTRELAS – Super Slowed', 'MXZI'), song('Coming Home', 'Skylar Grey')]
+    expect(pickSong(lib, 'I’ll Keep Coming by Low Roar')).toBeNull()
+    expect(pickSong(lib, 'I’ll Keep Coming')).toBeNull()
+    // Same title, different artist: not the one they meant.
+    expect(pickSong(lib, 'Lost Boys by Ruelle')).toBeNull()
+  })
+
   it('makes suggestions from the artists a playlist has most', () => {
     expect(artistSeeds([song('a', 'Ruelle'), song('b', 'Ruelle'), song('c', 'Phoebe Bridgers, Ruelle')])).toEqual([
       { name: 'Ruelle', weight: 3 },

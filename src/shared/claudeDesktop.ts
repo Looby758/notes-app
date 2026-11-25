@@ -18,7 +18,7 @@ export const CLAUDE_AREAS: readonly { id: ClaudeArea; label: string; what: strin
   { id: 'money', label: 'Money', what: 'Read your spending, budgets and savings. It can’t change anything.', onAtStart: true },
   { id: 'flashcards', label: 'Flashcards', what: 'See your cards and which ones you keep getting wrong, and add new ones.', onAtStart: true },
   { id: 'files', label: 'Files and downloads', what: 'Find files you’ve colour-tagged, see downloads and how full your drives are.', onAtStart: true },
-  { id: 'music', label: 'Music', what: 'Play songs and playlists (shuffle, loop), see what’s playing, make playlists, suggest songs, and download songs from YouTube into your music.', onAtStart: true },
+  { id: 'music', label: 'Music', what: 'Play, queue, shuffle and loop songs and playlists, change the volume, make, edit and tidy playlists, like, rate and tag songs, fix song details, suggest songs, and download songs from YouTube into your music.', onAtStart: true },
   { id: 'appStudio', label: 'App Studio', what: 'Read App Studio’s errors and release checks, and read and move cards on Ideas & bugs.', onAtStart: true },
   { id: 'email', label: 'Email', what: 'Search and read your emails. Off unless you switch it on.', onAtStart: false }
 ]

@@ -30,14 +30,16 @@ import { useVault } from '../store/vault'
 import { useFlashcards } from '../store/flashcards'
 import { ensureMoney, useMoney } from '../store/money'
 import { setPrefs, usePrefs } from '../store/prefs'
-import { musicControl, useMusic } from '../store/music'
-import { loadLocalLibrary, localUpNext, playLocal, setLocalModes, useLocalMusic } from '../store/localMusic'
+import { musicControl, musicSeek, musicSetVolume, setSleepTimer, useMusic } from '../store/music'
+import { addToQueue, clearUpNext, loadLocalLibrary, localUpNext, playLocal, playNext, removeFromQueue, setLocalModes, useLocalMusic } from '../store/localMusic'
 import { addEvent, editNote } from './daily'
-import { addToPlaylist as addSongsToPlaylist, createPlaylist, startMusicData, useMusicData } from '../store/musicData'
+import { addToPlaylist as addSongsToPlaylist, createPlaylist, deletePlaylist, moveInPlaylist, rateSong, removeFromPlaylist, renamePlaylist, startMusicData, tagSongs, toggleLike, useMusicData } from '../store/musicData'
+import { deleteSongs, editSongs } from '../store/musicFiles'
+import { IS_MAC } from '@shared/platform'
 import { onMusicLinkDone, saveMp3 } from '../store/musicLink'
 import { countdownId, isDate, MAX_COUNTDOWNS, type CountdownKind } from '@shared/countdown'
-import { likedSongs, playlistSongs, songsByPath } from '@shared/musicLibrary'
-import type { LocalSong } from '@shared/localMusic'
+import { allTags, likedSongs, mostPlayed, playlistSongs, recentlyAdded, songsByPath } from '@shared/musicLibrary'
+import { canTag, type LocalSong, type SongTagPatch } from '@shared/localMusic'
 import type { FoundTrack } from '@shared/songSearch'
 import { addDays, dayKey, fromDayKey } from './dates'
 import { moneyContext } from './askContext'
@@ -470,7 +472,7 @@ async function listPlaylistsFor(): Promise<string> {
 
 async function getPlaylistFor(args: Args): Promise<string> {
   const { name, songs } = await playlistSongsFor(str(args.playlist))
-  return songs.length ? `${name} (${songs.length} songs):\n${songLines(songs)}` : `“${name}” has no songs in it yet.`
+  return songs.length ? `${name} (${songs.length} songs):\n${songs.map((s, i) => `${i + 1}. ${songLines([s])}`).join('\n')}` : `“${name}” has no songs in it yet.`
 }
 
 async function findSongsFor(args: Args): Promise<string> {
@@ -544,7 +546,7 @@ async function addToPlaylistFor(args: Args): Promise<string> {
 }
 
 /** Waits for a download to finish (or gives up waiting, leaving it going). */
-function finished(id: string, ms: number): Promise<{ stage: string; path?: string; error?: string } | null> {
+function finished(id: string, ms: number): Promise<{ stage: string; path?: string; error?: string; title?: string; artist?: string } | null> {
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
       off()
@@ -607,7 +609,228 @@ async function downloadSongFor(args: Args): Promise<string> {
   }
   if (done.stage !== 'done' || !done.path) throw new Error(done.error ?? 'The download didn’t finish.')
   const added = playlist ? ` ${await addDownloaded(done.path, playlist)}` : ''
-  return `Downloaded “${title}” by ${artist} (from ${video.url}) into their music as ${done.path}.${added}`
+  const saved = done.title ? `“${done.title}” by ${done.artist || 'unknown artist'}` : `“${title}” by ${artist}`
+  const differs = done.title && (done.title.toLowerCase() !== title.toLowerCase() || !(done.artist ?? '').toLowerCase().includes(artist.toLowerCase().split(/[,&]/)[0].trim()))
+  return `Downloaded ${saved} (from ${video.url}) into their music as ${done.path}.${added}${differs ? `\nCareful: it was saved as ${saved}, not exactly “${title}” by ${artist}. If it’s the wrong song, remove it with remove_from_playlist and delete_songs, and tell the user.` : ''}`
+}
+
+// ---------- More music ----------
+
+/** A playlist (not Liked) by name, with its songs and their positions. */
+async function playlistFor(name: string): Promise<{ id: string; name: string; items: { song: LocalSong | null; path: string; position: number }[] }> {
+  const p = await findPlaylist(name)
+  const data = await musicData()
+  if (!p) throw new Error(`There’s no playlist called “${name}”. The playlists are: ${data.playlists.map((l) => l.name).join(', ') || 'none yet'}.`)
+  const list = data.playlists.find((l) => l.id === p.id)!
+  return { id: p.id, name: p.name, items: playlistSongs(list, songsByPath(await library())) }
+}
+
+/** Positions (0-based) of the songs Claude named in a playlist: by name, or by number from get_playlist. */
+function positionsOf(items: { song: LocalSong | null; position: number }[], names: unknown, numbers: unknown): { positions: number[]; missing: string[] } {
+  const positions = new Set<number>()
+  const missing: string[] = []
+  for (const n of Array.isArray(numbers) ? numbers : []) if (typeof n === 'number' && n >= 1 && n <= items.length) positions.add(n - 1)
+  const songs = items.flatMap((i) => (i.song ? [i.song] : []))
+  for (const n of Array.isArray(names) ? names : []) {
+    if (typeof n !== 'string') continue
+    const song = pickSong(songs, n)
+    const at = song ? items.filter((i) => i.song === song).map((i) => i.position) : []
+    if (at.length) at.forEach((x) => positions.add(x))
+    else missing.push(n)
+  }
+  return { positions: [...positions].sort((a, b) => a - b), missing }
+}
+
+async function removeFromPlaylistFor(args: Args): Promise<string> {
+  const p = await playlistFor(str(args.playlist))
+  const { positions, missing } = positionsOf(p.items, args.songs, args.numbers)
+  if (!positions.length) throw new Error(`None of those are in “${p.name}”.${missing.length ? ` Not found: ${missing.join('; ')}.` : ''} Use get_playlist to see its songs and their numbers.`)
+  const removed = positions.map((i) => p.items[i].song?.title ?? p.items[i].path)
+  if (!(await removeFromPlaylist(p.id, positions))) throw new Error('Orbit couldn’t change the playlist.')
+  return `Took ${removed.map((t) => `“${t}”`).join(', ')} out of “${p.name}”. Ctrl+Z in Orbit puts them back.${missing.length ? `\nNot in the playlist: ${missing.join('; ')}` : ''}`
+}
+
+async function moveInPlaylistFor(args: Args): Promise<string> {
+  const p = await playlistFor(str(args.playlist))
+  const { positions } = positionsOf(p.items, str(args.song) ? [str(args.song)] : [], typeof args.number === 'number' ? [args.number] : [])
+  if (!positions.length) throw new Error(`That song isn’t in “${p.name}”.`)
+  const to = Math.min(p.items.length, Math.max(1, num(args.to, 1))) - 1
+  if (!(await moveInPlaylist(p.id, positions[0], to))) return 'It’s already there.'
+  return `Moved “${p.items[positions[0]].song?.title ?? 'the song'}” to number ${to + 1} in “${p.name}”.`
+}
+
+async function renamePlaylistFor(args: Args): Promise<string> {
+  const p = await playlistFor(str(args.playlist))
+  const name = str(args.name).trim().slice(0, 100)
+  if (!name) throw new Error('Give the new name.')
+  if (!(await renamePlaylist(p.id, name))) return 'It already has that name.'
+  return `Renamed “${p.name}” to “${name}”.`
+}
+
+async function deletePlaylistFor(args: Args): Promise<string> {
+  const p = await playlistFor(str(args.playlist))
+  if (!(await deletePlaylist(p.id))) throw new Error('Orbit couldn’t delete it.')
+  return `Deleted the playlist “${p.name}” (the songs are still in their music). Ctrl+Z in Orbit brings it back.`
+}
+
+function queueFor(): string {
+  const { queue, index, shuffle, repeat } = useLocalMusic.getState()
+  if (!useMusic.getState().local || !queue.length) return nowPlayingFor()
+  const now = queue[index]
+  const next = queue.slice(index + 1)
+  return [
+    `Now: ${now ? `${now.title} by ${now.artist}` : 'nothing'}${useMusic.getState().state?.playing ? '' : ' (paused)'}`,
+    `Shuffle ${shuffle ? 'on' : 'off'}, loop ${repeat === 'track' ? 'this song' : repeat === 'context' ? 'the list' : 'off'}`,
+    next.length ? `Up next (${next.length}):\n${next.slice(0, 100).map((s, i) => `${i + 1}. ${s.title} by ${s.artist}`).join('\n')}${next.length > 100 ? `\n…and ${next.length - 100} more` : ''}` : 'Nothing up next.'
+  ].join('\n')
+}
+
+async function queueSongsFor(args: Args): Promise<string> {
+  const { found, missing } = await pickSongs(args.songs)
+  if (!found.length) return `None of those are in their music.${missingText(missing)}`
+  if (args.next === true) await playNext(found)
+  else await addToQueue(found)
+  return `${args.next === true ? 'Playing next' : 'Added to the end of Up next'}: ${found.map((s) => `“${s.title}”`).join(', ')}.${missingText(missing)}`
+}
+
+function removeFromQueueFor(args: Args): string {
+  const { queue, index } = useLocalMusic.getState()
+  if (args.all === true) {
+    clearUpNext()
+    return 'Cleared Up next (the song playing keeps going).'
+  }
+  const next = queue.slice(index + 1)
+  let at = typeof args.number === 'number' ? args.number - 1 : -1
+  if (at < 0 && str(args.song)) {
+    const song = pickSong(next, str(args.song))
+    at = song ? next.indexOf(song) : -1
+  }
+  if (at < 0 || at >= next.length) throw new Error('That song isn’t in Up next. Use get_queue to see it.')
+  const title = next[at].title
+  removeFromQueue(index + 1 + at)
+  return `Took “${title}” out of Up next.`
+}
+
+async function musicSettingsFor(args: Args): Promise<string> {
+  const said: string[] = []
+  const local = useMusic.getState().local
+  if (typeof args.shuffle === 'boolean' || str(args.loop)) {
+    if (local) {
+      const loop = str(args.loop) in LOOPS ? LOOPS[str(args.loop) as keyof typeof LOOPS] : undefined
+      setLocalModes({ shuffle: typeof args.shuffle === 'boolean' ? args.shuffle : undefined, repeat: loop })
+      said.push(`shuffle ${useLocalMusic.getState().shuffle ? 'on' : 'off'}, loop ${useLocalMusic.getState().repeat === 'track' ? 'this song' : useLocalMusic.getState().repeat === 'context' ? 'the list' : 'off'}`)
+    } else said.push('shuffle and loop can only be set here for their own music (on Spotify, use the Spotify app)')
+  }
+  if (typeof args.volume === 'number') {
+    await musicSetVolume(Math.round(Math.min(100, Math.max(0, args.volume))))
+    said.push(`volume ${Math.round(args.volume)}%`)
+  }
+  if (typeof args.seek_seconds === 'number') {
+    await musicSeek(Math.max(0, args.seek_seconds) * 1000)
+    said.push(`jumped to ${Math.floor(args.seek_seconds / 60)}:${String(Math.floor(args.seek_seconds % 60)).padStart(2, '0')}`)
+  }
+  if (args.sleep !== undefined) {
+    const sl = args.sleep
+    if (sl === 'off') setSleepTimer(null)
+    else if (sl === 'end_of_song') setSleepTimer('song')
+    else if (typeof sl === 'number' && sl > 0) setSleepTimer(Math.min(600, sl))
+    said.push(sl === 'off' ? 'sleep timer off' : sl === 'end_of_song' ? 'stops at the end of this song' : `stops in ${String(sl)} min`)
+  }
+  if (!said.length) throw new Error('Say what to change: shuffle, loop, volume, seek_seconds or sleep.')
+  return `Done: ${said.join('; ')}.`
+}
+
+async function likeSongsFor(args: Args): Promise<string> {
+  const { found, missing } = await pickSongs(args.songs)
+  if (!found.length) return `None of those are in their music.${missingText(missing)}`
+  const want = args.liked !== false
+  const data = await musicData()
+  const change = found.filter((s) => (s.path in data.liked) !== want)
+  if (change.length) await toggleLike(change)
+  return `${want ? 'Liked' : 'Unliked'} ${found.map((s) => `“${s.title}”`).join(', ')}.${missingText(missing)}`
+}
+
+async function rateSongFor(args: Args): Promise<string> {
+  const song = pickSong(await library(), str(args.song))
+  if (!song) throw new Error(`Couldn’t find “${str(args.song)}” in their music.`)
+  const stars = Math.round(Math.min(5, Math.max(0, num(args.stars, 0))))
+  const old = (await musicData()).ratings[song.path] ?? 0
+  // rateSong clears the rating when given the same stars again, so only send a change.
+  if (stars !== old) await rateSong(song, stars === 0 ? old : stars)
+  return stars ? `Rated “${song.title}” ${stars} star(s).` : `Took the rating off “${song.title}”.`
+}
+
+async function tagSongsFor(args: Args): Promise<string> {
+  const { found, missing } = await pickSongs(args.songs)
+  if (!found.length) return `None of those are in their music.${missingText(missing)}`
+  const on = args.remove !== true
+  await tagSongs(found, str(args.tag), on)
+  return `${on ? 'Tagged' : 'Untagged'} ${found.map((s) => `“${s.title}”`).join(', ')} “${str(args.tag)}”.${missingText(missing)}`
+}
+
+async function searchMyMusicFor(args: Args): Promise<string> {
+  const songs = await library()
+  const data = await musicData()
+  const tag = str(args.tag).trim().toLowerCase()
+  const list = tag ? songs.filter((s) => data.tags[s.path]?.includes(tag)) : matchSongs(songs, str(args.query))
+  if (!list.length) return tag ? `No songs are tagged “${tag}”.` : `No songs match “${str(args.query)}”.`
+  return list
+    .slice(0, 100)
+    .map((s) => {
+      const extra = [data.stats[s.path]?.plays ? `${data.stats[s.path].plays} plays` : '', s.path in data.liked ? 'liked' : '', data.ratings[s.path] ? `${data.ratings[s.path]}★` : '', data.tags[s.path]?.length ? `tags: ${data.tags[s.path].join(', ')}` : '', s.year ?? '']
+        .filter(Boolean)
+        .join(', ')
+      return `${songLines([s])}${extra ? ` [${extra}]` : ''}`
+    })
+    .join('\n') + (list.length > 100 ? `\n…and ${list.length - 100} more.` : '')
+}
+
+async function musicStatsFor(args: Args): Promise<string> {
+  const songs = await library()
+  const data = await musicData()
+  const byPath = songsByPath(songs)
+  const n = Math.min(50, num(args.limit, 15))
+  const line = (s: LocalSong): string => `${s.title} by ${s.artist}`
+  const top = mostPlayed(songs, data.stats, n)
+  const recent: LocalSong[] = []
+  for (const h of [...data.history].reverse()) {
+    const s = byPath.get(h.path)
+    if (s && !recent.includes(s)) recent.push(s)
+    if (recent.length >= n) break
+  }
+  const artists = new Map<string, number>()
+  for (const s of songs) artists.set(s.artist, (artists.get(s.artist) ?? 0) + (data.stats[s.path]?.plays ?? 0))
+  const topArtists = [...artists.entries()].filter(([, p]) => p > 0).sort((a, b) => b[1] - a[1]).slice(0, 10)
+  return [
+    `${songs.length} songs, ${Object.keys(data.liked).length} liked, ${data.playlists.length} playlists.`,
+    top.length ? `Most played:\n${top.map((s) => `${line(s)} (${data.stats[s.path]?.plays ?? 0} plays)`).join('\n')}` : '',
+    topArtists.length ? `Most played artists:\n${topArtists.map(([a, p]) => `${a} (${p} plays)`).join('\n')}` : '',
+    recent.length ? `Recently played:\n${recent.map(line).join('\n')}` : '',
+    `Recently added:\n${recentlyAdded(songs, n).map(line).join('\n')}`,
+    allTags(data).length ? `Tags: ${allTags(data).map((t) => `${t.tag} (${t.count})`).join(', ')}` : ''
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+}
+
+async function editSongFor(args: Args): Promise<string> {
+  const song = pickSong(await library(), str(args.song))
+  if (!song) throw new Error(`Couldn’t find “${str(args.song)}” in their music.`)
+  if (!canTag(song.path)) throw new Error('Orbit can only change the details of MP3 files.')
+  const patch: SongTagPatch = {}
+  for (const k of ['title', 'artist', 'album', 'year', 'genre'] as const) if (typeof args[k] === 'string') patch[k] = (args[k] as string).trim()
+  if (!Object.keys(patch).length) throw new Error('Say which details to change.')
+  if (!(await editSongs([song], patch))) throw new Error('Orbit couldn’t save the details.')
+  await loadLocalLibrary(true)
+  return `Changed “${song.title}”: ${Object.entries(patch).map(([k, v]) => `${k} → ${v}`).join(', ')}. Ctrl+Z in Orbit puts it back.`
+}
+
+async function deleteSongsFor(args: Args): Promise<string> {
+  const { found, missing } = await pickSongs(args.songs)
+  if (!found.length) return `None of those are in their music.${missingText(missing)}`
+  // Orbit asks the user first; the files go in the Recycle Bin / Bin.
+  const ok = await deleteSongs(found)
+  return ok ? `Deleted ${found.map((s) => `“${s.title}”`).join(', ')} from their music (the files are in the ${IS_MAC ? 'Bin' : 'Recycle Bin'}).${missingText(missing)}` : 'The user chose not to delete them (or it didn’t work).'
 }
 
 // ---------- Email ----------
@@ -654,6 +877,21 @@ const ANSWERS: Record<string, (args: Args) => string | Promise<string>> = {
   create_playlist: createPlaylistFor,
   add_to_playlist: addToPlaylistFor,
   download_song: downloadSongFor,
+  remove_from_playlist: removeFromPlaylistFor,
+  move_in_playlist: moveInPlaylistFor,
+  rename_playlist: renamePlaylistFor,
+  delete_playlist: deletePlaylistFor,
+  get_queue: queueFor,
+  queue_songs: queueSongsFor,
+  remove_from_queue: removeFromQueueFor,
+  music_settings: musicSettingsFor,
+  like_songs: likeSongsFor,
+  rate_song: rateSongFor,
+  tag_songs: tagSongsFor,
+  search_my_music: searchMyMusicFor,
+  music_stats: musicStatsFor,
+  edit_song: editSongFor,
+  delete_songs: deleteSongsFor,
   search_email: emailFor
 }
 
