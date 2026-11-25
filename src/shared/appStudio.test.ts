@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bugReportUrl, newReports, reportButtonCard, reportCard, type BugReport, rollbackCommand, rollbackVersion, parseOutdated, parseAudit, severityCounts, healthLevel, healthLine, healthBoardItem, type HealthReport, addDownloadDay, countText, downloadsByPlatform, downloadsSince, isDownloadFile, platformOf, type DownloadHistory, boardKey, commitAllCommand, describeChange, stashCommand, isTokenPermissionError, newTokenUrl, readyForReviewError, mergeAfterReadyError, mergeBlockedReason, mergeFailedMessage, TOKEN_NOT_ALLOWED, bumpVersion, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
+import { bugReportUrl, newReports, reportButtonCard, reportCard, type BugReport, rollbackCommand, rollbackVersion, parseOutdated, parseAudit, severityCounts, healthLevel, healthLine, healthBoardItem, type HealthReport, addDownloadDay, countText, downloadsByPlatform, downloadsSince, isDownloadFile, platformOf, type DownloadHistory, boardKey, commitAllCommand, describeChange, stashCommand, isTokenPermissionError, newTokenUrl, readyForReviewError, mergeAfterReadyError, mergeBlockedReason, mergeFailedMessage, TOKEN_NOT_ALLOWED, bumpVersion, releaseBase, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
 
 describe('githubRepo', () => {
   it('reads https and ssh remotes', () => {
@@ -467,5 +467,23 @@ describe('trying Orbit as a new user', () => {
     expect(isOrbitRepo('Looby758/notes-app')).toBe(true)
     expect(isOrbitRepo('looby758/orbit-music')).toBe(false)
     expect(isOrbitRepo(undefined)).toBe(false)
+  })
+})
+
+describe('releaseBase', () => {
+  it('counts from package.json once that version is released', () => {
+    expect(releaseBase('1.14.0', ['v1.13.0', 'v1.14.0'])).toBe('1.14.0')
+    expect(releaseBase('1.0.0', [])).toBe('1.0.0')
+  })
+
+  it('counts from the last real release when package.json’s version was given up', () => {
+    expect(releaseBase('1.15.0', ['v1.13.0', 'v1.14.0', 'v1.2.0'])).toBe('1.14.0')
+    expect(releaseBase('1.16.0', ['v1.14.0'])).toBe('1.14.0')
+  })
+
+  it('leaves odd versions alone', () => {
+    expect(releaseBase('1.0.0-beta.1', ['v0.9.0'])).toBe('1.0.0-beta.1')
+    expect(releaseBase('1.0.0', ['v2.0.0'])).toBe('1.0.0')
+    expect(releaseBase('1.0.0', ['nightly', 'latest'])).toBe('1.0.0')
   })
 })

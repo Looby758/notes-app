@@ -29,6 +29,8 @@ export interface AppInfo {
   buildScripts?: string[]
   /** Whether package.json has a real test script (run before a release). */
   hasTests?: boolean
+  /** The version tags on this computer (v1.2.3), so a given-up version isn't counted from. */
+  versionTags?: string[]
 }
 
 export interface PullRequest {
@@ -375,6 +377,28 @@ export function bumpVersion(version: string, bump: VersionBump): string | null {
   if (bump === 'major') return `${major + 1}.0.0`
   if (bump === 'minor') return `${major}.${minor + 1}.0`
   return `${major}.${minor}.${patch + 1}`
+}
+
+const plainVersion = (v: string): [number, number, number] | null => {
+  const m = /^v?(\d+)\.(\d+)\.(\d+)$/.exec((v ?? '').trim())
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null
+}
+const compareVersions = (a: [number, number, number], b: [number, number, number]): number => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]
+
+/**
+ * The version the next release counts up from. Normally the one in package.json. But when that
+ * version was never released (its release was given up: the tag deleted, while package.json still
+ * says what npm set it to), it's the newest version that was: 1.15.0 given up after 1.14.0 counts
+ * from 1.14.0, so the choices are 1.14.1, 1.15.0 and 2.0.0 again. `tags` are the version tags there
+ * are (on this computer and on GitHub) and published releases' tags.
+ */
+export function releaseBase(version: string, tags: Iterable<string>): string {
+  const now = plainVersion(version)
+  if (!now) return version
+  const released = [...tags].map(plainVersion).filter((v): v is [number, number, number] => !!v)
+  if (!released.length || released.some((v) => compareVersions(v, now) === 0)) return version
+  const newest = released.sort((a, b) => compareVersions(b, a))[0]
+  return compareVersions(newest, now) < 0 ? newest.join('.') : version
 }
 
 /**
