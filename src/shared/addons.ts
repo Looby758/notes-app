@@ -100,6 +100,13 @@ export const ADDONS: AddonInfo[] = [
   { id: 'streamer', name: 'Streamer mode', features: ['streamer'] }
 ]
 
+/**
+ * Whether a brand new Orbit (new settings, new notes folder) starts with only the core. Off until
+ * the store has real downloads: for now everyone new gets every add-on, and can remove what they
+ * don't want. Anyone who already has a saved list (like yours) keeps it either way.
+ */
+export const NEW_ORBIT_STARTS_CORE_ONLY = false
+
 export const ADDON_IDS: string[] = ADDONS.map((a) => a.id)
 
 const BY_ID = new Map(ADDONS.map((a) => [a.id, a]))

@@ -102,7 +102,7 @@ import { setupTerminal } from './terminal'
 import { setupAppStudio } from './appStudio'
 import { setupReleaseHelper } from './releaseHelper'
 import { addonOn, addonsMaybeChanged, setupAddonGate, startsCoreOnly } from './addonGate'
-import { cleanInstalledAddons } from '@shared/addons'
+import { cleanInstalledAddons, NEW_ORBIT_STARTS_CORE_ONLY } from '@shared/addons'
 import { TEST_COPY, TEST_COPY_FOLDER, testCopyReadOnly, WINDOWS_APP_ID } from './testCopy'
 import { setupGames } from './games'
 import { setupGameCovers } from './gameCovers'
@@ -408,7 +408,8 @@ function openVault(path: string | null): void {
   vault = path ? new Vault(path) : null
   if (!path) return
   // Brand new Orbit, brand new notes folder: just the core to start with (add more in Settings → Add-ons).
-  if (startsCoreOnly(!!loadSettings().prefs, path)) {
+  // Off for now (shared/addons.ts): new Orbits get every add-on until the store has real downloads.
+  if (NEW_ORBIT_STARTS_CORE_ONLY && startsCoreOnly(!!loadSettings().prefs, path)) {
     const prefs = normalizePrefs({ installedAddons: [] })
     saveSettings({ prefs })
     broadcastPrefs(prefs)
