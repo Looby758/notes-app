@@ -1,4 +1,5 @@
-import { readdirSync, readFileSync, statSync } from 'fs'
+import { createHash } from 'crypto'
+import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
 import { join, resolve } from 'path'
 import { describe, expect, it } from 'vitest'
 import { addonById } from './addons'
@@ -35,6 +36,10 @@ describe('add-on packages', () => {
       expect(pkg.file).toBe(packageFileName(id, pkg.build))
       expect(pkg.sha256).toMatch(/^[0-9a-f]{64}$/)
       expect(pkg.size).toBeGreaterThan(0)
+      // Orbit downloads it from addons/packages on main, so it has to be committed.
+      const file = join(ROOT, 'addons/packages', pkg.file)
+      expect(existsSync(file), `${pkg.file} is missing from addons/packages`).toBe(true)
+      expect(createHash('sha256').update(readFileSync(file)).digest('hex')).toBe(pkg.sha256)
     }
     for (const id of Object.keys(SPECS)) expect(ADDON_PACKAGES[id], `${id} hasn't been built (npm run build-addon -- ${id})`).toBeTruthy()
   })

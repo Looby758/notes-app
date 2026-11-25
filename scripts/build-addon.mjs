@@ -1,13 +1,13 @@
 // Builds an add-on that's a separate download (listed in addons/addons.json) into a .orbitaddon
 // file, and writes its fingerprint into src/shared/addonPackages.json so Orbit asks for that file.
 //
-//   npm run build-addon -- mini-games      build it (dist-addons/<id>-<build>.orbitaddon)
+//   npm run build-addon -- mini-games      build it (addons/packages/<id>-<build>.orbitaddon)
 //   npm run build-addon -- --all           build every one
 //   npm run build-addon -- --check         fail if any add-on's code changed since it was last built
 //
-// After building, upload the .orbitaddon file to the GitHub release named "addons"
-// (https://github.com/Looby758/notes-app/releases/tag/addons). Orbit only downloads the exact file
-// whose fingerprint it has, so a changed add-on is a new file next to the old ones.
+// The .orbitaddon file goes in addons/packages, which is committed: once it's merged into main,
+// Orbit downloads it from there. Orbit only downloads the exact file whose fingerprint it has, so a
+// changed add-on is a new file next to the old ones (old Orbits keep using theirs).
 //
 // The add-on's code is its entry plus whatever it reaches inside its own folders and files. Things
 // Orbit lends it (src/shared/addonHostModules.json) are left out and come from Orbit when it runs.
@@ -26,7 +26,8 @@ const ROOT = resolve(fileURLToPath(import.meta.url), '../..')
 const ADDONS = Object.fromEntries(Object.entries(JSON.parse(readFileSync(join(ROOT, 'addons/addons.json'), 'utf8'))).filter(([k]) => !k.startsWith('//')))
 const HOST = JSON.parse(readFileSync(join(ROOT, 'src/shared/addonHostModules.json'), 'utf8')).modules
 const CATALOG_FILE = join(ROOT, 'src/shared/addonPackages.json')
-const OUT = join(ROOT, 'dist-addons')
+const OUT = join(ROOT, 'addons/packages')
+const WORK = join(ROOT, 'dist-addons')
 const API = Number(/ADDON_HOST_API = (\d+)/.exec(readFileSync(join(ROOT, 'src/shared/addonPackages.ts'), 'utf8'))[1])
 /** Zips made at different times must come out the same, so every entry gets this date. */
 const ZIP_DATE = new Date('2025-01-01T00:00:00Z')
@@ -43,7 +44,7 @@ async function buildOne(id) {
   const own = spec.own.map((p) => resolve(ROOT, p) + (p.endsWith('/') ? '/' : ''))
   const isOwn = (file) => own.some((o) => (o.endsWith('/') ? file.startsWith(o) : file === o))
   const strays = new Set()
-  const dir = join(OUT, id)
+  const dir = join(WORK, id)
   rmSync(dir, { recursive: true, force: true })
 
   await build({
@@ -103,7 +104,7 @@ async function buildOne(id) {
   if (style) zip.file('style.css', style, { date: ZIP_DATE })
   const data = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 9 } })
   const file = `${id}-${buildId}.orbitaddon`
-  writeFileSync(join(OUT, file), data)
+  if (!check) writeFileSync(join(OUT, file), data)
   return { build: buildId, file, sha256: createHash('sha256').update(data).digest('hex'), size: data.length }
 }
 
@@ -115,6 +116,7 @@ if (!ids.length) {
   process.exit(1)
 }
 mkdirSync(OUT, { recursive: true })
+mkdirSync(WORK, { recursive: true })
 const catalog = JSON.parse(readFileSync(CATALOG_FILE, 'utf8'))
 let stale = 0
 for (const id of ids) {
@@ -123,12 +125,12 @@ for (const id of ids) {
   if (check) {
     if (was?.build !== pkg.build) {
       stale++
-      console.error(`${id} changed since it was last built. Run: npm run build-addon -- ${id}, then upload dist-addons/${pkg.file} to the "addons" release.`)
+      console.error(`${id} changed since it was last built. Run: npm run build-addon -- ${id}, and commit what it makes.`)
     } else console.log(`${id} is up to date (${pkg.file}).`)
     continue
   }
   catalog[id] = pkg
-  console.log(`${id}: dist-addons/${pkg.file} (${(pkg.size / 1024).toFixed(0)} KB). Upload it to the "addons" release.`)
+  console.log(`${id}: addons/packages/${pkg.file} (${(pkg.size / 1024).toFixed(0)} KB). Commit it with src/shared/addonPackages.json.`)
 }
 if (!check) writeFileSync(CATALOG_FILE, JSON.stringify(catalog, null, 2) + '\n')
 if (stale) process.exit(1)

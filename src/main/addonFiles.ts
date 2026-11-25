@@ -18,12 +18,12 @@ import { logError } from './log'
 
 /**
  * Add-ons that are separate downloads (shared/addonPackages.ts). Adding one downloads its package
- * from the "addons" GitHub release, checks its fingerprint, and unpacks it into
+ * from the repository's addons/packages folder, checks its fingerprint, and unpacks it into
  * <user data>/addons/<id>; removing one deletes it. The window loads the add-on's code from
  * orbit-addon://<id>/<file>, which only serves an add-on that's added and fully downloaded.
  *
  * For trying a package before it's uploaded, set ORBIT_ADDON_SOURCE to a folder holding the
- * .orbitaddon files (dist-addons/); they're still checked the same way.
+ * .orbitaddon files (addons/packages); they're still checked the same way.
  */
 
 export const ADDON_FILES_SCHEME = { scheme: ADDON_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } }

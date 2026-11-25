@@ -1,5 +1,5 @@
 {
-  "//": "Add-ons that are separate downloads rather than part of Orbit. Each one's code is everything its entry reaches inside the folders and files listed in own; anything else it uses must come from Orbit (src/shared/addonHostModules.json). Build with: npm run build-addon -- <id>",
+  "//": "Add-ons that are separate downloads rather than part of Orbit. Each one's code is everything its entry reaches inside the folders and files listed in own; anything else it uses must come from Orbit (src/shared/addonHostModules.json). Build with: npm run build-addon -- <id>, then commit the file it adds to addons/packages; Orbit downloads it from there once it's on main.",
   "mini-games": {
     "entry": "src/renderer/src/components/MiniGames/MiniGamesPage.tsx",
     "own": [

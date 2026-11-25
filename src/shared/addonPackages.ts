@@ -3,7 +3,7 @@ import packages from './addonPackages.json'
 /**
  * Add-ons that are separate downloads rather than part of Orbit (the first step of the add-on
  * store). Each one is a .orbitaddon file (a zip of the add-on's code, built by
- * scripts/build-addon.mjs) kept on the GitHub release named `addons`. This Orbit asks for the exact
+ * scripts/build-addon.mjs) kept in the repository's addons/packages folder. This Orbit asks for the exact
  * file listed in addonPackages.json and checks its fingerprint (SHA-256) before using it, so a
  * changed or broken download is never run.
  */
@@ -37,7 +37,8 @@ export const ADDON_HOST_API = 1
 
 export const ADDON_PACKAGES: Readonly<Record<string, AddonPackage>> = packages as Record<string, AddonPackage>
 
-export const ADDON_RELEASE_URL = 'https://github.com/Looby758/notes-app/releases/download/addons/'
+/** Built packages live in the repository (addons/packages), so merging a new one is all it takes to publish it. */
+export const ADDON_RELEASE_URL = 'https://raw.githubusercontent.com/Looby758/notes-app/main/addons/packages/'
 
 /** Downloaded add-ons are served to the window from orbit-addon://<id>/<file>. */
 export const ADDON_SCHEME = 'orbit-addon'
