@@ -4,9 +4,12 @@ import type { FileNode } from '@shared/types'
 import { releaseFiles } from './fileLocks'
 import { isTextFile, looksLikeText, MAX_TEXT_FILE_BYTES } from '@shared/textFiles'
 
-/** Hidden folders (.git, .obsidian, .trash…) and node_modules never show in the tree. */
+/**
+ * Hidden folders (.git, .obsidian, .trash…) and node_modules never show in the tree, nor do the
+ * teleprompter times saved beside a Studio recording ("<recording>.cues.json", read by the shot list).
+ */
 export function isIgnoredName(name: string): boolean {
-  return name.startsWith('.') || name === 'node_modules'
+  return name.startsWith('.') || name === 'node_modules' || name.endsWith('.cues.json')
 }
 
 const INVALID_CHARS = /[\\/:*?"<>|]/
@@ -332,6 +335,8 @@ export class Vault {
     await fs.mkdir(dir, { recursive: true })
     const target = await this.uniquePath(dir, ...splitName(safeFileName(basename(source))))
     await fs.copyFile(source, target)
+    // A Studio recording's teleprompter times (for the shot list) come along with it.
+    await fs.copyFile(`${source}.cues.json`, `${target}.cues.json`).catch(() => undefined)
     return this.rel(target)
   }
 

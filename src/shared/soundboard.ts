@@ -267,3 +267,31 @@ export function isVirtualCableOutput(label: string): boolean {
 export function isVirtualCableInput(label: string): boolean {
   return /cable output|voicemeeter (out|output)|blackhole|virtual (audio )?cable/i.test(label)
 }
+
+// ---------------------------------------------------------------------------------------------
+// Levelling the mic
+
+/**
+ * "Level my voice": a raw mic (with the system's auto-gain off) is often 15–20 dB quieter than
+ * what Discord gets from the same mic directly, because Discord turns its own auto-gain on. So
+ * the soundboard evens the voice out itself with a small boost and a gentle compressor (Chromium's
+ * compressor also lifts its output by itself, by about +15 dB with these settings).
+ *
+ * Measured in Chromium with a steady tone, before the call's limiter: speech coming in at
+ * −50 / −40 / −30 / −20 / −10 dBFS leaves at about −31 / −22 / −18 / −15 / −11 dBFS, so a quiet mic
+ * ends up about as loud as a normal one in Discord, and shouting doesn't get much louder.
+ */
+export const MIC_LEVELLER = {
+  /** Before the compressor (×1.5 ≈ +3.5 dB). */
+  preGain: 1.5,
+  thresholdDb: -40,
+  kneeDb: 10,
+  ratio: 3,
+  attack: 0.005,
+  release: 0.25,
+  /** After it. */
+  makeupGain: 1
+} as const
+
+/** The mic volume slider goes up to this (400%), for very quiet mics. */
+export const MAX_MIC_VOLUME = 4

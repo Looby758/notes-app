@@ -24331,6 +24331,10 @@ img.tm-icon {
   padding: 24px 28px;
   overflow-y: auto;
 }
+/* The details scroll as one column, so nothing in it may shrink (the picture was being squashed and cropped). */
+.addon-details > * {
+  flex-shrink: 0;
+}
 .addon-details-head {
   display: flex;
   align-items: center;
@@ -24384,6 +24388,48 @@ img.tm-icon {
   color: var(--text);
   font-size: 14px;
   line-height: 1.6;
+}
+.addon-how {
+  max-width: 62ch;
+}
+.addon-how h4 {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.addon-how ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.addon-how li {
+  position: relative;
+  padding-left: 16px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.addon-how li::before {
+  content: '';
+  position: absolute;
+  top: 0.6em;
+  left: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.addon-how strong {
+  display: block;
+  font-weight: 600;
+}
+.addon-how li span {
+  color: var(--text-muted);
 }
 .addon-facts {
   display: grid;

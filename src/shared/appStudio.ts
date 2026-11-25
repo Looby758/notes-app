@@ -502,6 +502,17 @@ const quoteBranch = (branch: string): string => (/^[\w./@+-]+$/.test(branch) ? b
  * Runs a test copy: gets the branch's latest, installs packages if they changed (or never were),
  * then starts the app. Each step only runs if the one before worked.
  */
+/**
+ * The run command for "Try as a new user": Orbit started with ORBIT_NEW_USER=1 starts from nothing
+ * (main/testCopy.ts). Only that one command sees it, so a normal run in the same app stays normal.
+ */
+export function newUserRunCommand(windows: boolean, run = 'npm run dev'): string {
+  return windows ? `$env:ORBIT_NEW_USER='1'; ${run}` : `ORBIT_NEW_USER=1 ${run}`
+}
+
+/** Whether an app is Orbit itself, the one app that knows how to try as a new user. */
+export const isOrbitRepo = (repo: string | undefined): boolean => !!repo && /^looby758\/notes-app$/i.test(repo)
+
 export function copyRunCommand(windows: boolean, branch: string, run = 'npm run dev'): string {
   const b = quoteBranch(branch)
   const files = PACKAGE_FILES.join(' ')

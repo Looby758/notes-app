@@ -14,6 +14,7 @@ import {
   Hammer,
   Pencil,
   Trash2,
+  UserPlus,
   X,
   FlaskConical,
   Copy as CopyIcon,
@@ -21,11 +22,11 @@ import {
   ChevronDown,
   Sparkles
 } from 'lucide-react'
-import { boardKey, isTokenPermissionError, newTokenUrl, pullKey, prSummary, timeAgo, type PullRequest, type TestCopy } from '@shared/appStudio'
+import { boardKey, isOrbitRepo, isTokenPermissionError, newTokenUrl, pullKey, prSummary, timeAgo, type PullRequest, type TestCopy } from '@shared/appStudio'
 import { FILE_MANAGER } from '@shared/platform'
 import { addProject, removeProject, updateProject, useTerminals, type TerminalProject } from '../../store/terminals'
 import { appRepos, dropPull, makeCopy, refreshApps, refreshGithub, refreshPulls, removeCopy, setGithub, setPullsRepo, setSection, useAppStudio } from '../../store/appStudio'
-import { closeCopyTerminals, getLatestAndRun, runTestCopy, tryBranch } from '../../lib/terminal'
+import { closeCopyTerminals, getLatestAndRun, runAsNewUser, runTestCopy, tryBranch } from '../../lib/terminal'
 import { openSpecialTab, TERMINAL_TAB } from '../../lib/editorController'
 import { notify } from '../../store/notify'
 import { linkPull, useAppBoard } from '../../store/appBoard'
@@ -229,6 +230,16 @@ function AppCard({ project }: { project: TerminalProject }) {
             </button>
           )}
           <Health project={project} repo={info.repo} />
+          {isOrbitRepo(info.repo) && (
+            <button
+              className="appstudio-card-line appstudio-pr-link"
+              onClick={() => runAsNewUser(project)}
+              title="Gets the latest and starts it as if you’d never used Orbit: nothing saved, the welcome screen, an empty notes folder and only the core add-ons. It starts from nothing every time, and your real Orbit and other test copies aren’t touched."
+              data-try-new-user
+            >
+              <UserPlus size={13} /> Try as a new user
+            </button>
+          )}
         </>
       )}
       <CopyList project={project} />
@@ -391,12 +402,12 @@ function PullCard({ pull, canAct }: { pull: PullRequest; canAct: boolean }) {
   const hasCopy = useAppStudio((s) => (project ? !!s.copies[project.folder]?.some((c) => s.copyInfo[c.path]?.branch === pull.branch) : false))
   const label = `#${pull.number} ${pull.title}`.slice(0, 60)
 
-  /** Try it: in a test copy of its own, so the app's folder isn't touched. */
-  const tryInCopy = async (): Promise<void> => {
+  /** Try it: in a test copy of its own, so the app's folder isn't touched (as a new user, for Orbit, if asked). */
+  const tryInCopy = async (newUser = false): Promise<void> => {
     if (!project) return
     try {
       const path = await makeCopy(project.folder, pull.branch, { label, repo: pull.repo, number: pull.number })
-      runTestCopy(project, path, pull.branch, label)
+      runTestCopy(project, path, pull.branch, label, newUser)
     } catch (err) {
       notify(err)
     }
@@ -483,6 +494,11 @@ function PullCard({ pull, canAct }: { pull: PullRequest; canAct: boolean }) {
               <button onMouseDown={(e) => e.preventDefault()} onClick={() => (setMenu(false), void tryInCopy())}>
                 Try it in a test copy
               </button>
+              {isOrbitRepo(pull.repo) && (
+                <button onMouseDown={(e) => e.preventDefault()} onClick={() => (setMenu(false), void tryInCopy(true))}>
+                  Try it in a test copy as a new user
+                </button>
+              )}
               <button onMouseDown={(e) => e.preventDefault()} onClick={() => (setMenu(false), tryBranch(project, pull.branch))}>
                 Try it in {project.name}’s own folder (switches its branch)
               </button>

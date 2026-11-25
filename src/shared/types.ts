@@ -1,3 +1,4 @@
+import type { SpokenWord, TranscribeProgress, TranscriberState } from './transcribe'
 import type { MadeApp, NewApp } from './appStarters'
 import type { AppInfo, BugReport, GitHubStatus, HealthReport, MergedPull, PullRequest, Release, TestCopy, VersionBump } from './appStudio'
 import type { BuildStatus, Check, FixResult, MainStatus, Preflight, ReleaseResult } from './releaseCheck'
@@ -393,6 +394,16 @@ export interface AiReply {
 }
 
 /** The offline AI (src/main/localAi.ts): an optional download that runs on this computer's graphics card. */
+/** A finished transcript from main/transcriber.ts. */
+export interface TranscribeResult {
+  words: SpokenWord[]
+  /** How long the recording is, in seconds. */
+  length: number
+  model: string
+  fileTime: number
+  fileSize: number
+}
+
 /**
  * What the snip read. `lang`: the extra reader it used ('' for English only). `detected`: the
  * alphabet it spotted (with "Detect automatically"). `need`: readers that would read it, when
@@ -1329,6 +1340,22 @@ export interface NotesApi {
   aiMeaning(word: string, sentence: string): Promise<string>
   /** Writing autocomplete: the next few words after `before`, from the offline AI (empty when there's no guess). */
   aiSuggest(title: string, before: string): Promise<string>
+  // Auto transcripts (main/transcriber.ts)
+  transcriberState(): Promise<TranscriberState>
+  /** Downloads what transcripts need (ffmpeg and the Whisper model); resolves when it's done or has failed. */
+  transcriberSetup(model?: string): Promise<TranscriberState>
+  transcriberRemove(): Promise<TranscriberState>
+  /** What's said in a recording (a path in the notes folder), word by word with times. */
+  transcribe(path: string): Promise<TranscribeResult>
+  transcribeCancel(): Promise<void>
+  /** Export for editing: asks where, then copies the recording and pictures and writes the files there. The folder made, or null if cancelled. */
+  transcribeExport(req: { folder: string; recording: string; pictures: { path: string; name: string }[]; files: { name: string; text: string }[] }): Promise<string | null>
+  /** Opens a folder "Export for editing" made. */
+  transcribeShowExport(dir: string): Promise<void>
+  /** The teleprompter's cue times saved beside a recording ("<recording>.cues.json"), as text; null if there are none. */
+  transcribeReadCues(path: string): Promise<string | null>
+  onTranscriberState(callback: (state: TranscriberState) => void): () => void
+  onTranscribeProgress(callback: (progress: TranscribeProgress) => void): () => void
   // The offline AI
   localAiState(): Promise<LocalAiState>
   /** Downloads the engine and a model (resumes a stopped download); resolves when it's done or has failed. */

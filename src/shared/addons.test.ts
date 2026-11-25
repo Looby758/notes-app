@@ -97,11 +97,18 @@ describe('saved settings', () => {
 })
 
 describe('the store’s details', async () => {
-  const { ADDON_ABOUT, ADDON_CATEGORIES } = await import('./addonDetails')
+  const { ADDON_ABOUT, ADDON_CATEGORIES, ADDON_HOW } = await import('./addonDetails')
   const shown = ADDONS.filter((a) => !a.helper).map((a) => a.id)
   it('has a description for every add-on it shows', () => {
     for (const id of shown) expect(ADDON_ABOUT[id], id).toBeTruthy()
     for (const id of Object.keys(ADDON_ABOUT)) expect(shown, id).toContain(id)
+  })
+  it('explains how every add-on it shows works, in at least three points', () => {
+    for (const id of shown) {
+      expect(ADDON_HOW[id]?.length ?? 0, id).toBeGreaterThanOrEqual(3)
+      for (const [lead, text] of ADDON_HOW[id]) expect(lead && text, id).toBeTruthy()
+    }
+    for (const id of Object.keys(ADDON_HOW)) expect(shown, id).toContain(id)
   })
   it('puts every add-on it shows in exactly one category', () => {
     const listed = ADDON_CATEGORIES.flatMap((c) => c.addons)

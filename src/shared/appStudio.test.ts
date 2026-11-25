@@ -458,3 +458,14 @@ describe('why a merge can’t happen', () => {
     expect(mergeFailedMessage(`${TOKEN_NOT_ALLOWED} merge pull requests`, 3, 'main')).toBe(`${TOKEN_NOT_ALLOWED} merge pull requests`)
   })
 })
+
+describe('trying Orbit as a new user', () => {
+  it('sets ORBIT_NEW_USER for just that run', async () => {
+    const { newUserRunCommand, isOrbitRepo } = await import('./appStudio')
+    expect(newUserRunCommand(true)).toBe("$env:ORBIT_NEW_USER='1'; npm run dev")
+    expect(newUserRunCommand(false, 'npm start')).toBe('ORBIT_NEW_USER=1 npm start')
+    expect(isOrbitRepo('Looby758/notes-app')).toBe(true)
+    expect(isOrbitRepo('looby758/orbit-music')).toBe(false)
+    expect(isOrbitRepo(undefined)).toBe(false)
+  })
+})

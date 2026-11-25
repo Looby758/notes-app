@@ -65,3 +65,22 @@ describe('text files (.txt, .json…)', () => {
     await expect(vault.write('photo.png', 'x')).rejects.toThrow()
   })
 })
+
+describe('Studio recordings added to the notes', () => {
+  it('bring their teleprompter times along, hidden from the file list', async () => {
+    const outside = await mkdtemp(join(tmpdir(), 'studio-'))
+    try {
+      await writeFile(join(outside, 'take.m4a'), 'sound')
+      await writeFile(join(outside, 'take.m4a.cues.json'), '{"version":1,"cues":[]}')
+      const vault = new Vault(root)
+      const rel = await vault.copyAttachment('attachments', join(outside, 'take.m4a'))
+      expect(rel).toBe('attachments/take.m4a')
+      expect(await readFile(join(root, 'attachments', 'take.m4a.cues.json'), 'utf8')).toContain('cues')
+      const names = JSON.stringify(await vault.tree())
+      expect(names).toContain('take.m4a')
+      expect(names).not.toContain('cues.json')
+    } finally {
+      await rm(outside, { recursive: true, force: true })
+    }
+  })
+})
