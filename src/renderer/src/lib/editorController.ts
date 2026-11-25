@@ -17,6 +17,7 @@ import {
   type PaneState
 } from '../store/editor'
 import { notify } from '../store/notify'
+import { useUI } from '../store/ui'
 import { usePrefs } from '../store/prefs'
 import type { Prefs } from '@shared/prefs'
 import { isWithin, replacePrefix } from './paths'
@@ -889,6 +890,11 @@ function addTab(pane: string, id: string): void {
 
 /** Opens (or switches to) a special page like Settings. There's only ever one of each. */
 export function openSpecialTab(id: string): void {
+  // Settings opens as a panel over the current page, not as a tab of its own.
+  if (id === SETTINGS_TAB) {
+    useUI.setState({ settingsOpen: true })
+    return
+  }
   const existing = paneWithTab(id)
   if (existing) {
     activateTab(id, existing)

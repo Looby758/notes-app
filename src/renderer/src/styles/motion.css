@@ -767,3 +767,22 @@
     opacity: 0;
   }
 }
+
+/* ---------- Settings panel: fades in and settles into place (Settings/SettingsDialog.tsx) ---------- */
+
+@keyframes m-settings-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(8px * var(--m-move))) scale(calc(1 - 0.02 * var(--m-move)));
+  }
+}
+.settings-backdrop {
+  animation: m-fade-in calc(160ms * var(--m-time)) ease backwards;
+}
+.settings-dialog {
+  animation: m-settings-in calc(220ms * var(--m-time)) var(--m-ease-out) backwards;
+}
+/* Switching section in the panel: a quick fade, not the page slide-up. */
+.settings-dialog .settings-content {
+  animation: m-fade-in calc(140ms * var(--m-time)) ease backwards;
+}

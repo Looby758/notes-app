@@ -39,6 +39,22 @@ const ICONS: Record<SectionId, typeof Palette> = {
   about: Info
 }
 
+/** The sidebar's groups, Nocturne style. A section not listed here goes under "More". */
+const NAV_GROUPS: { label: string; ids: string[] }[] = [
+  { label: 'Make it yours', ids: ['appearance', 'navigation', 'editor', 'shortcuts'] },
+  { label: 'Your stuff', ids: ['files', 'calendar', 'music', 'ai'] },
+  { label: 'Tools', ids: ['capture', 'browser', 'studio', 'computers'] },
+  { label: 'Orbit', ids: ['addons', 'about'] }
+]
+
+function navGroups<T extends { id: string }>(sections: T[]): { label: string; items: T[] }[] {
+  const listed = new Set(NAV_GROUPS.flatMap((g) => g.ids))
+  const groups = NAV_GROUPS.map((g) => ({ label: g.label, items: g.ids.flatMap((id) => sections.filter((s) => s.id === id)) }))
+  const rest = sections.filter((s) => !listed.has(s.id))
+  if (rest.length) groups.splice(groups.length - 1, 0, { label: 'More', items: rest })
+  return groups.filter((g) => g.items.length > 0)
+}
+
 const SNIPPET_WORDS = /^(snip|expan|text sh|abbrev|;)/i
 
 const isModified = (def: SettingDef, prefs: Record<string, unknown>): boolean =>
@@ -305,6 +321,33 @@ function CheckSettingsButton() {
   )
 }
 
+function CloseButton({ onClose }: { onClose: () => void }) {
+  return (
+    <button className="settings-close" onClick={onClose} title="Close (Esc)" aria-label="Close settings" data-settings-close>
+      <X size={16} />
+    </button>
+  )
+}
+
+/** "Orbit 1.13.7 · Up to date" at the foot of the sidebar. */
+function NavVersion() {
+  const status = useUpdates((s) => s.status)
+  const note =
+    status?.state === 'none'
+      ? 'Up to date'
+      : status?.state === 'ready'
+        ? 'Update ready'
+        : status?.state === 'available' || status?.state === 'downloading'
+          ? 'Update available'
+          : null
+  return (
+    <div className="settings-nav-version" data-settings-version>
+      Orbit {pkg.version}
+      {note && ` · ${note}`}
+    </div>
+  )
+}
+
 function About() {
   return (
     <section className="settings-group about">
@@ -333,7 +376,7 @@ function About() {
   )
 }
 
-export default function SettingsPage() {
+export default function SettingsPage({ onClose }: { onClose?: () => void } = {}) {
   const [section, setSection] = useState<SectionId>('appearance')
   const [query, setQuery] = useState('')
   const prefs = usePrefs((s) => s.prefs) as unknown as Record<string, unknown>
@@ -364,7 +407,13 @@ export default function SettingsPage() {
             ref={search}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
+            onKeyDown={(e) => {
+              // Escape clears the search first; with nothing typed, it closes Settings (SettingsDialog).
+              if (e.key === 'Escape' && query) {
+                e.stopPropagation()
+                setQuery('')
+              }
+            }}
             placeholder="Search settings"
             spellCheck={false}
           />
@@ -374,28 +423,40 @@ export default function SettingsPage() {
             </button>
           )}
         </div>
-        {SECTIONS.map(({ id, label }) => {
-          const Icon = ICONS[id]
-          return (
-            <button
-              key={id}
-              className={`settings-nav-item ${!q && section === id ? 'selected' : ''}`}
-              onClick={() => {
-                setQuery('')
-                setSection(id)
-              }}
-            >
-              <Icon size={15} /> {label}
-            </button>
-          )
-        })}
+        <div className="settings-nav-list">
+          {navGroups(SECTIONS).map((group) => (
+            <div key={group.label} className="settings-nav-group">
+              <span className="settings-nav-label">{group.label}</span>
+              {group.items.map(({ id, label }) => {
+                const Icon = ICONS[id]
+                return (
+                  <button
+                    key={id}
+                    className={`settings-nav-item ${!q && section === id ? 'selected' : ''}`}
+                    aria-current={!q && section === id ? 'page' : undefined}
+                    onClick={() => {
+                      setQuery('')
+                      setSection(id)
+                    }}
+                  >
+                    <Icon size={15} /> {label}
+                  </button>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+        <NavVersion />
       </nav>
 
       <div className="settings-body" ref={body}>
         <div className="settings-content">
           {q ? (
             <>
-              <h2>Results for “{q}”</h2>
+              <div className="settings-heading">
+                <h2>Results for “{q}”</h2>
+                {onClose && <CloseButton onClose={onClose} />}
+              </div>
               {results.length > 0 && <SettingsList defs={results} />}
               <ShortcutsEditor query={q} />
               {SNIPPET_WORDS.test(q) && <SnippetsEditor />}
@@ -405,11 +466,14 @@ export default function SettingsPage() {
             <>
               <div className="settings-heading">
                 <h2>{SECTIONS.find((s) => s.id === section)!.label}</h2>
-                {sectionModified.length > 0 && (
-                  <button className="btn" onClick={() => resetPrefs(sectionModified.map((d) => d.key))}>
-                    <RotateCcw size={13} /> Reset section
-                  </button>
-                )}
+                <div className="settings-heading-actions">
+                  {sectionModified.length > 0 && (
+                    <button className="btn" onClick={() => resetPrefs(sectionModified.map((d) => d.key))}>
+                      <RotateCcw size={13} /> Reset section
+                    </button>
+                  )}
+                  {onClose && <CloseButton onClose={onClose} />}
+                </div>
               </div>
               {section === 'shortcuts' ? (
                 <ShortcutsEditor query="" />
