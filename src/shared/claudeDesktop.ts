@@ -361,10 +361,17 @@ function send(line) {
 }
 
 let queue = Promise.resolve()
-readline.createInterface({ input: process.stdin }).on('line', function (line) {
+const lines = readline.createInterface({ input: process.stdin })
+lines.on('line', function (line) {
   if (line.trim()) queue = queue.then(function () { return send(line) })
 })
-process.stdin.on('end', function () { queue.then(function () { process.exit(0) }) })
+// Claude Desktop closed the pipe: finish what's asked, let the last answers reach it (writing to a
+// pipe is asynchronous, so exiting straight away could cut them off), then stop.
+lines.on('close', function () {
+  queue.then(function () {
+    process.stdout.write('', function () { process.exit(0) })
+  })
+})
 `
 
 /** Where Claude Desktop keeps its settings on Windows (both installs) and Mac. */

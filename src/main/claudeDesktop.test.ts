@@ -200,7 +200,7 @@ describe('the bridge Claude Desktop runs', () => {
     send({ jsonrpc: '2.0', method: 'notifications/initialized' })
     send({ jsonrpc: '2.0', id: 2, method: 'tools/list' })
     child.stdin.end()
-    await new Promise((resolve) => child.on('exit', resolve))
+    await new Promise((resolve) => child.on('close', resolve))
     const answers = lines.map((l) => JSON.parse(l) as { id: number; result?: { serverInfo?: { name: string }; tools?: { name: string }[] } })
     expect(answers.map((a) => a.id)).toEqual([1, 2])
     expect(answers[0].result?.serverInfo?.name).toBe('orbit')
@@ -215,7 +215,7 @@ describe('the bridge Claude Desktop runs', () => {
     let out = ''
     child.stdout.on('data', (d: Buffer) => (out += d.toString()))
     child.stdin.end(JSON.stringify({ jsonrpc: '2.0', id: 7, method: 'tools/list' }) + '\n')
-    await new Promise((resolve) => child.on('exit', resolve))
+    await new Promise((resolve) => child.on('close', resolve))
     const reply = JSON.parse(out.trim()) as { id: number; error: { message: string } }
     expect(reply.id).toBe(7)
     expect(reply.error.message).toMatch(/Orbit isn’t open/)
