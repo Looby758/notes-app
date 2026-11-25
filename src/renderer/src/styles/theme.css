@@ -24339,6 +24339,10 @@ img.tm-icon {
   padding: 24px 28px;
   overflow-y: auto;
 }
+/* The details scroll as one column, so nothing in it may shrink (the picture was being squashed and cropped). */
+.addon-details > * {
+  flex-shrink: 0;
+}
 .addon-details-head {
   display: flex;
   align-items: center;
