@@ -103,6 +103,18 @@ describe('safety', () => {
     expect(again).not.toContain('get_money')
   })
 
+  it('offers the games tools with the Games part, and passes which game to the window', async () => {
+    const client = await connect()
+    const names = (await client.listTools()).tools.map((t) => t.name)
+    expect(names).toEqual(expect.arrayContaining(['list_games', 'search_games', 'play_game', 'hide_game', 'show_game_folder']))
+    await client.callTool({ name: 'play_game', arguments: { game: 'Minecraft' } })
+    expect(asked.at(-1)).toEqual({ name: 'play_game', args: { game: 'Minecraft' } })
+    areas = { ...areas, games: false }
+    const off = (await (await connect()).listTools()).tools.map((t) => t.name)
+    expect(off).not.toContain('play_game')
+    expect(off).not.toContain('list_games')
+  })
+
   it('always offers open_page, and the briefing asks only for the parts that are on', async () => {
     areas = { ...areas, money: false }
     const client = await connect()
@@ -125,7 +137,7 @@ describe('safety', () => {
   it('marks everything but the few changes as read-only', async () => {
     const tools = (await (await connect()).listTools()).tools
     const writes = tools.filter((t) => t.annotations?.readOnlyHint === false).map((t) => t.name)
-    expect(writes.sort()).toEqual(['add_bookmark', 'add_calendar_event', 'add_card', 'add_countdown', 'add_flashcards', 'add_iou', 'add_money_category', 'add_money_entry', 'add_reminder', 'add_savings_goal', 'add_subscription', 'add_to_daily_note', 'add_to_note', 'add_to_playlist', 'add_under_heading', 'add_world_clock', 'arrange_home_page', 'cancel_subscription', 'close_app', 'close_bug_report', 'close_pull_request', 'control_music', 'convert_file', 'copy_note', 'create_folder', 'create_mind_map', 'create_note', 'create_playlist', 'delete_calendar_event', 'delete_card', 'delete_countdown', 'delete_money_entry', 'delete_music_routine', 'delete_note', 'delete_playlist', 'delete_savings_goal', 'delete_songs', 'discord_call_note', 'discord_leave', 'discord_set', 'discord_user_voice', 'dj', 'download_song', 'edit_card', 'edit_countdown', 'edit_money_entry', 'edit_note', 'edit_savings_goal', 'edit_song', 'focus_timer', 'get_latest_code', 'like_songs', 'make_theme', 'merge_pull_request', 'move_calendar_event', 'move_in_playlist', 'move_note', 'move_world_clock', 'music_settings', 'next_comic', 'next_episode', 'open_comic', 'open_mini_game', 'open_note', 'open_page', 'open_website', 'pay_back_iou', 'phone_alert', 'play_game', 'play_music', 'play_video', 'queue_songs', 'queue_videos', 'rate_song', 'read_receipt', 'read_statement', 'remove_from_playlist', 'remove_from_queue', 'remove_theme', 'remove_world_clock', 'rename_calendar_event', 'rename_note', 'rename_playlist', 'rename_world_clock', 'save_music_routine', 'savings_goal_money', 'send_to_phone', 'set_account_balance', 'set_balance', 'set_budget', 'set_theme', 'show_mind_map', 'songs_for_mood', 'split_bill', 'start_focus', 'start_music_routine', 'tag_songs', 'tick_note_task', 'tick_task', 'update_card', 'video_controls'])
+    expect(writes.sort()).toEqual(['add_bookmark', 'add_calendar_event', 'add_card', 'add_countdown', 'add_flashcards', 'add_iou', 'add_money_category', 'add_money_entry', 'add_reminder', 'add_savings_goal', 'add_subscription', 'add_to_daily_note', 'add_to_note', 'add_to_playlist', 'add_under_heading', 'add_world_clock', 'arrange_home_page', 'cancel_subscription', 'close_app', 'close_bug_report', 'close_pull_request', 'control_music', 'convert_file', 'copy_note', 'create_folder', 'create_mind_map', 'create_note', 'create_playlist', 'delete_calendar_event', 'delete_card', 'delete_countdown', 'delete_money_entry', 'delete_music_routine', 'delete_note', 'delete_playlist', 'delete_savings_goal', 'delete_songs', 'discord_call_note', 'discord_leave', 'discord_set', 'discord_user_voice', 'dj', 'download_song', 'edit_card', 'edit_countdown', 'edit_money_entry', 'edit_note', 'edit_savings_goal', 'edit_song', 'focus_timer', 'get_latest_code', 'hide_game', 'like_songs', 'make_theme', 'merge_pull_request', 'move_calendar_event', 'move_in_playlist', 'move_note', 'move_world_clock', 'music_settings', 'next_comic', 'next_episode', 'open_comic', 'open_mini_game', 'open_note', 'open_page', 'open_website', 'pay_back_iou', 'phone_alert', 'play_game', 'play_music', 'play_video', 'queue_songs', 'queue_videos', 'rate_song', 'read_receipt', 'read_statement', 'remove_from_playlist', 'remove_from_queue', 'remove_theme', 'remove_world_clock', 'rename_calendar_event', 'rename_note', 'rename_playlist', 'rename_world_clock', 'save_music_routine', 'savings_goal_money', 'send_to_phone', 'set_account_balance', 'set_balance', 'set_budget', 'set_theme', 'show_game_folder', 'show_mind_map', 'songs_for_mood', 'split_bill', 'start_focus', 'start_music_routine', 'tag_songs', 'tick_note_task', 'tick_task', 'update_card', 'video_controls'])
   })
 
   it('blanks out secrets in what the window answers', async () => {
