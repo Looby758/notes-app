@@ -39,22 +39,6 @@ const ICONS: Record<SectionId, typeof Palette> = {
   about: Info
 }
 
-/** The sidebar's groups, Nocturne style. A section not listed here goes under "More". */
-const NAV_GROUPS: { label: string; ids: string[] }[] = [
-  { label: 'Make it yours', ids: ['appearance', 'navigation', 'editor', 'shortcuts'] },
-  { label: 'Your stuff', ids: ['files', 'calendar', 'music', 'ai'] },
-  { label: 'Tools', ids: ['capture', 'browser', 'studio', 'computers'] },
-  { label: 'Orbit', ids: ['addons', 'about'] }
-]
-
-function navGroups<T extends { id: string }>(sections: T[]): { label: string; items: T[] }[] {
-  const listed = new Set(NAV_GROUPS.flatMap((g) => g.ids))
-  const groups = NAV_GROUPS.map((g) => ({ label: g.label, items: g.ids.flatMap((id) => sections.filter((s) => s.id === id)) }))
-  const rest = sections.filter((s) => !listed.has(s.id))
-  if (rest.length) groups.splice(groups.length - 1, 0, { label: 'More', items: rest })
-  return groups.filter((g) => g.items.length > 0)
-}
-
 const SNIPPET_WORDS = /^(snip|expan|text sh|abbrev|;)/i
 
 const isModified = (def: SettingDef, prefs: Record<string, unknown>): boolean =>
@@ -319,6 +303,22 @@ function CheckSettingsButton() {
       {result && <span className="about-note">{result}</span>}
     </>
   )
+}
+
+/** The sidebar's groups, Nocturne style. A section not listed here goes under "More". */
+const NAV_GROUPS: { label: string; ids: string[] }[] = [
+  { label: 'Make it yours', ids: ['appearance', 'navigation', 'editor', 'shortcuts'] },
+  { label: 'Your stuff', ids: ['files', 'calendar', 'music', 'ai'] },
+  { label: 'Tools', ids: ['capture', 'browser', 'studio', 'computers'] },
+  { label: 'Orbit', ids: ['addons', 'about'] }
+]
+
+function navGroups<T extends { id: string }>(sections: T[]): { label: string; items: T[] }[] {
+  const listed = new Set(NAV_GROUPS.flatMap((g) => g.ids))
+  const groups = NAV_GROUPS.map((g) => ({ label: g.label, items: g.ids.flatMap((id) => sections.filter((s) => s.id === id)) }))
+  const rest = sections.filter((s) => !listed.has(s.id))
+  if (rest.length) groups.splice(groups.length - 1, 0, { label: 'More', items: rest })
+  return groups.filter((g) => g.items.length > 0)
 }
 
 function CloseButton({ onClose }: { onClose: () => void }) {
