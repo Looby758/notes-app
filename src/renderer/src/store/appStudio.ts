@@ -14,6 +14,8 @@ interface AppStudioState {
   /** By folder. */
   info: Record<string, AppInfo>
   pulls: PullRequest[]
+  /** The app (by repository, "owner/name") the Pull requests list is narrowed to; null shows every app's. */
+  pullsRepo: string | null
   /** Pull request errors, by repository. */
   pullErrors: Record<string, string>
   github: GitHubStatus | null
@@ -51,6 +53,7 @@ export const useAppStudio = create<AppStudioState>(() => ({
   section: 'apps',
   info: {},
   pulls: [],
+  pullsRepo: null,
   pullErrors: {},
   github: null,
   loadingApps: false,
@@ -104,6 +107,11 @@ export async function removeCopy(folder: string, path: string): Promise<void> {
 
 export function setSection(section: AppStudioState['section']): void {
   useAppStudio.setState({ section })
+}
+
+/** Narrows the Pull requests list to one app's repository, or shows them all (null). */
+export function setPullsRepo(repo: string | null): void {
+  useAppStudio.setState({ pullsRepo: repo })
 }
 
 /** Reads every app's folder again. */
