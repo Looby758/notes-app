@@ -5,7 +5,7 @@ import { useActiveTheme, usePrefs } from '../../store/prefs'
 /**
  * An imported theme's picture behind a part of the app (see THEME_PAGES), faded by the theme's
  * picture strength. Nothing when the theme has no picture there. `exact` skips the theme's
- * picture for everywhere (for small places like the sidebar and the music player).
+ * picture for everywhere (for small places like the sidebar).
  */
 export default function ThemePicture({ page, exact }: { page: string; exact?: boolean }) {
   const theme = useActiveTheme()

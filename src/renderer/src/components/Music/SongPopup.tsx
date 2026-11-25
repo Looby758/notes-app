@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Music, X } from 'lucide-react'
 import type { MusicTrack } from '@shared/spotify'
-import { setMusicOpen, useMusic } from '../../store/music'
+import { showMusicPage, useMusic } from '../../store/music'
 import { usePrefs } from '../../store/prefs'
 
 const SHOW_MS = 4500
@@ -39,10 +39,10 @@ export function SongPopup() {
       className={`music-popup ${leaving ? 'leaving' : ''}`}
       onAnimationEnd={() => leaving && setSong(null)}
       onClick={() => {
-        setMusicOpen(true)
+        showMusicPage()
         setSong(null)
       }}
-      title="Show the music player"
+      title="Open Music"
       data-music-popup
     >
       <div className="music-art">{song.art ? <img src={song.art} alt="" /> : <Music size={18} />}</div>

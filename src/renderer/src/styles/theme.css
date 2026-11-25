@@ -13225,8 +13225,7 @@ p.games-none {
 
 /* A theme's picture sits behind a part of the app, faded into the theme's background. */
 .pane-body,
-.sidebar-inner,
-.music-player {
+.sidebar-inner {
   isolation: isolate;
 }
 .theme-picture {
@@ -13246,18 +13245,11 @@ p.games-none {
   background: linear-gradient(to bottom, transparent 20%, var(--bg) 90%);
 }
 /* Small, busy places: the picture is half as strong and fades sooner. */
-.sidebar-inner > .theme-picture,
-.music-player > .theme-picture {
+.sidebar-inner > .theme-picture {
   opacity: calc(var(--picture-strength) * 0.5);
 }
 .sidebar-inner > .theme-picture::after {
   background: linear-gradient(to bottom, transparent 0%, var(--bg-panel) 70%);
-}
-.music-player > .theme-picture {
-  border-radius: inherit;
-}
-.music-player > .theme-picture::after {
-  background: linear-gradient(to right, var(--bg-raised) 10%, transparent 100%);
 }
 body.theme-headings .cm-h,
 body.theme-headings :is(h1, h2, h3) {

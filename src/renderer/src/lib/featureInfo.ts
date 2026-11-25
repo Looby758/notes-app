@@ -56,8 +56,7 @@ export const FEATURE_INFO: FeatureInfo[] = [
   { id: 'chat', name: 'AI chat', blurb: 'Chat with Claude about anything', group: 'Connect', command: 'ai.chat', keywords: 'claude ai assistant' },
   { id: 'ask', name: 'Ask everything', blurb: 'AI that knows your notes, email, calendar and money', group: 'Connect', command: 'ai.ask', keywords: 'ai question claude' },
 
-  { id: 'musiclibrary', name: 'Music', blurb: 'Your own songs: albums, artists, playlists and likes', group: 'Media', command: 'music.page', keywords: 'songs mp3 library playlists albums artists liked orbit music player' },
-  { id: 'music', name: 'Music player', blurb: 'The small player in the corner', group: 'Media', command: 'music.player', keywords: 'spotify songs player mini corner' },
+  { id: 'musiclibrary', name: 'Music', blurb: 'Your own songs: albums, artists, playlists and likes', group: 'Media', command: 'music.page', keywords: 'songs mp3 library playlists albums artists liked orbit music player spotify sleep timer' },
   { id: 'songid', name: 'What’s this song?', blurb: 'Find the song in a video, game or stream', group: 'Media', command: 'music.whatsThisSong', keywords: 'identify recognise recognize shazam music playlist' },
   { id: 'video', name: 'Video player', blurb: 'Plays any video, with subtitles and speed', group: 'Media', command: 'video.open', keywords: 'mkv avi wmv mp4 movie film watch subtitles player vlc' },
   { id: 'comics', name: 'Comics', blurb: 'Read .cbz and .cbr comic books', group: 'Media', command: 'comics.open', keywords: 'comic book cbr cbz manga graphic novel read zen' },

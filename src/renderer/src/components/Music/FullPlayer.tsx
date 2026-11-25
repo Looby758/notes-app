@@ -12,7 +12,7 @@ import { setPrefs, usePrefs } from '../../store/prefs'
 import { notify } from '../../store/notify'
 import { errorMessage } from '../../lib/paths'
 import { Visualiser } from './Visualiser'
-import { VolumeSlider } from './MusicPlayer'
+import { VolumeSlider } from './Controls'
 import { RemotePanel, SoundPanel } from './SoundPanel'
 
 /**

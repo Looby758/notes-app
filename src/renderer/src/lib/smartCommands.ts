@@ -2,7 +2,7 @@ import { useUI, showSearch } from '../store/ui'
 import { usePrefs } from '../store/prefs'
 import { notify } from '../store/notify'
 import { addEntry, addGoal, ensureMoney, useMoney } from '../store/money'
-import { musicControl, musicPlay, setMusicOpen } from '../store/music'
+import { musicControl, musicPlay } from '../store/music'
 import { loadLocalLibrary, playLocal, useLocalMusic } from '../store/localMusic'
 import { filterSongs } from '@shared/localMusic'
 import { useVault } from '../store/vault'
@@ -111,7 +111,6 @@ export async function runSmart(a: SmartAction): Promise<string> {
         if (!useLocalMusic.getState().library) await loadLocalLibrary()
         const songs = filterSongs(useLocalMusic.getState().library?.songs ?? [], a.query)
         if (!songs.length) throw new Error(`Nothing in your music matches “${a.query}”.`)
-        setMusicOpen(true)
         await playLocal(songs, 0)
         return songs.length === 1 ? `Playing ${songs[0].title}` : `Playing ${songs.length} songs matching “${a.query}”`
       }
@@ -123,7 +122,6 @@ export async function runSmart(a: SmartAction): Promise<string> {
       }
       const pick = results.tracks[0] ?? results.playlists[0] ?? results.albums[0]
       if (!pick) throw new Error(`Nothing found on Spotify for “${a.query}”.`)
-      setMusicOpen(true)
       if (!(await musicPlay(pick.uri))) throw new Error('Spotify didn’t start playing. Open Spotify on this computer and try again.')
       return `Playing ${pick.name}${pick.detail ? ` – ${pick.detail}` : ''}`
     }

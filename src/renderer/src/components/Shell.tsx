@@ -71,7 +71,7 @@ import { startBrowser, tabsByPage } from '../store/browser'
 import StartupNotices from './Notices/StartupNotices'
 import Screensaver from './Screensaver/Screensaver'
 import Pet from './Motion/Pet'
-import MusicPlayer from './Music/MusicPlayer'
+import MusicHost from './Music/MusicHost'
 import { GrokFloat } from './Grok/GrokPage'
 import { ChatSiteFloat } from './ChatSite/ChatSite'
 import RecordingBar from './Studio/RecordingBar'
@@ -461,7 +461,7 @@ export default function Shell({ vault, onSwitchVault, onCloseVault }: Props) {
       <DownloadPrompt />
       <StartupNotices />
       <DeviceDrop />
-      {musicOn && <MusicPlayer />}
+      {musicOn && <MusicHost />}
       {grokOn && <GrokFloat />}
       {claudeOn && <ChatSiteFloat site="claude" />}
       <RecordingBar />

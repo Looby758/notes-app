@@ -79,7 +79,7 @@ import { parentOf } from './paths'
 import { newBoard } from './boards'
 import { newSpreadsheet } from './newSheet'
 import { openAsk, runNoteJob } from '../store/ai'
-import { musicControl, musicToggleLike, setMusicMini, shareSongToNote, toggleMusic, useMusic } from '../store/music'
+import { musicControl, musicToggleLike, setMusicMini, shareSongToNote, useMusic } from '../store/music'
 import { showAndFindSong } from '../store/songId'
 import { sendToPhone } from '../store/phone'
 import { toggleDiscord } from '../store/discord'
@@ -261,7 +261,6 @@ export const commands: Command[] = [
   { id: 'phone.pair', group: 'Phone', title: 'Phone: connect your phone (send, clipboard, remote, touchpad, talk, scan)', run: () => sendToPhone({ kind: 'pair' }) },
   { id: 'phone.wifi', group: 'Phone', title: 'Phone: Wi-Fi QR code for guests', run: () => sendToPhone({ kind: 'wifi' }) },
   { id: 'music.page', group: 'Music', title: 'Open the Music page (your songs, albums, artists and playlists)', run: () => openSpecialTab(MUSIC_TAB) },
-  { id: 'music.player', group: 'Music', title: 'Show or hide the music player', shortcut: 'Ctrl+Alt+M', run: toggleMusic },
   { id: 'music.toggle', group: 'Music', title: 'Music: play / pause', run: () => void musicControl('toggle') },
   { id: 'music.next', group: 'Music', title: 'Music: next song', run: () => void musicControl('next') },
   { id: 'music.previous', group: 'Music', title: 'Music: previous song', run: () => void musicControl('previous') },

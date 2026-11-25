@@ -42,7 +42,6 @@ import {
   MonitorUp,
   MousePointerClick,
   Moon,
-  Music,
   Music2,
   Orbit,
   PoundSterling,
@@ -74,7 +73,6 @@ import { useVault } from '../store/vault'
 import { setPrefs, usePrefs } from '../store/prefs'
 import { showSearch, toggleZen, useUI } from '../store/ui'
 import { toggleStreamerMode } from '../store/streamer'
-import { toggleMusic, useMusic } from '../store/music'
 import { showAndFindSong, useSongId } from '../store/songId'
 import { sendToPhone, usePhone } from '../store/phone'
 import { openAsk } from '../store/ai'
@@ -235,7 +233,6 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   grok: { icon: Bot, run: openGrokTab, useActive: () => useGrok((s) => s.floating) },
   claude: { icon: Asterisk, run: () => openSiteTab('claude'), useActive: () => useChatSites((s) => s.claude.floating) },
   ask: { icon: Sparkles, run: () => openAsk() },
-  music: { icon: Music, run: toggleMusic, useActive: () => useMusic((s) => s.open) },
   musiclibrary: { icon: Music2, run: () => openSpecialTab(MUSIC_TAB) },
   songid: { icon: Ear, run: showAndFindSong, useActive: () => useSongId((s) => s.phase === 'listening' || s.phase === 'thinking') },
   video: { icon: Film, run: () => openSpecialTab(VIDEO_TAB) },
