@@ -1487,7 +1487,8 @@ export interface NotesApi {
   appsRerunBuild(repo: string, runId: number): Promise<void>
   /** Windows: opens Settings → For developers (Developer Mode). */
   appsOpenDeveloperSettings(): Promise<void>
-  appsMerge(repo: string, number: number): Promise<void>
+  /** Merges a pull request, marking a draft ready for review first. */
+  appsMerge(repo: string, number: number): Promise<{ markedReady: boolean }>
   appsClose(repo: string, number: number): Promise<void>
   /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */
   aiChat(messages: AiChatMessage[], engine?: AiEngine): Promise<AiReply>

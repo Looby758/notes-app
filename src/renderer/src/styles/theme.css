@@ -16729,6 +16729,12 @@ body.reduce-motion .theme-loading-text {
   background: var(--bg-hover);
   color: var(--text-muted);
 }
+.appstudio-chip.draft {
+  background: transparent;
+  border: 1px dashed var(--text-muted);
+  color: var(--text-muted);
+  cursor: help;
+}
 .appstudio-repo {
   margin-top: -4px;
   font-size: 12px;
