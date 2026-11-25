@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { Check, ChevronDown, Copy, Ear, ExternalLink, FolderOpen, LogOut, Music } from 'lucide-react'
 import type { SongIdStatus } from '@shared/songId'
 import { usePrefs } from '../../store/prefs'
-import { refreshMusicStatus, setMusicOpen, useMusic } from '../../store/music'
+import { refreshMusicStatus, useMusic } from '../../store/music'
 import { errorMessage } from '../../lib/paths'
 import { loadLocalLibrary, useLocalMusic } from '../../store/localMusic'
 import { IS_MAC, SYSTEM_NAME } from '@shared/platform'
@@ -39,7 +39,6 @@ export default function MusicSettings() {
     run(async () => {
       await window.api.musicSetClient(clientId)
       await window.api.musicConnect()
-      setMusicOpen(true)
     })
 
   if (!status || !spotify) return null
@@ -48,13 +47,13 @@ export default function MusicSettings() {
     <section className="settings-group cal-sources" data-section="music">
       <h3>Spotify</h3>
       <p className="cal-sources-intro">
-        The music player sits in the bottom-left corner: show or hide it with <Music size={12} /> at the top. It shows what’s
-        playing, with play/pause, skip, shuffle, repeat and volume.
+        Spotify shows in the Home page’s <Music size={12} /> Now playing box, with play/pause, skip, shuffle, repeat and volume,
+        and your media keys control it too.
       </p>
       {status.appControl && (
         <p className="cal-sources-intro">
           On a Mac it works straight away with the Spotify app, no sign-in needed. The first time, macOS asks whether Notes may
-          control Spotify: press <strong>OK</strong>. You can also paste a Spotify link into the player to play it.
+          control Spotify: press <strong>OK</strong>.
         </p>
       )}
       <p className="cal-sources-intro">
@@ -180,7 +179,7 @@ export function SongIdSettings() {
     <section className="settings-group cal-sources" data-section="song-id">
       <h3>What’s this song?</h3>
       <p className="cal-sources-intro">
-        Hear a song in a video, game or stream? Press <Ear size={12} /> in the music player (or{' '}
+        Hear a song in a video, game or stream? Open <Ear size={12} /> What’s this song? on the Music page (or{' '}
         {status.shortcut ? <kbd>{status.shortcut}</kbd> : 'Ctrl+K → “What’s this song?”'}). Orbit listens for 10 seconds,
         {IS_MAC ? ' through the microphone,' : ''} sends the clip to <strong>AudD</strong> (a song-recognition service) and shows the
         song, ready to add to one of your Spotify playlists. Nothing is recorded until you press it.

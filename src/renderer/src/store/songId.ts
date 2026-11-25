@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { addToHistory, cleanHistory, encodeWav, LISTEN_SECONDS, CLIP_RATE, peak, SILENCE, songLine, type FoundSong } from '@shared/songId'
 import { desktopListenSupported, listen, type ListenSource } from '../lib/songListen'
 import { errorMessage } from '../lib/paths'
-import { setMusicOpen } from './music'
+import { showMusicPage } from './music'
 
 /** "What's this song?": listening, the answer, and the songs found before (kept on this computer). */
 
@@ -17,7 +17,7 @@ interface SongIdStore {
   error: string | null
   history: FoundSong[]
   source: ListenSource
-  /** Bumped to ask the music player to show this tab. */
+  /** Bumped to ask the Music page to show "What's this song?". */
   showAsk: number
 }
 
@@ -87,7 +87,7 @@ function tellOutside(title: string, body: string): void {
     const n = new Notification(title, { body, silent: true })
     n.onclick = () => window.focus()
   } catch {
-    // The answer is still in the music player.
+    // The answer is still on the Music page.
   }
 }
 
@@ -118,7 +118,7 @@ export async function findSong(): Promise<void> {
     }
     useSongId.setState({ phase: 'found', song })
     saveHistory(addToHistory(useSongId.getState().history, song))
-    tellOutside('Found it 🎵', `${songLine(song)}. Open Orbit's music player to add it to a playlist.`)
+    tellOutside('Found it 🎵', `${songLine(song)}. Open Music in Orbit to add it to a playlist.`)
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
       useSongId.setState({ phase: 'idle', level: 0 })
@@ -132,9 +132,9 @@ export async function findSong(): Promise<void> {
   }
 }
 
-/** Shows the music player on "What's this song?" and starts listening (Ctrl+K and the shortcut). */
+/** Shows "What's this song?" on the Music page and starts listening (Ctrl+K and the shortcut). */
 export function showAndFindSong(): void {
-  setMusicOpen(true)
+  showMusicPage()
   useSongId.setState((s) => ({ showAsk: s.showAsk + 1 }))
   void findSong()
 }

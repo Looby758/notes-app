@@ -88,21 +88,29 @@ While it's on, private things are blurred until you click them: your weather tow
 
 Turning streamer mode off and on again hides everything again. Whether notes and note names are hidden can be changed in Settings.
 
-## Music player (Spotify)
+## Music
 
-Press ♫ at the top (or Ctrl+Alt+M) to show a small player in the bottom-left corner. It shows the song that's playing, with play/pause, skip, a progress bar you can click to jump, and underneath it a volume slider, shuffle, repeat (press repeat again to repeat just this song) and a **sleep timer** (the moon) that pauses the music after 15 minutes to 1.5 hours, or at the end of the song. Hiding it doesn't stop the music. Ctrl+K also has *Music: play / pause*, *next* and *previous*, which you can give your own keys in Settings → Shortcuts.
+**Music** (Ctrl+K → *Open the Music page*, or the Music button on the bar) is your own songs as a full music app: songs, albums, artists, liked songs, playlists, history and listening stats, with what's playing and Up next on the right and the controls along the bottom. Along the bottom bar there's also:
 
-**On a Mac it works straight away** with the Spotify app (free or Premium), no sign-in. The first time, macOS asks whether Notes may control Spotify: press **OK**. (If you pressed *Don't Allow*, turn it back on in *System Settings → Privacy & Security → Automation*.) If Spotify isn't open, the player has an **Open Spotify** button. Under **Link** in the player you can paste a Spotify share link (*Share → Copy link*) to play a song, album or playlist.
+- A **sleep timer** (the moon): pauses the music after 15 minutes to 1.5 hours, or at the end of the song.
+- **Sound**: crossfade, equaliser and visualiser. **Phone remote**: control the music from your phone.
+- **Full screen** Now playing, with lyrics.
+- **Floating mini player** (the picture-in-picture button, or Ctrl+K → *Music: floating mini player*): a small window with the song, play/pause and skip that stays on top of your other apps.
 
-**Connect your Spotify account** (Settings → Music) to also **search** Spotify and pick from **your playlists** in the player, and to control Spotify on your phone, speakers or a Windows PC. With your account you also get:
+**What's this song?** (on the left of the Music page, Ctrl+K, or its own shortcut) listens to a video, game or stream and tells you the song.
 
-- **♥ Like** a song to save it to your Liked Songs.
-- **Up next** shows what's queued. The **+** next to a song in Search or Recent adds it to the queue.
-- **Recent** shows what you've played lately, to get back to it quickly.
-- **Make and change playlists**: under Playlists, press **New playlist**, or the **›** next to one of yours to rename or delete it, add songs (search right there, or add the song that's playing), take songs out with **×**, and drag songs into a new order.
-- **Choose where it plays**: press the device name at the bottom right of the player and pick this computer, your phone or a speaker. The music moves there and carries on.
+Elsewhere:
 
-Spotify only allows this for Premium accounts, and you make a free developer app on Spotify's site once (about 3 minutes):
+- **Keyboard media keys**: play/pause, next and previous on your keyboard control your music, even when another app is in front.
+- **Add to note** (Ctrl+K → *Music: add the song playing to this note*): puts the song that's playing into the note you're writing, as a card with its picture. Click the card to play the song.
+- A **"Now playing" pop-up** in the top corner when the next song starts (click it to open Music). Turn it off in Settings → Music.
+- The Home page's **Now playing** box shows what's playing, Spotify included, with play/pause, skip, shuffle, repeat and volume. Ctrl+K also has *Music: play / pause*, *next* and *previous*, which you can give your own keys in Settings → Shortcuts.
+
+### Spotify
+
+**On a Mac it works straight away** with the Spotify app (free or Premium), no sign-in. The first time, macOS asks whether Notes may control Spotify: press **OK**. (If you pressed *Don't Allow*, turn it back on in *System Settings → Privacy & Security → Automation*.) Spotify then shows in the Home page's Now playing box and answers your media keys.
+
+**Connect your Spotify account** (Settings → Music) to control Spotify on your phone, speakers or a Windows PC, and to **♥ like** songs. Spotify only allows this for Premium accounts, and you make a free developer app on Spotify's site once (about 3 minutes):
 
 1. Open the [Spotify developer dashboard](https://developer.spotify.com/dashboard) and log in with your Spotify account.
 2. Press **Create app**, give it any name and description.
@@ -112,16 +120,9 @@ Spotify only allows this for Premium accounts, and you make a free developer app
 
 There's no secret to copy. The sign-in is stored encrypted, like the Google one, in `spotify.json` in the settings folder. If Spotify says your account isn't allowed, add your Spotify email under **User Management** in the developer app. If you connected before liking, Recent and playlist editing were added, Settings → Music asks you to connect once more (Disconnect, then Connect) so Notes gets permission for them.
 
-Also under the player:
-
-- **Floating mini player** (the picture-in-picture button, or Ctrl+K → *Music: floating mini player*): a small window with the song, play/pause and skip that stays on top of your other apps. Drag it anywhere; it comes back where you left it, and reopens with Notes if it was showing.
-- **Keyboard media keys**: play/pause, next and previous on your keyboard control your own music, even when another app is in front. Orbit only holds the keys while your music is playing (or for 10 minutes after you pause it), so Spotify and your browser get them back the rest of the time. The song, cover and progress also show in the Mac's Now Playing and Windows' media overlay. On a Mac, catching the keys in every app needs Accessibility (the same permission macros use).
-- **Add to note** (the notebook button): puts the song that's playing into the note you're writing, as a card with its picture. Click the card to play the song (Spotify songs and your own files both work); click **Edit** to see the link.
-- A **"Now playing" pop-up** in the top corner when the next song starts. Turn it off in Settings → Music.
-
 ### Your own music files
 
-**My music** in the player plays music files on your computer (MP3, M4A, FLAC, WAV, OGG), with no Spotify or account needed. The first time, press **Choose music folder**. Notes reads each song's name, artist, album and picture from the file (or from its name, like `01 - Artist - Title.mp3`). Find songs by typing, press one to play it and the rest of the list after it, or press **Shuffle all**. Volume, shuffle, repeat, skip, Up next, the sleep timer and your keyboard's play/pause keys all work the same, and a **visualiser** shows moving bars to the music (switch it off with the bars button, or in Settings → Music; Spotify doesn't let other apps see its sound, so it's only for your own files). Playing something on Spotify stops your music, and **Back to Spotify** at the bottom right of the player hands it back. The folder you chose and what was read from your files are kept in `local-music.json` in the settings folder, so only new or changed files are read again (press ↻ to look for new ones).
+**Music** plays music files on your computer (MP3, M4A, FLAC, WAV, OGG), with no Spotify or account needed. The first time, press **Choose music folder**. Notes reads each song's name, artist, album and picture from the file (or from its name, like `01 - Artist - Title.mp3`). Find songs by typing, press one to play it and the rest of the list after it, or shuffle them. A **visualiser** shows moving bars to the music in the full-screen and mini players (switch it off in Sound or Settings → Music; Spotify doesn't let other apps see its sound, so it's only for your own files). Playing something on Spotify stops your music. The folder you chose and what was read from your files are kept in `local-music.json` in the settings folder, so only new or changed files are read again (press ↻ to look for new ones).
 
 ## AI helper (optional)
 

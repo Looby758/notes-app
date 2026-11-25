@@ -22,7 +22,13 @@ describe('motion setting', () => {
 describe('features moved into Mini games', () => {
   it('turns Sudoku and Minesweeper on the bars into one Mini games button', () => {
     const prefs = normalizePrefs({ dockFeatures: ['home', 'sudoku', 'minesweeper', 'music'], topbarFeatures: ['minesweeper'] })
-    expect(prefs.dockFeatures).toEqual(['home', 'mini-games', 'music'])
+    expect(prefs.dockFeatures).toEqual(['home', 'mini-games', 'musiclibrary'])
     expect(prefs.topbarFeatures).toEqual(['mini-games'])
+  })
+
+  it('turns the old corner music player button into the Music page', () => {
+    const prefs = normalizePrefs({ dockFeatures: ['music', 'musiclibrary'], radialFeatures: ['music'] })
+    expect(prefs.dockFeatures).toEqual(['musiclibrary'])
+    expect(prefs.radialFeatures).toEqual(['musiclibrary'])
   })
 })

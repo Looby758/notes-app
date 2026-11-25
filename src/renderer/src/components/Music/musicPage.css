@@ -1751,3 +1751,21 @@ body.motion-off .mp-eq i {
 .mp-rec-note {
   margin: 0 0 8px;
 }
+
+/* "What's this song?" on the Music page (it used to live in the small corner player). */
+.mp-song-id {
+  max-width: 460px;
+  margin: 0 24px 24px;
+}
+/* The sleep timer's moon on the bottom bar, with the minutes left beside it. */
+.mp-bar-right .music-sleep {
+  width: auto;
+  min-width: 28px;
+  padding: 0 6px;
+  flex-direction: row;
+  gap: 3px;
+}
+.mp-bar-right .music-sleep span {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}

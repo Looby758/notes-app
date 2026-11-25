@@ -42,11 +42,16 @@ import {
   Smartphone,
   Lightbulb,
   Radio,
-  Globe
+  Globe,
+  Ear
 } from 'lucide-react'
 import ListeningStats from './ListeningStats'
 import { openFullPlayer } from './FullPlayer'
 import { RemotePanel, SoundPanel } from './SoundPanel'
+import { SleepButton, SleepPanel } from './SleepTimer'
+import { SongFinder } from './SongFinder'
+import { useSongId } from '../../store/songId'
+import { useAddonOn } from '../../lib/addons'
 import { filterSongs, localArtUrl, plainText, type LocalSong } from '@shared/localMusic'
 import { favouriteArtists, recommendSongs, songsLike } from '@shared/musicRecommend'
 import { pickDiscoveries, type DiscoverGroup } from '@shared/musicDiscover'
@@ -96,7 +101,7 @@ import {
   useMusicData
 } from '../../store/musicData'
 import ContextMenu, { type MenuItem } from '../ContextMenu'
-import { VolumeSlider } from './MusicPlayer'
+import { VolumeSlider } from './Controls'
 import MusicSearch from './MusicSearch'
 import FromSpotify from './FromSpotify'
 import { droppedPicture, DuplicatesView, hasPicture, MusicDialogs, openMusicDialog, TagMenu } from './MusicTools'
@@ -128,6 +133,7 @@ type View =
   | { kind: 'playlist'; id: string }
   | { kind: 'tag'; tag: string }
   | { kind: 'duplicates' }
+  | { kind: 'find' }
 
 const VIEW_KEY = 'orbit.musicPageView'
 const SONGS_MIME = 'application/x-orbit-songs'
@@ -156,6 +162,9 @@ function artUrl(path: string): string {
 
 const sameView = (a: View, b: View): boolean => JSON.stringify(a) === JSON.stringify(b)
 
+/** The last "What's this song?" ask (Ctrl+K or its shortcut) the page has shown. */
+let shownFindAsk = 0
+
 export default function MusicPage() {
   const library = useLocalMusic((s) => s.library)
   const loading = useLocalMusic((s) => s.loading)
@@ -171,6 +180,15 @@ export default function MusicPage() {
       // Only a convenience.
     }
   }
+
+  // Ctrl+K or the system-wide shortcut asked for "What's this song?": show it.
+  const findAsk = useSongId((s) => s.showAsk)
+  useEffect(() => {
+    if (findAsk === shownFindAsk) return
+    shownFindAsk = findAsk
+    setView({ kind: 'find' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [findAsk])
 
   // A song saved from a link: say so, wherever you are.
   useEffect(
@@ -255,6 +273,8 @@ function Sidebar({ view, setView, folder, loading, onSaveLink, linkOpen }: { vie
   const tags = useMemo(() => allTags(data, present), [data, present])
   const likedCount = useMemo(() => Object.keys(data.liked).filter((p) => present.has(p)).length, [data, present])
   const [dropOn, setDropOn] = useState<string | null>(null)
+  // "What's this song?" is its own add-on.
+  const songIdOn = useAddonOn('songid')
   const [listMenu, setListMenu] = useState<{ x: number; y: number; playlist: MusicPlaylist } | null>(null)
   const listSongs = (p: MusicPlaylist): LocalSong[] => {
     const byPath = new Map((songs ?? []).map((s) => [s.path, s]))
@@ -291,6 +311,7 @@ function Sidebar({ view, setView, folder, loading, onSaveLink, linkOpen }: { vie
         {item({ kind: 'most' }, <TrendingUp size={16} />, 'Most played')}
         {item({ kind: 'history' }, <History size={16} />, 'History')}
         {item({ kind: 'stats' }, <BarChart3 size={16} />, 'Listening stats')}
+        {songIdOn && item({ kind: 'find' }, <Ear size={16} />, 'What’s this song?')}
       </div>
       <div className="mp-nav-heading">
         <span>Playlists</span>
@@ -403,6 +424,32 @@ function Sidebar({ view, setView, folder, loading, onSaveLink, linkOpen }: { vie
 
 // ---------- Middle: what you picked ----------
 
+/** "What's this song?": listen to a video, game or stream and find the song (its own add-on). */
+function FindSongView() {
+  const songIdOn = useAddonOn('songid')
+  return (
+    <div className="mp-scroll">
+      <header className="mp-header">
+        <div className="mp-header-art">
+          <Ear size={42} />
+        </div>
+        <div className="mp-header-text">
+          <span className="mp-kicker">What’s this song?</span>
+          <h1>Find a song</h1>
+          <span className="mp-header-sub">Listen to a video, game or stream and find out what’s playing</span>
+        </div>
+      </header>
+      {songIdOn ? (
+        <div className="mp-song-id" data-mp-song-id>
+          <SongFinder />
+        </div>
+      ) : (
+        <p className="mp-note">Add “What’s this song?” on the Add-ons page to use this.</p>
+      )}
+    </div>
+  )
+}
+
 let dragging: LocalSong[] = []
 function draggedSongs(e: DragEvent): LocalSong[] {
   return e.dataTransfer.types.includes(SONGS_MIME) ? dragging : []
@@ -469,6 +516,8 @@ function ViewContent({ view, setView, songs, folder }: { view: View; setView: (v
       return <SongView kicker="Tag" title={view.tag} icon={<Tag size={42} />} songs={songsWithTag(songs, data, view.tag)} setView={setView} folder={folder} empty="No songs have this tag any more." />
     case 'duplicates':
       return <DuplicatesView songs={songs} />
+    case 'find':
+      return <FindSongView />
     case 'playlist': {
       const p = data.playlists.find((x) => x.id === view.id)
       if (!p) return <Gone setView={setView} />
@@ -1408,7 +1457,7 @@ function PlayerBar({ setView }: { setView: (v: View) => void }) {
   const [scrub, setScrub] = useState<number | null>(null)
   const shownPos = scrub ?? pos
   const miniOpen = useMusic((s) => s.miniOpen)
-  const [panel, setPanel] = useState<'sound' | 'remote' | null>(null)
+  const [panel, setPanel] = useState<'sound' | 'remote' | 'sleep' | null>(null)
 
   return (
     <footer className="mp-bar" data-mp-bar>
@@ -1487,7 +1536,9 @@ function PlayerBar({ setView }: { setView: (v: View) => void }) {
         <button className="icon-btn" onClick={openFullPlayer} title="Full-screen Now playing, with lyrics" data-mp-full>
           <Maximize2 size={15} />
         </button>
+        <SleepButton open={panel === 'sleep'} onClick={() => setPanel(panel === 'sleep' ? null : 'sleep')} />
         {panel === 'sound' && <SoundPanel onClose={() => setPanel(null)} />}
+        {panel === 'sleep' && <SleepPanel onClose={() => setPanel(null)} />}
         {panel === 'remote' && <RemotePanel onClose={() => setPanel(null)} />}
         <button
           className={`icon-btn ${miniOpen ? 'mp-on' : ''}`}

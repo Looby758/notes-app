@@ -664,7 +664,7 @@ export const SETTINGS: SettingDef[] = [
     group: 'Player',
     type: 'toggle',
     label: 'Show Spotify features',
-    description: 'Turn off if you only play your own music files: the player hides Spotify’s playlists, search, recently played, links and devices, and Orbit stops checking Spotify.',
+    description: 'Turn off if you only play your own music files: Orbit hides Spotify in the Now playing box and stops checking Spotify.',
     keywords: 'spotify hide remove off own music files mp3 local'
   },
   {
@@ -683,7 +683,7 @@ export const SETTINGS: SettingDef[] = [
     type: 'choice',
     options: SONG_ID_SHORTCUTS.map((value) => ({ value, label: value ? acceleratorLabel(value) : 'Off' })),
     label: 'Shortcut',
-    description: 'Works in any app, even a full-screen game: Orbit listens for 10 seconds and tells you the song, then you can add it to a playlist from the music player. Also Ctrl+K → “What’s this song?”.',
+    description: 'Works in any app, even a full-screen game: Orbit listens for 10 seconds and tells you the song, then you can add it to a playlist from the Music page. Also Ctrl+K → “What’s this song?”.',
     keywords: 'whats this song identify recognise recognize shazam music hotkey game stream video'
   },
   {
@@ -692,7 +692,7 @@ export const SETTINGS: SettingDef[] = [
     group: 'Player',
     type: 'toggle',
     label: 'Visualiser for your own music',
-    description: 'Moving bars in the player while your own music files play (Spotify doesn’t let other apps see its sound). Also the bars button under the player.',
+    description: 'Moving bars in the full-screen player and the floating mini player while your own music files play (Spotify doesn’t let other apps see its sound).',
     keywords: 'music visualizer visualiser bars waves equaliser animation'
   },
   {

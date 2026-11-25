@@ -65,7 +65,7 @@ export const ADDON_ABOUT: Record<string, string> = {
 
   // Media
   music:
-    'A small player in the corner for your own songs and Spotify, with a full music library of albums, artists, playlists and likes. Download a song from a video link straight into it, and see lyrics and a visualiser while it plays.',
+    'Your own songs as a full music library of albums, artists, playlists and likes, with Spotify in the Home page’s Now playing box. Download a song from a video link straight into it, and see lyrics and a visualiser while it plays.',
   songid: 'Listen to whatever’s playing in a video, game or stream and find out what the song is. Add it to your music or a playlist in one click.',
   'video-player': 'Plays almost any video, with subtitles, playback speed and an Up next list. Pop it out over other windows to watch while you work.',
   comics: 'A shelf for your .cbz and .cbr comic books, and a reader that shows a page or one panel at a time. Remembers where you were in each one.',

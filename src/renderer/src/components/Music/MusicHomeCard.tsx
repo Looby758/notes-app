@@ -1,9 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Music, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from 'lucide-react'
-import { currentPosition, musicControl, musicSeek, setMusicOpen, useMusic, watchMusic } from '../../store/music'
+import { currentPosition, musicControl, musicSeek, openMusicSettings, showMusicPage, useMusic, watchMusic } from '../../store/music'
+import { openSpecialTab, SETTINGS_TAB } from '../../lib/editorController'
 import { HomeBox } from '../Home/HomePage'
 import { usePrefs } from '../../store/prefs'
-import { LikeButton, VolumeSlider } from './MusicPlayer'
+import { LikeButton, VolumeSlider } from './Controls'
+
+const setUpSpotify = (): void => {
+  openSpecialTab(SETTINGS_TAB)
+  openMusicSettings()
+}
 
 /** The Home page's "Now playing" box: nothing until there's music to control (Spotify on this Mac or your account, or your own songs). */
 export default function MusicHomeCard() {
@@ -19,8 +25,8 @@ export default function MusicHomeCard() {
       icon={<Music size={15} />}
       title="Now playing"
       action={
-        <button className="link-button home-box-action" onClick={() => setMusicOpen(true)}>
-          Player
+        <button className="link-button home-box-action" onClick={showMusicPage} data-music-home-open>
+          Music
         </button>
       }
     >
@@ -44,13 +50,25 @@ function Playing() {
       </div>
     )
   }
-  // Automation permission, account setup and so on: the corner player explains those.
+  if (state.hint === 'automation') {
+    return (
+      <div className="music-home-empty">
+        <span>
+          Let Orbit control Spotify: in <strong>Privacy &amp; Security → Automation</strong>, turn on <strong>Spotify</strong> under Notes.
+        </span>
+        <button className="btn" onClick={() => window.api.musicOpen('automation')}>
+          Open
+        </button>
+      </div>
+    )
+  }
+  // Account setup and so on: Settings → Music explains those.
   if (state.hint) {
     return (
       <div className="music-home-empty">
         <span>Spotify needs setting up.</span>
-        <button className="btn" onClick={() => setMusicOpen(true)}>
-          Show player
+        <button className="btn" onClick={setUpSpotify}>
+          Set up
         </button>
       </div>
     )
@@ -61,8 +79,8 @@ function Playing() {
       <div className="music-home-empty">
         <span>Nothing playing.</span>
         {spotify ? (
-          <button className="btn" onClick={() => setMusicOpen(true)}>
-            Pick a playlist
+          <button className="btn" onClick={() => window.api.musicOpen('app')}>
+            Open Spotify
           </button>
         ) : (
           <button className="btn" onClick={() => void musicControl('toggle')} data-music-home-shuffle>
