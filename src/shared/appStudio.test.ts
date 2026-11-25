@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bugReportUrl, newReports, reportButtonCard, reportCard, type BugReport, rollbackCommand, rollbackVersion, parseOutdated, parseAudit, severityCounts, healthLevel, healthLine, healthBoardItem, type HealthReport, addDownloadDay, countText, downloadsByPlatform, downloadsSince, isDownloadFile, platformOf, type DownloadHistory, boardKey, commitAllCommand, describeChange, stashCommand, isTokenPermissionError, newTokenUrl, readyForReviewError, mergeAfterReadyError, TOKEN_NOT_ALLOWED, bumpVersion, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
+import { bugReportUrl, newReports, reportButtonCard, reportCard, type BugReport, rollbackCommand, rollbackVersion, parseOutdated, parseAudit, severityCounts, healthLevel, healthLine, healthBoardItem, type HealthReport, addDownloadDay, countText, downloadsByPlatform, downloadsSince, isDownloadFile, platformOf, type DownloadHistory, boardKey, commitAllCommand, describeChange, stashCommand, isTokenPermissionError, newTokenUrl, readyForReviewError, mergeAfterReadyError, mergeBlockedReason, mergeFailedMessage, TOKEN_NOT_ALLOWED, bumpVersion, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
 
 describe('githubRepo', () => {
   it('reads https and ssh remotes', () => {
@@ -429,7 +429,32 @@ describe('draft pull requests', () => {
     expect(readyForReviewError([], 'me/app')).toContain('Nothing was merged')
   })
   it('says it was marked ready when the merge then fails', () => {
-    expect(mergeAfterReadyError('Merge conflict')).toBe('It’s now marked ready for review, but GitHub couldn’t merge it: Merge conflict. You can try Merge again.')
+    expect(mergeAfterReadyError('Try Merge again')).toBe('It’s now marked ready for review, but it didn’t merge. Try Merge again.')
     expect(mergeAfterReadyError(`${TOKEN_NOT_ALLOWED} merge pull requests`)).toBe(`${TOKEN_NOT_ALLOWED} merge pull requests`)
+  })
+})
+
+describe('why a merge can’t happen', () => {
+  it('says a pull request with conflicts has conflicts with its base', () => {
+    const m = mergeBlockedReason({ mergeable: false, mergeable_state: 'dirty' }, 188, 'main')
+    expect(m).toContain('#188 has conflicts with main')
+    expect(m).toContain('Nothing was merged')
+    expect(mergeBlockedReason({ mergeable: false, mergeable_state: 'draft' }, 5, 'main')).toContain('conflicts with main')
+  })
+  it('explains branch rules that are in the way', () => {
+    expect(mergeBlockedReason({ mergeable: true, mergeable_state: 'behind' }, 7, 'main')).toContain('#7 is behind main')
+    expect(mergeBlockedReason({ mergeable: true, mergeable_state: 'blocked' }, 7, 'main')).toContain('GitHub is blocking #7')
+  })
+  it('lets anything else through, failing checks that aren’t required and not-yet-known too', () => {
+    for (const state of ['clean', 'unstable', 'has_hooks', 'draft', 'unknown']) expect(mergeBlockedReason({ mergeable: true, mergeable_state: state }, 1, 'main')).toBeNull()
+    expect(mergeBlockedReason({ mergeable: null, mergeable_state: 'unknown' }, 1, 'main')).toBeNull()
+  })
+  it('turns GitHub’s merge errors into specific ones', () => {
+    expect(mergeFailedMessage('Pull Request is not mergeable', 188, 'main')).toContain('#188 has conflicts with main')
+    expect(mergeFailedMessage('Base branch was modified. Review and try the merge again.', 3, 'main')).toContain('Try Merge again')
+    expect(mergeFailedMessage('At least 1 approving review is required by reviewers with write access.', 3, 'main')).toContain('approving review')
+    expect(mergeFailedMessage('Required status check "build" is expected.', 3, 'main')).toContain('required check')
+    expect(mergeFailedMessage('Something new', 3, 'main')).toBe('GitHub couldn’t merge #3: Something new. Nothing was merged.')
+    expect(mergeFailedMessage(`${TOKEN_NOT_ALLOWED} merge pull requests`, 3, 'main')).toBe(`${TOKEN_NOT_ALLOWED} merge pull requests`)
   })
 })

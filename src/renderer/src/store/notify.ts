@@ -23,8 +23,9 @@ export function notify(err: unknown, kind: NotifyState['kind'] = 'error', action
   if (kind === 'info' && isQuiet()) return
   const message = errorMessage(err)
   useNotify.setState({ message, kind, action: action ?? null })
-  // A message with a button stays a little longer, so there's time to press it.
-  setTimeout(() => useNotify.getState().message === message && useNotify.setState({ message: null, action: null }), action ? 6000 : 4000)
+  // A message with a button, or a long one, stays a little longer, so there's time to press it or read it.
+  const ms = Math.max(action ? 6000 : 4000, Math.min(12_000, message.length * 50))
+  setTimeout(() => useNotify.getState().message === message && useNotify.setState({ message: null, action: null }), ms)
 }
 
 /** Hides the message now (its button was pressed). */

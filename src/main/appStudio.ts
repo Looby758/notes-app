@@ -2,7 +2,7 @@ import { app, ipcMain, net, safeStorage } from 'electron'
 import { execFile } from 'child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'fs'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'path'
-import { copyFolderName, githubRepo, isDownloadFile, isGitHubImage, parseAudit, parseOutdated, TOKEN_NOT_ALLOWED, readyForReviewError, mergeAfterReadyError, type GraphQLError, type HealthReport, type BugReport, type AppInfo, type TestCopy, type GitHubStatus, type MergedPull, type PullRequest, type Release } from '@shared/appStudio'
+import { copyFolderName, githubRepo, isDownloadFile, isGitHubImage, parseAudit, parseOutdated, TOKEN_NOT_ALLOWED, readyForReviewError, mergeAfterReadyError, mergeBlockedReason, mergeFailedMessage, type Mergeability, type GraphQLError, type HealthReport, type BugReport, type AppInfo, type TestCopy, type GitHubStatus, type MergedPull, type PullRequest, type Release } from '@shared/appStudio'
 import { npmMissingText } from '@shared/toolPath'
 import { appNameProblem, appSlug, starterFiles, STARTERS, type MadeApp, type NewApp } from '@shared/appStarters'
 import { logError } from './log'
@@ -397,9 +397,20 @@ async function setPrerelease(repo: string, tag: string, prerelease: boolean): Pr
  * (that's only in GitHub's GraphQL API), then merged. Says whether it had to do that.
  */
 async function merge(repo: string, number: number): Promise<{ markedReady: boolean }> {
-  const pull = await github<{ node_id: string; draft?: boolean; state: string; merged_at: string | null }>(`/repos/${repo}/pulls/${number}`)
+  type Pull = Mergeability & { node_id: string; draft?: boolean; state: string; merged_at: string | null; base: { ref: string } }
+  let pull = await github<Pull>(`/repos/${repo}/pulls/${number}`)
   if (pull.merged_at) return { markedReady: false }
   if (pull.state !== 'open') throw new GitHubError(`#${number} was closed on GitHub, so it can’t be merged.`, 409)
+  // GitHub works out whether it can merge in the background (after anything lands on the base, for
+  // one), and says null until it has. Give it a few seconds before going ahead without knowing.
+  for (let i = 0; pull.mergeable === null && i < 4; i++) {
+    await new Promise((r) => setTimeout(r, 1500))
+    pull = await github<Pull>(`/repos/${repo}/pulls/${number}`)
+  }
+  const base = pull.base?.ref || 'main'
+  // Say why before marking a draft ready, so a pull request that can't merge stays as it was.
+  const blocked = mergeBlockedReason(pull, number, base)
+  if (blocked) throw new GitHubError(blocked, 409)
   let markedReady = false
   if (pull.draft) {
     const res = await github<{ errors?: GraphQLError[] }>('/graphql', {
@@ -414,8 +425,10 @@ async function merge(repo: string, number: number): Promise<{ markedReady: boole
   try {
     await github(`/repos/${repo}/pulls/${number}/merge`, { method: 'PUT', body: { merge_method: 'merge' }, doing: 'merge pull requests', needs: 'Pull requests and Contents' })
   } catch (err) {
-    if (!markedReady) throw err
-    throw new GitHubError(mergeAfterReadyError(err instanceof Error ? err.message : String(err)), err instanceof GitHubError ? err.status : 0)
+    const raw = err instanceof Error ? err.message : String(err)
+    const status = err instanceof GitHubError ? err.status : 0
+    const message = status === 405 || status === 409 || status === 422 ? mergeFailedMessage(raw, number, base) : raw
+    throw new GitHubError(markedReady ? mergeAfterReadyError(message) : message, status)
   }
   return { markedReady }
 }

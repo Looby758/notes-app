@@ -635,7 +635,45 @@ export function readyForReviewError(errors: GraphQLError[], repo: string): strin
 
 /** What to show when a draft was marked ready, but merging it then failed. */
 export const mergeAfterReadyError = (message: string): string =>
-  isTokenPermissionError(message) ? message : `It’s now marked ready for review, but GitHub couldn’t merge it: ${message.replace(/\.?$/, '.')} You can try Merge again.`
+  isTokenPermissionError(message) ? message : `It’s now marked ready for review, but it didn’t merge. ${message.replace(/\.?$/, '.')}`
+
+// ---------- Why a merge can't happen ----------
+
+/** What GitHub says about whether a pull request can be merged (its REST `mergeable` fields). */
+export interface Mergeability {
+  /** null while GitHub is still working it out (it does that in the background after a push). */
+  mergeable: boolean | null
+  /** clean, dirty, blocked, behind, unstable, has_hooks, draft or unknown. */
+  mergeable_state?: string
+}
+
+const conflictsMessage = (number: number, base: string): string =>
+  `#${number} has conflicts with ${base}, so GitHub can’t merge it. Some of the same lines were changed on ${base} after it was opened. Ask Claude to fix the conflicts on its branch, then try Merge again. Nothing was merged.`
+
+/**
+ * Why GitHub won't merge this pull request, before App Studio tries (and before it takes a draft
+ * out of draft), or null if nothing's known to be in the way. Failing checks that aren't required
+ * ("unstable") don't stop a merge, so they don't count.
+ */
+export function mergeBlockedReason(m: Mergeability, number: number, base: string): string | null {
+  if (m.mergeable === false || m.mergeable_state === 'dirty') return conflictsMessage(number, base)
+  if (m.mergeable_state === 'behind')
+    return `#${number} is behind ${base}, and ${base}’s rules on GitHub need it up to date first. Use “Update branch” on its GitHub page, then try Merge again. Nothing was merged.`
+  if (m.mergeable_state === 'blocked')
+    return `GitHub is blocking #${number}: ${base}’s rules want something first, like a check that has to pass or an approving review. Open it on GitHub to see what’s missing. Nothing was merged.`
+  return null
+}
+
+/** Turns GitHub's answer when a merge fails (405 or 409) into something specific. */
+export function mergeFailedMessage(message: string, number: number, base: string): string {
+  if (isTokenPermissionError(message)) return message
+  if (/not mergeable|merge conflict/i.test(message)) return conflictsMessage(number, base)
+  if (/(base|head) branch was modified/i.test(message)) return `#${number} or ${base} changed on GitHub just as it was merging. Try Merge again. Nothing was merged.`
+  if (/approving review/i.test(message)) return `#${number} needs an approving review on GitHub before ${base}’s rules let it merge. Nothing was merged.`
+  if (/status check|required check/i.test(message)) return `#${number} has a required check on GitHub that hasn’t passed yet. Nothing was merged.`
+  if (/draft/i.test(message)) return `#${number} is still a draft on GitHub. Try Merge again. Nothing was merged.`
+  return `GitHub couldn’t merge #${number}${message ? `: ${message.replace(/\.?$/, '.')}` : '.'} Nothing was merged.`
+}
 
 // ---------- Uncommitted changes ----------
 
