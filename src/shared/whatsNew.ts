@@ -12,6 +12,16 @@ export interface ReleaseNotes {
 /** Newest first. Add an entry with each release. */
 export const RELEASE_NOTES: readonly ReleaseNotes[] = [
   {
+    version: '1.15.0',
+    items: [
+      'Let Claude Desktop look at Orbit (App Studio errors, notes, calendar and more)',
+      'Video post-production: auto transcripts, shot list and export for editing',
+      'Soundboard: level the mic so it isn\'t too quiet in Discord',
+      'Try Orbit as a new user, clean up test copy data, explain how add-ons work',
+      'Remove the old corner music player, keep the Music page'
+    ]
+  },
+  {
     version: '1.14.0',
     items: [
       'App Studio: say why a pull request can\'t merge, like "has conflicts with main"',
