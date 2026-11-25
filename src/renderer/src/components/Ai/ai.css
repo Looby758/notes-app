@@ -424,3 +424,16 @@
   background: var(--accent-soft);
   color: var(--text-strong);
 }
+
+/* Settings → AI → Claude Desktop */
+.ai-settings .claude-areas-heading {
+  margin: 18px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.ai-settings textarea {
+  width: 100%;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  resize: vertical;
+}

@@ -145,6 +145,27 @@ The AI helper can also run on your own computer, with no internet and nothing se
 - **Dictionary:** right-click a word → *Meaning*, then *Explain it as it's used here* for what it means in that sentence.
 - It's loaded into the graphics card only when something asks it a question, and unloaded after 10 quiet minutes (or with *Unload now*). While a game from the Games page is running it stays unloaded, so the game gets the whole card (switch that off in Settings if you like).
 
+## Claude Desktop (optional)
+
+Ask the Claude Desktop app about what's in Orbit, instead of copying and pasting. For example: "look at the error in App Studio", "what have I got on this week?", "find my notes about the Skyblock farm and sum them up", "make flashcards from my History notes", "which drive is nearly full?" or "skip this song". It uses your normal Claude plan, so there's no API key and nothing extra to pay.
+
+**Setting it up:** in **Settings → AI helper → Claude Desktop**, switch on **Let Claude Desktop see Orbit**, press **Connect to Claude Desktop**, then quit Claude Desktop completely and open it again. Orbit shows up in its connectors. Orbit needs to be open while you use it. If Orbit can't change Claude Desktop's settings for you, it shows the text to paste and where (in Claude Desktop: Settings → Developer → Edit Config). It only works in the Claude Desktop app on the same computer, not on claude.ai in a browser or in Orbit's own Claude tab.
+
+**What Claude can see** (each part has its own switch):
+
+- **App Studio:** the last 20 problems (failed checks before a release, failing tests, a release or fix that didn't work, GitHub's build failing, git trouble), each with the app, when, which step failed and everything git or npm said. They're kept in `app-studio-errors.json` in the settings folder, so they're still there after a restart. Claude can also ask what the release helper says about an app now (and whether its release has built yet), read the Ideas & bugs board, add a card, and move a card or link the pull request that fixed it.
+- **Notes:** search, read, make new notes and add to them.
+- **Calendar and countdowns:** what's coming up (including connected Google calendars), adding an event to Orbit's calendar, and your countdowns.
+- **Money:** spending, budgets, savings goals and repeating payments. Read-only.
+- **Flashcards:** your cards, which ones you keep getting wrong, and adding new ones to a note.
+- **Files and downloads:** colour-tagged files, Whole PC search, the download manager, and how full the drives are.
+- **Music:** what's playing, play, pause, skip, and playing songs from your music folder that match (like "chill").
+- **Email:** off until you switch it on. Search and read your emails.
+
+**Safety:** it's off until you switch it on. Only this computer can reach it (it listens on 127.0.0.1, never on the Wi-Fi), and every request needs a secret code that's stored encrypted, like the other sign-ins, in `settings.json`. Claude Desktop keeps a copy in its own settings file. **New secret code** makes a new one, so the old one stops working. Passwords, locked notes and anything in a locked folder are never shared, and anything that looks like a password, token or key is blanked out before it leaves Orbit. Claude can only change the things listed above; everything else it can only read.
+
+**How it works:** Claude Desktop starts its connectors as a program, so Orbit gives it a tiny bridge script (`claude-desktop-bridge.cjs` in the settings folder). The bridge runs with Orbit's own program acting as Node, so nothing needs installing, and it passes messages to Orbit's MCP server ([src/main/claudeDesktop.ts](src/main/claudeDesktop.ts), tools in [src/main/claudeTools.ts](src/main/claudeTools.ts)).
+
 ## Themes from a file
 
 Besides the built-in themes, Notes can wear themes that don't come with the app. A theme file (`.notestheme`) can change the colours, fonts, the pictures behind each part of the app, the loading screen, the icon on starred notes and the app icon. In **Settings → Appearance**, press **Import a theme…** and pick the file; it shows up with the other themes. Hover over it and press **×** to remove it. Importing a newer copy of the same theme replaces the old one.

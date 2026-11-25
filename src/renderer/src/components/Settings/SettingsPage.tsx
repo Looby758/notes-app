@@ -15,6 +15,7 @@ import PlaceholderHelp from './PlaceholderHelp'
 import RemindersSettings from './RemindersSettings'
 import NavEditor from '../Nav/NavEditor'
 import AiSettings from '../Ai/AiSettings'
+import ClaudeDesktopSettings from '../Ai/ClaudeDesktopSettings'
 import OfflineAiSettings from '../Ai/OfflineAiSettings'
 import MusicSettings, { MusicFolderSetting, SongIdSettings } from '../Music/MusicSettings'
 import StudioSettings from '../Studio/LiveSetup'
@@ -569,6 +570,7 @@ export default function SettingsPage({ onClose }: { onClose?: () => void } = {})
                   {section === 'capture' && <TaskbarSnip />}
                   {section === 'ai' && installed.includes('offline-ai') && <OfflineAiSettings />}
                   {section === 'ai' && <AiSettings />}
+                  {section === 'ai' && <ClaudeDesktopSettings />}
                   {section === 'music' && <MusicFolderSetting />}
                   {section === 'music' && <MusicSettings />}
                   {section === 'music' && <SongIdSettings />}

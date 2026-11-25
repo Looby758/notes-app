@@ -686,6 +686,18 @@ const api: NotesApi = {
   musicMiniLayout: () => ipcRenderer.invoke('musicMini:layout'),
   musicRemoteStatus: () => ipcRenderer.invoke('musicRemote:status'),
   setMusicRemote: (on, fresh) => ipcRenderer.invoke('musicRemote:set', on, fresh),
+  claudeDesktopStatus: () => ipcRenderer.invoke('claude:status'),
+  setClaudeDesktop: (on) => ipcRenderer.invoke('claude:set', on),
+  setClaudeArea: (area, on) => ipcRenderer.invoke('claude:setArea', area, on),
+  connectClaudeDesktop: () => ipcRenderer.invoke('claude:connect'),
+  disconnectClaudeDesktop: () => ipcRenderer.invoke('claude:disconnect'),
+  newClaudeDesktopToken: () => ipcRenderer.invoke('claude:newToken'),
+  onClaudeAsk: (callback) => {
+    const handler = (_e: unknown, ask: { id: number; name: string; args: Record<string, unknown> }): void => callback(ask)
+    ipcRenderer.on('claude:ask', handler)
+    return () => ipcRenderer.removeListener('claude:ask', handler)
+  },
+  claudeAnswer: (id, ok, value) => ipcRenderer.send('claude:answer', id, ok, value),
   localMusicLyrics: (path) => ipcRenderer.invoke('localMusic:lyrics', path),
   localMusicSaveLyrics: (path, text) => ipcRenderer.invoke('localMusic:saveLyrics', path, text),
   setMusicMiniLayout: (layout) => ipcRenderer.invoke('musicMini:setLayout', layout),

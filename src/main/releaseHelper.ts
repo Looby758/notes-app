@@ -26,7 +26,9 @@ import {
   type ReleaseResult
 } from '@shared/releaseCheck'
 import { appInfo, github, GitHubError, token, validRepo } from './appStudio'
+import type { AppInfo } from '@shared/appStudio'
 import { logError } from './log'
+import { nameApp, recordStudioError, sawBuild, sawFailure, sawFix, sawMainStatus, sawPreflight, sawRelease, sawTests } from './studioErrors'
 import { findTool, hasNvm, toolEnv } from './toolPath'
 import { npmMissingText } from '@shared/toolPath'
 
@@ -149,6 +151,7 @@ async function releaseFor(repo: string, tag: string): Promise<ApiRelease | undef
 /** The quick checks before a release (the tests are run separately, as they take a while). */
 async function preflight(folder: string, bump: VersionBump): Promise<Preflight> {
   const info = await appInfo(folder)
+  nameApp(folder, info.repo)
   if (!info.ok || info.error) throw new Error(info.error ?? 'Orbit couldn’t read this app’s folder.')
   const version = info.version
   if (!version) throw new Error('Orbit bumps the version in package.json, so it can only release apps that have one.')
@@ -254,6 +257,12 @@ async function preflight(folder: string, bump: VersionBump): Promise<Preflight> 
   return { version, next, tag, checks, notesFile }
 }
 
+/** Failing tests: kept in App Studio's problem history with everything npm said (the check shows the end). */
+function testsFailed(folder: string, p: Problem, output: string): Check {
+  recordStudioError(folder, 'tests', 'Type check and tests', p.title, p.detail, output)
+  return fromProblem('tests', p, output)
+}
+
 /** The type check (when there is one) and the tests, as GitHub's build runs them. */
 async function runTests(folder: string): Promise<Check> {
   let scripts: Record<string, string> = {}
@@ -269,13 +278,13 @@ async function runTests(folder: string): Promise<Check> {
     const r = await run(folder, 'npm', ['run', 'typecheck'], { timeout: 10 * 60_000 })
     output += r.out
     if (r.npmMissing) return npmMissing('tests', r.out)
-    if (!r.ok) return fromProblem('tests', explainProblem(r.out, { windows: WINDOWS, source: 'tests' }), r.out)
+    if (!r.ok) return testsFailed(folder, explainProblem(r.out, { windows: WINDOWS, source: 'tests' }), output)
   }
   if (hasTests) {
     const r = await run(folder, 'npm', ['test'], { timeout: 15 * 60_000 })
     output += '\n' + r.out
     if (r.npmMissing) return npmMissing('tests', r.out)
-    if (!r.ok) return fromProblem('tests', explainProblem(r.out, { windows: WINDOWS, source: 'tests' }), r.out)
+    if (!r.ok) return testsFailed(folder, explainProblem(r.out, { windows: WINDOWS, source: 'tests' }), output)
     const count = /Tests\s+(\d+) passed/.exec(r.out)?.[1]
     return check('tests', 'pass', `${scripts.typecheck ? 'The type check and ' : ''}${count ? `all ${count} tests` : 'the tests'} passed.`.replace(/^t/, 'T'), { output: lastLines(output, 30) })
   }
@@ -285,6 +294,7 @@ async function runTests(folder: string): Promise<Check> {
 /** The release: npm sets the version, commits and tags it; then the commit and tag are pushed. */
 async function release(folder: string, bump: VersionBump, expected: string): Promise<ReleaseResult> {
   const info = await appInfo(folder)
+  nameApp(folder, info.repo)
   const main = info.mainBranch ?? 'main'
   const next = info.version ? bumpVersion(info.version, bump) : null
   if (next !== expected) throw new Error('The version changed since the check. Check again.')
@@ -349,6 +359,7 @@ async function pullLatest(folder: string, main: string, dirty: boolean): Promise
  */
 async function mainStatus(folder: string): Promise<MainStatus> {
   const info = await appInfo(folder)
+  nameApp(folder, info.repo)
   if (!info.ok || info.error) throw new Error(info.error ?? 'Orbit couldn’t read this app’s folder.')
   const main = info.mainBranch ?? 'main'
   const base = { main, branch: info.branch, onMain: info.branch === main, dirty: info.changedFiles ?? 0, behind: 0, ahead: 0 }
@@ -378,6 +389,7 @@ async function mainStatus(folder: string): Promise<MainStatus> {
  */
 async function getLatestMain(folder: string): Promise<FixResult> {
   const info = await appInfo(folder)
+  nameApp(folder, info.repo)
   if (!info.ok || info.error) throw new Error(info.error ?? 'Orbit couldn’t read this app’s folder.')
   const main = info.mainBranch ?? 'main'
   const dirty = info.changedFiles ?? 0
@@ -412,6 +424,7 @@ async function getLatestMain(folder: string): Promise<FixResult> {
 /** One of the one-click fixes. */
 async function fix(folder: string, id: string, arg: string): Promise<FixResult> {
   const info = await appInfo(folder)
+  nameApp(folder, info.repo)
   const main = info.mainBranch ?? 'main'
   const repo = info.repo
   if (id === 'put-away') {
@@ -551,6 +564,16 @@ async function buildStatus(folder: string, repo: string, tag: string): Promise<B
   return out
 }
 
+/** The fixes that run here, in words, for App Studio's problem history. */
+const FIX_NAMES: Record<string, string> = {
+  'put-away': 'Put changes away',
+  'switch-main': 'Switch to main',
+  pull: 'Get the latest',
+  'finish-push': 'Push the release',
+  'delete-tag': 'Delete the tag',
+  retag: 'Build it again'
+}
+
 const validFolder = (folder: unknown): folder is string => typeof folder === 'string' && isAbsolute(folder) && !!statSync(folder, { throwIfNoEntry: false })?.isDirectory()
 const validBump = (bump: unknown): bump is VersionBump => VERSION_BUMPS.some((b) => b.id === bump)
 
@@ -569,44 +592,86 @@ async function once<T>(folder: string, job: () => Promise<T>): Promise<T> {
   }
 }
 
+/**
+ * A fresh, look-only check of an app for Claude Desktop: how it compares with GitHub's main, and
+ * GitHub's build of its current version. Nothing is changed (it only fetches), and it waits for
+ * nothing: when a release job is running on the folder, it says so instead.
+ */
+export async function lookAtRelease(folder: string): Promise<{ info: AppInfo; main?: MainStatus; build?: BuildStatus; busy?: boolean }> {
+  const info = await appInfo(folder)
+  nameApp(folder, info.repo)
+  if (busy.has(folder)) return { info, busy: true }
+  const main = info.ok && !info.error ? await mainStatus(folder).catch(() => undefined) : undefined
+  if (main) sawMainStatus(folder, main)
+  const tag = info.version ? `v${info.version}` : null
+  const build = info.repo && tag && info.releaseWorkflow && token() ? await buildStatus(folder, info.repo, tag).catch(() => undefined) : undefined
+  if (build) sawBuild(folder, build)
+  return { info, main, build }
+}
+
 export function setupReleaseHelper(): void {
   ipcMain.handle('apps:preflight', (_e, folder: unknown, bump: unknown) => {
     if (!validFolder(folder) || !validBump(bump)) throw new Error('Not allowed')
-    return once(folder, () => preflight(folder, bump))
+    return once(folder, () => preflight(folder, bump)).then(
+      (r) => (sawPreflight(folder, r), r),
+      (err) => {
+        sawFailure(folder, 'preflight', 'Checking before a release', err)
+        throw err
+      }
+    )
   })
   // Not under once(): the tests run while you look at (and fix) the other checks.
   ipcMain.handle('apps:releaseTests', (_e, folder: unknown) => {
     if (!validFolder(folder)) throw new Error('Not allowed')
-    return runTests(folder)
+    return runTests(folder).then((r) => (sawTests(folder, r), r))
   })
   ipcMain.handle('apps:release', (_e, folder: unknown, bump: unknown, expected: unknown) => {
     if (!validFolder(folder) || !validBump(bump) || typeof expected !== 'string') throw new Error('Not allowed')
-    return once(folder, () => release(folder, bump, expected))
+    return once(folder, () => release(folder, bump, expected)).then(
+      (r) => (sawRelease(folder, r), r),
+      (err) => {
+        sawFailure(folder, 'release', 'Making the release', err)
+        throw err
+      }
+    )
   })
   ipcMain.handle('apps:releaseFix', (_e, folder: unknown, id: unknown, arg: unknown) => {
     if (!validFolder(folder) || typeof id !== 'string') throw new Error('Not allowed')
-    return once(folder, () => fix(folder, id, typeof arg === 'string' ? arg : ''))
+    const what = `Fix: ${FIX_NAMES[id] ?? id}`
+    return once(folder, () => fix(folder, id, typeof arg === 'string' ? arg : '')).then(
+      (r) => (sawFix(folder, what, r), r),
+      (err) => {
+        sawFailure(folder, 'git', what, err)
+        throw err
+      }
+    )
   })
   // Not under once() (it's only a look), but it waits its turn behind a release job, so their
   // fetches don't trip over each other.
   ipcMain.handle('apps:mainStatus', (_e, folder: unknown) => {
     if (!validFolder(folder)) throw new Error('Not allowed')
     if (busy.has(folder)) throw new Error('busy')
-    return mainStatus(folder)
+    return mainStatus(folder).then((r) => (sawMainStatus(folder, r), r))
   })
   ipcMain.handle('apps:getLatestMain', (_e, folder: unknown) => {
     if (!validFolder(folder)) throw new Error('Not allowed')
-    return once(folder, () => getLatestMain(folder))
+    return once(folder, () => getLatestMain(folder)).then(
+      (r) => (sawFix(folder, 'Get latest main', r), r),
+      (err) => {
+        sawFailure(folder, 'git', 'Get latest main', err)
+        throw err
+      }
+    )
   })
   ipcMain.handle('apps:writeNotes', (_e, folder: unknown, version: unknown, items: unknown) => {
     if (!validFolder(folder) || typeof version !== 'string' || !/^\d+\.\d+\.\d+$/.test(version) || !Array.isArray(items)) throw new Error('Not allowed')
     const lines = items.filter((i): i is string => typeof i === 'string' && !!i.trim()).map((i) => i.trim().slice(0, 500)).slice(0, 40)
     if (!lines.length) throw new Error('Write at least one line first.')
-    return once(folder, () => writeNotes(folder, version, lines))
+    return once(folder, () => writeNotes(folder, version, lines)).then((r) => (sawFix(folder, 'Writing the What’s new notes', r), r))
   })
   ipcMain.handle('apps:buildStatus', (_e, folder: unknown, repo: unknown, tag: unknown) => {
     if (!validFolder(folder) || !validRepo(repo) || typeof tag !== 'string' || !isVersionTag(tag)) throw new Error('Not allowed')
-    return buildStatus(folder, repo, tag)
+    return buildStatus(folder, repo, tag).then((r) => (sawBuild(folder, r), r))
   })
   ipcMain.handle('apps:rerunBuild', async (_e, repo: unknown, runId: unknown) => {
     if (!validRepo(repo) || !Number.isInteger(runId)) throw new Error('Not allowed')
