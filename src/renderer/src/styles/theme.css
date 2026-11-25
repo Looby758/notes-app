@@ -733,6 +733,210 @@ body.hide-statusbar .statusbar {
   height: 24px;
 }
 
+/* ---------- Settings as a panel over the page (Nocturne look; Settings/SettingsDialog.tsx) ----------
+   Colours all come from the theme, so it follows whichever theme and accent you pick. */
+.modal-backdrop.settings-backdrop {
+  align-items: center;
+  padding: 24px;
+  background: rgba(4, 4, 8, 0.6);
+  backdrop-filter: blur(3px);
+}
+.settings-dialog {
+  display: flex;
+  width: min(1040px, 100%);
+  height: min(700px, 100%);
+  border: 1px solid var(--border-strong);
+  border-radius: 18px;
+  background: var(--bg);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+.settings-dialog .settings-page {
+  flex: 1;
+  min-width: 0;
+}
+.settings-dialog .settings-nav {
+  width: 240px;
+  padding: 18px 12px 14px;
+  border-right-color: var(--border);
+  /* A shade darker than the page, in light themes as well as dark ones. */
+  background: color-mix(in srgb, var(--bg) 90%, black);
+}
+.settings-dialog .settings-search {
+  height: 34px;
+  margin-bottom: 8px;
+  border-radius: 9px;
+  border-color: var(--border-strong);
+  background: transparent;
+}
+.settings-nav-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings-nav-label {
+  display: none;
+}
+.settings-dialog .settings-nav-label {
+  display: block;
+  padding: 14px 10px 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.settings-dialog .settings-nav-group:first-child .settings-nav-label {
+  padding-top: 8px;
+}
+.settings-dialog .settings-nav-item {
+  flex-shrink: 0;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.settings-dialog .settings-nav-item.selected {
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-raised));
+}
+.settings-nav-version {
+  display: none;
+}
+.settings-dialog .settings-nav-version {
+  display: block;
+  padding: 10px 10px 0;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.settings-dialog .settings-content {
+  max-width: none;
+  margin: 0;
+  padding: 26px 40px 60px;
+}
+.settings-dialog .settings-heading {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: -26px -40px 6px;
+  padding: 22px 40px 4px;
+  background: linear-gradient(var(--bg) 80%, transparent);
+}
+.settings-dialog .settings-content h2 {
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+.settings-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.settings-close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 100ms var(--ease), color 100ms var(--ease);
+}
+.settings-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-strong);
+}
+.settings-dialog .settings-heading > .settings-close {
+  margin-bottom: 18px;
+}
+.settings-dialog .settings-group {
+  margin-bottom: 30px;
+}
+.settings-dialog .settings-group h3 {
+  margin-bottom: 0;
+  padding-bottom: 10px;
+  border-bottom: none;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-strong);
+}
+.settings-dialog .setting-row {
+  padding: 16px 0;
+  border-bottom: none;
+  border-top: 1px solid var(--border);
+}
+.settings-dialog .setting-text label {
+  font-size: 14px;
+  color: var(--text-strong);
+}
+.settings-dialog .setting-text p {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.settings-dialog .switch {
+  width: 36px;
+  height: 20px;
+  border: none;
+  border-radius: 999px;
+  background: var(--border-strong);
+}
+.settings-dialog .switch-knob {
+  background: var(--text-strong);
+}
+.settings-dialog .switch.on {
+  background: var(--accent);
+}
+.settings-dialog .switch.on .switch-knob {
+  background: var(--bg);
+}
+.settings-dialog .theme-grid {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+}
+.settings-dialog .theme-card {
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--bg-panel);
+}
+.settings-dialog .theme-preview {
+  height: 80px;
+  border-radius: 8px;
+}
+.settings-dialog .theme-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+.settings-dialog .swatch.selected {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--swatch);
+}
+.settings-dialog .slider input[type='range'] {
+  width: 220px;
+}
+@media (max-width: 760px) {
+  .settings-dialog .settings-nav {
+    width: 190px;
+  }
+  .settings-dialog .settings-content {
+    padding: 22px 22px 48px;
+  }
+  .settings-dialog .settings-heading {
+    margin: -22px -22px 6px;
+    padding: 18px 22px 4px;
+  }
+}
+
 /* toggle switch */
 .switch {
   position: relative;
@@ -16729,6 +16933,12 @@ body.reduce-motion .theme-loading-text {
   background: var(--bg-hover);
   color: var(--text-muted);
 }
+.appstudio-chip.draft {
+  background: transparent;
+  border: 1px dashed var(--text-muted);
+  color: var(--text-muted);
+  cursor: help;
+}
 .appstudio-repo {
   margin-top: -4px;
   font-size: 12px;
@@ -17933,6 +18143,43 @@ button.board-add-picture:hover {
 .release-warning > span {
   flex: 1;
   min-width: 0;
+}
+/* Releases: "Latest main" (how far behind GitHub's main, and the button that gets it) */
+.release-latest {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, #e5a50a 14%, transparent);
+  font-size: 12.5px;
+}
+.release-latest-ok {
+  background: color-mix(in srgb, #2ea043 12%, transparent);
+}
+.release-latest-problem {
+  background: color-mix(in srgb, #e5534b 12%, transparent);
+}
+.release-latest-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.release-latest-line > span {
+  flex: 1;
+  min-width: 0;
+}
+.release-latest-line > svg {
+  flex-shrink: 0;
+}
+.release-latest-ok .release-latest-line > svg {
+  color: #2ea043;
+}
+.release-latest-line .release-warning-btn {
+  margin-left: 0;
+}
+.release-latest-result {
+  color: var(--text);
 }
 .release-warning svg {
   flex-shrink: 0;

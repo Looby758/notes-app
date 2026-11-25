@@ -40,6 +40,7 @@ import { setupSongSearch } from './songSearch'
 import { setupMusicTags } from './musicTags'
 import { setupMusicFromLink } from './musicFromLink'
 import { closeMusicMini, setupMusicMini } from './musicMini'
+import { setupMediaKeys, teardownMediaKeys } from './mediaKeys'
 import { closePopout, setupPopout } from './popout'
 import { closeDiscordPopout, setupDiscordPopout } from './discordPopout'
 import { closeVideoWindow, setupVideoWindow } from './videoWindow'
@@ -1113,6 +1114,7 @@ app.whenReady().then(async () => {
   safely('Opera GX import', setupOperaImport)
   safely('Music mini player', () => setupMusicMini(currentPrefs, () => mainWindow))
   safely('music phone remote', setupMusicRemote)
+  safely('keyboard media keys', setupMediaKeys)
   safely('pop-out window', () => setupPopout(currentPrefs))
   safely('export', setupExport)
   safely('converter', setupConverter)
@@ -1184,6 +1186,7 @@ app.on('before-quit', () => {
   quitting = true
 })
 app.on('will-quit', () => {
+  safely('keyboard media keys', teardownMediaKeys)
   teardownCapture()
   safely('screens between computers', teardownScreenLink)
   safely('mouse sharing', teardownMouseShare)

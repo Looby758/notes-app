@@ -12,6 +12,21 @@ export interface ReleaseNotes {
 /** Newest first. Add an entry with each release. */
 export const RELEASE_NOTES: readonly ReleaseNotes[] = [
   {
+    version: '1.13.8',
+    items: [
+      'Settings opens as a Nocturne-style panel over the current page',
+      'App Studio: filter pull requests by app'
+    ]
+  },
+  {
+    version: '1.13.7',
+    items: [
+      'Add a "Get latest main" button to App Studio\'s Releases',
+      'Add a clean uninstaller',
+      'Money: a Budget tab where you type each income and outgoing'
+    ]
+  },
+  {
     version: '1.13.6',
     items: [
       'Fix Google sign-in saying "This browser or app may not be secure" on the Mac (tested against Google this time), and "Sign in with Google" going back to "Choose an account"'

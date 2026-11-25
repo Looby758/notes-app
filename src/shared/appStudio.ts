@@ -612,6 +612,31 @@ export function newTokenUrl(owner?: string): string {
   return `https://github.com/settings/personal-access-tokens/new?${q.toString()}`
 }
 
+// ---------- Draft pull requests ----------
+
+/** One error from GitHub's GraphQL API (it answers 200 and lists what went wrong). */
+export interface GraphQLError {
+  type?: string
+  message?: string
+}
+
+/**
+ * What to show when GitHub wouldn't mark a draft ready for review. A token without Pull requests
+ * write gets the same "isn't allowed" message as everywhere else, so App Studio can offer a new one.
+ */
+export function readyForReviewError(errors: GraphQLError[], repo: string): string {
+  const first = errors[0] ?? {}
+  const message = first.message ?? ''
+  if (first.type === 'FORBIDDEN' || /resource not accessible by (personal access token|integration)/i.test(message)) {
+    return `${TOKEN_NOT_ALLOWED} mark pull requests ready for review on ${repo}. It needs Pull requests set to “Read and write”, with ${repo} in its repositories. Make a new token with those and paste it into App Studio.`
+  }
+  return `GitHub wouldn’t take it out of draft${message ? `: ${message.replace(/\.?$/, '.')}` : '.'} Nothing was merged.`
+}
+
+/** What to show when a draft was marked ready, but merging it then failed. */
+export const mergeAfterReadyError = (message: string): string =>
+  isTokenPermissionError(message) ? message : `It’s now marked ready for review, but GitHub couldn’t merge it: ${message.replace(/\.?$/, '.')} You can try Merge again.`
+
 // ---------- Uncommitted changes ----------
 
 /** "package-lock.json (changed)" from a line of `git status --porcelain`. */

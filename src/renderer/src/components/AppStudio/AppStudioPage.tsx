@@ -24,7 +24,7 @@ import {
 import { boardKey, isTokenPermissionError, newTokenUrl, pullKey, prSummary, timeAgo, type PullRequest, type TestCopy } from '@shared/appStudio'
 import { FILE_MANAGER } from '@shared/platform'
 import { addProject, removeProject, updateProject, useTerminals, type TerminalProject } from '../../store/terminals'
-import { appRepos, dropPull, makeCopy, refreshApps, refreshGithub, refreshPulls, removeCopy, setGithub, setSection, useAppStudio } from '../../store/appStudio'
+import { appRepos, dropPull, makeCopy, refreshApps, refreshGithub, refreshPulls, removeCopy, setGithub, setPullsRepo, setSection, useAppStudio } from '../../store/appStudio'
 import { closeCopyTerminals, getLatestAndRun, runTestCopy, tryBranch } from '../../lib/terminal'
 import { openSpecialTab, TERMINAL_TAB } from '../../lib/editorController'
 import { notify } from '../../store/notify'
@@ -218,7 +218,12 @@ function AppCard({ project }: { project: TerminalProject }) {
             </div>
           )}
           {info.repo && (
-            <button className="appstudio-card-line appstudio-pr-link" onClick={() => setSection('pulls')} disabled={!pulls.length}>
+            <button className="appstudio-card-line appstudio-pr-link" onClick={() => {
+                setPullsRepo(info.repo ?? null)
+                setSection('pulls')
+              }}
+              disabled={!pulls.length}
+            >
               <GitPullRequest size={13} />
               {pulls.length ? `${pulls.length} open pull request${pulls.length === 1 ? '' : 's'}` : 'No open pull requests'}
             </button>
@@ -314,22 +319,53 @@ function CopyRow({ project, copy }: { project: TerminalProject; copy: TestCopy }
 }
 
 function PullInbox() {
-  const pulls = useAppStudio((s) => s.pulls)
-  const errors = useAppStudio((s) => s.pullErrors)
+  const allPulls = useAppStudio((s) => s.pulls)
+  const allErrors = useAppStudio((s) => s.pullErrors)
   const info = useAppStudio((s) => s.info)
   const loading = useAppStudio((s) => s.loadingPulls)
   const github = useAppStudio((s) => s.github)
+  const picked = useAppStudio((s) => s.pullsRepo)
+  const projects = useTerminals((s) => s.projects)
   const repos = appRepos(info)
+  // One choice per app on GitHub, named as in My apps (apps sharing a repository share a choice).
+  const apps: { repo: string; name: string }[] = []
+  for (const p of projects) {
+    const repo = info[p.folder]?.repo
+    if (repo && !apps.some((a) => a.repo === repo)) apps.push({ repo, name: p.name })
+  }
+  // A picked app that's gone (removed, or its folder left GitHub) shows everything again.
+  const repo = picked && repos.includes(picked) ? picked : null
+  const pulls = repo ? allPulls.filter((p) => p.repo === repo) : allPulls
+  const errors = repo ? Object.fromEntries(Object.entries(allErrors).filter(([r]) => r === repo)) : allErrors
+  const appName = apps.find((a) => a.repo === repo)?.name
   return (
     <div className="appstudio-pulls">
       <GitHubConnect />
+      {apps.length > 1 && (
+        <div className="board-apps appstudio-pull-filter" aria-label="Show pull requests for">
+          <button className={!repo ? 'active' : ''} onClick={() => setPullsRepo(null)}>
+            All apps
+            <span className="appstudio-count">{allPulls.length}</span>
+          </button>
+          {apps.map((a) => (
+            <button key={a.repo} className={a.repo === repo ? 'active' : ''} onClick={() => setPullsRepo(a.repo)} title={a.repo}>
+              {a.name}
+              <span className="appstudio-count">{allPulls.filter((p) => p.repo === a.repo).length}</span>
+            </button>
+          ))}
+        </div>
+      )}
       {Object.entries(errors).map(([repo, error]) => (
         <div key={repo} className="appstudio-error">
           <strong>{repo}:</strong> {error}
         </div>
       ))}
       {!repos.length && <p className="appstudio-empty">Add an app whose folder is on GitHub (in My apps) and its pull requests show up here.</p>}
-      {repos.length > 0 && !pulls.length && !loading && !Object.keys(errors).length && <p className="appstudio-empty">No open pull requests. When Claude opens one on {repos.length === 1 ? repos[0] : 'one of your apps'}, it shows up here.</p>}
+      {repos.length > 0 && !pulls.length && !loading && !Object.keys(errors).length && (
+        <p className="appstudio-empty">
+          No open pull requests{repo ? ` on ${appName ?? repo}` : ''}. When Claude opens one on {repo ? (appName ?? repo) : repos.length === 1 ? repos[0] : 'one of your apps'}, it shows up here.
+        </p>
+      )}
       {loading && !pulls.length && (
         <p className="appstudio-empty">
           <Loader2 size={14} className="spin" /> Checking GitHub…
@@ -373,16 +409,21 @@ function PullCard({ pull, canAct }: { pull: PullRequest; canAct: boolean }) {
     }
     setBusy(true)
     try {
-      if (what === 'merge') await window.api.appsMerge(pull.repo, pull.number)
-      else await window.api.appsClose(pull.repo, pull.number)
+      let done = `Closed #${pull.number}.`
+      if (what === 'merge') {
+        const { markedReady } = await window.api.appsMerge(pull.repo, pull.number)
+        done = markedReady ? `Marked #${pull.number} ready for review and merged it into ${pull.base}.` : `Merged #${pull.number} into ${pull.base}.`
+      } else await window.api.appsClose(pull.repo, pull.number)
       dropPull(pull.repo, pull.number)
-      notify(what === 'merge' ? `Merged #${pull.number} into ${pull.base}.` : `Closed #${pull.number}.`, 'info')
+      notify(done, 'info')
       void refreshApps()
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       if (isTokenPermissionError(message)) setTokenProblem(message.replace(/^Error invoking remote method '[^']+': (\w*Error: )?/, ''))
       else notify(err)
       setConfirm(null)
+      // A draft may have been marked ready before the merge failed; show it as it is now.
+      if (what === 'merge' && pull.draft) void refreshApps()
     } finally {
       setBusy(false)
     }
@@ -392,7 +433,11 @@ function PullCard({ pull, canAct }: { pull: PullRequest; canAct: boolean }) {
     <article className="appstudio-pull">
       <div className="appstudio-pull-top">
         <span className="appstudio-chip">{project?.name ?? pull.repo}</span>
-        {pull.draft && <span className="appstudio-chip muted">Draft</span>}
+        {pull.draft && (
+          <span className="appstudio-chip draft" title="Claude opens pull requests as drafts. GitHub won’t merge a draft, so Merge here marks it ready for review first, then merges it.">
+            Draft
+          </span>
+        )}
         <span className="muted">
           #{pull.number} · by {pull.author} · updated {timeAgo(pull.updatedAt)}
         </span>
@@ -448,12 +493,12 @@ function PullCard({ pull, canAct }: { pull: PullRequest; canAct: boolean }) {
         <button
           className={`btn${confirm === 'merge' ? ' btn-primary appstudio-confirm' : ''}`}
           disabled={busy || !canAct}
-          title={canAct ? `Merge into ${pull.base}` : 'Connect GitHub (above) to merge from here'}
+          title={canAct ? (pull.draft ? `It’s a draft: marks it ready for review on GitHub, then merges it into ${pull.base}` : `Merge into ${pull.base}`) : 'Connect GitHub (above) to merge from here'}
           onClick={() => void act('merge')}
           onBlur={() => confirm === 'merge' && !busy && setConfirm(null)}
         >
           {busy && confirm === 'merge' ? <Loader2 size={14} className="spin" /> : <GitMerge size={14} />}
-          {confirm === 'merge' ? `Merge into ${pull.base}?` : 'Merge'}
+          {busy && confirm === 'merge' ? 'Merging…' : confirm === 'merge' ? (pull.draft ? `Mark ready and merge into ${pull.base}?` : `Merge into ${pull.base}?`) : 'Merge'}
         </button>
         <button
           className={`btn${confirm === 'close' ? ' appstudio-confirm-danger' : ''}`}

@@ -65,6 +65,39 @@ export interface Preflight {
   notesFile?: string
 }
 
+/** How the app's folder compares with GitHub's main branch (the "Latest main" strip on Releases). */
+export interface MainStatus {
+  /** The main branch's name (main or master). */
+  main: string
+  /** The branch the folder is on now (none when git is mid-rebase or on a commit). */
+  branch?: string
+  onMain: boolean
+  /** Files changed since the last commit. */
+  dirty: number
+  /** Whether the folder has a GitHub remote (origin) at all. */
+  linked: boolean
+  /** Commits on GitHub's main this folder's main doesn't have. */
+  behind: number
+  /** Commits on this folder's main GitHub doesn't have yet. */
+  ahead: number
+  /** Why GitHub couldn't be checked, in plain words. */
+  problem?: string
+  output?: string
+}
+
+/** A line saying how far behind (or ahead of) GitHub's main the folder is. */
+export function mainStatusText(s: MainStatus): string {
+  if (!s.linked) return 'This app’s folder isn’t linked to GitHub, so there’s no main to get.'
+  if (s.problem) return s.problem
+  const commits = (n: number): string => (n === 1 ? '1 commit' : `${n} commits`)
+  // Off main it's still main that's compared (what a release is made from); the strip says which branch it's on.
+  const where = `This folder’s ${s.main}`
+  if (!s.behind && !s.ahead) return `${where} matches GitHub’s ${s.main}.`
+  if (!s.behind) return `${where} has everything on GitHub’s ${s.main}, plus ${commits(s.ahead)} that ${s.ahead === 1 ? 'isn’t' : 'aren’t'} on GitHub yet.`
+  const behind = `${where} is ${commits(s.behind)} behind GitHub’s ${s.main}`
+  return s.ahead ? `${behind}, and has ${commits(s.ahead)} GitHub doesn’t.` : `${behind}.`
+}
+
 export const CHECK_LABELS: Record<CheckId, string> = {
   tree: 'Everything is committed',
   branch: 'On the main branch',

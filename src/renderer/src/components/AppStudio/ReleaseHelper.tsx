@@ -35,6 +35,12 @@ import { errorMessage } from '../../lib/paths'
 const useBuildTick = create<{ tick: number }>(() => ({ tick: 0 }))
 const bumpBuild = (): void => useBuildTick.setState((s) => ({ tick: s.tick + 1 }))
 
+/** Bumped when "Get latest main" changed the folder, so checks made before it are cleared. */
+export const useMainTick = create<{ tick: number }>(() => ({ tick: 0 }))
+export const mainChanged = (): void => useMainTick.setState((s) => ({ tick: s.tick + 1 }))
+/** Read by the "Latest main" strip, which looks again after any fix. */
+export const useFixTick = (): number => useBuildTick((s) => s.tick)
+
 const FIX_LABELS: Record<FixId, string> = {
   'put-away': 'Put the changes away',
   'switch-main': 'Switch to main',
@@ -266,13 +272,16 @@ export function ReleaseFlow({ project, appKey, repo, bump }: { project: Terminal
   const run = useRef(0)
   const main = info?.mainBranch ?? 'main'
 
-  // A different bump is a different release.
+  const mainTick = useMainTick((s) => s.tick)
+  // A different bump is a different release, and new commits from main mean checking again.
   useEffect(() => {
+    run.current++
     setPre(null)
     setTests(null)
     setResult(null)
     setConfirm(false)
-  }, [bump])
+    setChecking(false)
+  }, [bump, mainTick])
 
   const check = async (withTests = true): Promise<void> => {
     const id = ++run.current

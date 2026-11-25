@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ClipboardCopy, Download, EyeOff, Eye, Undo2, GitBranch, ExternalLink, Hammer, Loader2, RefreshCw, Rocket, Sparkles, Tag, Upload, Wand2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AlertTriangle, ClipboardCopy, Check, Download, EyeOff, Eye, Undo2, GitBranch, ArrowDownToLine, ExternalLink, Hammer, Loader2, RefreshCw, Rocket, Sparkles, Tag, Upload, Wand2 } from 'lucide-react'
 import { boardKey, bumpVersion, rollbackVersion, countText, describeChange, downloadsByPlatform, downloadsSince, isTokenPermissionError, changelogSource, notesTarget, plainChangelog, timeAgo, VERSION_BUMPS, type Release, type VersionBump } from '@shared/appStudio'
 import { useTerminals, type TerminalProject } from '../../store/terminals'
 import { refreshApps, setSection, useAppStudio } from '../../store/appStudio'
 import { downloadDay, lastRelease, loadReleases, putRelease, setNotes, setReleasesApp, totalDownloads, useAppReleases } from '../../store/appReleases'
-import { commitChanges, rollBack, runProjectCommand, stashChanges, switchBranch } from '../../lib/terminal'
+import { commitChanges, rollBack, runProjectCommand, stashChanges } from '../../lib/terminal'
 import { notify } from '../../store/notify'
 import TokenProblem from './TokenProblem'
-import { BuildCard, ReleaseFlow } from './ReleaseHelper'
+import { BuildCard, mainChanged, ReleaseFlow, useFixTick } from './ReleaseHelper'
+import { mainStatusText, type MainStatus } from '@shared/releaseCheck'
 import { errorMessage } from '../../lib/paths'
 
 /** Releases are read from GitHub again when you come back after this long. */
@@ -294,15 +295,6 @@ function NextRelease({ project, releases, appKey, repo }: { project: TerminalPro
   const next = version ? bumpVersion(version, bump) : null
   const last = lastRelease(releases)
   const dirty = (info?.changedFiles ?? 0) > 0
-  const main = info?.mainBranch ?? 'main'
-  const offMain = !!info?.branch && info.branch !== main
-
-  const toMain = (): void => {
-    switchBranch(project, main)
-    // The card catches up once git has switched.
-    window.setTimeout(() => void refreshApps(), 4000)
-    window.setTimeout(() => void refreshApps(), 10000)
-  }
 
   return (
     <section className="appstudio-card">
@@ -332,17 +324,7 @@ function NextRelease({ project, releases, appKey, repo }: { project: TerminalPro
             ))}
           </div>
           {dirty && <Uncommitted project={project} />}
-          {offMain && (
-            <div className="release-warning">
-              <AlertTriangle size={13} />
-              <span>
-                It’s on the branch <code>{info?.branch}</code>. Releases are usually made from {main}.
-              </span>
-              <button className="btn release-warning-btn" disabled={dirty} title={dirty ? 'Commit or put away the changes first' : `Runs git checkout ${main} and git pull in ${project.name}’s terminal`} onClick={toMain}>
-                <GitBranch size={13} /> Switch to {main}
-              </button>
-            </div>
-          )}
+          {repo && <LatestMain project={project} />}
           <ReleaseFlow project={project} appKey={appKey} repo={repo} bump={bump} />
           <p className="muted release-explain">
             {info?.hasTests && 'Runs the tests first. Then it '}
@@ -363,6 +345,118 @@ function NextRelease({ project, releases, appKey, repo }: { project: TerminalPro
         </div>
       )}
     </section>
+  )
+}
+
+/**
+ * "Latest main": how far this folder is behind GitHub's main, and one button that gets it (switching
+ * to main first when it's on another branch), so a release is made from what's really on GitHub
+ * and not an old copy. It looks again when you open the app, after a fix, and when the branch or
+ * the changed files change.
+ */
+function LatestMain({ project }: { project: TerminalProject }) {
+  const info = useAppStudio((s) => s.info[project.folder])
+  const fixTick = useFixTick()
+  const [status, setStatus] = useState<MainStatus | null>(null)
+  const [looking, setLooking] = useState(false)
+  const [pulling, setPulling] = useState(false)
+  const [result, setResult] = useState<{ ok: boolean; text: string; output?: string } | null>(null)
+  const ask = useRef(0)
+  const main = info?.mainBranch ?? 'main'
+  const offMain = !!info?.branch && info.branch !== main
+  const dirty = info?.changedFiles ?? 0
+
+  const look = useCallback(async (): Promise<void> => {
+    const id = ++ask.current
+    setLooking(true)
+    try {
+      const s = await window.api.appsMainStatus(project.folder)
+      if (id === ask.current) setStatus(s)
+    } catch (err) {
+      // "busy": a release job is using git right now; the next look catches up.
+      const message = errorMessage(err)
+      if (id === ask.current && !/busy/.test(message)) setStatus((s) => ({ ...(s ?? { main, onMain: !offMain, dirty, linked: true, behind: 0, ahead: 0 }), problem: message }))
+    } finally {
+      if (id === ask.current) setLooking(false)
+    }
+  }, [project.folder])
+
+  useEffect(() => {
+    void look()
+  }, [look, fixTick, info?.branch, info?.lastChange?.date])
+
+  const getLatest = async (): Promise<void> => {
+    setPulling(true)
+    setResult(null)
+    try {
+      const r = await window.api.appsGetLatestMain(project.folder)
+      setResult({ ok: r.ok, text: r.message, output: r.output })
+      notify(r.message, r.ok ? 'info' : 'error')
+      if (r.ok) mainChanged()
+    } catch (err) {
+      setResult({ ok: false, text: errorMessage(err) })
+    } finally {
+      setPulling(false)
+      await refreshApps()
+      void look()
+    }
+  }
+
+  if (status && !status.linked) return null
+  const behind = status?.behind ?? 0
+  const upToDate = !!status && !status.problem && !behind && !offMain
+  const blocked = offMain && dirty > 0
+  const label = offMain ? `Switch to ${main} and get the latest` : `Get latest ${main}`
+  const title = blocked
+    ? `Commit or put away the ${dirty === 1 ? 'changed file' : `${dirty} changed files`} first, so ${dirty === 1 ? 'it stays' : 'they stay'} on ${info?.branch}`
+    : offMain
+      ? `Runs git checkout ${main}, then gets everything on GitHub’s ${main}. Nothing is thrown away.`
+      : `Gets everything on GitHub’s ${main} (git pull). Changed files are kept; if the new commits touch them, git stops and nothing changes.`
+
+  return (
+    <div className={`release-latest${upToDate ? ' release-latest-ok' : ''}${status?.problem ? ' release-latest-problem' : ''}`}>
+      <div className="release-latest-line">
+        {!status ? <Loader2 size={13} className="spin" /> : upToDate ? <Check size={13} /> : offMain ? <GitBranch size={13} /> : <AlertTriangle size={13} />}
+        <span>
+          {!status ? (
+            `Checking GitHub’s ${main}…`
+          ) : (
+            <>
+              {offMain && (
+                <>
+                  It’s on the branch <code>{info?.branch}</code>, and releases are made from {main}.{' '}
+                </>
+              )}
+              {mainStatusText(status)}
+              {behind > 0 && !status.problem && ' Get it first so the release has everything that’s been merged.'}
+            </>
+          )}
+        </span>
+        <button className="icon-btn" title={`Check GitHub’s ${main} again`} disabled={looking || pulling} onClick={() => void look()}>
+          {looking && status ? <Loader2 size={13} className="spin" /> : <RefreshCw size={13} />}
+        </button>
+        <button className={`btn release-warning-btn${!upToDate && !blocked ? ' btn-primary' : ''}`} disabled={pulling || blocked} title={title} onClick={() => void getLatest()}>
+          {pulling ? <Loader2 size={13} className="spin" /> : <ArrowDownToLine size={13} />} {pulling ? 'Getting it…' : label}
+        </button>
+      </div>
+      {result && !result.ok && (
+        <div className="release-latest-result">
+          <span>{result.text}</span>
+          {result.output?.trim() && (
+            <details className="release-details">
+              <summary>Show what git said</summary>
+              <pre>{result.output}</pre>
+            </details>
+          )}
+        </div>
+      )}
+      {status?.problem && status.output && (
+        <details className="release-details">
+          <summary>Show what git said</summary>
+          <pre>{status.output}</pre>
+        </details>
+      )}
+    </div>
   )
 }
 

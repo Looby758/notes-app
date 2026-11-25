@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bugReportUrl, newReports, reportButtonCard, reportCard, type BugReport, rollbackCommand, rollbackVersion, parseOutdated, parseAudit, severityCounts, healthLevel, healthLine, healthBoardItem, type HealthReport, addDownloadDay, countText, downloadsByPlatform, downloadsSince, isDownloadFile, platformOf, type DownloadHistory, boardKey, commitAllCommand, describeChange, stashCommand, isTokenPermissionError, newTokenUrl, TOKEN_NOT_ALLOWED, bumpVersion, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
+import { bugReportUrl, newReports, reportButtonCard, reportCard, type BugReport, rollbackCommand, rollbackVersion, parseOutdated, parseAudit, severityCounts, healthLevel, healthLine, healthBoardItem, type HealthReport, addDownloadDay, countText, downloadsByPlatform, downloadsSince, isDownloadFile, platformOf, type DownloadHistory, boardKey, commitAllCommand, describeChange, stashCommand, isTokenPermissionError, newTokenUrl, readyForReviewError, mergeAfterReadyError, TOKEN_NOT_ALLOWED, bumpVersion, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
 
 describe('githubRepo', () => {
   it('reads https and ssh remotes', () => {
@@ -415,5 +415,21 @@ describe('bug reports', () => {
     expect(url.searchParams.get('labels')).toBe('bug')
     expect(url.searchParams.get('body')).toContain('Eclipse 1.2.3 on Windows 11')
     expect(reportButtonCard({ name: 'Eclipse', repo: 'me/eclipse' }).details).toContain('https://github.com/me/eclipse/issues/new?')
+  })
+})
+
+describe('draft pull requests', () => {
+  it('turns a missing permission into the token message', () => {
+    const m = readyForReviewError([{ type: 'FORBIDDEN', message: 'Resource not accessible by personal access token' }], 'me/app')
+    expect(isTokenPermissionError(m)).toBe(true)
+    expect(m).toContain('me/app')
+  })
+  it('says nothing was merged when it stays a draft', () => {
+    expect(readyForReviewError([{ message: 'Could not resolve to a node' }], 'me/app')).toBe('GitHub wouldn’t take it out of draft: Could not resolve to a node. Nothing was merged.')
+    expect(readyForReviewError([], 'me/app')).toContain('Nothing was merged')
+  })
+  it('says it was marked ready when the merge then fails', () => {
+    expect(mergeAfterReadyError('Merge conflict')).toBe('It’s now marked ready for review, but GitHub couldn’t merge it: Merge conflict. You can try Merge again.')
+    expect(mergeAfterReadyError(`${TOKEN_NOT_ALLOWED} merge pull requests`)).toBe(`${TOKEN_NOT_ALLOWED} merge pull requests`)
   })
 })

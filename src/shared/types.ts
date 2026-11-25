@@ -1,6 +1,6 @@
 import type { MadeApp, NewApp } from './appStarters'
 import type { AppInfo, BugReport, GitHubStatus, HealthReport, MergedPull, PullRequest, Release, TestCopy, VersionBump } from './appStudio'
-import type { BuildStatus, Check, FixResult, Preflight, ReleaseResult } from './releaseCheck'
+import type { BuildStatus, Check, FixResult, MainStatus, Preflight, ReleaseResult } from './releaseCheck'
 import type { DriveSpace, ExplorerEntry, ExplorerPlace, PasteMode, PcIndexStatus } from './explorer'
 import type { FileTagStore, TagColour } from './fileTags'
 import type { BinListing } from './recycleBin'
@@ -1254,6 +1254,8 @@ export interface NotesApi {
   onMusicLinkProgress(callback: (progress: MusicLinkProgress) => void): () => void
   /** Any song (Apple's free iTunes Search), for the Music page's Search. */
   songSearch(query: string): Promise<FoundTrack[]>
+  /** New songs by artists like your favourites (shared/musicDiscover.ts). */
+  songDiscover(seeds: { name: string; weight: number }[]): Promise<import('./musicDiscover').DiscoverGroup[]>
   /** A public Spotify playlist or album's songs, from its link (no sign-in; the first 100). */
   spotifyList(link: string): Promise<SpotifyList>
   /** A song's YouTube video (`exact` false: YouTube's search for it instead). */
@@ -1479,6 +1481,10 @@ export interface NotesApi {
   appsRelease(folder: string, bump: VersionBump, expected: string): Promise<ReleaseResult>
   /** One of the release helper's one-click fixes (put-away, switch-main, pull, finish-push, delete-tag, retag). */
   appsReleaseFix(folder: string, fix: string, tag?: string): Promise<FixResult>
+  /** Fetches GitHub's main and says how far this app's folder is behind (or ahead of) it. Rejects with "busy" while a release job runs. */
+  appsMainStatus(folder: string): Promise<MainStatus>
+  /** Switches to main (if on another branch, with nothing uncommitted) and pulls GitHub's latest main. Never throws changes away. */
+  appsGetLatestMain(folder: string): Promise<FixResult>
   /** Adds "What's new" notes for a version to the app's list in its code, and commits them. */
   appsWriteNotes(folder: string, version: string, items: string[]): Promise<FixResult>
   /** What GitHub's build of a release tag is doing, and why it failed. */
@@ -1487,7 +1493,8 @@ export interface NotesApi {
   appsRerunBuild(repo: string, runId: number): Promise<void>
   /** Windows: opens Settings → For developers (Developer Mode). */
   appsOpenDeveloperSettings(): Promise<void>
-  appsMerge(repo: string, number: number): Promise<void>
+  /** Merges a pull request, marking a draft ready for review first. */
+  appsMerge(repo: string, number: number): Promise<{ markedReady: boolean }>
   appsClose(repo: string, number: number): Promise<void>
   /** The AI chat: Claude's reply to the conversation so far (the last message is yours). */
   aiChat(messages: AiChatMessage[], engine?: AiEngine): Promise<AiReply>

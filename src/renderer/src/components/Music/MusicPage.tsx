@@ -39,12 +39,20 @@ import {
   BarChart3,
   Maximize2,
   SlidersHorizontal,
-  Smartphone
+  Smartphone,
+  Lightbulb,
+  Radio,
+  Globe
 } from 'lucide-react'
 import ListeningStats from './ListeningStats'
 import { openFullPlayer } from './FullPlayer'
 import { RemotePanel, SoundPanel } from './SoundPanel'
 import { filterSongs, localArtUrl, plainText, type LocalSong } from '@shared/localMusic'
+import { favouriteArtists, recommendSongs, songsLike } from '@shared/musicRecommend'
+import { pickDiscoveries, type DiscoverGroup } from '@shared/musicDiscover'
+import { songKey } from '@shared/songSearch'
+import { FoundTable } from './FoundSongs'
+import { errorMessage } from '../../lib/paths'
 import { formatTime } from '@shared/spotify'
 import {
   albumsOf,
@@ -114,6 +122,7 @@ type View =
   | { kind: 'liked' }
   | { kind: 'recent' }
   | { kind: 'most' }
+  | { kind: 'recommended' }
   | { kind: 'history' }
   | { kind: 'stats' }
   | { kind: 'playlist'; id: string }
@@ -277,6 +286,7 @@ function Sidebar({ view, setView, folder, loading, onSaveLink, linkOpen }: { vie
         {item({ kind: 'albums' }, <Disc3 size={16} />, 'Albums')}
         {item({ kind: 'artists' }, <Mic2 size={16} />, 'Artists')}
         {item({ kind: 'liked' }, <Heart size={16} />, 'Liked songs', likedCount ? String(likedCount) : undefined)}
+        {item({ kind: 'recommended' }, <Lightbulb size={16} />, 'Recommended')}
         {item({ kind: 'recent' }, <Sparkles size={16} />, 'Recently added')}
         {item({ kind: 'most' }, <TrendingUp size={16} />, 'Most played')}
         {item({ kind: 'history' }, <History size={16} />, 'History')}
@@ -447,6 +457,8 @@ function ViewContent({ view, setView, songs, folder }: { view: View; setView: (v
       return <SongView kicker="Your library" title="Recently added" icon={<Sparkles size={42} />} songs={recentlyAdded(songs)} setView={setView} folder={folder} defaultSort="added" />
     case 'most':
       return <SongView kicker="Your library" title="Most played" icon={<TrendingUp size={42} />} songs={mostPlayed(songs, data.stats)} setView={setView} folder={folder} empty="Songs you play show up here, counted after 30 seconds." />
+    case 'recommended':
+      return <RecommendedView songs={songs} setView={setView} folder={folder} />
     case 'history': {
       const list = [...data.history].reverse().map((h) => byPath.get(h.path)).filter((s): s is LocalSong => !!s).slice(0, 300)
       return <SongView kicker="Your library" title="History" icon={<History size={42} />} songs={list} setView={setView} folder={folder} empty="Songs you play show up here." />
@@ -585,7 +597,7 @@ function askRename(id: string): void {
   renameAsks.forEach((fn) => fn())
 }
 
-function Header({ kicker, title, sub, art, icon, songs, onRename, editable, renameId }: { kicker: string; title: string; sub?: string; art?: string; icon?: React.ReactNode; songs: LocalSong[]; onRename?: (name: string) => void; editable?: LocalSong[]; renameId?: string }) {
+function Header({ kicker, title, sub, art, icon, songs, onRename, editable, renameId, noCount }: { kicker: string; title: string; sub?: string; art?: string; icon?: React.ReactNode; songs: LocalSong[]; onRename?: (name: string) => void; editable?: LocalSong[]; renameId?: string; noCount?: boolean }) {
   const [editing, setEditing] = useState(false)
   /** When renaming was started from the right-click menu (the page and menu settling can take the focus away just after). */
   const askedAt = useRef(0)
@@ -680,9 +692,13 @@ function Header({ kicker, title, sub, art, icon, songs, onRename, editable, rena
           </h1>
         )}
         <span className="mp-header-sub">
-          {sub ? `${sub} · ` : ''}
-          {songs.length} {songs.length === 1 ? 'song' : 'songs'}
-          {songs.length > 0 ? `, ${totalLength(songs)}` : ''}
+          {noCount ? sub : (
+            <>
+              {sub ? `${sub} · ` : ''}
+              {songs.length} {songs.length === 1 ? 'song' : 'songs'}
+              {songs.length > 0 ? `, ${totalLength(songs)}` : ''}
+            </>
+          )}
         </span>
       </div>
     </header>
@@ -699,6 +715,168 @@ function PlayButtons({ songs, extra }: { songs: LocalSong[]; extra?: React.React
         <Shuffle size={20} />
       </button>
       {extra}
+    </div>
+  )
+}
+
+/** Plays a song and then songs that go with it (a song radio). */
+function playLike(song: LocalSong): void {
+  const { data } = useMusicData.getState()
+  const songs = useLocalMusic.getState().library?.songs ?? []
+  void playLocal([song, ...songsLike(song, data, songs, { now: Date.now(), seed: Date.now() })], 0)
+}
+
+type RecTab = 'new' | 'mine'
+const REC_TAB_KEY = 'orbit.musicRecommendedTab'
+
+/**
+ * Recommended: new songs you don't have yet, from artists like the ones you play (Deezer's free
+ * catalogue, the same one Search uses), and songs from your own music you'd probably like to hear now.
+ * Both lists stay put while you play from them until you press New picks.
+ */
+function RecommendedView({ songs, setView, folder }: { songs: LocalSong[]; setView: (v: View) => void; folder: string }) {
+  const [tab, setTabState] = useState<RecTab>(() => {
+    try {
+      return localStorage.getItem(REC_TAB_KEY) === 'mine' ? 'mine' : 'new'
+    } catch {
+      return 'new'
+    }
+  })
+  const setTab = (t: RecTab): void => {
+    setTabState(t)
+    try {
+      localStorage.setItem(REC_TAB_KEY, t)
+    } catch {
+      /* only remembered for next time */
+    }
+  }
+  const [seed, setSeed] = useState(() => Math.floor(Date.now() / 3_600_000))
+  const tabs = (
+    <div className="mp-tabs" data-mp-rec-tabs>
+      <button className={tab === 'new' ? 'active' : ''} onClick={() => setTab('new')} data-mp-rec-tab="new">
+        New to you
+      </button>
+      <button className={tab === 'mine' ? 'active' : ''} onClick={() => setTab('mine')} data-mp-rec-tab="mine">
+        From your music
+      </button>
+    </div>
+  )
+  const newPicks = (
+    <button className="btn mp-add-songs mp-new-picks" onClick={() => setSeed((n) => n + 1)} title="A fresh set of recommendations" data-mp-new-picks>
+      <RefreshCw size={14} /> New picks
+    </button>
+  )
+  return tab === 'new' ? (
+    <NewToYou songs={songs} seed={seed} tabs={tabs} newPicks={newPicks} />
+  ) : (
+    <FromYourMusic songs={songs} setView={setView} folder={folder} seed={seed} tabs={tabs} newPicks={newPicks} />
+  )
+}
+
+/** What Deezer found for the same favourite artists, kept while Orbit is open (main also keeps it a few hours). */
+let discoverCache: { key: string; groups: DiscoverGroup[] } | null = null
+
+function NewToYou({ songs, seed, tabs, newPicks }: { songs: LocalSong[]; seed: number; tabs: React.ReactNode; newPicks: React.ReactNode }) {
+  const loaded = useMusicData((s) => s.loaded)
+  // Your favourite artists, worked out once the file is read (not again on every play).
+  const seeds = useMemo(() => (loaded ? favouriteArtists(useMusicData.getState().data, songs, Date.now()) : []), [loaded, songs])
+  const key = JSON.stringify(seeds.map((s) => s.name))
+  const [groups, setGroups] = useState<DiscoverGroup[] | null>(discoverCache?.key === key ? discoverCache.groups : null)
+  const [error, setError] = useState<string | null>(null)
+  const [tries, setTries] = useState(0)
+  useEffect(() => {
+    if (!seeds.length) return
+    if (discoverCache?.key === key && !tries) return setGroups(discoverCache.groups)
+    let stale = false
+    setGroups(null)
+    setError(null)
+    window.api.songDiscover(seeds).then(
+      (g) => {
+        if (stale) return
+        discoverCache = { key, groups: g }
+        setGroups(g)
+      },
+      (err) => !stale && setError(errorMessage(err).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''))
+    )
+    return () => {
+      stale = true
+    }
+  }, [key, tries])
+  const owned = useMemo(() => new Set(songs.map((s) => songKey(s.artist, s.title))), [songs])
+  const picks = useMemo(() => (groups ? pickDiscoveries(groups, { owned, seed }) : []), [groups, owned, seed])
+  const notes = useMemo(() => new Map(picks.map((p) => [p.id, p.because])), [picks])
+  return (
+    <div className="mp-scroll" data-mp-new-to-you>
+      <Header kicker="Made for you" title="Recommended" sub="New songs you don’t have yet, from artists like the ones you play" icon={<Lightbulb size={42} />} songs={[]} noCount />
+      <div className="mp-actions">
+        <div className="mp-play-buttons">
+          {tabs}
+          {newPicks}
+        </div>
+      </div>
+      <p className="mp-search-note mp-rec-note">
+        <Globe size={12} /> From Deezer’s free music catalogue, the same one Search uses. Press play for a 30-second sample, YouTube for the whole song, or right-click → Save MP3 to my music.
+      </p>
+      {!loaded ? null : !seeds.length ? (
+        <p className="mp-empty">Play or like a few songs first, so Orbit knows which artists you’re into.</p>
+      ) : error ? (
+        <p className="mp-empty">
+          {error}{' '}
+          <button className="link-btn" onClick={() => setTries((n) => n + 1)}>
+            Try again
+          </button>
+        </p>
+      ) : !groups ? (
+        <p className="mp-empty">Finding new music like {seeds.slice(0, 3).map((s) => s.name).join(', ')}…</p>
+      ) : picks.length === 0 ? (
+        <p className="mp-empty">Couldn’t find anything new for your artists. Try again later, or use Search.</p>
+      ) : (
+        <FoundTable tracks={picks} songs={songs} notes={notes} />
+      )}
+    </div>
+  )
+}
+
+/** Songs from your own music picked from how you listen (shared/musicRecommend.ts). */
+function FromYourMusic({ songs, setView, folder, seed, tabs, newPicks }: { songs: LocalSong[]; setView: (v: View) => void; folder: string; seed: number; tabs: React.ReactNode; newPicks: React.ReactNode }) {
+  const loaded = useMusicData((s) => s.loaded)
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<{ by: SongSort; desc: boolean } | null>(null)
+  const stats = useMusicData((s) => s.data.stats)
+  const recs = useMemo(
+    () => (loaded ? recommendSongs(useMusicData.getState().data, songs, { now: Date.now(), seed, limit: 50 }) : []),
+    [loaded, songs, seed]
+  )
+  const shown = useMemo(() => {
+    const keep = new Set(filterSongs(recs.map((r) => r.song), query))
+    const found = recs.filter((r) => keep.has(r.song))
+    if (!sort) return found
+    const reasons = new Map(found.map((r) => [r.song, r.reason]))
+    return sortSongsBy(found.map((r) => r.song), sort.by, sort.desc, stats).map((song) => ({ song, reason: reasons.get(song) ?? '' }))
+  }, [recs, query, sort, stats])
+  const list = shown.map((r) => r.song)
+  const hasPlays = useMusicData((s) => s.data.history.length > 0 || Object.keys(s.data.liked).length > 0)
+  return (
+    <div className="mp-scroll">
+      <Header kicker="Made for you" title="Recommended" sub="From your own music, picked from what you play, like and rate" icon={<Lightbulb size={42} />} songs={list} />
+      <div className="mp-actions">
+        <PlayButtons
+          songs={list}
+          extra={
+            <>
+              {tabs}
+              {newPicks}
+            </>
+          }
+        />
+        <FindBox value={query} onChange={setQuery} placeholder="Find in this list" />
+      </div>
+      {!hasPlays && recs.length > 0 && <p className="mp-note">Play, like and rate some songs and these get more like you. For now, here are some to try.</p>}
+      {shown.length === 0 ? (
+        <p className="mp-empty">{query ? 'Nothing found.' : 'Add some music and recommendations show up here.'}</p>
+      ) : (
+        <SongTable rows={shown.map((r, i) => ({ song: r.song, key: `${r.song.path}:${i}`, note: r.reason }))} setView={setView} folder={folder} sort={sort} onSort={setSort} />
+      )}
     </div>
   )
 }
@@ -766,6 +944,8 @@ interface Row {
   /** Where it is in the playlist (playlist views only). */
   position?: number
   path?: string
+  /** A line under the artist (why a song is recommended). */
+  note?: string
 }
 
 interface TableProps {
@@ -835,6 +1015,7 @@ function SongTable({ rows, setView, folder, sort, onSort, showTrack, playlist }:
       { label: 'Play', icon: <Play size={14} />, onClick: () => playLocal(list, 0) },
       { label: 'Play next', icon: <ListStart size={14} />, onClick: () => void playNext(list) },
       { label: 'Add to Up next', icon: <ListEnd size={14} />, onClick: () => void addToQueue(list) },
+      ...(one ? [{ label: 'Play songs like this', icon: <Radio size={14} />, onClick: () => playLike(one) }] : []),
       'separator',
       { label: allLiked ? 'Remove from Liked songs' : 'Add to Liked songs', icon: <Heart size={14} />, onClick: () => void toggleLike(list) },
       {
@@ -995,6 +1176,7 @@ function SongTable({ rows, setView, folder, sort, onSort, showTrack, playlist }:
                 ) : (
                   <span>Not in your music folder</span>
                 )}
+                {r.note && <em className="mp-row-note">{r.note}</em>}
               </span>
             </span>
             <span className="mp-col-album">
@@ -1148,7 +1330,59 @@ function NowPlayingPanel({ setView }: { setView: (v: View) => void }) {
           )
         })}
       </ul>
+      {song && <UpNextSuggestions song={song} />}
     </aside>
+  )
+}
+
+/** A few songs that go with what's playing, to add to Up next with one press. */
+function UpNextSuggestions({ song }: { song: LocalSong }) {
+  const songs = useLocalMusic((s) => s.library?.songs)
+  const queue = useLocalMusic((s) => s.queue)
+  const index = useLocalMusic((s) => s.index)
+  const [seed, setSeed] = useState(1)
+  const [hidden, setHidden] = useState(false)
+  // Songs just played or coming up soon (playing a whole album or all your songs queues everything, so not the whole queue).
+  const queued = useMemo(() => new Set(queue.slice(Math.max(0, index - 5), index + 11).map((s) => s.path)), [queue, index])
+  // Worked out again only for a new song (not on every play counted), so the list doesn't jump about.
+  const pool = useMemo(
+    () => songsLike(song, useMusicData.getState().data, songs ?? [], { now: Date.now(), seed, limit: 20 }),
+    [song.path, songs, seed]
+  )
+  const picks = pool.filter((s) => !queued.has(s.path)).slice(0, 4)
+  if (!picks.length) return null
+  return (
+    <div className="mp-suggest" data-mp-suggest>
+      <div className="mp-queue-head">
+        <h3>Suggested</h3>
+        <span>
+          {!hidden && (
+            <button className="icon-btn" onClick={() => setSeed((n) => n + 1)} title="Other suggestions" data-mp-suggest-more>
+              <RefreshCw size={13} />
+            </button>
+          )}
+          <button className="link-btn" onClick={() => setHidden(!hidden)}>
+            {hidden ? 'Show' : 'Hide'}
+          </button>
+        </span>
+      </div>
+      {!hidden && (
+        <ul className="mp-queue">
+          {picks.map((s) => (
+            <li key={s.path} onDoubleClick={() => void addToQueue([s])} title="Double-click or press + to add it to Up next" data-mp-suggest-song={s.title}>
+              <span className="mp-row-art">{s.art ? <img src={localArtUrl(s.path, s.added)} alt="" loading="lazy" /> : <Music size={13} />}</span>
+              <span className="mp-row-text">
+                <strong>{s.title}</strong>
+                <span>{s.artist}</span>
+              </span>
+              <button className="icon-btn" onClick={() => void addToQueue([s])} title="Add to Up next" data-mp-suggest-add>
+                <Plus size={14} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 
