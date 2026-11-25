@@ -163,7 +163,7 @@ async function startBuffer(): Promise<void> {
     type = pickRecordingType((m) => MediaRecorder.isTypeSupported(m))
     if (!type) throw new Error('This computer can’t record video.')
     const s = await openStreams()
-    if (id !== runId || !prefs().replayOn) {
+    if (id !== runId || !replayWanted()) {
       s.getTracks().forEach((t) => t.stop())
       closeExtras()
       return
@@ -209,7 +209,7 @@ function stopBuffer(problem: string | null = null): void {
 export async function saveReplay(): Promise<void> {
   const st = useReplay.getState()
   if (!st.running) {
-    notify(prefs().replayOn ? 'Instant replay is still starting.' : 'Instant replay is off. Turn it on in Clips or Settings → Studio.')
+    notify(replayWanted() ? 'Instant replay is still starting.' : 'Instant replay is off. Turn it on in Clips or Settings → Studio.')
     return
   }
   if (st.saving) return
@@ -231,13 +231,17 @@ export async function saveReplay(): Promise<void> {
   }
 }
 
+/** Instant replay runs when it's turned on and the Clips add-on is added. */
+const wanted = (p: Prefs): boolean => p.replayOn && p.installedAddons.includes('clips')
+const replayWanted = (): boolean => wanted(prefs())
+
 /** A clip was made or removed: the clip list should look again. */
 export const clipsChanged = (): void => useReplay.setState((s) => ({ version: s.version + 1 }))
 
 /** Turns the buffer on and off with Settings, and listens for the shortcut. Main window only. */
 export function watchReplay(): () => void {
   const sync = (): void => {
-    if (prefs().replayOn) void startBuffer()
+    if (replayWanted()) void startBuffer()
     else if (useReplay.getState().running || useReplay.getState().starting) stopBuffer()
     else useReplay.setState({ needsFfmpeg: false, problem: null })
   }
@@ -245,7 +249,7 @@ export function watchReplay(): () => void {
   const offPrefs = usePrefs.subscribe((s, prev) => {
     const a = s.prefs
     const b = prev.prefs
-    if (a.replayOn !== b.replayOn) sync()
+    if (wanted(a) !== wanted(b)) sync()
     else if (a.replayOn && (a.replayQuality !== b.replayQuality || a.replaySound !== b.replaySound || a.replayMic !== b.replayMic)) {
       // Different quality or sound: start again with the new settings.
       stopBuffer()
@@ -254,7 +258,7 @@ export function watchReplay(): () => void {
   })
   // Once the video add-on is downloaded, a replay that was waiting for it starts.
   const offFfmpeg = window.api.onVideoConverterStatus((state) => {
-    if (state.state === 'ready' && prefs().replayOn && !useReplay.getState().running) void startBuffer()
+    if (state.state === 'ready' && replayWanted() && !useReplay.getState().running) void startBuffer()
   })
   const offSave = window.api.onReplaySave(() => void saveReplay())
   const offOpen = window.api.onClipsOpen((path) => {

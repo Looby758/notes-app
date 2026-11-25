@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { displayUrl, firefoxOnGoogleSignIn, firefoxUserAgent, isGoogleSignIn, isWebUrl, plainUserAgent, toWebUrl } from './web'
+import { chromiumBrands, chromiumHints, googleSignInAgent, hintPlatform, isGoogleRejection } from './web'
 
 describe('toWebUrl', () => {
   it('opens addresses', () => {
@@ -104,5 +105,54 @@ describe('firefoxOnGoogleSignIn', () => {
   it('leaves every other page alone', () => {
     expect(run('https://grok.com/').userAgent).toBe('Chrome')
     expect(run('https://www.google.com/search?q=x').userAgent).toBe('Chrome')
+  })
+})
+
+describe('isGoogleRejection', () => {
+  it('spots Google’s “This browser or app may not be secure” page', () => {
+    expect(isGoogleRejection('https://accounts.google.com/v3/signin/rejected?rrk=46&hl=en-GB')).toBe(true)
+    expect(isGoogleRejection('https://accounts.google.com/signin/rejected?rrk=46')).toBe(true)
+    expect(isGoogleRejection('https://accounts.google.com/signin/v2/deniedsigninrejected?flowName=GlifWebSignIn')).toBe(true)
+  })
+
+  it('leaves the rest of sign-in alone', () => {
+    expect(isGoogleRejection('https://accounts.google.com/v3/signin/identifier?continue=x')).toBe(false)
+    expect(isGoogleRejection('https://accounts.google.com/o/oauth2/v2/auth?client_id=x')).toBe(false)
+    expect(isGoogleRejection('https://example.com/signin/rejected')).toBe(false)
+  })
+})
+
+describe('looking like Chromium', () => {
+  it("lists Chromium's own brands, in its own order, as the page itself does", () => {
+    // What Electron 36's pages report in navigator.userAgentData (checked in a real Electron 36.9.5).
+    expect(chromiumBrands('136.0.7103.177').map((b) => `${b.brand} ${b.version}`)).toEqual(['Not.A/Brand 99', 'Chromium 136'])
+    expect(chromiumBrands('136.0.7103.177', true)).toEqual([
+      { brand: 'Not.A/Brand', version: '99.0.0.0' },
+      { brand: 'Chromium', version: '136.0.7103.177' }
+    ])
+    expect(chromiumBrands('137.0.1.2').every((b) => b.brand !== 'Google Chrome')).toBe(true)
+    expect(hintPlatform('darwin')).toBe('macOS')
+    expect(hintPlatform('win32')).toBe('Windows')
+  })
+
+  it('sends the client hints Chromium sends, never claiming Google Chrome', () => {
+    const none = chromiumHints({ 'User-Agent': 'x' }, '136.0.7103.177', 'darwin')
+    expect(none['sec-ch-ua']).toBe('"Not.A/Brand";v="99", "Chromium";v="136"')
+    expect(none['sec-ch-ua-mobile']).toBe('?0')
+    expect(none['sec-ch-ua-platform']).toBe('"macOS"')
+    expect(none['User-Agent']).toBe('x')
+    const some = chromiumHints({ 'Sec-CH-UA': '"Chromium";v="136", "Google Chrome";v="136"', 'sec-ch-ua-full-version-list': '"Chromium";v="136.0.7103.177"' }, '136.0.7103.177', 'win32')
+    expect(some['Sec-CH-UA']).toBeUndefined()
+    expect(some['sec-ch-ua']).not.toContain('Google Chrome')
+    expect(some['sec-ch-ua-full-version-list']).toBe('"Not.A/Brand";v="99.0.0.0", "Chromium";v="136.0.7103.177"')
+    expect(some['sec-ch-ua-platform']).toBe('"Windows"')
+  })
+})
+
+describe('googleSignInAgent', () => {
+  it("names Orbit after the plain browser name, so Google doesn't take it for a fake Chrome", () => {
+    const plain = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
+    expect(googleSignInAgent(plain, '1.13.6')).toBe(`${plain} Orbit/1.13.6`)
+    expect(googleSignInAgent(googleSignInAgent(plain, '1.13.6'), '1.13.6')).toBe(`${plain} Orbit/1.13.6`)
   })
 })

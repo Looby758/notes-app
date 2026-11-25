@@ -16,15 +16,15 @@ import {
   webContents,
   type MenuItemConstructorOptions
 } from 'electron'
-import { existsSync, statSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'fs'
 import { readFile } from 'fs/promises'
 import * as fsp from 'fs/promises'
 import { basename, extname, isAbsolute, join, relative } from 'path'
-import type { AiAskTurn, AiExtraContext, AiChat, AiChatMessage, AiEngine, AiNote, AiSortRow, ConfirmOptions, EmailFolder, OutgoingEmail } from '@shared/types'
+import type { AiAskTurn, AiExtraContext, AiChat, AiChatMessage, AiEngine, AiNote, AiSortRow, ConfirmOptions, EmailFolder, GoogleEventInput, OutgoingEmail } from '@shared/types'
 import type { MusicAction } from '@shared/spotify'
 import { normalizePrefs, type Prefs } from '@shared/prefs'
 import { activeThemeId, getTheme } from '@shared/themes'
-import { loadSettings, saveSettings, settingsFile, watchSettingsFile } from './settings'
+import { hadSettingsAtStart, loadSettings, saveSettings, settingsFile, watchSettingsFile } from './settings'
 import { Vault } from './vault'
 import { startWatching, stopWatching } from './watcher'
 import * as calendars from './calendarSources'
@@ -34,32 +34,46 @@ import * as email from './email'
 import * as emailAsk from './emailAsk'
 import * as spotify from './spotify'
 import * as localMusic from './localMusic'
+import { setupMusicData } from './musicData'
+import { setupMusicRemote } from './musicRemote'
+import { setupSongSearch } from './songSearch'
+import { setupMusicTags } from './musicTags'
+import { setupMusicFromLink } from './musicFromLink'
 import { closeMusicMini, setupMusicMini } from './musicMini'
+import { setupMediaKeys, teardownMediaKeys } from './mediaKeys'
 import { closePopout, setupPopout } from './popout'
 import { closeDiscordPopout, setupDiscordPopout } from './discordPopout'
 import { closeVideoWindow, setupVideoWindow } from './videoWindow'
 import { closeWebWindow, setupWebWindow } from './webWindow'
-import { applyCaptureShortcut, noteHiddenToTray, setTrayIcon, setupCapture, teardownCapture } from './capture'
-import { applySnipShortcut, setupSnip, startSnip } from './snip'
+import { applyCaptureShortcut, noteHiddenToTray, refreshTrayMenu, setTrayIcon, setupCapture, teardownCapture } from './capture'
+import { applySnipShortcut, openSnipFolder, setupSnip, startSnip } from './snip'
+import { setupSnipTaskbar } from './snipTaskbar'
+import { snipDelayFromArgv, snipModeFromArgv } from '@shared/snipLaunch'
 import { applySongIdShortcut, setupSongId } from './songId'
 import { setupUpdater } from './updater'
 import { setupSettingsHealth } from './settingsHealth'
 import { setupExport } from './exporter'
 import { setupConverter } from './converter'
 import { setupVideoDownloader } from './videoDownload'
+import { setupSoundFromLink } from './soundFromLink'
 import { setupDownloadManager } from './downloadManager'
+import { setupFileSend } from './fileSend'
 import { isAppPage, setupStudio } from './studio'
 import { applyReplayShortcut, clipResponse, setupClips } from './clips'
 import { setupLocalAi } from './localAi'
 import { reloadSoundboard, setupSoundboard, soundboardFolder, soundFile } from './soundboard'
 import { macrosFolder, reloadMacros, setupMacros, teardownMacros } from './macros'
+import { setupKeyRemap, teardownKeyRemap } from './keyRemap'
 import { setupDiscord, teardownDiscord } from './discord'
 import { setupOrbitSync, syncOrbitSoon, type PartHandler } from './orbitSync'
 import { cleanPrefsPart, prefsPart } from '@shared/orbitSync'
 import { setupMonitors, teardownMonitors } from './monitors'
 import { setupMixer, teardownMixer } from './mixer'
+import { setupTaskManager, teardownTaskManager } from './taskManager'
+import { setupUninstaller } from './uninstaller'
+import { applyDuckPrefs, setupMusicDuck } from './musicDuck'
 import { setupLive } from './live'
-import { explorerFile, setupExplorer } from './explorer'
+import { explorerFile, setFileIndexOn, setupExplorer } from './explorer'
 import { openOutside } from './openOutside'
 import { openInOrbit, pathsFromArgv, setupOpenInOrbit } from './openInOrbit'
 import { hold, setupUndoBin } from './undoBin'
@@ -68,7 +82,7 @@ import { setupVideoPlayer, videoResponse } from './videoPlayer'
 import { releaseFiles, serveFile } from './fileLocks'
 import { comicResponse, setupComics, shareProgress as shareComicProgress } from './comics'
 import { setupWiki, shareWikiProgress, wikiImageResponse } from './wiki'
-import { IS_MAC, TRASH_NAME } from '@shared/platform'
+import { IS_MAC } from '@shared/platform'
 import { logCrashes, logError, safely } from './log'
 import { formatMenuFor, setupMenus } from './menus'
 import { dictionaryMenu, setupDictionary } from './dictionary'
@@ -84,13 +98,18 @@ import { setupWeather } from './weather'
 import { releaseMessages, saveMessages, setupBrowser } from './browser'
 import { openInOtherBrowser, openLinksFromArgv, setupDefaultBrowser } from './defaultBrowser'
 import { setupOperaImport } from './operaImport'
-import { closeYouTube, setupYouTube } from './youtube'
 import { setupImporter } from './importer'
 import { setupTerminal } from './terminal'
 import { setupAppStudio } from './appStudio'
-import { TEST_COPY, TEST_COPY_FOLDER } from './testCopy'
+import { setupReleaseHelper } from './releaseHelper'
+import { addonOn, addonsMaybeChanged, setupAddonGate, startsCoreOnly } from './addonGate'
+import { cleanInstalledAddons } from '@shared/addons'
+import { NEW_USER_TEST, newUserNotesFolder, TEST_COPY, TEST_COPY_FOLDER, testCopyReadOnly, WINDOWS_APP_ID } from './testCopy'
 import { setupGames } from './games'
 import { setupGameCovers } from './gameCovers'
+import { setupSkyblock } from './skyblock'
+import { setupSkyblockGoals } from './skyblockGoals'
+import { setupSkyblockAddon, SKYBLOCK_TEX_SCHEME } from './skyblockAddon'
 import { applyIconOutsideApp, taskbarIcon } from './appIcon'
 import { broadcastThemes, loadImportedThemes, setupThemes, THEME_SCHEME, themeFilePath, themesDir } from './themes'
 import { CODE_SANDBOX_SCHEME, registerCodeSandbox } from './codeSandbox'
@@ -119,14 +138,34 @@ app.setPath('userData', join(app.getPath('appData'), TEST_COPY ? TEST_COPY_FOLDE
 app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns')
 
 // Windows shows notifications under this app id (it matches the installer's).
-if (process.platform === 'win32') app.setAppUserModelId(TEST_COPY ? 'com.notesapp.desktop.testcopy' : 'com.notesapp.desktop')
+if (process.platform === 'win32') app.setAppUserModelId(WINDOWS_APP_ID)
 
 // Only one copy of Notes runs; starting it again just brings the window back.
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
+  // "Try as a new user" (App Studio): start from nothing every time, with an empty notes folder to
+  // pick. Only once this copy holds the lock (kept in the same folder), so a running one isn't wiped.
+  if (NEW_USER_TEST) {
+    const data = app.getPath('userData')
+    for (const name of existsSync(data) ? readdirSync(data) : []) {
+      if (name.startsWith('Singleton')) continue
+      try {
+        rmSync(join(data, name), { recursive: true, force: true })
+      } catch (err) {
+        console.error('Couldn’t clear a new-user test’s', name, err)
+      }
+    }
+    mkdirSync(newUserNotesFolder(), { recursive: true })
+  }
   // "Open in Orbit" from File Explorer while Orbit is running starts a second copy, which hands the file over here.
   app.on('second-instance', (_e, argv) => {
+    // The taskbar's "Orbit Snip" or jump list: just snip, without bringing the window up.
+    const snip = snipModeFromArgv(argv)
+    if (snip) {
+      if (app.isReady()) void startSnip(snip, snipDelayFromArgv(argv))
+      return
+    }
     showMain()
     pathsFromArgv(argv).forEach(openInOrbit)
     // A link clicked in another app while Orbit is the default browser.
@@ -151,6 +190,9 @@ app.on('open-file', (e, path) => {
 app.on('activate', () => {
   if (app.isReady()) showMain()
 })
+
+/** Started by the taskbar's "Orbit Snip" or jump list: which snip to open once Orbit is up. */
+const launchSnip = snipModeFromArgv(process.argv)
 
 function showMain(): void {
   if (!app.isReady()) return
@@ -221,10 +263,15 @@ function appIconFile(prefs: Prefs): { id: string; file?: string } {
 
 /** Settings that live outside the app's windows: the capture shortcut, the app icon and starting at login. */
 function applySystemPrefs(prefs: Prefs): void {
-  applyCaptureShortcut(prefs.captureShortcut)
-  applySnipShortcut(prefs.snipShortcut)
-  applySongIdShortcut(prefs.songIdShortcut)
-  applyReplayShortcut(prefs.replayOn ? prefs.replayShortcut : '')
+  // System-wide shortcuts only for the add-ons you've added.
+  const added = (id: string): boolean => prefs.installedAddons.includes(id)
+  applyCaptureShortcut(added('summon-bar') ? prefs.captureShortcut : '')
+  // The tray's "Snip after a delay" lists your own delay too.
+  safely('tray menu', refreshTrayMenu)
+  applySnipShortcut(added('snip') ? prefs.snipShortcut : '')
+  applySongIdShortcut(added('songid') ? prefs.songIdShortcut : '')
+  applyReplayShortcut(prefs.replayOn && added('clips') ? prefs.replayShortcut : '')
+  applyDuckPrefs()
   safely('app icon', () => applyAppIcon(prefs))
   // Only the installed app registers itself (in development it would register electron.exe).
   if (!app.isPackaged) return
@@ -321,6 +368,16 @@ function broadcastPrefs(prefs: Prefs): void {
     win.webContents.send('prefs:changed', prefs)
   }
   safely('system settings', () => applySystemPrefs(prefs))
+  safely('add-ons', addonsMaybeChanged)
+  safely('whole PC search', () => applyFileIndex(prefs))
+}
+
+/** Whole PC search's list of files (Settings → Files), with its progress sent to every window. */
+function applyFileIndex(prefs: Prefs): void {
+  // The whole-PC file list comes with the Files add-on.
+  setFileIndexOn(prefs.filesWholePcSearch && prefs.installedAddons.includes('files'), app.getPath('userData'), (status) => {
+    for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send('explorer:indexStatus', status)
+  })
 }
 
 /** The parts of Orbit kept in the notes folder for your other computers (see orbitSync.ts). */
@@ -361,10 +418,22 @@ function orbitParts(themesChanged: () => void): Record<'settings' | 'home' | 'th
   }
 }
 
+/** A new Orbit is set to the core once only (switching to another new folder later keeps your choices). */
+let coreStartDone = false
+
 function openVault(path: string | null): void {
   stopWatching()
   vault = path ? new Vault(path) : null
   if (!path) return
+  // Brand new Orbit, brand new notes folder: just the core to start with (add more on the Add-ons page).
+  // "New" is decided by what was on this computer when Orbit started, so anything saved since (like
+  // a colour picked on the welcome screen) doesn't count. Anyone who already used Orbit keeps theirs.
+  if (startsCoreOnly(hadSettingsAtStart() && !!loadSettings().prefs, path) && !coreStartDone) {
+    coreStartDone = true
+    const prefs = normalizePrefs({ installedAddons: [] })
+    saveSettings({ prefs })
+    broadcastPrefs(prefs)
+  }
   void shareComicProgress()
   void shareWikiProgress()
   syncOrbitSoon()
@@ -386,7 +455,8 @@ protocol.registerSchemesAsPrivileged([
   // corsEnabled: your own music plays through the Web Audio visualiser, which needs it.
   { scheme: 'vault', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
   CODE_SANDBOX_SCHEME,
-  THEME_SCHEME
+  THEME_SCHEME,
+  SKYBLOCK_TEX_SCHEME
 ])
 
 /** Your own music and soundboard clips go through the Web Audio visualiser, which needs this. */
@@ -463,7 +533,7 @@ function createWindow(): BrowserWindow {
     minHeight: 480,
     show: false,
     backgroundColor: BG,
-    ...(TEST_COPY ? { title: 'Orbit (test copy)' } : {}),
+    ...(TEST_COPY ? { title: NEW_USER_TEST ? 'Orbit (test copy, new user)' : 'Orbit (test copy)' } : {}),
     ...(IS_MAC
       ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 14, y: 12 } }
       : {
@@ -486,8 +556,9 @@ function createWindow(): BrowserWindow {
     }
   })
 
-  // Started at login: stay in the tray / menu bar until you open it.
-  const startHidden = startedAtLogin() && prefs.closeToTray
+  // Started at login: stay in the tray / menu bar until you open it. Started by the taskbar's
+  // "Orbit Snip": just the snip (the first window is the one; later ones were opened on purpose).
+  const startHidden = (startedAtLogin() && prefs.closeToTray) || (!mainWindow && !!launchSnip)
   let shown = false
   const reveal = (): void => {
     if (shown || win.isDestroyed()) return
@@ -552,9 +623,8 @@ function createWindow(): BrowserWindow {
     const maximized = win.isMaximized()
     const b = maximized ? win.getNormalBounds() : win.getBounds()
     saveSettings({ window: { ...b, maximized } })
-    // The notes window is really closing: the YouTube mini window goes with it.
+    // The notes window is really closing: its other windows go with it.
     if (win === mainWindow) {
-      closeYouTube()
       closeMusicMini()
       closePopout()
       closeDiscordPopout()
@@ -598,7 +668,8 @@ function createWindow(): BrowserWindow {
         else
           items.push(
             { label: 'Record a voice note…', click: () => win.webContents.send('voice:start') },
-            { label: 'Draw a sketch…', click: () => win.webContents.send('sketch:start') },
+            // Sketching is an add-on.
+            ...(addonOn('sketch') ? [{ label: 'Draw a sketch…', click: () => win.webContents.send('sketch:start') }] : []),
             { type: 'separator' }
           )
       }
@@ -699,11 +770,19 @@ function registerIpc(): void {
   setupPlaces()
   setupWeather()
   localMusic.setupLocalMusic()
+  setupMusicData()
+  setupSongSearch()
+  setupMusicTags()
+  setupMusicFromLink()
   setupImporter()
   setupGames()
   setupGameCovers()
+  setupSkyblock({ getMain: () => mainWindow })
+  setupSkyblockGoals()
+  setupSkyblockAddon()
   setupTerminal(() => vault?.root ?? null)
   setupAppStudio()
+  setupReleaseHelper()
   // The Mac asks once whether Notes may use the microphone.
   ipcMain.handle('voice:access', async () => (IS_MAC ? systemPreferences.askForMediaAccess('microphone') : true))
   ipcMain.handle('app:fullscreen', (event, on: boolean) => BrowserWindow.fromWebContents(event.sender)?.setFullScreen(on))
@@ -729,8 +808,9 @@ function registerIpc(): void {
   ipcMain.handle('vault:pick', async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)!
     const result = await dialog.showOpenDialog(win, {
-      title: 'Choose a folder for your notes',
+      title: NEW_USER_TEST ? 'Choose a folder for your notes (this new-user test starts in an empty one)' : 'Choose a folder for your notes',
       buttonLabel: 'Use this folder',
+      ...(NEW_USER_TEST ? { defaultPath: newUserNotesFolder() } : {}),
       properties: ['openDirectory', 'createDirectory', 'promptToCreate']
     })
     if (result.canceled || result.filePaths.length === 0) return null
@@ -784,6 +864,9 @@ function registerIpc(): void {
   ipcMain.handle('cal:addFeed', (_e, name: string, url: string) => calendars.addFeed(name, url))
   ipcMain.handle('cal:removeFeed', (_e, id: string) => calendars.removeFeed(id))
   ipcMain.handle('cal:events', (_e, from: string, to: string) => calendars.fetchEvents(from, to))
+  ipcMain.handle('cal:create', (_e, calendarId: string, event: GoogleEventInput) => calendars.createEvent(calendarId, event))
+  ipcMain.handle('cal:update', (_e, calendarId: string, eventId: string, event: Partial<GoogleEventInput>) => calendars.updateEvent(calendarId, eventId, event))
+  ipcMain.handle('cal:delete', (_e, calendarId: string, eventId: string) => calendars.deleteEvent(calendarId, eventId))
   ipcMain.handle('email:status', () => email.status())
   ipcMain.handle('email:connect', () => email.connect())
   ipcMain.handle('email:list', (_e, folder: EmailFolder, query: string, next?: string) => email.list(folder, query, next))
@@ -922,22 +1005,12 @@ function registerIpc(): void {
     await openOutside(e.sender, full, !!ask)
   })
 
-  // Several at once: one question, then each to the Bin. Returns the ones moved.
-  ipcMain.handle('fs:trashMany', async (event, paths: string[]) => {
+  // Several at once, straight into Orbit's undo bin (no question: Ctrl+Z or the toast's Undo brings
+  // them back, and they go on to the Recycle Bin / Bin afterwards). Returns the ones moved.
+  ipcMain.handle('fs:trashMany', async (_event, paths: string[]) => {
     const v = currentVault()
     const items = paths.filter(Boolean)
     if (items.length === 0) return []
-    const win = BrowserWindow.fromWebContents(event.sender)!
-    const { response } = await dialog.showMessageBox(win, {
-      type: 'warning',
-      buttons: [`Move to ${TRASH_NAME}`, 'Cancel'],
-      defaultId: 0,
-      cancelId: 1,
-      noLink: true,
-      message: `Delete ${items.length} items?`,
-      detail: `They'll be moved to the ${TRASH_NAME}:\n${items.slice(0, 8).map((p) => basename(p).replace(/\.md$/i, '')).join('\n')}${items.length > 8 ? `\n…and ${items.length - 8} more` : ''}`
-    })
-    if (response !== 0) return []
     const done: string[] = []
     for (const p of items) {
       try {
@@ -950,24 +1023,11 @@ function registerIpc(): void {
     return done
   })
 
-  ipcMain.handle('fs:trash', async (event, path: string) => {
+  // No question either: it can be undone (and it ends up in the Recycle Bin / Bin anyway).
+  ipcMain.handle('fs:trash', async (_event, path: string) => {
     const v = currentVault()
     if (!path) throw new Error('The notes folder itself cannot be deleted here.')
     const full = v.abs(path)
-    const isFolder = statSync(full).isDirectory()
-    const win = BrowserWindow.fromWebContents(event.sender)!
-    const { response } = await dialog.showMessageBox(win, {
-      type: 'warning',
-      buttons: [`Move to ${TRASH_NAME}`, 'Cancel'],
-      defaultId: 0,
-      cancelId: 1,
-      noLink: true,
-      message: `Delete "${basename(full).replace(/\.md$/i, '')}"?`,
-      detail: isFolder
-        ? `The folder and everything in it will be moved to the ${TRASH_NAME}.`
-        : `The note will be moved to the ${TRASH_NAME}.`
-    })
-    if (response !== 0) return false
     await hold(full)
     return true
   })
@@ -1010,6 +1070,11 @@ async function offerMoveToApplications(): Promise<boolean> {
 }
 
 app.whenReady().then(async () => {
+  // First, so every add-on's messages are checked (addonGate.ts).
+  setupAddonGate(() => {
+    const prefs = loadSettings().prefs as Partial<Prefs> | undefined
+    return cleanInstalledAddons(prefs?.installedAddons, prefs?.addonsSeen)
+  })
   // Ask everything's copy of recent emails, so it can answer without the internet (emailAsk.ts).
   setTimeout(() => void emailAsk.catchUp(), 60_000)
   setInterval(() => void emailAsk.catchUp(), 30 * 60_000)
@@ -1062,21 +1127,27 @@ app.whenReady().then(async () => {
     })
   )
   safely('Opera GX import', setupOperaImport)
-  safely('YouTube mini window', () => setupYouTube(currentPrefs))
   safely('Music mini player', () => setupMusicMini(currentPrefs, () => mainWindow))
+  safely('music phone remote', setupMusicRemote)
+  safely('keyboard media keys', setupMediaKeys)
   safely('pop-out window', () => setupPopout(currentPrefs))
   safely('export', setupExport)
   safely('converter', setupConverter)
   safely('video downloader', () => setupVideoDownloader(() => vault))
   safely('download manager', setupDownloadManager)
+  safely('big file sender', setupFileSend)
   safely('studio', setupStudio)
   safely('offline AI', setupLocalAi)
   safely('soundboard', setupSoundboard)
+  safely('soundboard from a link', setupSoundFromLink)
   safely('macros', setupMacros)
+  safely('key remapper', setupKeyRemap)
   safely('Discord voice', setupDiscord)
   safely('Discord voice pop-out', () => setupDiscordPopout(currentPrefs))
   safely('live streaming', setupLive)
   safely('file explorer', () => setupExplorer(() => vault?.root ?? null))
+  // A few seconds in, so walking the drives doesn't slow Orbit's start.
+  setTimeout(() => safely('whole PC search', () => applyFileIndex(currentPrefs())), 5000)
   safely('undo', () => setupUndoBin(() => vault?.root ?? null))
   safely('deleted videos', () => setupVideoBin(() => vault?.root ?? null))
   safely('video player', () => setupVideoPlayer(() => vault?.root ?? null))
@@ -1086,15 +1157,21 @@ app.whenReady().then(async () => {
   safely('wikis', () => setupWiki(() => vault))
   // Hand edits to settings.json apply straight away.
   safely('settings watcher', () => watchSettingsFile((settings) => broadcastPrefs(normalizePrefs(settings.prefs))))
-  safely('Orbit sync', () => setupOrbitSync({ root: () => vault?.root ?? null, enabled: () => currentPrefs().syncOrbit, window: () => mainWindow, parts: orbitParts(themesChanged) }))
+  safely('Orbit sync', () => setupOrbitSync({ root: () => vault?.root ?? null, enabled: () => currentPrefs().syncOrbit, window: () => mainWindow, parts: orbitParts(themesChanged), readOnly: () => testCopyReadOnly(vault?.root ?? null) }))
   mainWindow = createWindow()
   // The extras: if one of them fails on some computer, the app itself still works.
-  safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: () => void startSnip() }))
-  safely('screen snip', () => setupSnip({ getMain: () => mainWindow, showMain }))
+  safely('quick capture', () => setupCapture({ getMain: () => mainWindow, showMain, prefs: currentPrefs, snip: (as, delay) => void startSnip(as, delay), openSnips: () => void openSnipFolder() }))
+  safely('screen snip', () => setupSnip({ getMain: () => mainWindow, showMain, prefs: currentPrefs }))
+  safely('taskbar snip', setupSnipTaskbar)
+  // Started from the taskbar's "Orbit Snip" (or its jump list) while Orbit wasn't running.
+  if (launchSnip) setTimeout(() => void startSnip(launchSnip, snipDelayFromArgv(process.argv)), 300)
   safely('what’s this song', () => setupSongId({ getMain: () => mainWindow }))
   safely('instant replay', () => setupClips({ getMain: () => mainWindow, showMain }))
   safely('screen controls', setupMonitors)
   safely('volume mixer', setupMixer)
+  safely('task manager', setupTaskManager)
+  safely('uninstaller', setupUninstaller)
+  safely('music dipping', () => setupMusicDuck(currentPrefs))
   // A password copied from the vault isn't passed to the other computer.
   safely('mouse sharing', () => setupMouseShare(() => mainWindow, (text) => text === copiedSecret))
   safely('screens between computers', () => setupScreenLink(() => mainWindow))
@@ -1124,13 +1201,16 @@ app.on('before-quit', () => {
   quitting = true
 })
 app.on('will-quit', () => {
+  safely('keyboard media keys', teardownMediaKeys)
   teardownCapture()
   safely('screens between computers', teardownScreenLink)
   safely('mouse sharing', teardownMouseShare)
   safely('Discord voice', teardownDiscord)
   safely('screen controls', teardownMonitors)
   safely('volume mixer', teardownMixer)
+  safely('task manager', teardownTaskManager)
   safely('macros', teardownMacros)
+  safely('key remapper', teardownKeyRemap)
   clearSecret()
 })
 

@@ -6,7 +6,8 @@ import { useUI } from '../../store/ui'
 import { usePrefs } from '../../store/prefs'
 import { useVault } from '../../store/vault'
 import { addDays, dayKey, formatDate, fromDayKey, monthGrid } from '../../lib/dates'
-import { addEvent, dailyPath, openDaily } from '../../lib/daily'
+import { dailyPath, openDaily } from '../../lib/daily'
+import { createCalendarEvent } from '../../lib/calendarEdit'
 import { CALENDAR_TAB, openNote, openSpecialTab } from '../../lib/editorController'
 import { earlierDays } from '../../lib/onThisDay'
 import type { DatedItem } from '../../lib/schedule'
@@ -51,7 +52,6 @@ export default function MiniCalendar() {
   const weekStart = usePrefs((s) => s.prefs.weekStart) as 0 | 1
   const createOnClick = usePrefs((s) => s.prefs.createDailyOnClick)
   const tree = useVault((s) => s.tree)
-  const byDay = useItemsByDay()
   const selectedDate = fromDayKey(selected) ?? new Date()
   const [month, setMonth] = useState({ y: selectedDate.getFullYear(), m: selectedDate.getMonth() })
   const [adding, setAdding] = useState(false)
@@ -65,6 +65,7 @@ export default function MiniCalendar() {
   useEffect(() => setAdding(false), [selected])
 
   const days = monthGrid(month.y, month.m, weekStart)
+  const byDay = useItemsByDay(dayKey(days[0]), dayKey(days[days.length - 1]))
   const external = useExternalRange(days[0], addDays(days[days.length - 1], 1))
   const shift = (n: number): void => {
     const d = new Date(month.y, month.m + n, 1)
@@ -147,9 +148,10 @@ export default function MiniCalendar() {
         </div>
         {adding && (
           <QuickAdd
-            onSave={async (title, start, end) => {
+            date={selectedDate}
+            onSave={async (title, start, end, extra) => {
               setAdding(false)
-              await addEvent(selectedDate, title, start, end)
+              await createCalendarEvent(selectedDate, title, start, end, extra)
             }}
             onCancel={() => setAdding(false)}
           />

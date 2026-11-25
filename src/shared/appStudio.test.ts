@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boardKey, commitAllCommand, describeChange, stashCommand, isTokenPermissionError, newTokenUrl, TOKEN_NOT_ALLOWED, bumpVersion, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
+import { bugReportUrl, newReports, reportButtonCard, reportCard, type BugReport, rollbackCommand, rollbackVersion, parseOutdated, parseAudit, severityCounts, healthLevel, healthLine, healthBoardItem, type HealthReport, addDownloadDay, countText, downloadsByPlatform, downloadsSince, isDownloadFile, platformOf, type DownloadHistory, boardKey, commitAllCommand, describeChange, stashCommand, isTokenPermissionError, newTokenUrl, readyForReviewError, mergeAfterReadyError, mergeBlockedReason, mergeFailedMessage, TOKEN_NOT_ALLOWED, bumpVersion, changelogSource, claudePrompt, copyFolderName, copyRunCommand, githubRepo, imageUrls, isGitHubImage, keywords, looksLikeGitHubToken, matchPull, notesTarget, plainChangelog, prSummary, pullKey, readBoard, releaseCommand, shotsByFeature, switchBranchCommand, timeAgo, tryBranchCommand, type BoardItem, type Release, type Shot } from './appStudio'
 
 describe('githubRepo', () => {
   it('reads https and ssh remotes', () => {
@@ -251,6 +251,7 @@ describe('token permissions', () => {
     expect(url.pathname).toBe('/settings/personal-access-tokens/new')
     expect(url.searchParams.get('pull_requests')).toBe('write')
     expect(url.searchParams.get('contents')).toBe('write')
+    expect(url.searchParams.get('actions')).toBe('write')
     expect(url.searchParams.get('target_name')).toBe('Looby758')
     expect(isTokenPermissionError(`${TOKEN_NOT_ALLOWED} merge pull requests on a/b.`)).toBe(true)
     expect(isTokenPermissionError('GitHub said no (403).')).toBe(false)
@@ -269,5 +270,202 @@ describe('uncommitted changes', () => {
     expect(commitAllCommand(false, 'Small "fixes"')).toBe('git add -A && git commit -m "Small fixes"')
     expect(commitAllCommand(true, 'x')).toBe('git add -A; if ($LASTEXITCODE -eq 0) { git commit -m "x" }')
     expect(stashCommand()).toContain('git stash push --include-untracked')
+  })
+})
+
+describe('downloads', () => {
+  it('counts installers, not the updater’s own files', () => {
+    expect(isDownloadFile('Orbit-Setup-1.13.0.exe')).toBe(true)
+    expect(isDownloadFile('Orbit-1.13.0-arm64.dmg')).toBe(true)
+    expect(isDownloadFile('Orbit-1.13.0-mac.zip')).toBe(true)
+    expect(isDownloadFile('latest.yml')).toBe(false)
+    expect(isDownloadFile('latest-mac.yml')).toBe(false)
+    expect(isDownloadFile('Orbit-Setup-1.13.0.exe.blockmap')).toBe(false)
+    expect(isDownloadFile('checksums.sha256')).toBe(false)
+  })
+  it('tells which computer a file is for', () => {
+    expect(platformOf('Orbit-Setup-1.13.0.exe')).toBe('Windows')
+    expect(platformOf('Orbit-1.13.0-arm64.dmg')).toBe('Mac')
+    expect(platformOf('Orbit-1.13.0-mac.zip')).toBe('Mac')
+    expect(platformOf('orbit_1.13.0_amd64.deb')).toBe('Linux')
+    expect(platformOf('source.zip')).toBe('Other')
+    const files = [
+      { name: 'a.exe', downloads: 3 },
+      { name: 'a.dmg', downloads: 5 },
+      { name: 'b.msi', downloads: 4 }
+    ]
+    expect(downloadsByPlatform(files)).toEqual([
+      { platform: 'Windows', downloads: 7 },
+      { platform: 'Mac', downloads: 5 }
+    ])
+  })
+  it('writes counts short', () => {
+    expect(countText(0)).toBe('0')
+    expect(countText(1234)).toBe('1,234')
+    expect(countText(15_300)).toBe('15.3k')
+    expect(countText(250_000)).toBe('250k')
+    expect(countText(2_000_000)).toBe('2m')
+  })
+  it('keeps one total a day and works out the last week', () => {
+    let h: DownloadHistory = []
+    h = addDownloadDay(h, '2026-11-01', 100)
+    h = addDownloadDay(h, '2026-11-10', 150)
+    h = addDownloadDay(h, '2026-11-15', 170)
+    h = addDownloadDay(h, '2026-11-15', 180)
+    expect(h).toHaveLength(3)
+    expect(downloadsSince(h, 7, '2026-11-15')).toBe(80)
+    expect(downloadsSince(h, 30, '2026-11-15')).toBeNull()
+    expect(downloadsSince([], 7, '2026-11-15')).toBeNull()
+  })
+})
+
+describe('health check', () => {
+  it('reads npm outdated', () => {
+    const json = JSON.stringify({
+      react: { current: '18.2.0', wanted: '18.3.1', latest: '19.1.0', type: 'devDependencies' },
+      zustand: { current: '5.0.1', wanted: '5.0.8', latest: '5.0.8', type: 'devDependencies' },
+      chokidar: [{ current: '4.0.1', wanted: '4.0.3', latest: '4.0.3', type: 'dependencies' }],
+      broken: { current: '1.0.0' }
+    })
+    const list = parseOutdated(json)
+    expect(list.map((p) => p.name)).toEqual(['chokidar', 'zustand', 'react'])
+    expect(list.find((p) => p.name === 'react')).toMatchObject({ major: true, dev: true })
+    expect(list.find((p) => p.name === 'chokidar')).toMatchObject({ major: false, dev: false })
+    expect(parseOutdated('')).toEqual([])
+    expect(parseOutdated('not json')).toEqual([])
+  })
+  it('reads npm audit', () => {
+    const json = JSON.stringify({
+      vulnerabilities: {
+        'brace-expansion': { name: 'brace-expansion', severity: 'low', via: [{ title: 'ReDoS', url: 'https://github.com/advisories/1' }], fixAvailable: true },
+        vite: { name: 'vite', severity: 'high', via: [{ title: 'File read', url: 'https://github.com/advisories/2' }], fixAvailable: { name: 'vite', version: '7.0.0', isSemVerMajor: true } },
+        'electron-vite': { name: 'electron-vite', severity: 'high', via: ['vite'], fixAvailable: false }
+      }
+    })
+    const list = parseAudit(json)
+    expect(list.map((w) => w.name)).toEqual(['electron-vite', 'vite', 'brace-expansion'])
+    expect(list[0].title).toBe('Uses vite, which has a problem')
+    expect(list[1]).toMatchObject({ easyFix: false, majorFix: true })
+    expect(list[2]).toMatchObject({ easyFix: true, majorFix: false })
+    expect(severityCounts(list)).toEqual([
+      { severity: 'high', count: 2 },
+      { severity: 'low', count: 1 }
+    ])
+  })
+  it('sums it up', () => {
+    const report: HealthReport = { checkedAt: '', outdated: [], security: [], problems: [] }
+    expect(healthLevel(report)).toBe('good')
+    expect(healthLine(report)).toBe('All up to date and safe')
+    report.outdated = [{ name: 'a', current: '1.0.0', wanted: '1.1.0', latest: '2.0.0', major: true, dev: false }]
+    expect(healthLevel(report)).toBe('fine')
+    report.security = [{ name: 'b', severity: 'high', title: 'Bad', easyFix: true, majorFix: false }]
+    expect(healthLevel(report)).toBe('attention')
+    expect(healthLine(report)).toBe('1 security warning (1 high) · 1 update')
+    const card = healthBoardItem(report)
+    expect(card.title).toBe('Fix the security warnings and update packages')
+    expect(card.details).toContain('- b (high): Bad')
+    expect(card.details).toContain('- a 1.0.0 → 2.0.0')
+  })
+})
+
+describe('roll back', () => {
+  it('picks one fix up from the newest version', () => {
+    expect(rollbackVersion('1.13.0', [{ tag: 'v1.13.0' }, { tag: 'v1.12.1' }])).toBe('1.13.1')
+    expect(rollbackVersion('1.13.0', [{ tag: 'v1.13.2' }, { tag: 'v1.12.1' }])).toBe('1.13.3')
+    expect(rollbackVersion('1.9.0', [{ tag: 'v1.10.0' }])).toBe('1.10.1')
+    expect(rollbackVersion(undefined, [])).toBeNull()
+  })
+  it('puts the old code back and releases it as a new version', () => {
+    const mac = rollbackCommand(false, 'v1.12.1', '1.13.1')
+    expect(mac).toContain('git restore --source=v1.12.1 --staged --worktree -- .')
+    expect(mac).toContain('npm version 1.13.1 --no-git-tag-version')
+    expect(mac).toContain('git tag -a v1.13.1')
+    expect(mac.endsWith('git push --follow-tags')).toBe(true)
+    expect(rollbackCommand(true, 'v1.12.1', '1.13.1')).toMatch(/^git fetch --tags origin; if \(\$LASTEXITCODE -eq 0\) \{ git restore/)
+    expect(() => rollbackCommand(false, 'v1; rm -rf /', '1.13.1')).toThrow()
+  })
+})
+
+describe('bug reports', () => {
+  const report = (n: number, extra: Partial<BugReport> = {}): BugReport => ({
+    repo: 'me/eclipse',
+    number: n,
+    title: `Report ${n}`,
+    body: '',
+    author: 'sam',
+    url: `https://github.com/me/eclipse/issues/${n}`,
+    createdAt: `2026-11-0${n}T10:00:00Z`,
+    labels: [],
+    comments: 0,
+    ...extra
+  })
+  it('lists the ones not on the board yet, newest first', () => {
+    const list = newReports([report(1), report(2), report(3)], [{ issue: 'me/eclipse#2' }, {}], ['me/eclipse#1'])
+    expect(list.map((r) => r.number)).toEqual([3])
+    expect(newReports([report(1), report(3)], []).map((r) => r.number)).toEqual([3, 1])
+  })
+  it('turns a report into a card', () => {
+    const card = reportCard(report(4, { title: ' Crashes on start ', body: '<!-- template -->\nIt crashes.\n\n![shot](https://x/y.png)\n\n\n\nEclipse 1.2', labels: ['bug'] }))
+    expect(card).toEqual({ title: 'Crashes on start', kind: 'bug', details: 'It crashes.\n\nEclipse 1.2\n\nReported by sam on GitHub: https://github.com/me/eclipse/issues/4' })
+    expect(reportCard(report(5, { labels: ['enhancement'] })).kind).toBe('idea')
+  })
+  it('makes a ready-filled report link', () => {
+    const url = new URL(bugReportUrl('me/eclipse', { app: 'Eclipse', version: '1.2.3', os: 'Windows 11' }))
+    expect(url.origin + url.pathname).toBe('https://github.com/me/eclipse/issues/new')
+    expect(url.searchParams.get('labels')).toBe('bug')
+    expect(url.searchParams.get('body')).toContain('Eclipse 1.2.3 on Windows 11')
+    expect(reportButtonCard({ name: 'Eclipse', repo: 'me/eclipse' }).details).toContain('https://github.com/me/eclipse/issues/new?')
+  })
+})
+
+describe('draft pull requests', () => {
+  it('turns a missing permission into the token message', () => {
+    const m = readyForReviewError([{ type: 'FORBIDDEN', message: 'Resource not accessible by personal access token' }], 'me/app')
+    expect(isTokenPermissionError(m)).toBe(true)
+    expect(m).toContain('me/app')
+  })
+  it('says nothing was merged when it stays a draft', () => {
+    expect(readyForReviewError([{ message: 'Could not resolve to a node' }], 'me/app')).toBe('GitHub wouldn’t take it out of draft: Could not resolve to a node. Nothing was merged.')
+    expect(readyForReviewError([], 'me/app')).toContain('Nothing was merged')
+  })
+  it('says it was marked ready when the merge then fails', () => {
+    expect(mergeAfterReadyError('Try Merge again')).toBe('It’s now marked ready for review, but it didn’t merge. Try Merge again.')
+    expect(mergeAfterReadyError(`${TOKEN_NOT_ALLOWED} merge pull requests`)).toBe(`${TOKEN_NOT_ALLOWED} merge pull requests`)
+  })
+})
+
+describe('why a merge can’t happen', () => {
+  it('says a pull request with conflicts has conflicts with its base', () => {
+    const m = mergeBlockedReason({ mergeable: false, mergeable_state: 'dirty' }, 188, 'main')
+    expect(m).toContain('#188 has conflicts with main')
+    expect(m).toContain('Nothing was merged')
+    expect(mergeBlockedReason({ mergeable: false, mergeable_state: 'draft' }, 5, 'main')).toContain('conflicts with main')
+  })
+  it('explains branch rules that are in the way', () => {
+    expect(mergeBlockedReason({ mergeable: true, mergeable_state: 'behind' }, 7, 'main')).toContain('#7 is behind main')
+    expect(mergeBlockedReason({ mergeable: true, mergeable_state: 'blocked' }, 7, 'main')).toContain('GitHub is blocking #7')
+  })
+  it('lets anything else through, failing checks that aren’t required and not-yet-known too', () => {
+    for (const state of ['clean', 'unstable', 'has_hooks', 'draft', 'unknown']) expect(mergeBlockedReason({ mergeable: true, mergeable_state: state }, 1, 'main')).toBeNull()
+    expect(mergeBlockedReason({ mergeable: null, mergeable_state: 'unknown' }, 1, 'main')).toBeNull()
+  })
+  it('turns GitHub’s merge errors into specific ones', () => {
+    expect(mergeFailedMessage('Pull Request is not mergeable', 188, 'main')).toContain('#188 has conflicts with main')
+    expect(mergeFailedMessage('Base branch was modified. Review and try the merge again.', 3, 'main')).toContain('Try Merge again')
+    expect(mergeFailedMessage('At least 1 approving review is required by reviewers with write access.', 3, 'main')).toContain('approving review')
+    expect(mergeFailedMessage('Required status check "build" is expected.', 3, 'main')).toContain('required check')
+    expect(mergeFailedMessage('Something new', 3, 'main')).toBe('GitHub couldn’t merge #3: Something new. Nothing was merged.')
+    expect(mergeFailedMessage(`${TOKEN_NOT_ALLOWED} merge pull requests`, 3, 'main')).toBe(`${TOKEN_NOT_ALLOWED} merge pull requests`)
+  })
+})
+
+describe('trying Orbit as a new user', () => {
+  it('sets ORBIT_NEW_USER for just that run', async () => {
+    const { newUserRunCommand, isOrbitRepo } = await import('./appStudio')
+    expect(newUserRunCommand(true)).toBe("$env:ORBIT_NEW_USER='1'; npm run dev")
+    expect(newUserRunCommand(false, 'npm start')).toBe('ORBIT_NEW_USER=1 npm start')
+    expect(isOrbitRepo('Looby758/notes-app')).toBe(true)
+    expect(isOrbitRepo('looby758/orbit-music')).toBe(false)
+    expect(isOrbitRepo(undefined)).toBe(false)
   })
 })

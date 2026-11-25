@@ -12,6 +12,91 @@ export interface ReleaseNotes {
 /** Newest first. Add an entry with each release. */
 export const RELEASE_NOTES: readonly ReleaseNotes[] = [
   {
+    version: '1.14.0',
+    items: [
+      'App Studio: say why a pull request can\'t merge, like "has conflicts with main"',
+      'Add-ons: the add-on list, an Add-ons page, and add-ons that aren\'t added stay hidden and never run',
+      'Add recommended songs to the music player, including new songs from Deezer'
+    ]
+  },
+  {
+    version: '1.13.8',
+    items: [
+      'Settings opens as a Nocturne-style panel over the current page',
+      'App Studio: filter pull requests by app'
+    ]
+  },
+  {
+    version: '1.13.7',
+    items: [
+      'Add a "Get latest main" button to App Studio\'s Releases',
+      'Add a clean uninstaller',
+      'Money: a Budget tab where you type each income and outgoing'
+    ]
+  },
+  {
+    version: '1.13.6',
+    items: [
+      'Fix Google sign-in saying "This browser or app may not be secure" on the Mac (tested against Google this time), and "Sign in with Google" going back to "Choose an account"'
+    ]
+  },
+  {
+    version: '1.13.5',
+    items: [
+      'Fix Google sign-in still saying "This browser or app may not be secure" on the Mac'
+    ]
+  },
+  {
+    version: '1.13.4',
+    items: [
+      'Fix Google sign-in saying "This browser or app may not be secure" again'
+    ]
+  },
+  {
+    version: '1.13.3',
+    items: [
+      'Orbit Sync: test copies only read, and never call this PC "another computer"'
+    ]
+  },
+  {
+    version: '1.13.2',
+    items: [
+      'Big file sender: send huge files to a friend with a code, or a Google Drive link',
+      'App Studio: download counts, health check, roll back, start a new app, bug reports',
+      'Mac: update in place, and stop asking "Open Anyway" every launch',
+      'Add four mini games, polish every game, and add sound effects',
+      'Remove the built-in YouTube mini window',
+      'Music: test that dipping covers crossfade, the equaliser and songs started mid-dip',
+      'Music: crossfade, equaliser, visualisers, listening stats, phone remote and full-screen player',
+      'Add a built-in task manager',
+      'Files: show free space on each drive',
+      'Downloads: show Epic Games Launcher downloads next to Steam\'s',
+      'Keep the Discord sign-in in Messages after Orbit restarts',
+      'SkyBlock: suggest each skill\'s Personal Compactor again'
+    ]
+  },
+  {
+    version: '1.13.0',
+    items: [
+      'Music page: songs, albums and playlists in one place, with search (or search YouTube), a music folder setting, and tools to fix details, find covers and tidy duplicates.',
+      'Calendar: repeating events, drag to move or resize, a Day view, and edit Google events from Orbit.',
+      'Files: search the whole PC, colour tags, favourites, folder sizes and the Recycle Bin.',
+      'Money: accounts and your net worth over time, and IOUs with reminders when you split a bill.',
+      'Mini games: Solitaire, 2048 and Chess, with win streaks and best times.',
+      'Discord: write call notes on the pop-out, and see call stats.',
+      'Clips sorted by game, soundboard sounds from a link, and music dips while friends talk.',
+      'SkyBlock: profiles (yours or anyone’s) with networth, progress and compare, an ironman goal planner, and a summary card when Minecraft closes.',
+      'Key remapper: remap any key, everywhere or just in one game.',
+      'World clocks: add friends and see if it’s a good time to message them.',
+      'Screen snip: translate offline, snip after a countdown, snip from the Windows taskbar, and snip a bug on any monitor.',
+      'Picture editor: boxes, circles, highlighter, numbered steps and a pen.',
+      'Video player: A-B loop, step frame by frame, and save a frame into a note.',
+      'Delete notes and folders straight away, with an Undo button instead of an “Are you sure?” box.',
+      'App Studio: bug pictures are sent to Claude too.',
+      'Fix: Google sign-in no longer says “This browser or app may not be secure”.'
+    ]
+  },
+  {
     version: '1.12.1',
     items: [
       'App Studio: a home for the apps you make with Claude. See each app’s branch, last change and open pull requests, and get the latest and run it in one click.',

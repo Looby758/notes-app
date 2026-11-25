@@ -2,7 +2,6 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
 import CaptureApp from './components/CaptureApp'
-import YouTubeMini from './components/YouTube/YouTubeMini'
 import MusicMini from './components/Music/MusicMini'
 import PopoutWindow from './components/Popout/PopoutWindow'
 import VideoWindow from './components/Video/VideoWindow'
@@ -23,9 +22,8 @@ import './styles/motion.css'
 document.documentElement.dataset.platform = IS_MAC ? 'mac' : 'win'
 
 // The same page serves the main window, the quick-capture window (opened with #capture), the
-// YouTube mini window (#youtube), the floating mini music player (#music) and screen snip (#snip).
+// floating mini music player (#music) and screen snip (#snip).
 const isCapture = location.hash === '#capture'
-const isYouTube = location.hash === '#youtube'
 const isMusic = location.hash === '#music'
 const isSnip = location.hash === '#snip'
 // The pop-out window: any app, live, floating on top (#popout).
@@ -52,8 +50,8 @@ if (isScreenSend || isScreenView) {
 } else if (isPopout) {
   document.body.classList.add('popout-window')
   loadPrefs().catch(() => undefined)
-} else if (isCapture || isYouTube || isMusic || isSnip || isVideo) {
-  document.body.classList.add(isCapture ? 'capture-window' : isYouTube ? 'youtube-window' : isSnip ? 'snip-window' : isVideo ? 'video-window-body' : 'music-window')
+} else if (isCapture || isMusic || isSnip || isVideo) {
+  document.body.classList.add(isCapture ? 'capture-window' : isSnip ? 'snip-window' : isVideo ? 'video-window-body' : 'music-window')
   loadPrefs().catch(() => undefined)
 } else {
   startInterfaceSounds()
@@ -71,8 +69,6 @@ createRoot(document.getElementById('root')!).render(
       <ShareDrop />
     ) : isCapture ? (
       <CaptureApp />
-    ) : isYouTube ? (
-      <YouTubeMini />
     ) : isMusic ? (
       <MusicMini />
     ) : isSnip ? (

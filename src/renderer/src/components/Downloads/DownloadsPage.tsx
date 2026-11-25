@@ -1,3 +1,7 @@
+import { Music2 } from 'lucide-react'
+import { LOCAL_AUDIO } from '@shared/localMusic'
+import { importSongs } from '../../store/musicFiles'
+import { useVault } from '../../store/vault'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowDownToLine,
@@ -27,7 +31,7 @@ import type { LocalAiState, VideoDownload, VideoDownloaderState } from '@shared/
 import type { WebDownload } from '@shared/browser'
 import { DOWNLOAD_QUALITIES, type DownloadQuality } from '@shared/videoDownload'
 import { localModelById } from '@shared/localAi'
-import { steamAppIdFromLink, type SteamDownload } from '@shared/games'
+import { steamAppIdFromLink, type EpicDownload, type SteamDownload } from '@shared/games'
 import {
   clockText,
   isVideoPage,
@@ -49,6 +53,7 @@ import { insertIntoActiveNote, openFileTab } from '../../lib/editorController'
 import { openDownload } from '../Web/Downloads'
 import FolderPicker from '../Web/FolderPicker'
 import { SaveTo, SetupBox } from './videoParts'
+import { addonOn } from '../../lib/addons'
 
 /**
  * The download manager tab: paste links and they download a few at a time, in order. Each one can
@@ -108,10 +113,19 @@ function Bar({ value }: { value: number | null }) {
   )
 }
 
+const isSong = (path: string): boolean => LOCAL_AUDIO.some((ext) => path.toLowerCase().endsWith(ext))
+
+/** A downloaded song goes into your music folder too (videos are kept in the notes folder). */
+async function addToMusic(d: DmItem): Promise<void> {
+  if (!d.path) return
+  const full = d.kind === 'video' ? `${useVault.getState().vault}/${d.path}` : d.path
+  await importSongs([full])
+}
+
 function openItem(d: DmItem): void {
   if (!d.path) return
   if (d.kind === 'video') {
-    if (d.quality === 'audio') openFileTab(d.path)
+    if (d.quality === 'audio' || !addonOn('video-player')) openFileTab(d.path)
     else openVaultVideo(d.path)
     return
   }
@@ -192,6 +206,11 @@ function QueueItem({ d, state, first, last }: { d: DmItem; state: DmState; first
                 <FileInput size={14} />
               </button>
             )}
+            {isSong(d.path) && addonOn('music') && (
+              <button className="icon-btn" title="Add to my music (copies it into your music folder)" onClick={() => void addToMusic(d)} data-dm-to-music>
+                <Music2 size={14} />
+              </button>
+            )}
             <button
               className="icon-btn"
               title="Show in folder"
@@ -268,14 +287,36 @@ function useSteamDownloads(): SteamRow[] {
   return list
 }
 
+type EpicRow = EpicDownload & { speed?: number }
+
+/** The Epic Games Launcher's downloads, measured from the games' folders while this page is open. */
+function useEpicDownloads(): EpicRow[] {
+  const [list, setList] = useState<EpicRow[]>([])
+  useEffect(() => {
+    let alive = true
+    const look = (): void => void window.api.epicDownloads().then((l) => alive && setList(l)).catch(() => undefined)
+    look()
+    const t = setInterval(look, 5000)
+    return () => {
+      alive = false
+      clearInterval(t)
+    }
+  }, [])
+  return list
+}
+
+const epicStateText = (g: EpicDownload): string =>
+  g.state === 'downloading' ? (g.kind === 'update' ? 'Updating in Epic' : 'Downloading in Epic') : 'Paused or waiting in Epic’s queue'
+
 const STEAM_STATE: Record<SteamDownload['state'], string> = { downloading: 'Downloading in Steam', paused: 'Paused in Steam', waiting: 'Waiting in Steam’s queue' }
 
 function Elsewhere({ videos, ai }: { videos: VideoDownload[]; ai: LocalAiState | null }) {
   const steam = useSteamDownloads()
+  const epic = useEpicDownloads()
   const web = useBrowser((s) => s.downloads).filter((d) => d.state === 'downloading' || d.state === 'paused')
   const vids = videos.filter((v) => !v.manager && v.status === 'working')
   const aiBusy = ai && (ai.state === 'downloading' || (ai.state === 'missing' && ai.error?.startsWith('Download paused')))
-  if (!web.length && !vids.length && !aiBusy && !steam.length) return null
+  if (!web.length && !vids.length && !aiBusy && !steam.length && !epic.length) return null
 
   const laterTonight = (d: WebDownload): void => {
     const folder = d.path ? d.path.replace(/[\\/][^\\/]*$/, '') : undefined
@@ -343,6 +384,33 @@ function Elsewhere({ videos, ai }: { videos: VideoDownload[]; ai: LocalAiState |
             <div className="vdl-actions">
               <button className="btn dm-small" title="Pause, reorder or schedule it in Steam's Downloads page" onClick={() => void window.api.steamOpenDownloads().catch(notify)}>
                 Open in Steam
+              </button>
+            </div>
+          </li>
+        ))}
+        {epic.map((g) => (
+          <li key={`epic:${g.appName}`} className="convert-item" data-dm-epic={g.state}>
+            <Gamepad2 size={16} className="convert-kind" />
+            <div className="convert-name">
+              <span>{g.name}</span>
+              <small>
+                {[
+                  epicStateText(g),
+                  g.total ? `${sizeText(g.downloaded)} of ${sizeText(g.total)}` : g.downloaded ? `${sizeText(g.downloaded)} so far` : '',
+                  g.speed ? speedText(g.speed) : '',
+                  g.total && g.speed ? timeLeft(g.total - g.downloaded, g.speed) : ''
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </small>
+              <div className="vdl-progress">
+                <Bar value={g.total ? g.downloaded / g.total : g.state === 'downloading' ? null : 0} />
+                {g.total > 0 && <span className="vdl-percent">{Math.round((g.downloaded / g.total) * 100)}%</span>}
+              </div>
+            </div>
+            <div className="vdl-actions">
+              <button className="btn dm-small" title="Pause, reorder or cancel it in the Epic Games Launcher" onClick={() => void window.api.epicOpenDownloads().catch(notify)}>
+                Open in Epic
               </button>
             </div>
           </li>

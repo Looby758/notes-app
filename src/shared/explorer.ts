@@ -64,12 +64,13 @@ export function isHiddenName(name: string): boolean {
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
 
-/** Folders first, then by the chosen column (newest and biggest first). */
-export function sortEntries(entries: ExplorerEntry[], by: ExplorerSort): ExplorerEntry[] {
+/** Folders first, then by the chosen column (newest and biggest first). `folderSizes`: folders' sizes once they've been added up. */
+export function sortEntries(entries: ExplorerEntry[], by: ExplorerSort, folderSizes?: ReadonlyMap<string, number>): ExplorerEntry[] {
+  const sizeOf = (e: ExplorerEntry): number => (e.isDir ? (folderSizes?.get(e.path) ?? -1) : e.size)
   return [...entries].sort((a, b) => {
     if (a.isDir !== b.isDir) return a.isDir ? -1 : 1
     if (by === 'modified' && a.modified !== b.modified) return b.modified - a.modified
-    if (by === 'size' && !a.isDir && a.size !== b.size) return b.size - a.size
+    if (by === 'size' && sizeOf(a) !== sizeOf(b)) return sizeOf(b) - sizeOf(a)
     return collator.compare(a.name, b.name)
   })
 }
@@ -170,3 +171,104 @@ export function whereIn(path: string, from: string): string {
 
 /** Searching subfolders stops after this many matches. */
 export const SEARCH_LIMIT = 500
+
+/** A folder's size as the Files tab shows it: "1.2 GB", or "1.2 GB+" when part of it couldn't be read. */
+export const describeFolderSize = (size: { bytes: number; complete: boolean }): string => `${describeBytes(size.bytes)}${size.complete ? '' : '+'}`
+
+/** Whole PC search shows at most this many (each one is looked up for its size and date). */
+export const PC_SEARCH_LIMIT = 300
+
+/** Whether a name contains every (lowercase) word. */
+export const matchesWords = (name: string, words: string[]): boolean => {
+  const lower = name.toLowerCase()
+  return words.every((w) => lower.includes(w))
+}
+
+/**
+ * Paths the system's own search turns up that are only an app's workings (caches, AppData,
+ * ~/Library, dot folders): left out of Whole PC results, like Orbit's own list leaves them out.
+ */
+export function looksLikeAppFiles(path: string, showHidden: boolean): boolean {
+  const parts = path.split(/[\\/]+/).filter(Boolean)
+  const lower = parts.map((p) => p.toLowerCase())
+  if (lower.some((p) => p === 'appdata' || p === 'node_modules' || p === '$recycle.bin' || p === 'caches' || p === 'cache')) return true
+  // A Mac's system folders: /System, /Library, /private and the like, and ~/Library.
+  if (lower[0] === 'system' || lower[0] === 'library' || lower[0] === 'private' || lower[0] === 'usr' || lower[0] === 'opt') return true
+  if (lower[0] === 'users' && lower[2] === 'library') return true
+  // Inside an app (Name.app/Contents/…).
+  if (lower.slice(0, -1).some((p) => p.endsWith('.app'))) return true
+  if (!showHidden && parts.some((p) => isHiddenName(p))) return true
+  return false
+}
+
+/** How Whole PC search's list of files is getting on (see main/fileIndex). */
+export interface PcIndexStatus {
+  state: 'off' | 'loading' | 'building' | 'ready'
+  /** Files and folders in the list. */
+  count: number
+  /** When the drives were last walked in full (ms), or 0. */
+  builtAt: number
+  /** While walking the drives: how many found so far. */
+  progress: number
+  /** Changes are being picked up as they happen. */
+  live: boolean
+  /** Where the list starts from (every drive on Windows). */
+  roots: string[]
+}
+
+/** "1.2 million files", "48,210 files". */
+export function describeCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} million`
+  return n.toLocaleString('en-GB')
+}
+
+/** How full a drive is, from the system (main/explorer.ts reads it with statfs). */
+export interface DriveSpace {
+  /** The drive's size in bytes. */
+  total: number
+  /** Bytes still free for this user. */
+  free: number
+}
+
+/** A drive's space from Node's statfs: blocks × block size, with the blocks this user may still fill as free. Null when it makes no sense (an empty or odd volume). */
+export function driveSpaceFromStatfs(s: { bsize: number | bigint; blocks: number | bigint; bavail: number | bigint }): DriveSpace | null {
+  const bsize = Number(s.bsize)
+  const total = Number(s.blocks) * bsize
+  const free = Number(s.bavail) * bsize
+  if (!Number.isFinite(total) || !Number.isFinite(free) || total <= 0 || free < 0) return null
+  return { total, free: Math.min(free, total) }
+}
+
+/**
+ * A drive's size the way the computer's own file manager writes it: File Explorer counts in
+ * 1024s ("476 GB" for a 512 GB drive), Finder in 1000s. Whole numbers from 100 up, one decimal below.
+ */
+export function describeDriveBytes(bytes: number, binary: boolean): string {
+  const k = binary ? 1024 : 1000
+  const units = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB']
+  let n = Math.max(0, bytes)
+  let i = 0
+  while (n >= k && i < units.length - 1) {
+    n /= k
+    i++
+  }
+  if (i === 0) return `${Math.round(n)} bytes`
+  const shown = n >= 100 ? Math.round(n).toString() : (Math.round(n * 10) / 10).toString()
+  return `${shown} ${units[i]}`
+}
+
+/** Under a tenth of the drive free, its bar turns red (as File Explorer's does). */
+export const isDriveLow = (space: DriveSpace): boolean => space.free < space.total * 0.1
+
+/** What the Drives list shows under a drive: how full the bar is, "120 GB free of 476 GB", and the longer hover text. */
+export function describeDriveSpace(space: DriveSpace, binary: boolean): { usedPercent: number; low: boolean; text: string; title: string } {
+  const used = Math.max(0, space.total - space.free)
+  const usedPercent = space.total > 0 ? Math.min(100, Math.max(0, (used / space.total) * 100)) : 0
+  const fmt = (b: number): string => describeDriveBytes(b, binary)
+  return {
+    usedPercent,
+    low: isDriveLow(space),
+    text: `${fmt(space.free)} free of ${fmt(space.total)}`,
+    title: `${fmt(used)} used · ${fmt(space.free)} free · ${fmt(space.total)} in all (${Math.round(usedPercent)}% full)`
+  }
+}

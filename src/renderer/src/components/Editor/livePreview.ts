@@ -21,6 +21,7 @@ import { TableWidget } from './tableEditor'
 import { AUDIO_EXT } from '../../lib/voice'
 import { VIDEO_EMBED_EXT } from './attachments'
 import { looksLikeSketch, withSketchVersion } from '../../lib/sketch'
+import { addonOn } from '../../lib/addons'
 import { useUI } from '../../store/ui'
 import { CLICK_MOD } from '@shared/platform'
 import { mathDiagrams } from './mathDiagrams'
@@ -471,7 +472,7 @@ function buildInline(view: EditorView): DecorationSet {
                   ? new AudioWidget(src, alt)
                   : VIDEO_EMBED_EXT.test(raw)
                     ? new VideoWidget(src, alt)
-                    : new ImageWidget(src, alt, file, !!file && looksLikeSketch(file))
+                    : new ImageWidget(src, alt, file, !!file && looksLikeSketch(file) && addonOn('sketch'))
                 out.push(Decoration.replace({ widget }).range(node.from, node.to))
                 return false
               }

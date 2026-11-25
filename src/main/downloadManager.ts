@@ -26,9 +26,11 @@ import {
 } from '@shared/downloadManager'
 import { defaultDownloadFolder } from './browserData'
 import { cancelVideoJob, onVideoJobs, startVideoJob } from './videoDownload'
-import { steamDownloads } from './games'
-import type { SteamDownload } from '@shared/games'
+import { epicDownloads, steamDownloads } from './games'
+import { epicProgress, type EpicDownload, type EpicSeen, type SteamDownload } from '@shared/games'
+import { countFolder } from './folderSize/count'
 import { logError } from './log'
+import { addonOn } from './addonGate'
 
 /**
  * The download manager: a queue of downloads that run a few at a time, pause and carry on where
@@ -290,6 +292,8 @@ function stop(item: DmItem, status: DmItem['status']): void {
 }
 
 function pump(): void {
+  // Queued and overnight downloads only run with the Downloads add-on.
+  if (!addonOn('downloads')) return
   const night = isNight(new Date(), settings.nightStart, settings.nightEnd)
   for (const id of pauseForMorning(items, night, settings.pauseAtNightEnd)) {
     const item = items.find((i) => i.id === id)
@@ -419,6 +423,36 @@ async function steamNow(): Promise<(SteamDownload & { speed?: number })[]> {
   })
 }
 
+/**
+ * Epic's downloads. Epic doesn't write its progress down, so each game's folder is measured
+ * (no more than every 10 seconds, as big games have a lot of files) and the speed and whether
+ * it's going come from how it grows.
+ */
+const EPIC_MEASURE_MS = 10_000
+const lastEpic = new Map<string, EpicSeen & { measuring?: boolean }>()
+let epicLast: (EpicDownload & { speed?: number })[] = []
+async function epicNow(): Promise<(EpicDownload & { speed?: number })[]> {
+  const list = await epicDownloads().catch(() => [])
+  const now = Date.now()
+  for (const key of [...lastEpic.keys()]) if (!list.some((d) => d.appName === key)) lastEpic.delete(key)
+  const out = await Promise.all(
+    list.map(async (d) => {
+      const prev = lastEpic.get(d.appName)
+      const shown = epicLast.find((e) => e.appName === d.appName)
+      if (prev && (prev.measuring || now - prev.at < EPIC_MEASURE_MS) && shown) return { ...shown, name: d.name, kind: d.kind, total: d.total }
+      if (prev) prev.measuring = true
+      const size = await countFolder(d.kind === 'install' ? d.installLocation : d.stagingLocation, { concurrency: 4 }).catch(() => null)
+      const bytes = size?.bytes ?? 0
+      const p = epicProgress(prev, bytes, Date.now())
+      lastEpic.set(d.appName, p.seen)
+      const downloaded = d.total ? Math.min(bytes, d.total) : bytes
+      return { appName: d.appName, name: d.name, kind: d.kind, state: p.state, downloaded, total: d.total, speed: p.speed }
+    })
+  )
+  epicLast = out
+  return out
+}
+
 export function setupDownloadManager(): void {
   load()
   mkdirSync(partsDir(), { recursive: true })
@@ -428,6 +462,9 @@ export function setupDownloadManager(): void {
   // Steam asks which drive and confirms (Orbit can't press Steam's buttons for you).
   ipcMain.handle('dm:steamInstall', (_e, appId: string) => (/^\d+$/.test(String(appId)) ? shell.openExternal(`steam://install/${appId}`) : undefined))
   ipcMain.handle('dm:steamOpen', () => shell.openExternal('steam://open/downloads'))
+  ipcMain.handle('dm:epic', () => epicNow())
+  // Epic's downloads are paused, reordered and cancelled in the launcher itself.
+  ipcMain.handle('dm:epicOpen', () => shell.openExternal('com.epicgames.launcher://store/library'))
   ipcMain.handle('dm:add', (_e, req: DmAddRequest) => add(req))
   ipcMain.handle('dm:act', (_e, id: string, action: Action) => act(String(id), action))
   ipcMain.handle('dm:all', (_e, action: 'pause' | 'resume' | 'clear') => all(action))

@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { claudePrompt, matchPull, pullKey, readBoard, type BoardColumn, type BoardItem, type PullRequest, type Shot } from '@shared/appStudio'
 import { isClaudeLink } from '@shared/chatSites'
-import { sendToSite } from '../components/ChatSite/ChatSite'
+import { sendToSite, type SiteFile } from '../components/ChatSite/ChatSite'
+import { pictureAsPng } from '../lib/boardPictures'
 import { notify } from './notify'
 
 /**
@@ -73,6 +74,15 @@ export function setBoardApp(app: string): void {
 export function startItem(app: string, kind: BoardItem['kind'], pictures: string[] = []): void {
   const t = now()
   useAppBoard.setState({ app, editing: { id: newId(), app, kind, title: '', details: '', column: 'ideas', pictures, created: t, updated: t } })
+}
+
+/** Puts a finished idea or bug straight on the board (a health check's card, a report from someone using the app). */
+export function addItem(app: string, kind: BoardItem['kind'], title: string, details: string, extra: Partial<BoardItem> = {}): BoardItem {
+  const t = now()
+  const item: BoardItem = { id: newId(), app, kind, title: title.trim(), details: details.trimEnd(), column: 'ideas', pictures: [], created: t, updated: t, ...extra }
+  useAppBoard.setState((s) => ({ items: [...s.items, item] }))
+  persist()
+  return item
 }
 
 export function editItem(item: BoardItem): void {
@@ -172,11 +182,38 @@ export async function sendToClaude(appKey: string, app: { name: string; repo?: s
     editing: s.editing && ids.has(s.editing.id) ? null : s.editing
   }))
   persist()
-  const typed = await sendToSite('claude', link, prompt)
-  const pictures = items.some((i) => i.pictures.length)
-  if (!typed) notify('Claude is open. The prompt is copied: paste it in with Ctrl+V.', 'info')
-  else if (pictures) notify('The prompt is in Claude’s message box. Copy each picture across too (Copy picture on the card), then send it.', 'info')
+  const files = await pictureFiles(items)
+  const pictures = items.reduce((n, i) => n + i.pictures.length, 0)
+  const { typed, attached } = await sendToSite('claude', link, prompt, files)
+  if (!typed) notify('Claude is open. The prompt is copied: paste it in with Ctrl+V.' + (pictures ? ' Then copy each picture across too (Copy picture on the card).' : ''), 'info')
+  else if (attached < pictures) notify(`The prompt is in Claude’s message box, but ${attached ? `only ${attached} of ${pictures} pictures went in` : 'the pictures didn’t go in'}. Copy each one across (Copy picture on the card), then send it.`, 'info')
   return true
+}
+
+/** The cards' pictures as PNG files to attach in Claude, named after the screenshots. One that can't be read is left out. */
+async function pictureFiles(items: BoardItem[]): Promise<SiteFile[]> {
+  const paths = items.flatMap((i) => i.pictures)
+  const files = await Promise.all(
+    paths.map(async (path): Promise<SiteFile | null> => {
+      try {
+        const png = await pictureAsPng(path)
+        const name = (path.split(/[\\/]/).pop() || 'picture').replace(/\.[^.]*$/, '') + '.png'
+        return { name, type: 'image/png', base64: await toBase64(png) }
+      } catch {
+        return null
+      }
+    })
+  )
+  return files.filter((f): f is SiteFile => !!f)
+}
+
+function toBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '')
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(blob)
+  })
 }
 
 // ---------- Matching pull requests to cards ----------

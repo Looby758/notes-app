@@ -4,7 +4,7 @@ import { checkForUpdates, useUpdates, watchUpdates } from '../../store/updates'
 import { checkSettingsNow, showWhatsNew } from '../../store/notices'
 import { DEFAULT_PREFS } from '@shared/prefs'
 import type { CaptureStatus } from '@shared/types'
-import { resetPrefs, usePrefs } from '../../store/prefs'
+import { resetPrefs, setPrefs, usePrefs } from '../../store/prefs'
 import BrowserSettings from '../Web/BrowserSettings'
 import { matchesSearch, SECTIONS, SETTINGS, type SectionId, type SettingDef } from '../../lib/settingsSchema'
 import { SettingControl } from './Controls'
@@ -16,7 +16,7 @@ import RemindersSettings from './RemindersSettings'
 import NavEditor from '../Nav/NavEditor'
 import AiSettings from '../Ai/AiSettings'
 import OfflineAiSettings from '../Ai/OfflineAiSettings'
-import MusicSettings, { SongIdSettings } from '../Music/MusicSettings'
+import MusicSettings, { MusicFolderSetting, SongIdSettings } from '../Music/MusicSettings'
 import StudioSettings from '../Studio/LiveSetup'
 import ShareSettings from '../Share/ShareSettings'
 import { useUI } from '../../store/ui'
@@ -37,6 +37,74 @@ const ICONS: Record<SectionId, typeof Palette> = {
   computers: MonitorSmartphone,
   shortcuts: Keyboard,
   about: Info
+}
+
+/** Sections that are only about add-ons: shown when at least one of them is added. */
+const SECTION_ADDONS: Partial<Record<SectionId, string[]>> = {
+  capture: ['summon-bar', 'snip'],
+  browser: ['web'],
+  music: ['music', 'songid'],
+  studio: ['studio', 'clips', 'discord-voice']
+}
+
+/** Single settings that belong to an add-on: hidden when it isn't added. Settings not listed are core. */
+const SETTING_ADDONS: Partial<Record<string, string>> = {
+  gameLaunchAnimation: 'games',
+  gameAnimatedCovers: 'games',
+  streamerMode: 'streamer',
+  streamerHideNotes: 'streamer',
+  streamerHideNames: 'streamer',
+  handwritingReader: 'sketch',
+  focusMinutes: 'zen',
+  focusRounds: 'zen',
+  breakMinutes: 'zen',
+  longBreakMinutes: 'zen',
+  timerChime: 'zen',
+  timerAlwaysVisible: 'zen',
+  timerLeaveZen: 'zen',
+  openLinksInApp: 'web',
+  googleSignInAsFirefox: 'web',
+  videosFolder: 'video-projects',
+  filesWholePcSearch: 'files',
+  randomIncludeDaily: 'random-note',
+  musicSpotify: 'music',
+  musicSongPopup: 'music',
+  musicVisualiser: 'music',
+  musicVisualiserStyle: 'music',
+  musicCrossfade: 'music',
+  songIdShortcut: 'songid',
+  weatherHome: 'weather',
+  weatherCalendar: 'weather',
+  captureShortcut: 'summon-bar',
+  captureTarget: 'summon-bar',
+  captureHeading: 'summon-bar',
+  captureInbox: 'summon-bar',
+  captureTimestamp: 'summon-bar',
+  captureRememberTarget: 'summon-bar',
+  snipShortcut: 'snip',
+  snipDelay: 'snip',
+  snipSave: 'snip',
+  replayOn: 'clips',
+  replayShortcut: 'clips',
+  replaySeconds: 'clips',
+  replayQuality: 'clips',
+  replaySound: 'clips',
+  replayMic: 'clips',
+  discordPopoutPrompt: 'discord-voice',
+  duckMusic: 'discord-voice',
+  duckWhenITalk: 'discord-voice',
+  duckSpotify: 'discord-voice',
+  duckOrbit: 'discord-voice'
+}
+
+const settingOn = (d: SettingDef, installed: readonly string[]): boolean => {
+  const addon = SETTING_ADDONS[d.key]
+  return sectionOn(d.section, installed) && (!addon || installed.includes(addon))
+}
+
+const sectionOn = (id: SectionId, installed: readonly string[]): boolean => {
+  const needs = SECTION_ADDONS[id]
+  return !needs || needs.some((a) => installed.includes(a))
 }
 
 const SNIPPET_WORDS = /^(snip|expan|text sh|abbrev|;)/i
@@ -117,6 +185,93 @@ function SnipShortcutStatus() {
       <button className="btn" onClick={() => void window.api.startSnip()}>
         Try it now
       </button>
+    </div>
+  )
+}
+
+/** Where picture snips are saved, with Change, Open folder and the last one saved. */
+function SnipSaving() {
+  const save = usePrefs((s) => s.prefs.snipSave)
+  const chosen = usePrefs((s) => s.prefs.snipFolder)
+  const [info, setInfo] = useState<{ save: boolean; folder: string; custom: boolean; last: string | null } | null>(null)
+  useEffect(() => {
+    const t = setTimeout(() => void window.api.snipSaveInfo().then(setInfo), 200)
+    return () => clearTimeout(t)
+  }, [save, chosen])
+  if (!info || !save) return null
+  const change = async (): Promise<void> => {
+    const folder = await window.api.snipPickFolder()
+    if (folder) setPrefs({ snipFolder: folder })
+  }
+  const lastName = info.last?.split(/[\\/]/).pop()
+  return (
+    <div className="capture-status taskbar-snip" data-snip-saving>
+      <p>
+        Picture snips are saved in <strong className="snip-folder-path" data-snip-folder>{info.folder}</strong>
+        {!info.custom && ' (the usual Screenshots folder)'}.
+      </p>
+      {info.last && (
+        <p className="snip-last">
+          Last one: {lastName}{' '}
+          <button className="link-btn" onClick={() => void window.api.snipShowLast()}>
+            Show it
+          </button>
+        </p>
+      )}
+      <div className="taskbar-snip-buttons">
+        <button className="btn" onClick={() => void change()} data-snip-change-folder>
+          Change folder…
+        </button>
+        <button className="btn" onClick={() => void window.api.snipOpenFolder()} data-snip-open-folder>
+          Open folder
+        </button>
+        {info.custom && (
+          <button className="btn" onClick={() => setPrefs({ snipFolder: '' })} title="Back to the Screenshots folder in Pictures">
+            Use the usual folder
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Windows: snipping from the taskbar, like the Snipping Tool (main/snipTaskbar.ts). */
+function TaskbarSnip() {
+  const [state, setState] = useState<{ available: boolean; shortcut: boolean } | null>(null)
+  useEffect(() => {
+    void window.api.snipTaskbar().then(setState)
+  }, [])
+  if (!state?.available) return null
+  return (
+    <div className="capture-status taskbar-snip" data-taskbar-snip>
+      <p>
+        <strong>Snip from the taskbar.</strong> Click, drag a box round anything, and it’s copied, ready to paste anywhere with <kbd>Ctrl+V</kbd>. Works on every monitor, without opening Orbit.
+      </p>
+      <ul>
+        {state.shortcut ? (
+          <li>
+            For a one-click button: open Start, find <strong>Orbit Snip</strong>, right-click it and choose <strong>Pin to taskbar</strong>.
+          </li>
+        ) : (
+          <li>The installed Orbit adds an <strong>Orbit Snip</strong> button to the Start menu that you can pin to the taskbar.</li>
+        )}
+        <li>
+          Or right-click Orbit’s own taskbar button and choose <strong>Snip a picture</strong>, or <strong>Snip in 3, 5 or 10 seconds</strong> to hover over something first.
+        </li>
+        <li>
+          Or set <strong>Clicking the tray icon</strong> (under Tray, above) to snip.
+        </li>
+      </ul>
+      <div className="taskbar-snip-buttons">
+        <button className="btn" onClick={() => void window.api.startSnip('picture')} data-taskbar-snip-try>
+          Try it now
+        </button>
+        {state.shortcut && (
+          <button className="btn" onClick={() => void window.api.snipShowShortcut()} title="Shows Orbit Snip in File Explorer, where right-click → Pin to taskbar works too">
+            Show Orbit Snip
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -218,6 +373,49 @@ function CheckSettingsButton() {
   )
 }
 
+/** The sidebar's groups, Nocturne style. A section not listed here goes under "More". */
+const NAV_GROUPS: { label: string; ids: string[] }[] = [
+  { label: 'Make it yours', ids: ['appearance', 'navigation', 'editor', 'shortcuts'] },
+  { label: 'Your stuff', ids: ['files', 'calendar', 'music', 'ai'] },
+  { label: 'Tools', ids: ['capture', 'browser', 'studio', 'computers'] },
+  { label: 'Orbit', ids: ['about'] }
+]
+
+function navGroups<T extends { id: string }>(sections: T[]): { label: string; items: T[] }[] {
+  const listed = new Set(NAV_GROUPS.flatMap((g) => g.ids))
+  const groups = NAV_GROUPS.map((g) => ({ label: g.label, items: g.ids.flatMap((id) => sections.filter((s) => s.id === id)) }))
+  const rest = sections.filter((s) => !listed.has(s.id))
+  if (rest.length) groups.splice(groups.length - 1, 0, { label: 'More', items: rest })
+  return groups.filter((g) => g.items.length > 0)
+}
+
+function CloseButton({ onClose }: { onClose: () => void }) {
+  return (
+    <button className="settings-close" onClick={onClose} title="Close (Esc)" aria-label="Close settings" data-settings-close>
+      <X size={16} />
+    </button>
+  )
+}
+
+/** "Orbit 1.13.7 · Up to date" at the foot of the sidebar. */
+function NavVersion() {
+  const status = useUpdates((s) => s.status)
+  const note =
+    status?.state === 'none'
+      ? 'Up to date'
+      : status?.state === 'ready'
+        ? 'Update ready'
+        : status?.state === 'available' || status?.state === 'downloading'
+          ? 'Update available'
+          : null
+  return (
+    <div className="settings-nav-version" data-settings-version>
+      Orbit {pkg.version}
+      {note && ` · ${note}`}
+    </div>
+  )
+}
+
 function About() {
   return (
     <section className="settings-group about">
@@ -246,10 +444,11 @@ function About() {
   )
 }
 
-export default function SettingsPage() {
+export default function SettingsPage({ onClose }: { onClose?: () => void } = {}) {
   const [section, setSection] = useState<SectionId>('appearance')
   const [query, setQuery] = useState('')
   const prefs = usePrefs((s) => s.prefs) as unknown as Record<string, unknown>
+  const installed = usePrefs((s) => s.prefs.installedAddons)
   const search = useRef<HTMLInputElement>(null)
   const body = useRef<HTMLDivElement>(null)
 
@@ -264,9 +463,13 @@ export default function SettingsPage() {
   useEffect(() => body.current?.scrollTo({ top: 0 }), [section])
 
   const q = query.trim()
-  const sectionDefs = SETTINGS.filter((d) => d.section === section)
+  const sectionDefs = SETTINGS.filter((d) => d.section === section && settingOn(d, installed))
   const sectionModified = sectionDefs.filter((d) => isModified(d, prefs))
-  const results = q ? SETTINGS.filter((d) => matchesSearch(d, q)) : []
+  const results = q ? SETTINGS.filter((d) => settingOn(d, installed) && matchesSearch(d, q)) : []
+  // Removing the add-on a section is about leaves it: go back to the first one.
+  useEffect(() => {
+    if (!sectionOn(section, installed)) setSection('appearance')
+  }, [section, installed])
 
   return (
     <div className="settings-page">
@@ -277,7 +480,13 @@ export default function SettingsPage() {
             ref={search}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
+            onKeyDown={(e) => {
+              // Escape clears the search first; with nothing typed, it closes Settings (SettingsDialog).
+              if (e.key === 'Escape' && query) {
+                e.stopPropagation()
+                setQuery('')
+              }
+            }}
             placeholder="Search settings"
             spellCheck={false}
           />
@@ -287,28 +496,40 @@ export default function SettingsPage() {
             </button>
           )}
         </div>
-        {SECTIONS.map(({ id, label }) => {
-          const Icon = ICONS[id]
-          return (
-            <button
-              key={id}
-              className={`settings-nav-item ${!q && section === id ? 'selected' : ''}`}
-              onClick={() => {
-                setQuery('')
-                setSection(id)
-              }}
-            >
-              <Icon size={15} /> {label}
-            </button>
-          )
-        })}
+        <div className="settings-nav-list">
+          {navGroups(SECTIONS.filter(({ id }) => sectionOn(id, installed))).map((group) => (
+            <div key={group.label} className="settings-nav-group">
+              <span className="settings-nav-label">{group.label}</span>
+              {group.items.map(({ id, label }) => {
+                const Icon = ICONS[id]
+                return (
+                  <button
+                    key={id}
+                    className={`settings-nav-item ${!q && section === id ? 'selected' : ''}`}
+                    aria-current={!q && section === id ? 'page' : undefined}
+                    onClick={() => {
+                      setQuery('')
+                      setSection(id)
+                    }}
+                  >
+                    <Icon size={15} /> {label}
+                  </button>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+        <NavVersion />
       </nav>
 
       <div className="settings-body" ref={body}>
         <div className="settings-content">
           {q ? (
             <>
-              <h2>Results for “{q}”</h2>
+              <div className="settings-heading">
+                <h2>Results for “{q}”</h2>
+                {onClose && <CloseButton onClose={onClose} />}
+              </div>
               {results.length > 0 && <SettingsList defs={results} />}
               <ShortcutsEditor query={q} />
               {SNIPPET_WORDS.test(q) && <SnippetsEditor />}
@@ -318,11 +539,14 @@ export default function SettingsPage() {
             <>
               <div className="settings-heading">
                 <h2>{SECTIONS.find((s) => s.id === section)!.label}</h2>
-                {sectionModified.length > 0 && (
-                  <button className="btn" onClick={() => resetPrefs(sectionModified.map((d) => d.key))}>
-                    <RotateCcw size={13} /> Reset section
-                  </button>
-                )}
+                <div className="settings-heading-actions">
+                  {sectionModified.length > 0 && (
+                    <button className="btn" onClick={() => resetPrefs(sectionModified.map((d) => d.key))}>
+                      <RotateCcw size={13} /> Reset section
+                    </button>
+                  )}
+                  {onClose && <CloseButton onClose={onClose} />}
+                </div>
               </div>
               {section === 'shortcuts' ? (
                 <ShortcutsEditor query="" />
@@ -337,12 +561,15 @@ export default function SettingsPage() {
                   {section === 'editor' && <SnippetsEditor />}
                   {section === 'calendar' && <RemindersSettings />}
                   {section === 'calendar' && <PlaceholderHelp />}
-                  {section === 'calendar' && <CalendarSources />}
+                  {section === 'calendar' && installed.includes('calendar') && <CalendarSources />}
                   {section === 'navigation' && <NavEditor />}
                   {section === 'capture' && <CaptureShortcutStatus />}
                   {section === 'capture' && <SnipShortcutStatus />}
-                  {section === 'ai' && <OfflineAiSettings />}
+                  {section === 'capture' && <SnipSaving />}
+                  {section === 'capture' && <TaskbarSnip />}
+                  {section === 'ai' && installed.includes('offline-ai') && <OfflineAiSettings />}
                   {section === 'ai' && <AiSettings />}
+                  {section === 'music' && <MusicFolderSetting />}
                   {section === 'music' && <MusicSettings />}
                   {section === 'music' && <SongIdSettings />}
                   {section === 'studio' && <StudioSettings />}

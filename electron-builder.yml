@@ -10,6 +10,8 @@ files:
   - build/icon.png
   - build/trayTemplate.png
   - build/trayTemplate@2x.png
+  # The "Orbit Snip" taskbar shortcut's icon (main/snipTaskbar.ts).
+  - build/snip.png
   # The Terminal tab's command line (node-pty): only the ready-made parts, without debug files.
   - '!node_modules/node-pty/{src,deps,third_party,scripts,build,typings,node-addon-api}/**'
   - '!node_modules/node-pty/binding.gyp'
@@ -17,6 +19,7 @@ files:
   - '!node_modules/node-addon-api/**'
   # The offline handwriting reader uses the smaller English model (4.0.0_best_int), not this one.
   - '!node_modules/@tesseract.js-data/eng/4.0.0/**'
+  - '!node_modules/@tesseract.js-data/osd/4.0.0/**'
 # node-pty is used as it comes (it's ready-made for Windows and both kinds of Mac), so it isn't rebuilt.
 npmRebuild: false
 # These can't run from inside the app's archive: node-pty's programs and background helper, and
@@ -34,6 +37,10 @@ asarUnpack:
   # The zip / RAR / 7z opener's 7-Zip (WebAssembly) and the worker thread that runs it.
   - node_modules/7z-wasm/**
   - out/main/**/sevenZipWorker*.js
+  # Whole PC search's worker thread, which keeps the list of every file (Files tab).
+  - out/main/**/fileIndexWorker*.js
+  # The Files tab's folder sizes are added up in a worker thread too.
+  - out/main/**/folderSizeWorker*.js
 win:
   target:
     - target: nsis

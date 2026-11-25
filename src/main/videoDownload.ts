@@ -13,6 +13,7 @@ import {
   cookiesFile,
   downloadArgs,
   explainDownloadError,
+  passingDownloadError,
   isYouTube,
   parseVideoLink,
   readLine,
@@ -288,6 +289,76 @@ function start(req: VideoDownloadRequest, vault: () => Vault | null): VideoDownl
   tellJobs(true)
   void run(job, url, folder, vault)
   return job
+}
+
+/**
+ * Downloads just the sound of a link into a folder of the caller's own (not the notes folder),
+ * for the soundboard's "From a link". Resolves to the file and the video's title. `onProgress` gets
+ * 0–1 while it's known. Stop it with the returned `cancel`.
+ */
+export function downloadSoundTo(link: string, dir: string, onProgress: (done: number | null) => void): { done: Promise<{ file: string; title: string }>; cancel: () => void } {
+  let child: ChildProcess | null = null
+  let cancelled = false
+  const done = (async (): Promise<{ file: string; title: string }> => {
+    const url = parseVideoLink(link)
+    if (!url) throw new Error('That doesn’t look like a link. Copy the video’s address and paste it here.')
+    if (!existsSync(toolPath())) {
+      await getTool()
+      if (!existsSync(toolPath())) throw new Error(state().error ?? 'The downloader couldn’t be set up.')
+    }
+    if (ffmpegState().state !== 'ready') await downloadFfmpeg()
+    await updateTool()
+    if (cancelled) throw new Error('Stopped.')
+    await mkdir(dir, { recursive: true })
+    const ffmpeg = existsSync(ffmpegPath()) ? ffmpegPath() : null
+    const args = downloadArgs({ url: url.href, quality: 'audio', outDir: dir, ffmpeg, cookies: await cookiesFor(url, dir), jsRuntime: `node:${process.execPath}` })
+    let title = ''
+    // Up to 3 goes: YouTube now and then drops a download part-way, and the next go nearly always works.
+    for (let attempt = 1; ; attempt++) {
+      const log: string[] = []
+      const code = await new Promise<number | null>((resolve, reject) => {
+        child = spawn(toolPath(), args, { windowsHide: true, env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', PYTHONIOENCODING: 'utf-8' } })
+        let rest = ''
+        const onData = (chunk: Buffer): void => {
+          const lines = (rest + chunk.toString('utf8')).split(/\r?\n|\r/)
+          rest = lines.pop() ?? ''
+          for (const line of lines) {
+            if (!line.trim()) continue
+            if (!line.startsWith('[orbit]')) log.push(line)
+            if (log.length > 60) log.shift()
+            const seen = readLine(line)
+            if (seen?.kind === 'progress') onProgress(seen.done)
+            else if (seen?.kind === 'part') title ||= seen.title
+            else if (seen?.kind === 'joining') onProgress(null)
+          }
+        }
+        child.stdout?.on('data', onData)
+        child.stderr?.on('data', onData)
+        child.on('error', reject)
+        child.on('close', (c) => resolve(c))
+      })
+      if (cancelled) throw new Error('Stopped.')
+      if (code === 0) break
+      const text = log.join('\n')
+      logError(`saving a song's sound (go ${attempt})`, new Error(log.filter((l) => l.startsWith('ERROR:')).join('\n') || text.slice(-600)))
+      if (attempt >= 3 || !passingDownloadError(text)) throw new Error(explainDownloadError(text, siteName(url)))
+      onProgress(null)
+      await new Promise((r) => setTimeout(r, 1500 * attempt))
+      if (cancelled) throw new Error('Stopped.')
+      // Start the next go clean (yt-dlp would otherwise pick up a broken part file).
+      for (const name of await readdir(dir).catch(() => [] as string[])) if (name !== 'cookies.txt') await rm(join(dir, name), { recursive: true, force: true }).catch(() => undefined)
+    }
+    const file = await finishedFile(dir)
+    if (!file) throw new Error('The sound couldn’t be downloaded.')
+    return { file, title: title || file.slice(dir.length + 1).replace(/\.\w+$/, '') }
+  })()
+  return {
+    done,
+    cancel: () => {
+      cancelled = true
+      if (child) kill(child)
+    }
+  }
 }
 
 /** Starts a video download for the download manager (when its turn comes). */

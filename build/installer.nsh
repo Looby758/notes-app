@@ -23,6 +23,8 @@
     DeleteRegKey HKCU "Software\Classes\OrbitURL"
     DeleteRegKey HKCU "Software\Clients\StartMenuInternet\Orbit"
     DeleteRegValue HKCU "Software\RegisteredApplications" "Orbit"
+    ; The "Orbit Snip" Start menu shortcut, which Orbit makes itself (main/snipTaskbar.ts).
+    Delete "$SMPROGRAMS\Orbit Snip.lnk"
     !insertmacro OrbitRemoveVerb "mp4"
     !insertmacro OrbitRemoveVerb "m4v"
     !insertmacro OrbitRemoveVerb "mov"

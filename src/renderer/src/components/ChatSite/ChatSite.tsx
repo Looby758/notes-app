@@ -8,6 +8,7 @@ import { CLAUDE_TAB, closeTab, GROK_TAB, openSpecialTab } from '../../lib/editor
 import { paneWithTab } from '../../store/editor'
 import { setSiteFloating, setSiteRect, setSiteUrl, useChatSites } from '../../store/grok'
 import { webviews } from '../../store/web'
+import { addonOn } from '../../lib/addons'
 
 /**
  * Chat bots inside Orbit (Grok, Claude): the real site in a walled-off web page (main/browser.ts
@@ -45,15 +46,34 @@ const floatKey = (site: ChatSiteId): string => `${site}:float`
 /** The site's pages showing now (tab and panel), newest first: where "Send to Claude" types. */
 const shown = new Map<ChatSiteId, WebviewTag[]>()
 
+/** A file to attach along with the text (a picture, as base64 so it can be handed to the page). */
+export interface SiteFile {
+  name: string
+  type: string
+  base64: string
+}
+
+/** What sendToSite managed: the text typed in, and how many of the files were attached. */
+export interface SiteSent {
+  typed: boolean
+  attached: number
+}
+
 /**
  * Opens the site (in its panel if that's how you use it, else its tab), goes to `url`, and puts
- * `text` in its message box, ready to send. False if the box couldn't be found in time (the text
- * should then be pasted by hand).
+ * `text` in its message box, ready to send, with `files` attached to the message. `typed` is false
+ * if the box couldn't be found in time (the text should then be pasted by hand); `attached` says
+ * how many files went in (the rest should be copied across by hand).
  */
-export async function sendToSite(site: ChatSiteId, url: string, text: string): Promise<boolean> {
+export async function sendToSite(site: ChatSiteId, url: string, text: string, files: SiteFile[] = []): Promise<SiteSent> {
+  // Claude and Grok are add-ons: without this one, the page opens in your browser instead (the text is pasted by hand).
+  if (!addonOn(site)) {
+    window.open(url)
+    return { typed: false, attached: 0 }
+  }
   if (!useChatSites.getState()[site].floating) openSiteTab(site)
   const view = await waitFor(() => shown.get(site)?.[0] ?? null, 8000)
-  if (!view) return false
+  if (!view) return { typed: false, attached: 0 }
   await new Promise<void>((done) => {
     const finished = (): void => {
       view.removeEventListener('did-stop-loading', finished)
@@ -82,8 +102,51 @@ export async function sendToSite(site: ChatSiteId, url: string, text: string): P
     return !!box.textContent.trim()
   })()`
   const typed = await waitFor(async () => ((await view.executeJavaScript(script).catch(() => false)) ? true : null), 15000)
+  const attached = typed && files.length ? await attachFiles(view, files) : 0
   if (typed) view.focus()
-  return !!typed
+  return { typed: !!typed, attached }
+}
+
+/**
+ * Attaches files to the message being written: through the page's own file picker if it has one
+ * (as if you'd chosen them there), else pasted into the message box like a copied picture. Gives
+ * how many went in.
+ */
+async function attachFiles(view: WebviewTag, files: SiteFile[]): Promise<number> {
+  const script = `(() => {
+    const files = ${JSON.stringify(files)}.map((f) => {
+      const bytes = Uint8Array.from(atob(f.base64), (c) => c.charCodeAt(0))
+      return new File([bytes], f.name, { type: f.type })
+    })
+    const data = new DataTransfer()
+    for (const f of files) data.items.add(f)
+    const inputs = [...document.querySelectorAll('input[type="file"]')].filter((i) => !i.disabled)
+    const input = inputs.find((i) => !i.accept || /image|\\*/.test(i.accept)) || inputs[0]
+    if (input) {
+      if (!input.multiple && files.length > 1) {
+        // One at a time, for a picker that takes a single file.
+        for (const f of files) {
+          const one = new DataTransfer()
+          one.items.add(f)
+          input.files = one.files
+          input.dispatchEvent(new Event('input', { bubbles: true }))
+          input.dispatchEvent(new Event('change', { bubbles: true }))
+        }
+      } else {
+        input.files = data.files
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+        input.dispatchEvent(new Event('change', { bubbles: true }))
+      }
+      return files.length
+    }
+    const box = document.querySelector('div[contenteditable="true"]') || document.querySelector('textarea')
+    if (!box) return 0
+    box.focus()
+    box.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+    return files.length
+  })()`
+  const n = await view.executeJavaScript(script).catch(() => 0)
+  return typeof n === 'number' ? n : 0
 }
 
 async function waitFor<T>(get: () => T | null | Promise<T | null>, ms: number): Promise<T | null> {

@@ -5,10 +5,11 @@ import Private from '../Streamer/Private'
 import { useHideNames } from '../../store/streamer'
 import { useEditor } from '../../store/editor'
 import { toggleStar, useStarred } from '../../store/starred'
-import { Images, Clock } from 'lucide-react'
+import { Images, Clock, Send } from 'lucide-react'
 import { useNoteIndex } from '../../store/noteIndex'
-import { ArrowDownToLine, Keyboard, Upload } from 'lucide-react'
-import { FilePen } from 'lucide-react'
+import { ArrowDownToLine, Keyboard, Repeat2, Upload } from 'lucide-react'
+import { FilePen, Music2, Target } from 'lucide-react'
+import { Activity, PackageX, Puzzle } from 'lucide-react'
 import { isMindMap, openExport, toggleMindMap, useUI } from '../../store/ui'
 import {
   activateTab,
@@ -27,6 +28,7 @@ import {
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
+  FILESENDER_TAB,
   PDF_EDITOR_TAB,
   isExplorerTab,
   COMICS_TAB,
@@ -34,9 +36,14 @@ import {
   MINIGAMES_TAB,
   CLOCKS_TAB,
   COUNTDOWNS_TAB,
+  SKYBLOCK_GOALS_TAB,
   PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
+  TASKS_TAB,
+  UNINSTALL_TAB,
+  ADDONS_TAB,
+  MUSIC_TAB,
   DOWNLOADS_TAB,
   STUDIO_TAB,
   APPSTUDIO_TAB,
@@ -44,6 +51,7 @@ import {
   VIDEOS_TAB,
   SOUNDBOARD_TAB,
   MACROS_TAB,
+  KEYREMAP_TAB,
   DISCORD_TAB,
   MESSAGES_TAB,
   GROK_TAB,
@@ -111,15 +119,21 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === HOME_TAB) return 'Home'
   if (id === MONEY_TAB) return 'Money'
   if (id === CONVERT_TAB) return 'Convert files'
+  if (id === FILESENDER_TAB) return 'Big file sender'
   if (id === PDF_EDITOR_TAB) return 'PDF editor'
   if (id === COMICS_TAB) return 'Comics'
   if (id === WIKI_TAB) return 'Wikis'
   if (id === MINIGAMES_TAB) return 'Mini games'
   if (id === CLOCKS_TAB) return 'World clocks'
   if (id === COUNTDOWNS_TAB) return 'Countdowns'
+  if (id === SKYBLOCK_GOALS_TAB) return 'SkyBlock'
   if (id === PUBLISHING_TAB) return 'Publishing'
   if (id === SCREENS_TAB) return 'Screens'
   if (id === MIXER_TAB) return 'Volume mixer'
+  if (id === TASKS_TAB) return 'Task manager'
+  if (id === UNINSTALL_TAB) return 'Uninstaller'
+  if (id === ADDONS_TAB) return 'Add-ons'
+  if (id === MUSIC_TAB) return 'Music'
   if (id === DOWNLOADS_TAB) return 'Downloads'
   if (id === STUDIO_TAB) return 'Studio'
   if (id === APPSTUDIO_TAB) return 'App Studio'
@@ -127,6 +141,7 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === VIDEOS_TAB) return 'Videos'
   if (id === SOUNDBOARD_TAB) return 'Soundboard'
   if (id === MACROS_TAB) return 'Macros'
+  if (id === KEYREMAP_TAB) return 'Key remapper'
   if (id === DISCORD_TAB) return 'Discord voice'
   if (id === MESSAGES_TAB) return 'Messages'
   if (id === GROK_TAB) return 'Grok'
@@ -341,15 +356,21 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === HOME_TAB && <House size={13} className="tab-icon" />}
               {id === MONEY_TAB && <PoundSterling size={13} className="tab-icon" />}
               {id === CONVERT_TAB && <ArrowRightLeft size={13} className="tab-icon" />}
+              {id === FILESENDER_TAB && <Send size={13} className="tab-icon" />}
               {id === PDF_EDITOR_TAB && <FilePen size={13} className="tab-icon" />}
               {id === COMICS_TAB && <LibraryBig size={13} className="tab-icon" />}
               {id === WIKI_TAB && <Library size={13} className="tab-icon" />}
               {id === MINIGAMES_TAB && <Joystick size={13} className="tab-icon" />}
               {id === CLOCKS_TAB && <Globe2 size={13} className="tab-icon" />}
               {id === COUNTDOWNS_TAB && <Hourglass size={13} className="tab-icon" />}
+              {id === SKYBLOCK_GOALS_TAB && <Target size={13} className="tab-icon" />}
               {id === PUBLISHING_TAB && <Upload size={13} className="tab-icon" />}
               {id === SCREENS_TAB && <Monitor size={13} className="tab-icon" />}
               {id === MIXER_TAB && <SlidersVertical size={13} className="tab-icon" />}
+              {id === TASKS_TAB && <Activity size={13} className="tab-icon" />}
+              {id === UNINSTALL_TAB && <PackageX size={13} className="tab-icon" />}
+              {id === ADDONS_TAB && <Puzzle size={13} className="tab-icon" />}
+              {id === MUSIC_TAB && <Music2 size={13} className="tab-icon" />}
               {id === DOWNLOADS_TAB && <ArrowDownToLine size={13} className="tab-icon" />}
               {id === STUDIO_TAB && <Clapperboard size={13} className="tab-icon" />}
               {id === APPSTUDIO_TAB && <Hammer size={13} className="tab-icon" />}
@@ -357,6 +378,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === VIDEOS_TAB && <Video size={13} className="tab-icon" />}
               {id === SOUNDBOARD_TAB && <AudioLines size={13} className="tab-icon" />}
               {id === MACROS_TAB && <Keyboard size={13} className="tab-icon" />}
+              {id === KEYREMAP_TAB && <Repeat2 size={13} className="tab-icon" />}
               {id === DISCORD_TAB && <Headphones size={13} className="tab-icon" />}
               {id === MESSAGES_TAB && <MessagesSquare size={13} className="tab-icon" />}
               {id === GROK_TAB && <Bot size={13} className="tab-icon" />}

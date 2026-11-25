@@ -161,6 +161,8 @@ export interface BoardItem {
   sentAt?: string
   /** The pull request Claude opened for it ("owner/name#12"), once matched. */
   pull?: string
+  /** The bug report (a GitHub issue, "owner/name#7") it came from. */
+  issue?: string
 }
 
 /** A screenshot of one of an app's features, for its gallery. */
@@ -227,7 +229,8 @@ export function readBoard(json: string | null): BoardData {
           created: typeof i.created === 'string' ? i.created : new Date(0).toISOString(),
           updated: typeof i.updated === 'string' ? i.updated : typeof i.created === 'string' ? i.created : new Date(0).toISOString(),
           sentAt: str(i.sentAt),
-          pull: str(i.pull)
+          pull: str(i.pull),
+          issue: str(i.issue)
         }))
     }
   } catch {
@@ -286,6 +289,64 @@ export interface Release {
   url: string
   /** Its notes, as written. */
   body: string
+  /** How many times its installers were downloaded (the updater's own files left out). */
+  downloads?: number
+  /** Each installer file and its downloads. */
+  files?: ReleaseFile[]
+}
+
+export interface ReleaseFile {
+  name: string
+  downloads: number
+}
+
+/** Files on a release that people don't download themselves: the updater's own files, checksums, signatures. */
+const NOT_A_DOWNLOAD = /(\.(ya?ml|blockmap|json|txt|sha(1|256|512)|sig|asc|md5)|^(latest|RELEASES)[\w.-]*)$/i
+
+/** Whether a release file is an installer (or a zip of the app) that counts as a download. */
+export const isDownloadFile = (name: string): boolean => !NOT_A_DOWNLOAD.test(name)
+
+export type Platform = 'Windows' | 'Mac' | 'Linux' | 'Other'
+
+/** Which computer a release file is for, from its name. */
+export function platformOf(name: string): Platform {
+  const n = name.toLowerCase()
+  if (/\.(exe|msi|appx|msix)$/.test(n) || /\b(win|windows|win32|win64)\b/.test(n)) return 'Windows'
+  if (/\.(dmg|pkg)$/.test(n) || /\b(mac|macos|darwin|osx)\b/.test(n)) return 'Mac'
+  if (/\.(appimage|deb|rpm|snap|flatpak)$/.test(n) || /\blinux\b/.test(n)) return 'Linux'
+  return 'Other'
+}
+
+/** A release's downloads by computer, biggest first. */
+export function downloadsByPlatform(files: ReleaseFile[]): { platform: Platform; downloads: number }[] {
+  const out = new Map<Platform, number>()
+  for (const f of files) out.set(platformOf(f.name), (out.get(platformOf(f.name)) ?? 0) + f.downloads)
+  return [...out].map(([platform, downloads]) => ({ platform, downloads })).sort((a, b) => b.downloads - a.downloads)
+}
+
+/** 1234 → "1,234", 15300 → "15.3k". */
+export function countText(n: number): string {
+  if (n < 10_000) return n.toLocaleString('en-GB')
+  if (n < 1_000_000) return `${(n / 1000).toFixed(n < 100_000 ? 1 : 0).replace(/\.0$/, '')}k`
+  return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}m`
+}
+
+/** An app's total downloads, noted once a day on this computer, so the week and month can be worked out. */
+export type DownloadHistory = { day: string; total: number }[]
+
+/** Adds today's total (replacing today's earlier one), keeping the last year. */
+export function addDownloadDay(history: DownloadHistory, day: string, total: number): DownloadHistory {
+  const rest = history.filter((h) => h.day !== day)
+  return [...rest, { day, total }].sort((a, b) => a.day.localeCompare(b.day)).slice(-366)
+}
+
+/** Downloads in the last `days` days, from the history; null when it doesn't go back that far yet. */
+export function downloadsSince(history: DownloadHistory, days: number, today: string): number | null {
+  if (!history.length) return null
+  const cutoff = new Date(Date.parse(today + 'T00:00:00Z') - days * 86_400_000).toISOString().slice(0, 10)
+  const before = [...history].reverse().find((h) => h.day <= cutoff)
+  if (!before) return null
+  return Math.max(0, history[history.length - 1].total - before.total)
 }
 
 /** A pull request that was merged. */
@@ -327,6 +388,39 @@ export function releaseCommand(windows: boolean, bump: VersionBump, test = false
   if (!windows) return steps.join(' && ')
   // PowerShell: each step only if the one before worked.
   return steps.reduceRight((rest, step) => `${step}; if ($LASTEXITCODE -eq 0) { ${rest} }`)
+}
+
+/**
+ * Rolling back: a new release (so apps that update themselves move to it) with an earlier
+ * release's code in it. Every file is put back as it was at `goodTag` (files added since are
+ * removed), the version is set to `newVersion`, and that's committed, tagged and pushed, which a
+ * release workflow builds like any other release. Nothing is deleted from git's history, so the
+ * newer work can be brought back later.
+ */
+export function rollbackCommand(windows: boolean, goodTag: string, newVersion: string): string {
+  if (!/^[\w.+-]{1,60}$/.test(goodTag) || !/^\d+\.\d+\.\d+$/.test(newVersion)) throw new Error('Not a version Orbit can roll back to.')
+  const steps = [
+    `git fetch --tags origin`,
+    `git restore --source=${goodTag} --staged --worktree -- .`,
+    `npm version ${newVersion} --no-git-tag-version --allow-same-version`,
+    `git add -A`,
+    `git commit -m "Roll back to ${goodTag} (released as v${newVersion})"`,
+    `git tag -a v${newVersion} -m "Release ${newVersion}"`,
+    `git push --follow-tags`
+  ]
+  if (!windows) return steps.join(' && ')
+  return steps.reduceRight((rest, step) => `${step}; if ($LASTEXITCODE -eq 0) { ${rest} }`)
+}
+
+/** The version a roll back is released as: one fix up from the newest version there is (package.json or a release). */
+export function rollbackVersion(current: string | undefined, releases: { tag: string }[]): string | null {
+  const versions = [current, ...releases.map((r) => r.tag)]
+    .map((v) => /^v?(\d+)\.(\d+)\.(\d+)$/.exec((v ?? '').trim()))
+    .filter((m): m is RegExpExecArray => !!m)
+    .map((m) => [Number(m[1]), Number(m[2]), Number(m[3])])
+  if (!versions.length) return null
+  const [a, b, c] = versions.sort((x, y) => y[0] - x[0] || y[1] - x[1] || y[2] - x[2])[0]
+  return `${a}.${b}.${c + 1}`
 }
 
 /** Switches to a branch and gets its latest, in the app's terminal. */
@@ -408,6 +502,17 @@ const quoteBranch = (branch: string): string => (/^[\w./@+-]+$/.test(branch) ? b
  * Runs a test copy: gets the branch's latest, installs packages if they changed (or never were),
  * then starts the app. Each step only runs if the one before worked.
  */
+/**
+ * The run command for "Try as a new user": Orbit started with ORBIT_NEW_USER=1 starts from nothing
+ * (main/testCopy.ts). Only that one command sees it, so a normal run in the same app stays normal.
+ */
+export function newUserRunCommand(windows: boolean, run = 'npm run dev'): string {
+  return windows ? `$env:ORBIT_NEW_USER='1'; ${run}` : `ORBIT_NEW_USER=1 ${run}`
+}
+
+/** Whether an app is Orbit itself, the one app that knows how to try as a new user. */
+export const isOrbitRepo = (repo: string | undefined): boolean => !!repo && /^looby758\/notes-app$/i.test(repo)
+
 export function copyRunCommand(windows: boolean, branch: string, run = 'npm run dev'): string {
   const b = quoteBranch(branch)
   const files = PACKAGE_FILES.join(' ')
@@ -508,13 +613,77 @@ export const isTokenPermissionError = (message: string): boolean => message.incl
 
 /**
  * GitHub's page for making a fine-grained token, filled in with what App Studio needs: Pull
- * requests and Contents set to read and write (merging, closing, release notes), for the owner's
+ * requests and Contents set to read and write (merging, closing, release notes), and Actions (so
+ * the release helper can see GitHub's builds and run a failed one again), for the owner's
  * repositories.
  */
 export function newTokenUrl(owner?: string): string {
-  const q = new URLSearchParams({ name: 'Orbit App Studio', description: 'Merge, close and release from Orbit’s App Studio', pull_requests: 'write', contents: 'write', metadata: 'read' })
+  const q = new URLSearchParams({ name: 'Orbit App Studio', description: 'Merge, close and release from Orbit’s App Studio', pull_requests: 'write', contents: 'write', actions: 'write', metadata: 'read' })
   if (owner) q.set('target_name', owner)
   return `https://github.com/settings/personal-access-tokens/new?${q.toString()}`
+}
+
+// ---------- Draft pull requests ----------
+
+/** One error from GitHub's GraphQL API (it answers 200 and lists what went wrong). */
+export interface GraphQLError {
+  type?: string
+  message?: string
+}
+
+/**
+ * What to show when GitHub wouldn't mark a draft ready for review. A token without Pull requests
+ * write gets the same "isn't allowed" message as everywhere else, so App Studio can offer a new one.
+ */
+export function readyForReviewError(errors: GraphQLError[], repo: string): string {
+  const first = errors[0] ?? {}
+  const message = first.message ?? ''
+  if (first.type === 'FORBIDDEN' || /resource not accessible by (personal access token|integration)/i.test(message)) {
+    return `${TOKEN_NOT_ALLOWED} mark pull requests ready for review on ${repo}. It needs Pull requests set to “Read and write”, with ${repo} in its repositories. Make a new token with those and paste it into App Studio.`
+  }
+  return `GitHub wouldn’t take it out of draft${message ? `: ${message.replace(/\.?$/, '.')}` : '.'} Nothing was merged.`
+}
+
+/** What to show when a draft was marked ready, but merging it then failed. */
+export const mergeAfterReadyError = (message: string): string =>
+  isTokenPermissionError(message) ? message : `It’s now marked ready for review, but it didn’t merge. ${message.replace(/\.?$/, '.')}`
+
+// ---------- Why a merge can't happen ----------
+
+/** What GitHub says about whether a pull request can be merged (its REST `mergeable` fields). */
+export interface Mergeability {
+  /** null while GitHub is still working it out (it does that in the background after a push). */
+  mergeable: boolean | null
+  /** clean, dirty, blocked, behind, unstable, has_hooks, draft or unknown. */
+  mergeable_state?: string
+}
+
+const conflictsMessage = (number: number, base: string): string =>
+  `#${number} has conflicts with ${base}, so GitHub can’t merge it. Some of the same lines were changed on ${base} after it was opened. Ask Claude to fix the conflicts on its branch, then try Merge again. Nothing was merged.`
+
+/**
+ * Why GitHub won't merge this pull request, before App Studio tries (and before it takes a draft
+ * out of draft), or null if nothing's known to be in the way. Failing checks that aren't required
+ * ("unstable") don't stop a merge, so they don't count.
+ */
+export function mergeBlockedReason(m: Mergeability, number: number, base: string): string | null {
+  if (m.mergeable === false || m.mergeable_state === 'dirty') return conflictsMessage(number, base)
+  if (m.mergeable_state === 'behind')
+    return `#${number} is behind ${base}, and ${base}’s rules on GitHub need it up to date first. Use “Update branch” on its GitHub page, then try Merge again. Nothing was merged.`
+  if (m.mergeable_state === 'blocked')
+    return `GitHub is blocking #${number}: ${base}’s rules want something first, like a check that has to pass or an approving review. Open it on GitHub to see what’s missing. Nothing was merged.`
+  return null
+}
+
+/** Turns GitHub's answer when a merge fails (405 or 409) into something specific. */
+export function mergeFailedMessage(message: string, number: number, base: string): string {
+  if (isTokenPermissionError(message)) return message
+  if (/not mergeable|merge conflict/i.test(message)) return conflictsMessage(number, base)
+  if (/(base|head) branch was modified/i.test(message)) return `#${number} or ${base} changed on GitHub just as it was merging. Try Merge again. Nothing was merged.`
+  if (/approving review/i.test(message)) return `#${number} needs an approving review on GitHub before ${base}’s rules let it merge. Nothing was merged.`
+  if (/status check|required check/i.test(message)) return `#${number} has a required check on GitHub that hasn’t passed yet. Nothing was merged.`
+  if (/draft/i.test(message)) return `#${number} is still a draft on GitHub. Try Merge again. Nothing was merged.`
+  return `GitHub couldn’t merge #${number}${message ? `: ${message.replace(/\.?$/, '.')}` : '.'} Nothing was merged.`
 }
 
 // ---------- Uncommitted changes ----------
@@ -534,4 +703,214 @@ export const stashCommand = (): string => 'git stash push --include-untracked -m
 export function commitAllCommand(windows: boolean, message: string): string {
   const m = message.replace(/["`$\\]/g, '').trim() || 'Update'
   return windows ? `git add -A; if ($LASTEXITCODE -eq 0) { git commit -m "${m}" }` : `git add -A && git commit -m "${m}"`
+}
+
+// ---------- Health check ----------
+
+/** A package with a newer version out. */
+export interface OutdatedPackage {
+  name: string
+  /** What's installed (missing when the packages aren't installed yet). */
+  current?: string
+  /** The newest version package.json already allows (what `npm update` gets). */
+  wanted: string
+  /** The newest version there is. */
+  latest: string
+  /** Getting `latest` means a new major version, which can need code changes. */
+  major: boolean
+  dev: boolean
+}
+
+export type Severity = 'critical' | 'high' | 'moderate' | 'low' | 'info'
+
+export const SEVERITIES: Severity[] = ['critical', 'high', 'moderate', 'low', 'info']
+
+/** A package with a known security problem. */
+export interface SecurityWarning {
+  name: string
+  severity: Severity
+  /** What the problem is, from the advisory. */
+  title: string
+  url?: string
+  /** Whether `npm audit fix` can fix it without a major update. */
+  easyFix: boolean
+  /** Fixing it needs a major update of a package (npm audit fix --force), which can break things. */
+  majorFix: boolean
+}
+
+export interface HealthReport {
+  checkedAt: string
+  outdated: OutdatedPackage[]
+  security: SecurityWarning[]
+  /** Something that stopped part of the check (npm not installed, no package-lock.json…). */
+  problems: string[]
+}
+
+const majorOf = (v?: string): number | null => {
+  const m = /^\D*(\d+)\./.exec(v ?? '')
+  return m ? Number(m[1]) : null
+}
+
+/** Reads `npm outdated --json --long`. */
+export function parseOutdated(json: string): OutdatedPackage[] {
+  let data: unknown
+  try {
+    data = JSON.parse(json || '{}')
+  } catch {
+    return []
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return []
+  const out: OutdatedPackage[] = []
+  for (const [name, raw] of Object.entries(data as Record<string, unknown>)) {
+    // Workspaces list a package once for each place it's used.
+    const entry = (Array.isArray(raw) ? raw[0] : raw) as { current?: string; wanted?: string; latest?: string; type?: string } | undefined
+    if (!entry || typeof entry.latest !== 'string' || typeof entry.wanted !== 'string') continue
+    const from = majorOf(entry.current ?? entry.wanted)
+    const to = majorOf(entry.latest)
+    out.push({
+      name,
+      current: entry.current,
+      wanted: entry.wanted,
+      latest: entry.latest,
+      major: from !== null && to !== null && to > from,
+      dev: entry.type === 'devDependencies'
+    })
+  }
+  return out.sort((a, b) => Number(a.major) - Number(b.major) || a.name.localeCompare(b.name))
+}
+
+/** Reads `npm audit --json` (npm 7 and later): one warning for each package with a problem. */
+export function parseAudit(json: string): SecurityWarning[] {
+  let data: { vulnerabilities?: Record<string, { name?: string; severity?: string; via?: unknown[]; fixAvailable?: unknown }> }
+  try {
+    data = JSON.parse(json || '{}')
+  } catch {
+    return []
+  }
+  const out: SecurityWarning[] = []
+  for (const [key, v] of Object.entries(data?.vulnerabilities ?? {})) {
+    const severity = (SEVERITIES as string[]).includes(v.severity ?? '') ? (v.severity as Severity) : 'info'
+    // "via" holds the advisories themselves, or the names of other packages that bring the problem in.
+    const advisory = (v.via ?? []).find((x): x is { title?: string; url?: string } => !!x && typeof x === 'object')
+    const through = (v.via ?? []).filter((x): x is string => typeof x === 'string')
+    const fix = v.fixAvailable
+    out.push({
+      name: v.name ?? key,
+      severity,
+      title: advisory?.title ?? (through.length ? `Uses ${through.slice(0, 3).join(', ')}, which ${through.length === 1 ? 'has' : 'have'} a problem` : 'A known problem'),
+      url: advisory?.url,
+      easyFix: fix === true || (!!fix && typeof fix === 'object' && !(fix as { isSemVerMajor?: boolean }).isSemVerMajor),
+      majorFix: !!fix && typeof fix === 'object' && !!(fix as { isSemVerMajor?: boolean }).isSemVerMajor
+    })
+  }
+  return out.sort((a, b) => SEVERITIES.indexOf(a.severity) - SEVERITIES.indexOf(b.severity) || a.name.localeCompare(b.name))
+}
+
+/** Each severity and how many warnings have it, worst first ("2 high, 1 low"). */
+export function severityCounts(warnings: SecurityWarning[]): { severity: Severity; count: number }[] {
+  return SEVERITIES.map((severity) => ({ severity, count: warnings.filter((w) => w.severity === severity).length })).filter((c) => c.count > 0)
+}
+
+/** How the app is doing: good (nothing to do), fine (updates, no security problems), or attention (security problems). */
+export function healthLevel(report: HealthReport): 'good' | 'fine' | 'attention' {
+  if (report.security.some((w) => w.severity !== 'info' && w.severity !== 'low')) return 'attention'
+  if (report.security.length || report.outdated.length) return 'fine'
+  return 'good'
+}
+
+/** One line about it, for the app's card. */
+export function healthLine(report: HealthReport): string {
+  const parts: string[] = []
+  if (report.security.length) {
+    const worst = severityCounts(report.security)[0]
+    parts.push(`${report.security.length} security warning${report.security.length === 1 ? '' : 's'}${worst.severity !== 'info' ? ` (${worst.count} ${worst.severity})` : ''}`)
+  }
+  if (report.outdated.length) parts.push(`${report.outdated.length} update${report.outdated.length === 1 ? '' : 's'}`)
+  return parts.length ? parts.join(' · ') : report.problems.length ? 'Couldn’t check everything' : 'All up to date and safe'
+}
+
+/** A board card asking Claude to update the packages and fix the security warnings. */
+export function healthBoardItem(report: HealthReport): { title: string; details: string } {
+  const lines: string[] = []
+  if (report.security.length) {
+    lines.push('Security warnings from npm audit:')
+    for (const w of report.security) lines.push(`- ${w.name} (${w.severity}): ${w.title}${w.url ? ` ${w.url}` : ''}`)
+  }
+  const majors = report.outdated.filter((p) => p.major)
+  const minors = report.outdated.filter((p) => !p.major)
+  if (minors.length) {
+    if (lines.length) lines.push('')
+    lines.push('Safe updates:')
+    for (const p of minors) lines.push(`- ${p.name} ${p.current ?? '(not installed)'} → ${p.latest}`)
+  }
+  if (majors.length) {
+    if (lines.length) lines.push('')
+    lines.push('Big updates (new major versions, check nothing breaks):')
+    for (const p of majors) lines.push(`- ${p.name} ${p.current ?? '(not installed)'} → ${p.latest}`)
+  }
+  lines.push('', 'Update what’s safe, fix the security warnings, and make sure the app still builds and its tests pass.')
+  const title = report.security.length ? 'Fix the security warnings and update packages' : 'Update packages'
+  return { title, details: lines.join('\n') }
+}
+
+// ---------- Bug reports from people using the app ----------
+
+/** A bug report: an open issue on the app's GitHub repository. */
+export interface BugReport {
+  repo: string
+  number: number
+  title: string
+  body: string
+  author: string
+  url: string
+  createdAt: string
+  labels: string[]
+  comments: number
+}
+
+/** Reports not on the board yet (and not hidden), newest first. */
+export function newReports(reports: BugReport[], items: { issue?: string }[], hidden: string[] = []): BugReport[] {
+  const known = new Set([...items.map((i) => i.issue).filter(Boolean), ...hidden])
+  return reports.filter((r) => !known.has(pullKey(r.repo, r.number))).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+}
+
+/** A report as a board card: its title, and its words with who sent it and where. Pictures in it are added separately. */
+export function reportCard(report: BugReport): { title: string; details: string; kind: 'idea' | 'bug' } {
+  const body = report.body
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/<img[^>]*>/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, 4000)
+  const idea = report.labels.some((l) => /enhancement|feature|idea|suggestion/i.test(l)) && !report.labels.some((l) => /bug/i.test(l))
+  return {
+    title: report.title.trim().slice(0, 200),
+    details: [body, `Reported by ${report.author} on GitHub: ${report.url}`].filter(Boolean).join('\n\n'),
+    kind: idea ? 'idea' : 'bug'
+  }
+}
+
+/**
+ * The link a "Report a bug" button opens: a new GitHub issue on the app's repository with the
+ * app's version and computer filled in, so the person only has to say what went wrong.
+ */
+export function bugReportUrl(repo: string, about: { app: string; version?: string; os?: string }): string {
+  const body = ['**What went wrong?**', '', '', '**What were you doing when it happened?**', '', '', '---', `${about.app}${about.version ? ` ${about.version}` : ''}${about.os ? ` on ${about.os}` : ''}`].join('\n')
+  const q = new URLSearchParams({ labels: 'bug', title: '', body })
+  return `https://github.com/${repo}/issues/new?${q.toString()}`
+}
+
+/** A board card asking Claude to add a "Report a bug" button to the app. */
+export function reportButtonCard(app: { name: string; repo: string }): { title: string; details: string } {
+  return {
+    title: 'Add a “Report a bug” button',
+    details: [
+      `Add a “Report a bug” button to ${app.name} (in its menu or settings, wherever fits best). It should open this link in the web browser, with the app’s real version and the computer’s system filled in where the example says:`,
+      '',
+      bugReportUrl(app.repo, { app: app.name, version: '1.2.3', os: 'Windows 11' }),
+      '',
+      'Build the link in code (URL-encode the body) rather than pasting it as it is. Reports land as GitHub issues, which App Studio shows on the board.'
+    ].join('\n')
+  }
 }

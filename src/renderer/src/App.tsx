@@ -10,6 +10,8 @@ import { runCommandText } from './lib/smartCommands'
 import { saveCapture } from './lib/capture'
 import StartupLogo from './components/Motion/StartupLogo'
 import { openVideo } from './store/videoPlayer'
+import { useAddonOn } from './lib/addons'
+import { startFileSend } from './store/fileSend'
 
 export default function App() {
   // undefined = still loading, null = no vault chosen yet
@@ -54,6 +56,13 @@ export default function App() {
 
   // A video handed back from the video window ("Back into Orbit") carries on in the player tab.
   useEffect(() => window.api.onVideoWindow((event, path) => event === 'popIn' && openVideo(path)), [])
+
+  // The big file sender's connections live here, so sends carry on in any tab.
+  // Only with the Big file sender add-on.
+  const fileSendOn = useAddonOn('filesender')
+  useEffect(() => {
+    if (fileSendOn) startFileSend()
+  }, [fileSendOn])
 
   const pickVault = useCallback(async () => {
     await flushAll()

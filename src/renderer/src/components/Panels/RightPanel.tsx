@@ -7,6 +7,7 @@ import { isNoteTab } from '../../lib/editorController'
 import Backlinks from './Backlinks'
 import Outline from './Outline'
 import MiniCalendar from '../Calendar/MiniCalendar'
+import { useAddonOn } from '../../lib/addons'
 import { useNoteHidden } from '../../store/streamer'
 
 const VIEWS: { id: RightView; label: string; icon: typeof Link2 }[] = [
@@ -16,7 +17,10 @@ const VIEWS: { id: RightView; label: string; icon: typeof Link2 }[] = [
 ]
 
 export default function RightPanel() {
-  const view = useUI((s) => s.rightView)
+  // The calendar view comes with the Calendar add-on.
+  const calendarOn = useAddonOn('calendar')
+  const picked = useUI((s) => s.rightView)
+  const view = picked === 'calendar' && !calendarOn ? 'backlinks' : picked
   const active = useEditor((s) => (isNoteTab(s.active) ? s.active : null))
   const version = useNoteIndex((s) => s.version)
   const headings = useEditor((s) => s.outline.length)
@@ -33,7 +37,7 @@ export default function RightPanel() {
     <div className="sidebar-inner">
       <div className="panel-header panel-tabs">
         {/* Only the selected tab shows its name, so three fit in a narrow panel. */}
-        {VIEWS.map(({ id, label, icon: Icon }) => (
+        {VIEWS.filter(({ id }) => id !== 'calendar' || calendarOn).map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             className={`panel-tab ${view === id ? 'selected' : ''}`}

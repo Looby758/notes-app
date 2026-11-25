@@ -58,3 +58,42 @@ export function unreadFromTitle(title: string): Unread {
 export function badgeText(count: number): string {
   return count <= 0 ? '' : count > 99 ? '99+' : String(count)
 }
+
+/**
+ * Whether a page needs windowSizedToPage: only Discord's own pages. Everywhere else the window keeps
+ * its real outer size. A window whose outer size is exactly the page's, reported by a script's
+ * getter rather than the browser's own, is what Google's sign-in looks for in browsers built into
+ * apps and automated ones: with it on every page, Google went back to "This browser or app may not
+ * be secure".
+ */
+export function needsPageSizedWindow(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase()
+    return ['discord.com', 'discordapp.com'].some((d) => host === d || host.endsWith(`.${d}`))
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Runs in each web page before the site's own code (src/preload/web.ts): the window's outer size is
+ * the page's own size, as in a browser window with nothing around the page.
+ *
+ * A page in Orbit sits inside the app window, beside the sidebar and under the tab bar, so the
+ * window's real outer size is much bigger than the page. Discord reads a gap of more than 160 pixels
+ * on one side as its developer tools being open, and then takes your sign-in out of its saved
+ * storage (keeping it only in memory, to put back as the page closes). Whenever the page didn't get
+ * to close properly, the next start found no sign-in: "Please log in again".
+ * Self-contained: it's copied into the page.
+ */
+export function windowSizedToPage(win: Window = window): void {
+  const sized = (name: 'outerWidth' | 'outerHeight', inner: 'innerWidth' | 'innerHeight'): void => {
+    try {
+      Object.defineProperty(win, name, { get: () => win[inner], set: () => undefined, configurable: true, enumerable: true })
+    } catch {
+      // left as it is
+    }
+  }
+  sized('outerWidth', 'innerWidth')
+  sized('outerHeight', 'innerHeight')
+}

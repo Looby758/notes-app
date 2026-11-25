@@ -460,3 +460,148 @@
     overflow: visible;
   }
 }
+
+/* ---------- Sound from a link ---------- */
+.sb-link {
+  margin: 10px 16px 0;
+}
+.sb-link-paste,
+.sb-link-actions,
+.sb-link-times {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sb-link-paste input,
+.sb-link label input {
+  flex: 1;
+  min-width: 0;
+}
+.sb-editor.sb-link label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.sb-link .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sb-link-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.sb-link-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+.sb-link-bar > div {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s;
+}
+.sb-link-bar > div.busy {
+  width: 30% !important;
+  animation: sb-link-busy 1.2s ease-in-out infinite;
+}
+@keyframes sb-link-busy {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+.sb-link-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sb-link-title {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sb-link-title em,
+.sb-link-times em {
+  font-style: normal;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.sb-link-overview,
+.sb-link-detail {
+  position: relative;
+  border-radius: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  --wave-on: var(--accent);
+  --wave-off: color-mix(in srgb, var(--text-muted) 55%, transparent);
+}
+.sb-link-overview {
+  height: 34px;
+  cursor: pointer;
+}
+.sb-link-detail {
+  height: 96px;
+  touch-action: none;
+}
+.sb-link-overview canvas,
+.sb-link-detail canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.sb-link-window {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  pointer-events: none;
+}
+.sb-link-part {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  cursor: grab;
+}
+.sb-link-handle {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 10px;
+  margin-left: -5px;
+  cursor: ew-resize;
+}
+.sb-link-handle::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.sb-link-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background: var(--text-strong);
+  pointer-events: none;
+}

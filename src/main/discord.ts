@@ -8,6 +8,11 @@ import {
   channelLink,
   clampVolume,
   cleanCalls,
+  NOTE_MAX,
+  presenceTotals,
+  setCallNote,
+  trackPresence,
+  type Presence,
   decodeFrames,
   discordError,
   DISCORD_PORTAL,
@@ -33,6 +38,7 @@ import {
   type DiscordStatus
 } from '@shared/discord'
 import { logError } from './log'
+import { addonOn, onAddonsChanged } from './addonGate'
 
 /**
  * Discord voice controls, through Discord's official local RPC socket (see shared/discord.ts).
@@ -106,6 +112,7 @@ function update(patch: Partial<DiscordStatus>): void {
   }
   trackCall()
   broadcast()
+  for (const l of statusListeners) l(status)
   if (before !== after) for (const l of channelListeners) l(before, after, firstLook)
 }
 
@@ -116,6 +123,8 @@ interface OpenCall {
   channelId: string
   record: CallRecord
   people: Set<string>
+  /** How long each person has been in it with you. */
+  presence: Presence
 }
 let openCall: OpenCall | null = null
 let calls: CallRecord[] | null = null
@@ -147,11 +156,28 @@ function trackCall(): void {
   const ch = status.channel
   if (!ch) return
   if (!openCall || openCall.channelId !== ch.id) {
-    openCall = { channelId: ch.id, people: new Set(), record: { id: randomUUID(), channel: ch.name, server: ch.server, start: ch.joinedAt, end: ch.joinedAt, people: [] } }
+    openCall = { channelId: ch.id, people: new Set(), presence: {}, record: { id: randomUUID(), channel: ch.name, server: ch.server, start: ch.joinedAt, end: ch.joinedAt, people: [] } }
   }
   openCall.record.channel = ch.name
   openCall.record.server = ch.server
-  for (const m of ch.members) if (m.id !== status.me?.id && !m.bot) openCall.people.add(m.name)
+  const here = ch.members.filter((m) => m.id !== status.me?.id && !m.bot).map((m) => m.name)
+  for (const name of here) openCall.people.add(name)
+  openCall.presence = trackPresence(openCall.presence, here, Math.max(Date.now(), openCall.record.start))
+}
+
+/** The note of the call going on now. */
+const currentNote = (): string => openCall?.record.note ?? ''
+
+/**
+ * Saves the note for the call going on now. `channelId` is the call it was typed in: a save that
+ * arrives after you've left (or moved channel) is dropped, so it doesn't end up on the next call.
+ */
+function setCurrentNote(text: string, channelId: string): void {
+  if (!openCall || openCall.channelId !== channelId) return
+  const note = text.slice(0, NOTE_MAX)
+  if (note.trim()) openCall.record.note = note
+  else delete openCall.record.note
+  for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send('discord:note-changed', note)
 }
 
 /** You left (or Discord closed): the call goes into the history. */
@@ -160,8 +186,20 @@ function finishCall(): void {
   openCall = null
   if (!c) return
   const before = loadCalls()
-  calls = addCall(before, { ...c.record, end: Date.now(), people: [...c.people] })
+  const end = Date.now()
+  const together = presenceTotals(c.presence, end)
+  calls = addCall(before, { ...c.record, end, people: [...c.people], ...(Object.keys(together).length ? { with: together } : {}) })
   if (calls !== before) saveCalls()
+  // The pop-out's note box starts empty for the next call.
+  for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send('discord:note-changed', '')
+}
+
+const statusListeners = new Set<(status: DiscordStatus) => void>()
+
+/** Called on every change (who's talking included), for main/musicDuck.ts. */
+export function onDiscordStatus(listener: (status: DiscordStatus) => void): () => void {
+  statusListeners.add(listener)
+  return () => statusListeners.delete(listener)
 }
 
 type ChannelListener = (before: string | null, after: string | null, firstLook: boolean) => void
@@ -438,6 +476,8 @@ function forgetSignIn(): void {
  * show its Authorize window; otherwise only a saved sign-in is used.
  */
 async function connect(interactive: boolean): Promise<void> {
+  // Discord voice is an add-on: without it Orbit never connects to Discord.
+  if (!addonOn('discord-voice')) return
   clearTimeout(retryTimer)
   const s = load()
   if (!hasApp()) return update({ ...EMPTY_DISCORD, canEncrypt: safeStorage.isEncryptionAvailable() })
@@ -673,6 +713,14 @@ export function setupDiscord(): void {
     saveCalls()
     return calls
   })
+  // The call note: the one for the call going on now, and editing a past call's.
+  ipcMain.handle('discord:note', () => currentNote())
+  ipcMain.handle('discord:set-note', (_e, text: unknown, channelId: unknown) => setCurrentNote(typeof text === 'string' ? text : '', String(channelId ?? '')))
+  ipcMain.handle('discord:set-call-note', (_e, id: unknown, text: unknown) => {
+    calls = setCallNote(loadCalls(), String(id ?? ''), typeof text === 'string' ? text : '')
+    saveCalls()
+    return calls
+  })
   ipcMain.handle('discord:clear-calls', () => {
     calls = []
     saveCalls()
@@ -681,6 +729,10 @@ export function setupDiscord(): void {
 
   // A saved sign-in connects quietly at start (and whenever Discord starts later).
   if (hasSignIn()) void connect(false)
+  onAddonsChanged(() => {
+    if (!addonOn('discord-voice')) teardownDiscord()
+    else if (hasSignIn() && !socket) void connect(false)
+  })
 }
 
 export function teardownDiscord(): void {

@@ -25,6 +25,10 @@ import { usePrefs } from '../../store/prefs'
 import { useUI } from '../../store/ui'
 import { notify } from '../../store/notify'
 import { vaultUrl } from '../../lib/fileKinds'
+import { pictureAsPng } from '../../lib/boardPictures'
+import { closeReport, useAppReports } from '../../store/appReports'
+import Reports from './Reports'
+import { addonOn, useAddonOn } from '../../lib/addons'
 
 /** An app as the board sees it: its name, repository (if on GitHub) and the key its items are saved under. */
 interface BoardApp {
@@ -128,6 +132,7 @@ export default function Board() {
           <Camera size={14} /> Snip a bug
         </button>
       </div>
+      {loaded && <Reports app={app} />}
       {!loaded ? (
         <p className="appstudio-empty">Loading…</p>
       ) : (
@@ -263,6 +268,7 @@ function Card({ item, picked, onDrop, onCopy, onSend }: { item: BoardItem; picke
         </button>
       </div>
       {item.details && <p className="board-card-details">{item.details}</p>}
+      {item.issue && <ReportStatus item={item} />}
       {(item.pull || item.sentAt) && (
         <div className="board-card-status">
           {item.pull ? (
@@ -288,29 +294,44 @@ function Card({ item, picked, onDrop, onCopy, onSend }: { item: BoardItem; picke
   )
 }
 
-/** Turns a picture from the notes folder (a screenshot, or a sketch's SVG) into a PNG for the clipboard. */
-async function pictureAsPng(path: string): Promise<Blob> {
-  const blob = await (await fetch(vaultUrl(path))).blob()
-  if (blob.type === 'image/png') return blob
-  const url = URL.createObjectURL(blob)
-  try {
-    const img = new Image()
-    img.src = url
-    await img.decode()
-    const canvas = document.createElement('canvas')
-    canvas.width = img.naturalWidth || 1200
-    canvas.height = img.naturalHeight || 800
-    const ctx = canvas.getContext('2d')!
-    // Sketches are drawn on a see-through page; Claude sees them better on white.
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-    const png = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'))
-    if (!png) throw new Error('Couldn’t copy that picture.')
-    return png
-  } finally {
-    URL.revokeObjectURL(url)
+/** A card made from someone's report: a link to it, and once the card is done, a button to tell them it's fixed (closing the report). */
+function ReportStatus({ item }: { item: BoardItem }) {
+  const [repo, num] = (item.issue ?? '').split('#')
+  const report = useAppReports((s) => s.byRepo[repo]?.reports.find((r) => r.number === Number(num)))
+  const connected = useAppStudio((s) => !!s.github?.connected)
+  const [busy, setBusy] = useState(false)
+  const tell = async (): Promise<void> => {
+    if (!report) return
+    setBusy(true)
+    try {
+      await closeReport(report, 'Thanks for reporting this! It’s fixed now, and the fix comes in the next update.')
+      notify(`Told ${report.author} it’s fixed and closed the report.`, 'info')
+    } catch (err) {
+      notify(err)
+    } finally {
+      setBusy(false)
+    }
   }
+  return (
+    <div className="board-card-status">
+      <a href={`https://github.com/${repo}/issues/${num}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title="The report this came from">
+        <Bug size={11} /> Report #{num}
+      </a>
+      {item.column === 'done' && report && connected && (
+        <button
+          className="link-button"
+          disabled={busy}
+          title="Comments on the report that it’s fixed and closes it"
+          onClick={(e) => {
+            e.stopPropagation()
+            void tell()
+          }}
+        >
+          {busy ? 'Telling them…' : 'Tell them it’s fixed'}
+        </button>
+      )}
+    </div>
+  )
 }
 
 export async function copyPicture(path: string): Promise<void> {
@@ -367,6 +388,7 @@ function Editor({ item, apps, onCopy, onSend }: { item: BoardItem; apps: BoardAp
     }
   }
 
+  const sketchOn = useAddonOn('sketch')
   const sketch = (): void => useUI.setState({ sketch: { path: null, onSaved: addPicture } })
 
   return (
@@ -445,10 +467,12 @@ function Editor({ item, apps, onCopy, onSend }: { item: BoardItem; apps: BoardAp
               </div>
             </figure>
           ))}
-          <button className="board-add-picture" onClick={sketch} title="Draw a rough layout of a screen">
-            <PenLine size={16} />
-            Sketch a screen
-          </button>
+          {sketchOn && (
+            <button className="board-add-picture" onClick={sketch} title="Draw a rough layout of a screen">
+              <PenLine size={16} />
+              Sketch a screen
+            </button>
+          )}
           <div className="board-add-picture muted" title="Copy a picture, then paste it into the details box">
             <ImageIcon size={16} />
             Paste a picture into the details
@@ -533,7 +557,7 @@ function ClaudeLinkDialog({ app, link, sending, onClose, onSave }: { app: BoardA
         />
         {!ok && <p className="appstudio-error">That isn’t a claude.ai link.</p>}
         <div className="board-editor-actions">
-          <button className="btn" onClick={() => openSiteTab('claude')} title="Open Claude in Orbit to find the project">
+          <button className="btn" onClick={() => (addonOn('claude') ? openSiteTab('claude') : window.open('https://claude.ai/projects'))} title="Open Claude to find the project">
             <ExternalLink size={14} /> Open Claude
           </button>
           {onProject && current !== url && (

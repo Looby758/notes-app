@@ -42,6 +42,66 @@ export interface MoneyData {
   cancelled: Record<string, string>
   /** What you told Orbit is in your account, so the end-of-month forecast starts from real money rather than statements alone. */
   balance: Balance | null
+  /** Your other accounts (savings, cash, a credit card…), each with a balance you type in now and then. */
+  accounts: Account[]
+  /** Everything you have, added up once a day, so you can see it go up (or down) over time. */
+  netWorth: NetWorthPoint[]
+  /** Who owes you money and who you owe ("Sam: £8.50 for the takeaway"). */
+  ious: Iou[]
+  /** Your budget, typed in line by line: each thing coming in or going out, and how often. */
+  budgetLines: BudgetLine[]
+}
+
+export interface BudgetLine {
+  id: string
+  /** What it is: "Netflix", "Rent", "Wages". */
+  name: string
+  /** Pence, always positive. */
+  amount: number
+  /** Money coming in rather than going out. */
+  income: boolean
+  interval: RepeatInterval
+}
+
+export type AccountKind = 'current' | 'savings' | 'cash' | 'credit' | 'other'
+
+export interface Account {
+  id: string
+  name: string
+  kind: AccountKind
+  /** Pence: what's in it, or (for a credit card) minus what you owe on it. */
+  amount: number
+  /** YYYY-MM-DD you last said what's in it. */
+  date: string
+}
+
+export interface NetWorthPoint {
+  /** YYYY-MM-DD */
+  date: string
+  /** Pence: accounts plus what you're owed, minus what you owe. */
+  total: number
+}
+
+export interface Iou {
+  id: string
+  /** Who: "Sam". */
+  person: string
+  /** Pence, always positive. */
+  amount: number
+  /** True when they owe you; false when you owe them. */
+  theyOwe: boolean
+  /** What it was for ("Takeaway"). */
+  note: string
+  /** YYYY-MM-DD it happened. */
+  date: string
+  /** Pence paid back so far. */
+  paid: number
+  /** YYYY-MM-DD to be reminded on, or '' for no reminder. */
+  remind: string
+  /** The `remind` day a reminder has already been shown for, so it shows once. */
+  reminded?: string
+  /** YYYY-MM-DD it was all paid back (or written off). */
+  settled?: string
 }
 
 export type RepeatInterval = 'weekly' | 'monthly' | 'yearly'
@@ -99,7 +159,7 @@ export const DEFAULT_CATEGORIES: MoneyCategory[] = [
   { id: OTHER_INCOME, name: 'Other income', color: GREY, income: true }
 ]
 
-export const emptyMoney = (): MoneyData => ({ categories: DEFAULT_CATEGORIES.map((c) => ({ ...c })), entries: [], budgets: {}, rules: {}, goals: [], notRecurring: [], subscriptions: [], cancelled: {}, balance: null })
+export const emptyMoney = (): MoneyData => ({ categories: DEFAULT_CATEGORIES.map((c) => ({ ...c })), entries: [], budgets: {}, rules: {}, goals: [], notRecurring: [], subscriptions: [], cancelled: {}, balance: null, accounts: [], netWorth: [], ious: [], budgetLines: [] })
 
 /** Reads money.json, keeping whatever is usable from a damaged or older file. */
 export function readMoney(text: string | null): MoneyData {
@@ -191,7 +251,76 @@ export function readMoney(text: string | null): MoneyData {
   }
   const b = r.balance as Record<string, unknown> | null | undefined
   if (b && typeof b === 'object' && Number.isFinite(b.amount) && isDay(b.date)) data.balance = { amount: Math.round(b.amount as number), date: b.date }
+  const KINDS: AccountKind[] = ['current', 'savings', 'cash', 'credit', 'other']
+  if (Array.isArray(r.accounts)) {
+    data.accounts = (r.accounts as Record<string, unknown>[])
+      .filter((a) => !!a && typeof a.id === 'string' && typeof a.name === 'string' && Number.isFinite(a.amount))
+      .map((a) => ({
+        id: a.id as string,
+        name: (a.name as string).slice(0, 80),
+        kind: KINDS.includes(a.kind as AccountKind) ? (a.kind as AccountKind) : 'other',
+        amount: Math.round(a.amount as number),
+        date: isDay(a.date) ? a.date : '1970-01-01'
+      }))
+  }
+  if (Array.isArray(r.netWorth)) {
+    data.netWorth = (r.netWorth as Record<string, unknown>[])
+      .filter((p): p is { date: string; total: number } => !!p && isDay(p.date) && Number.isFinite(p.total))
+      .map((p) => ({ date: p.date, total: Math.round(p.total) }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .filter((p, i, all) => i === all.length - 1 || all[i + 1].date !== p.date)
+  }
+  if (Array.isArray(r.ious)) {
+    data.ious = (r.ious as Record<string, unknown>[])
+      .filter((x) => !!x && typeof x.id === 'string' && typeof x.person === 'string' && Number.isFinite(x.amount) && (x.amount as number) > 0)
+      .map((x) => ({
+        id: x.id as string,
+        person: (x.person as string).slice(0, 80),
+        amount: Math.round(x.amount as number),
+        theyOwe: x.theyOwe !== false,
+        note: typeof x.note === 'string' ? x.note.slice(0, 200) : '',
+        date: isDay(x.date) ? x.date : '1970-01-01',
+        paid: Number.isFinite(x.paid) ? Math.max(0, Math.round(x.paid as number)) : 0,
+        remind: isDay(x.remind) ? x.remind : '',
+        ...(isDay(x.reminded) ? { reminded: x.reminded } : {}),
+        ...(isDay(x.settled) ? { settled: x.settled } : {})
+      }))
+  }
+  if (Array.isArray(r.budgetLines)) {
+    data.budgetLines = (r.budgetLines as Record<string, unknown>[])
+      .filter((x) => !!x && typeof x.id === 'string' && typeof x.name === 'string' && Number.isFinite(x.amount))
+      .map((x) => ({
+        id: x.id as string,
+        name: (x.name as string).slice(0, 80),
+        amount: Math.abs(Math.round(x.amount as number)),
+        income: !!x.income,
+        interval: x.interval === 'weekly' || x.interval === 'yearly' ? x.interval : 'monthly'
+      }))
+  }
   return data
+}
+
+/** A budget line's amount as a monthly figure (a weekly £10 is about £43.33 a month). */
+export const lineMonthly = (line: Pick<BudgetLine, 'amount' | 'interval'>): number =>
+  Math.round(line.interval === 'weekly' ? (line.amount * 52) / 12 : line.interval === 'yearly' ? line.amount / 12 : line.amount)
+
+export interface BudgetTotals {
+  /** Pence a month. */
+  income: number
+  out: number
+  /** income - out: what's left over each month (negative when you plan to spend more than comes in). */
+  left: number
+}
+
+/** Adds up the budget as monthly figures. */
+export function budgetTotals(lines: BudgetLine[]): BudgetTotals {
+  let income = 0
+  let out = 0
+  for (const l of lines) {
+    if (l.income) income += lineMonthly(l)
+    else out += lineMonthly(l)
+  }
+  return { income, out, left: income - out }
 }
 
 export const newId = (): string => Date.now().toString(36) + Math.random().toString(36).slice(2, 7)

@@ -1,16 +1,19 @@
 import { create } from 'zustand'
 import { nextRepeat, type MusicAction, type MusicState, type MusicStatus } from '@shared/spotify'
 import { errorMessage } from '../lib/paths'
+import { localArtUrl } from '@shared/localMusic'
+import type { MusicMiniSong } from '@shared/types'
 import { useUI } from './ui'
+import { usePrefs } from './prefs'
+import { startMusicData } from './musicData'
 import { songMarkdown, type SongTarget } from '@shared/songLinks'
-import { insertBlockIntoActiveNote } from '../lib/editorController'
+import { insertBlockIntoActiveNote, MUSIC_TAB, openSpecialTab } from '../lib/editorController'
 import { notify } from './notify'
-import { playLocalPath, localNext, localPause, localPrevious, localRepeat, localSeek, localShuffle, localToggle, localVolume, stopLocal } from './localMusic'
+import { localJump, localUpNext, soundLevels, loadLocalLibrary, playLocal, resumeLastSession, useLocalMusic, playLocalPath, localNext, localPause, localPrevious, localRepeat, localSeek, localShuffle, localToggle, localVolume, stopLocal } from './localMusic'
 
-/** The music player in the corner: what's playing (asked for every couple of seconds while it's open). */
+/** What's playing (asked for every couple of seconds while something is showing it). */
 
 interface MusicStore {
-  open: boolean
   state: MusicState | null
   /** When `state` arrived, so the progress bar can move between updates. */
   at: number
@@ -27,32 +30,18 @@ interface MusicStore {
   sleep: { until: number } | { song: string } | null
 }
 
-const OPEN_KEY = 'musicOpen'
-const wasOpen = ((): boolean => {
-  try {
-    return localStorage.getItem(OPEN_KEY) === '1'
-  } catch {
-    return false
-  }
-})()
+export const useMusic = create<MusicStore>(() => ({ state: null, at: 0, status: null, error: null, liked: null, sleep: null, local: false, miniOpen: false }))
 
-export const useMusic = create<MusicStore>(() => ({ open: wasOpen, state: null, at: 0, status: null, error: null, liked: null, sleep: null, local: false, miniOpen: false }))
+/** Opens the Music page (your songs, albums, artists and playlists). */
+export const showMusicPage = (): void => openSpecialTab(MUSIC_TAB)
 
-export function setMusicOpen(open: boolean): void {
-  useMusic.setState({ open, error: null })
-  try {
-    localStorage.setItem(OPEN_KEY, open ? '1' : '0')
-  } catch {
-    // Only a convenience.
-  }
-  if (open) void refreshMusic()
-}
-
-/** Other places showing what's playing (the Home page's box), so it's kept up to date while the player is hidden. */
+/** Places showing what's playing (the Home page's box), so it's kept up to date while they're showing. */
 let watchers = 0
 
 /** Keeps "now playing" fresh until the returned function is called. */
 export function watchMusic(): () => void {
+  // Nothing to watch without the Music add-on.
+  if (!usePrefs.getState().prefs.installedAddons.includes('music')) return () => undefined
   watchers++
   void refreshMusic()
   return () => {
@@ -60,7 +49,11 @@ export function watchMusic(): () => void {
   }
 }
 
-export const toggleMusic = (): void => setMusicOpen(!useMusic.getState().open)
+/** Spotify's parts of the player are on (Settings → Music → Show Spotify features). */
+export const spotifyOn = (): boolean => usePrefs.getState().prefs.musicSpotify
+
+/** What the player shows with Spotify turned off and none of your own music playing. */
+const IDLE: MusicState = { source: 'none', playing: false, positionMs: 0 }
 
 export const openMusicSettings = (): void => useUI.setState({ settingsSection: 'music' })
 
@@ -73,6 +66,10 @@ export async function refreshMusicStatus(): Promise<MusicStatus> {
 let asking = false
 export async function refreshMusic(): Promise<void> {
   if (asking || useMusic.getState().local) return
+  if (!spotifyOn()) {
+    if (useMusic.getState().state !== IDLE) useMusic.setState({ state: IDLE, at: Date.now(), liked: null })
+    return
+  }
   asking = true
   try {
     const state = await window.api.musicNowPlaying()
@@ -90,7 +87,7 @@ export async function refreshMusic(): Promise<void> {
 /** Asks once per song whether it's liked. */
 async function checkLiked(uri: string | undefined): Promise<void> {
   const { liked, status } = useMusic.getState()
-  if (!uri || liked?.uri === uri || !status?.connected) return
+  if (!uri || liked?.uri === uri || !status?.connected || !spotifyOn()) return
   useMusic.setState({ liked: { uri, liked: false } })
   try {
     const yes = await window.api.musicIsLiked(uri)
@@ -141,6 +138,7 @@ export function musicControl(action: MusicAction): Promise<boolean> {
       }
     )
   }
+  if (!spotifyOn()) return playOwnMusic(action)
   // Show the change straight away.
   if (action === 'pause' && state?.track) {
     useMusic.setState({ state: { ...state, playing: false, positionMs: currentPosition(state, at) }, at: Date.now() })
@@ -156,12 +154,31 @@ export function musicControl(action: MusicAction): Promise<boolean> {
   return run(() => window.api.musicControl(action))
 }
 
+/** With Spotify off and nothing of yours playing: Play shuffles your music, the other buttons do nothing. */
+async function playOwnMusic(action: MusicAction): Promise<boolean> {
+  if (action !== 'toggle') return false
+  try {
+    if (!useLocalMusic.getState().library) await loadLocalLibrary()
+    const songs = useLocalMusic.getState().library?.songs ?? []
+    if (!songs.length) {
+      useMusic.setState({ error: 'Choose your music folder on the Music page first.' })
+      return false
+    }
+    await playLocal(songs, 'shuffle')
+    return true
+  } catch (err) {
+    useMusic.setState({ error: errorMessage(err) })
+    return false
+  }
+}
+
 export function musicSeek(ms: number): Promise<boolean> {
   const { state, local } = useMusic.getState()
   if (local) {
     localSeek(ms)
     return Promise.resolve(true)
   }
+  if (!spotifyOn()) return Promise.resolve(false)
   if (state) useMusic.setState({ state: { ...state, positionMs: ms }, at: Date.now() })
   return run(() => window.api.musicSeek(ms))
 }
@@ -183,6 +200,7 @@ export function musicSetVolume(percent: number): Promise<boolean> {
     localVolume(percent)
     return Promise.resolve(true)
   }
+  if (!spotifyOn()) return Promise.resolve(false)
   if (state) useMusic.setState({ state: { ...state, volume: percent } })
   return run(() => window.api.musicSetVolume(percent))
 }
@@ -241,17 +259,20 @@ function checkSleep(): void {
   void musicControl('pause')
 }
 
-/** Keeps the player up to date: often while it (or the Home box) is showing and you're looking (or a sleep timer is waiting), otherwise not at all. */
+/** Keeps "now playing" up to date: often while the Home box (or the mini player) is showing and you're looking (or a sleep timer is waiting), otherwise not at all. */
 export function startMusic(): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined
   const sleepTimer = setInterval(checkSleep, 400)
   const tick = async (): Promise<void> => {
-    const { open, state, sleep, miniOpen } = useMusic.getState()
-    if (((open || watchers > 0) && document.visibilityState === 'visible') || sleep || miniOpen) await refreshMusic()
+    const { state, sleep, miniOpen } = useMusic.getState()
+    if ((watchers > 0 && document.visibilityState === 'visible') || sleep || miniOpen) await refreshMusic()
     // The Mac app answers instantly; your account is asked a little less often.
     timer = setTimeout(tick, state?.source === 'account' ? 3000 : 1500)
   }
-  void refreshMusicStatus().catch(() => undefined)
+  if (spotifyOn()) void refreshMusicStatus().catch(() => undefined)
+  // Your own music only: the song you were on is ready to carry on from (paused).
+  else void resumeLastSession()
+  startMusicData()
   void tick()
   const stopMini = startMini()
   return () => {
@@ -265,22 +286,63 @@ export function startMusic(): () => void {
 
 export const setMusicMini = (open: boolean): Promise<boolean> => window.api.setMusicMini(open)
 
+/** The next songs of your own music, for the mini player (which shows five) and the phone remote. */
+function miniUpNext(): MusicMiniSong[] | undefined {
+  if (useMusic.getState().state?.source !== 'local') return undefined
+  return localUpNext()
+    .slice(0, 25)
+    .map((s) => ({ title: s.title, artist: s.artist, art: s.art ? localArtUrl(s.path, s.added) : undefined }))
+}
+
 /** Sends what's playing to the mini player (and a paired phone's remote), and does what their buttons ask. */
 function startMini(): () => void {
   const push = (): void => {
     const { state, at } = useMusic.getState()
-    window.api.pushMusicMini({ state, at })
+    window.api.pushMusicMini({ state, at, upNext: miniUpNext() })
   }
+  // The visualiser's bars go to the mini player while it shows them and your music plays.
+  let showBars = false
+  let bars: ReturnType<typeof setInterval> | undefined
+  const levels = (): void => {
+    const { miniOpen, state } = useMusic.getState()
+    const want = miniOpen && showBars && state?.source === 'local' && state.playing
+    if (!want) {
+      clearInterval(bars)
+      bars = undefined
+      return
+    }
+    if (bars) return
+    const read = soundLevels()
+    if (!read) return
+    bars = setInterval(() => window.api.pushMusicMiniLevels(Array.from(read(), (v) => Math.round(v * 100))), 40)
+  }
+  void window.api.musicMiniLayout().then((l) => {
+    showBars = l.visualiser
+    levels()
+  })
+  const offLayout = window.api.onMusicMiniLayout((l) => {
+    showBars = l.visualiser
+    levels()
+  })
   const offOpen = window.api.onMusicMiniOpen((miniOpen) => {
     useMusic.setState({ miniOpen })
     if (miniOpen) void refreshMusic().then(push)
   })
   const offCommand = window.api.onMusicMiniCommand((command) => {
     if ('seek' in command) void musicSeek(command.seek)
-    else void musicControl(command.action)
+    else if ('volume' in command) void musicSetVolume(command.volume)
+    else if ('jump' in command) {
+      const { index, queue } = useLocalMusic.getState()
+      const to = index + 1 + Math.max(0, Math.floor(Number(command.jump) || 0))
+      if (useMusic.getState().state?.source === 'local' && to < queue.length) void localJump(to)
+    } else void musicControl(command.action)
   })
   const offState = useMusic.subscribe((now, before) => {
     if (now.state !== before.state || now.at !== before.at || (now.miniOpen && !before.miniOpen)) push()
+    levels()
+  })
+  const offQueue = useLocalMusic.subscribe((now, before) => {
+    if (now.queue !== before.queue || now.index !== before.index) push()
   })
   // It comes back if it was showing when Notes closed.
   void window.api.musicMiniWasOpen().then((was) => was && setMusicMini(true))
@@ -288,15 +350,21 @@ function startMini(): () => void {
     offOpen()
     offCommand()
     offState()
+    offQueue()
+    offLayout()
+    clearInterval(bars)
   }
 }
 
 // ---------- Songs shared into notes ----------
 
-/** Plays a song card's song, and shows the player. */
+/** Plays a song card's song. */
 export async function playSongTarget(target: SongTarget): Promise<void> {
-  setMusicOpen(true)
   if (target.kind === 'spotify') {
+    if (!spotifyOn()) {
+      useMusic.setState({ error: 'Spotify is turned off in Settings → Music.' })
+      return
+    }
     await musicPlay(target.uri)
     return
   }

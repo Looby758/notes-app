@@ -39,6 +39,19 @@ async function makeFiles(): Promise<string[]> {
   return ['notes.txt', ODD, 'Holiday'].map((n) => join(src, n))
 }
 
+/** Whether this account can make symlinks here. Windows says EPERM unless it's an admin or Developer Mode is on. */
+async function canMakeSymlinks(at: string): Promise<boolean> {
+  const probe = join(at, '.symlink-probe')
+  try {
+    await symlink('nowhere', probe)
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'EPERM') return false
+    throw e
+  }
+  await rm(probe, { force: true })
+  return true
+}
+
 const tree = async (at: string, base = ''): Promise<string[]> => {
   const out: string[] = []
   for (const e of await readdir(at, { withFileTypes: true })) {
@@ -147,10 +160,15 @@ describe('unpack (the file explorer’s Extract)', () => {
     expect(await readFile(join(folder, 'x', 'y.txt'), 'utf8')).toBe('rar!')
   })
 
-  it('drops shortcuts (symlinks) that come out of an archive', async () => {
+  it('drops shortcuts (symlinks) that come out of an archive', async ({ skip }) => {
     // 7-Zip keeps links in a 7z when asked (-snl isn't used by Orbit, so make one by hand).
     const src = join(dir, 'linky')
     await mkdir(src)
+    // Windows only lets an admin, or an account with Developer Mode on, make symlinks.
+    // Without that there's no way to build the archive this checks, so skip rather than fail.
+    if (!(await canMakeSymlinks(src))) {
+      return skip('this account can’t make symlinks (on Windows, turn on Developer Mode or run as admin to run this test)')
+    }
     await writeFile(join(src, 'real.txt'), 'real')
     await symlink('/etc/hosts', join(src, 'link'))
     // One that points at a file next to it, which 7-Zip itself would let through.

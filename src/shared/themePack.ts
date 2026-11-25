@@ -20,7 +20,7 @@ import type { Theme, ThemeColors } from './themes'
  *       "home": { "file": "pictures/daryl.jpg", "position": "center top", "accent": "#7d9a6a" },
  *       "all": { "file": "pictures/group.jpg" }   // anywhere without its own picture
  *     },
- *     "pictureStrength": 0.15,         // how strongly pictures show, 0.03 to 0.6 (the sidebar and music player show half)
+ *     "pictureStrength": 0.15,         // how strongly pictures show, 0.03 to 0.6 (the sidebar shows half)
  *     "loading": { "text": "JSS", "picture": "pictures/enid.jpg", "font": "fonts/marker.ttf", "color": "#e8e2d4" },
  *     "starIcon": "icons/wings.png",   // in place of the star on starred notes
  *     "appIcon": "icons/hat.png",      // the app's icon while the theme is on (square, 512px or more)
@@ -42,7 +42,7 @@ export const THEME_PAGES: Record<string, string> = {
   calendar: 'Calendar',
   money: 'Money',
   games: 'Games',
-  music: 'Music player',
+  music: 'Music',
   flashcards: 'Flashcards',
   passwords: 'Passwords',
   email: 'Email',

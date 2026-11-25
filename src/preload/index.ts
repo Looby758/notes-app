@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { LocalAiState, MusicMiniCommand, MusicMiniState, NotesApi } from '@shared/types'
+import type { LocalAiState, MusicLinkProgress, MusicMiniCommand, MusicMiniLayout, MusicMiniState, NotesApi } from '@shared/types'
+import type { MusicData } from '@shared/musicLibrary'
+import type { LocalLibrary } from '@shared/localMusic'
 
 /** Listens for a message from the main process; returns the way to stop. */
 function on<T>(channel: string, callback: (value: T) => void): () => void {
@@ -56,12 +58,21 @@ const api: NotesApi = {
     ipcRenderer.on('replay:save', handler)
     return () => ipcRenderer.removeListener('replay:save', handler)
   },
+  onMusicDuck: (callback) => {
+    const handler = (_e: unknown, level: number): void => callback(level)
+    ipcRenderer.on('music:duck', handler)
+    return () => ipcRenderer.removeListener('music:duck', handler)
+  },
   onClipsOpen: (callback) => {
     const handler = (_e: unknown, path: string): void => callback(path)
     ipcRenderer.on('clips:open', handler)
     return () => ipcRenderer.removeListener('clips:open', handler)
   },
   clipsList: (folder) => ipcRenderer.invoke('clips:list', folder),
+  clipsMeta: (folder) => ipcRenderer.invoke('clips:meta', folder),
+  clipsStar: (folder, path, on) => ipcRenderer.invoke('clips:star', folder, path, on),
+  clipsMove: (folder, path, to) => ipcRenderer.invoke('clips:move', folder, path, to),
+  clipsRenameFolder: (folder, from, to) => ipcRenderer.invoke('clips:renameFolder', folder, from, to),
   clipsExport: (folder, request) => ipcRenderer.invoke('clips:export', folder, request),
   clipsCancel: () => ipcRenderer.invoke('clips:cancel'),
   onClipsProgress: (callback) => {
@@ -201,19 +212,7 @@ const api: NotesApi = {
     ipcRenderer.on('web:mouseNav', handler)
     return () => ipcRenderer.removeListener('web:mouseNav', handler)
   },
-  openYouTube: (url, seconds) => ipcRenderer.invoke('youtube:open', url, seconds),
   popOutWebPage: (url, seconds) => ipcRenderer.invoke('webWindow:open', url, seconds),
-  youTubeState: () => ipcRenderer.invoke('youtube:state'),
-  rememberYouTube: (url) => ipcRenderer.invoke('youtube:remember', url),
-  pinYouTube: (on) => ipcRenderer.invoke('youtube:pin', on),
-  setYouTubeVideoOnly: (on) => ipcRenderer.invoke('youtube:videoOnly', on),
-  minimizeYouTube: () => ipcRenderer.invoke('youtube:minimize'),
-  closeYouTube: () => ipcRenderer.invoke('youtube:close'),
-  onYouTubeLoad: (callback) => {
-    const handler = (_e: unknown, url: string, seconds?: number): void => callback(url, Number(seconds) || 0)
-    ipcRenderer.on('youtube:load', handler)
-    return () => ipcRenderer.removeListener('youtube:load', handler)
-  },
   pickImport: (kind, extensions) => ipcRenderer.invoke('import:pick', kind, extensions),
   listImport: (root) => ipcRenderer.invoke('import:list', root),
   readImport: (path) => ipcRenderer.invoke('import:read', path),
@@ -330,6 +329,8 @@ const api: NotesApi = {
   steamDownloads: () => ipcRenderer.invoke('dm:steam'),
   steamInstall: (appId) => ipcRenderer.invoke('dm:steamInstall', appId),
   steamOpenDownloads: () => ipcRenderer.invoke('dm:steamOpen'),
+  epicDownloads: () => ipcRenderer.invoke('dm:epic'),
+  epicOpenDownloads: () => ipcRenderer.invoke('dm:epicOpen'),
   convertVideo: (request) => ipcRenderer.invoke('convert:video', request),
   cancelVideo: (id) => ipcRenderer.invoke('convert:video-cancel', id),
   onVideoProgress: (callback) => {
@@ -341,6 +342,7 @@ const api: NotesApi = {
   videoInfo: (path) => ipcRenderer.invoke('video:info', path),
   videoSubtitles: (path, source) => ipcRenderer.invoke('video:subtitles', path, source),
   videoKeyframe: (path, at, fileStart) => ipcRenderer.invoke('video:keyframe', path, at, fileStart),
+  videoFrame: (path, at) => ipcRenderer.invoke('video:frame', path, at),
   stopVideoStream: (session) => ipcRenderer.invoke('video:stop', session),
   releaseVideo: (path) => ipcRenderer.invoke('video:release', path),
   releaseFile: (path) => ipcRenderer.invoke('files:release', path),
@@ -373,6 +375,16 @@ const api: NotesApi = {
   mixerGet: () => ipcRenderer.invoke('mixer:get'),
   mixerVolume: (id, volume) => ipcRenderer.invoke('mixer:volume', id, volume),
   mixerMute: (id, muted) => ipcRenderer.invoke('mixer:mute', id, muted),
+  tasksGet: () => ipcRenderer.invoke('tasks:get'),
+  tasksEnd: (targets) => ipcRenderer.invoke('tasks:end', targets),
+  tasksReveal: (pid) => ipcRenderer.invoke('tasks:reveal', pid),
+  uninstallList: () => ipcRenderer.invoke('uninstall:list'),
+  uninstallRun: (id) => ipcRenderer.invoke('uninstall:run', id),
+  uninstallGone: (id) => ipcRenderer.invoke('uninstall:gone', id),
+  uninstallScan: (id) => ipcRenderer.invoke('uninstall:scan', id),
+  uninstallRemove: (scanId, ids) => ipcRenderer.invoke('uninstall:remove', scanId, ids),
+  uninstallQuit: (id) => ipcRenderer.invoke('uninstall:quit', id),
+  uninstallReveal: (path) => ipcRenderer.invoke('uninstall:reveal', path),
   soundboardGet: () => ipcRenderer.invoke('soundboard:get'),
   soundboardPick: () => ipcRenderer.invoke('soundboard:pick'),
   soundboardAddFiles: (paths) => ipcRenderer.invoke('soundboard:add-files', paths),
@@ -382,6 +394,14 @@ const api: NotesApi = {
   soundboardMove: (id, to) => ipcRenderer.invoke('soundboard:move', id, to),
   soundboardOpenLink: (which) => ipcRenderer.invoke('soundboard:open-link', which),
   soundboardShowFolder: () => ipcRenderer.invoke('soundboard:show-folder'),
+  soundLinkFetch: (id, link) => ipcRenderer.invoke('soundLink:fetch', id, link),
+  soundLinkMake: (id, start, end, name) => ipcRenderer.invoke('soundLink:make', id, start, end, name),
+  soundLinkForget: (id) => ipcRenderer.invoke('soundLink:forget', id),
+  onSoundLinkProgress: (callback) => {
+    const handler = (_e: unknown, id: string, done: number | null): void => callback(id, done)
+    ipcRenderer.on('soundLink:progress', handler)
+    return () => ipcRenderer.removeListener('soundLink:progress', handler)
+  },
   onSoundboardHotkey: (callback) => {
     const handler = (_e: unknown, action: Parameters<typeof callback>[0]): void => callback(action)
     ipcRenderer.on('soundboard:hotkey', handler)
@@ -408,6 +428,20 @@ const api: NotesApi = {
     ipcRenderer.on('macros:changed', handler)
     return () => ipcRenderer.removeListener('macros:changed', handler)
   },
+  keyRemapGet: () => ipcRenderer.invoke('keyremap:get'),
+  keyRemapSetOn: (on) => ipcRenderer.invoke('keyremap:on', on),
+  keyRemapSetHotkey: (accel) => ipcRenderer.invoke('keyremap:hotkey', accel),
+  keyRemapAddSet: (app, name) => ipcRenderer.invoke('keyremap:addSet', app, name),
+  keyRemapUpdateSet: (id, patch) => ipcRenderer.invoke('keyremap:updateSet', id, patch),
+  keyRemapRemoveSet: (id) => ipcRenderer.invoke('keyremap:removeSet', id),
+  keyRemapSaveRule: (setId, rule) => ipcRenderer.invoke('keyremap:saveRule', setId, rule),
+  keyRemapRemoveRule: (setId, ruleId) => ipcRenderer.invoke('keyremap:removeRule', setId, ruleId),
+  keyRemapHold: (on) => ipcRenderer.invoke('keyremap:hold', on),
+  onKeyRemapChanged: (callback) => {
+    const handler = (_e: unknown, status: Parameters<typeof callback>[0]): void => callback(status)
+    ipcRenderer.on('keyremap:changed', handler)
+    return () => ipcRenderer.removeListener('keyremap:changed', handler)
+  },
 
   discordGet: () => ipcRenderer.invoke('discord:get'),
   discordSaveApp: (clientId, secret) => ipcRenderer.invoke('discord:save-app', clientId, secret),
@@ -425,6 +459,14 @@ const api: NotesApi = {
   discordCalls: () => ipcRenderer.invoke('discord:calls'),
   discordRemoveCall: (id) => ipcRenderer.invoke('discord:remove-call', id),
   discordClearCalls: () => ipcRenderer.invoke('discord:clear-calls'),
+  discordNote: () => ipcRenderer.invoke('discord:note'),
+  discordSetNote: (text, channelId) => ipcRenderer.invoke('discord:set-note', text, channelId),
+  discordSetCallNote: (id, text) => ipcRenderer.invoke('discord:set-call-note', id, text),
+  onDiscordNote: (callback) => {
+    const handler = (_e: Electron.IpcRendererEvent, text: string): void => callback(text)
+    ipcRenderer.on('discord:note-changed', handler)
+    return () => ipcRenderer.removeListener('discord:note-changed', handler)
+  },
   onDiscordCalls: (callback) => {
     const handler = (_e: Electron.IpcRendererEvent, calls: Parameters<typeof callback>[0]): void => callback(calls)
     ipcRenderer.on('discord:calls-changed', handler)
@@ -450,20 +492,53 @@ const api: NotesApi = {
     return () => ipcRenderer.removeListener('discord:changed', handler)
   },
 
-  startSnip: () => ipcRenderer.invoke('snip:start'),
+  startSnip: (mode, delay) => ipcRenderer.invoke('snip:start', mode, delay),
+  snipCopyPicture: (png) => ipcRenderer.invoke('snip:copyPicture', png),
+  snipTaskbar: () => ipcRenderer.invoke('snip:taskbar'),
+  snipShowShortcut: () => ipcRenderer.invoke('snip:showShortcut'),
+  snipSaveInfo: () => ipcRenderer.invoke('snip:saveInfo'),
+  snipPickFolder: () => ipcRenderer.invoke('snip:pickFolder'),
+  snipOpenFolder: () => ipcRenderer.invoke('snip:openFolder'),
+  snipShowLast: () => ipcRenderer.invoke('snip:showLast'),
   snipStatus: () => ipcRenderer.invoke('snip:status'),
   snipImage: () => ipcRenderer.invoke('snip:image'),
-  snipRead: (png) => ipcRenderer.invoke('snip:read', png),
+  snipRead: (png, lang) => ipcRenderer.invoke('snip:read', png, lang),
+  snipOcrLangs: () => ipcRenderer.invoke('snip:ocrLangs'),
+  snipGetOcrLang: (code) => ipcRenderer.invoke('snip:getOcrLang', code),
+  snipTranslate: (text, target) => ipcRenderer.invoke('snip:translate', text, target),
   snipClose: () => ipcRenderer.invoke('snip:close'),
+  snipBoxing: () => ipcRenderer.invoke('snip:boxing'),
+  snipDrawn: () => ipcRenderer.invoke('snip:drawn'),
+  snipPainted: () => ipcRenderer.invoke('snip:painted'),
+  onSnipNew: (callback) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('snip:new', handler)
+    return () => ipcRenderer.removeListener('snip:new', handler)
+  },
+  onSnipVisible: (callback) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('snip:visible', handler)
+    return () => ipcRenderer.removeListener('snip:visible', handler)
+  },
+  onSnipReset: (callback) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('snip:reset', handler)
+    return () => ipcRenderer.removeListener('snip:reset', handler)
+  },
+  onSnipClear: (callback) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('snip:clear', handler)
+    return () => ipcRenderer.removeListener('snip:clear', handler)
+  },
   snipReportBug: (png) => ipcRenderer.invoke('snip:bug', png),
   onAppStudioBug: (callback) => {
     const handler = (_e: unknown, png: Uint8Array): void => callback(png)
     ipcRenderer.on('appstudio:bug', handler)
     return () => ipcRenderer.removeListener('appstudio:bug', handler)
   },
-  snipSend: (action, text) => ipcRenderer.invoke('snip:send', action, text),
+  snipSend: (action, text, target) => ipcRenderer.invoke('snip:send', action, text, target),
   onSnipText: (callback) => {
-    const handler = (_e: unknown, action: 'note' | 'ask', text: string): void => callback(action, text)
+    const handler = (_e: unknown, action: 'note' | 'ask' | 'setup-ai', text: string): void => callback(action, text)
     ipcRenderer.on('snip:text', handler)
     return () => ipcRenderer.removeListener('snip:text', handler)
   },
@@ -498,6 +573,9 @@ const api: NotesApi = {
   addCalendarFeed: (name, url) => ipcRenderer.invoke('cal:addFeed', name, url),
   removeCalendarFeed: (id) => ipcRenderer.invoke('cal:removeFeed', id),
   fetchCalendarEvents: (from, to) => ipcRenderer.invoke('cal:events', from, to),
+  googleCreateEvent: (calendarId, event) => ipcRenderer.invoke('cal:create', calendarId, event),
+  googleUpdateEvent: (calendarId, eventId, event) => ipcRenderer.invoke('cal:update', calendarId, eventId, event),
+  googleDeleteEvent: (calendarId, eventId) => ipcRenderer.invoke('cal:delete', calendarId, eventId),
   emailStatus: () => ipcRenderer.invoke('email:status'),
   emailConnect: () => ipcRenderer.invoke('email:connect'),
   emailList: (folder, query, next) => ipcRenderer.invoke('email:list', folder, query, next),
@@ -536,6 +614,40 @@ const api: NotesApi = {
   musicMoveInPlaylist: (uri, from, to) => ipcRenderer.invoke('music:moveInPlaylist', uri, from, to),
   localMusicLibrary: (fresh) => ipcRenderer.invoke('localMusic:library', fresh),
   localMusicChooseFolder: () => ipcRenderer.invoke('localMusic:chooseFolder'),
+  localMusicDefaultFolder: () => ipcRenderer.invoke('localMusic:defaultFolder'),
+  onLocalMusicChanged: (callback) => {
+    const handler = (_e: unknown, library: LocalLibrary): void => callback(library)
+    ipcRenderer.on('localMusic:changed', handler)
+    return () => ipcRenderer.removeListener('localMusic:changed', handler)
+  },
+  musicTagsEdit: (changes) => ipcRenderer.invoke('musicTags:edit', changes),
+  musicTagsFillFromNames: (paths) => ipcRenderer.invoke('musicTags:fillFromNames', paths),
+  musicTagsSetCover: (paths, source) => ipcRenderer.invoke('musicTags:setCover', paths, source),
+  musicTagsFindCovers: (artist, album) => ipcRenderer.invoke('musicTags:findCovers', artist, album),
+  musicTagsChooseImage: () => ipcRenderer.invoke('musicTags:chooseImage'),
+  localMusicImport: (files) => ipcRenderer.invoke('localMusic:import', files),
+  localMusicChooseImport: () => ipcRenderer.invoke('localMusic:chooseImport'),
+  localMusicMove: (moves) => ipcRenderer.invoke('localMusic:move', moves),
+  localMusicTrash: (paths) => ipcRenderer.invoke('localMusic:trash', paths),
+  localMusicQuality: (paths) => ipcRenderer.invoke('localMusic:quality', paths),
+  musicLinkSave: (link, known) => ipcRenderer.invoke('musicLink:save', link, known),
+  musicLinkCancel: (id) => ipcRenderer.invoke('musicLink:cancel', id),
+  onMusicLinkProgress: (callback) => {
+    const handler = (_e: unknown, p: MusicLinkProgress): void => callback(p)
+    ipcRenderer.on('musicLink:progress', handler)
+    return () => ipcRenderer.removeListener('musicLink:progress', handler)
+  },
+  musicDataGet: () => ipcRenderer.invoke('musicData:get'),
+  songSearch: (query) => ipcRenderer.invoke('songSearch:search', query),
+  songDiscover: (seeds) => ipcRenderer.invoke('songSearch:discover', seeds),
+  spotifyList: (link) => ipcRenderer.invoke('songSearch:spotifyList', link),
+  songYouTube: (artist, title) => ipcRenderer.invoke('songSearch:youtube', artist, title),
+  musicDataEdit: (edits) => ipcRenderer.invoke('musicData:edit', edits),
+  onMusicDataChanged: (callback) => {
+    const handler = (_e: unknown, data: MusicData): void => callback(data)
+    ipcRenderer.on('musicData:changed', handler)
+    return () => ipcRenderer.removeListener('musicData:changed', handler)
+  },
   openPopout: () => ipcRenderer.invoke('popout:open'),
   popoutSources: () => ipcRenderer.invoke('popout:sources'),
   popoutState: () => ipcRenderer.invoke('popout:state'),
@@ -570,6 +682,23 @@ const api: NotesApi = {
     const handler = (_e: unknown, command: MusicMiniCommand): void => callback(command)
     ipcRenderer.on('musicMini:command', handler)
     return () => ipcRenderer.removeListener('musicMini:command', handler)
+  },
+  musicMiniLayout: () => ipcRenderer.invoke('musicMini:layout'),
+  musicRemoteStatus: () => ipcRenderer.invoke('musicRemote:status'),
+  setMusicRemote: (on, fresh) => ipcRenderer.invoke('musicRemote:set', on, fresh),
+  localMusicLyrics: (path) => ipcRenderer.invoke('localMusic:lyrics', path),
+  localMusicSaveLyrics: (path, text) => ipcRenderer.invoke('localMusic:saveLyrics', path, text),
+  setMusicMiniLayout: (layout) => ipcRenderer.invoke('musicMini:setLayout', layout),
+  onMusicMiniLayout: (callback) => {
+    const handler = (_e: unknown, layout: MusicMiniLayout): void => callback(layout)
+    ipcRenderer.on('musicMini:layout', handler)
+    return () => ipcRenderer.removeListener('musicMini:layout', handler)
+  },
+  pushMusicMiniLevels: (levels) => ipcRenderer.send('musicMini:levels', levels),
+  onMusicMiniLevels: (callback) => {
+    const handler = (_e: unknown, levels: number[]): void => callback(levels)
+    ipcRenderer.on('musicMini:levels', handler)
+    return () => ipcRenderer.removeListener('musicMini:levels', handler)
   },
   musicTransfer: (deviceId) => ipcRenderer.invoke('music:transfer', deviceId),
   musicOpen: (what) => ipcRenderer.invoke('music:open', what),
@@ -616,6 +745,49 @@ const api: NotesApi = {
     ipcRenderer.on('games:changed', handler)
     return () => ipcRenderer.removeListener('games:changed', handler)
   },
+  skyblockStatus: () => ipcRenderer.invoke('skyblock:status'),
+  skyblockSessions: () => ipcRenderer.invoke('skyblock:sessions'),
+  skyblockSetup: (input) => ipcRenderer.invoke('skyblock:setup', input),
+  skyblockSetProfile: (id) => ipcRenderer.invoke('skyblock:setProfile', id),
+  skyblockSetLog: (readLog, folder) => ipcRenderer.invoke('skyblock:setLog', readLog, folder),
+  skyblockPickLogFolder: () => ipcRenderer.invoke('skyblock:pickLogFolder'),
+  skyblockForget: () => ipcRenderer.invoke('skyblock:forget'),
+  skyblockStartNow: () => ipcRenderer.invoke('skyblock:startNow'),
+  skyblockEndNow: () => ipcRenderer.invoke('skyblock:endNow'),
+  skyblockDeleteSession: (id) => ipcRenderer.invoke('skyblock:deleteSession', id),
+  onSkyblockSummary: (callback) => on('skyblock:summary', callback),
+  onSkyblockUpdated: (callback) => on('skyblock:updated', callback),
+  onSkyblockChanged: (callback) => on<void>('skyblock:changed', () => callback()),
+  skyblockSetPersonalKey: (personal) => ipcRenderer.invoke('skyblock:setPersonalKey', personal),
+  skyblockGoalsState: (page) => ipcRenderer.invoke('skyblockGoals:state', page),
+  skyblockGoalsDownload: () => ipcRenderer.invoke('skyblockGoals:download'),
+  skyblockProfileView: () => ipcRenderer.invoke('skyblockProfile:view'),
+  skyblockProfilePage: () => ipcRenderer.invoke('skyblockProfile:page'),
+  skyblockProfileChoose: (id) => ipcRenderer.invoke('skyblockProfile:choose', id),
+  skyblockProfileSeen: (id) => ipcRenderer.invoke('skyblockProfile:seen', id),
+  skyblockPlayersLookup: (who, profileId, fresh) => ipcRenderer.invoke('skyblockPlayers:lookup', who, profileId, fresh),
+  skyblockPlayersList: () => ipcRenderer.invoke('skyblockPlayers:list'),
+  skyblockPlayersStar: (uuid, on) => ipcRenderer.invoke('skyblockPlayers:star', uuid, on),
+  skyblockPlayersForget: (uuid) => ipcRenderer.invoke('skyblockPlayers:forget', uuid),
+  skyblockPlayersRefreshStarred: () => ipcRenderer.invoke('skyblockPlayers:refreshStarred'),
+  skyblockHelpers: () => ipcRenderer.invoke('skyblockHelpers:get'),
+  skyblockCalendar: () => ipcRenderer.invoke('skyblock:calendar'),
+  skyblockGoalsRefresh: () => ipcRenderer.invoke('skyblockGoals:refresh'),
+  skyblockGoalsSearch: (query) => ipcRenderer.invoke('skyblockGoals:search', query),
+  skyblockGoalsAdd: (id, amount) => ipcRenderer.invoke('skyblockGoals:add', id, amount),
+  skyblockGoalsUpdate: (id, change) => ipcRenderer.invoke('skyblockGoals:update', id, change),
+  skyblockGoalsRemove: (id) => ipcRenderer.invoke('skyblockGoals:remove', id),
+  onSkyblockGoalsChanged: (callback) => on<void>('skyblockGoals:changed', () => callback()),
+  skyblockAddonState: () => ipcRenderer.invoke('skyblockAddon:state'),
+  skyblockAddonInstall: (packs) => ipcRenderer.invoke('skyblockAddon:install', packs),
+  skyblockAddonCancel: () => ipcRenderer.invoke('skyblockAddon:cancel'),
+  skyblockAddonRemove: () => ipcRenderer.invoke('skyblockAddon:remove'),
+  skyblockAddonPickVanilla: (folder) => ipcRenderer.invoke('skyblockAddon:pickVanilla', folder),
+  skyblockAddonClearVanilla: () => ipcRenderer.invoke('skyblockAddon:clearVanilla'),
+  skyblockAddonUseVanilla: (path) => ipcRenderer.invoke('skyblockAddon:useVanilla', path),
+  skyblockAddonPackFolders: () => ipcRenderer.invoke('skyblockAddon:packFolders'),
+  skyblockAddonIcons: () => ipcRenderer.invoke('skyblockAddon:icons'),
+  onSkyblockAddonChanged: (callback) => on<void>('skyblockAddon:changed', () => callback()),
   terminalStart: (id, folder, cols, rows) => ipcRenderer.invoke('term:start', id, folder, cols, rows),
   terminalStop: (id) => ipcRenderer.invoke('term:stop', id),
   terminalInput: (id, data) => ipcRenderer.send('term:input', id, data),
@@ -648,6 +820,21 @@ const api: NotesApi = {
   appsRemoveCopy: (folder, path) => ipcRenderer.invoke('apps:removeCopy', folder, path),
   appsPullStates: (repo, numbers) => ipcRenderer.invoke('apps:pullStates', repo, numbers),
   appsFetchImage: (url) => ipcRenderer.invoke('apps:fetchImage', url),
+  appsSetPrerelease: (repo, tag, prerelease) => ipcRenderer.invoke('apps:setPrerelease', repo, tag, prerelease),
+  appsCreateApp: (req) => ipcRenderer.invoke('apps:createApp', req),
+  appsIssues: (repo) => ipcRenderer.invoke('apps:issues', repo),
+  appsCloseIssue: (repo, number, comment) => ipcRenderer.invoke('apps:closeIssue', repo, number, comment),
+  appsHealth: (folder) => ipcRenderer.invoke('apps:health', folder),
+  appsPreflight: (folder, bump) => ipcRenderer.invoke('apps:preflight', folder, bump),
+  appsReleaseTests: (folder) => ipcRenderer.invoke('apps:releaseTests', folder),
+  appsRelease: (folder, bump, expected) => ipcRenderer.invoke('apps:release', folder, bump, expected),
+  appsReleaseFix: (folder, fix, tag) => ipcRenderer.invoke('apps:releaseFix', folder, fix, tag),
+  appsMainStatus: (folder) => ipcRenderer.invoke('apps:mainStatus', folder),
+  appsGetLatestMain: (folder) => ipcRenderer.invoke('apps:getLatestMain', folder),
+  appsWriteNotes: (folder, version, items) => ipcRenderer.invoke('apps:writeNotes', folder, version, items),
+  appsBuildStatus: (folder, repo, tag) => ipcRenderer.invoke('apps:buildStatus', folder, repo, tag),
+  appsRerunBuild: (repo, runId) => ipcRenderer.invoke('apps:rerunBuild', repo, runId),
+  appsOpenDeveloperSettings: () => ipcRenderer.invoke('apps:openDeveloperSettings'),
   appsMerge: (repo, number) => ipcRenderer.invoke('apps:merge', repo, number),
   appsClose: (repo, number) => ipcRenderer.invoke('apps:close', repo, number),
   aiChat: (messages, engine) => ipcRenderer.invoke('ai:chat', messages, engine),
@@ -721,6 +908,33 @@ const api: NotesApi = {
   dropTargets: () => ipcRenderer.invoke('drop:targets'),
   onDropTargets: (callback) => on('drop:targets', callback),
   dropSend: (target, paths) => ipcRenderer.invoke('drop:send', target, paths),
+  fileSendState: () => ipcRenderer.invoke('fsend:state'),
+  onFileSendState: (callback) => on('fsend:state', callback),
+  fileSendSetServer: (address) => ipcRenderer.invoke('fsend:setServer', address),
+  fileSendSetUp: (token) => ipcRenderer.invoke('fsend:setUp', token),
+  fileSendRelayOn: (keyId, apiToken) => ipcRenderer.invoke('fsend:relayOn', keyId, apiToken),
+  fileSendOpen: (page) => ipcRenderer.invoke('fsend:open', page),
+  fileSendPick: (kind) => ipcRenderer.invoke('fsend:pick', kind),
+  fileSendStart: (paths) => ipcRenderer.invoke('fsend:send', paths),
+  fileSendReceive: (code) => ipcRenderer.invoke('fsend:receive', code),
+  fileSendAccept: (id, chooseFolder) => ipcRenderer.invoke('fsend:accept', id, chooseFolder),
+  fileSendCancel: (id) => ipcRenderer.invoke('fsend:cancel', id),
+  fileSendForget: (id) => ipcRenderer.invoke('fsend:forget', id),
+  fileSendResume: (id) => ipcRenderer.invoke('fsend:resume', id),
+  fileSendReveal: (id) => ipcRenderer.invoke('fsend:reveal', id),
+  fileSendDrive: (paths) => ipcRenderer.invoke('fsend:drive', paths),
+  fileSendDriveConnect: () => ipcRenderer.invoke('fsend:driveConnect'),
+  fileSendDriveRemove: (id) => ipcRenderer.invoke('fsend:driveRemove', id),
+  fileSendDriveForget: (id) => ipcRenderer.invoke('fsend:driveForget', id),
+  onFileSendEvent: (callback) => on('fsend:event', callback),
+  fileSendSignal: (id, signal) => ipcRenderer.invoke('fsend:signal', id, signal),
+  fileSendUpdate: (id, patch) => ipcRenderer.invoke('fsend:update', id, patch),
+  fileSendManifest: (id) => ipcRenderer.invoke('fsend:manifest', id),
+  fileSendGotManifest: (id, manifest) => ipcRenderer.invoke('fsend:gotManifest', id, manifest),
+  fileSendStarted: (id, pos) => ipcRenderer.invoke('fsend:started', id, pos),
+  fileSendDeclined: (id) => ipcRenderer.invoke('fsend:declined', id),
+  fileSendRead: (id, index, offset, length) => ipcRenderer.invoke('fsend:read', id, index, offset, length),
+  fileSendWrite: (id, data) => ipcRenderer.invoke('fsend:write', id, data),
   camStatus: () => ipcRenderer.invoke('cam:status'),
   camOn: () => ipcRenderer.invoke('cam:on'),
   camOff: () => ipcRenderer.invoke('cam:off'),
@@ -756,6 +970,7 @@ const api: NotesApi = {
   pickAttachment: (folder, imagesOnly) => ipcRenderer.invoke('fs:pickAttachment', folder, imagesOnly),
   attachFromComputer: (folder, source) => ipcRenderer.invoke('fs:attachFromComputer', folder, source),
   explorerPlaces: () => ipcRenderer.invoke('explorer:places'),
+  explorerDriveSpace: () => ipcRenderer.invoke('explorer:driveSpace'),
   explorerList: (dir) => ipcRenderer.invoke('explorer:list', dir),
   explorerReadText: (path) => ipcRenderer.invoke('explorer:readText', path),
   explorerOpen: (path, ask) => ipcRenderer.invoke('explorer:open', path, ask),
@@ -765,6 +980,36 @@ const api: NotesApi = {
   explorerPaste: (paths, dir, mode) => ipcRenderer.invoke('explorer:paste', paths, dir, mode),
   explorerTrash: (paths) => ipcRenderer.invoke('explorer:trash', paths),
   explorerSearch: (dir, query, showHidden) => ipcRenderer.invoke('explorer:search', dir, query, showHidden),
+  explorerSearchPc: (query, showHidden) => ipcRenderer.invoke('explorer:searchPc', query, showHidden),
+  explorerIndexStatus: () => ipcRenderer.invoke('explorer:indexStatus'),
+  onExplorerIndexStatus: (callback) => {
+    const handler = (_e: unknown, status: Parameters<typeof callback>[0]): void => callback(status)
+    ipcRenderer.on('explorer:indexStatus', handler)
+    return () => ipcRenderer.removeListener('explorer:indexStatus', handler)
+  },
+  explorerFolderSizes: (paths, fresh) => ipcRenderer.invoke('explorer:folderSizes', paths, fresh),
+  onExplorerFolderSize: (callback) => {
+    const handler = (_e: unknown, ev: Parameters<typeof callback>[0]): void => callback(ev)
+    ipcRenderer.on('explorer:folderSize', handler)
+    return () => ipcRenderer.removeListener('explorer:folderSize', handler)
+  },
+  explorerReindex: () => ipcRenderer.invoke('explorer:reindex'),
+  explorerTagged: (colour) => ipcRenderer.invoke('explorer:tagged', colour),
+  binList: () => ipcRenderer.invoke('bin:list'),
+  binRestore: (ids) => ipcRenderer.invoke('bin:restore', ids),
+  binDelete: (ids) => ipcRenderer.invoke('bin:delete', ids),
+  binEmpty: () => ipcRenderer.invoke('bin:empty'),
+  binOpenSystem: () => ipcRenderer.invoke('bin:openSystem'),
+  binMacPrivacy: () => ipcRenderer.invoke('bin:macPrivacy'),
+  tagsGet: () => ipcRenderer.invoke('tags:get'),
+  tagsSet: (paths, colour, on) => ipcRenderer.invoke('tags:set', paths, colour, on),
+  tagsLabel: (colour, label) => ipcRenderer.invoke('tags:label', colour, label),
+  tagsFavourites: (paths) => ipcRenderer.invoke('tags:favourites', paths),
+  onTagsChanged: (callback) => {
+    const handler = (_e: unknown, store: Parameters<typeof callback>[0]): void => callback(store)
+    ipcRenderer.on('tags:changed', handler)
+    return () => ipcRenderer.removeListener('tags:changed', handler)
+  },
   explorerToVault: (paths, folder) => ipcRenderer.invoke('explorer:toVault', paths, folder),
   explorerStartDrag: (paths) => ipcRenderer.send('explorer:startDrag', paths),
   explorerArchiveList: (path, password) => ipcRenderer.invoke('explorer:archiveList', path, password),

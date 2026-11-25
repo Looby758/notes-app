@@ -28,6 +28,7 @@ import {
   type MonitorTarget
 } from '@shared/monitors'
 import { logError } from './log'
+import { addonOn, onAddonsChanged } from './addonGate'
 
 /**
  * Screen controls: brightness, contrast and input switching, sent down the cable over DDC/CI so
@@ -380,6 +381,8 @@ function applyHotkeys(): void {
   for (const accel of registered.keys()) globalShortcut.unregister(accel)
   registered.clear()
   for (const k of Object.keys(hotkeyErrors)) delete hotkeyErrors[k]
+  // Screen hotkeys come with the Screens add-on.
+  if (!addonOn('screens')) return
   for (const h of saved.hotkeys) {
     const accel = normalizeAccelerator(h.keys)
     if (!accel) continue
@@ -425,6 +428,7 @@ function changedSaved(next: unknown): MonitorsStatus {
 export function setupMonitors(): void {
   load()
   applyHotkeys()
+  onAddonsChanged(applyHotkeys)
   ipcMain.handle('monitors:get', async () => {
     if (screens.length === 0 && !state.problem) await rescan()
     return status()

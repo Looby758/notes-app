@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checksumFor, cookiesFile, downloadArgs, explainDownloadError, formatArgs, parseVideoLink, readLine, siteName, titleOf } from './videoDownload'
+import { checksumFor, cookiesFile, downloadArgs, explainDownloadError, formatArgs, passingDownloadError, parseVideoLink, readLine, siteName, titleOf } from './videoDownload'
 
 describe('parseVideoLink', () => {
   it('reads links, adding https:// when it’s missing', () => {
@@ -109,5 +109,14 @@ describe('cookiesFile', () => {
     )
     expect(file).toBe('# Netscape HTTP Cookie File\n.instagram.com\tTRUE\t/\tTRUE\t2000000000\tsessionid\ts1\n')
     expect(cookiesFile([{ name: 'a', value: 'b', domain: 'google.com' }], 'x.com')).toBeNull()
+  })
+})
+
+describe('passingDownloadError', () => {
+  it('tries a dropped connection again, but not a missing video', () => {
+    expect(passingDownloadError('ERROR: [youtube] abc: Unable to download webpage: Connection reset by peer')).toBe(true)
+    expect(passingDownloadError('ERROR: unable to download video data: HTTP Error 403: Forbidden')).toBe(true)
+    expect(passingDownloadError('ERROR: [youtube] abc: Video unavailable')).toBe(false)
+    expect(passingDownloadError('ERROR: Unsupported URL: https://x.com')).toBe(false)
   })
 })

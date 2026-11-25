@@ -12,6 +12,11 @@ export interface WorldClock {
   label: string
   /** IANA time zone, e.g. "America/New_York". */
   zone: string
+  /**
+   * Set when this clock is a friend rather than a place: their name ("Sam"). The label is then
+   * where they are, and the clock says whether it's a good time to message them.
+   */
+  person?: string
 }
 
 export const MAX_CLOCKS = 24
@@ -46,7 +51,10 @@ export function cleanClocks(v: unknown): WorldClock[] {
     const { id, label, zone } = c as Record<string, unknown>
     if (typeof id !== 'string' || !/^[a-z0-9-]{1,40}$/.test(id) || seen.has(id) || !isZone(zone)) continue
     seen.add(id)
-    out.push({ id, zone, label: typeof label === 'string' && label.trim() ? label.trim().slice(0, 60) : cityOfZone(zone) })
+    const clean: WorldClock = { id, zone, label: typeof label === 'string' && label.trim() ? label.trim().slice(0, 60) : cityOfZone(zone) }
+    const person = (c as Record<string, unknown>).person
+    if (typeof person === 'string' && person.trim()) clean.person = person.trim().slice(0, 40)
+    out.push(clean)
     if (out.length >= MAX_CLOCKS) break
   }
   return out
@@ -174,6 +182,46 @@ export function partOfDay(hour: number): 'night' | 'morning' | 'day' | 'evening'
   if (hour < 18) return 'day'
   return 'evening'
 }
+
+// ---------- friends ----------
+
+export type MessageMood = 'good' | 'maybe' | 'asleep'
+
+export interface MessageTime {
+  mood: MessageMood
+  /** Short, e.g. "Good time to message". */
+  text: string
+}
+
+/**
+ * Whether it's a good time to message someone, going by the time where they are: asleep in the
+ * small hours, fine in the day and evening, and "maybe" either side of that.
+ */
+export function messageTime(t: { hour: number; minute: number }): MessageTime {
+  const h = t.hour + t.minute / 60
+  if (h < 7) return { mood: 'asleep', text: 'Probably asleep' }
+  if (h < 9) return { mood: 'maybe', text: 'Early morning, might be up' }
+  if (h < 22) return { mood: 'good', text: 'Good time to message' }
+  if (h < 23.5) return { mood: 'maybe', text: 'Getting late there' }
+  return { mood: 'asleep', text: 'Probably asleep' }
+}
+
+/**
+ * The next moment (on the quarter-hour, within a day) it becomes a good time to message someone
+ * in `zone`; null if it already is.
+ */
+export function nextGoodTime(zone: string, from: Date): Date | null {
+  if (messageTime(timeIn(zone, from)).mood === 'good') return null
+  const start = Math.ceil(from.getTime() / 900_000) * 900_000
+  for (let t = start; t <= start + DAY; t += 900_000) {
+    const d = new Date(t)
+    if (messageTime(timeIn(zone, d)).mood === 'good') return d
+  }
+  return null
+}
+
+/** What a clock is called on its card: a friend's name, or the place. */
+export const clockTitle = (c: WorldClock): string => c.person || c.label
 
 // ---------- daylight saving ----------
 

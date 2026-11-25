@@ -9,12 +9,13 @@ import { endSession, lanAddress, newToken, openSession } from './phoneLink'
 import { phoneAppHtml } from './phoneApp'
 import { sendInput, type PhoneInput } from './phoneInput'
 import { lastMusic, musicCommand, onMusic } from './musicMini'
-import { youTubeControl, type YouTubeAction } from './youtube'
+import { handleMusicRemote } from './musicRemote'
 import { readPrintedText } from './handwriting'
 import { mixerSet, mixerSlide, mixerState } from './mixer'
 import { currentWifi } from './wifi'
 import { loadSettings, saveSettings } from './settings'
 import { logError } from './log'
+import { addonOn } from './addonGate'
 
 /**
  * Your phone, paired: scan one QR code and the phone gets a page (it can go on the Home Screen)
@@ -24,7 +25,6 @@ import { logError } from './log'
 
 const MAX_UPLOAD = 100 * 1024 * 1024
 const MUSIC_ACTIONS = new Set(['toggle', 'next', 'previous'])
-const YOUTUBE_ACTIONS = new Set(['toggle', 'back', 'forward', 'next'])
 
 let getWindow: () => BrowserWindow | null
 let saveFile: (name: string, data: Uint8Array) => Promise<string>
@@ -150,10 +150,6 @@ async function command(cmd: { kind?: string; [key: string]: unknown }): Promise<
     case 'music':
       if (MUSIC_ACTIONS.has(cmd.action as string)) musicCommand({ action: cmd.action as 'toggle' })
       return
-    case 'youtube':
-      if (!YOUTUBE_ACTIONS.has(cmd.action as string)) return
-      if (!(await youTubeControl(cmd.action as YouTubeAction))) throw new Error('Open the YouTube mini window in Notes first.')
-      return
     case 'move':
     case 'click':
     case 'scroll':
@@ -203,6 +199,8 @@ async function handle(req: IncomingMessage, res: ServerResponse, rest: string, b
     return void res.end(phoneAppHtml(base))
   }
   if (req.method === 'GET' && rest === '/events') return connect(req, res)
+  // The full music remote, under the paired page's own address.
+  if (rest === '/music' || rest.startsWith('/music/')) return handleMusicRemote(req, res, rest.slice('/music'.length) || '/', `${base}/music`)
   const get = /^\/get\/([A-Za-z0-9_-]{22})$/.exec(rest)
   if (get && (req.method === 'GET' || req.method === 'HEAD')) return serveOffered(req, res, get[1])
   if (req.method !== 'POST') return json(res, 404, { error: 'Not found' })
@@ -281,5 +279,5 @@ export function setupPhonePair(
   })
   ipcMain.handle('phone:notify', (_e, title: string, body: string) => phoneNotify(String(title), String(body)))
   // A phone paired before reconnects as soon as Notes is open again.
-  if (loadSettings().phoneToken) pair().catch((err) => logError('phone link', err))
+  if (loadSettings().phoneToken && addonOn('phone')) pair().catch((err) => logError('phone link', err))
 }

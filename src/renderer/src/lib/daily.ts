@@ -1,7 +1,8 @@
 import type { Prefs } from '@shared/prefs'
 import { addDays, formatDate, fromDayKey } from './dates'
 import { fillTemplate } from './templates'
-import { formatEventLine, insertEvent, toggleTaskAt, type DatedItem } from './schedule'
+import { findEventLine, formatEventBody, formatEventLine, insertEvent, removeLineAt, replaceEventAt, toggleTaskAt, type DatedItem } from './schedule'
+import { moveRule, shiftDay, daysBetween, type RepeatRule } from '@shared/repeat'
 import { applyText, getOpenText, isNoteTab, openNote } from './editorController'
 import { findNode, noteTitle } from './paths'
 import { isLockedText } from './lock/crypto'
@@ -129,16 +130,115 @@ export async function ensureDaily(date: Date): Promise<string> {
 }
 
 /** Adds an event to a day's schedule, creating the daily note if needed. */
-export async function addEvent(date: Date, title: string, start?: string, end?: string): Promise<void> {
+export async function addEvent(date: Date, title: string, start?: string, end?: string, repeat?: RepeatRule): Promise<void> {
   if (!title.trim()) return
   const prefs = usePrefs.getState().prefs
   try {
     const path = await ensureDaily(date)
-    await editNote(path, (text) => insertEvent(text, prefs.scheduleHeading, formatEventLine(title, start, end)), { undo: `Added “${title.trim()}” to the calendar` })
+    await editNote(path, (text) => insertEvent(text, prefs.scheduleHeading, formatEventLine(title, start, end, repeat)), { undo: `Added “${title.trim()}” to the calendar` })
     await useVault.getState().refresh([path])
   } catch (err) {
     notify(err)
   }
+}
+
+/** Where an event should go: a day, and a time (both missing for all day). */
+export interface EventMove {
+  date: string
+  start?: string
+  end?: string
+}
+
+/**
+ * Moves (or resizes) an event written in a note. A repeating event moves only the day you dragged
+ * (`which: 'one'`: that day is skipped in the series and a one-off is added at the new time) or
+ * the whole series (`'all'`: every day shifts the same way, e.g. every Tuesday → every Wednesday).
+ */
+export async function moveEvent(item: DatedItem, to: EventMove, which: 'one' | 'all' = 'all'): Promise<void> {
+  if (item.kind !== 'event') return
+  const prefs = usePrefs.getState().prefs
+  const seriesDate = item.seriesDate ?? item.date
+  try {
+    if (item.repeat && which === 'one') {
+      const except = [...new Set([...(item.repeat.except ?? []), item.date])].sort()
+      await rewriteEvent(item, formatEventBody(item.title, item.start, item.end, { ...item.repeat, except }), `Moved “${item.title}” on one day`)
+      await addEvent(fromDayKey(to.date)!, item.title, to.start, to.end)
+      return
+    }
+    // Moving the whole series moves the day it starts on by the same amount.
+    const newDate = item.repeat ? shiftDay(seriesDate, daysBetween(item.date, to.date)) : to.date
+    const repeat = item.repeat ? moveRule(item.repeat, seriesDate, newDate) : undefined
+    const body = formatEventBody(item.title, to.start, to.end, repeat)
+    if (newDate === seriesDate) {
+      await rewriteEvent(item, body, `Moved “${item.title}”`)
+      return
+    }
+    // To another day: out of this daily note, into that one.
+    const target = await ensureDaily(fromDayKey(newDate)!)
+    if (target === item.path) {
+      await rewriteEvent(item, body, `Moved “${item.title}”`)
+      return
+    }
+    const line = await lineText(item)
+    const box = /^\s*[-*+]\s+(\[[ xX]\])\s/.exec(line)
+    await editNote(target, (text) => insertEvent(text, prefs.scheduleHeading, `- ${box ? box[1] + ' ' : ''}${body}`), { undo: `Moved “${item.title}” to ${formatDate(fromDayKey(newDate)!, 'ddd D MMM')}` })
+    await editNote(item.path, (text) => {
+      const at = findEventLine(text, item)
+      return at === -1 ? null : removeLineAt(text, at)
+    }, { undo: `Moved “${item.title}”` })
+    await useVault.getState().refresh([item.path, target])
+  } catch (err) {
+    notify(err)
+  }
+}
+
+/** Skips one day of a repeating event. */
+export async function skipOccurrence(item: DatedItem): Promise<void> {
+  if (!item.repeat) return
+  const except = [...new Set([...(item.repeat.except ?? []), item.date])].sort()
+  try {
+    await rewriteEvent(item, formatEventBody(item.title, item.start, item.end, { ...item.repeat, except }), `Skipped “${item.title}” on ${formatDate(fromDayKey(item.date)!, 'ddd D MMM')}`)
+  } catch (err) {
+    notify(err)
+  }
+}
+
+/** Ends a repeating event: it stops repeating after the day before `item`'s day. */
+export async function endSeriesBefore(item: DatedItem): Promise<void> {
+  if (!item.repeat) return
+  try {
+    await rewriteEvent(item, formatEventBody(item.title, item.start, item.end, { ...item.repeat, until: shiftDay(item.date, -1) }), `Stopped “${item.title}” repeating`)
+  } catch (err) {
+    notify(err)
+  }
+}
+
+/** Takes an event out of its note (a repeating one: the whole series). */
+export async function deleteEvent(item: DatedItem): Promise<void> {
+  try {
+    await editNote(item.path, (text) => {
+      const at = findEventLine(text, item)
+      return at === -1 ? null : removeLineAt(text, at)
+    }, { undo: `Deleted “${item.title}”` })
+    await useVault.getState().refresh([item.path])
+  } catch (err) {
+    notify(err)
+  }
+}
+
+async function rewriteEvent(item: DatedItem, body: string, undo: string): Promise<void> {
+  const changed = await editNote(item.path, (text) => {
+    const at = findEventLine(text, item)
+    return at === -1 ? null : replaceEventAt(text, at, body)
+  }, { undo })
+  if (!changed) throw new Error(`“${item.title}” has changed in its note since, so it wasn’t moved.`)
+  await useVault.getState().refresh([item.path])
+}
+
+async function lineText(item: DatedItem): Promise<string> {
+  const text = getOpenText(item.path) ?? normalizeText(await window.api.readNote(item.path))
+  const at = findEventLine(text, item)
+  return at === -1 ? '' : text.split('\n')[at]
 }
 
 /** Ticks or unticks a task shown in the calendar. */

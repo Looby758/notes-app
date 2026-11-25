@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowUpRight, Check, Copy, Crop, Droplets, Redo2, Type, Undo2, X } from 'lucide-react'
+import { ArrowUpRight, Check, Circle, Copy, Crop, Droplets, Highlighter, PenLine, Redo2, Square, Type, Undo2, X } from 'lucide-react'
 import { useUI } from '../../store/ui'
 import { notify } from '../../store/notify'
 import { recordUndo } from '../../lib/undo'
@@ -7,6 +7,7 @@ import { bumpSketch } from '../../lib/sketch'
 import { errorMessage } from '../../lib/paths'
 import { refreshLinkDecorations } from '../../lib/editorController'
 import {
+  addPoint,
   arrowHead,
   blurCell,
   clampRect,
@@ -17,23 +18,34 @@ import {
   isChanged,
   markSizes,
   newEdit,
+  nextStep,
   outputSize,
+  pathSpan,
   rectFrom,
   saveType,
   shaftEnd,
+  shapeBox,
   tooSmall,
   widthForHeight,
   type Mark,
   type PicEdit,
+  type Point,
   type Rect
 } from '../../lib/picEdit'
 import { showKeys } from '@shared/platform'
 
-type Tool = 'crop' | 'arrow' | 'blur' | 'text'
+type Tool = 'crop' | 'arrow' | 'box' | 'circle' | 'highlight' | 'pen' | 'step' | 'blur' | 'text'
+
+type Sizes = ReturnType<typeof markSizes>
+
+/** The tools' one-letter keys. */
+const TOOL_KEYS: Record<string, Tool> = { c: 'crop', a: 'arrow', r: 'box', o: 'circle', h: 'highlight', p: 'pen', n: 'step', b: 'blur', t: 'text' }
 
 const COLOURS = ['#e5484d', '#f08c00', '#ffd43b', '#2f9e5b', '#2f6fdf', '#ffffff', '#1f2328']
 const SIZE_NAMES = ['Thin', 'Medium', 'Thick']
 const TEXT_SIZE_NAMES = ['Small', 'Medium', 'Big']
+/** The highlighter's own colours: bright marker shades that stay see-through. */
+const HIGHLIGHTS = ['#ffe066', '#8ce99a', '#74c0fc', '#f783ac', '#ffa94d']
 
 /** A drag in progress, in the picture's pixels. */
 interface Drag {
@@ -41,10 +53,15 @@ interface Drag {
   y1: number
   x2: number
   y2: number
+  /** Shift is held: boxes and circles are square/round, the highlighter goes straight. */
+  even: boolean
+  /** The line so far, for the pen and highlighter. */
+  points: Point[]
 }
 
 /**
- * The quick picture editor: crop, resize, arrows, blur and text on a picture in the notes folder.
+ * The quick picture editor: crop, resize, and mark up a picture in the notes folder with arrows,
+ * boxes, circles, a highlighter, numbered steps, a pen, blur and text.
  * Save puts the edited picture over the original (Ctrl+Z puts the old one back), or "Save a copy"
  * keeps the original and saves "… (edited)" next to it.
  */
@@ -62,6 +79,7 @@ function Editor({ path, close }: { path: string; close: () => void }) {
   const [history, setHistory] = useState<{ undo: PicEdit[]; redo: PicEdit[] }>({ undo: [], redo: [] })
   const [tool, setToolState] = useState<Tool>('arrow')
   const [colour, setColour] = useState(COLOURS[0])
+  const [highlightColour, setHighlightColour] = useState(HIGHLIGHTS[0])
   const [sizeIndex, setSizeIndex] = useState(1)
   const [drag, setDrag] = useState<Drag | null>(null)
   /** The crop box being chosen (before Apply). */
@@ -105,7 +123,9 @@ function Editor({ path, close }: { path: string; close: () => void }) {
     }
   }, [path])
 
-  const sizes = edit ? markSizes(edit) : { arrow: [3, 6, 10], text: [24, 40, 64] }
+  const sizes: Sizes = edit ? markSizes(edit) : { arrow: [3, 6, 10], text: [24, 40, 64], highlight: [14, 24, 36], step: [14, 20, 28] }
+  /** The colour the current tool draws in. */
+  const ink = tool === 'highlight' ? highlightColour : colour
   /** What the canvas shows: the whole picture while cropping, otherwise the part that's kept. */
   const view: Rect | null = edit ? (tool === 'crop' ? { x: 0, y: 0, w: edit.width, h: edit.height } : cropOf(edit)) : null
 
@@ -160,7 +180,7 @@ function Editor({ path, close }: { path: string; close: () => void }) {
     if (canvas.height !== view.h) canvas.height = view.h
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    const live = liveMark(tool, drag, colour, sizes.arrow[sizeIndex])
+    const live = liveMark(tool, drag, ink, sizes, sizeIndex)
     draw(ctx, img, edit, view, live ? [...edit.marks, live] : edit.marks)
     if (tool === 'crop') {
       const box = drag ? rectFrom(drag.x1, drag.y1, drag.x2, drag.y2) : cropBox
@@ -185,13 +205,24 @@ function Editor({ path, close }: { path: string; close: () => void }) {
       setTyping({ x: p.x, y: p.y, text: '' })
       return
     }
+    if (tool === 'step') {
+      e.preventDefault()
+      commit({ ...edit, marks: [...edit.marks, { kind: 'step', x: p.x, y: p.y, n: nextStep(edit.marks), color: colour, size: sizes.step[sizeIndex] }] })
+      return
+    }
     e.currentTarget.setPointerCapture(e.pointerId)
-    setDrag({ x1: p.x, y1: p.y, x2: p.x, y2: p.y })
+    setDrag({ x1: p.x, y1: p.y, x2: p.x, y2: p.y, even: e.shiftKey, points: [[p.x, p.y]] })
   }
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>): void => {
-    if (!drag) return
+    if (!drag || !edit) return
     const p = at(e)
-    setDrag({ ...drag, x2: p.x, y2: p.y })
+    let points = drag.points
+    if (tool === 'pen' || tool === 'highlight') {
+      // Shift makes the highlighter a straight line, handy for running along a line of writing.
+      if (tool === 'highlight' && e.shiftKey) points = [points[0], [p.x, p.y]]
+      else points = addPoint(points, [p.x, p.y], Math.max(1, Math.max(edit.width, edit.height) / 1600))
+    }
+    setDrag({ ...drag, x2: p.x, y2: p.y, even: e.shiftKey, points })
   }
   const onPointerUp = (): void => {
     if (!drag || !edit) return
@@ -201,10 +232,8 @@ function Editor({ path, close }: { path: string; close: () => void }) {
       if (!tooSmall(box)) setCropBox(clampRect(box, edit.width, edit.height))
       return
     }
-    const mark = liveMark(tool, drag, colour, sizes.arrow[sizeIndex])
-    if (mark && !(mark.kind === 'blur' ? tooSmall(box) : Math.hypot(drag.x2 - drag.x1, drag.y2 - drag.y1) < 6)) {
-      commit({ ...edit, marks: [...edit.marks, mark] })
-    }
+    const mark = liveMark(tool, drag, ink, sizes, sizeIndex)
+    if (mark && !isStray(mark, drag)) commit({ ...edit, marks: [...edit.marks, mark] })
   }
 
   useEffect(() => {
@@ -322,10 +351,7 @@ function Editor({ path, close }: { path: string; close: () => void }) {
       else if (mod && key === 'y') redo()
       else if (mod && key === 's' && e.shiftKey) void saveCopy()
       else if (mod && key === 's') void save()
-      else if (!mod && !e.altKey && key === 'c') setTool('crop')
-      else if (!mod && !e.altKey && key === 'a') setTool('arrow')
-      else if (!mod && !e.altKey && key === 'b') setTool('blur')
-      else if (!mod && !e.altKey && key === 't') setTool('text')
+      else if (!mod && !e.altKey && TOOL_KEYS[key]) setTool(TOOL_KEYS[key])
       else handled = false
       if (handled) {
         e.preventDefault()
@@ -349,6 +375,21 @@ function Editor({ path, close }: { path: string; close: () => void }) {
             </ToolButton>
             <ToolButton active={tool === 'arrow'} onClick={() => setTool('arrow')} title="Arrow: drag from the tail to the point (A)" data="arrow">
               <ArrowUpRight size={15} />
+            </ToolButton>
+            <ToolButton active={tool === 'box'} onClick={() => setTool('box')} title="Box: drag round something (R). Hold Shift for a square." data="box">
+              <Square size={15} />
+            </ToolButton>
+            <ToolButton active={tool === 'circle'} onClick={() => setTool('circle')} title="Circle: drag round something (O). Hold Shift for a perfect circle." data="circle">
+              <Circle size={15} />
+            </ToolButton>
+            <ToolButton active={tool === 'highlight'} onClick={() => setTool('highlight')} title="Highlighter: drag over writing (H). Hold Shift for a straight line." data="highlight">
+              <Highlighter size={15} />
+            </ToolButton>
+            <ToolButton active={tool === 'step'} onClick={() => setTool('step')} title="Numbered steps: click to drop 1, 2, 3… (N)" data="step">
+              <span className="pic-step-icon">1</span>
+            </ToolButton>
+            <ToolButton active={tool === 'pen'} onClick={() => setTool('pen')} title="Pen: draw freehand (P)" data="pen">
+              <PenLine size={15} />
             </ToolButton>
             <ToolButton active={tool === 'blur'} onClick={() => setTool('blur')} title="Blur: drag a box over anything private (B)" data="blur">
               <Droplets size={15} />
@@ -374,12 +415,12 @@ function Editor({ path, close }: { path: string; close: () => void }) {
           ) : (
             <>
               <div className="sketch-group">
-                {COLOURS.map((c) => (
+                {(tool === 'highlight' ? HIGHLIGHTS : COLOURS).map((c) => (
                   <button
                     key={c}
-                    className={`sketch-colour ${c === colour ? 'active' : ''}`}
+                    className={`sketch-colour ${c === ink ? 'active' : ''}`}
                     style={{ background: c }}
-                    onClick={() => setColour(c)}
+                    onClick={() => (tool === 'highlight' ? setHighlightColour(c) : setColour(c))}
                     title="Colour"
                     aria-label={`Colour ${c}`}
                     data-pic-colour={c}
@@ -392,12 +433,17 @@ function Editor({ path, close }: { path: string; close: () => void }) {
                     key={i}
                     className={`icon-btn sketch-size ${i === sizeIndex ? 'active' : ''}`}
                     onClick={() => setSizeIndex(i)}
-                    title={(tool === 'text' ? TEXT_SIZE_NAMES : SIZE_NAMES)[i]}
+                    title={(tool === 'text' || tool === 'step' ? TEXT_SIZE_NAMES : SIZE_NAMES)[i]}
                   >
                     <i style={{ width: 4 + i * 4, height: 4 + i * 4 }} />
                   </button>
                 ))}
               </div>
+              {tool === 'step' && edit && (
+                <span className="pic-hint" data-pic-next-step>
+                  Next: {nextStep(edit.marks)}
+                </span>
+              )}
             </>
           )}
           <div className="sketch-group">
@@ -547,11 +593,22 @@ function ToolButton(props: { active: boolean; onClick: () => void; title: string
 }
 
 /** The mark being dragged out, if the tool makes one. */
-function liveMark(tool: Tool, drag: Drag | null, colour: string, size: number): Mark | null {
+function liveMark(tool: Tool, drag: Drag | null, colour: string, sizes: Sizes, sizeIndex: number): Mark | null {
   if (!drag) return null
+  const size = sizes.arrow[sizeIndex]
   if (tool === 'arrow') return { kind: 'arrow', x1: drag.x1, y1: drag.y1, x2: drag.x2, y2: drag.y2, color: colour, size }
   if (tool === 'blur') return { kind: 'blur', ...rectFrom(drag.x1, drag.y1, drag.x2, drag.y2) }
+  if (tool === 'box' || tool === 'circle') return { kind: tool, ...shapeBox(drag.x1, drag.y1, drag.x2, drag.y2, drag.even), color: colour, size }
+  if (tool === 'pen') return { kind: 'pen', points: drag.points, color: colour, size }
+  if (tool === 'highlight') return { kind: 'highlight', points: drag.points, color: colour, size: sizes.highlight[sizeIndex] }
   return null
+}
+
+/** A click or tiny wobble rather than a mark you meant. */
+function isStray(mark: Mark, drag: Drag): boolean {
+  if (mark.kind === 'blur' || mark.kind === 'box' || mark.kind === 'circle') return tooSmall(mark)
+  if (mark.kind === 'pen' || mark.kind === 'highlight') return pathSpan(mark.points) < 4
+  return Math.hypot(drag.x2 - drag.x1, drag.y2 - drag.y1) < 6
 }
 
 /** The edit with half-typed text put on, so saving doesn't lose it. */
@@ -562,7 +619,8 @@ function withTyping(edit: PicEdit, typing: { x: number; y: number; text: string 
 
 /**
  * Draws the picture and its marks, with `view` (in the picture's pixels) filling the canvas at its
- * current scale. Blurs go first so arrows and text on top stay sharp.
+ * current scale. Blurs go first so marks on top stay sharp, then highlighter strokes, then the rest
+ * in the order they were made.
  */
 function draw(ctx: CanvasRenderingContext2D, img: HTMLImageElement, edit: PicEdit, view: Rect, marks: Mark[], clear = true): void {
   ctx.save()
@@ -592,8 +650,55 @@ function draw(ctx: CanvasRenderingContext2D, img: HTMLImageElement, edit: PicEdi
     ctx.drawImage(small, box.x, box.y, box.w, box.h)
     ctx.restore()
   }
+  // Highlighter strokes go under the other marks, like a marker on paper.
   for (const m of marks) {
-    if (m.kind === 'arrow') {
+    if (m.kind !== 'highlight') continue
+    ctx.save()
+    ctx.globalAlpha = 0.42
+    ctx.strokeStyle = m.color
+    ctx.lineWidth = m.size
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    strokePath(ctx, m.points)
+    ctx.restore()
+  }
+  for (const m of marks) {
+    if (m.kind === 'box' || m.kind === 'circle') {
+      ctx.save()
+      ctx.strokeStyle = m.color
+      ctx.lineWidth = m.size
+      ctx.lineJoin = 'round'
+      ctx.beginPath()
+      if (m.kind === 'box') ctx.rect(m.x, m.y, m.w, m.h)
+      else ctx.ellipse(m.x + m.w / 2, m.y + m.h / 2, Math.max(0.5, m.w / 2), Math.max(0.5, m.h / 2), 0, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.restore()
+    } else if (m.kind === 'pen') {
+      ctx.save()
+      ctx.strokeStyle = m.color
+      ctx.lineWidth = m.size
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      strokePath(ctx, m.points)
+      ctx.restore()
+    } else if (m.kind === 'step') {
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(m.x, m.y, m.size, 0, Math.PI * 2)
+      ctx.fillStyle = m.color
+      ctx.fill()
+      // A white ring (dark on a white dot) so it stands out on any background.
+      ctx.lineWidth = Math.max(1.5, m.size / 7)
+      ctx.strokeStyle = isLight(m.color) ? 'rgba(0,0,0,0.6)' : '#ffffff'
+      ctx.stroke()
+      const label = String(m.n)
+      ctx.font = `700 ${Math.round(m.size * (label.length > 1 ? 1.0 : 1.2))}px system-ui, -apple-system, "Segoe UI", sans-serif`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillStyle = isLight(m.color) ? '#1f2328' : '#ffffff'
+      ctx.fillText(label, m.x, m.y + m.size * 0.06)
+      ctx.restore()
+    } else if (m.kind === 'arrow') {
       const [ex, ey] = shaftEnd(m.x1, m.y1, m.x2, m.y2, m.size)
       ctx.strokeStyle = m.color
       ctx.fillStyle = m.color
@@ -623,6 +728,25 @@ function draw(ctx: CanvasRenderingContext2D, img: HTMLImageElement, edit: PicEdi
     }
   }
   ctx.restore()
+}
+
+/** A smooth line through the points (curving through the midpoints), or a dot for a single point. */
+function strokePath(ctx: CanvasRenderingContext2D, points: readonly Point[]): void {
+  if (points.length === 0) return
+  ctx.beginPath()
+  ctx.moveTo(points[0][0], points[0][1])
+  if (points.length === 1) ctx.lineTo(points[0][0] + 0.01, points[0][1])
+  else if (points.length === 2) ctx.lineTo(points[1][0], points[1][1])
+  else {
+    for (let i = 1; i < points.length - 1; i++) {
+      const [x, y] = points[i]
+      const [nx, ny] = points[i + 1]
+      ctx.quadraticCurveTo(x, y, (x + nx) / 2, (y + ny) / 2)
+    }
+    const last = points[points.length - 1]
+    ctx.lineTo(last[0], last[1])
+  }
+  ctx.stroke()
 }
 
 /** The crop box: everything outside it dimmed, with a border and the size. */

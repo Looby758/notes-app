@@ -30,7 +30,9 @@ import {
 import { hotkeyLabel, normalizeAccelerator } from '@shared/soundboard'
 import { IS_MAC, SYSTEM_NAME } from '@shared/platform'
 import { logError } from './log'
+import { addonOn, onAddonsChanged } from './addonGate'
 import { accessibilityHelp, inputAllowed } from './shareInput'
+import { onRemapsChanged, remappedKeyIds } from './keyRemap'
 
 /**
  * The macro recorder and auto-clicker (main-process side). The timing is all done by a helper
@@ -79,6 +81,8 @@ function save(): void {
 }
 
 function problem(): string | null {
+  // Failsafe: without the Macros add-on nothing records, plays or clicks.
+  if (!addonOn('macros')) return 'Macros isn’t added. Add it on the Add-ons page.'
   if (!SUPPORTED) return 'Macros and the auto-clicker work on Windows and on a Mac.'
   if (IS_MAC && !inputAllowed(false)) return accessibilityHelp()
   return null
@@ -192,7 +196,8 @@ public static class OrbitMacro {
   public static void Command(string line) {
     string[] p = line.Split(' ');
     switch (p[0]) {
-      case "rec": StartRecording(p.Length > 1 ? p[1] : ""); break;
+      case "rec": StartRecording(p.Length > 1 ? p[1] : "", p.Length > 2 ? p[2] : ""); break;
+      case "recskip": SetSkip(p.Length > 1 ? p[1] : ""); break;
       case "recstop": StopRecording(); break;
       // play <run> <path> / click <run> <args…>: the run number comes back on everything it says.
       case "play": { int sp = line.IndexOf(' ', 5); Play(p[1], line.Substring(sp + 1)); break; }
@@ -287,6 +292,15 @@ public static class OrbitMacro {
   static readonly HashSet<uint> ignore = new HashSet<uint>();
   static readonly HashSet<uint> keysDown = new HashSet<uint>();
   static RawSink sink;
+  // Keys the key remapper is remapping right now: from your real keyboard they're skipped, and what
+  // the remapper pressed instead (marked with its sign) is recorded, so a macro plays what you got.
+  static volatile HashSet<uint> skip = new HashSet<uint>();
+  static readonly IntPtr RemapMark = new IntPtr(0x4F524254);
+  static void SetSkip(string list) {
+    var s = new HashSet<uint>();
+    foreach (var item in list.Split(',')) { uint v; if (uint.TryParse(item, out v)) s.Add(v); }
+    skip = s;
+  }
 
   static string T(long now) { return N((now - recStart) / perMs); }
 
@@ -302,8 +316,9 @@ public static class OrbitMacro {
     return false;
   }
 
-  static void StartRecording(string ignoreList) {
+  static void StartRecording(string ignoreList, string skipList) {
     if (recThread != null) return;
+    SetSkip(skipList);
     ignore.Clear(); keysDown.Clear();
     foreach (var s in ignoreList.Split(',')) { uint v; if (uint.TryParse(s, out v)) ignore.Add(v); }
     var ready = new ManualResetEvent(false);
@@ -347,10 +362,11 @@ public static class OrbitMacro {
     if (code >= 0) {
       long now = Stopwatch.GetTimestamp();
       var k = (KBDLL)Marshal.PtrToStructure(l, typeof(KBDLL));
-      // 0x10: typed by a program (Orbit itself while playing), not by you.
-      if ((k.flags & 0x10) == 0) {
-        bool up = (k.flags & 0x80) != 0, ext = (k.flags & 1) != 0;
-        uint id = k.vk | (ext ? 0x100u : 0u);
+      // 0x10: typed by a program (Orbit itself while playing), not by you; except the key remapper's.
+      bool injected = (k.flags & 0x10) != 0, ext = (k.flags & 1) != 0;
+      uint id = k.vk | (ext ? 0x100u : 0u);
+      if (injected ? k.extra == RemapMark : !skip.Contains(id)) {
+        bool up = (k.flags & 0x80) != 0;
         if (ignore.Contains(k.vk)) { if (!up) Say("h " + T(now)); }
         else {
           string kind;
@@ -906,7 +922,7 @@ function startRecording(): void {
   activity = { kind: 'recording', since: Date.now(), events: 0 }
   const ignore = hotkeyKeys().join(',')
   if (IS_MAC) macStart(MAC_RECORDER, [ignore])
-  else winWrite(`rec ${ignore}`)
+  else winWrite(`rec ${ignore || '-'} ${remappedKeyIds().join(',') || '-'}`)
   broadcast()
 }
 
@@ -1117,6 +1133,7 @@ let used = false
 const lastPress = new Map<string, number>()
 
 function runHotkey(action: HotkeyAction): void {
+  if (!addonOn('macros')) return
   const key = errorKey(action)
   const now = Date.now()
   if (now - (lastPress.get(key) ?? 0) < 350) return
@@ -1144,7 +1161,7 @@ const errorKey = (a: HotkeyAction): string => (a.kind === 'macro' ? a.id : a.kin
 
 function wantedHotkeys(): Map<string, HotkeyAction> {
   const out = new Map<string, HotkeyAction>()
-  if (!used || !SUPPORTED) return out
+  if (!used || !SUPPORTED || !addonOn('macros')) return out
   for (const m of data.macros) if (m.hotkey) out.set(m.hotkey, { kind: 'macro', id: m.id })
   const h = data.hotkeys
   if (h.clicker) out.set(h.clicker, { kind: 'clicker' })
@@ -1222,7 +1239,17 @@ function markUsed(): void {
 
 export function setupMacros(): void {
   load()
+  // Remapped keys are recorded as what they were remapped to (Windows; on a Mac macOS does that already).
+  onRemapsChanged(() => {
+    if (!IS_MAC && activity.kind === 'recording') winWrite(`recskip ${remappedKeyIds().join(',') || '-'}`)
+  })
   used = existsSync(dataFile())
+  // Removing the add-on stops anything playing or recording at once, and lets go of its hotkeys.
+  onAddonsChanged(() => {
+    if (!addonOn('macros')) stopAll()
+    applyHotkeys()
+    broadcast()
+  })
   // Hotkeys (and the helper) after the handlers below, so the page always works even if they fail.
   setTimeout(() => {
     try {

@@ -105,6 +105,17 @@ export function downloadArgs(i: DownloadArgsInput): string[] {
     '--no-colors',
     '--no-mtime',
     '--windows-filenames',
+    // Sites (YouTube most of all) drop the odd connection: try those again rather than give up.
+    '--retries',
+    '10',
+    '--fragment-retries',
+    '10',
+    '--extractor-retries',
+    '3',
+    '--retry-sleep',
+    'exp=1:8',
+    '--socket-timeout',
+    '20',
     '--progress-template',
     `download:${PROGRESS_TAG} %(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress.total_bytes_estimate)s`,
     '-P',
@@ -147,6 +158,11 @@ export function titleOf(path: string): string {
   const name = path.slice(Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1)
   return name.replace(/(\.f[\w-]+)?\.\w+$/, '') || name
 }
+
+/** A failure that often goes away by itself (a dropped connection, a site that was slow to answer). */
+export const passingDownloadError = (log: string): boolean =>
+  !/Unsupported URL|private|age.?restrict|confirm your age|unavailable|removed|deleted|HTTP Error 404|does not exist|not a bot|No space left/i.test(log) &&
+  /getaddrinfo|Unable to download|timed out|Connection|Network is unreachable|HTTP Error (403|429|5\d\d)|Read timed out|IncompleteRead|reset by peer|fragment/i.test(log)
 
 /** yt-dlp's error lines in plain words. */
 export function explainDownloadError(log: string, site: string): string {

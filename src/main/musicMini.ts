@@ -3,7 +3,7 @@ import { join } from 'path'
 import { activeThemeId, getTheme } from '@shared/themes'
 import type { Prefs } from '@shared/prefs'
 import { IS_MAC } from '@shared/platform'
-import type { MusicMiniCommand, MusicMiniState } from '@shared/types'
+import type { MusicMiniCommand, MusicMiniLayout, MusicMiniState } from '@shared/types'
 import { loadSettings, saveSettings } from './settings'
 
 /**
@@ -18,10 +18,18 @@ let last: MusicMiniState | null = null
 let prefs: () => Prefs
 let notesWindow: () => BrowserWindow | null
 
-const SIZE = { width: 340, height: 96 }
+const WIDTH = 340
 const MARGIN = 24
+/** The song row, then the visualiser and Up next under it when they're showing. */
+const ROW = 96
+const VISUALISER = 46
+const UP_NEXT = 214
+
+const layout = (): MusicMiniLayout => ({ visualiser: true, upNext: true, ...loadSettings().musicMiniLayout })
+const heightFor = (l: MusicMiniLayout): number => ROW + (l.visualiser ? VISUALISER : 0) + (l.upNext ? UP_NEXT : 0)
 
 function startBounds(): Electron.Rectangle {
+  const SIZE = { width: WIDTH, height: heightFor(layout()) }
   const saved = loadSettings().musicMiniWindow
   if (saved && saved.x !== undefined && saved.y !== undefined) {
     const onScreen = screen.getAllDisplays().some(({ workArea: a }) => saved.x! + 60 < a.x + a.width && saved.x! + SIZE.width - 60 > a.x && saved.y! >= a.y - 10 && saved.y! + 30 < a.y + a.height)
@@ -124,6 +132,26 @@ export function setupMusicMini(getPrefs: () => Prefs, getNotesWindow: () => Brow
     if (miniWin && !miniWin.isDestroyed()) miniWin.webContents.send('musicMini:state', state)
   })
   ipcMain.handle('musicMini:last', () => last)
+  ipcMain.handle('musicMini:layout', () => layout())
+  ipcMain.handle('musicMini:setLayout', (_e, l: MusicMiniLayout) => {
+    const next = { visualiser: l?.visualiser !== false, upNext: l?.upNext !== false }
+    saveSettings({ musicMiniLayout: next })
+    if (miniWin && !miniWin.isDestroyed()) {
+      // Grows or shrinks downwards, kept on the screen it's on.
+      const b = miniWin.getBounds()
+      const area = screen.getDisplayMatching(b).workArea
+      const height = heightFor(next)
+      const y = Math.max(area.y, Math.min(b.y, area.y + area.height - height))
+      miniWin.setBounds({ x: b.x, y, width: WIDTH, height })
+      miniWin.webContents.send('musicMini:layout', next)
+    }
+    const win = notesWindow()
+    if (win && !win.isDestroyed()) win.webContents.send('musicMini:layout', next)
+  })
+  // The visualiser's bars, from the notes window (where the music plays).
+  ipcMain.on('musicMini:levels', (_e, levels: number[]) => {
+    if (miniWin && !miniWin.isDestroyed() && Array.isArray(levels)) miniWin.webContents.send('musicMini:levels', levels)
+  })
   // From the mini player: a button press, carried out by the notes window.
   ipcMain.on('musicMini:command', (_e, command: MusicMiniCommand) => musicCommand(command))
 }

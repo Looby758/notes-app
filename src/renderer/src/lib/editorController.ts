@@ -17,9 +17,11 @@ import {
   type PaneState
 } from '../store/editor'
 import { notify } from '../store/notify'
+import { useUI } from '../store/ui'
 import { usePrefs } from '../store/prefs'
 import type { Prefs } from '@shared/prefs'
 import { isWithin, replacePrefix } from './paths'
+import { notAddedText, tabFeature, tabOn } from './addons'
 import { noteLockState, onBeforeLock, openText, remapLock, sealText, useLock, type NoteLock } from './lock/session'
 import { currentHeadingIndex, extractHeadings } from './outline'
 import { flushBoards } from './boards'
@@ -72,12 +74,14 @@ export const EMAIL_TAB = 'email:'
 export const HOME_TAB = 'home:'
 export const MONEY_TAB = 'money:'
 export const CONVERT_TAB = 'convert:'
+/** Send huge files to a friend with a code, or a Google Drive link (components/FileSender). */
+export const FILESENDER_TAB = 'filesender:'
 export const COMICS_TAB = 'comics:'
 /** Sign, merge, split, reorder and fill in PDFs (components/PdfEditor); what's open is in store/pdfEditor. */
 export const PDF_EDITOR_TAB = 'pdf-editor:'
 /** Downloaded wikis, read offline (components/Wiki). */
 export const WIKI_TAB = 'wiki:'
-/** Sudoku, Minesweeper, Nonograms, Jigsaw and Wordle (components/MiniGames); which one is showing is in store/miniGames. */
+/** The mini games, from Sudoku to Chess (components/MiniGames); which one is showing is in store/miniGames. */
 export const MINIGAMES_TAB = 'minigames:'
 /** Tabs of features folded into others: Sudoku and Minesweeper open Mini games, the old video downloader opens Downloads. */
 const OLD_TABS: Record<string, string> = { 'sudoku:': 'minigames:', 'minesweeper:': 'minigames:', 'downloader:': 'downloads:' }
@@ -90,8 +94,16 @@ export const COUNTDOWNS_TAB = 'countdowns:'
 export const PUBLISHING_TAB = 'publishing:'
 /** Monitor brightness, contrast and input (components/Screens). */
 export const SCREENS_TAB = 'screens:'
+/** Your own music as a full music app (components/Music/MusicPage). */
+export const MUSIC_TAB = 'music:'
 /** A volume for each app (components/Mixer). */
 export const MIXER_TAB = 'mixer:'
+/** What's running, how much it uses, and ending it (components/TaskManager). */
+export const TASKS_TAB = 'tasks:'
+/** Removing an app and what it leaves behind (components/Uninstaller). */
+export const UNINSTALL_TAB = 'uninstall:'
+/** Add-ons: browse, add and remove parts of Orbit (components/Settings/AddonsSettings, its own page). */
+export const ADDONS_TAB = 'addons:'
 /** The download manager: a queue that pauses, carries on and can wait for the night (components/Downloads). */
 export const DOWNLOADS_TAB = 'downloads:'
 /** Scenes, webcam and screen recording (components/Studio). */
@@ -106,6 +118,8 @@ export const VIDEOS_TAB = 'videos:'
 export const SOUNDBOARD_TAB = 'soundboard:'
 /** The macro recorder and auto-clicker (components/Macros). */
 export const MACROS_TAB = 'macros:'
+/** Remap keys, everywhere or for one game (components/KeyRemap). */
+export const KEYREMAP_TAB = 'keyremap:'
 /** Who's in your Discord voice channel, with mute and deafen (components/Discord). */
 export const DISCORD_TAB = 'discord-voice:'
 /** WhatsApp and Discord in one tab (components/Messages). */
@@ -115,6 +129,8 @@ export const GROK_TAB = 'grok:'
 /** Claude (claude.ai), the same way as Grok: a tab, or floating over your notes (components/ChatSite). */
 export const CLAUDE_TAB = 'claude:'
 export const GAMES_TAB = 'games:'
+/** SkyBlock ironman goal planner (components/Games/SkyblockGoalsPage). */
+export const SKYBLOCK_GOALS_TAB = 'skyblock-goals:'
 /** The video player (components/Video); which video it shows is in store/videoPlayer. */
 export const VIDEO_TAB = 'video:'
 /** Browse the whole computer and Google Drive (components/Explorer). */
@@ -867,6 +883,11 @@ export function newTab(pane = activePane()): void {
 
 /** Adds a tab after the current one in `pane` and switches to it. */
 function addTab(pane: string, id: string): void {
+  // A page from an add-on you haven't added doesn't open (the Add-ons page adds it).
+  if (!tabOn(id)) {
+    notify(notAddedText(tabFeature(id) ?? ''), 'info', { label: 'Add-ons', run: openAddons })
+    return
+  }
   const p = paneState(pane)
   const at = p.active ? p.tabs.indexOf(p.active) + 1 : p.tabs.length
   const tabs = [...p.tabs]
@@ -875,8 +896,18 @@ function addTab(pane: string, id: string): void {
   activateTab(id, pane)
 }
 
+/** Opens the Add-ons page. */
+export function openAddons(): void {
+  openSpecialTab(ADDONS_TAB)
+}
+
 /** Opens (or switches to) a special page like Settings. There's only ever one of each. */
 export function openSpecialTab(id: string): void {
+  // Settings opens as a panel over the current page, not as a tab of its own.
+  if (id === SETTINGS_TAB) {
+    useUI.setState({ settingsOpen: true })
+    return
+  }
   const existing = paneWithTab(id)
   if (existing) {
     activateTab(id, existing)
@@ -907,6 +938,11 @@ export function openExplorerTab(dir?: string, { beside = false }: { beside?: boo
  * a new pane on the right.
  */
 export function openWebTab(url = '', { beside = false, privately = false }: { beside?: boolean; privately?: boolean } = {}): void {
+  // Without the Web browser add-on, a page opens in your usual browser instead.
+  if (url && !tabOn('web:')) {
+    window.open(url)
+    return
+  }
   if (privately) {
     const id = webId(true)
     setWebPage(id, { url, title: '' })

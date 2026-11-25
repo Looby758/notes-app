@@ -2,7 +2,7 @@ import './nav.css'
 import { RotateCcw } from 'lucide-react'
 import { DEFAULT_PREFS } from '@shared/prefs'
 import { resetPrefs, usePrefs } from '../../store/prefs'
-import { FEATURE_GROUPS, FEATURES, toggleFeatureIn, type FeaturePlace } from '../../lib/features'
+import { FEATURE_GROUPS, useFeatures, toggleFeatureIn, type FeaturePlace } from '../../lib/features'
 import { DECK_EXTRAS } from '../../lib/phoneDeck'
 
 const PLACES: { place: FeaturePlace; label: string }[] = [
@@ -14,6 +14,7 @@ const PLACES: { place: FeaturePlace; label: string }[] = [
 
 /** Settings → Finding features: tick where each feature shows up. Everything is always in the launcher. */
 export default function NavEditor() {
+  const features = useFeatures()
   const prefs = usePrefs((s) => s.prefs)
   const changed = PLACES.some(({ place }) => JSON.stringify(prefs[place]) !== JSON.stringify(DEFAULT_PREFS[place]))
   return (
@@ -44,7 +45,7 @@ export default function NavEditor() {
             <tr key={g} className="nav-editor-group">
               <td colSpan={5}>{g}</td>
             </tr>,
-            ...FEATURES.filter((f) => f.group === g).map((f) => {
+            ...features.filter((f) => f.group === g).map((f) => {
               const Icon = f.icon
               return (
                 <tr key={f.id} data-feature={f.id}>

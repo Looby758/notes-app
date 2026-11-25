@@ -1,4 +1,5 @@
 import { useEditor } from '../store/editor'
+import { searchWholePc } from '../store/filesReveal'
 import { focusIdeaBox } from '../store/videos'
 import { useVault } from '../store/vault'
 import { openExport, showRightView, showSearch, showSidebarView, toggleFocusMode, toggleMindMap, toggleZen, useUI } from '../store/ui'
@@ -21,14 +22,20 @@ import {
   HOME_TAB,
   MONEY_TAB,
   CONVERT_TAB,
+  FILESENDER_TAB,
   PDF_EDITOR_TAB,
   COMICS_TAB,
   WIKI_TAB,
   CLOCKS_TAB,
   COUNTDOWNS_TAB,
+  SKYBLOCK_GOALS_TAB,
   PUBLISHING_TAB,
   SCREENS_TAB,
   MIXER_TAB,
+  TASKS_TAB,
+  UNINSTALL_TAB,
+  ADDONS_TAB,
+  MUSIC_TAB,
   DOWNLOADS_TAB,
   STUDIO_TAB,
   APPSTUDIO_TAB,
@@ -36,6 +43,7 @@ import {
   VIDEOS_TAB,
   SOUNDBOARD_TAB,
   MACROS_TAB,
+  KEYREMAP_TAB,
   DISCORD_TAB,
   EXPLORER_TAB,
   openExplorerTab,
@@ -71,7 +79,7 @@ import { parentOf } from './paths'
 import { newBoard } from './boards'
 import { newSpreadsheet } from './newSheet'
 import { openAsk, runNoteJob } from '../store/ai'
-import { musicControl, musicToggleLike, setMusicMini, shareSongToNote, toggleMusic, useMusic } from '../store/music'
+import { musicControl, musicToggleLike, setMusicMini, shareSongToNote, useMusic } from '../store/music'
 import { showAndFindSong } from '../store/songId'
 import { sendToPhone } from '../store/phone'
 import { toggleDiscord } from '../store/discord'
@@ -80,6 +88,7 @@ import { openGrokTab, toggleGrokFloat } from '../components/Grok/GrokPage'
 import { openSiteTab, toggleSiteFloat } from '../components/ChatSite/ChatSite'
 import { startSnip } from './snip'
 import { openMiniGames } from '../store/miniGames'
+import { commandOn } from './addons'
 import { changeNotesPassword, lockAllNow, lockFolder, lockNote, lockNoteOwn, removeLock } from './lock/actions'
 
 export interface Command {
@@ -251,7 +260,7 @@ export const commands: Command[] = [
   { id: 'calendar.panel', group: 'Calendar', title: 'Show calendar in the side panel', run: () => showRightView('calendar') },
   { id: 'phone.pair', group: 'Phone', title: 'Phone: connect your phone (send, clipboard, remote, touchpad, talk, scan)', run: () => sendToPhone({ kind: 'pair' }) },
   { id: 'phone.wifi', group: 'Phone', title: 'Phone: Wi-Fi QR code for guests', run: () => sendToPhone({ kind: 'wifi' }) },
-  { id: 'music.player', group: 'Music', title: 'Show or hide the music player', shortcut: 'Ctrl+Alt+M', run: toggleMusic },
+  { id: 'music.page', group: 'Music', title: 'Open the Music page (your songs, albums, artists and playlists)', run: () => openSpecialTab(MUSIC_TAB) },
   { id: 'music.toggle', group: 'Music', title: 'Music: play / pause', run: () => void musicControl('toggle') },
   { id: 'music.next', group: 'Music', title: 'Music: next song', run: () => void musicControl('next') },
   { id: 'music.previous', group: 'Music', title: 'Music: previous song', run: () => void musicControl('previous') },
@@ -322,6 +331,8 @@ export const commands: Command[] = [
   { id: 'launcher', group: 'Navigation', title: 'All features (the launcher)', shortcut: 'Ctrl+Shift+Space', run: () => useUI.setState({ launcherOpen: true }) },
   { id: 'radial', group: 'Navigation', title: 'Radial menu (your favourite features in a ring)', run: () => openRadial() },
   { id: 'snip.start', group: 'Tools', title: 'Screen snip: grab text from anywhere on screen', shortcut: 'Ctrl+Shift+S', run: () => void startSnip() },
+  { id: 'snip.picture', group: 'Tools', title: 'Snip a picture: drag a box and it’s copied, ready to paste anywhere', run: () => void startSnip('picture') },
+  { id: 'snip.picture.later', group: 'Tools', title: 'Snip a picture in 5 seconds (time to hover over something first)', run: () => void startSnip('picture', 5) },
   { id: 'switcher', group: 'Navigation', title: 'Open note…', shortcut: 'Ctrl+P', run: () => useUI.setState({ modal: 'switcher' }) },
   { id: 'palette', group: 'Navigation', title: 'Show all commands', shortcut: 'Ctrl+K', run: () => useUI.setState({ modal: 'commands' }) },
   { id: 'search', group: 'Navigation', title: 'Search all notes', shortcut: 'Ctrl+Shift+F', run: () => showSearch() },
@@ -351,16 +362,25 @@ export const commands: Command[] = [
   { id: 'terminal.new', group: 'Navigation', title: 'New terminal (another command line, in the notes folder)', run: () => void import('./terminal').then((t) => t.newTerminal()) },
   { id: 'money.open', group: 'Navigation', title: 'Open money tracker', shortcut: 'Ctrl+Shift+B', run: () => openSpecialTab(MONEY_TAB) },
   { id: 'convert.open', group: 'Navigation', title: 'Convert files (photos, Word, audio…)', run: () => openSpecialTab(CONVERT_TAB) },
+  { id: 'filesender.open', group: 'Navigation', title: 'Big file sender (send huge files to a friend with a code)', run: () => openSpecialTab(FILESENDER_TAB) },
   { id: 'pdf.open', group: 'Navigation', title: 'PDF editor (sign, fill in, merge, split, reorder pages)', run: () => openSpecialTab(PDF_EDITOR_TAB) },
   { id: 'explorer.open', group: 'Navigation', title: 'Browse files on this computer (and Google Drive)', run: () => openSpecialTab(EXPLORER_TAB) },
+  { id: 'explorer.searchPc', group: 'Navigation', title: 'Search the whole PC for a file or folder', run: () => searchWholePc() },
   { id: 'explorer.newTab', group: 'Navigation', title: 'New Files tab (another folder, to drag files between)', run: () => openExplorerTab() },
   { id: 'comics.open', group: 'Navigation', title: 'Read comics (your comic book shelf)', run: () => openSpecialTab(COMICS_TAB) },
   { id: 'wiki.open', group: 'Navigation', title: 'Wikis (downloaded Fandom wikis, read offline)', run: () => openSpecialTab(WIKI_TAB) },
-  { id: 'minigames.open', group: 'Navigation', title: 'Mini games (Sudoku, Minesweeper, Nonograms, Jigsaw, Wordle)', run: () => openMiniGames(null) },
+  { id: 'minigames.open', group: 'Navigation', title: 'Mini games (Sudoku, Minesweeper, Nonograms, Jigsaw, Wordle, Word search, Hangman, Solitaire, Blackjack, 2048, Breakout, Chess)', run: () => openMiniGames(null) },
   { id: 'sudoku.open', group: 'Navigation', title: 'Play sudoku (take a quick break)', run: () => openMiniGames('sudoku') },
   { id: 'nonogram.open', group: 'Navigation', title: 'Play nonograms (picture logic puzzles)', run: () => openMiniGames('nonogram') },
   { id: 'jigsaw.open', group: 'Navigation', title: 'Make a jigsaw from a photo', run: () => openMiniGames('jigsaw') },
   { id: 'wordle.open', group: 'Navigation', title: 'Play Wordle (any time, 2 to 8 letters, Walking Dead mode)', run: () => openMiniGames('wordle') },
+  { id: 'wordsearch.open', group: 'Navigation', title: 'Play word search (endless puzzles, Walking Dead theme)', run: () => openMiniGames('wordsearch') },
+  { id: 'hangman.open', group: 'Navigation', title: 'Play hangman (any words, themes, Walking Dead)', run: () => openMiniGames('hangman') },
+  { id: 'solitaire.open', group: 'Navigation', title: 'Play Solitaire (Klondike, draw 1 or 3)', run: () => openMiniGames('solitaire') },
+  { id: 'blackjack.open', group: 'Navigation', title: 'Play Blackjack (against the dealer, pretend chips)', run: () => openMiniGames('blackjack') },
+  { id: 'g2048.open', group: 'Navigation', title: 'Play 2048', run: () => openMiniGames('g2048') },
+  { id: 'breakout.open', group: 'Navigation', title: 'Play Breakout (bounce the ball, break the bricks)', run: () => openMiniGames('breakout') },
+  { id: 'chess.open', group: 'Navigation', title: 'Play chess (against the computer or a friend)', run: () => openMiniGames('chess') },
   { id: 'discord.open', group: 'Navigation', title: 'Discord voice (who’s in voice, mute, deafen)', run: () => openSpecialTab(DISCORD_TAB) },
   { id: 'discord.popout', group: 'Discord', title: 'Discord: pop out the voice call (its own window)', run: () => void window.api.openDiscordPopout() },
   { id: 'discord.mute', group: 'Discord', title: 'Discord: mute / unmute', run: () => void toggleDiscord('mute') },
@@ -368,6 +388,7 @@ export const commands: Command[] = [
   { id: 'soundboard.open', group: 'Navigation', title: 'Open the soundboard and voice changer', run: () => openSpecialTab(SOUNDBOARD_TAB) },
   { id: 'soundboard.stop', group: 'Navigation', title: 'Stop all soundboard sounds', run: () => void import('./soundboard').then((m) => m.stopAll()) },
   { id: 'macros.open', group: 'Navigation', title: 'Macros: record and play keys and mouse, auto-clicker', run: () => openSpecialTab(MACROS_TAB) },
+  { id: 'keyremap.open', group: 'Navigation', title: 'Key remapper: remap keys, everywhere or for one game', run: () => openSpecialTab(KEYREMAP_TAB) },
   { id: 'macros.record', group: 'Macros', title: 'Macros: start / stop recording', run: () => void window.api.macrosRecord() },
   { id: 'macros.stop', group: 'Macros', title: 'Macros: stop playing or the auto-clicker', run: () => void window.api.macrosStop() },
   { id: 'studio.open', group: 'Navigation', title: 'Open the Studio (record your screen and webcam)', run: () => openSpecialTab(STUDIO_TAB) },
@@ -416,6 +437,9 @@ export const commands: Command[] = [
   { id: 'minesweeper.open', group: 'Navigation', title: 'Play minesweeper (take a quick break)', run: () => openMiniGames('minesweeper') },
   { id: 'video.open', group: 'Navigation', title: 'Video player (play any video, MKV, AVI…)', run: () => openSpecialTab(VIDEO_TAB) },
   { id: 'mixer.open', group: 'Navigation', title: 'Volume mixer (a volume for each app)', run: () => openSpecialTab(MIXER_TAB) },
+  { id: 'tasks.open', group: 'Navigation', title: 'Task manager (what’s running, CPU and memory, end a stuck app)', run: () => openSpecialTab(TASKS_TAB) },
+  { id: 'addons.open', group: 'Navigation', title: 'Add-ons (add or remove parts of Orbit)', run: () => openSpecialTab(ADDONS_TAB) },
+  { id: 'uninstall.open', group: 'Navigation', title: 'Uninstaller (remove an app and everything it leaves behind)', run: () => openSpecialTab(UNINSTALL_TAB) },
   { id: 'screens.open', group: 'Navigation', title: 'Screens (monitor brightness, contrast and input)', run: () => openSpecialTab(SCREENS_TAB) },
   { id: 'screens.brighter', group: 'Navigation', title: 'Make every screen brighter', run: () => void window.api.monitorAction('all', { kind: 'brightness', mode: 'up', amount: 10 }) },
   { id: 'screens.dimmer', group: 'Navigation', title: 'Make every screen dimmer', run: () => void window.api.monitorAction('all', { kind: 'brightness', mode: 'down', amount: 10 }) },
@@ -424,16 +448,10 @@ export const commands: Command[] = [
   { id: 'countdowns.open', group: 'Navigation', title: 'Countdowns (days until a new season, trip, birthday…)', run: () => openSpecialTab(COUNTDOWNS_TAB) },
   { id: 'clocks.open', group: 'Navigation', title: 'World clocks (the time in other places)', run: () => openSpecialTab(CLOCKS_TAB) },
   { id: 'games.open', group: 'Navigation', title: 'Games (play your Steam and other games)', run: () => openSpecialTab(GAMES_TAB) },
+  { id: 'skyblockGoals.open', group: 'Navigation', title: 'SkyBlock (your profile like SkyCrypt, plus the ironman goal planner)', run: () => openSpecialTab(SKYBLOCK_GOALS_TAB) },
   { id: 'web.open', group: 'Web', title: 'Open a web page', shortcut: 'Ctrl+Shift+I', run: () => openWebTab() },
   { id: 'web.beside', group: 'Web', title: 'Open a web page beside this note', run: () => openWebTab('', { beside: true }) },
   { id: 'web.private', group: 'Web', title: 'Open a private web tab (no history, nothing saved)', run: () => openWebTab('', { privately: true }) },
-  {
-    id: 'youtube.open',
-    group: 'Web',
-    title: 'YouTube in a mini window (floats over everything while you work)',
-    shortcut: 'Ctrl+Alt+Y',
-    run: () => void window.api.openYouTube()
-  },
   { id: 'web.clear', group: 'Web', title: 'Clear browsing data (sign out of all websites)', run: () => void clearBrowsingData() },
   {
     id: 'view.mindmap',
@@ -492,9 +510,12 @@ export const commands: Command[] = [
 /** A command's current shortcut, taking your Settings into account. */
 export const shortcutFor = (cmd: Command): string | null => effectiveShortcut(cmd.id, cmd.shortcut)
 
+/** The commands you can use: core ones, and those of the add-ons you've added. */
+export const availableCommands = (): Command[] => commands.filter((c) => commandOn(c.id))
+
 /** The app-wide commands' shortcuts (so they also work while a web page has focus). */
 export function appShortcuts(): string[] {
-  return commands.flatMap((c) => {
+  return availableCommands().flatMap((c) => {
     const shortcut = c.scope === 'editor' ? null : shortcutFor(c)
     return shortcut ? [normalizeShortcut(shortcut)] : []
   })
@@ -502,12 +523,12 @@ export function appShortcuts(): string[] {
 
 /** The app-wide command bound to a shortcut like "Ctrl+W", if any. */
 export function commandForShortcut(shortcut: string): Command | undefined {
-  return commands.find((c) => c.scope !== 'editor' && normalizeShortcut(shortcutFor(c) ?? '') === shortcut)
+  return availableCommands().find((c) => c.scope !== 'editor' && normalizeShortcut(shortcutFor(c) ?? '') === shortcut)
 }
 
 /** The app-wide command (not an editor one) bound to this key press, if any. */
 export function commandForKey(e: KeyboardEvent): Command | undefined {
-  return commands.find((c) => {
+  return availableCommands().find((c) => {
     if (c.scope === 'editor') return false
     const shortcut = shortcutFor(c)
     return !!shortcut && matchesShortcut(e, shortcut)
