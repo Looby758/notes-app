@@ -10,18 +10,24 @@ import type { BoardColumn, BoardItem } from './appStudio'
 
 // ---------- The parts of Orbit Claude can see ----------
 
-export type ClaudeArea = 'appStudio' | 'notes' | 'calendar' | 'clocks' | 'money' | 'flashcards' | 'files' | 'music' | 'videos' | 'computer' | 'email'
+export type ClaudeArea = 'appStudio' | 'notes' | 'calendar' | 'clocks' | 'money' | 'flashcards' | 'files' | 'music' | 'videos' | 'computer' | 'look' | 'games' | 'discord' | 'phone' | 'web' | 'clipboard' | 'email'
 
 export const CLAUDE_AREAS: readonly { id: ClaudeArea; label: string; what: string; onAtStart: boolean }[] = [
-  { id: 'notes', label: 'Notes', what: 'Find, read, open, make, change, rename, move, copy and delete notes, daily notes, tasks, tags, links and folders (deleted ones go to the bin). Locked notes are never shown.', onAtStart: true },
-  { id: 'calendar', label: 'Calendar and countdowns', what: 'See what’s coming up, add, move, rename and delete events (repeating ones and Google ones too), tick tasks, and add, change and delete countdowns.', onAtStart: true },
+  { id: 'notes', label: 'Notes', what: 'Find, read, open, make, change, rename, move, copy and delete notes, daily notes, tasks, tags, links and folders (deleted ones go to the bin), and show or make mind maps. Locked notes are never shown.', onAtStart: true },
+  { id: 'calendar', label: 'Calendar, reminders and weather', what: 'See what’s coming up, add, move, rename and delete events (repeating ones and Google ones too), tick tasks, countdowns, reminders, the weather, finding free time to plan your week, and a morning briefing.', onAtStart: true },
   { id: 'clocks', label: 'World clocks', what: 'The time anywhere, converting times between places, when to message friends, and adding, renaming and removing clocks.', onAtStart: true },
-  { id: 'money', label: 'Money', what: 'Read your spending, budgets and savings, and add, change and delete entries, budgets, savings goals, who owes who, subscriptions and balances (Ctrl+Z undoes them).', onAtStart: true },
+  { id: 'money', label: 'Money', what: 'Read your spending, budgets and savings, a weekly check-in, splitting a bill, reading receipts and bank statements, and adding, changing and deleting entries, budgets, savings goals, who owes who, subscriptions and balances (Ctrl+Z undoes them).', onAtStart: true },
   { id: 'flashcards', label: 'Flashcards', what: 'See your cards and which ones you keep getting wrong, and add new ones.', onAtStart: true },
-  { id: 'files', label: 'Files and downloads', what: 'Find files you’ve colour-tagged, see downloads and how full your drives are, and convert files (saved beside the original).', onAtStart: true },
-  { id: 'music', label: 'Music', what: 'Play, queue, shuffle and loop songs and playlists, change the volume, make, edit and tidy playlists, like, rate and tag songs, fix song details, suggest songs, and download songs from YouTube into your music.', onAtStart: true },
+  { id: 'files', label: 'Files and downloads', what: 'Find files you’ve colour-tagged, find and read screenshots, see downloads and how full your drives are, and convert files (saved beside the original).', onAtStart: true },
+  { id: 'music', label: 'Music', what: 'Play, queue, shuffle and loop songs and playlists, change the volume, make, edit and tidy playlists, like, rate and tag songs, fix song details, suggest songs, music for a mood, a DJ that fills Up next, routines like “gym” or “bedtime” (they can start at a time), and download songs from YouTube into your music.', onAtStart: true },
   { id: 'videos', label: 'Videos', what: 'Find videos in your notes folder and play them in the video player, including a show’s episodes (“play the next episode”), Up next, and pause, skip, speed and volume.', onAtStart: true },
   { id: 'computer', label: 'Task manager', what: 'See what’s running and how busy the computer is, and close a stuck program (Orbit asks you first).', onAtStart: true },
+  { id: 'look', label: 'Home page, themes and focus', what: 'Arrange the Home page, change or make themes (one colour, with a picture behind if you like), and start focus mode: a study timer that holds Orbit’s pop-ups, with zen mode and music.', onAtStart: true },
+  { id: 'games', label: 'Games and comics', what: 'Your games and time played, start a game, mini game scores, Hypixel SkyBlock profile, goals and sessions, and comics (what you’re up to, open the next one).', onAtStart: true },
+  { id: 'discord', label: 'Discord', what: 'Who’s in your call, mute and deafen, someone’s volume, leave, past calls and call notes.', onAtStart: true },
+  { id: 'phone', label: 'Phone', what: 'Send a note, file or link to your phone, and alert your paired phone.', onAtStart: true },
+  { id: 'web', label: 'Web, wikis and dictionary', what: 'Open sites in Orbit’s browser, your browser history and bookmarks, search and ask your downloaded wikis, and look up words.', onAtStart: true },
+  { id: 'clipboard', label: 'Clipboard history', what: 'Remembers text you copy (not passwords, and only until Orbit closes) so Claude can find it, and copy text for you. Off unless you switch it on.', onAtStart: false },
   { id: 'appStudio', label: 'App Studio', what: 'Read errors and release checks, run tests, get the latest code, check packages, read and change cards on Ideas & bugs, pull requests, releases and bug reports. Merging or closing a pull request asks you first.', onAtStart: true },
   { id: 'email', label: 'Email', what: 'Search and read your emails. Off unless you switch it on.', onAtStart: false }
 ]

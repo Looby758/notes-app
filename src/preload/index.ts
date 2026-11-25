@@ -26,6 +26,7 @@ const api: NotesApi = {
   listThemes: () => ipcRenderer.invoke('themes:list'),
   importTheme: () => ipcRenderer.invoke('themes:import'),
   removeTheme: (id) => ipcRenderer.invoke('themes:remove', id),
+  makeTheme: (manifest, picture) => ipcRenderer.invoke('themes:make', manifest, picture),
   onThemesChanged: (callback) => {
     const handler = (_e: unknown, themes: Parameters<typeof callback>[0]): void => callback(themes)
     ipcRenderer.on('themes:changed', handler)

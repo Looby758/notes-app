@@ -570,6 +570,8 @@ export interface NotesApi {
   /** Asks for a theme file and imports it. */
   importTheme(): Promise<{ theme?: Theme; error?: string; canceled?: boolean }>
   removeTheme(id: string): Promise<void>
+  /** Makes a theme from colours (theme.json fields) and an optional background picture (a file path or https address); resolves with it. */
+  makeTheme(manifest: Record<string, unknown>, picture?: string): Promise<import('./themes').Theme>
   onThemesChanged(callback: (themes: Theme[]) => void): () => void
   /** Shows notes.log (problems Notes ran into) in File Explorer / Finder. */
   showLog(): Promise<void>

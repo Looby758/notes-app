@@ -10,6 +10,7 @@ import {
   deleteGoal,
   deleteSubscription,
   ensureMoney,
+  importEntries,
   payBackIou,
   setBalance,
   setBudget,
@@ -19,11 +20,13 @@ import {
   updateGoal,
   useMoney
 } from '../../store/money'
-import { CATEGORY_COLORS, formatPounds, OTHER, OTHER_INCOME, type AccountKind, type MoneyCategory, type MoneyEntry, type RepeatInterval } from '../money'
-import { iouLeft, openIous } from '../moneyAccounts'
-import { allRecurring } from '../moneyInsights'
-import { dayKey } from '../dates'
-import { has, needNotes, num, pence, pickOne, str, type Answer, type Args } from './common'
+import { budgetState, CATEGORY_COLORS, detectColumns, formatPounds, guessCategory, importKeys, monthTotals, OTHER, OTHER_INCOME, parseCsv, readStatement, type AccountKind, type MoneyCategory, type MoneyEntry, type RepeatInterval } from '../money'
+import { iouLeft, openIous, splitEvenly } from '../moneyAccounts'
+import { allRecurring, chargedAfterCancelling, weeklyToGoal } from '../moneyInsights'
+import { parseReceipt } from '../receipt'
+import { statementFromPdf } from '../pdfStatement'
+import { addDays, dayKey, fromDayKey } from '../dates'
+import { has, needNotes, num, pence, pickOne, str, strs, type Answer, type Args } from './common'
 
 /**
  * Money for Claude Desktop: adding, finding, changing and deleting what was spent, budgets,
@@ -276,7 +279,135 @@ async function accountFor(args: Args): Promise<string> {
   return `Added the account ${a.name} with ${formatPounds(amount)}.`
 }
 
+
+// ---------- check-in, splitting, receipts and statements ----------
+
+async function checkInFor(args: Args): Promise<string> {
+  const m = await money()
+  const days = Math.min(90, Math.max(1, num(args.days, 7)))
+  const end = today()
+  const start = dayKey(addDays(fromDayKey(end)!, 1 - days))
+  const before = dayKey(addDays(fromDayKey(start)!, -days))
+  const byCat = (from: string, to: string): Map<string, number> => {
+    const out = new Map<string, number>()
+    for (const e of m.entries) if (!e.income && e.date >= from && e.date <= to) out.set(e.category, (out.get(e.category) ?? 0) + e.amount)
+    return out
+  }
+  const now = byCat(start, end)
+  const prev = byCat(before, dayKey(addDays(fromDayKey(start)!, -1)))
+  const total = (x: Map<string, number>): number => [...x.values()].reduce((t, v) => t + v, 0)
+  const lines = [`Spent ${formatPounds(total(now))} in the last ${days} days (the ${days} days before: ${formatPounds(total(prev))}).`]
+  lines.push(
+    ...[...now]
+      .sort((a, b) => b[1] - a[1])
+      .map(([c, v]) => `  ${catName(c)}: ${formatPounds(v)}${prev.has(c) ? ` (was ${formatPounds(prev.get(c)!)})` : ' (new)'}`)
+  )
+  const month = monthTotals(m.entries, end.slice(0, 7))
+  const budgets = Object.entries(m.budgets).map(([c, b]) => {
+    const spent = month.byCategory.get(c) ?? 0
+    const state = budgetState(spent, b)
+    return `  ${catName(c)}: ${formatPounds(spent)} of ${formatPounds(b)}${state === 'over' ? ' (OVER)' : state === 'near' ? ' (nearly used up)' : ''}`
+  })
+  if (budgets.length) lines.push('This month’s budgets:', ...budgets)
+  if (m.goals.length)
+    lines.push(
+      'Savings goals:',
+      ...m.goals.map((g) => {
+        const weekly = weeklyToGoal(g, end)
+        return `  ${g.name}: ${formatPounds(g.saved)} of ${formatPounds(g.target)}${g.due ? ` by ${g.due}` : ''}${weekly ? `, needs ${formatPounds(weekly)} a week` : ''}`
+      })
+    )
+  const recurring = allRecurring(m, end).filter((r) => !r.income)
+  const soon = recurring.filter((r) => r.next <= dayKey(addDays(fromDayKey(end)!, 14)))
+  if (soon.length) lines.push('Payments in the next 2 weeks:', ...soon.map((r) => `  ${r.next} ${r.name} ${formatPounds(r.amount)}`))
+  const monthly = recurring.reduce((t, r) => t + (r.interval === 'weekly' ? (r.amount * 52) / 12 : r.interval === 'yearly' ? r.amount / 12 : r.amount), 0)
+  lines.push(`Subscriptions and bills: ${recurring.length}, about ${formatPounds(Math.round(monthly))} a month.`)
+  const zombie = chargedAfterCancelling(recurring, m.cancelled)
+  if (zombie.length) lines.push(`Charged again after being marked cancelled: ${zombie.map((r) => r.name).join(', ')}.`)
+  const ious = openIous(m.ious)
+  if (ious.length) {
+    const owed = ious.filter((i) => i.theyOwe).reduce((t, i) => t + iouLeft(i), 0)
+    const owe = ious.filter((i) => !i.theyOwe).reduce((t, i) => t + iouLeft(i), 0)
+    lines.push(`Owed to them: ${formatPounds(owed)}. They owe: ${formatPounds(owe)}.`)
+  }
+  return lines.join('\n')
+}
+
+async function splitBillFor(args: Args): Promise<string> {
+  await money()
+  const total = Math.abs(pence(args.total, 'total'))
+  const people = strs(args.people).map((p) => p.trim().slice(0, 40))
+  if (!people.length) throw new Error('Say who it’s split with.')
+  const paidBy = str(args.paid_by).trim()
+  const iPaid = !paidBy || /^(me|i|myself)$/i.test(paidBy)
+  const shares = splitEvenly(total, people.length + 1)
+  const note = str(args.note).trim().slice(0, 100)
+  const remind = str(args.remind)
+  if (remind && !/^\d{4}-\d{2}-\d{2}$/.test(remind)) throw new Error('The reminder date has to be like 2026-12-01.')
+  if (iPaid) {
+    addIous(people.map((person, i) => ({ person, amount: shares[i + 1], theyOwe: true, note, date: today(), remind })))
+  } else {
+    addIous([{ person: paidBy, amount: shares[0], theyOwe: false, note, date: today(), remind }])
+  }
+  if (args.record_spending === true) {
+    const cat = categoryFor(str(args.category), false)
+    addEntry({ date: today(), amount: iPaid ? total : shares[0], income: false, category: cat.id, note: note || 'Split bill' })
+  }
+  return iPaid
+    ? `Split ${formatPounds(total)} ${people.length + 1} ways (${formatPounds(shares[0])} each): ${people.map((p, i) => `${p} owes ${formatPounds(shares[i + 1])}`).join(', ')}${remind ? `, reminder on ${remind}` : ''}.`
+    : `Split ${formatPounds(total)} ${people.length + 1} ways: they owe ${paidBy} ${formatPounds(shares[0])}.`
+}
+
+async function receiptFor(args: Args): Promise<string> {
+  await money()
+  const path = str(args.path)
+  const bytes = await window.api.readForConvert(path)
+  const reading = await window.api.snipRead(bytes)
+  const r = parseReceipt(reading.text)
+  const head = `Read from the receipt: ${r.shop || 'shop not found'}, ${r.total !== null ? formatPounds(r.total) : 'total not found'}, ${r.date}.`
+  if (args.add !== true) return `${head}\n\nThe receipt’s text:\n${reading.text.slice(0, 6000)}`
+  if (r.total === null) throw new Error(`${head} Without a total it wasn’t added; use add_money_entry with the right amount.`)
+  const cat = categoryFor(str(args.category), false)
+  addEntry({ date: r.date, amount: r.total, income: false, category: cat.id, note: r.shop })
+  return `${head} Added it as spending (${cat.name}).`
+}
+
+async function statementRows(path: string): Promise<string[][]> {
+  const bytes = await window.api.readForConvert(path)
+  if (/\.pdf$/i.test(path)) {
+    const { pdfPages } = await import('../pdfText')
+    return statementFromPdf(await pdfPages(bytes.slice().buffer as ArrayBuffer))
+  }
+  if (!/\.(csv|txt)$/i.test(path)) throw new Error('Statements have to be a CSV or PDF file from the bank.')
+  return parseCsv(new TextDecoder().decode(bytes))
+}
+
+async function statementFor(args: Args): Promise<string> {
+  const m = await money()
+  const path = str(args.path)
+  const raw = await statementRows(path)
+  const rows = readStatement(raw, detectColumns(raw))
+  if (!rows.length) throw new Error('Orbit couldn’t find any payments in that file. The user can import it on the Money page instead.')
+  const keys = importKeys(rows)
+  const known = new Set(m.entries.map((e) => e.importKey).filter(Boolean))
+  const fresh = rows.map((r, i) => ({ r, key: keys[i] })).filter((x) => !known.has(x.key))
+  const lines = fresh.slice(0, 200).map(({ r }) => `${r.date} ${r.amount < 0 ? '-' : '+'}${formatPounds(Math.abs(r.amount))} ${r.description} → ${catName(guessCategory(r, m.rules, m.categories))}`)
+  if (args.import !== true) return `${rows.length} payments in the statement, ${fresh.length} not in Money yet:\n${lines.join('\n')}${fresh.length > 200 ? '\n…' : ''}`
+  if (!fresh.length) return 'Everything in that statement is already in Money.'
+  const ok = await window.api.confirm({ message: `Add ${fresh.length} payments from this statement to Money?`, detail: 'Claude asked to import it. Categories are guessed the way the Money page does; Ctrl+Z undoes it.', ok: 'Add them' })
+  if (!ok) return 'The user chose not to import it.'
+  importEntries(
+    fresh.map(({ r, key }) => ({ date: r.date, amount: Math.abs(r.amount), income: r.amount > 0, category: guessCategory(r, m.rules, m.categories), note: r.description, importKey: key })),
+    {}
+  )
+  return `Added ${fresh.length} payments to Money.`
+}
+
 export const MONEY_ANSWERS: Record<string, Answer> = {
+  money_check_in: checkInFor,
+  split_bill: splitBillFor,
+  read_receipt: receiptFor,
+  read_statement: statementFor,
   add_money_entry: addEntryFor,
   find_money_entries: findEntriesFor,
   edit_money_entry: editEntryFor,

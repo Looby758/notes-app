@@ -23,6 +23,10 @@ export interface ToolDeps {
   knownFolders(): string[]
   memory(folder: string): ReleaseMemory
   look(folder: string): Promise<{ info: AppInfo; main?: MainStatus; build?: BuildStatus; busy?: boolean }>
+  /** A word's meanings from Orbit's dictionary. */
+  define?(word: string): Promise<string>
+  /** What's been copied lately (only kept while the Clipboard part is on), and copying text. */
+  clipboard?: { list(): { text: string; at: number }[]; copy(text: string): void }
 }
 
 const text = (t: string): CallToolResult => ({ content: [{ type: 'text', text: redactSecrets(t) }] })
@@ -892,21 +896,401 @@ function videoTools(server: McpServer, deps: ToolDeps): void {
   })
 }
 
+// ---------- Planning: briefing, free time, reminders, weather, any page ----------
+
+function plannerTools(server: McpServer, deps: ToolDeps): void {
+  windowTool(server, deps, 'get_weather', {
+    title: 'Weather',
+    description: 'The weather where the user is (the town set on Orbit’s Home page): now, and each day with 3-hourly detail and the chance of rain. Up to 14 days ahead.',
+    inputSchema: { date: day.optional().describe('First day (default today)'), days: z.number().int().min(1).max(14).optional() }
+  })
+  windowTool(server, deps, 'add_reminder', {
+    title: 'Add a reminder',
+    description: 'Orbit pops up a reminder at a time (it’s saved as a task in that day’s daily note; ticking it stops it).',
+    inputSchema: { text: z.string().min(1).max(300), time, date: day.optional().describe('Default today') },
+    write: true
+  })
+  windowTool(server, deps, 'get_reminders', { title: 'Reminders coming up', description: 'The reminders still to come, soonest first.', inputSchema: { limit: z.number().int().min(1).max(100).optional() } })
+  windowTool(server, deps, 'find_free_time', {
+    title: 'Find free time',
+    description:
+      'The free gaps in the user’s days (around Orbit’s events and timed tasks and their connected calendars), for planning a week: "plan my week", "when can I study 3 hours?". Then add_calendar_event can block the time.',
+    inputSchema: {
+      from: day.optional().describe('Default today'),
+      to: day.optional().describe('Default a week on'),
+      day_start: time.optional().describe('Default 09:00'),
+      day_end: time.optional().describe('Default 21:00'),
+      min_minutes: z.number().int().min(10).max(600).optional().describe('Shortest gap worth listing (default 30)')
+    },
+    timeoutMs: 60_000
+  })
+}
+
+function briefingTool(server: McpServer, deps: ToolDeps): void {
+  const areas = (['calendar', 'money', 'music'] as const).filter((a) => deps.areas[a])
+  server.registerTool(
+    'morning_briefing',
+    {
+      title: 'Morning briefing',
+      description: 'One summary of the user’s day: today’s calendar, tasks due soon, reminders, the weather, countdowns, money this week and what’s playing (whichever parts are switched on). For "good morning" or "what’s my day like?".',
+      inputSchema: { date: day.optional().describe('Default today') },
+      annotations: READ
+    },
+    safely(({ date }: { date?: string }) => deps.ask('morning_briefing', { date, areas }, 60_000))
+  )
+}
+
+const PAGE_LIST = 'home, calendar, music, money, flashcards, countdowns, world clocks, email, messages, app studio, convert, comics, videos, video player, games, mini games, skyblock, task manager, volume mixer, files, downloads, screenshots, clips, soundboard, macros, discord, wiki, graph, timeline, terminal, ask ai, ai chat, pdf editor, publishing, screens, studio, send files, find and replace, add-ons, uninstaller, key remapper, web, settings'
+
+function pageTool(server: McpServer, deps: ToolDeps): void {
+  windowTool(server, deps, 'open_page', {
+    title: 'Open a page in Orbit',
+    description: `Opens one of Orbit’s pages in its window, like the Calendar or Money. The pages: ${PAGE_LIST}.`,
+    inputSchema: { page: z.string().min(1) },
+    write: true
+  })
+}
+
+// ---------- More money ----------
+
+function moneyExtraTools(server: McpServer, deps: ToolDeps): void {
+  windowTool(server, deps, 'money_check_in', {
+    title: 'Money check-in',
+    description: 'How the user’s money has gone lately: spent and received, the biggest categories and shops, budgets running out, and what’s coming up. For a weekly check-in.',
+    inputSchema: { days: z.number().int().min(1).max(92).optional().describe('Default 7') }
+  })
+  windowTool(server, deps, 'split_bill', {
+    title: 'Split a bill',
+    description: 'Splits a bill evenly between the user and friends and notes who owes who (with an optional reminder day). paid_by: who paid, if not the user.',
+    inputSchema: {
+      total: pounds,
+      people: z.array(z.string().min(1).max(40)).min(1).max(20).describe('Everyone else, not the user'),
+      paid_by: z.string().optional(),
+      note: z.string().max(100).optional(),
+      remind: day.optional(),
+      record_spending: z.boolean().optional().describe('Also add the user’s share as spending'),
+      category: z.string().optional()
+    },
+    write: true
+  })
+  windowTool(server, deps, 'read_receipt', {
+    title: 'Read a receipt',
+    description: 'Reads a photo of a receipt (its full path): the shop, total and date, and its text. With add true, adds it as spending.',
+    inputSchema: { path: z.string().min(1), add: z.boolean().optional(), category: z.string().optional() },
+    write: true,
+    timeoutMs: 90_000
+  })
+  windowTool(server, deps, 'read_statement', {
+    title: 'Read a bank statement',
+    description: 'Reads a bank statement (CSV or PDF, its full path) and says which entries are new. With import true, adds the new ones to Money (Orbit asks the user first).',
+    inputSchema: { path: z.string().min(1), import: z.boolean().optional() },
+    write: true,
+    timeoutMs: 180_000
+  })
+}
+
+// ---------- More music: moods, the DJ, routines ----------
+
+function musicMoreTools(server: McpServer, deps: ToolDeps): void {
+  windowTool(server, deps, 'music_library', { title: 'What’s in their music', description: 'The genres, artists and tags in the user’s music folder, with counts, for picking songs by mood.', inputSchema: {} })
+  windowTool(server, deps, 'songs_for_mood', {
+    title: 'Songs for a mood',
+    description:
+      'Picks songs from the user’s music for a mood or activity ("something chill for studying", "an hour of upbeat rock"), by genres, artists, tags and words (see music_library), adding up to about some minutes. Can save them as a playlist and/or play them.',
+    inputSchema: {
+      genres: z.array(z.string()).optional(),
+      artists: z.array(z.string()).optional(),
+      tags: z.array(z.string()).optional(),
+      words: z.array(z.string()).optional(),
+      minutes: z.number().int().min(0).max(600).optional().describe('Default 60; 0 for all that fit'),
+      playlist_name: z.string().max(80).optional(),
+      play: z.boolean().optional()
+    },
+    write: true,
+    timeoutMs: 60_000
+  })
+  windowTool(server, deps, 'dj', {
+    title: 'DJ: fill Up next',
+    description: 'Adds songs that go well after what’s playing (same artists and genre, songs from the same playlists, liked and well-rated ones, not played lately) to Up next. If nothing is playing, give a song to start from (like).',
+    inputSchema: { count: z.number().int().min(1).max(50).optional(), like: z.string().optional() },
+    write: true,
+    timeoutMs: 60_000
+  })
+  windowTool(server, deps, 'save_music_routine', {
+    title: 'Save a music routine',
+    description:
+      'Saves a named music routine, like "gym" (a playlist shuffled, volume 90) or "bedtime" (calm songs, volume 30, stop after 45 minutes). With at (and days, 0 = Sunday), it starts by itself at that time while Orbit is open. Saving one with the same name replaces it.',
+    inputSchema: {
+      name: z.string().min(1).max(40),
+      playlist: z.string().optional(),
+      search: z.string().optional().describe('Songs matching these words, if no playlist'),
+      shuffle: z.boolean().optional(),
+      loop: z.enum(['off', 'song', 'all']).optional(),
+      volume: z.number().int().min(0).max(100).optional(),
+      sleep_minutes: z.number().int().min(1).max(600).optional(),
+      at: time.optional(),
+      days: z.array(z.number().int().min(0).max(6)).optional()
+    },
+    write: true
+  })
+  windowTool(server, deps, 'get_music_routines', { title: 'Music routines', description: 'The user’s saved music routines.', inputSchema: {} })
+  windowTool(server, deps, 'start_music_routine', { title: 'Start a music routine', description: 'Starts a saved music routine now ("gym mode").', inputSchema: { name: z.string().min(1) }, write: true, timeoutMs: 60_000 })
+  windowTool(server, deps, 'delete_music_routine', { title: 'Delete a music routine', description: 'Deletes a saved music routine.', inputSchema: { name: z.string().min(1) }, write: true })
+}
+
+// ---------- Screenshots ----------
+
+function screenshotTools(server: McpServer, deps: ToolDeps): void {
+  windowTool(server, deps, 'find_screenshots', {
+    title: 'Find screenshots',
+    description: 'The user’s screenshots (newest first) from the last few days. With search, reads the words in each one and keeps those that have them, like "error".',
+    inputSchema: { days: z.number().int().min(1).max(365).optional().describe('Default 7'), search: z.string().optional(), limit: z.number().int().min(1).max(50).optional() },
+    timeoutMs: 180_000
+  })
+  windowTool(server, deps, 'read_screenshot', {
+    title: 'Read a screenshot',
+    description: 'The words in a screenshot or picture (its full path, or "latest" for the newest screenshot).',
+    inputSchema: { path: z.string().optional() },
+    timeoutMs: 90_000
+  })
+}
+
+// ---------- Mind maps ----------
+
+function mindMapTools(server: McpServer, deps: ToolDeps): void {
+  const note = z.string().min(1).describe('The note’s name or path')
+  windowTool(server, deps, 'show_mind_map', { title: 'Show a mind map', description: 'Shows a note as a mind map in Orbit (its headings are the branches).', inputSchema: { note }, write: true })
+  windowTool(server, deps, 'mind_map_outline', { title: 'A mind map’s outline', description: 'A note’s mind map as an indented outline of its headings.', inputSchema: { note } })
+  windowTool(server, deps, 'create_mind_map', {
+    title: 'Make a mind map',
+    description: 'Makes a new mind map note from an indented outline ("- Plants\n  - Roots\n  - Leaves") and shows it.',
+    inputSchema: { title: z.string().min(1).max(120), outline: z.string().min(1).max(20_000), folder: z.string().optional() },
+    write: true
+  })
+}
+
+// ---------- Home page, themes and focus ----------
+
+function lookTools(server: McpServer, deps: ToolDeps): void {
+  windowTool(server, deps, 'get_home_page', { title: 'The Home page', description: 'The boxes on Orbit’s Home page, in order, and which are hidden.', inputSchema: {} })
+  windowTool(server, deps, 'arrange_home_page', {
+    title: 'Arrange the Home page',
+    description: 'Changes Orbit’s Home page: put boxes first in an order, move one to a place (to, from 1), hide or show boxes, or reset it.',
+    inputSchema: {
+      order: z.array(z.string()).optional(),
+      move: z.string().optional(),
+      to: z.number().int().min(1).optional(),
+      hide: z.array(z.string()).optional(),
+      show: z.array(z.string()).optional(),
+      reset: z.boolean().optional()
+    },
+    write: true
+  })
+  windowTool(server, deps, 'list_themes', { title: 'Themes', description: 'Orbit’s themes, which one is on, and the accent colour.', inputSchema: {} })
+  windowTool(server, deps, 'set_theme', {
+    title: 'Change the theme',
+    description: 'Switches Orbit’s theme and/or accent colour (#rrggbb, or empty for the theme’s own), or makes it follow the system’s light/dark.',
+    inputSchema: { theme: z.string().optional(), accent: z.string().optional(), follow_system: z.boolean().optional() },
+    write: true
+  })
+  windowTool(server, deps, 'make_theme', {
+    title: 'Make a theme',
+    description:
+      'Makes a new theme from one colour (like #2a1650 for dark purple) and switches to it, optionally with a picture behind every page: a picture’s full path or an https address (for "a space background", find a suitable picture’s address first).',
+    inputSchema: {
+      name: z.string().min(1).max(60),
+      colour: z.string().describe('#rrggbb'),
+      light: z.boolean().optional().describe('A light theme (default dark)'),
+      accent: z.string().optional().describe('#rrggbb (default the colour)'),
+      picture: z.string().optional(),
+      picture_strength: z.number().min(0.03).max(0.6).optional().describe('How strongly the picture shows (default 0.2)')
+    },
+    write: true,
+    timeoutMs: 90_000
+  })
+  windowTool(server, deps, 'remove_theme', { title: 'Remove a theme', description: 'Removes a theme that was made or imported (not a built-in one).', inputSchema: { theme: z.string().min(1) }, write: true })
+  windowTool(server, deps, 'start_focus', {
+    title: 'Start focus mode',
+    description:
+      'Starts a focus (study) timer: minutes per round and rounds with breaks between. By default Orbit’s pop-ups and reminders wait until it’s over (quiet false to keep them). Can switch on zen mode and play a playlist or songs matching words.',
+    inputSchema: {
+      minutes: z.number().int().min(1).max(240).optional(),
+      rounds: z.number().int().min(1).max(12).optional(),
+      quiet: z.boolean().optional(),
+      zen: z.boolean().optional(),
+      playlist: z.string().optional(),
+      search: z.string().optional()
+    },
+    write: true,
+    timeoutMs: 60_000
+  })
+  windowTool(server, deps, 'focus_timer', {
+    title: 'The focus timer',
+    description: 'How long is left on the focus timer, or pause, resume, add minutes or stop it.',
+    inputSchema: { action: z.enum(['status', 'pause', 'resume', 'add', 'stop']).optional(), minutes: z.number().int().min(1).max(120).optional() },
+    write: true
+  })
+}
+
+// ---------- Games, SkyBlock and comics ----------
+
+function gamesTools(server: McpServer, deps: ToolDeps): void {
+  windowTool(server, deps, 'list_games', { title: 'Games', description: 'The games on the computer, with time played in all and this week, and when each was last played.', inputSchema: {} })
+  windowTool(server, deps, 'play_game', { title: 'Start a game', description: 'Starts one of the computer’s games.', inputSchema: { game: z.string().min(1) }, write: true })
+  windowTool(server, deps, 'mini_game_stats', { title: 'Mini game scores', description: 'Orbit’s mini games: games played and won, win streaks and best times.', inputSchema: {} })
+  windowTool(server, deps, 'open_mini_game', {
+    title: 'Open a mini game',
+    description: 'Opens one of Orbit’s mini games: Sudoku, Minesweeper, Nonogram, Jigsaw, Wordle, Word search, Hangman, Solitaire, Blackjack, 2048, Breakout or Chess (none: the list).',
+    inputSchema: { game: z.string().optional() },
+    write: true
+  })
+  windowTool(server, deps, 'skyblock_profile', { title: 'SkyBlock profile', description: 'The user’s Hypixel SkyBlock profile as Orbit shows it: skills, slayers, dungeons, collections, coins and the rest (JSON).', inputSchema: {}, timeoutMs: 60_000 })
+  windowTool(server, deps, 'skyblock_goals', { title: 'SkyBlock goals', description: 'The user’s Hypixel SkyBlock goals and how far along each is (JSON).', inputSchema: {}, timeoutMs: 60_000 })
+  windowTool(server, deps, 'skyblock_sessions', {
+    title: 'SkyBlock sessions',
+    description: 'The user’s recent Hypixel SkyBlock play sessions: how long, coins made per hour, skill XP and collections gained (JSON).',
+    inputSchema: { limit: z.number().int().min(1).max(50).optional() }
+  })
+  windowTool(server, deps, 'list_comics', { title: 'Comics', description: 'The comics on Orbit’s shelf, last read first, with the page they’re up to.', inputSchema: {} })
+  windowTool(server, deps, 'open_comic', { title: 'Open a comic', description: 'Opens a comic in Orbit where they left off.', inputSchema: { comic: z.string().min(1) }, write: true })
+  windowTool(server, deps, 'next_comic', {
+    title: 'Open the next comic',
+    description: 'Opens the next issue they haven’t finished in a series (default: the series they read last; if they’re part way through one, that one).',
+    inputSchema: { series: z.string().optional() },
+    write: true
+  })
+}
+
+// ---------- Discord ----------
+
+function discordTools(server: McpServer, deps: ToolDeps): void {
+  windowTool(server, deps, 'discord_status', { title: 'Discord call', description: 'The Discord voice channel the user is in, who’s there and talking, their own mute/deafen, and the recent chat.', inputSchema: {} })
+  windowTool(server, deps, 'discord_set', { title: 'Mute or deafen on Discord', description: 'Mutes/unmutes and/or deafens/undeafens the user on Discord.', inputSchema: { mute: z.boolean().optional(), deaf: z.boolean().optional() }, write: true })
+  windowTool(server, deps, 'discord_leave', { title: 'Leave the Discord call', description: 'Leaves the Discord voice channel.', inputSchema: {}, write: true })
+  windowTool(server, deps, 'discord_user_voice', {
+    title: 'Someone’s volume on Discord',
+    description: 'Changes how loud the user hears someone in the call (0 to 200, 100 is normal), or mutes them just for the user.',
+    inputSchema: { user: z.string().min(1), volume: z.number().int().min(0).max(200).optional(), mute: z.boolean().optional() },
+    write: true
+  })
+  windowTool(server, deps, 'discord_calls', { title: 'Past Discord calls', description: 'The user’s recent Discord calls (newest first): when, how long, who with, and the call notes.', inputSchema: { limit: z.number().int().min(1).max(100).optional() } })
+  windowTool(server, deps, 'discord_call_note', {
+    title: 'Write a call note',
+    description: 'Sets the note for the call the user is in (things to say or remember), or a past call’s note with call_id. append true adds to it.',
+    inputSchema: { text: z.string().max(5000), call_id: z.string().optional(), append: z.boolean().optional() },
+    write: true
+  })
+}
+
+// ---------- The phone ----------
+
+function phoneTools(server: McpServer, deps: ToolDeps): void {
+  windowTool(server, deps, 'send_to_phone', {
+    title: 'Send to the phone',
+    description: 'Sends a note (by name), a file in the notes folder (path) or a web link (url) to the user’s phone: Orbit shows a code to scan with the phone’s camera.',
+    inputSchema: { note: z.string().optional(), path: z.string().optional(), url: z.string().optional() },
+    write: true
+  })
+  windowTool(server, deps, 'phone_alert', {
+    title: 'Alert the phone',
+    description: 'Shows an alert on the user’s paired phone.',
+    inputSchema: { title: z.string().max(80).optional(), message: z.string().min(1).max(300) },
+    write: true
+  })
+}
+
+// ---------- The web, wikis and the dictionary ----------
+
+function webTools(server: McpServer, deps: ToolDeps): void {
+  windowTool(server, deps, 'open_website', {
+    title: 'Open a website',
+    description: 'Opens a website (or a search, for words) in Orbit’s own browser.',
+    inputSchema: { url: z.string().min(1), private: z.boolean().optional() },
+    write: true
+  })
+  windowTool(server, deps, 'web_history', {
+    title: 'Browser history',
+    description: 'Pages the user visited in Orbit’s browser that match some words (in the title, address or the page’s text).',
+    inputSchema: { search: z.string(), limit: z.number().int().min(1).max(100).optional() }
+  })
+  windowTool(server, deps, 'get_bookmarks', { title: 'Bookmarks', description: 'The bookmarks in Orbit’s browser.', inputSchema: {} })
+  windowTool(server, deps, 'add_bookmark', { title: 'Add a bookmark', description: 'Bookmarks a page in Orbit’s browser.', inputSchema: { url: z.string().min(1), title: z.string().max(120).optional() }, write: true })
+  windowTool(server, deps, 'wiki_search', {
+    title: 'Search the wikis',
+    description: 'Searches the wikis the user downloaded into Orbit (all of them, or one), within their spoiler limit.',
+    inputSchema: { query: z.string().min(1), wiki: z.string().optional() },
+    timeoutMs: 60_000
+  })
+  windowTool(server, deps, 'wiki_page', { title: 'Read a wiki page', description: 'A page of a downloaded wiki, as text.', inputSchema: { title: z.string().min(1), wiki: z.string().optional() }, timeoutMs: 60_000 })
+  windowTool(server, deps, 'wiki_ask', {
+    title: 'Ask the wikis',
+    description: 'Answers a question from the downloaded wikis, with the pages it came from, without spoilers past where the user is.',
+    inputSchema: { question: z.string().min(1).max(500), wiki: z.string().optional() },
+    timeoutMs: 120_000
+  })
+  const define = deps.define
+  if (define)
+    server.registerTool(
+      'define_word',
+      { title: 'Look up a word', description: 'A word’s meanings, examples and synonyms from Orbit’s built-in dictionary.', inputSchema: { word: z.string().min(1).max(60) }, annotations: READ },
+      safely(({ word }: { word: string }) => define(word))
+    )
+}
+
+// ---------- Clipboard ----------
+
+function clipboardTools(server: McpServer, deps: ToolDeps): void {
+  const clip = deps.clipboard
+  if (!clip) return
+  server.registerTool(
+    'get_clipboard_history',
+    {
+      title: 'Clipboard history',
+      description: 'Text the user copied since the Clipboard part was switched on (newest first, the last 50, kept only while Orbit is open). Passwords and keys are never kept.',
+      inputSchema: { search: z.string().optional() },
+      annotations: READ
+    },
+    safely(({ search }: { search?: string }) => {
+      const want = (search ?? '').toLowerCase()
+      const list = clip.list().filter((c) => !want || c.text.toLowerCase().includes(want))
+      if (!list.length) return want ? 'Nothing copied matches that.' : 'Nothing copied yet.'
+      return list.map((c, i) => `${i + 1}. ${new Date(c.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}: ${c.text.length > 1500 ? `${c.text.slice(0, 1500)}…` : c.text}`).join('\n\n')
+    })
+  )
+  server.registerTool(
+    'copy_to_clipboard',
+    { title: 'Copy text', description: 'Puts some text on the user’s clipboard, ready to paste.', inputSchema: { text: z.string().min(1).max(100_000) }, annotations: WRITE },
+    safely(({ text: t }: { text: string }) => {
+      clip.copy(t)
+      return 'Copied. It’s ready to paste.'
+    })
+  )
+}
+
 const AREA_TOOLS: Record<ClaudeArea, (server: McpServer, deps: ToolDeps) => void> = {
   appStudio: (s, d) => (appStudioTools(s, d), studioMoreTools(s, d)),
-  notes: (s, d) => (notesTools(s, d), notesMoreTools(s, d)),
-  calendar: (s, d) => (calendarTools(s, d), calendarMoreTools(s, d)),
+  notes: (s, d) => (notesTools(s, d), notesMoreTools(s, d), mindMapTools(s, d)),
+  calendar: (s, d) => (calendarTools(s, d), calendarMoreTools(s, d), plannerTools(s, d)),
   clocks: clockTools,
-  money: (s, d) => (moneyTools(s, d), moneyMoreTools(s, d)),
+  money: (s, d) => (moneyTools(s, d), moneyMoreTools(s, d), moneyExtraTools(s, d)),
   flashcards: flashcardTools,
-  files: (s, d) => (filesTools(s, d), convertTools(s, d)),
-  music: musicTools,
+  files: (s, d) => (filesTools(s, d), convertTools(s, d), screenshotTools(s, d)),
+  music: (s, d) => (musicTools(s, d), musicMoreTools(s, d)),
   videos: videoTools,
   computer: computerTools,
+  look: lookTools,
+  games: gamesTools,
+  discord: discordTools,
+  phone: phoneTools,
+  web: webTools,
+  clipboard: clipboardTools,
   email: emailTools
 }
 
 /** Adds the tools for the parts of Orbit that are switched on. */
 export function registerOrbitTools(server: McpServer, deps: ToolDeps): void {
   for (const [area, add] of Object.entries(AREA_TOOLS) as [ClaudeArea, (typeof AREA_TOOLS)[ClaudeArea]][]) if (deps.areas[area]) add(server, deps)
+  // Always there: opening any page, and the briefing (with whatever parts are on).
+  pageTool(server, deps)
+  briefingTool(server, deps)
 }

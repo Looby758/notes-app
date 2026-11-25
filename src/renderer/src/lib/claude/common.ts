@@ -1,4 +1,6 @@
 import { NOT_READY } from '@shared/claudeDesktop'
+import { findNotePath } from '@shared/claudeFormat'
+import { useNoteIndex } from '../../store/noteIndex'
 import { useVault } from '../../store/vault'
 import { lockedFolderOf } from '../lock/folders'
 
@@ -46,4 +48,31 @@ export function pence(v: unknown, what = 'amount'): number {
   const n = typeof v === 'number' ? v : Number(str(v).replace(/[£,\s]/g, ''))
   if (!Number.isFinite(n)) throw new Error(`The ${what} has to be a number of pounds, like 12.50.`)
   return Math.round(n * 100)
+}
+
+/** A note's path from its name or path, leaving out locked ones. */
+export function findNote(want: string): string {
+  const all = [...useNoteIndex.getState().notes.keys()]
+  const path = findNotePath(
+    all.filter((p) => !locked(p)),
+    want
+  )
+  if (path) return path
+  if (findNotePath(all, want)) throw new Error('That note is in a locked folder, so Claude can’t see it.')
+  throw new Error(`There’s no note called “${want}” (or more than one has that name: use its full path from search_notes).`)
+}
+
+/** A web page's or wiki page's HTML as plain text, keeping paragraphs and headings on their own lines. */
+export function htmlText(html: string): string {
+  const marked = html
+    .replace(/<(script|style)[\s\S]*?<\/\1>/gi, '')
+    .replace(/<h([1-6])[^>]*>/gi, (_m, n: string) => `\n\n${'#'.repeat(Number(n))} `)
+    .replace(/<li[^>]*>/gi, '\n- ')
+    .replace(/<(br|\/p|\/div|\/tr|\/h[1-6]|\/table)[^>]*>/gi, '\n')
+  const text = new DOMParser().parseFromString(marked, 'text/html').body.textContent ?? ''
+  return text
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n /g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }

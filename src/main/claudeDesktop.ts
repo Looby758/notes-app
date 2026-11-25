@@ -25,6 +25,8 @@ import { registerOrbitTools, type ToolDeps } from './claudeTools'
 import { knownFolders, releaseMemory, studioErrors } from './studioErrors'
 import { lookAtRelease } from './releaseHelper'
 import { logError } from './log'
+import { defineWord } from './dictionary'
+import { clipboardHistory, copyText, watchClipboard } from './clipboardHistory'
 
 /**
  * The Claude Desktop connection: an MCP server (the way Claude Desktop talks to other apps) inside
@@ -117,8 +119,16 @@ function deps(): ToolDeps {
     errors: studioErrors,
     knownFolders,
     memory: releaseMemory,
-    look: lookAtRelease
+    look: lookAtRelease,
+    define: defineWord,
+    clipboard: { list: clipboardHistory, copy: copyText }
   }
+}
+
+let isSecret: (text: string) => boolean = () => false
+/** Clipboard history is only kept while the connection and its Clipboard part are both on. */
+function syncClipboard(): void {
+  watchClipboard(!!server && cleanAreas(loadSettings().claudeDesktopAreas).clipboard, isSecret)
 }
 
 /** A new MCP server with the tools for the parts that are switched on (one for each request). */
@@ -127,7 +137,7 @@ export function orbitMcpServer(d: ToolDeps = deps()): McpServer {
     { name: 'orbit', version: app.getVersion?.() ?? '1.0.0' },
     {
       instructions:
-        'Orbit is the user’s notes app. These tools read (and in a few cases change) what’s in it: App Studio’s errors and release checks, the Ideas & bugs board, notes, calendar, countdowns, money, flashcards, files, downloads, music and email, for whichever parts the user switched on. Passwords, locked notes and keys are never available.'
+        'Orbit is the user’s notes app, and much more. These tools read and change what’s in it, for whichever parts the user switched on: notes and mind maps, calendar, reminders, weather and a morning briefing, money, flashcards, files and screenshots, music (moods, a DJ, routines), videos, the task manager, the Home page, themes and focus mode, games, SkyBlock and comics, Discord, the phone, Orbit’s web browser, wikis and dictionary, clipboard history, App Studio and email. open_page opens any of Orbit’s pages. Passwords, locked notes and keys are never available.'
     }
   )
   registerOrbitTools(mcp, d)
@@ -219,6 +229,7 @@ async function start(): Promise<void> {
   }
   server = s
   writePortFile(port)
+  syncClipboard()
   saveSettings({ claudeDesktop: true, claudeDesktopPort: port })
 }
 
@@ -227,6 +238,7 @@ function stop(): void {
   server = null
   port = null
   writePortFile(null)
+  syncClipboard()
   for (const [id, w] of waiting) {
     clearTimeout(w.timer)
     w.reject(new Error('The Claude Desktop connection was switched off in Orbit.'))
@@ -326,8 +338,10 @@ function status(error?: string): ClaudeDesktopStatus {
 
 const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err))
 
-export function setupClaudeDesktop(window: () => BrowserWindow | null): void {
+/** `secret` says if some text is a password Orbit copied (never kept in the clipboard history). */
+export function setupClaudeDesktop(window: () => BrowserWindow | null, secret?: (text: string) => boolean): void {
   getWindow = window
+  if (secret) isSecret = secret
   ipcMain.on('claude:answer', (e, id: unknown, ok: unknown, value: unknown) => {
     const win = getWindow()
     if (win && e.sender === win.webContents) answered(id, ok, value)
@@ -351,6 +365,7 @@ export function setupClaudeDesktop(window: () => BrowserWindow | null): void {
   ipcMain.handle('claude:setArea', (_e, area: unknown, on: unknown) => {
     if (!CLAUDE_AREAS.some((a) => a.id === area) || typeof on !== 'boolean') throw new Error('Not allowed')
     saveSettings({ claudeDesktopAreas: { ...cleanAreas(loadSettings().claudeDesktopAreas), [area as ClaudeArea]: on } })
+    syncClipboard()
     return status()
   })
   ipcMain.handle('claude:connect', () => {

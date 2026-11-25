@@ -53,6 +53,12 @@ import { STUDIO_ANSWERS } from './claude/studioAnswers'
 import { CONVERT_ANSWERS } from './claude/convertAnswers'
 import { TASK_ANSWERS } from './claude/tasksAnswers'
 import { VIDEO_ANSWERS } from './claude/videoAnswers'
+import { plannerAnswers } from './claude/plannerAnswers'
+import { musicMoreAnswers } from './claude/musicMoreAnswers'
+import { lookAnswers } from './claude/lookAnswers'
+import { FUN_ANSWERS } from './claude/funAnswers'
+import { CONNECT_ANSWERS } from './claude/connectAnswers'
+import { MIND_MAP_ANSWERS } from './claude/mindMapAnswers'
 
 /**
  * Orbit's window answering Claude Desktop (main/claudeDesktop.ts asks; main/claudeTools.ts lists
@@ -897,12 +903,24 @@ const ANSWERS: Record<string, (args: Args) => string | Promise<string>> = {
   ...STUDIO_ANSWERS,
   ...CONVERT_ANSWERS,
   ...TASK_ANSWERS,
-  ...VIDEO_ANSWERS
+  ...VIDEO_ANSWERS,
+  ...FUN_ANSWERS,
+  ...CONNECT_ANSWERS,
+  ...MIND_MAP_ANSWERS
 }
+
+// Answers that use other answers (the briefing reads the calendar, a routine plays music, and so on).
+const run = (name: string, args: Args): Promise<string> => {
+  const answer = ANSWERS[name]
+  return answer ? Promise.resolve(answer(args)) : Promise.reject(new Error(`Orbit doesn’t know ${name}.`))
+}
+const musicMore = musicMoreAnswers(run)
+Object.assign(ANSWERS, plannerAnswers(run), musicMore.answers, lookAnswers(run))
 
 /** Starts answering Claude Desktop's questions; returns a function that stops. */
 export function answerClaude(): () => void {
-  return window.api.onClaudeAsk(({ id, name, args }) => {
+  const stopRoutines = musicMore.startRoutineClock()
+  const stopAsking = window.api.onClaudeAsk(({ id, name, args }) => {
     const answer = ANSWERS[name]
     if (!answer) return window.api.claudeAnswer(id, false, 'Orbit doesn’t know that question.')
     Promise.resolve()
@@ -912,5 +930,8 @@ export function answerClaude(): () => void {
         (err) => window.api.claudeAnswer(id, false, err instanceof Error ? err.message : String(err))
       )
   })
+  return () => {
+    stopRoutines()
+    stopAsking()
+  }
 }
-

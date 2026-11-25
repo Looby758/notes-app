@@ -1115,7 +1115,7 @@ app.whenReady().then(async () => {
   safely('Opera GX import', setupOperaImport)
   safely('Music mini player', () => setupMusicMini(currentPrefs, () => mainWindow))
   safely('music phone remote', setupMusicRemote)
-  safely('Claude Desktop connection', () => setupClaudeDesktop(() => mainWindow))
+  safely('Claude Desktop connection', () => setupClaudeDesktop(() => mainWindow, (text) => text === copiedSecret))
   safely('keyboard media keys', setupMediaKeys)
   safely('pop-out window', () => setupPopout(currentPrefs))
   safely('export', setupExport)
