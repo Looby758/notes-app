@@ -5,7 +5,7 @@ import '@xterm/xterm/css/xterm.css'
 import { useEditor } from '../store/editor'
 import { commandForKey, type Command } from './commands'
 import { openSpecialTab, TERMINAL_TAB } from './editorController'
-import { commitAllCommand, copyRunCommand, releaseCommand, rollbackCommand, stashCommand, switchBranchCommand, tryBranchCommand, type VersionBump } from '@shared/appStudio'
+import { commitAllCommand, copyRunCommand, newUserRunCommand, releaseCommand, rollbackCommand, stashCommand, switchBranchCommand, tryBranchCommand, type VersionBump } from '@shared/appStudio'
 import { IS_MAC } from '@shared/platform'
 import { commandLabel, findFiles, isErrorLine, keepsRunning, latestAndRunCommand, LineTracker, resolveFrom, runCommandOf } from '@shared/terminalTools'
 import {
@@ -524,6 +524,16 @@ export function getLatestAndRun(project: TerminalProject): void {
   runInAppTerminal(project, latestAndRunCommand(IS_WINDOWS, run))
 }
 
+/**
+ * App Studio's "Try as a new user" for Orbit: gets the latest and starts it as if nobody had used
+ * Orbit on this computer (nothing saved, only the core add-ons), in a terminal of its own.
+ */
+export function runAsNewUser(project: TerminalProject): void {
+  const run = newUserRunCommand(IS_WINDOWS, runCommandOf(project.commands))
+  rememberCommand('git pull')
+  runInAppTerminal(project, latestAndRunCommand(IS_WINDOWS, run), run, `${project.name} · new user`)
+}
+
 /** App Studio's "Try it": switches the app to a pull request's branch, gets its latest, and starts it. */
 export function tryBranch(project: TerminalProject, branch: string): void {
   rememberCommand(`git checkout ${branch}`)
@@ -540,8 +550,8 @@ export function releaseApp(project: TerminalProject, bump: VersionBump, test = f
  * own terminal (made if needed, started fresh), gets the branch's latest, installs if needed, and
  * starts it. Restart afterwards just starts it again.
  */
-export function runTestCopy(project: TerminalProject, path: string, branch: string, label: string): void {
-  const run = runCommandOf(project.commands)
+export function runTestCopy(project: TerminalProject, path: string, branch: string, label: string, newUser = false): void {
+  const run = newUser ? newUserRunCommand(IS_WINDOWS, runCommandOf(project.commands)) : runCommandOf(project.commands)
   rememberCommand(`git checkout ${branch}`)
   const line = copyRunCommand(IS_WINDOWS, branch, run)
   const existing = useTerminals.getState().terminals.find((t) => t.folder === path && t.command === run)
@@ -555,7 +565,7 @@ export function runTestCopy(project: TerminalProject, path: string, branch: stri
     } else pendingFor.set(existing.id, line)
     return
   }
-  const t = addTerminal({ name: `${project.name} · ${label}`, folder: path, command: run })
+  const t = addTerminal({ name: `${project.name} · ${label}${newUser ? ' · new user' : ''}`, folder: path, command: run })
   openSpecialTab(TERMINAL_TAB)
   queueMicrotask(() => {
     const s = sessions.get(t.id)
@@ -592,8 +602,7 @@ export function switchBranch(project: TerminalProject, branch: string): void {
 const IS_WINDOWS = !IS_MAC && /win/i.test(navigator.platform)
 
 /** Types a command line into the project's app terminal (made if needed, started fresh), and shows it. */
-function runInAppTerminal(project: TerminalProject, line: string): void {
-  const run = runCommandOf(project.commands)
+function runInAppTerminal(project: TerminalProject, line: string, run = runCommandOf(project.commands), name?: string): void {
   const existing = useTerminals.getState().terminals.find((t) => t.projectId === project.id && t.command === run)
   if (existing) {
     setActiveTerminal(existing.id)
@@ -606,7 +615,7 @@ function runInAppTerminal(project: TerminalProject, line: string): void {
     return
   }
   const t = addTerminal({
-    name: `${project.name} · ${commandLabel(run).replace(/^(npm|pnpm|yarn|bun) (run )?/, '')}`,
+    name: name ?? `${project.name} · ${commandLabel(run).replace(/^(npm|pnpm|yarn|bun) (run )?/, '')}`,
     folder: project.folder,
     projectId: project.id,
     command: run
