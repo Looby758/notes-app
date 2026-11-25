@@ -136,7 +136,7 @@ export function startsCoreOnly(hasSavedPrefs: boolean, notesFolder: string): boo
   return !hasSavedPrefs && !existsSync(join(notesFolder, '.notesapp'))
 }
 
-const notAdded = (id: string): Error => new Error(`${addonById(id)?.name ?? 'That'} isn’t added. Add it in Settings → Add-ons.`)
+const notAdded = (id: string): Error => new Error(`${addonById(id)?.name ?? 'That'} isn’t added. Add it on the Add-ons page.`)
 
 /**
  * Starts checking messages. Call before anything registers its handlers, so every one is covered.

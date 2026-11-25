@@ -882,7 +882,7 @@ export function newTab(pane = activePane()): void {
 
 /** Adds a tab after the current one in `pane` and switches to it. */
 function addTab(pane: string, id: string): void {
-  // A page from an add-on you haven't added doesn't open (Settings → Add-ons adds it).
+  // A page from an add-on you haven't added doesn't open (the Add-ons page adds it).
   if (!tabOn(id)) {
     notify(notAddedText(tabFeature(id) ?? ''), 'info', { label: 'Add-ons', run: openAddons })
     return
@@ -895,7 +895,7 @@ function addTab(pane: string, id: string): void {
   activateTab(id, pane)
 }
 
-/** Opens Settings → Add-ons. */
+/** Opens the Add-ons page. */
 export function openAddons(): void {
   openSpecialTab(ADDONS_TAB)
 }

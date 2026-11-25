@@ -23,7 +23,7 @@ export const useInstalledAddons = (): string[] => usePrefs((s) => s.prefs.instal
 /** "Music isn't added…" for a feature that isn't here. */
 export function notAddedText(featureId: string): string {
   const addon = addonOfFeature(featureId)
-  return `${(addon && addonById(addon)?.name) || 'That'} isn’t added. Add it in Settings → Add-ons.`
+  return `${(addon && addonById(addon)?.name) || 'That'} isn’t added. Add it on the Add-ons page.`
 }
 
 /**

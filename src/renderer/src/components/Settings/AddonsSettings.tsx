@@ -32,7 +32,7 @@ const ADDED = 'Added'
 const SHOWN = ADDONS.filter((a) => !a.helper)
 
 /**
- * Settings → Add-ons: everything beyond the core. Categories on the left, their add-ons in the
+ * The Add-ons page: everything beyond the core. Categories on the left, their add-ons in the
  * middle, and the one you picked on the right, with a picture and what it does. An add-on you
  * haven't added is hidden everywhere and doesn't run. (Later each one will be its own download.)
  */

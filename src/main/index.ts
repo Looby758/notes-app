@@ -410,7 +410,7 @@ function openVault(path: string | null): void {
   stopWatching()
   vault = path ? new Vault(path) : null
   if (!path) return
-  // Brand new Orbit, brand new notes folder: just the core to start with (add more in Settings → Add-ons).
+  // Brand new Orbit, brand new notes folder: just the core to start with (add more on the Add-ons page).
   // "New" is decided by what was on this computer when Orbit started, so anything saved since (like
   // a colour picked on the welcome screen) doesn't count. Anyone who already used Orbit keeps theirs.
   if (startsCoreOnly(hadSettingsAtStart() && !!loadSettings().prefs, path) && !coreStartDone) {

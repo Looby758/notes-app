@@ -15,7 +15,7 @@ export const ADDON_CATEGORIES: { name: string; addons: string[] }[] = [
 ]
 
 /**
- * What each add-on is, in a few sentences, for its page in Settings → Add-ons (the store later).
+ * What each add-on is, in a few sentences, for its page on the Add-ons page (the store later).
  * Every add-on the store shows has one (addons.test.ts checks). Pictures are in
  * renderer/public/addons/<id>.webp.
  */

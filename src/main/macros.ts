@@ -82,7 +82,7 @@ function save(): void {
 
 function problem(): string | null {
   // Failsafe: without the Macros add-on nothing records, plays or clicks.
-  if (!addonOn('macros')) return 'Macros isn’t added. Add it in Settings → Add-ons.'
+  if (!addonOn('macros')) return 'Macros isn’t added. Add it on the Add-ons page.'
   if (!SUPPORTED) return 'Macros and the auto-clicker work on Windows and on a Mac.'
   if (IS_MAC && !inputAllowed(false)) return accessibilityHelp()
   return null
