@@ -825,6 +825,10 @@ export interface NotesApi {
   exportFiles(folderName: string, files: { name: string; data: ExportData }[]): Promise<string | null>
   /** Shows a file in File Explorer / Finder. */
   showExported(path: string): Promise<void>
+  /** A file's bytes (a full path, up to 500 MB), for converting it (Claude Desktop's convert_file). */
+  readForConvert(path: string): Promise<Uint8Array>
+  /** Saves a converted file in the same folder as `original`, never over another file; resolves with where. */
+  saveBeside(original: string, name: string, data: ExportData): Promise<string>
 
   // File converter
   /** An iPhone photo (HEIC/HEIF) as plain pixels: RGBA, 4 bytes a pixel. */

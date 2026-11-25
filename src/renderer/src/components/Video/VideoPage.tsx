@@ -56,7 +56,7 @@ import {
 } from '@shared/videoPlayer'
 import { FILE_MANAGER } from '@shared/platform'
 import { notify } from '../../store/notify'
-import { IN_VIDEO_WINDOW, closeVideo, forgetVideo, moveQueued, openVideo, playNext, remember, unqueueVideo, useVideoPlayer, watchedOf, type SubtitleChoice } from '../../store/videoPlayer'
+import { IN_VIDEO_WINDOW, closeVideo, forgetVideo, moveQueued, onVideoCommand, openVideo, playNext, remember, unqueueVideo, useVideoPlayer, watchedOf, type SubtitleChoice, type VideoCommand } from '../../store/videoPlayer'
 import { unloadMedia } from '../../lib/media'
 import { DestPicker, type Dest } from '../CaptureApp'
 import { useDestLabel } from '../Comics/ComicExtras'
@@ -646,6 +646,50 @@ function Player({ path, autoFocus }: { path: string; autoFocus?: boolean }) {
     document.addEventListener('fullscreenchange', on)
     return () => document.removeEventListener('fullscreenchange', on)
   }, [])
+
+  // Claude Desktop's video_controls: the latest of these functions answer each command.
+  const answerCommand = useRef<(c: VideoCommand) => string>(() => '')
+  answerCommand.current = (c) => {
+    const v = video.current
+    const at = (): string => `${formatTime(timeRef.current)}${duration ? ` of ${formatTime(duration)}` : ''}`
+    switch (c.action) {
+      case 'status':
+        return `${fileName(path)}: ${v && !v.paused ? 'playing' : 'paused'} at ${at()}, speed ${speed}×, volume ${Math.round(useVideoPlayer.getState().volume * 100)}%${useVideoPlayer.getState().muted ? ' (muted)' : ''}.`
+      case 'play':
+        if (v?.paused) togglePlay()
+        return `Playing ${fileName(path)}.`
+      case 'pause':
+        if (v && !v.paused) togglePlay()
+        return `Paused at ${at()}.`
+      case 'forward':
+      case 'back':
+        nudge((c.action === 'back' ? -1 : 1) * Math.abs(c.value ?? 10))
+        return `Jumped ${c.action === 'back' ? 'back' : 'forward'} ${Math.abs(c.value ?? 10)} seconds.`
+      case 'seek':
+        seek(Math.max(0, c.value ?? 0))
+        return `Jumped to ${formatTime(Math.max(0, c.value ?? 0))}.`
+      case 'restart':
+        seek(0)
+        return 'Started it again from the beginning.'
+      case 'speed': {
+        const s = Math.min(3, Math.max(0.25, c.value ?? 1))
+        changeSpeed(s)
+        return `Speed ${s}×.`
+      }
+      case 'volume':
+        setVolume(Math.min(100, Math.max(0, c.value ?? 100)) / 100)
+        return `Volume ${Math.round(Math.min(100, Math.max(0, c.value ?? 100)))}%.`
+      case 'mute':
+      case 'unmute':
+        useVideoPlayer.setState({ muted: c.action === 'mute' })
+        return c.action === 'mute' ? 'Muted.' : 'Sound on.'
+      case 'fullscreen':
+      case 'exit_fullscreen':
+        if ((c.action === 'fullscreen') !== !!document.fullscreenElement) toggleFullscreen()
+        return c.action === 'fullscreen' ? 'Asked for full screen (if it doesn’t go, the user can double-click the video).' : 'Left full screen.'
+    }
+  }
+  useEffect(() => onVideoCommand((c) => answerCommand.current(c)), [])
 
   const pickSubtitles = async (): Promise<void> => {
     setMenu(null)

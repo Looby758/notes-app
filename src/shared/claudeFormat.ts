@@ -3,6 +3,8 @@ import type { DmState } from './downloadManager'
 import type { DriveSpace, ExplorerEntry } from './explorer'
 import type { LocalSong } from './localMusic'
 import type { CalEvent } from './types'
+import { changeSentence, clockText, clockTitle, differenceText, messageTime, nextChange, offsetMinutes, relativeDay, timeIn, type WorldClock } from './worldClock'
+import { formatBytes, formatPercent, formatRate, formatUptime, type TaskGroup, type TaskPerf } from './taskManager'
 
 /**
  * How Orbit's things are written out for Claude Desktop (see renderer/lib/claudeAnswers.ts): plain
@@ -260,4 +262,66 @@ export function artistSeeds(songs: readonly LocalSong[], limit = 8): { name: str
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
     .map(([name, weight]) => ({ name, weight }))
+}
+
+// ---------- world clocks ----------
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/** "Sam (Sydney): Thu 06:05 (Tomorrow), 11 hours ahead, Probably asleep" */
+export function clockLine(c: WorldClock, home: string, now: Date, twelve: boolean): string {
+  const t = timeIn(c.zone, now)
+  const parts = [`${WEEKDAYS[t.weekday]} ${clockText(t, twelve)} (${relativeDay(c.zone, home, now)})`, differenceText(c.zone, home, now)]
+  if (c.person) parts.push(messageTime(t).text)
+  const change = nextChange(c.zone, now, 30)
+  if (change) parts.push(changeSentence(c.zone, change, twelve))
+  return `${clockTitle(c)}${c.person ? ` (${c.label})` : ''} [${c.zone}]: ${parts.join(', ')}`
+}
+
+export function clocksText(clocks: WorldClock[], home: string, now: Date, twelve: boolean): string {
+  const here = timeIn(home, now)
+  const lines = [`Here [${home}]: ${WEEKDAYS[here.weekday]} ${clockText(here, twelve)}`]
+  if (!clocks.length) lines.push('No world clocks yet.')
+  return [...lines, ...clocks.map((c) => clockLine(c, home, now, twelve))].join('\n')
+}
+
+/** The moment it's `time` (HH:MM) on `date` (YYYY-MM-DD) on the clocks in `zone`. */
+export function wallTimeIn(zone: string, date: string, time: string): Date {
+  const [y, m, d] = date.split('-').map(Number)
+  const [h, mi] = time.split(':').map(Number)
+  const guess = Date.UTC(y, m - 1, d, h, mi)
+  let at = guess - offsetMinutes(zone, new Date(guess)) * 60_000
+  // Near a clock change the first guess can be an hour out: check it once more.
+  const again = guess - offsetMinutes(zone, new Date(at)) * 60_000
+  if (again !== at) at = again
+  return new Date(at)
+}
+
+// ---------- task manager ----------
+
+export type TaskSort = 'cpu' | 'memory' | 'disk' | 'name'
+
+/** The programs running, busiest first: what Claude reads from the task manager. */
+export function tasksText(groups: TaskGroup[], sort: TaskSort = 'cpu', limit = 25, search = ''): string {
+  const q = search.trim().toLowerCase()
+  const list = groups.filter((g) => !q || g.name.toLowerCase().includes(q) || g.procs.some((p) => p.window?.toLowerCase().includes(q)))
+  const key = (g: TaskGroup): number => (sort === 'memory' ? g.mem : sort === 'disk' ? (g.disk ?? 0) : g.cpu)
+  list.sort((a, b) => (sort === 'name' ? a.name.localeCompare(b.name) : key(b) - key(a)))
+  if (!list.length) return q ? `Nothing running matches “${search}”.` : 'Nothing is running (or it couldn’t be read).'
+  const lines = list.slice(0, limit).map((g) => {
+    const bits = [`CPU ${formatPercent(g.cpu)}`, `memory ${formatBytes(g.mem)}`]
+    if (g.disk !== undefined) bits.push(`disk ${formatRate(g.disk)}`)
+    if (g.procs.length > 1) bits.push(`${g.procs.length} processes`)
+    const kind = g.kind === 'app' ? 'app' : g.kind === 'background' ? 'background' : 'system'
+    return `${g.name} (${kind}${g.self ? ', this is Orbit' : ''}): ${bits.join(', ')}`
+  })
+  return lines.join('\n') + (list.length > limit ? `\n…and ${list.length - limit} more.` : '')
+}
+
+export function perfText(p: TaskPerf): string {
+  const lines = [`CPU: ${formatPercent(p.cpu)}${p.cpuName ? ` (${p.cpuName}, ${p.cores.length} cores)` : ''}`, `Memory: ${formatBytes(p.memUsed)} of ${formatBytes(p.memTotal)} used (${formatPercent((p.memUsed / Math.max(1, p.memTotal)) * 100)})`]
+  if (p.diskRead !== undefined || p.diskWrite !== undefined) lines.push(`Disk: reading ${formatRate(p.diskRead)}, writing ${formatRate(p.diskWrite)}`)
+  if (p.netDown !== undefined || p.netUp !== undefined) lines.push(`Network: down ${formatRate(p.netDown)}, up ${formatRate(p.netUp)}`)
+  lines.push(`Processes: ${p.processes}`, `On for: ${formatUptime(p.uptime)}`)
+  return lines.join('\n')
 }

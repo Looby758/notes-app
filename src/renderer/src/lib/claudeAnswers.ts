@@ -32,7 +32,7 @@ import { ensureMoney, useMoney } from '../store/money'
 import { setPrefs, usePrefs } from '../store/prefs'
 import { musicControl, musicSeek, musicSetVolume, setSleepTimer, useMusic } from '../store/music'
 import { addToQueue, clearUpNext, loadLocalLibrary, localUpNext, playLocal, playNext, removeFromQueue, setLocalModes, useLocalMusic } from '../store/localMusic'
-import { addEvent, editNote } from './daily'
+import { editNote } from './daily'
 import { addToPlaylist as addSongsToPlaylist, createPlaylist, deletePlaylist, moveInPlaylist, rateSong, removeFromPlaylist, renamePlaylist, startMusicData, tagSongs, toggleLike, useMusicData } from '../store/musicData'
 import { deleteSongs, editSongs } from '../store/musicFiles'
 import { IS_MAC } from '@shared/platform'
@@ -45,6 +45,14 @@ import { addDays, dayKey, fromDayKey } from './dates'
 import { moneyContext } from './askContext'
 import { lockedFolderOf } from './lock/folders'
 import { isLockedText } from './lock/crypto'
+import { NOTE_ANSWERS } from './claude/notesAnswers'
+import { CALENDAR_ANSWERS } from './claude/calendarAnswers'
+import { CLOCK_ANSWERS } from './claude/clocksAnswers'
+import { MONEY_ANSWERS } from './claude/moneyAnswers'
+import { STUDIO_ANSWERS } from './claude/studioAnswers'
+import { CONVERT_ANSWERS } from './claude/convertAnswers'
+import { TASK_ANSWERS } from './claude/tasksAnswers'
+import { VIDEO_ANSWERS } from './claude/videoAnswers'
 
 /**
  * Orbit's window answering Claude Desktop (main/claudeDesktop.ts asks; main/claudeTools.ts lists
@@ -275,16 +283,6 @@ async function calendarFor(args: Args): Promise<string> {
   return calendarText(lines, from, to)
 }
 
-async function addEventFor(args: Args): Promise<string> {
-  needNotes()
-  const date = fromDayKey(str(args.date))
-  if (!date) throw new Error('The date has to be like 2026-11-25.')
-  const title = str(args.title).trim()
-  const start = str(args.start) || undefined
-  const end = start ? str(args.end) || undefined : undefined
-  await addEvent(date, title, start, end)
-  return `Added “${title}” on ${str(args.date)}${start ? ` at ${start}${end ? `–${end}` : ''}` : ' (all day)'} to Orbit’s calendar.`
-}
 
 const countdownsFor = (): string => countdownsText(usePrefs.getState().prefs.countdowns, new Date())
 
@@ -857,7 +855,6 @@ const ANSWERS: Record<string, (args: Args) => string | Promise<string>> = {
   move_note: moveNoteFor,
   delete_note: deleteNoteFor,
   get_calendar: calendarFor,
-  add_calendar_event: addEventFor,
   get_countdowns: countdownsFor,
   add_countdown: addCountdownFor,
   get_money: moneyFor,
@@ -892,7 +889,15 @@ const ANSWERS: Record<string, (args: Args) => string | Promise<string>> = {
   music_stats: musicStatsFor,
   edit_song: editSongFor,
   delete_songs: deleteSongsFor,
-  search_email: emailFor
+  search_email: emailFor,
+  ...NOTE_ANSWERS,
+  ...CALENDAR_ANSWERS,
+  ...CLOCK_ANSWERS,
+  ...MONEY_ANSWERS,
+  ...STUDIO_ANSWERS,
+  ...CONVERT_ANSWERS,
+  ...TASK_ANSWERS,
+  ...VIDEO_ANSWERS
 }
 
 /** Starts answering Claude Desktop's questions; returns a function that stops. */

@@ -10,16 +10,19 @@ import type { BoardColumn, BoardItem } from './appStudio'
 
 // ---------- The parts of Orbit Claude can see ----------
 
-export type ClaudeArea = 'appStudio' | 'notes' | 'calendar' | 'money' | 'flashcards' | 'files' | 'music' | 'email'
+export type ClaudeArea = 'appStudio' | 'notes' | 'calendar' | 'clocks' | 'money' | 'flashcards' | 'files' | 'music' | 'videos' | 'computer' | 'email'
 
 export const CLAUDE_AREAS: readonly { id: ClaudeArea; label: string; what: string; onAtStart: boolean }[] = [
-  { id: 'notes', label: 'Notes', what: 'Find, read, make, change, rename, move and delete notes (deleted ones go to the bin). Locked notes are never shown.', onAtStart: true },
-  { id: 'calendar', label: 'Calendar and countdowns', what: 'See what’s coming up, add events, and read and add countdowns.', onAtStart: true },
-  { id: 'money', label: 'Money', what: 'Read your spending, budgets and savings. It can’t change anything.', onAtStart: true },
+  { id: 'notes', label: 'Notes', what: 'Find, read, open, make, change, rename, move, copy and delete notes, daily notes, tasks, tags, links and folders (deleted ones go to the bin). Locked notes are never shown.', onAtStart: true },
+  { id: 'calendar', label: 'Calendar and countdowns', what: 'See what’s coming up, add, move, rename and delete events (repeating ones and Google ones too), tick tasks, and add, change and delete countdowns.', onAtStart: true },
+  { id: 'clocks', label: 'World clocks', what: 'The time anywhere, converting times between places, when to message friends, and adding, renaming and removing clocks.', onAtStart: true },
+  { id: 'money', label: 'Money', what: 'Read your spending, budgets and savings, and add, change and delete entries, budgets, savings goals, who owes who, subscriptions and balances (Ctrl+Z undoes them).', onAtStart: true },
   { id: 'flashcards', label: 'Flashcards', what: 'See your cards and which ones you keep getting wrong, and add new ones.', onAtStart: true },
-  { id: 'files', label: 'Files and downloads', what: 'Find files you’ve colour-tagged, see downloads and how full your drives are.', onAtStart: true },
+  { id: 'files', label: 'Files and downloads', what: 'Find files you’ve colour-tagged, see downloads and how full your drives are, and convert files (saved beside the original).', onAtStart: true },
   { id: 'music', label: 'Music', what: 'Play, queue, shuffle and loop songs and playlists, change the volume, make, edit and tidy playlists, like, rate and tag songs, fix song details, suggest songs, and download songs from YouTube into your music.', onAtStart: true },
-  { id: 'appStudio', label: 'App Studio', what: 'Read App Studio’s errors and release checks, and read and move cards on Ideas & bugs.', onAtStart: true },
+  { id: 'videos', label: 'Videos', what: 'Find videos in your notes folder and play them in the video player, including a show’s episodes (“play the next episode”), Up next, and pause, skip, speed and volume.', onAtStart: true },
+  { id: 'computer', label: 'Task manager', what: 'See what’s running and how busy the computer is, and close a stuck program (Orbit asks you first).', onAtStart: true },
+  { id: 'appStudio', label: 'App Studio', what: 'Read errors and release checks, run tests, get the latest code, check packages, read and change cards on Ideas & bugs, pull requests, releases and bug reports. Merging or closing a pull request asks you first.', onAtStart: true },
   { id: 'email', label: 'Email', what: 'Search and read your emails. Off unless you switch it on.', onAtStart: false }
 ]
 

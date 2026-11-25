@@ -292,12 +292,6 @@ function calendarTools(server: McpServer, deps: ToolDeps): void {
     description: 'Events and due tasks between two days: from Orbit’s own calendar (daily notes) and any connected Google or other calendars.',
     inputSchema: { from: day.optional().describe('First day (default today)'), to: day.optional().describe('Last day (default a week after the first)') }
   })
-  windowTool(server, deps, 'add_calendar_event', {
-    title: 'Add an event',
-    description: 'Adds an event to Orbit’s calendar (in that day’s daily note). Leave out the times for an all-day event.',
-    inputSchema: { date: day, title: z.string().min(1).max(200), start: time.optional(), end: time.optional() },
-    write: true
-  })
   windowTool(server, deps, 'get_countdowns', {
     title: 'Countdowns',
     description: 'The countdowns from Orbit’s Countdowns page, with how long is left until each.',
@@ -321,7 +315,7 @@ function calendarTools(server: McpServer, deps: ToolDeps): void {
 function moneyTools(server: McpServer, deps: ToolDeps): void {
   windowTool(server, deps, 'get_money', {
     title: 'Money',
-    description: 'A summary of the user’s money in Orbit: the last few months’ spending by category, budgets, savings goals, repeating payments, balance and forecast, plus their entries (the ones matching the question first). Read-only.',
+    description: 'A summary of the user’s money in Orbit: the last few months’ spending by category, budgets, savings goals, repeating payments, balance and forecast, plus their entries (the ones matching the question first).',
     inputSchema: { question: z.string().optional().describe('What they asked, so matching entries come first') }
   })
 }
@@ -551,14 +545,364 @@ function emailTools(server: McpServer, deps: ToolDeps): void {
   })
 }
 
+// ---------- More of each part (claude/*Answers.ts in the window) ----------
+
+const pounds = z.number().describe('Pounds, like 12.50')
+
+function notesMoreTools(server: McpServer, deps: ToolDeps): void {
+  windowTool(server, deps, 'open_note', {
+    title: 'Open a note in Orbit',
+    description: 'Opens a note on the user’s screen in Orbit, so they can see it.',
+    inputSchema: { path: z.string().min(1), new_tab: z.boolean().optional() },
+    write: true
+  })
+  windowTool(server, deps, 'get_daily_note', {
+    title: 'Daily note',
+    description: 'The daily note for a day (today if no date), if there is one.',
+    inputSchema: { date: day.optional() }
+  })
+  windowTool(server, deps, 'add_to_daily_note', {
+    title: 'Add to the daily note',
+    description: 'Adds text (Markdown) to the end of a day’s daily note (today if no date), making the note if needed. open: also show it.',
+    inputSchema: { text: z.string().min(1).max(100_000), date: day.optional(), open: z.boolean().optional() },
+    write: true
+  })
+  windowTool(server, deps, 'list_tasks', {
+    title: 'Tasks in notes',
+    description: 'Tick-box tasks ("- [ ] ...") across the notes: unticked ones, or ticked ones with done true. Can be limited to a folder or words.',
+    inputSchema: { folder: z.string().optional(), search: z.string().optional(), done: z.boolean().optional(), limit: z.number().int().min(1).max(500).optional() }
+  })
+  windowTool(server, deps, 'tick_note_task', {
+    title: 'Tick a task in a note',
+    description: 'Ticks (or unticks, with done false) a tick-box task in a note, found by its words.',
+    inputSchema: { note: z.string().min(1), task: z.string().min(1), done: z.boolean().optional() },
+    write: true
+  })
+  windowTool(server, deps, 'get_tags', { title: 'Tags', description: 'Every #tag in the notes, with how many notes use it.', inputSchema: {} })
+  windowTool(server, deps, 'notes_with_tag', {
+    title: 'Notes with a tag',
+    description: 'The notes that have a #tag (and its sub-tags).',
+    inputSchema: { tag: z.string().min(1) }
+  })
+  windowTool(server, deps, 'get_links', {
+    title: 'Links to and from a note',
+    description: 'Which notes link to a note (with the line each link is on), and which notes it links to.',
+    inputSchema: { note: z.string().min(1) }
+  })
+  windowTool(server, deps, 'create_folder', {
+    title: 'Make a folder',
+    description: 'Makes a folder (and any folders above it) in the notes folder, like "School/History".',
+    inputSchema: { folder: z.string().min(1).max(300) },
+    write: true
+  })
+  windowTool(server, deps, 'copy_note', {
+    title: 'Copy a note',
+    description: 'Makes a copy of a note, with a new name and folder if given (otherwise "<name> copy" beside it).',
+    inputSchema: { path: z.string().min(1), name: z.string().max(200).optional(), folder: z.string().optional() },
+    write: true
+  })
+  windowTool(server, deps, 'add_under_heading', {
+    title: 'Add under a heading',
+    description: 'Adds text at the end of one section of a note (under a heading like "Shopping"), adding the heading at the end if it isn’t there.',
+    inputSchema: { path: z.string().min(1), heading: z.string().min(1).max(200), text: z.string().min(1).max(100_000) },
+    write: true
+  })
+}
+
+function calendarMoreTools(server: McpServer, deps: ToolDeps): void {
+  windowTool(server, deps, 'add_calendar_event', {
+    title: 'Add an event',
+    description:
+      'Adds an event to Orbit’s calendar (in that day’s daily note), or to one of the user’s Google calendars (see list_calendars). Leave out the times for an all-day event. repeat makes it repeat, in plain words like "every Tuesday", "every weekday", "every 2 weeks on Thursday", "every month on the 1st", "every year", with "until 2027-03-31" if it ends.',
+    inputSchema: {
+      date: day.describe('The day (for a repeating event, the first day)'),
+      title: z.string().min(1).max(200),
+      start: time.optional(),
+      end: time.optional(),
+      repeat: z.string().max(200).optional(),
+      calendar: z.string().optional().describe('A Google calendar’s name; leave out for Orbit’s own')
+    },
+    write: true
+  })
+  windowTool(server, deps, 'list_calendars', { title: 'Calendars', description: 'The calendars events can be added to: Orbit’s own, and Google calendars Orbit can change.', inputSchema: {} })
+  const which = { date: day.describe('The day it’s on now'), title: z.string().min(1).describe('Its name as get_calendar shows it') }
+  windowTool(server, deps, 'move_calendar_event', {
+    title: 'Move or change the time of an event',
+    description:
+      'Moves an event to another day and/or time (Orbit’s own or an editable Google one). Changing only the start keeps how long it lasts. all_day true makes it all day. For a repeating Orbit event, which "one" moves just that day; "all" (default) moves every repeat.',
+    inputSchema: { ...which, to_date: day.optional(), start: time.optional(), end: time.optional(), all_day: z.boolean().optional(), which: z.enum(['one', 'all']).optional() },
+    write: true
+  })
+  windowTool(server, deps, 'rename_calendar_event', {
+    title: 'Rename an event',
+    description: 'Changes an event’s name.',
+    inputSchema: { ...which, new_title: z.string().min(1).max(200) },
+    write: true
+  })
+  windowTool(server, deps, 'delete_calendar_event', {
+    title: 'Delete an event',
+    description: 'Deletes an event. For a repeating Orbit event: which "one" skips just that day, "from_here" stops it repeating from that day on, "all" (default) deletes every repeat. Check with the user first for anything repeating.',
+    inputSchema: { ...which, which: z.enum(['one', 'from_here', 'all']).optional() },
+    write: true
+  })
+  windowTool(server, deps, 'tick_task', {
+    title: 'Tick a dated task',
+    description: 'Ticks (or unticks, with done false) a task shown in the calendar on a day.',
+    inputSchema: { ...which, done: z.boolean().optional() },
+    write: true
+  })
+  windowTool(server, deps, 'get_due_tasks', {
+    title: 'Tasks with dates',
+    description: 'Unticked tasks with a date or due date between two days (default the next 30 days).',
+    inputSchema: { from: day.optional(), to: day.optional() }
+  })
+  windowTool(server, deps, 'edit_countdown', {
+    title: 'Change a countdown',
+    description: 'Changes a countdown’s name, date, time (empty for the whole day), kind or whether it’s yearly.',
+    inputSchema: {
+      countdown: z.string().min(1).describe('Its name'),
+      title: z.string().max(80).optional(),
+      date: day.optional(),
+      time: z.string().optional().describe('Like 18:00, or empty for the whole day'),
+      kind: z.enum(['season', 'game', 'trip', 'birthday', 'event', 'other']).optional(),
+      yearly: z.boolean().optional()
+    },
+    write: true
+  })
+  windowTool(server, deps, 'delete_countdown', { title: 'Delete a countdown', description: 'Deletes a countdown.', inputSchema: { countdown: z.string().min(1) }, write: true })
+}
+
+function clockTools(server: McpServer, deps: ToolDeps): void {
+  const place = z.string().min(1).describe('A city or country ("Tokyo"), a friend on the world clocks ("Sam"), a time zone ("America/New_York") or "here"')
+  windowTool(server, deps, 'get_world_clocks', {
+    title: 'World clocks',
+    description: 'The time now on each of the user’s world clocks (places and friends), how far ahead or behind each is, whether it’s a good time to message friends, and clock changes coming up.',
+    inputSchema: {}
+  })
+  windowTool(server, deps, 'time_in', { title: 'Time somewhere', description: 'The time now anywhere in the world, and how far ahead or behind it is.', inputSchema: { place } })
+  windowTool(server, deps, 'convert_time', {
+    title: 'Convert a time',
+    description: 'What a time in one place is somewhere else ("7pm in New York in my time"). Leave out "to" for here and every world clock.',
+    inputSchema: { time, from: place, to: place.optional(), date: day.optional().describe('The day in the "from" place (default today)') }
+  })
+  windowTool(server, deps, 'add_world_clock', {
+    title: 'Add a world clock',
+    description: 'Adds a place to World clocks, or a friend (person) and where they live.',
+    inputSchema: { place, person: z.string().max(40).optional().describe('A friend’s name, for a friend’s clock'), name: z.string().max(60).optional().describe('What to call the place') },
+    write: true
+  })
+  const clock = z.string().min(1).describe('The clock’s place or friend’s name')
+  windowTool(server, deps, 'remove_world_clock', { title: 'Remove a world clock', description: 'Takes a clock off World clocks.', inputSchema: { clock }, write: true })
+  windowTool(server, deps, 'rename_world_clock', { title: 'Rename a world clock', description: 'Renames a clock (a friend’s name, or a place’s label).', inputSchema: { clock, name: z.string().min(1).max(60) }, write: true })
+  windowTool(server, deps, 'move_world_clock', { title: 'Reorder world clocks', description: 'Moves a clock to a new place in the list (1 is first).', inputSchema: { clock, position: z.number().int().min(1) }, write: true })
+  windowTool(server, deps, 'good_time_to_message', { title: 'When to message a friend', description: 'Whether it’s a good time to message a friend on the world clocks now, and if not, when it will be.', inputSchema: { clock } })
+}
+
+function moneyMoreTools(server: McpServer, deps: ToolDeps): void {
+  const type = z.enum(['spent', 'received'])
+  windowTool(server, deps, 'add_money_entry', {
+    title: 'Add spending or money in',
+    description: 'Adds something the user spent or received to Money. The category is matched by name (default Other).',
+    inputSchema: { amount: pounds, type, note: z.string().max(200).optional().describe('What it was, like "Tesco" or "Pay"'), category: z.string().optional(), date: day.optional().describe('Default today') },
+    write: true
+  })
+  windowTool(server, deps, 'find_money_entries', {
+    title: 'Find money entries',
+    description: 'Entries in Money (newest first, with their ids and totals), matching words in the note, dates and/or a category.',
+    inputSchema: { search: z.string().optional(), from: day.optional(), to: day.optional(), category: z.string().optional(), limit: z.number().int().min(1).max(300).optional() }
+  })
+  windowTool(server, deps, 'edit_money_entry', {
+    title: 'Change a money entry',
+    description: 'Changes an entry (by its id from find_money_entries).',
+    inputSchema: { id: z.string().min(1), amount: pounds.optional(), type: type.optional(), note: z.string().max(200).optional(), category: z.string().optional(), date: day.optional() },
+    write: true
+  })
+  windowTool(server, deps, 'delete_money_entry', { title: 'Delete a money entry', description: 'Deletes an entry (by its id). Ctrl+Z in Orbit brings it back.', inputSchema: { id: z.string().min(1) }, write: true })
+  windowTool(server, deps, 'set_budget', { title: 'Set a budget', description: 'Sets a spending category’s monthly budget (0 takes it off).', inputSchema: { category: z.string().min(1), amount: pounds }, write: true })
+  windowTool(server, deps, 'add_money_category', { title: 'Add a money category', description: 'Adds a spending category (or a money-in one with income true).', inputSchema: { name: z.string().min(1).max(40), income: z.boolean().optional() }, write: true })
+  windowTool(server, deps, 'add_savings_goal', {
+    title: 'Add a savings goal',
+    description: 'Adds a savings goal, like "New PC £1,200 by June".',
+    inputSchema: { name: z.string().min(1).max(60), target: pounds, due: day.optional(), saved: pounds.optional().describe('Already saved') },
+    write: true
+  })
+  const goal = z.string().min(1).describe('The goal’s name')
+  windowTool(server, deps, 'savings_goal_money', { title: 'Put money into a goal', description: 'Puts money into a savings goal (or takes it out, with a negative amount).', inputSchema: { goal, amount: pounds }, write: true })
+  windowTool(server, deps, 'edit_savings_goal', { title: 'Change a savings goal', description: 'Changes a goal’s name, target or date (empty date for none).', inputSchema: { goal, name: z.string().max(60).optional(), target: pounds.optional(), due: z.string().optional() }, write: true })
+  windowTool(server, deps, 'delete_savings_goal', { title: 'Delete a savings goal', description: 'Deletes a savings goal.', inputSchema: { goal }, write: true })
+  windowTool(server, deps, 'get_ious', { title: 'Who owes who', description: 'Money friends owe the user, and money the user owes them.', inputSchema: {} })
+  windowTool(server, deps, 'add_iou', {
+    title: 'Note who owes who',
+    description: 'Notes that someone owes the user money (they_owe true, the default) or the user owes them (false), with an optional reminder day.',
+    inputSchema: { person: z.string().min(1).max(40), amount: pounds, they_owe: z.boolean().optional(), note: z.string().max(100).optional(), remind: day.optional() },
+    write: true
+  })
+  windowTool(server, deps, 'pay_back_iou', {
+    title: 'Pay back',
+    description: 'Records money paid back between the user and someone (all of it if no amount), oldest first.',
+    inputSchema: { person: z.string().min(1), amount: pounds.optional() },
+    write: true
+  })
+  windowTool(server, deps, 'get_subscriptions', { title: 'Subscriptions and bills', description: 'Repeating payments: found from statements and added by hand, with the next payment day.', inputSchema: {} })
+  windowTool(server, deps, 'add_subscription', {
+    title: 'Add a subscription',
+    description: 'Adds a subscription or bill by hand.',
+    inputSchema: { name: z.string().min(1).max(60), amount: pounds, interval: z.enum(['weekly', 'monthly', 'yearly']).optional(), next_payment: day.optional(), category: z.string().optional() },
+    write: true
+  })
+  windowTool(server, deps, 'cancel_subscription', { title: 'Mark a subscription cancelled', description: 'Marks a subscription as cancelled, so it’s no longer listed (unless it charges again).', inputSchema: { name: z.string().min(1) }, write: true })
+  windowTool(server, deps, 'set_balance', { title: 'Set the bank balance', description: 'What’s in the user’s main account today (negative if overdrawn), for the forecast.', inputSchema: { amount: pounds }, write: true })
+  windowTool(server, deps, 'set_account_balance', {
+    title: 'Set another account’s balance',
+    description: 'What’s in one of the user’s other accounts (savings, cash, a credit card as a negative amount). Adds the account if it isn’t there.',
+    inputSchema: { account: z.string().min(1).max(40), amount: pounds, kind: z.enum(['current', 'savings', 'cash', 'credit', 'other']).optional() },
+    write: true
+  })
+}
+
+function studioMoreTools(server: McpServer, deps: ToolDeps): void {
+  const app = z.string().min(1).describe('The app (name or owner/name)')
+  windowTool(server, deps, 'edit_card', {
+    title: 'Change a card',
+    description: 'Changes a card’s title, details or kind on Ideas & bugs (by its id from get_board).',
+    inputSchema: { id: z.string().min(1), title: z.string().max(200).optional(), details: z.string().max(10_000).optional(), kind: z.enum(['idea', 'bug']).optional() },
+    write: true
+  })
+  windowTool(server, deps, 'delete_card', { title: 'Delete a card', description: 'Deletes a card from Ideas & bugs.', inputSchema: { id: z.string().min(1) }, write: true })
+  windowTool(server, deps, 'get_pull_requests', { title: 'Pull requests', description: 'Open pull requests on GitHub for one app, or all of them.', inputSchema: { app: app.optional() } })
+  windowTool(server, deps, 'merge_pull_request', {
+    title: 'Merge a pull request',
+    description: 'Merges a pull request. Orbit asks the user to confirm first.',
+    inputSchema: { app, number: z.number().int().min(1) },
+    write: true,
+    timeoutMs: 180_000
+  })
+  windowTool(server, deps, 'close_pull_request', {
+    title: 'Close a pull request',
+    description: 'Closes a pull request without merging it. Orbit asks the user to confirm first.',
+    inputSchema: { app, number: z.number().int().min(1) },
+    write: true,
+    timeoutMs: 180_000
+  })
+  windowTool(server, deps, 'get_releases', { title: 'Releases', description: 'An app’s latest releases on GitHub, with their notes and downloads.', inputSchema: { app, limit: z.number().int().min(1).max(30).optional() } })
+  windowTool(server, deps, 'get_bug_reports', { title: 'Bug reports', description: 'Open bug reports (GitHub issues) for an app.', inputSchema: { app } })
+  windowTool(server, deps, 'close_bug_report', {
+    title: 'Close a bug report',
+    description: 'Closes a bug report, with a comment if given. Check with the user first.',
+    inputSchema: { app, number: z.number().int().min(1), comment: z.string().max(5000).optional() },
+    write: true
+  })
+  windowTool(server, deps, 'run_tests', {
+    title: 'Run an app’s tests',
+    description: 'Runs an app’s type check and tests on this computer (as the release helper does) and gives what failed. Can take a few minutes.',
+    inputSchema: { app },
+    timeoutMs: 15 * 60_000
+  })
+  windowTool(server, deps, 'get_latest_code', {
+    title: 'Get the latest code',
+    description: 'Gets the latest main branch from GitHub into the app’s folder on this computer.',
+    inputSchema: { app },
+    write: true,
+    timeoutMs: 5 * 60_000
+  })
+  windowTool(server, deps, 'check_packages', { title: 'Check packages', description: 'Outdated npm packages and security warnings for an app.', inputSchema: { app }, timeoutMs: 5 * 60_000 })
+}
+
+function convertTools(server: McpServer, deps: ToolDeps): void {
+  windowTool(server, deps, 'convert_formats', {
+    title: 'What a file can become',
+    description: 'What Orbit’s file converter can turn files into (pictures, sound, video and documents).',
+    inputSchema: { paths: z.array(z.string().min(1)).min(1).max(50).describe('Full paths, from search_files, get_downloads or find_tagged_files') }
+  })
+  windowTool(server, deps, 'convert_file', {
+    title: 'Convert files',
+    description:
+      'Converts files on this computer with Orbit’s converter (like HEIC to jpg, mp4 to mp3, mov to mp4, docx to pdf, md to docx), each saved in the same folder as the original, never over another file. Videos need the video converter downloaded once from Orbit’s Convert page.',
+    inputSchema: {
+      paths: z.array(z.string().min(1)).min(1).max(50).describe('Full paths of the files'),
+      to: z.enum(['jpg', 'png', 'webp', 'mp3', 'wav', 'mp4', 'mov', 'webm', 'gif', 'pdf', 'docx', 'md', 'txt', 'html']),
+      max_size: z.number().int().min(16).max(20_000).optional().describe('Pictures: shrink so the longest side is at most this many pixels'),
+      video_height: z.number().int().min(144).max(4320).optional().describe('Videos: shrink to at most this many pixels tall')
+    },
+    write: true,
+    timeoutMs: 15 * 60_000
+  })
+}
+
+function computerTools(server: McpServer, deps: ToolDeps): void {
+  windowTool(server, deps, 'get_running_apps', {
+    title: 'What’s running',
+    description: 'The programs running on the computer with their CPU, memory and disk use (busiest first), from Orbit’s task manager.',
+    inputSchema: { sort: z.enum(['cpu', 'memory', 'disk', 'name']).optional(), search: z.string().optional(), limit: z.number().int().min(1).max(100).optional() }
+  })
+  windowTool(server, deps, 'get_computer_usage', {
+    title: 'How busy the computer is',
+    description: 'CPU, memory, disk and network use, how long it’s been on, and the busiest programs.',
+    inputSchema: {}
+  })
+  windowTool(server, deps, 'close_app', {
+    title: 'Close a program',
+    description: 'Closes (ends) a program that’s running, like one that’s stuck. Orbit asks the user to confirm first; anything unsaved in it is lost.',
+    inputSchema: { app: z.string().min(1).describe('Its name as get_running_apps shows it') },
+    write: true,
+    timeoutMs: 120_000
+  })
+}
+
+function videoTools(server: McpServer, deps: ToolDeps): void {
+  const show = z.string().min(1).describe('The show’s name, like "Breaking Bad"')
+  windowTool(server, deps, 'find_videos', {
+    title: 'Find videos',
+    description: 'Videos in the user’s notes folder (with the show and episode when it’s a TV episode, and how much has been watched).',
+    inputSchema: { search: z.string().optional(), limit: z.number().int().min(1).max(300).optional() }
+  })
+  windowTool(server, deps, 'list_shows', { title: 'TV shows', description: 'The TV shows in the notes folder and how many episodes each has.', inputSchema: {} })
+  windowTool(server, deps, 'list_episodes', { title: 'A show’s episodes', description: 'A show’s episodes in order, with which have been watched.', inputSchema: { show } })
+  windowTool(server, deps, 'play_video', {
+    title: 'Play a video',
+    description:
+      'Plays a video from the notes folder in Orbit’s video player. A show on its own carries on where the user is up to (the episode they stopped in, or the next one). With season and episode: that episode. With only a season: its first episode. It carries on from where it was left unless from_start is true.',
+    inputSchema: {
+      video: z.string().optional().describe('A video’s name or path (for a video that isn’t a show)'),
+      show: show.optional(),
+      season: z.number().int().min(1).optional(),
+      episode: z.number().int().min(1).optional(),
+      from_start: z.boolean().optional()
+    },
+    write: true
+  })
+  windowTool(server, deps, 'next_episode', { title: 'Next episode', description: 'Plays the episode after the one open in the video player.', inputSchema: {}, write: true })
+  windowTool(server, deps, 'queue_videos', {
+    title: 'Add videos to Up next',
+    description: 'Adds videos to the video player’s Up next: by name, or several episodes of a show (count episodes from from_episode, default the first).',
+    inputSchema: { videos: z.array(z.string().min(1)).max(50).optional(), show: show.optional(), season: z.number().int().min(1).optional(), from_episode: z.number().int().min(1).optional(), count: z.number().int().min(1).max(50).optional() },
+    write: true
+  })
+  windowTool(server, deps, 'get_video_queue', { title: 'Video Up next', description: 'The video that’s open and what’s in Up next.', inputSchema: {} })
+  windowTool(server, deps, 'video_history', { title: 'Recently watched', description: 'Videos watched lately, with where each was left.', inputSchema: { limit: z.number().int().min(1).max(50).optional() } })
+  windowTool(server, deps, 'video_controls', {
+    title: 'Control the video',
+    description:
+      'Controls the video that’s open: status (what’s playing and where), play, pause, forward / back (value: seconds, default 10), seek (value: seconds from the start), restart, speed (value 0.25 to 3), volume (value 0 to 100), mute, unmute, fullscreen, exit_fullscreen, next (next in Up next) or close.',
+    inputSchema: {
+      action: z.enum(['status', 'play', 'pause', 'forward', 'back', 'seek', 'restart', 'speed', 'volume', 'mute', 'unmute', 'fullscreen', 'exit_fullscreen', 'next', 'close']),
+      value: z.number().optional()
+    },
+    write: true
+  })
+}
+
 const AREA_TOOLS: Record<ClaudeArea, (server: McpServer, deps: ToolDeps) => void> = {
-  appStudio: appStudioTools,
-  notes: notesTools,
-  calendar: calendarTools,
-  money: moneyTools,
+  appStudio: (s, d) => (appStudioTools(s, d), studioMoreTools(s, d)),
+  notes: (s, d) => (notesTools(s, d), notesMoreTools(s, d)),
+  calendar: (s, d) => (calendarTools(s, d), calendarMoreTools(s, d)),
+  clocks: clockTools,
+  money: (s, d) => (moneyTools(s, d), moneyMoreTools(s, d)),
   flashcards: flashcardTools,
-  files: filesTools,
+  files: (s, d) => (filesTools(s, d), convertTools(s, d)),
   music: musicTools,
+  videos: videoTools,
+  computer: computerTools,
   email: emailTools
 }
 

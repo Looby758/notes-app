@@ -130,9 +130,9 @@ export default function ClaudeDesktopSettings() {
             </div>
           ))}
           <p className="cal-note">
-            Passwords, locked notes and sign-in keys are never shared. Claude can only change things in the parts that say so (notes,
-            events, countdowns, flashcards, Ideas & bugs cards, music and playlists); everything else it can only read. Changed notes can be put
-            back with Ctrl+Z, and deleted ones are in the bin.
+            Passwords, locked notes and sign-in keys are never shared. Claude can only change things in the parts that say so. Changed
+            notes, events and money can be put back with Ctrl+Z, and deleted notes are in the bin. Orbit asks you first before Claude deletes
+            songs, closes a program, or merges or closes a pull request.
           </p>
 
           <div className="cal-client-actions">

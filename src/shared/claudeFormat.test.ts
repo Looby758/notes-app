@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { artistSeeds, pickSong, calendarText, cleanFolder, cleanNoteName, countdownsText, drivesText, findNotePath, flashcardLines, flashcardsText, isInside, isStruggling, matchSongs, taggedText, type CardWithProgress } from './claudeFormat'
+import { clocksText, tasksText, wallTimeIn, artistSeeds, pickSong, calendarText, cleanFolder, cleanNoteName, countdownsText, drivesText, findNotePath, flashcardLines, flashcardsText, isInside, isStruggling, matchSongs, taggedText, type CardWithProgress } from './claudeFormat'
 import type { LocalSong } from './localMusic'
 
 describe('notes', () => {
@@ -135,5 +135,29 @@ describe('pickSong', () => {
       { name: 'Ruelle', weight: 3 },
       { name: 'Phoebe Bridgers', weight: 1 }
     ])
+  })
+})
+
+describe('world clocks', () => {
+  it('turns a time in one place into the moment it is', () => {
+    expect(wallTimeIn('America/New_York', '2026-11-25', '19:00').toISOString()).toBe('2026-11-26T00:00:00.000Z')
+    expect(wallTimeIn('Europe/London', '2026-07-01', '09:30').toISOString()).toBe('2026-07-01T08:30:00.000Z')
+  })
+
+  it('says the time on each clock and whether to message a friend', () => {
+    const now = new Date('2026-11-25T12:00:00Z')
+    const text = clocksText([{ id: 'a', label: 'Sydney', zone: 'Australia/Sydney', person: 'Sam' }], 'Europe/London', now, false)
+    expect(text.split('\n')[0]).toBe('Here [Europe/London]: Wed 12:00')
+    expect(text).toContain('Sam (Sydney) [Australia/Sydney]: Wed 23:00 (Today), 11 hours ahead')
+  })
+})
+
+describe('tasksText', () => {
+  it('lists the busiest programs first', () => {
+    const g = (name: string, cpu: number, mem: number) => ({ id: name, name, kind: 'app' as const, procs: [], cpu, mem })
+    const text = tasksText([g('Chrome', 5, 2e9), g('Game', 40, 1e9)], 'cpu', 10)
+    expect(text.split('\n')[0]).toMatch(/^Game \(app\): CPU 40\.0%/)
+    expect(tasksText([g('Chrome', 5, 2e9), g('Game', 40, 1e9)], 'memory', 10).split('\n')[0]).toMatch(/^Chrome/)
+    expect(tasksText([], 'cpu', 10, 'zoom')).toContain('Nothing running matches')
   })
 })
