@@ -1748,3 +1748,6 @@ body.motion-off .mp-eq i {
 .mp-suggest .mp-queue li {
   cursor: default;
 }
+.mp-rec-note {
+  margin: 0 0 8px;
+}

@@ -266,3 +266,16 @@ export function songsLike(seed: LocalSong, data: MusicData, songs: LocalSong[], 
   }
   return pickVaried(scored, limit, 4).map((s) => s.song)
 }
+
+/** The artists you play and like most (as they're written in your songs), with how much (0 to 1), for finding new music like theirs. */
+export function favouriteArtists(data: MusicData, songs: LocalSong[], now: number, limit = 6): { name: string; weight: number }[] {
+  const byPath = new Map(songs.map((s) => [s.path, s]))
+  const taste = learnTaste(data, byPath, now)
+  const names = new Map<string, string>()
+  for (const s of songs) if (s.artist && !names.has(artistKey(s))) names.set(artistKey(s), s.artist)
+  return [...taste.artist]
+    .filter(([key, w]) => w > 0 && names.has(key))
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([key, weight]) => ({ name: names.get(key)!, weight }))
+}

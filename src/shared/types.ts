@@ -1254,6 +1254,8 @@ export interface NotesApi {
   onMusicLinkProgress(callback: (progress: MusicLinkProgress) => void): () => void
   /** Any song (Apple's free iTunes Search), for the Music page's Search. */
   songSearch(query: string): Promise<FoundTrack[]>
+  /** New songs by artists like your favourites (shared/musicDiscover.ts). */
+  songDiscover(seeds: { name: string; weight: number }[]): Promise<import('./musicDiscover').DiscoverGroup[]>
   /** A public Spotify playlist or album's songs, from its link (no sign-in; the first 100). */
   spotifyList(link: string): Promise<SpotifyList>
   /** A song's YouTube video (`exact` false: YouTube's search for it instead). */
