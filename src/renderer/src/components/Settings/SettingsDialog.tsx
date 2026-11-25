@@ -1,17 +1,33 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useUI } from '../../store/ui'
 import SettingsPage from './SettingsPage'
 
 const close = (): void => useUI.setState({ settingsOpen: false })
 
+/** Longest the closing animation can take (motion.css), in case its end event never comes. */
+const CLOSE_MS = 220
+
 /**
  * Settings as a panel over whatever page you're on (Nocturne style), instead of a tab of its own.
  * Opened by Ctrl+, the gear button, or any "Open settings" link (openSpecialTab(SETTINGS_TAB)).
- * Esc, the close button or clicking outside closes it.
+ * Esc, the close button or clicking outside closes it. It animates out the way it came in
+ * (motion.css), then unmounts; with Motion off it goes at once.
  */
 export default function SettingsDialog() {
   const open = useUI((s) => s.settingsOpen)
-  const box = useRef<HTMLDivElement>(null)
+  const [mounted, setMounted] = useState(open)
+  const closing = mounted && !open
+
+  useEffect(() => {
+    if (open) setMounted(true)
+  }, [open])
+
+  useEffect(() => {
+    if (!closing) return
+    const ms = document.documentElement.dataset.motion === 'off' ? 0 : CLOSE_MS
+    const t = setTimeout(() => setMounted(false), ms)
+    return () => clearTimeout(t)
+  }, [closing])
 
   useEffect(() => {
     if (!open) return
@@ -29,10 +45,15 @@ export default function SettingsDialog() {
     }
   }, [open])
 
-  if (!open) return null
+  if (!mounted && !open) return null
   return (
-    <div className="modal-backdrop settings-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()} data-settings-dialog>
-      <div ref={box} className="settings-dialog" role="dialog" aria-modal="true" aria-label="Settings">
+    <div
+      className={`modal-backdrop settings-backdrop ${closing ? 'closing' : ''}`}
+      onMouseDown={(e) => e.target === e.currentTarget && close()}
+      onAnimationEnd={(e) => closing && e.target === e.currentTarget && setMounted(false)}
+      data-settings-dialog={closing ? 'closing' : 'open'}
+    >
+      <div className="settings-dialog" role="dialog" aria-modal="true" aria-label="Settings">
         <SettingsPage onClose={close} />
       </div>
     </div>

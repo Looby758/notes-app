@@ -786,3 +786,17 @@
 .settings-dialog .settings-content {
   animation: m-fade-in calc(140ms * var(--m-time)) ease backwards;
 }
+/* Closing: the same move played backwards, a little quicker (SettingsDialog waits for it). */
+@keyframes m-settings-out {
+  to {
+    opacity: 0;
+    transform: translateY(calc(8px * var(--m-move))) scale(calc(1 - 0.02 * var(--m-move)));
+  }
+}
+.settings-backdrop.closing {
+  pointer-events: none;
+  animation: m-fade-out calc(180ms * var(--m-time)) ease forwards;
+}
+.settings-backdrop.closing .settings-dialog {
+  animation: m-settings-out calc(180ms * var(--m-time)) cubic-bezier(0.4, 0, 1, 1) forwards;
+}
