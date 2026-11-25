@@ -210,3 +210,36 @@ export function matchSongs(songs: readonly LocalSong[], search: string): LocalSo
   const all = songs.filter((s) => words.every((w) => hay(s).includes(w)))
   return all.length ? all : songs.filter((s) => words.some((w) => w.length > 2 && hay(s).includes(w)))
 }
+
+/**
+ * The one song Claude means ("Lost Boys", "Lost Boys by Phoebe Bridgers", "Phoebe Bridgers - Lost
+ * Boys"): an exact title (and artist, when given) first, else the only match. Null when there's
+ * none, or it can't tell which.
+ */
+export function pickSong(songs: readonly LocalSong[], want: string): LocalSong | null {
+  const norm = (s: string): string => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+  const text = want.trim()
+  const parts = /^(.+?)\s+by\s+(.+)$/i.exec(text) ?? /^(.+?)\s+-\s+(.+)$/.exec(text)
+  const tries: { title: string; artist?: string }[] = [{ title: text }]
+  if (parts) tries.unshift({ title: parts[1], artist: parts[2] }, { title: parts[2], artist: parts[1] })
+  for (const t of tries) {
+    const exact = songs.filter((s) => norm(s.title) === norm(t.title) && (!t.artist || norm(s.artist).includes(norm(t.artist))))
+    if (exact.length >= 1) return exact[0]
+  }
+  const loose = matchSongs(songs, text.replace(/\s+by\s+|\s+-\s+/gi, ' '))
+  return loose.length === 1 ? loose[0] : null
+}
+
+/** Songs as lines for Claude: "Title by Artist (Album, genre)". */
+export const songLines = (songs: readonly LocalSong[]): string =>
+  songs.map((s) => `${s.title} by ${s.artist || 'unknown artist'}${s.album || s.genre ? ` (${[s.album, s.genre].filter(Boolean).join(', ')})` : ''}`).join('\n')
+
+/** Artists in a list of songs, most songs first, as seeds for suggestions. */
+export function artistSeeds(songs: readonly LocalSong[], limit = 8): { name: string; weight: number }[] {
+  const counts = new Map<string, number>()
+  for (const s of songs) for (const a of s.artist.split(/\s*(?:,|&| feat\.? | ft\.? | x )\s*/i).filter(Boolean)) counts.set(a, (counts.get(a) ?? 0) + 1)
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([name, weight]) => ({ name, weight }))
+}

@@ -154,12 +154,12 @@ Ask the Claude Desktop app about what's in Orbit, instead of copying and pasting
 **What Claude can see** (each part has its own switch):
 
 - **App Studio:** the last 20 problems (failed checks before a release, failing tests, a release or fix that didn't work, GitHub's build failing, git trouble), each with the app, when, which step failed and everything git or npm said. They're kept in `app-studio-errors.json` in the settings folder, so they're still there after a restart. Claude can also ask what the release helper says about an app now (and whether its release has built yet), read the Ideas & bugs board, add a card, and move a card or link the pull request that fixed it.
-- **Notes:** search, read, make new notes and add to them.
-- **Calendar and countdowns:** what's coming up (including connected Google calendars), adding an event to Orbit's calendar, and your countdowns.
+- **Notes:** search, read, make, change, rename, move and delete notes. Changes can be undone with Ctrl+Z, and deleted notes go to Orbit's bin.
+- **Calendar and countdowns:** what's coming up (including connected Google calendars), adding an event to Orbit's calendar, and reading and adding countdowns (Claude asks for the date if you didn't say it).
 - **Money:** spending, budgets, savings goals and repeating payments. Read-only.
 - **Flashcards:** your cards, which ones you keep getting wrong, and adding new ones to a note.
 - **Files and downloads:** colour-tagged files, Whole PC search, the download manager, and how full the drives are.
-- **Music:** what's playing, play, pause, skip, and playing songs from your music folder that match (like "chill").
+- **Music:** what's playing, play, pause and skip; play a song, a playlist, or a playlist starting from one song, with shuffle and loop ("play X on loop"); songs that match (like "chill"); make playlists and add songs; suggest songs like a playlist's; and download a song from YouTube into your music (with its details and cover) and add it to a playlist.
 - **Email:** off until you switch it on. Search and read your emails.
 
 **Safety:** it's off until you switch it on. Only this computer can reach it (it listens on 127.0.0.1, never on the Wi-Fi), and every request needs a secret code that's stored encrypted, like the other sign-ins, in `settings.json`. Claude Desktop keeps a copy in its own settings file. **New secret code** makes a new one, so the old one stops working. Passwords, locked notes and anything in a locked folder are never shared, and anything that looks like a password, token or key is blanked out before it leaves Orbit. Claude can only change the things listed above; everything else it can only read.

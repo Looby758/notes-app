@@ -328,6 +328,13 @@ export function localShuffle(): void {
   publish()
 }
 
+/** Sets shuffle and repeat straight to these (Claude Desktop's "play it on loop"), keeping the song playing. */
+export function setLocalModes(modes: { shuffle?: boolean; repeat?: LocalStore['repeat'] }): void {
+  if (modes.shuffle !== undefined && modes.shuffle !== useLocalMusic.getState().shuffle) localShuffle()
+  if (modes.repeat !== undefined) useLocalMusic.setState({ repeat: modes.repeat })
+  publish()
+}
+
 export function localRepeat(): void {
   useLocalMusic.setState({ repeat: nextRepeat(useLocalMusic.getState().repeat) })
   publish()

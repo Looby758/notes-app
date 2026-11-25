@@ -113,7 +113,7 @@ function answered(id: unknown, ok: unknown, value: unknown): void {
 function deps(): ToolDeps {
   return {
     areas: cleanAreas(loadSettings().claudeDesktopAreas),
-    ask: (name, args) => askWindow(name, args),
+    ask: (name, args, timeoutMs) => askWindow(name, args, timeoutMs),
     errors: studioErrors,
     knownFolders,
     memory: releaseMemory,

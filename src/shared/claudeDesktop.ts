@@ -13,12 +13,12 @@ import type { BoardColumn, BoardItem } from './appStudio'
 export type ClaudeArea = 'appStudio' | 'notes' | 'calendar' | 'money' | 'flashcards' | 'files' | 'music' | 'email'
 
 export const CLAUDE_AREAS: readonly { id: ClaudeArea; label: string; what: string; onAtStart: boolean }[] = [
-  { id: 'notes', label: 'Notes', what: 'Find and read your notes, make new ones and add to them. Locked notes are never shown.', onAtStart: true },
-  { id: 'calendar', label: 'Calendar and countdowns', what: 'See what’s coming up, add events, and read your countdowns.', onAtStart: true },
+  { id: 'notes', label: 'Notes', what: 'Find, read, make, change, rename, move and delete notes (deleted ones go to the bin). Locked notes are never shown.', onAtStart: true },
+  { id: 'calendar', label: 'Calendar and countdowns', what: 'See what’s coming up, add events, and read and add countdowns.', onAtStart: true },
   { id: 'money', label: 'Money', what: 'Read your spending, budgets and savings. It can’t change anything.', onAtStart: true },
   { id: 'flashcards', label: 'Flashcards', what: 'See your cards and which ones you keep getting wrong, and add new ones.', onAtStart: true },
   { id: 'files', label: 'Files and downloads', what: 'Find files you’ve colour-tagged, see downloads and how full your drives are.', onAtStart: true },
-  { id: 'music', label: 'Music', what: 'See what’s playing, play, pause and skip, and play songs from your music folder.', onAtStart: true },
+  { id: 'music', label: 'Music', what: 'Play songs and playlists (shuffle, loop), see what’s playing, make playlists, suggest songs, and download songs from YouTube into your music.', onAtStart: true },
   { id: 'appStudio', label: 'App Studio', what: 'Read App Studio’s errors and release checks, and read and move cards on Ideas & bugs.', onAtStart: true },
   { id: 'email', label: 'Email', what: 'Search and read your emails. Off unless you switch it on.', onAtStart: false }
 ]

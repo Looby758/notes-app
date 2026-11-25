@@ -17,7 +17,7 @@ import type { ReleaseMemory } from './studioErrors'
 export interface ToolDeps {
   areas: Record<ClaudeArea, boolean>
   /** Asks Orbit's window; the answer is text for Claude. */
-  ask(name: string, args: Record<string, unknown>): Promise<string>
+  ask(name: string, args: Record<string, unknown>, timeoutMs?: number): Promise<string>
   errors(): StudioError[]
   /** Folders the release helper has looked at since Orbit started. */
   knownFolders(): string[]
@@ -210,11 +210,11 @@ function appStudioTools(server: McpServer, deps: ToolDeps): void {
 // ---------- Everything the window answers ----------
 
 /** A tool that's answered by Orbit's window, under the same name. */
-function windowTool(server: McpServer, deps: ToolDeps, name: string, config: { title: string; description: string; inputSchema: Record<string, z.ZodType>; write?: boolean }): void {
+function windowTool(server: McpServer, deps: ToolDeps, name: string, config: { title: string; description: string; inputSchema: Record<string, z.ZodType>; write?: boolean; timeoutMs?: number }): void {
   server.registerTool(
     name,
     { title: config.title, description: config.description, inputSchema: config.inputSchema, annotations: config.write ? WRITE : READ },
-    safely((args: Record<string, unknown>) => deps.ask(name, args ?? {}))
+    safely((args: Record<string, unknown>) => deps.ask(name, args ?? {}, config.timeoutMs))
   )
 }
 
@@ -253,6 +253,37 @@ function notesTools(server: McpServer, deps: ToolDeps): void {
     inputSchema: { path: z.string().min(1), text: z.string().min(1).max(100_000) },
     write: true
   })
+  windowTool(server, deps, 'edit_note', {
+    title: 'Change a note',
+    description:
+      'Changes text in a note: replaces `find` (copied exactly from read_note) with `replace`, or with whole set, replaces all of the note’s text. The user can undo it with Ctrl+Z in Orbit. Read the note first.',
+    inputSchema: {
+      path: z.string().min(1),
+      find: z.string().max(100_000).optional().describe('The exact text to change'),
+      replace: z.string().max(200_000).describe('What to put instead (empty deletes it)'),
+      all: z.boolean().optional().describe('Change every place `find` appears, not just one'),
+      whole: z.boolean().optional().describe('Replace the whole note with `replace`')
+    },
+    write: true
+  })
+  windowTool(server, deps, 'rename_note', {
+    title: 'Rename a note',
+    description: 'Gives a note a new name (links to it are updated).',
+    inputSchema: { path: z.string().min(1), name: z.string().min(1).max(120).describe('The new name, without .md') },
+    write: true
+  })
+  windowTool(server, deps, 'move_note', {
+    title: 'Move a note',
+    description: 'Moves a note into another folder (made if it isn’t there; empty for the top of the notes). Links to it are updated.',
+    inputSchema: { path: z.string().min(1), folder: z.string().describe('Like "School/History", or empty for the top') },
+    write: true
+  })
+  windowTool(server, deps, 'delete_note', {
+    title: 'Delete a note',
+    description: 'Moves a note to Orbit’s bin, where the user can get it back. Check with the user before deleting unless they asked for it.',
+    inputSchema: { path: z.string().min(1) },
+    write: true
+  })
 }
 
 function calendarTools(server: McpServer, deps: ToolDeps): void {
@@ -271,6 +302,19 @@ function calendarTools(server: McpServer, deps: ToolDeps): void {
     title: 'Countdowns',
     description: 'The countdowns from Orbit’s Countdowns page, with how long is left until each.',
     inputSchema: {}
+  })
+  windowTool(server, deps, 'add_countdown', {
+    title: 'Add a countdown',
+    description:
+      'Adds a countdown to Orbit’s Countdowns page. It needs what it’s counting down to and the date: if the user didn’t say the date (or it’s unclear which year), ask them before adding it. A time is optional (leave it out for the whole day). Birthdays and other things that come round every year should be yearly.',
+    inputSchema: {
+      title: z.string().min(1).max(80).describe('What it’s counting down to, like "Holiday to Spain"'),
+      date: day.describe('The day, like 2026-12-20'),
+      time: time.optional().describe('A 24-hour time on that day, like 18:00'),
+      kind: z.enum(['season', 'game', 'trip', 'birthday', 'event', 'other']).optional().describe('season (a TV season), game (a game or update), trip, birthday, event or other'),
+      yearly: z.boolean().optional().describe('Comes round every year on the same date')
+    },
+    write: true
   })
 }
 
@@ -335,10 +379,62 @@ function musicTools(server: McpServer, deps: ToolDeps): void {
     write: true
   })
   windowTool(server, deps, 'play_music', {
-    title: 'Play songs',
-    description: 'Plays songs from the user’s own music folder whose title, artist, album or genre match (shuffled). For a mood like “chill”, try a genre or a few words.',
-    inputSchema: { search: z.string().min(1).describe('Words to match, like "chill", "Arctic Monkeys" or "lofi"') },
+    title: 'Play music',
+    description:
+      'Plays the user’s own music: a playlist (from the start, or from a chosen song and then on through the rest of the playlist), one song, or songs whose title, artist, album or genre match some words (like "chill"). Can also turn shuffle and looping on or off, on its own to change what’s playing. "Play X on loop": song X with loop "song". "Play my gym playlist shuffled on loop": playlist, shuffle true, loop "all".',
+    inputSchema: {
+      playlist: z.string().optional().describe('A playlist’s name ("Liked" for liked songs)'),
+      song: z.string().optional().describe('A song, like "No One Left To Love" or "Lost Boys by Phoebe Bridgers". With a playlist: start from it and carry on through the playlist.'),
+      search: z.string().optional().describe('Or words to match, like "chill" or "Arctic Monkeys"'),
+      shuffle: z.boolean().optional(),
+      loop: z.enum(['off', 'song', 'all']).optional().describe('song: repeat this one song; all: repeat the whole list')
+    },
     write: true
+  })
+  windowTool(server, deps, 'list_playlists', {
+    title: 'Playlists',
+    description: 'The user’s playlists in Orbit’s music player, with how many songs each has, plus their liked songs count.',
+    inputSchema: {}
+  })
+  windowTool(server, deps, 'get_playlist', {
+    title: 'A playlist’s songs',
+    description: 'The songs in one playlist (title, artist, album, genre). Use it to recommend songs like the ones in it. "Liked" gives the liked songs.',
+    inputSchema: { playlist: z.string().min(1).describe('The playlist’s name') }
+  })
+  windowTool(server, deps, 'find_songs', {
+    title: 'Find songs',
+    description:
+      'Looks a song up: whether it’s already in the user’s music folder, and matches from the online catalogue (title, artist, album, year). Use it to check which song the user means before downloading.',
+    inputSchema: { query: z.string().min(1).describe('A song’s name, and its artist if known') }
+  })
+  windowTool(server, deps, 'suggest_songs', {
+    title: 'Suggest songs',
+    description: 'Songs the user doesn’t have yet by artists like the ones in a playlist (from the online catalogue). Add your own ideas too; when they pick some, use download_song for each.',
+    inputSchema: { playlist: z.string().min(1).describe('The playlist to base it on') }
+  })
+  windowTool(server, deps, 'create_playlist', {
+    title: 'Make a playlist',
+    description: 'Makes a new playlist, with songs from the user’s music folder in it if given. Songs that aren’t in the music folder are listed back so they can be downloaded with download_song.',
+    inputSchema: { name: z.string().min(1).max(100), songs: z.array(z.string().min(1)).max(200).optional().describe('Songs, like "Lost Boys by Phoebe Bridgers"') },
+    write: true
+  })
+  windowTool(server, deps, 'add_to_playlist', {
+    title: 'Add songs to a playlist',
+    description: 'Adds songs already in the user’s music folder to a playlist (made if it isn’t there). Songs that aren’t in the music folder are listed back so they can be downloaded with download_song.',
+    inputSchema: { playlist: z.string().min(1), songs: z.array(z.string().min(1)).min(1).max(200).describe('Songs, like "Lost Boys by Phoebe Bridgers"') },
+    write: true
+  })
+  windowTool(server, deps, 'download_song', {
+    title: 'Download a song',
+    description:
+      'Finds a song on YouTube and saves it as an MP3 in the user’s music folder (with its title, artist, album and cover), then adds it to a playlist if one is given (made if it isn’t there). Give the exact title and artist: use find_songs first if unsure which song they mean, and ask them if it’s still unclear. If the song is already in their music, it isn’t downloaded again.',
+    inputSchema: {
+      title: z.string().min(1).max(200),
+      artist: z.string().min(1).max(200),
+      playlist: z.string().optional().describe('A playlist to add it to')
+    },
+    write: true,
+    timeoutMs: 90_000
   })
 }
 

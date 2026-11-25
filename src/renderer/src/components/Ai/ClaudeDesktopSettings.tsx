@@ -130,8 +130,9 @@ export default function ClaudeDesktopSettings() {
             </div>
           ))}
           <p className="cal-note">
-            Passwords, locked notes and sign-in keys are never shared. Claude can only change things in the parts that say so (making
-            notes, adding events and flashcards, moving cards, playing music); everything else it can only read.
+            Passwords, locked notes and sign-in keys are never shared. Claude can only change things in the parts that say so (notes,
+            events, countdowns, flashcards, Ideas & bugs cards, music and playlists); everything else it can only read. Changed notes can be put
+            back with Ctrl+Z, and deleted ones are in the bin.
           </p>
 
           <div className="cal-client-actions">

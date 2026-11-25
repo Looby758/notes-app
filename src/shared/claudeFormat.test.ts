@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calendarText, cleanFolder, cleanNoteName, countdownsText, drivesText, findNotePath, flashcardLines, flashcardsText, isInside, isStruggling, matchSongs, taggedText, type CardWithProgress } from './claudeFormat'
+import { artistSeeds, pickSong, calendarText, cleanFolder, cleanNoteName, countdownsText, drivesText, findNotePath, flashcardLines, flashcardsText, isInside, isStruggling, matchSongs, taggedText, type CardWithProgress } from './claudeFormat'
 import type { LocalSong } from './localMusic'
 
 describe('notes', () => {
@@ -105,5 +105,27 @@ describe('matchSongs', () => {
     expect(matchSongs(songs, 'chill').map((s) => s.title)).toEqual(['Sunset', 'Rain'])
     expect(matchSongs(songs, 'chill jazz').map((s) => s.title)).toEqual(['Sunset', 'Rain'])
     expect(matchSongs(songs, '')).toEqual([])
+  })
+})
+
+describe('pickSong', () => {
+  const song = (title: string, artist: string): LocalSong => ({ path: `${title}.mp3`, title, artist, album: '', track: 0, durationMs: 1, art: false })
+  const songs = [song('No One Left To Love', 'Alan Wake & ROOS + BERG'), song('Lost Boys', 'Phoebe Bridgers'), song('Lost', 'Frank Ocean'), song('Invincible', 'Ruelle')]
+
+  it('finds the song however it’s written', () => {
+    expect(pickSong(songs, 'no one left to love')?.artist).toBe('Alan Wake & ROOS + BERG')
+    expect(pickSong(songs, 'Lost Boys by Phoebe Bridgers')?.title).toBe('Lost Boys')
+    expect(pickSong(songs, 'Phoebe Bridgers - Lost Boys')?.title).toBe('Lost Boys')
+    // "Lost" is a title of its own, even though "Lost Boys" has it too.
+    expect(pickSong(songs, 'Lost')?.artist).toBe('Frank Ocean')
+    expect(pickSong(songs, 'ruelle')?.title).toBe('Invincible')
+    expect(pickSong(songs, 'Bohemian Rhapsody')).toBeNull()
+  })
+
+  it('makes suggestions from the artists a playlist has most', () => {
+    expect(artistSeeds([song('a', 'Ruelle'), song('b', 'Ruelle'), song('c', 'Phoebe Bridgers, Ruelle')])).toEqual([
+      { name: 'Ruelle', weight: 3 },
+      { name: 'Phoebe Bridgers', weight: 1 }
+    ])
   })
 })

@@ -51,7 +51,8 @@ interface VaultState {
   /** Creates a note at an exact path (folders included) and opens it. */
   createNoteAt(path: string, content?: string, cursor?: number | null): Promise<string | null>
   newFolder(folder?: string): Promise<void>
-  rename(path: string, name: string): Promise<void>
+  /** `updateLinks`: already decided (Claude Desktop renaming one), so don't ask. */
+  rename(path: string, name: string, updateLinks?: boolean): Promise<void>
   /** `updateLinks`: already decided (moving several things at once), so don't ask. */
   move(path: string, folder: string, updateLinks?: boolean): Promise<void>
   trash(path: string): Promise<void>
@@ -345,10 +346,10 @@ export const useVault = create<VaultState>((set, get) => {
       }
     },
 
-    async rename(path, name) {
+    async rename(path, name, updateLinks) {
       set({ renaming: null })
       try {
-        const next = await doRename(path, name)
+        const next = await doRename(path, name, updateLinks)
         if (next === path) return
         const oldName = path.split('/').pop()!
         const newName = next.split('/').pop()!

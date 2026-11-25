@@ -11,8 +11,11 @@ import {
   flashcardLines,
   flashcardsText,
   isInside,
+  artistSeeds,
   matchSongs,
   noteName,
+  pickSong,
+  songLines,
   taggedText,
   type CalendarLine,
   type CardWithProgress
@@ -26,10 +29,16 @@ import { itemsByDay, searchNotes, useNoteIndex } from '../store/noteIndex'
 import { useVault } from '../store/vault'
 import { useFlashcards } from '../store/flashcards'
 import { ensureMoney, useMoney } from '../store/money'
-import { usePrefs } from '../store/prefs'
+import { setPrefs, usePrefs } from '../store/prefs'
 import { musicControl, useMusic } from '../store/music'
-import { loadLocalLibrary, localUpNext, playLocal, useLocalMusic } from '../store/localMusic'
+import { loadLocalLibrary, localUpNext, playLocal, setLocalModes, useLocalMusic } from '../store/localMusic'
 import { addEvent, editNote } from './daily'
+import { addToPlaylist as addSongsToPlaylist, createPlaylist, startMusicData, useMusicData } from '../store/musicData'
+import { onMusicLinkDone, saveMp3 } from '../store/musicLink'
+import { countdownId, isDate, MAX_COUNTDOWNS, type CountdownKind } from '@shared/countdown'
+import { likedSongs, playlistSongs, songsByPath } from '@shared/musicLibrary'
+import type { LocalSong } from '@shared/localMusic'
+import type { FoundTrack } from '@shared/songSearch'
 import { addDays, dayKey, fromDayKey } from './dates'
 import { moneyContext } from './askContext'
 import { lockedFolderOf } from './lock/folders'
@@ -182,6 +191,62 @@ async function addToNoteFor(args: Args): Promise<string> {
   return `Added to ${path}.`
 }
 
+async function editNoteFor(args: Args): Promise<string> {
+  needNotes()
+  const path = findNote(str(args.path))
+  const find = str(args.find)
+  const replace = str(args.replace)
+  let count = 0
+  await editNote(
+    path,
+    (text) => {
+      if (args.whole === true) return replace
+      if (!find) throw new Error('Say which text to change (find), or set whole to replace the whole note.')
+      count = text.split(find).length - 1
+      if (count === 0) throw new Error(`“${find.slice(0, 80)}” isn’t in that note. Read it again with read_note and copy the text exactly.`)
+      if (count > 1 && args.all !== true) throw new Error(`“${find.slice(0, 80)}” is in that note ${count} times. Give more of the text around it, or set all to change every one.`)
+      return text.split(find).join(replace)
+    },
+    { undo: `Claude changed “${noteName(path)}”` }
+  )
+  await useVault.getState().refresh([path])
+  return args.whole === true ? `Replaced the text of ${path}. Ctrl+Z in Orbit undoes it.` : `Changed ${count} place(s) in ${path}. Ctrl+Z in Orbit undoes it.`
+}
+
+async function renameNoteFor(args: Args): Promise<string> {
+  needNotes()
+  const path = findNote(str(args.path))
+  const name = cleanNoteName(str(args.name))
+  const parent = path.includes('/') ? path.slice(0, path.lastIndexOf('/') + 1) : ''
+  const next = `${parent}${name}.md`
+  if (useNoteIndex.getState().notes.has(next)) throw new Error(`There’s already a note called “${name}” there.`)
+  await useVault.getState().rename(path, `${name}.md`, true)
+  if (!useNoteIndex.getState().notes.has(next)) throw new Error('Orbit couldn’t rename it.')
+  return `Renamed ${path} to ${next}. Links to it were updated.`
+}
+
+async function moveNoteFor(args: Args): Promise<string> {
+  needNotes()
+  const path = findNote(str(args.path))
+  const folder = cleanFolder(str(args.folder))
+  if (folder && locked(`${folder}/x.md`)) throw new Error('That folder is locked, so Claude can’t move notes into it.')
+  if (folder) await window.api.createFolder(folder).catch(() => undefined)
+  const next = `${folder ? `${folder}/` : ''}${path.split('/').pop()}`
+  if (next === path) return 'It’s already in that folder.'
+  if (useNoteIndex.getState().notes.has(next)) throw new Error('There’s already a note with that name in that folder.')
+  await useVault.getState().move(path, folder, true)
+  if (!useNoteIndex.getState().notes.has(next)) throw new Error('Orbit couldn’t move it.')
+  return `Moved it to ${next}. Links to it were updated.`
+}
+
+async function deleteNoteFor(args: Args): Promise<string> {
+  needNotes()
+  const path = findNote(str(args.path))
+  await useVault.getState().trash(path)
+  if (useNoteIndex.getState().notes.has(path)) throw new Error('Orbit couldn’t delete it.')
+  return `Deleted ${path}. It’s in Orbit’s bin, and Ctrl+Z (or the bin) brings it back.`
+}
+
 // ---------- Calendar ----------
 
 async function calendarFor(args: Args): Promise<string> {
@@ -220,6 +285,22 @@ async function addEventFor(args: Args): Promise<string> {
 }
 
 const countdownsFor = (): string => countdownsText(usePrefs.getState().prefs.countdowns, new Date())
+
+const KINDS: CountdownKind[] = ['season', 'game', 'trip', 'birthday', 'event', 'other']
+
+function addCountdownFor(args: Args): string {
+  const list = usePrefs.getState().prefs.countdowns
+  if (list.length >= MAX_COUNTDOWNS) throw new Error(`There are already ${MAX_COUNTDOWNS} countdowns, the most Orbit keeps. Delete one on the Countdowns page first.`)
+  const title = str(args.title).trim().slice(0, 80)
+  const date = str(args.date)
+  if (!title) throw new Error('Say what it’s counting down to.')
+  if (!isDate(date)) throw new Error('The date has to be a real day, like 2026-12-20.')
+  const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(str(args.time)) ? str(args.time) : ''
+  const kind = KINDS.includes(str(args.kind) as CountdownKind) ? (str(args.kind) as CountdownKind) : args.yearly === true ? 'birthday' : 'event'
+  const yearly = args.yearly === true
+  setPrefs({ countdowns: [...list, { id: countdownId(), title, kind, date, time, yearly, created: Date.now() }] })
+  return `Added the countdown “${title}” for ${date}${time ? ` at ${time}` : ''}${yearly ? ', every year' : ''}.\n\n${countdownsText(usePrefs.getState().prefs.countdowns.filter((c) => c.title === title), new Date())}`
+}
 
 // ---------- Money ----------
 
@@ -306,14 +387,227 @@ async function controlMusicFor(args: Args): Promise<string> {
   return action === 'play' ? 'Playing.' : action === 'pause' ? 'Paused.' : action === 'next' ? 'Skipped to the next song.' : 'Went back a song.'
 }
 
-async function playMusicFor(args: Args): Promise<string> {
+async function library(): Promise<LocalSong[]> {
   if (!useLocalMusic.getState().library) await loadLocalLibrary()
   const songs = useLocalMusic.getState().library?.songs ?? []
   if (!songs.length) throw new Error('Orbit has no music folder set (or it’s empty). Choose one on the Music page first.')
-  const found = matchSongs(songs, str(args.search))
-  if (!found.length) return `None of the songs match “${str(args.search)}”. Try an artist, an album or a genre.`
-  await playLocal(found.slice(0, 200), 'shuffle')
-  return `Playing ${found.length} song(s) matching “${str(args.search)}”, shuffled.`
+  return songs
+}
+
+async function musicData(): Promise<ReturnType<typeof useMusicData.getState>['data']> {
+  startMusicData()
+  for (let i = 0; i < 40 && !useMusicData.getState().loaded; i++) await new Promise((r) => setTimeout(r, 50))
+  return useMusicData.getState().data
+}
+
+const LIKED = /^(liked|liked songs|favourites|favorites)$/i
+
+/** A playlist by name (any case), or null. */
+async function findPlaylist(name: string): Promise<{ id: string; name: string; songs: string[] } | null> {
+  const want = name.trim().toLowerCase()
+  const lists = (await musicData()).playlists
+  return lists.find((p) => p.name.trim().toLowerCase() === want) ?? (lists.filter((p) => p.name.toLowerCase().includes(want)).length === 1 ? lists.find((p) => p.name.toLowerCase().includes(want))! : null)
+}
+
+async function playlistSongsFor(name: string): Promise<{ name: string; songs: LocalSong[] }> {
+  const songs = await library()
+  const data = await musicData()
+  const byPath = songsByPath(songs)
+  if (LIKED.test(name.trim())) return { name: 'Liked songs', songs: likedSongs(data, byPath) }
+  const p = await findPlaylist(name)
+  if (!p) throw new Error(`There’s no playlist called “${name}”. The playlists are: ${data.playlists.map((l) => l.name).join(', ') || 'none yet'}.`)
+  const list = data.playlists.find((l) => l.id === p.id)!
+  return { name: p.name, songs: playlistSongs(list, byPath).flatMap((x) => (x.song ? [x.song] : [])) }
+}
+
+const LOOPS = { off: 'off', song: 'track', all: 'context' } as const
+
+async function playMusicFor(args: Args): Promise<string> {
+  const shuffle = typeof args.shuffle === 'boolean' ? args.shuffle : undefined
+  const loop = str(args.loop) in LOOPS ? LOOPS[str(args.loop) as keyof typeof LOOPS] : undefined
+  const songName = str(args.song)
+  let said: string
+  if (str(args.playlist)) {
+    const { name, songs } = await playlistSongsFor(str(args.playlist))
+    if (!songs.length) return `“${name}” has no songs in it yet.`
+    const at = songName ? songs.indexOf(pickSong(songs, songName) as LocalSong) : 0
+    if (at < 0) throw new Error(`“${songName}” isn’t in the playlist “${name}”. Use get_playlist to see its songs.`)
+    // Shuffle is set first, so the chosen song plays first and the rest follow (in order, or shuffled).
+    if (shuffle !== undefined) useLocalMusic.setState({ shuffle })
+    if (shuffle && !songName) await playLocal(songs, 'shuffle')
+    else await playLocal(songs, at)
+    said = `Playing ${songName ? `“${songs[at].title}” from` : 'the playlist'} “${name}”${songName ? ', then the rest of the playlist' : ''}${useLocalMusic.getState().shuffle ? ', shuffled' : ''}`
+  } else if (songName) {
+    const song = pickSong(await library(), songName)
+    if (!song) throw new Error(`Couldn’t find “${songName}” in their music. Use find_songs to check the name, or download_song to get it.`)
+    useLocalMusic.setState({ shuffle: false })
+    await playLocal([song], 0)
+    said = `Playing “${song.title}” by ${song.artist}`
+  } else if (str(args.search)) {
+    const found = matchSongs(await library(), str(args.search))
+    if (!found.length) return `None of the songs match “${str(args.search)}”. Try an artist, an album or a genre.`
+    if (shuffle === false) {
+      useLocalMusic.setState({ shuffle: false })
+      await playLocal(found.slice(0, 200), 0)
+    } else await playLocal(found.slice(0, 200), 'shuffle')
+    said = `Playing ${found.length} song(s) matching “${str(args.search)}”${shuffle === false ? '' : ', shuffled'}`
+  } else {
+    // Only changing shuffle or loop on what's playing.
+    if (shuffle === undefined && !loop) throw new Error('Say what to play: a song, a playlist or some words to match.')
+    said = 'Changed how it plays'
+  }
+  if (shuffle !== undefined || loop) setLocalModes({ shuffle: str(args.playlist) || songName || str(args.search) ? undefined : shuffle, repeat: loop })
+  const r = useLocalMusic.getState().repeat
+  return `${said}${r === 'track' ? ', looping this song' : r === 'context' ? ', looping the list' : ''}.`
+}
+
+async function listPlaylistsFor(): Promise<string> {
+  const data = await musicData()
+  const lines = data.playlists.map((p) => `${p.name}: ${p.songs.length} song(s)`)
+  lines.push(`Liked songs: ${Object.keys(data.liked).length} song(s)`)
+  return lines.join('\n')
+}
+
+async function getPlaylistFor(args: Args): Promise<string> {
+  const { name, songs } = await playlistSongsFor(str(args.playlist))
+  return songs.length ? `${name} (${songs.length} songs):\n${songLines(songs)}` : `“${name}” has no songs in it yet.`
+}
+
+async function findSongsFor(args: Args): Promise<string> {
+  const query = str(args.query)
+  const mine = matchSongs(useLocalMusic.getState().library?.songs ?? (await library().catch(() => [])), query).slice(0, 5)
+  let online: FoundTrack[] = []
+  try {
+    online = (await window.api.songSearch(query)).slice(0, 8)
+  } catch {
+    // Offline: what's here is still known.
+  }
+  return [
+    mine.length ? `Already in their music:\n${songLines(mine)}` : 'Not in their music yet.',
+    online.length ? `Online:\n${online.map((t) => `${t.title} by ${t.artist}${t.album ? ` (${t.album}${t.year ? `, ${t.year}` : ''})` : ''}`).join('\n')}` : 'Nothing found online (or no internet).'
+  ].join('\n\n')
+}
+
+async function suggestSongsFor(args: Args): Promise<string> {
+  const { name, songs } = await playlistSongsFor(str(args.playlist))
+  if (!songs.length) return `“${name}” has no songs to base suggestions on.`
+  const have = new Set((await library()).map((s) => `${s.title}|${s.artist}`.toLowerCase()))
+  const groups = await window.api.songDiscover(artistSeeds(songs))
+  const lines: string[] = []
+  for (const g of groups.sort((a, b) => b.weight - a.weight)) {
+    const fresh = g.tracks.filter((t) => !have.has(`${t.title}|${t.artist}`.toLowerCase())).slice(0, 4)
+    if (fresh.length) lines.push(`${g.because}:\n${fresh.map((t) => `  ${t.title} by ${t.artist}`).join('\n')}`)
+    if (lines.length >= 8) break
+  }
+  return lines.length ? `Songs like “${name}” that they don’t have yet:\n\n${lines.join('\n\n')}` : 'Couldn’t find suggestions online right now. Suggest some yourself from the playlist’s songs.'
+}
+
+/** Songs Claude named, split into the ones in the music folder and the ones that aren't. */
+async function pickSongs(names: unknown): Promise<{ found: LocalSong[]; missing: string[] }> {
+  const songs = await library()
+  const found: LocalSong[] = []
+  const missing: string[] = []
+  for (const n of Array.isArray(names) ? names : []) {
+    const s = typeof n === 'string' ? pickSong(songs, n) : null
+    if (s) found.push(s)
+    else if (typeof n === 'string') missing.push(n)
+  }
+  return { found, missing }
+}
+
+const missingText = (missing: string[]): string => (missing.length ? `\nNot in their music (download them with download_song, or check the name): ${missing.join('; ')}` : '')
+
+/** A playlist's id, made when it isn't there yet. */
+async function playlistId(name: string): Promise<{ id: string; made: boolean; name: string }> {
+  const p = await findPlaylist(name)
+  if (p) return { id: p.id, made: false, name: p.name }
+  const id = await createPlaylist(name.trim().slice(0, 100))
+  if (!id) throw new Error('Orbit couldn’t make that playlist.')
+  return { id, made: true, name: name.trim() }
+}
+
+async function createPlaylistFor(args: Args): Promise<string> {
+  const name = str(args.name).trim()
+  if (await findPlaylist(name).then((p) => p?.name.toLowerCase() === name.toLowerCase())) throw new Error(`There’s already a playlist called “${name}”. Use add_to_playlist to add to it.`)
+  const { found, missing } = await pickSongs(args.songs)
+  const id = await createPlaylist(name, found)
+  if (!id) throw new Error('Orbit couldn’t make that playlist.')
+  return `Made the playlist “${name}”${found.length ? ` with ${found.length} song(s)` : ''}.${missingText(missing)}`
+}
+
+async function addToPlaylistFor(args: Args): Promise<string> {
+  const { found, missing } = await pickSongs(args.songs)
+  if (!found.length) return `None of those are in their music yet.${missingText(missing)}`
+  const p = await playlistId(str(args.playlist))
+  await addSongsToPlaylist(p.id, found)
+  return `${p.made ? `Made the playlist “${p.name}” and added` : `Added`} ${found.map((s) => `“${s.title}”`).join(', ')}${p.made ? '' : ` to “${p.name}”`}.${missingText(missing)}`
+}
+
+/** Waits for a download to finish (or gives up waiting, leaving it going). */
+function finished(id: string, ms: number): Promise<{ stage: string; path?: string; error?: string } | null> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      off()
+      resolve(null)
+    }, ms)
+    const off = onMusicLinkDone((p) => {
+      if (p.id !== id) return
+      clearTimeout(timer)
+      off()
+      resolve(p)
+    })
+  })
+}
+
+async function addDownloaded(path: string, playlist: string): Promise<string> {
+  await loadLocalLibrary(true)
+  const song = useLocalMusic.getState().library?.songs.find((s) => s.path === path)
+  if (!song) return `It’s saved, but Orbit couldn’t find it in the music folder to add it to “${playlist}”.`
+  const p = await playlistId(playlist)
+  await addSongsToPlaylist(p.id, [song])
+  return `${p.made ? `Made the playlist “${p.name}” and added it` : `Added it to “${p.name}”`}.`
+}
+
+async function downloadSongFor(args: Args): Promise<string> {
+  const title = str(args.title).trim()
+  const artist = str(args.artist).trim()
+  const playlist = str(args.playlist).trim()
+  const songs = await library().catch((err) => {
+    if (useLocalMusic.getState().library) return []
+    throw err
+  })
+  const already = pickSong(songs, `${title} by ${artist}`)
+  if (already) {
+    if (!playlist) return `“${already.title}” by ${already.artist} is already in their music, so it wasn’t downloaded again.`
+    const p = await playlistId(playlist)
+    await addSongsToPlaylist(p.id, [already])
+    return `“${already.title}” is already in their music, so it wasn’t downloaded again. ${p.made ? `Made the playlist “${p.name}” and added it.` : `Added it to “${p.name}”.`}`
+  }
+  // The catalogue's details (album, cover), when it knows the song.
+  let known: FoundTrack = { id: '', title, artist, album: '', year: '', genre: '', durationMs: 0 }
+  try {
+    const hits = await window.api.songSearch(`${artist} ${title}`)
+    const match = hits.find((h) => h.title.toLowerCase() === title.toLowerCase() && h.artist.toLowerCase().includes(artist.toLowerCase().split(/[,&]/)[0].trim()))
+    if (match) known = match
+  } catch {
+    // Not known: it's saved with the name and artist given.
+  }
+  const video = await window.api.songYouTube(artist, title)
+  if (!video.exact) throw new Error(`Couldn’t find a YouTube video for “${title}” by ${artist}. Check the name, or try the Music page’s Search.`)
+  const id = await saveMp3(video.url, known)
+  if (!id) throw new Error('Orbit couldn’t start the download. Is a music folder set on the Music page?')
+  const done = await finished(id, 75_000)
+  if (!done) {
+    // Still going: the playlist gets it when it finishes.
+    if (playlist)
+      void finished(id, 15 * 60_000).then((p) => {
+        if (p?.stage === 'done' && p.path) void addDownloaded(p.path, playlist)
+      })
+    return `Downloading “${title}” by ${artist} from ${video.url}. It’s taking a while; it’ll be in their music${playlist ? ` and added to “${playlist}”` : ''} when it finishes.`
+  }
+  if (done.stage !== 'done' || !done.path) throw new Error(done.error ?? 'The download didn’t finish.')
+  const added = playlist ? ` ${await addDownloaded(done.path, playlist)}` : ''
+  return `Downloaded “${title}” by ${artist} (from ${video.url}) into their music as ${done.path}.${added}`
 }
 
 // ---------- Email ----------
@@ -335,9 +629,14 @@ const ANSWERS: Record<string, (args: Args) => string | Promise<string>> = {
   list_notes: listNotesFor,
   create_note: createNoteFor,
   add_to_note: addToNoteFor,
+  edit_note: editNoteFor,
+  rename_note: renameNoteFor,
+  move_note: moveNoteFor,
+  delete_note: deleteNoteFor,
   get_calendar: calendarFor,
   add_calendar_event: addEventFor,
   get_countdowns: countdownsFor,
+  add_countdown: addCountdownFor,
   get_money: moneyFor,
   get_flashcards: flashcardsFor,
   add_flashcards: addFlashcardsFor,
@@ -348,6 +647,13 @@ const ANSWERS: Record<string, (args: Args) => string | Promise<string>> = {
   get_now_playing: nowPlayingFor,
   control_music: controlMusicFor,
   play_music: playMusicFor,
+  list_playlists: listPlaylistsFor,
+  get_playlist: getPlaylistFor,
+  find_songs: findSongsFor,
+  suggest_songs: suggestSongsFor,
+  create_playlist: createPlaylistFor,
+  add_to_playlist: addToPlaylistFor,
+  download_song: downloadSongFor,
   search_email: emailFor
 }
 
