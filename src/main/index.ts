@@ -61,6 +61,7 @@ import { setupFileSend } from './fileSend'
 import { isAppPage, setupStudio } from './studio'
 import { applyReplayShortcut, clipResponse, setupClips } from './clips'
 import { setupLocalAi } from './localAi'
+import { setupTranscriber } from './transcriber'
 import { reloadSoundboard, setupSoundboard, soundboardFolder, soundFile } from './soundboard'
 import { macrosFolder, reloadMacros, setupMacros, teardownMacros } from './macros'
 import { setupKeyRemap, teardownKeyRemap } from './keyRemap'
@@ -1138,6 +1139,7 @@ app.whenReady().then(async () => {
   safely('big file sender', setupFileSend)
   safely('studio', setupStudio)
   safely('offline AI', setupLocalAi)
+  safely('transcripts', () => setupTranscriber((path) => currentVault().abs(path)))
   safely('soundboard', setupSoundboard)
   safely('soundboard from a link', setupSoundFromLink)
   safely('macros', setupMacros)

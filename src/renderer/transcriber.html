@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Orbit transcriber</title>
+    <!--
+      A hidden page that runs Whisper for auto transcripts (src/main/transcriber.ts). Unlike the app's
+      own pages it may run WebAssembly and fetch the model from Hugging Face; it has no access to
+      your notes or to anything in Orbit except the sound it's handed.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; connect-src 'self' blob: data: https://huggingface.co https://*.huggingface.co https://*.hf.co"
+    />
+  </head>
+  <body>
+    <script type="module" src="/transcriber/worker.ts"></script>
+  </body>
+</html>

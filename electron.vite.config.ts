@@ -14,7 +14,7 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()],
     resolve: { alias: shared },
     // index: the app's own windows. web: every web page (see src/preload/web.ts).
-    build: { rollupOptions: { input: { index: resolve(__dirname, 'src/preload/index.ts'), web: resolve(__dirname, 'src/preload/web.ts') } } }
+    build: { rollupOptions: { input: { index: resolve(__dirname, 'src/preload/index.ts'), web: resolve(__dirname, 'src/preload/web.ts'), transcriber: resolve(__dirname, 'src/preload/transcriber.ts') } } }
   },
   renderer: {
     plugins: [react()],
@@ -23,6 +23,8 @@ export default defineConfig({
         ...shared,
         '@renderer': resolve(__dirname, 'src/renderer/src')
       }
-    }
+    },
+    // index: the app. transcriber: the hidden page that runs Whisper for auto transcripts (main/transcriber.ts).
+    build: { rollupOptions: { input: { index: resolve(__dirname, 'src/renderer/index.html'), transcriber: resolve(__dirname, 'src/renderer/transcriber.html') } } }
   }
 })
