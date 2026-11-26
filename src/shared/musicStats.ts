@@ -10,7 +10,7 @@
  */
 
 import { guessFromName, type LocalSong } from './localMusic'
-import { HISTORY_LIMIT, monthKey, type MusicData } from './musicLibrary'
+import { HISTORY_LIMIT, monthKey, songsByPath, type MusicData } from './musicLibrary'
 
 export type StatsPeriod = 'week' | 'month' | 'year' | 'all'
 
@@ -156,7 +156,7 @@ function chartFor(kind: StatsPeriod, range: PeriodRange, data: MusicData): { bar
 /** How you listened in one week, month or year (`offset` periods back), or ever. */
 export function listeningStats(data: MusicData, songs: LocalSong[], kind: StatsPeriod, offset: number, now: number, weekStart = 1): ListeningStats {
   const range = periodRange(kind, offset, now, weekStart)
-  const byPath = new Map(songs.map((s) => [s.path, s]))
+  const byPath = songsByPath(songs)
   let counts: Map<string, number>
   if (kind === 'week') counts = countHistory(data, range.start, range.end)
   else if (kind === 'month') {

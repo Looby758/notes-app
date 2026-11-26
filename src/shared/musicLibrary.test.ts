@@ -9,10 +9,13 @@ import {
   HISTORY_LIMIT,
   likedSongs,
   mostPlayed,
+  musicPathKey,
   normalizeMusicData,
+  playlistSongs,
   queueMove,
   queuePlayNext,
   queueRemove,
+  respelledPaths,
   songsByPath,
   sortSongsBy,
   totalLength
@@ -199,5 +202,63 @@ describe('plays by month', () => {
     expect(applyMusicEdit(d, { kind: 'renamePaths', map: { a: 'b' } }).months).toEqual({ '2026-05': { b: 2 } })
     expect(applyMusicEdit(d, { kind: 'forgetSongs', paths: ['a'] }).months).toEqual({ '2026-05': { b: 1 } })
     expect(normalizeMusicData({ months: { nonsense: { a: 1 }, '2026-05': { a: 'x', b: 2 } } }).months).toEqual({ '2026-05': { b: 2 } })
+  })
+})
+
+describe('songs with accents or other spellings', () => {
+  // The same name, written two ways: "À" as one character (NFC), or "A" plus an accent mark (NFD, as Macs store file names).
+  const nfc = 'Clair Obscur/Une Vie À Peindre.mp3'.normalize('NFC')
+  const nfd = nfc.normalize('NFD')
+  const dakitiNfd = 'Bad Bunny/DÁKITI.mp3'.normalize('NFD')
+
+  it('the two spellings really are different strings', () => {
+    expect(nfc).not.toBe(nfd)
+    expect(musicPathKey(nfc)).toBe(musicPathKey(nfd))
+  })
+
+  it('finds a playlist song whose accent is stored the other way', () => {
+    const folder = [song(nfd, { title: 'Une Vie À Peindre' }), song(dakitiNfd, { title: 'DÁKITI' }), song('Plain.mp3')]
+    const playlist = { id: 'p', name: 'Main', songs: [nfc, 'Bad Bunny/DÁKITI.mp3'.normalize('NFC'), 'Plain.mp3', 'Gone.mp3'], created: 1, updated: 1 }
+    const rows = playlistSongs(playlist, songsByPath(folder))
+    expect(rows.map((r) => r.song?.title ?? null)).toEqual(['Une Vie À Peindre', 'DÁKITI', 'Plain.mp3', null])
+  })
+
+  it('matches whatever way round the spellings are, and other upper/lower case', () => {
+    const byPath = songsByPath([song(nfc)])
+    expect(byPath.get(nfd)?.path).toBe(nfc)
+    expect(byPath.get(nfc.toUpperCase())?.path).toBe(nfc)
+    expect(byPath.has(nfd)).toBe(true)
+    expect(byPath.hasExact(nfd)).toBe(false)
+  })
+
+  it('an exact match wins over a looser one', () => {
+    const byPath = songsByPath([song('Song.mp3', { title: 'upper' }), song('song.mp3', { title: 'lower' })])
+    expect(byPath.get('song.mp3')?.title).toBe('lower')
+    expect(byPath.get('Song.mp3')?.title).toBe('upper')
+  })
+
+  it('liked songs saved with the other spelling still show', () => {
+    const data = { ...emptyMusicData(), liked: { [nfc]: 1 } }
+    expect(likedSongs(data, songsByPath([song(nfd)])).map((s) => s.path)).toEqual([nfd])
+  })
+
+  it('moves saved paths over to the folder spelling', () => {
+    const data = {
+      ...emptyMusicData(),
+      playlists: [{ id: 'p', name: 'Main', songs: [nfc, 'Plain.mp3', 'Gone.mp3'], created: 1, updated: 1 }],
+      liked: { [nfc]: 5 },
+      stats: { [nfc]: { plays: 3 } }
+    }
+    const map = respelledPaths(data, [song(nfd), song('Plain.mp3')])
+    expect(map).toEqual({ [nfc]: nfd })
+    const fixed = applyMusicEdit(data, { kind: 'renamePaths', map })
+    expect(fixed.playlists[0].songs).toEqual([nfd, 'Plain.mp3', 'Gone.mp3'])
+    expect(fixed.liked).toEqual({ [nfd]: 5 })
+    expect(fixed.stats[nfd].plays).toBe(3)
+  })
+
+  it('has nothing to move when every spelling already matches', () => {
+    const data = { ...emptyMusicData(), playlists: [{ id: 'p', name: 'Main', songs: [nfd], created: 1, updated: 1 }] }
+    expect(respelledPaths(data, [song(nfd)])).toEqual({})
   })
 })

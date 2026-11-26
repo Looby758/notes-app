@@ -11,7 +11,7 @@
  */
 
 import type { LocalSong } from './localMusic'
-import type { MusicData } from './musicLibrary'
+import { songsByPath, type MusicData } from './musicLibrary'
 
 export interface Recommendation {
   song: LocalSong
@@ -149,7 +149,7 @@ export interface RecommendOptions {
 /** Songs from your music you'd probably like to hear now, best first, each with a reason. */
 export function recommendSongs(data: MusicData, songs: LocalSong[], { now, seed = 1, limit = 50 }: RecommendOptions): Recommendation[] {
   if (!songs.length) return []
-  const byPath = new Map(songs.map((s) => [s.path, s]))
+  const byPath = songsByPath(songs)
   const taste = learnTaste(data, byPath, now)
   const random = seeded(seed)
 
@@ -232,7 +232,7 @@ export interface LikeOptions {
 
 /** Songs that go with one song: same artist or album, same genre or tags, played next to it, a similar year. Doesn't include the song itself. */
 export function songsLike(seed: LocalSong, data: MusicData, songs: LocalSong[], { now, seed: randomSeed = 1, limit = 50, skip }: LikeOptions): LocalSong[] {
-  const byPath = new Map(songs.map((s) => [s.path, s]))
+  const byPath = songsByPath(songs)
   const taste = learnTaste(data, byPath, now)
   const random = seeded(randomSeed)
   const near = taste.together.get(seed.path)
@@ -269,7 +269,7 @@ export function songsLike(seed: LocalSong, data: MusicData, songs: LocalSong[], 
 
 /** The artists you play and like most (as they're written in your songs), with how much (0 to 1), for finding new music like theirs. */
 export function favouriteArtists(data: MusicData, songs: LocalSong[], now: number, limit = 6): { name: string; weight: number }[] {
-  const byPath = new Map(songs.map((s) => [s.path, s]))
+  const byPath = songsByPath(songs)
   const taste = learnTaste(data, byPath, now)
   const names = new Map<string, string>()
   for (const s of songs) if (s.artist && !names.has(artistKey(s))) names.set(artistKey(s), s.artist)

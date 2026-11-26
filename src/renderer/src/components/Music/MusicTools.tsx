@@ -3,7 +3,7 @@ import { create } from 'zustand'
 import { Check, Copy, FileText, Globe, ImagePlus, Music, Plus, Search, Tag, Wand2 } from 'lucide-react'
 import { canTag, duplicateGroups, filterSongs, guessFromName, localArtUrl, tidyMoves, type LocalSong, type SongTagPatch, type TidyLayout } from '@shared/localMusic'
 import { formatTime } from '@shared/spotify'
-import { allTags, cleanTag } from '@shared/musicLibrary'
+import { allTags, cleanTag, musicPathKey, songsByPath } from '@shared/musicLibrary'
 import { useLocalMusic } from '../../store/localMusic'
 import { addToPlaylist, tagSongs, useMusicData } from '../../store/musicData'
 import { editSongs, fillFromNames, keepOne, moveSongs, relink, setCover } from '../../store/musicFiles'
@@ -83,7 +83,7 @@ function EditDetails({ songs: given }: { songs: LocalSong[] }) {
   const library = useLocalMusic((s) => s.library)
   // The songs as they are now (after a cover or a fill-in, their details change).
   const songs = useMemo(() => {
-    const byPath = new Map((library?.songs ?? []).map((s) => [s.path, s]))
+    const byPath = songsByPath(library?.songs ?? [])
     return given.map((s) => byPath.get(s.path) ?? s)
   }, [given, library])
   const many = songs.length > 1
@@ -388,10 +388,13 @@ function AddSongs({ playlistId }: { playlistId: string }) {
   // Kept by file path: the library is read again when a song is added to the folder, and that mustn't lose your ticks.
   const [pickedPaths, setPickedPaths] = useState<string[]>([])
   const picked = useMemo(() => {
-    const byPath = new Map(songs.map((s) => [s.path, s]))
+    const byPath = songsByPath(songs)
     return pickedPaths.map((p) => byPath.get(p)).filter((s): s is LocalSong => !!s)
   }, [songs, pickedPaths])
-  const inList = useMemo(() => new Set(playlist?.songs ?? []), [playlist])
+  const inList = useMemo(() => {
+    const keys = new Set((playlist?.songs ?? []).map(musicPathKey))
+    return { has: (path: string) => keys.has(musicPathKey(path)) }
+  }, [playlist])
   const shown = useMemo(() => {
     const found = query.trim() ? filterSongs(songs, query) : [...songs].sort((a, b) => a.title.localeCompare(b.title))
     return found.slice(0, 300)
