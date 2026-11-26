@@ -24,13 +24,44 @@ interface Saved {
   songs?: Cached[]
   /** What was read from each file changes now and then (year and genre were added); older lists are read again. */
   v?: number
+  /** The folder `songs` were last read from. */
+  scanned?: string
 }
 
 const CACHE_VERSION = 2
 
 const file = (): string => join(app.getPath('userData'), 'local-music.json')
 let saved: Saved | null = null
-let scanning: Promise<LocalLibrary> | null = null
+
+// A folder in Google Drive, iCloud or on a network drive can stop answering (Drive signed out or
+// still starting, the Mac just woke up, a file that's only in the cloud). Every look in the folder
+// gives up after a while, so one stuck file or folder can't leave the Music page waiting for ever.
+/** How long one folder listing or file may take. */
+const LIST_WAIT = 15_000
+const READ_WAIT = 20_000
+/** After this, files not read yet keep what was read last time instead of being read now. */
+const SCAN_BUDGET = 90_000
+/** How long the page waits for a look through the folder before showing the songs from last time. */
+const ANSWER_WAIT = 6_000
+
+/** `p`'s answer, or `fallback` if it takes longer than `ms` (the work itself carries on). */
+export function within<T, F>(p: Promise<T>, ms: number, fallback: F): Promise<T | F> {
+  return new Promise((resolveIt, rejectIt) => {
+    const timer = setTimeout(() => resolveIt(fallback), ms)
+    p.then(
+      (v) => {
+        clearTimeout(timer)
+        resolveIt(v)
+      },
+      (err) => {
+        clearTimeout(timer)
+        rejectIt(err)
+      }
+    )
+  })
+}
+
+class FolderNotAnswering extends Error {}
 
 function load(): Saved {
   if (saved) return saved
@@ -74,15 +105,25 @@ export function musicFile(path: string): string | null {
   return inside && !inside.startsWith('..') && !isAbsolute(inside) ? full : null
 }
 
-/** Every music file under the folder (skipping hidden folders), up to the limit. */
-async function findFiles(folder: string): Promise<{ files: string[]; truncated: boolean }> {
+/**
+ * Every music file under the folder (skipping hidden folders), up to the limit. `stuck` are folders
+ * that didn't answer in time (as paths inside the music folder), so their songs from last time are kept.
+ */
+async function findFiles(folder: string): Promise<{ files: string[]; truncated: boolean; stuck: string[] }> {
   const files: string[] = []
+  const stuck: string[] = []
   const walk = async (dir: string, depth: number): Promise<void> => {
     if (depth > 12 || files.length >= LOCAL_LIMIT) return
     let entries
     try {
-      entries = await readdir(dir, { withFileTypes: true })
+      entries = await within(readdir(dir, { withFileTypes: true }), LIST_WAIT, null)
     } catch {
+      return
+    }
+    if (!entries) {
+      if (dir === folder) throw new FolderNotAnswering(`Your music folder (${folder}) isn’t answering. If it’s in Google Drive or iCloud, check that it’s running and signed in, then press Try again.`)
+      logError('reading the music folder', new Error(`${dir} didn’t answer in time`))
+      stuck.push(relative(folder, dir).split(sep).join('/'))
       return
     }
     for (const e of entries) {
@@ -94,7 +135,13 @@ async function findFiles(folder: string): Promise<{ files: string[]; truncated: 
     }
   }
   await walk(folder, 0)
-  return { files, truncated: files.length >= LOCAL_LIMIT }
+  return { files, truncated: files.length >= LOCAL_LIMIT, stuck }
+}
+
+/** A song's details from its file name alone. */
+function guessSong(path: string): LocalSong {
+  const guess = guessFromName(path)
+  return { path, title: guess.title, artist: guess.artist, album: '', track: guess.track, durationMs: 0, art: false }
 }
 
 async function readSong(full: string, path: string): Promise<LocalSong> {
@@ -117,44 +164,114 @@ async function readSong(full: string, path: string): Promise<LocalSong> {
   }
 }
 
+const toLibrary = (folder: string, songs: Cached[], truncated?: boolean): LocalLibrary => ({
+  folder,
+  songs: sortSongs(songs.map(({ mtime, size: _s, ...song }) => ({ ...song, added: Math.round(mtime) }))),
+  truncated
+})
+
+/** What was read from `folder` last time (kept in local-music.json), if anything. */
+function lastTime(folder: string): Cached[] | null {
+  const s = load()
+  if (s.v !== CACHE_VERSION || !s.songs?.length) return null
+  // Lists saved before `scanned` was kept were read from the folder chosen then.
+  const from = s.scanned ?? (s.folder ?? app.getPath('music'))
+  return from === folder ? s.songs : null
+}
+
 /** Looks through the folder, reading only files that are new or changed since last time. */
-async function scan(): Promise<LocalLibrary> {
-  const folder = musicFolder()
+async function scan(folder: string | null): Promise<LocalLibrary> {
   if (!folder) return { folder: null, songs: [] }
+  const started = Date.now()
   const s = load()
   const known = new Map((s.v === CACHE_VERSION ? (s.songs ?? []) : []).map((c) => [c.path, c]))
-  const { files, truncated } = await findFiles(folder)
+  const { files, truncated, stuck } = await findFiles(folder)
   const songs: Cached[] = []
+  const seen = new Set<string>()
   for (const full of files) {
     const path = relative(folder, full).split(sep).join('/')
+    seen.add(path)
+    const old = known.get(path)
+    // Out of time: keep what was read last time, and read the rest on the next look.
+    if (Date.now() - started > SCAN_BUDGET) {
+      songs.push(old ?? { ...guessSong(path), mtime: 0, size: -1 })
+      continue
+    }
     let info
     try {
-      info = await stat(full)
+      info = await within(stat(full), READ_WAIT, null)
     } catch {
       continue
     }
-    const old = known.get(path)
-    if (old && old.mtime === info.mtimeMs && old.size === info.size) songs.push(old)
-    else songs.push({ ...(await readSong(full, path)), mtime: info.mtimeMs, size: info.size })
+    if (!info) {
+      if (old) songs.push(old)
+      continue
+    }
+    if (old && old.mtime === info.mtimeMs && old.size === info.size) {
+      songs.push(old)
+      continue
+    }
+    const read = await within(readSong(full, path), READ_WAIT, null)
+    // A file that's only in the cloud and slow to come down: its name for now, read again next time.
+    if (read) songs.push({ ...read, mtime: info.mtimeMs, size: info.size })
+    else songs.push(old ?? { ...guessSong(path), mtime: 0, size: -1 })
+  }
+  // Songs in folders that didn't answer this time are still there, as far as anyone knows.
+  for (const dir of stuck) {
+    for (const old of known.values()) if (!seen.has(old.path) && old.path.startsWith(`${dir}/`)) songs.push(old)
   }
   s.songs = songs
   s.v = CACHE_VERSION
+  s.scanned = folder
   try {
     store()
   } catch (err) {
     logError('saving local-music.json', err)
   }
-  return { folder, songs: sortSongs(songs.map(({ mtime, size: _s, ...song }) => ({ ...song, added: Math.round(mtime) }))), truncated }
+  return toLibrary(folder, songs, truncated)
 }
 
 /** Your songs; `fresh` looks through the folder again even if it was read already this session. */
 let last: LocalLibrary | null = null
+/** The look through the folder going on now; `early` is set once someone was given last time's songs instead. */
+let scanning: { folder: string | null; done: Promise<LocalLibrary>; early: boolean } | null = null
+
+const withChosen = (lib: LocalLibrary): LocalLibrary => ({ ...lib, chosen: typeof load().folder === 'string' })
+
 export async function library(fresh = false): Promise<LocalLibrary> {
-  if (last && !fresh && last.folder === musicFolder()) return last
-  scanning ??= scan().finally(() => (scanning = null))
-  last = await scanning
-  watch(last.folder)
-  return { ...last, chosen: typeof load().folder === 'string' }
+  const folder = musicFolder()
+  if (last && !fresh && last.folder === folder) return withChosen(last)
+  // A look through another folder (you just chose a new one) doesn't answer for this one.
+  if (!scanning || scanning.folder !== folder) {
+    const run: { folder: string | null; done: Promise<LocalLibrary>; early: boolean } = { folder, done: scan(folder), early: false }
+    scanning = run
+    run.done.then(
+      (lib) => {
+        if (scanning !== run) return
+        scanning = null
+        last = lib
+        watch(lib.folder)
+        // The page was shown last time's songs: now it gets the real list.
+        if (run.early) for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send('localMusic:changed', withChosen(lib))
+      },
+      (err) => {
+        if (scanning === run) scanning = null
+        logError('reading the music folder', err)
+      }
+    )
+  }
+  const run = scanning
+  const before = folder ? lastTime(folder) : null
+  if (!before) return withChosen(await run.done)
+  // A slow folder: show the songs from last time now, and the fresh list when it's ready.
+  const lib = await within(run.done, ANSWER_WAIT, null).catch((err) => {
+    if (err instanceof FolderNotAnswering) return null
+    throw err
+  })
+  if (lib) return withChosen(lib)
+  run.early = true
+  watch(folder)
+  return withChosen(toLibrary(folder!, before))
 }
 
 /** Reads the folder again and tells every window (after a song is added, changed or removed). */
