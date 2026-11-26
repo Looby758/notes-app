@@ -66,6 +66,7 @@ import {
   mostPlayed,
   playlistSongs,
   recentlyAdded,
+  respelledPaths,
   songsByPath,
   songsWithTag,
   allTags,
@@ -93,6 +94,7 @@ import {
   deletePlaylist,
   isLiked,
   moveInPlaylist,
+  movePaths,
   rateSong,
   removeFromPlaylist,
   renamePlaylist,
@@ -293,16 +295,27 @@ function Sidebar({ view, setView, folder, loading, onSaveLink, linkOpen }: { vie
   const data = useMusicData((s) => s.data)
   const songs = useLocalMusic((s) => s.library?.songs)
   // Only songs still in your music count (one deleted outside Orbit keeps its like, in case it comes back).
-  const present = useMemo(() => new Set((songs ?? []).map((s) => s.path)), [songs])
+  const present = useMemo(() => songsByPath(songs ?? []), [songs])
   const tags = useMemo(() => allTags(data, present), [data, present])
   const likedCount = useMemo(() => Object.keys(data.liked).filter((p) => present.has(p)).length, [data, present])
+  // A song saved under another spelling of its name (an accent stored differently, or other upper/lower
+  // case) is moved over to the folder's spelling, so its likes, plays and playlist spots all line up.
+  const dataLoaded = useMusicData((s) => s.loaded)
+  const respelled = useRef('')
+  useEffect(() => {
+    if (!dataLoaded || !songs?.length) return
+    const map = respelledPaths(data, songs)
+    const key = JSON.stringify(map)
+    if (key === '{}' || key === respelled.current) return
+    respelled.current = key
+    void movePaths(map)
+  }, [data, songs, dataLoaded])
   const [dropOn, setDropOn] = useState<string | null>(null)
   // "What's this song?" is its own add-on.
   const songIdOn = useAddonOn('songid')
   const [listMenu, setListMenu] = useState<{ x: number; y: number; playlist: MusicPlaylist } | null>(null)
   const listSongs = (p: MusicPlaylist): LocalSong[] => {
-    const byPath = new Map((songs ?? []).map((s) => [s.path, s]))
-    return p.songs.map((path) => byPath.get(path)).filter((s): s is LocalSong => !!s)
+    return p.songs.map((path) => present.get(path)).filter((s): s is LocalSong => !!s)
   }
   const item = (v: View, icon: React.ReactNode, label: string, extra?: string) => (
     <button className={`mp-nav-item ${sameView(view, v) ? 'active' : ''}`} onClick={() => setView(v)} data-mp-nav={v.kind}>

@@ -4,7 +4,7 @@ import { nextRepeat, type MusicRepeat, type MusicState } from '@shared/spotify'
 import { errorMessage } from '../lib/paths'
 import { unloadMedia } from '../lib/media'
 import { useMusic } from './music'
-import { queueMove, queuePlayNext, queueRemove } from '@shared/musicLibrary'
+import { queueMove, queuePlayNext, queueRemove, songsByPath } from '@shared/musicLibrary'
 import { recordPlay } from './musicData'
 import { usePrefs } from './prefs'
 import { activeGains, EQ_BANDS, fadeCurve, fadeLength, shouldCrossfade, type MusicEq } from '@shared/musicSound'
@@ -48,7 +48,7 @@ let listening = false
  * get their new details too; `moved` says which files now have another path.
  */
 export function applyLibrary(library: LocalLibrary, moved: Record<string, string> = {}): void {
-  const byPath = new Map(library.songs.map((s) => [s.path, s]))
+  const byPath = songsByPath(library.songs)
   const fresh = (s: LocalSong): LocalSong => byPath.get(moved[s.path] ?? s.path) ?? s
   const { queue, index } = useLocalMusic.getState()
   const playingPath = queue[index]?.path
@@ -693,7 +693,7 @@ export async function resumeLastSession(): Promise<void> {
   }
   if (!saved || !Array.isArray(saved.queue) || !saved.queue.length || useMusic.getState().local) return
   if (!useLocalMusic.getState().library) await loadLocalLibrary()
-  const byPath = new Map((useLocalMusic.getState().library?.songs ?? []).map((s) => [s.path, s]))
+  const byPath = songsByPath(useLocalMusic.getState().library?.songs ?? [])
   const songs = saved.queue.map((p) => byPath.get(p)).filter((s): s is LocalSong => !!s)
   const playing = byPath.get(saved.queue[saved.index] ?? '')
   const index = playing ? songs.indexOf(playing) : -1

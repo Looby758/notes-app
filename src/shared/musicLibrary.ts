@@ -272,7 +272,7 @@ function renamePaths(data: MusicData, map: Record<string, string>): MusicData {
 }
 
 /** Every tag you've used, most used first (only on songs in `present`, when given). */
-export function allTags(data: MusicData, present?: Set<string>): { tag: string; count: number }[] {
+export function allTags(data: MusicData, present?: { has: (path: string) => boolean }): { tag: string; count: number }[] {
   const counts = new Map<string, number>()
   for (const [path, list] of Object.entries(data.tags ?? {})) {
     if (present && !present.has(path)) continue
@@ -353,9 +353,83 @@ export function sortSongsBy(songs: LocalSong[], by: SongSort, desc: boolean, sta
   return [...songs].sort((a, b) => sign * cmp[by](a, b) || base(a, b))
 }
 
+/**
+ * A path as a matching key. The same name can be spelled with different bytes: "À" can be one
+ * character (NFC) or "A" plus an accent mark (NFD, how Macs often store file names), and Mac and
+ * Windows folders don't care about upper or lower case. So "Une Vie À Peindre.mp3" saved in a
+ * playlist is the same file as the folder's decomposed spelling of it.
+ */
+export function musicPathKey(path: string): string {
+  return path.normalize('NFC').toLowerCase()
+}
+
+/**
+ * Your songs by path. An exact match wins; otherwise a path spelled differently (accents written
+ * another way, or other upper/lower case) still finds its song.
+ */
+export class SongIndex extends Map<string, LocalSong> {
+  private loose = new Map<string, LocalSong>()
+  override set(path: string, song: LocalSong): this {
+    super.set(path, song)
+    const key = musicPathKey(path)
+    if (!this.loose.has(key)) this.loose.set(key, song)
+    return this
+  }
+  override get(path: string): LocalSong | undefined {
+    return super.get(path) ?? this.loose.get(musicPathKey(path))
+  }
+  /** Whether this exact spelling is a song's path. */
+  hasExact(path: string): boolean {
+    return super.has(path)
+  }
+  override has(path: string): boolean {
+    return super.has(path) || this.loose.has(musicPathKey(path))
+  }
+  override delete(path: string): boolean {
+    const had = super.delete(path)
+    if (had) {
+      const key = musicPathKey(path)
+      this.loose.delete(key)
+      for (const [p, s] of this) if (musicPathKey(p) === key && !this.loose.has(key)) this.loose.set(key, s)
+    }
+    return had
+  }
+  override clear(): void {
+    super.clear()
+    this.loose.clear()
+  }
+}
+
 /** Your songs looked up by path (for playlists, liked and history, which store paths). */
-export function songsByPath(songs: LocalSong[]): Map<string, LocalSong> {
-  return new Map(songs.map((s) => [s.path, s]))
+export function songsByPath(songs: LocalSong[]): SongIndex {
+  const index = new SongIndex()
+  for (const s of songs) index.set(s.path, s)
+  return index
+}
+
+/**
+ * Saved paths (playlists, likes, plays, ratings, tags) that are a song in the folder spelled
+ * another way: saved path → the folder's spelling. Fed to a `renamePaths` edit so everything
+ * about the song uses the folder's own spelling from then on.
+ */
+export function respelledPaths(data: MusicData, songs: LocalSong[]): Record<string, string> {
+  const index = songsByPath(songs)
+  const saved = new Set<string>([
+    ...data.playlists.flatMap((p) => p.songs),
+    ...Object.keys(data.liked),
+    ...Object.keys(data.ratings),
+    ...Object.keys(data.stats),
+    ...Object.keys(data.tags ?? {}),
+    ...data.history.map((h) => h.path),
+    ...Object.values(data.months ?? {}).flatMap((m) => Object.keys(m))
+  ])
+  const map: Record<string, string> = {}
+  for (const path of saved) {
+    if (index.hasExact(path)) continue
+    const song = index.get(path)
+    if (song && song.path !== path) map[path] = song.path
+  }
+  return map
 }
 
 /** A playlist's songs that are still in the folder, with where each is in the playlist. */
