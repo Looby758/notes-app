@@ -169,6 +169,14 @@ export default function MusicPage() {
   const library = useLocalMusic((s) => s.library)
   const loading = useLocalMusic((s) => s.loading)
   const error = useLocalMusic((s) => s.error)
+  // Still looking after a while: say so, and let you try again or pick another folder.
+  const [slow, setSlow] = useState(false)
+  useEffect(() => {
+    if (library) return
+    setSlow(false)
+    const timer = setTimeout(() => setSlow(true), 12_000)
+    return () => clearTimeout(timer)
+  }, [library, loading])
   const [view, setViewState] = useState<View>(savedView)
   const [filesOver, setFilesOver] = useState(false)
   const [linkOpen, setLinkOpen] = useState(false)
@@ -208,7 +216,23 @@ export default function MusicPage() {
     })()
   }, [])
 
-  if (!library) return <div className="mp-page mp-center">{error ?? 'Looking for your music…'}</div>
+  if (!library) {
+    if (!error && !slow) return <div className="mp-page mp-center">Looking for your music…</div>
+    return (
+      <div className="mp-page mp-center" data-music-page-stuck>
+        <Music size={40} />
+        <p>{error ?? 'Still looking for your music. If your music folder is in Google Drive or iCloud, check that it’s running and signed in.'}</p>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-primary" disabled={loading && !slow} onClick={() => void loadLocalLibrary(true)} data-music-page-retry>
+            Try again
+          </button>
+          <button className="btn" onClick={() => void loadLocalLibrary(true, true)}>
+            <FolderOpen size={14} /> Choose another folder
+          </button>
+        </div>
+      </div>
+    )
+  }
   if (!library.folder) {
     return (
       <div className="mp-page mp-center" data-music-page>
