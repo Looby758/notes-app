@@ -813,10 +813,16 @@ export function searchItems(items: Record<string, SbItem>, query: string, limit 
 /** How long a Hypixel developer key lasts. */
 export const DEV_KEY_DAYS = 3
 
+/** How long a developer key has left in ms (0 or less once it's run out), or null for a Personal key or none. */
+export function keyTimeLeft(savedAt: number | null, personal: boolean, now: number): number | null {
+  if (!savedAt || personal) return null
+  return savedAt + DEV_KEY_DAYS * 86_400_000 - now
+}
+
 /** A warning for a developer key that's about to run out (a day before), or has. */
 export function keyWarning(savedAt: number | null, personal: boolean, now: number): string {
-  if (!savedAt || personal) return ''
-  const left = savedAt + DEV_KEY_DAYS * 86_400_000 - now
+  const left = keyTimeLeft(savedAt, personal, now)
+  if (left === null) return ''
   if (left <= 0) return 'Your Hypixel developer key has probably run out (they last 3 days). Make a new one on developer.hypixel.net and paste it on the Games page → SkyBlock.'
   if (left <= 86_400_000) return `Your Hypixel developer key runs out in about ${describeHours(left / 3_600_000)}. Make a new one on developer.hypixel.net and paste it on the Games page → SkyBlock.`
   return ''

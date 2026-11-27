@@ -102,6 +102,8 @@ export interface SkyblockStatus {
   finishing: boolean
   /** The last thing that went wrong talking to Hypixel, if anything. */
   problem: string
+  /** Hypixel turned the saved key down (403), so a new one has to be pasted. */
+  keyRejected: boolean
 }
 
 // ---------- reading the API ----------
