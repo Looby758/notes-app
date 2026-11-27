@@ -133,7 +133,8 @@ function status(): SkyblockStatus {
     logFolder: s.logFolder,
     session: s.current ? { start: s.current.start, startedLate: s.current.startedLate } : null,
     finishing: s.pending.some((p) => !p.shown),
-    problem
+    problem,
+    keyRejected: problem === KEY_REJECTED
   }
 }
 
@@ -164,6 +165,8 @@ export const skyblockProblem = (message: string): void => {
 
 export class KeyRejected extends Error {}
 
+const KEY_REJECTED = 'Hypixel didn’t accept your API key. Keys from the developer dashboard stop working after 3 days: make a new one (or apply for a Personal key that lasts) and paste it on the Games page → SkyBlock.'
+
 export async function hypixel(path: string, apiKey: string | null): Promise<unknown> {
   let res: Response
   try {
@@ -172,7 +175,7 @@ export async function hypixel(path: string, apiKey: string | null): Promise<unkn
     throw new Error('Couldn’t reach Hypixel. Check the internet connection.')
   }
   if (res.status === 403) {
-    throw new KeyRejected('Hypixel didn’t accept your API key. Keys from the developer dashboard stop working after 3 days: make a new one (or apply for a Personal key that lasts) and paste it on the Games page → SkyBlock.')
+    throw new KeyRejected(KEY_REJECTED)
   }
   if (res.status === 429) throw new Error('Hypixel says too many requests right now. Orbit will try again.')
   if (!res.ok) throw new Error(`Hypixel answered ${res.status}. Orbit will try again.`)

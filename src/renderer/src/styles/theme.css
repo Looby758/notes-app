@@ -3077,6 +3077,7 @@ body.capture-window {
   color: var(--text-muted);
 }
 .cal-client input,
+.sb-key-fix-row input,
 .cal-feed-form input {
   height: 32px;
   padding: 0 10px;
@@ -3088,6 +3089,7 @@ body.capture-window {
   user-select: text;
 }
 .cal-client input:focus,
+.sb-key-fix-row input:focus,
 .cal-feed-form input:focus {
   outline: none;
   border-color: var(--accent);
@@ -25050,4 +25052,25 @@ img.tm-icon {
   height: 100%;
   background: var(--accent);
   transition: width 0.4s ease;
+}
+
+/* Games page → SkyBlock: the box to paste a new Hypixel key, right under the "key ran out" message */
+.sb-key-fix {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.sb-key-fix .setting-warning {
+  margin: 0;
+}
+.sb-key-fix-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sb-key-fix-row input {
+  flex: 1 1 260px;
+  min-width: 0;
 }

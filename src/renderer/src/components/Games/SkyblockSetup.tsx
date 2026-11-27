@@ -5,7 +5,7 @@ import { SYSTEM_NAME } from '@shared/platform'
 import { errorMessage } from '../../lib/paths'
 import { showSkyblockSummary } from './SkyblockCard'
 import { openSpecialTab, SKYBLOCK_GOALS_TAB } from '../../lib/editorController'
-import { keyWarning } from '@shared/skyblockGoals'
+import { describeHours, keyTimeLeft } from '@shared/skyblockGoals'
 import SkyblockAddonCard from './SkyblockAddonCard'
 import { useSkyblockAddon } from './SkyblockPic'
 
@@ -70,6 +70,21 @@ function SkyblockSetup() {
 
   if (!status) return null
   const ready = status.hasKey && !!status.uuid && !editing
+  // When the key has been turned down or is about to run out, the box to paste a new one sits right under the message.
+  const left = keyTimeLeft(status.keySavedAt, status.personalKey, Date.now())
+  const keyTrouble = !ready
+    ? ''
+    : status.keyRejected
+      ? 'Hypixel didn’t accept your API key. Keys from the developer dashboard stop working after 3 days, so make a new one and paste it here.'
+      : left !== null && left <= 0
+        ? 'Your Hypixel developer key has probably run out (they last 3 days). Make a new one and paste it here.'
+        : left !== null && left <= 86_400_000
+          ? `Your Hypixel developer key runs out in about ${describeHours(left / 3_600_000)}. Make a new one and paste it here.`
+          : ''
+  const saveNewKey = (): Promise<void> => run(() => window.api.skyblockSetup({ key, player: status.player }))
+  // One message per problem, even when the same one comes back from several places.
+  const warnings = [...new Set([keyTrouble ? '' : status.problem, !status.canEncrypt ? 'This computer can’t encrypt the key, so it can’t be saved.' : '', keyTrouble ? '' : (error ?? '')])].filter(Boolean)
+  const keyFixError = error?.startsWith('Hypixel didn’t accept') ? 'Hypixel didn’t accept that key either. Check you copied all of it, or make another one.' : error
 
   return (
     <div className="games-covers sb-setup" data-skyblock-setup>
@@ -225,10 +240,35 @@ function SkyblockSetup() {
         </>
       )}
 
-      {ready && keyWarning(status.keySavedAt, status.personalKey, Date.now()) && <p className="setting-warning">{keyWarning(status.keySavedAt, status.personalKey, Date.now())}</p>}
-      {status.problem && <p className="setting-warning">{status.problem}</p>}
-      {!status.canEncrypt && <p className="setting-warning">This computer can’t encrypt the key, so it can’t be saved.</p>}
-      {error && <p className="setting-warning">{error}</p>}
+      {keyTrouble && (
+        <div className="sb-key-fix" data-skyblock-key-fix>
+          <p className="setting-warning">{keyTrouble}</p>
+          <div className="sb-key-fix-row">
+            <button className="btn" onClick={() => window.open('https://developer.hypixel.net/dashboard')}>
+              <ExternalLink size={12} /> Get a new key
+            </button>
+            <input
+              type="password"
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              spellCheck={false}
+              placeholder="Paste your new Hypixel API key"
+              aria-label="New Hypixel API key"
+              data-skyblock-new-key
+              onKeyDown={(e) => e.key === 'Enter' && key.trim() && void saveNewKey()}
+            />
+            <button className="btn btn-primary" disabled={busy || !key.trim() || !status.canEncrypt} onClick={() => void saveNewKey()} data-skyblock-save-new-key>
+              <KeyRound size={13} /> {busy ? 'Checking…' : 'Save key'}
+            </button>
+          </div>
+          {keyFixError && <p className="setting-warning">{keyFixError}</p>}
+        </div>
+      )}
+      {warnings.map((w) => (
+        <p key={w} className="setting-warning">
+          {w}
+        </p>
+      ))}
 
       {sessions.length > 0 && (
         <div className="sb-past" data-skyblock-sessions>
