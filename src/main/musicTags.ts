@@ -7,6 +7,8 @@ import { parseFile } from 'music-metadata'
 import { canTag, guessFromName, LOCAL_AUDIO, safeName, type LocalLibrary, type SongTagPatch } from '@shared/localMusic'
 import { musicFile, musicFolder, refreshLibrary } from './localMusic'
 import { logError } from './log'
+import { execFile } from 'child_process'
+import { downloadFfmpeg, ffmpegPath } from './ffmpeg'
 
 /**
  * Changing your music files from the Music page (plan part 3): song details and covers written into
@@ -243,6 +245,42 @@ async function trashSongs(paths: string[]): Promise<LocalLibrary> {
   return refreshLibrary(true)
 }
 
+/**
+ * Cuts a song down to the part from `start` to `end` (seconds), in place. ffmpeg copies the sound
+ * as it is (no re-encoding, so nothing is lost) along with its details and cover. The original goes
+ * to the Recycle Bin / Bin, so a trim can still be undone by hand.
+ */
+async function trimSong(path: string, start: number, end: number): Promise<LocalLibrary> {
+  const full = inFolder(path)
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end - start < 0.1) throw new Error('Pick at least a moment of the song to keep.')
+  const ffmpeg = existsSync(ffmpegPath()) ? ffmpegPath() : (await downloadFfmpeg(), existsSync(ffmpegPath()) ? ffmpegPath() : null)
+  if (!ffmpeg) throw new Error('Trimming needs ffmpeg, the free sound and video tool, and it couldn’t be downloaded. Try again in a moment.')
+  const ext = extname(full)
+  const tmp = `${full.slice(0, -ext.length)}.orbit-trim${ext}`
+  // Seeking before -i jumps straight there (exact to the frame when copying), and -t is how long to keep.
+  const args = ['-y', '-hide_banner', '-loglevel', 'error', '-ss', start.toFixed(3), '-i', full, '-t', (end - start).toFixed(3), '-map', '0', '-c', 'copy', '-map_metadata', '0']
+  if (ext.toLowerCase() === '.mp3') args.push('-id3v2_version', '3', '-write_xing', '1')
+  args.push(tmp)
+  try {
+    await new Promise<void>((resolve, reject) =>
+      execFile(ffmpeg, args, { windowsHide: true, timeout: 120_000 }, (err, _out, stderr) => (err ? reject(new Error(stderr.trim().split('\n').pop() || err.message)) : resolve()))
+    )
+    if (!existsSync(tmp) || (await stat(tmp)).size < 1024) throw new Error('The trimmed song came out empty.')
+    // Make sure an MP3 keeps every detail and its cover, whatever ffmpeg carried over.
+    if (canTag(full)) {
+      const tags = NodeID3.read(full, { noRaw: true })
+      if (Object.keys(tags).length && NodeID3.write(tags, tmp) !== true) throw new Error('Its details couldn’t be copied over.')
+    }
+    await shell.trashItem(full)
+    await rename(tmp, full)
+  } catch (err) {
+    logError('trimming a song', err)
+    if (existsSync(tmp)) await shell.trashItem(tmp).catch(() => undefined)
+    throw new Error(`Couldn’t trim “${basename(full)}”. ${err instanceof Error ? err.message : String(err)}`)
+  }
+  return refreshLibrary(true)
+}
+
 /** Sound quality and size of each song, to suggest which copy to keep. */
 async function quality(paths: string[]): Promise<Record<string, { bitrate: number; size: number }>> {
   const out: Record<string, { bitrate: number; size: number }> = {}
@@ -266,6 +304,7 @@ export function setupMusicTags(): void {
   ipcMain.handle('musicTags:setCover', (_e, paths: string[], source: { file?: string; url?: string }) => setCover(strings(paths), { file: source?.file ? String(source.file) : undefined, url: source?.url ? String(source.url) : undefined }))
   ipcMain.handle('musicTags:findCovers', (_e, artist: string, album: string) => findCovers(String(artist ?? ''), String(album ?? '')))
   ipcMain.handle('musicTags:chooseImage', (e) => chooseImage(e))
+  ipcMain.handle('musicTags:trim', (_e, path: string, start: number, end: number) => trimSong(String(path), Number(start), Number(end)))
   ipcMain.handle('localMusic:import', (_e, files: string[]) => importFiles(strings(files)))
   ipcMain.handle('localMusic:chooseImport', (e) => chooseImport(e))
   ipcMain.handle('localMusic:move', (_e, moves: { from: string; to: string }[]) => moveFiles(Array.isArray(moves) ? moves.filter((m) => m && typeof m.from === 'string' && typeof m.to === 'string') : []))

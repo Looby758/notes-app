@@ -88,6 +88,7 @@ import { shelveComicFile } from '../../store/comics'
 import { useFilesReveal } from '../../store/filesReveal'
 import { notify } from '../../store/notify'
 import { openInPdfEditor } from '../../store/pdfEditor'
+import { openInAudioEditor } from '../../store/audioEditor'
 import { FilePen } from 'lucide-react'
 import ContextMenu, { type MenuItem } from '../ContextMenu'
 import FileIcon from '../FileIcon'
@@ -1579,6 +1580,11 @@ function Preview({
         {kind === 'pdf' && (
           <button className="btn" onClick={() => void openInPdfEditor(entry.name, url).catch(notify)} title="Sign it, fill it in, or change its pages" data-explorer-edit-pdf>
             <FilePen size={13} /> Edit PDF
+          </button>
+        )}
+        {kind === 'audio' && addonOn('audio-editor') && (
+          <button className="btn" onClick={() => void openInAudioEditor(entry.name, url).catch(notify)} title="Cut it down to the part you want" data-explorer-trim-audio>
+            <Scissors size={13} /> Trim audio
           </button>
         )}
         <button className="btn" onClick={() => window.api.explorerReveal(entry.path).catch(notify)}>

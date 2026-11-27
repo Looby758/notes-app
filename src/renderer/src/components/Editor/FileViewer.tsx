@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ExternalLink, FilePen, FileText, Film, FolderSearch, Pencil, SquarePen } from 'lucide-react'
+import { ExternalLink, FilePen, FileText, Film, FolderSearch, Pencil, Scissors, SquarePen } from 'lucide-react'
 import { openInPdfEditor } from '../../store/pdfEditor'
+import { openInAudioEditor } from '../../store/audioEditor'
 import { notify } from '../../store/notify'
 import { fileKind, openExternally, vaultUrl } from '../../lib/fileKinds'
 import { openNote } from '../../lib/editorController'
@@ -80,6 +81,11 @@ export default function FileViewer({ path }: { path: string }) {
         {kind === 'pdf' && addonOn('pdf-editor') && (
           <button className="btn btn-primary" onClick={() => void openInPdfEditor(name, vaultUrl(path)).catch(notify)} title="Sign it, fill it in, or change its pages" data-edit-pdf>
             <FilePen size={13} /> Edit PDF
+          </button>
+        )}
+        {kind === 'audio' && addonOn('audio-editor') && (
+          <button className="btn btn-primary" onClick={() => void openInAudioEditor(name, vaultUrl(path)).catch(notify)} title="Cut it down to the part you want" data-trim-audio>
+            <Scissors size={13} /> Trim audio
           </button>
         )}
         {kind === 'video' && addonOn('video-player') && (

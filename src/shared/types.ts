@@ -1270,6 +1270,8 @@ export interface NotesApi {
   musicTagsFindCovers(artist: string, album: string): Promise<{ url: string; album: string; artist: string }[]>
   /** Asks for a picture file; null if cancelled. */
   musicTagsChooseImage(): Promise<string | null>
+  /** Cuts a song in the music folder down to `start`…`end` seconds, in place (the original goes to the Recycle Bin / Bin). Downloads ffmpeg first if needed. */
+  musicTagsTrim(path: string, start: number, end: number): Promise<LocalLibrary>
   /** Copies music files (full paths) into the music folder. */
   localMusicImport(files: string[]): Promise<MusicImportResult>
   /** Asks which music files to add, then copies them in; null if cancelled. */

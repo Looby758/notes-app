@@ -5,7 +5,7 @@ export const ADDON_CATEGORIES: { name: string; addons: string[] }[] = [
   { name: 'Money and passwords', addons: ['money', 'passwords'] },
   { name: 'Friends and messages', addons: ['email', 'messages', 'discord-voice'] },
   { name: 'AI and the web', addons: ['ask', 'ai-chat', 'claude', 'grok', 'offline-ai', 'web'] },
-  { name: 'Music and sound', addons: ['music', 'songid', 'soundboard', 'mixer'] },
+  { name: 'Music and sound', addons: ['music', 'songid', 'soundboard', 'mixer', 'audio-editor'] },
   { name: 'Watch and read', addons: ['video-player', 'comics', 'wiki'] },
   { name: 'Gaming', addons: ['games', 'skyblock', 'mini-games', 'clips'] },
   { name: 'Make videos', addons: ['video-projects', 'studio', 'screenshots', 'timeline', 'streamer'] },
@@ -83,6 +83,7 @@ export const ADDON_ABOUT: Record<string, string> = {
   'task-manager': 'See what’s running and what it’s using: CPU, memory, disk and network. End an app that’s stuck or slowing everything down.',
   uninstaller: 'Remove an app properly, along with the files, settings and leftovers it would normally leave behind, and see how much space you get back.',
   mixer: 'A volume slider for each app, so games, Discord and Spotify can each be as loud as you want.',
+  'audio-editor': 'Trim a song, voice memo or recording: see its waveform, listen, pick the part you want and save it as a new MP3 or WAV. The original stays as it is.',
   screens: 'Change your monitors’ brightness, contrast and input from Orbit, with hotkeys for each, without touching the buttons on the screen.',
   files: 'Browse the files on your computer in a tab, with previews, tags, zips and a search of the whole PC. Open two folders side by side to drag files between them.',
   'pdf-editor': 'Sign PDFs, fill in forms, and merge, split, rotate or reorder pages, all on this computer.',
@@ -263,6 +264,12 @@ export const ADDON_HOW: Record<string, [lead: string, text: string][]> = {
     ['A slider for each app', 'Everything making sound gets its own volume, so a game, Discord and Spotify can each be as loud as you like.'],
     ['Mute one thing', 'Silence just one app without touching the rest.'],
     ['Quieter music while people talk', 'In a Discord call, music dips while someone speaks and comes back a moment after.']
+  ],
+  'audio-editor': [
+    ['Open a sound file', 'Drop one in, or press Trim audio on a sound file in Files. MP3, WAV, M4A, FLAC, OGG and more.'],
+    ['Pick the part', 'Drag on the waveform, nudge the edges, or type exact times. Keep that part, or cut it out and join the rest.'],
+    ['Listen first', 'Play hears it exactly as it will be saved, fades and all.'],
+    ['Save a copy', 'As an MP3 or WAV. It all happens on this computer and your original isn’t touched.']
   ],
 
   // Watch and read

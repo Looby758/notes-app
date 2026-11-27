@@ -4,14 +4,14 @@ export type AudioFormat = 'mp3' | 'wav'
 
 /** MP3s are made at this quality: good for music, and a minute is about 1.4 MB. */
 const MP3_KBPS = 192
-const SAMPLE_RATE = 44100
+export const SAMPLE_RATE = 44100
 
-/** The sound in a file, as one or two channels (more are mixed down to two). */
-async function decode(file: File): Promise<Float32Array[]> {
+/** The sound in a file (or its bytes), as one or two channels at SAMPLE_RATE (more are mixed down to two). */
+export async function decodeAudio(file: Blob | ArrayBuffer): Promise<Float32Array[]> {
   const ctx = new OfflineAudioContext(2, 1, SAMPLE_RATE)
   let audio: AudioBuffer
   try {
-    audio = await ctx.decodeAudioData(await file.arrayBuffer())
+    audio = await ctx.decodeAudioData(file instanceof ArrayBuffer ? file : await file.arrayBuffer())
   } catch {
     throw new Error('This sound file couldn’t be read. It may be damaged, or in a kind this computer can’t play.')
   }
@@ -60,7 +60,11 @@ async function toMp3(channels: Float32Array[], onProgress?: (done: number) => vo
 
 /** Converts a sound file (anything this computer can play) to MP3 or WAV. */
 export async function convertAudio(file: File, format: AudioFormat, onProgress?: (done: number) => void): Promise<Uint8Array> {
-  const channels = await decode(file)
+  const channels = await decodeAudio(file)
   if (!channels.length || !channels[0].length) throw new Error('This sound file is empty.')
-  return format === 'wav' ? encodeWav(channels, SAMPLE_RATE) : toMp3(channels, onProgress)
+  return encodeAudio(channels, format, onProgress)
 }
+
+/** Sound (channels at SAMPLE_RATE, as decodeAudio gives) as an MP3 or WAV file. */
+export const encodeAudio = (channels: Float32Array[], format: AudioFormat, onProgress?: (done: number) => void): Promise<Uint8Array> =>
+  format === 'wav' ? Promise.resolve(encodeWav(channels, SAMPLE_RATE)) : toMp3(channels, onProgress)

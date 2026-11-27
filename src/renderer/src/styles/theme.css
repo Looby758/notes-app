@@ -9381,6 +9381,252 @@ a.passwords-text:hover {
   gap: 4px;
 }
 
+/* Audio editor (components/AudioEditor) */
+.audio-editor {
+  overflow-y: auto;
+  min-height: 0;
+}
+.audio-editor-inner {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 28px 32px 60px;
+}
+.audio-editor-inner h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+.audio-editor-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 0;
+  color: var(--text-muted);
+}
+.audio-editor-error {
+  margin: 12px 0 0;
+  color: var(--danger, #e5484d);
+}
+.ae {
+  outline: none;
+}
+.ae-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 12px;
+}
+.ae-file .btn,
+.ae-small {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  font-size: 12.5px;
+}
+.ae-wave-wrap {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-panel);
+  overflow: hidden;
+}
+.ae:focus-visible .ae-wave-wrap {
+  border-color: var(--accent-dim);
+}
+.ae-wave {
+  position: relative;
+  height: 180px;
+  cursor: text;
+  touch-action: none;
+  user-select: none;
+}
+.ae-wave canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.ae-sel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--accent-soft);
+  pointer-events: none;
+}
+.ae-wave.cut .ae-sel {
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--danger, #e5484d) 12%, transparent) 0 8px, transparent 8px 16px);
+}
+.ae-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  margin-left: -7px;
+  cursor: ew-resize;
+  z-index: 2;
+}
+.ae-handle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 6px;
+  width: 2px;
+  background: var(--accent);
+  pointer-events: none;
+}
+.ae-handle span {
+  position: absolute;
+  top: 0;
+  width: 12px;
+  height: 18px;
+  background: var(--accent);
+  border-radius: 0 0 4px 4px;
+  left: 1px;
+}
+.ae-handle.start span {
+  border-radius: 0 0 4px 0;
+  left: 7px;
+}
+.ae-handle.end span {
+  border-radius: 0 0 0 4px;
+  left: -5px;
+}
+.ae-wave.cut .ae-handle::before,
+.ae-wave.cut .ae-handle span {
+  background: var(--danger, #e5484d);
+}
+.ae-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text-strong);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  z-index: 3;
+}
+.ae-ruler {
+  position: relative;
+  height: 22px;
+  border-top: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+}
+.ae-ruler span {
+  position: absolute;
+  top: 0;
+  padding: 4px 0 0 4px;
+  border-left: 1px solid var(--border-strong);
+  height: 100%;
+  white-space: nowrap;
+}
+.ae-scroll {
+  width: 100%;
+  margin: 8px 0 0;
+  accent-color: var(--accent);
+}
+.ae-transport {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+.ae-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 84px;
+  justify-content: center;
+}
+.ae-transport .icon-btn.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.ae-transport .icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.ae-clock {
+  margin-left: 8px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-strong);
+}
+.ae-clock small {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.ae-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.ae-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+.ae-row .convert-option {
+  margin-top: 0;
+}
+.ae-row .select {
+  width: 130px;
+}
+.ae-time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+}
+.ae-time .text-input {
+  width: 104px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.ae-length {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--text-muted);
+}
+.ae-length strong {
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+.ae-result {
+  color: var(--text-muted);
+}
+.ae-result strong {
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+.ae .convert-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ae .btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.ae-keys {
+  margin: 18px 0 0;
+  color: var(--text-faint);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
 /* GIF maker (components/Convert/GifMaker) */
 .modal.gif-maker {
   width: 980px;

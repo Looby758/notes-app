@@ -70,6 +70,7 @@ const FEATURE_EMOJI: Record<string, string> = {
   'snip-picture': '🖼️',
   explorer: '🗂️',
   convert: '🔄',
+  'audio-editor': '✂️',
   studio: '🎬',
   appstudio: '🛠️',
   clips: '🎞️',

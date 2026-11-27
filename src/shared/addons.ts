@@ -87,6 +87,7 @@ export const ADDONS: AddonInfo[] = [
   { id: 'screens', name: 'Screens', features: ['screens'] },
   { id: 'files', name: 'Files', features: ['explorer'] },
   { id: 'pdf-editor', name: 'PDF editor', features: ['pdf-editor'] },
+  { id: 'audio-editor', name: 'Audio editor', features: ['audio-editor'] },
   { id: 'convert', name: 'Convert files', features: ['convert'], needs: ['video-tools'] },
   { id: 'filesender', name: 'Big file sender', features: ['filesender'] },
   { id: 'downloads', name: 'Downloads', features: ['downloads'], needs: ['link-tools'] },
