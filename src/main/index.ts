@@ -473,7 +473,9 @@ function registerVaultProtocol(): void {
         const rel = decodeURIComponent(url.pathname.slice(1))
         const full = localMusic.musicFile(rel)
         if (!full || !AUDIO_TYPES.has(extname(full).toLowerCase())) return new Response('Not allowed', { status: 403 })
-        if (url.host === 'music') return serveFile(full, request.headers.get('range'), CORS)
+        // Never kept: a song can change under the same name (trimmed, or its details rewritten), and a
+        // window mixing what it kept of the old file with the new one plays nothing past the old length.
+        if (url.host === 'music') return serveFile(full, request.headers.get('range'), { ...CORS, 'Cache-Control': 'no-store' })
         const pic = await localMusic.cover(rel)
         return pic ? new Response(Buffer.from(pic.data), { headers: { 'Content-Type': pic.type, 'Cache-Control': 'max-age=3600' } }) : new Response('No picture', { status: 404 })
       }

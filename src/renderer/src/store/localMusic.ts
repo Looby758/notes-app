@@ -60,7 +60,7 @@ export function applyLibrary(library: LocalLibrary, moved: Record<string, string
     const a = audio
     const at = a.currentTime
     const wasPlaying = !a.paused
-    a.src = localSongUrl(to)
+    a.src = localSongUrl(to, byPath.get(to)?.added)
     a.addEventListener('loadedmetadata', () => (a.currentTime = at), { once: true })
     if (wasPlaying) void a.play().catch(() => undefined)
   }
@@ -215,7 +215,7 @@ async function start(index: number): Promise<void> {
   endCrossfade()
   const a = player()
   fullVolume(a)
-  a.src = localSongUrl(song.path)
+  a.src = localSongUrl(song.path, song.added)
   useMusic.setState({ local: true, error: null })
   publish()
   try {
@@ -475,7 +475,7 @@ async function crossfadeTo(index: number, seconds: number): Promise<void> {
   const t = g.ctx.currentTime
   fadeIn.gain.cancelScheduledValues(t)
   fadeIn.gain.value = 0
-  to.src = localSongUrl(song.path)
+  to.src = localSongUrl(song.path, song.added)
   counted = false
   audio = to
   useLocalMusic.setState({ index })
@@ -702,7 +702,7 @@ export async function resumeLastSession(): Promise<void> {
   useLocalMusic.setState({ queue: songs, index, shuffle: !!saved.shuffle })
   const a = player()
   counted = false
-  a.src = localSongUrl(playing!.path)
+  a.src = localSongUrl(playing!.path, playing!.added)
   const at = Math.max(0, (saved.positionMs ?? 0) / 1000)
   a.addEventListener('loadedmetadata', () => (a.currentTime = Math.min(at, Math.max(0, a.duration - 1))), { once: true })
   useMusic.setState({ local: true, error: null })
