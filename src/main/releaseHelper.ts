@@ -828,7 +828,9 @@ interface ApiRun {
   html_url: string
   run_started_at?: string
   created_at: string
+  updated_at?: string
   event: string
+  workflow_id?: number
 }
 
 interface ApiJob {
@@ -836,7 +838,47 @@ interface ApiJob {
   name: string
   status: string
   conclusion: string | null
-  steps?: { name: string; conclusion: string | null }[]
+  started_at?: string | null
+  completed_at?: string | null
+  steps?: { name: string; status: string; conclusion: string | null }[]
+}
+
+const took = (from?: string | null, to?: string | null): number | undefined => {
+  const t = from && to ? Date.parse(to) - Date.parse(from) : NaN
+  return Number.isFinite(t) && t > 0 ? t : undefined
+}
+
+const average = (list: (number | undefined)[]): number | undefined => {
+  const ok = list.filter((n): n is number => n !== undefined)
+  return ok.length ? Math.round(ok.reduce((a, b) => a + b, 0) / ok.length) : undefined
+}
+
+/**
+ * How long a workflow's last few good builds took, in all and job by job, for the time left.
+ * Asked once per workflow (they don't change while a build runs).
+ */
+const usualTimes = new Map<string, Promise<{ run?: number; jobs: Record<string, number> }>>()
+function usualTimesFor(repo: string, workflow: number, skip: number): Promise<{ run?: number; jobs: Record<string, number> }> {
+  const key = `${repo}#${workflow}`
+  let got = usualTimes.get(key)
+  if (!got) {
+    got = (async () => {
+      const runs = await github<{ workflow_runs: ApiRun[] }>(`/repos/${repo}/actions/workflows/${workflow}/runs?status=success&per_page=4`)
+      const last = runs.workflow_runs.filter((r) => r.id !== skip).slice(0, 3)
+      const lists = await Promise.all(last.map((r) => github<{ jobs: ApiJob[] }>(`/repos/${repo}/actions/runs/${r.id}/jobs?filter=latest`).then((j) => j.jobs, () => [] as ApiJob[])))
+      const names = new Set(lists.flat().map((j) => j.name))
+      const jobs: Record<string, number> = {}
+      for (const name of names) {
+        const t = average(lists.map((l) => l.find((j) => j.name === name)).map((j) => took(j?.started_at, j?.completed_at)))
+        if (t) jobs[name] = t
+      }
+      return { run: average(last.map((r) => took(r.run_started_at ?? r.created_at, r.updated_at))), jobs }
+    })()
+    usualTimes.set(key, got)
+    // A failed look is tried again next time.
+    got.catch(() => usualTimes.delete(key))
+  }
+  return got
 }
 
 /** What GitHub's build of a release is doing, and why it failed when it did. */
@@ -850,9 +892,30 @@ async function buildStatus(folder: string, repo: string, tag: string): Promise<B
     const runs = await github<{ workflow_runs: ApiRun[] }>(`/repos/${repo}/actions/runs?branch=${encodeURIComponent(tag)}&per_page=5`, { doing: 'see GitHub’s builds (Actions)', needs: 'Actions' })
     const latest = runs.workflow_runs.find((w) => w.event === 'push' || w.event === 'workflow_dispatch')
     if (latest) {
-      const jobs = await github<{ jobs: ApiJob[] }>(`/repos/${repo}/actions/runs/${latest.id}/jobs?filter=latest`)
-      const list: BuildJob[] = jobs.jobs.map((j) => ({ name: j.name, status: j.status, conclusion: j.conclusion, failedStep: j.steps?.find((s) => s.conclusion === 'failure')?.name }))
-      out.run = { id: latest.id, status: latest.status, conclusion: latest.conclusion, url: latest.html_url, started: latest.run_started_at ?? latest.created_at, jobs: list }
+      const [jobs, usual] = await Promise.all([
+        github<{ jobs: ApiJob[] }>(`/repos/${repo}/actions/runs/${latest.id}/jobs?filter=latest`),
+        latest.status !== 'completed' && latest.workflow_id ? usualTimesFor(repo, latest.workflow_id, latest.id).catch(() => undefined) : undefined
+      ])
+      const list: BuildJob[] = jobs.jobs.map((j) => ({
+        name: j.name,
+        status: j.status,
+        conclusion: j.conclusion,
+        failedStep: j.steps?.find((s) => s.conclusion === 'failure')?.name,
+        started: j.started_at ?? undefined,
+        finished: j.completed_at ?? undefined,
+        steps: j.steps?.map((s) => ({ name: s.name, status: s.status, conclusion: s.conclusion })),
+        usualMs: usual?.jobs[j.name]
+      }))
+      out.run = {
+        id: latest.id,
+        status: latest.status,
+        conclusion: latest.conclusion,
+        url: latest.html_url,
+        started: latest.run_started_at ?? latest.created_at,
+        finished: latest.status === 'completed' ? latest.updated_at : undefined,
+        usualMs: usual?.run,
+        jobs: list
+      }
       const bad = jobs.jobs.find((j) => j.conclusion === 'failure')
       if (bad) {
         const log = await githubText(`/repos/${repo}/actions/jobs/${bad.id}/logs`)

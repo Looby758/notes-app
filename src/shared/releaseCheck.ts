@@ -445,6 +445,19 @@ export interface BuildJob {
   conclusion: string | null
   /** The step it failed on. */
   failedStep?: string
+  /** When GitHub started and finished it (ISO times). */
+  started?: string
+  finished?: string
+  /** Its steps, in order, as GitHub lists them. */
+  steps?: BuildStep[]
+  /** How long it took on the last good builds (ms), for the time left. */
+  usualMs?: number
+}
+
+export interface BuildStep {
+  name: string
+  status: string
+  conclusion: string | null
 }
 
 export interface BuildStatus {
@@ -456,7 +469,7 @@ export interface BuildStatus {
   /** The release on GitHub for the tag. */
   release?: { draft: boolean; prerelease: boolean; url: string }
   /** The newest GitHub Actions run for the tag. */
-  run?: { id: number; status: string; conclusion: string | null; url: string; started: string; jobs: BuildJob[] }
+  run?: { id: number; status: string; conclusion: string | null; url: string; started: string; finished?: string; usualMs?: number; jobs: BuildJob[] }
   /** Why it failed, when it did (read from the failed job's log). */
   problem?: Problem
   /** The end of the failed job's log. */
@@ -509,6 +522,72 @@ export function jobsLine(jobs: BuildJob[]): string {
       return `${name} ${j.conclusion === 'cancelled' ? 'cancelled' : 'failed'}${j.failedStep ? ` (${j.failedStep})` : ''}`
     })
     .join(' · ')
+}
+
+export type JobState = 'waiting' | 'running' | 'done' | 'failed' | 'skipped' | 'cancelled'
+
+export interface JobProgress {
+  /** "Windows" for "Build (Windows)". */
+  label: string
+  state: JobState
+  /** "Step 4 of 9: Build and upload installers", "Waiting for a computer", "Done in 6:12"… */
+  text: string
+  /** How far through it is (0 to 1), when that can be told. */
+  share?: number
+  /** "3:05" so far (or in all, once it's done). */
+  elapsed?: string
+  /** "about 4 min left", "almost done", "taking longer than usual (6:10)". */
+  left?: string
+}
+
+const ms = (iso?: string): number | undefined => {
+  const t = iso ? Date.parse(iso) : NaN
+  return Number.isFinite(t) ? t : undefined
+}
+
+/** Rough time left from how long it usually takes. */
+export function leftText(elapsed: number, usualMs?: number): string {
+  if (!usualMs) return ''
+  const left = usualMs - elapsed
+  if (left < 0) return `taking longer than usual (${clockTime(usualMs)})`
+  if (left < 15_000) return 'almost done'
+  return left < 60_000 ? `about ${Math.ceil(left / 10_000) * 10} seconds left` : `about ${Math.round(left / 60_000)} min left`
+}
+
+/** What one of GitHub's build jobs is doing, in words, with its time so far and time left. */
+export function jobProgress(j: BuildJob, now: number): JobProgress {
+  const label = j.name.replace(/^Build \((.+)\)$/, '$1')
+  const start = ms(j.started)
+  const end = ms(j.finished)
+  const steps = j.steps ?? []
+  if (j.status === 'completed') {
+    const took = start && end ? clockTime(end - start) : undefined
+    if (j.conclusion === 'success') return { label, state: 'done', text: took ? `Done in ${took}` : 'Done', share: 1, elapsed: took }
+    if (j.conclusion === 'skipped') return { label, state: 'skipped', text: 'Skipped' }
+    if (j.conclusion === 'cancelled') return { label, state: 'cancelled', text: 'Cancelled', elapsed: took }
+    return { label, state: 'failed', text: j.failedStep ? `Failed at “${j.failedStep}”` : 'Failed', elapsed: took }
+  }
+  if (j.status !== 'in_progress' || !start) return { label, state: 'waiting', text: j.status === 'queued' ? 'Waiting for one of GitHub’s computers' : 'Waiting for the jobs before it', share: 0 }
+  const elapsed = Math.max(0, now - start)
+  const at = steps.findIndex((s) => s.status !== 'completed')
+  const text = steps.length && at >= 0 ? `Step ${at + 1} of ${steps.length}: ${steps[at].name}` : 'Starting…'
+  const byTime = j.usualMs ? elapsed / j.usualMs : undefined
+  const bySteps = steps.length ? Math.max(0, at) / steps.length : undefined
+  const share = Math.min(0.97, byTime ?? bySteps ?? 0)
+  return { label, state: 'running', text, share, elapsed: clockTime(elapsed), left: leftText(elapsed, j.usualMs) || undefined }
+}
+
+/** The whole build: "4:12 so far, about 3 min left" or "Took 7:40". */
+export function runTimeText(run: NonNullable<BuildStatus['run']>, now: number): string {
+  const start = ms(run.started)
+  if (!start) return ''
+  if (run.status === 'completed') {
+    const end = ms(run.finished)
+    return end ? `Took ${clockTime(end - start)}` : ''
+  }
+  const elapsed = Math.max(0, now - start)
+  const left = leftText(elapsed, run.usualMs)
+  return `${clockTime(elapsed)} so far${left ? `, ${left}` : ''}`
 }
 
 /** Only plain version tags are touched by the recovery buttons. */

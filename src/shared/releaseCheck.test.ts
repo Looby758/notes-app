@@ -12,7 +12,10 @@ import {
   failedTests,
   finishedTestFile,
   isNotesList,
+  jobProgress,
   jobsLine,
+  leftText,
+  runTimeText,
   notesItems,
   notesVersions,
   problemCard,
@@ -250,6 +253,47 @@ describe('after the release: GitHub’s build', () => {
         { name: 'Build (Mac)', status: 'in_progress', conclusion: null }
       ])
     ).toBe('Create draft release ✓ · Windows failed (Run npm test) · Mac building…')
+  })
+})
+
+describe('jobProgress', () => {
+  const now = Date.parse('2026-11-27T16:10:00Z')
+  const steps = [
+    { name: 'Set up job', status: 'completed', conclusion: 'success' },
+    { name: 'Install packages', status: 'completed', conclusion: 'success' },
+    { name: 'Build and upload installers', status: 'in_progress', conclusion: null },
+    { name: 'Complete job', status: 'queued', conclusion: null }
+  ]
+
+  it('says which step a running job is on, with its time so far and time left', () => {
+    const p = jobProgress({ name: 'Build (Windows)', status: 'in_progress', conclusion: null, started: '2026-11-27T16:07:00Z', steps, usualMs: 8 * 60_000 }, now)
+    expect(p).toMatchObject({ label: 'Windows', state: 'running', text: 'Step 3 of 4: Build and upload installers', elapsed: '3:00', left: 'about 5 min left' })
+    expect(p.share).toBeCloseTo(3 / 8)
+  })
+
+  it('goes by the steps when it has never built before', () => {
+    const p = jobProgress({ name: 'Build (Mac)', status: 'in_progress', conclusion: null, started: '2026-11-27T16:09:30Z', steps }, now)
+    expect(p.share).toBe(0.5)
+    expect(p.left).toBeUndefined()
+  })
+
+  it('says when a job is waiting, done or failed', () => {
+    expect(jobProgress({ name: 'Publish release', status: 'queued', conclusion: null }, now)).toMatchObject({ state: 'waiting', text: 'Waiting for one of GitHub’s computers' })
+    expect(jobProgress({ name: 'Build (Mac)', status: 'completed', conclusion: 'success', started: '2026-11-27T16:00:00Z', finished: '2026-11-27T16:06:12Z' }, now)).toMatchObject({ state: 'done', text: 'Done in 6:12' })
+    expect(jobProgress({ name: 'Build (Windows)', status: 'completed', conclusion: 'failure', failedStep: 'Run npm test' }, now)).toMatchObject({ state: 'failed', text: 'Failed at “Run npm test”' })
+  })
+
+  it('words the time left', () => {
+    expect(leftText(60_000)).toBe('')
+    expect(leftText(60_000, 65_000)).toBe('almost done')
+    expect(leftText(60_000, 100_000)).toBe('about 40 seconds left')
+    expect(leftText(9 * 60_000, 8 * 60_000)).toBe('taking longer than usual (8:00)')
+  })
+
+  it('times the whole build', () => {
+    const run = { id: 1, status: 'in_progress', conclusion: null, url: '', started: '2026-11-27T16:06:00Z', usualMs: 9 * 60_000, jobs: [] }
+    expect(runTimeText(run, now)).toBe('4:00 so far, about 5 min left')
+    expect(runTimeText({ ...run, status: 'completed', conclusion: 'success', finished: '2026-11-27T16:13:40Z' }, now)).toBe('Took 7:40')
   })
 })
 
