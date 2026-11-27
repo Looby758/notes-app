@@ -1572,6 +1572,9 @@ function PlayerBar({ setView }: { setView: (v: View) => void }) {
         <button className={`icon-btn ${panel === 'sound' ? 'mp-on' : ''}`} onClick={() => setPanel(panel === 'sound' ? null : 'sound')} title="Sound: crossfade, equaliser and visualiser" data-mp-sound>
           <SlidersHorizontal size={16} />
         </button>
+        <button className="icon-btn" onClick={() => song && openMusicDialog({ kind: 'trim', song })} title="Trim this song: cut bits off the start or end" disabled={!song} data-mp-bar-trim>
+          <Scissors size={15} />
+        </button>
         <button className="icon-btn" onClick={openFullPlayer} title="Full-screen Now playing, with lyrics" data-mp-full>
           <Maximize2 size={15} />
         </button>

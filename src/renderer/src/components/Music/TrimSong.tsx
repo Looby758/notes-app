@@ -4,8 +4,8 @@ import { localSongUrl, type LocalSong } from '@shared/localMusic'
 import { decodeAudio, SAMPLE_RATE } from '../../lib/convert/audio'
 import { clamp, fixSelection, formatTime, type Selection } from '../../lib/audioTrim'
 import { errorMessage } from '../../lib/paths'
-import { applyLibrary, stopLocal, useLocalMusic } from '../../store/localMusic'
-import { useMusic } from '../../store/music'
+import { applyLibrary, localPause, stopLocal, useLocalMusic } from '../../store/localMusic'
+import { currentPosition, useMusic } from '../../store/music'
 import { notify } from '../../store/notify'
 import type { OpenAudio } from '../../store/audioEditor'
 import { TimeBox, Waveform } from '../AudioEditor/Waveform'
@@ -34,6 +34,20 @@ export default function TrimSong({ song, onClose }: { song: LocalSong; onClose: 
   selRef.current = sel
   const playheadRef = useRef(0)
 
+  /** Whether this song is the one in the player. */
+  const isCurrent = (): boolean => {
+    const { queue, index } = useLocalMusic.getState()
+    return useMusic.getState().local && queue[index]?.path === song.path
+  }
+
+  // Opening the window pauses the music, so you can listen to the trim instead, and starts where the song was.
+  const [resumeAt] = useState(() => {
+    const { state, at } = useMusic.getState()
+    if (!isCurrent() || state?.source !== 'local') return 0
+    if (state.playing) localPause()
+    return currentPosition(state, at) / 1000
+  })
+
   useEffect(() => {
     let gone = false
     void (async () => {
@@ -45,6 +59,7 @@ export default function TrimSong({ song, onClose }: { song: LocalSong; onClose: 
         if (gone) return
         setAudio({ name: song.title, channels, sampleRate: SAMPLE_RATE, duration })
         setSelState({ start: 0, end: duration })
+        setHead(clamp(resumeAt, 0, duration))
       } catch (err) {
         if (!gone) setProblem(errorMessage(err))
       }
@@ -132,8 +147,7 @@ export default function TrimSong({ song, onClose }: { song: LocalSong; onClose: 
     setBusy(true)
     try {
       // The player lets go of the song first, or Windows won't let the file be replaced.
-      const { queue, index } = useLocalMusic.getState()
-      if (useMusic.getState().local && queue[index]?.path === song.path) stopLocal()
+      if (isCurrent()) stopLocal()
       applyLibrary(await window.api.musicTagsTrim(song.path, sel.start, sel.end))
       notify(`Trimmed “${song.title}”. The untrimmed song is in the ${navigator.platform.startsWith('Mac') ? 'Bin' : 'Recycle Bin'} if you want it back.`, 'info')
       onClose()
