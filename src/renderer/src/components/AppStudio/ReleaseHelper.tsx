@@ -56,6 +56,7 @@ const FIX_LABELS: Record<FixId, string> = {
   'finish-push': 'Push it',
   'delete-tag': 'Delete the leftover tag',
   'write-notes': 'Write the notes',
+  'drop-notes': 'Take out the leftover notes',
   'sign-in': 'Sign in (in the terminal)',
   'connect-github': 'Connect GitHub',
   'new-token': 'Make a new token',
@@ -103,6 +104,8 @@ async function runFix(fix: FixId, c: FixContext): Promise<void> {
       return server(fix, c.tag)
     case 'write-notes':
       return c.writeNotes(c.version)
+    case 'drop-notes':
+      return server(fix, c.version)
     case 'sign-in':
       // In the terminal, git can ask (or Git Credential Manager pops up its sign-in window).
       runProjectCommand(c.project, 'git push --dry-run')

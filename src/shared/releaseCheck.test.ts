@@ -4,6 +4,8 @@ import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import {
   addNotesEntry,
+  removeNotesEntries,
+  staleNotes,
   aheadBehind,
   buildPhase,
   cleanOutput,
@@ -253,6 +255,60 @@ describe('after the release: GitHub’s build', () => {
         { name: 'Build (Mac)', status: 'in_progress', conclusion: null }
       ])
     ).toBe('Create draft release ✓ · Windows failed (Run npm test) · Mac building…')
+  })
+})
+
+describe('notes left over from a version that was given up on', () => {
+  // As it was: 1.16.0 was given up on, but its notes stayed at the top.
+  const list = `export const RELEASE_NOTES: readonly ReleaseNotes[] = [
+  {
+    version: '1.16.0',
+    items: [
+      'Music page: never stuck on "Looking for your music" {really}'
+    ]
+  },
+  {
+    version: '1.15.2',
+    items: ['Find songs with accents']
+  },
+  {
+    version: '1.15.1',
+    items: []
+  }
+]
+`
+
+  it('spots notes newer than the version being released', () => {
+    expect(staleNotes(notesVersions(list), '1.15.3')).toEqual(['1.16.0'])
+    expect(staleNotes(notesVersions(list), '1.16.0')).toEqual([])
+    expect(staleNotes(['1.10.0', '1.9.9'], '1.9.10')).toEqual(['1.10.0'])
+  })
+
+  it('writes new notes in version order, below newer ones', () => {
+    expect(notesVersions(addNotesEntry(list, '1.15.3', ['Fix'])!)).toEqual(['1.16.0', '1.15.3', '1.15.2', '1.15.1'])
+    expect(notesVersions(addNotesEntry(list, '1.17.0', ['New'])!)).toEqual(['1.17.0', '1.16.0', '1.15.2', '1.15.1'])
+    const last = addNotesEntry(list, '1.0.0', ['Old'])!
+    expect(notesVersions(last)).toEqual(['1.16.0', '1.15.2', '1.15.1', '1.0.0'])
+    // Still a list that loads.
+    for (const out of [addNotesEntry(list, '1.15.3', ['Fix'])!, last]) {
+      const js = ts.transpileModule(out.replace(': readonly ReleaseNotes[]', ''), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText
+      const mod = { exports: {} as { RELEASE_NOTES?: { version: string }[] } }
+      new Function('module', 'exports', js)(mod, mod.exports)
+      expect(mod.exports.RELEASE_NOTES?.length).toBe(4)
+    }
+  })
+
+  it('takes the leftover notes out, leaving the rest as it was', () => {
+    const out = removeNotesEntries(list, ['1.16.0'])!
+    expect(notesVersions(out)).toEqual(['1.15.2', '1.15.1'])
+    expect(out).toBe(list.replace(/  \{\n    version: '1\.16\.0'[\s\S]*?\n  \},\n/, ''))
+    expect(notesVersions(removeNotesEntries(list, ['1.15.1'])!)).toEqual(['1.16.0', '1.15.2'])
+    expect(removeNotesEntries(list, ['2.0.0'])).toBeNull()
+  })
+
+  it('explains a list out of order', () => {
+    const p = explainProblem(" FAIL  src/shared/whatsNew.test.ts > what's new > keeps the notes newest first\nAssertionError: expected -1 to be 1", { tag: 'v1.15.3' })
+    expect(p.title).toBe('The What’s new list is out of order')
   })
 })
 

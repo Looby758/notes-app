@@ -14,6 +14,8 @@ import {
   lastLines,
   NOTES_FILE_NAMES,
   notesVersions,
+  removeNotesEntries,
+  staleNotes,
   type BuildJob,
   type BuildStatus,
   type Check,
@@ -350,10 +352,19 @@ async function preflight(folder: string, bump: VersionBump): Promise<Preflight> 
   const notesFile = findNotesFile(folder) ?? undefined
   if (notesFile) {
     const have = notesVersions(readFileSync(join(folder, notesFile), 'utf8'))
+    const stale = staleNotes(have, next)
+    const list = stale.length === 1 ? stale[0] : `${stale.slice(0, -1).join(', ')} and ${stale[stale.length - 1]}`
     checks.push(
-      have.includes(next)
-        ? check('notes', 'pass', `${notesFile} has notes for ${next}.`)
-        : check('notes', 'fail', `${notesFile} has no notes for ${next} yet. The app shows them after it updates (and a test may check for them, which would stop GitHub’s build). Write them and Orbit adds them and commits them.`, { fixes: ['write-notes'] })
+      stale.length
+        ? check(
+            'notes',
+            'fail',
+            `${notesFile} has notes for ${list}, newer than ${next}, which ${stale.length === 1 ? 'was' : 'were'} never released (left over from a version you gave up on). The app would show them, and a test wants the list newest first. Take them out and Orbit commits that.${have.includes(next) ? '' : ` Then write the notes for ${next}.`}`,
+            { fixes: have.includes(next) ? ['drop-notes'] : ['drop-notes', 'write-notes'] }
+          )
+        : have.includes(next)
+          ? check('notes', 'pass', `${notesFile} has notes for ${next}.`)
+          : check('notes', 'fail', `${notesFile} has no notes for ${next} yet. The app shows them after it updates (and a test may check for them, which would stop GitHub’s build). Write them and Orbit adds them and commits them.`, { fixes: ['write-notes'] })
     )
   }
 
@@ -747,6 +758,10 @@ async function fix(folder: string, id: string, arg: string): Promise<FixResult> 
     const p = await run(folder, 'git', ['push', '--atomic', '--follow-tags', 'origin', `HEAD:refs/heads/${main}`], { timeout: 180_000, interactive: true })
     return p.ok ? { ok: true, message: 'Pushed. GitHub builds the release next.' } : failed(p, { main })
   }
+  if (id === 'drop-notes') {
+    if (!/^\d+\.\d+\.\d+$/.test(arg)) throw new Error('Not allowed')
+    return dropNotes(folder, arg)
+  }
   if (!isVersionTag(arg)) throw new Error('Not allowed')
   const tag = arg
   if (id === 'delete-tag') {
@@ -807,6 +822,24 @@ async function writeNotes(folder: string, version: string, items: string[]): Pro
   const commit = await run(folder, 'git', ['commit', '-m', `What's new notes for ${version}`, '--', file])
   if (!commit.ok) return failed(commit)
   return { ok: true, message: `Added the notes for ${version} to ${file} and committed them.` }
+}
+
+/** Takes out the "What's new" notes for versions newer than `next` (never released), and commits just that file. */
+async function dropNotes(folder: string, next: string): Promise<FixResult> {
+  const file = findNotesFile(folder)
+  if (!file) return { ok: false, message: 'Orbit couldn’t find the app’s What’s new list.' }
+  const path = join(folder, file)
+  const source = readFileSync(path, 'utf8')
+  const stale = staleNotes(notesVersions(source), next)
+  if (!stale.length) return { ok: true, message: `${file} has no notes newer than ${next}.` }
+  const updated = removeNotesEntries(source, stale)
+  if (updated === null) return { ok: false, message: `Orbit couldn’t take the notes for ${stale.join(', ')} out of ${file}. Take them out by hand (or ask Claude).` }
+  writeFileSync(path, updated)
+  const add = await run(folder, 'git', ['add', '--', file])
+  if (!add.ok) return failed(add)
+  const commit = await run(folder, 'git', ['commit', '-m', `Remove What's new notes for unreleased ${stale.join(', ')}`, '--', file])
+  if (!commit.ok) return failed(commit)
+  return { ok: true, message: `Took the notes for ${stale.join(', ')} out of ${file} and committed it.` }
 }
 
 /** A GitHub address's text (a job's log). GitHub sends a link to the log, which fetch follows. */
@@ -939,7 +972,8 @@ const FIX_NAMES: Record<string, string> = {
   pull: 'Get the latest',
   'finish-push': 'Push the release',
   'delete-tag': 'Delete the tag',
-  retag: 'Build it again'
+  retag: 'Build it again',
+  'drop-notes': 'Take out leftover notes'
 }
 
 const validFolder = (folder: unknown): folder is string => typeof folder === 'string' && isAbsolute(folder) && !!statSync(folder, { throwIfNoEntry: false })?.isDirectory()

@@ -18,6 +18,8 @@ export type FixId =
   | 'delete-tag'
   /** Write the "What's new" notes for the version into the app's code. */
   | 'write-notes'
+  /** Take out "What's new" notes for versions newer than the one being released (never released). */
+  | 'drop-notes'
   /** Sign in to GitHub for git (a push in the terminal, so git can ask). */
   | 'sign-in'
   /** Connect GitHub in App Studio. */
@@ -200,6 +202,14 @@ const plural = (n: number, one: string, many = one + 's'): string => `${n} ${n =
  * specific, so a failed test explains itself before the "npm test failed" that follows it.
  */
 const RULES: Rule[] = [
+  {
+    test: /keeps the notes newest first/i,
+    problem: () => ({
+      title: 'The What’s new list is out of order',
+      detail: 'A test checks the app’s What’s new list goes newest version first, and it doesn’t. Usually that’s notes left over from a version you gave up on, sitting above the new ones. Check again: Orbit spots leftovers and can take them out.',
+      fixes: ['ask-claude']
+    })
+  },
   {
     test: /has notes for the current version|(?:FAIL|×|✗)\s+\S*whats-?new\.test/i,
     problem: (_m, ctx) => ({
@@ -413,9 +423,53 @@ export function notesItems(text: string): string[] {
 
 const quote = (s: string): string => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, ' ')}'`
 
+const versionParts = (v: string): number[] => v.split('.').map(Number)
+/** 1 when a is the newer version, -1 when b is, 0 when they're the same. */
+export function compareVersion(a: string, b: string): number {
+  const x = versionParts(a)
+  const y = versionParts(b)
+  for (let i = 0; i < 3; i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) > (y[i] ?? 0) ? 1 : -1
+  return 0
+}
+
+/** Notes for versions newer than the one being released: left over from a version that was given up on. */
+export const staleNotes = (versions: string[], next: string): string[] => versions.filter((v) => compareVersion(v, next) > 0)
+
+interface NotesEntry {
+  version: string
+  /** Where its `{` is, and just after its `}`. */
+  start: number
+  end: number
+}
+
+/** The entries in a notes list, found by matching their braces (skipping over strings). */
+function notesEntries(source: string): NotesEntry[] {
+  const out: NotesEntry[] = []
+  for (const m of source.matchAll(/\bversion\s*:\s*['"`](\d+\.\d+\.\d+)['"`]/g)) {
+    const start = source.lastIndexOf('{', m.index)
+    if (start < 0) continue
+    let depth = 0
+    let quote = ''
+    let end = -1
+    for (let i = start; i < source.length && end < 0; i++) {
+      const c = source[i]
+      if (quote) {
+        if (c === '\\') i++
+        else if (c === quote) quote = ''
+      } else if (c === "'" || c === '"' || c === '`') quote = c
+      else if (c === '{') depth++
+      else if (c === '}' && --depth === 0) end = i + 1
+    }
+    if (end > 0) out.push({ version: m[1], start, end })
+  }
+  return out
+}
+
+const lineStart = (source: string, at: number): number => source.lastIndexOf('\n', at - 1) + 1
+
 /**
- * The file with an entry for `version` added at the top of its list (newest first), indented like
- * the entries already there. Null when there's no list to add to, or it already has that version.
+ * The file with an entry for `version` added to its list, in version order (newest first), indented
+ * like the entries already there. Null when there's no list to add to, or it already has that version.
  */
 export function addNotesEntry(source: string, version: string, items: string[]): string | null {
   if (notesVersions(source).includes(version)) return null
@@ -429,10 +483,38 @@ export function addNotesEntry(source: string, version: string, items: string[]):
   const unit = indent.includes('\t') ? '\t' : indent.length >= 2 ? indent.slice(0, 2) : '  '
   const lines = [`${indent}{`, `${indent}${unit}version: '${version}',`, `${indent}${unit}items: [`]
   items.forEach((item, i) => lines.push(`${indent}${unit}${unit}${quote(item)}${i < items.length - 1 ? ',' : ''}`))
-  lines.push(`${indent}${unit}]`, `${indent}}${/^\s*\]/.test(rest) ? '' : ','}`)
+  lines.push(`${indent}${unit}]`, `${indent}}`)
   // Windows line endings stay Windows line endings (git on Windows often checks files out that way).
   const eol = source.includes('\r\n') ? '\r\n' : '\n'
+  const entries = notesEntries(source).filter((e) => e.start >= at)
+  // Below any newer entries (notes written ahead for a bigger version), so the list stays in order.
+  if (entries.length && compareVersion(entries[0].version, version) > 0) {
+    const older = entries.find((e) => compareVersion(e.version, version) < 0)
+    if (older) {
+      const line = lineStart(source, older.start)
+      return source.slice(0, line) + lines.join(eol) + ',' + eol + source.slice(line)
+    }
+    const last = entries[entries.length - 1]
+    const comma = /^\s*,/.test(source.slice(last.end)) ? '' : ','
+    const after = last.end + (comma ? 0 : source.slice(last.end).indexOf(',') + 1)
+    return source.slice(0, after) + comma + eol + lines.join(eol) + source.slice(after)
+  }
+  lines[lines.length - 1] += /^\s*\]/.test(rest) ? '' : ','
   return source.slice(0, at) + eol + lines.join(eol) + (/^[ \t]*\r?\n/.test(rest) ? '' : eol) + rest
+}
+
+/** The file without the entries for these versions (and their lines). Null when none were there. */
+export function removeNotesEntries(source: string, versions: string[]): string | null {
+  const gone = notesEntries(source).filter((e) => versions.includes(e.version))
+  if (!gone.length) return null
+  let out = source
+  for (const e of gone.sort((a, b) => b.start - a.start)) {
+    const from = lineStart(out, e.start)
+    // The comma after it, and the rest of its line.
+    const tail = /^[ \t]*,?[ \t]*(\r?\n)?/.exec(out.slice(e.end))
+    out = out.slice(0, from) + out.slice(e.end + (tail ? tail[0].length : 0))
+  }
+  return out
 }
 
 // ---------- After the release: GitHub's build ----------
