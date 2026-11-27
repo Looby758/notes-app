@@ -8,7 +8,7 @@ import { toggleStar, useStarred } from '../../store/starred'
 import { Images, Clock, Send } from 'lucide-react'
 import { useNoteIndex } from '../../store/noteIndex'
 import { ArrowDownToLine, Keyboard, Repeat2, Upload } from 'lucide-react'
-import { FilePen, Music2, Target } from 'lucide-react'
+import { AudioWaveform, FilePen, Music2, Target } from 'lucide-react'
 import { Activity, PackageX, Puzzle } from 'lucide-react'
 import { isMindMap, openExport, toggleMindMap, useUI } from '../../store/ui'
 import {
@@ -30,6 +30,7 @@ import {
   CONVERT_TAB,
   FILESENDER_TAB,
   PDF_EDITOR_TAB,
+  AUDIO_EDITOR_TAB,
   isExplorerTab,
   COMICS_TAB,
   WIKI_TAB,
@@ -121,6 +122,7 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === CONVERT_TAB) return 'Convert files'
   if (id === FILESENDER_TAB) return 'Big file sender'
   if (id === PDF_EDITOR_TAB) return 'PDF editor'
+  if (id === AUDIO_EDITOR_TAB) return 'Audio editor'
   if (id === COMICS_TAB) return 'Comics'
   if (id === WIKI_TAB) return 'Wikis'
   if (id === MINIGAMES_TAB) return 'Mini games'
@@ -358,6 +360,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === CONVERT_TAB && <ArrowRightLeft size={13} className="tab-icon" />}
               {id === FILESENDER_TAB && <Send size={13} className="tab-icon" />}
               {id === PDF_EDITOR_TAB && <FilePen size={13} className="tab-icon" />}
+              {id === AUDIO_EDITOR_TAB && <AudioWaveform size={13} className="tab-icon" />}
               {id === COMICS_TAB && <LibraryBig size={13} className="tab-icon" />}
               {id === WIKI_TAB && <Library size={13} className="tab-icon" />}
               {id === MINIGAMES_TAB && <Joystick size={13} className="tab-icon" />}

@@ -79,6 +79,8 @@ export const FILESENDER_TAB = 'filesender:'
 export const COMICS_TAB = 'comics:'
 /** Sign, merge, split, reorder and fill in PDFs (components/PdfEditor); what's open is in store/pdfEditor. */
 export const PDF_EDITOR_TAB = 'pdf-editor:'
+/** Trim sound files (components/AudioEditor); what's open is in store/audioEditor. */
+export const AUDIO_EDITOR_TAB = 'audio-editor:'
 /** Downloaded wikis, read offline (components/Wiki). */
 export const WIKI_TAB = 'wiki:'
 /** The mini games, from Sudoku to Chess (components/MiniGames); which one is showing is in store/miniGames. */
