@@ -8,13 +8,14 @@ import { useLocalMusic } from '../../store/localMusic'
 import { addToPlaylist, tagSongs, useMusicData } from '../../store/musicData'
 import { editSongs, fillFromNames, keepOne, moveSongs, relink, setCover } from '../../store/musicFiles'
 import { notify } from '../../store/notify'
+import TrimSong from './TrimSong'
 
 /**
  * The Music page's tools for your files (plan part 3): editing details and covers, tags, tidying
  * file names, spare copies and missing songs.
  */
 
-type Dialog = { kind: 'edit'; songs: LocalSong[] } | { kind: 'tidy' } | { kind: 'relink'; path: string } | { kind: 'addSongs'; playlistId: string } | null
+type Dialog = { kind: 'edit'; songs: LocalSong[] } | { kind: 'trim'; song: LocalSong } | { kind: 'tidy' } | { kind: 'relink'; path: string } | { kind: 'addSongs'; playlistId: string } | null
 
 export const useMusicDialog = create<{ dialog: Dialog }>(() => ({ dialog: null }))
 export const openMusicDialog = (dialog: Dialog): void => useMusicDialog.setState({ dialog })
@@ -25,6 +26,7 @@ export function MusicDialogs() {
   if (!dialog) return null
   if (dialog.kind === 'edit') return <EditDetails songs={dialog.songs} />
   if (dialog.kind === 'tidy') return <TidyFiles />
+  if (dialog.kind === 'trim') return <TrimSong song={dialog.song} onClose={close} />
   if (dialog.kind === 'addSongs') return <AddSongs playlistId={dialog.playlistId} />
   return <FindMissing path={dialog.path} />
 }

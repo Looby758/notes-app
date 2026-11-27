@@ -2,6 +2,7 @@ import './musicPage.css'
 import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import {
   Disc3,
+  Scissors,
   FolderOpen,
   Heart,
   History,
@@ -1140,6 +1141,7 @@ function SongTable({ rows, setView, folder, sort, onSort, showTrack, playlist }:
     items.push({ custom: (close) => <TagMenu songs={list} onDone={close} /> })
     items.push('separator')
     items.push({ label: one ? 'Edit details…' : `Edit ${list.length} songs…`, icon: <Pencil size={14} />, onClick: () => openMusicDialog({ kind: 'edit', songs: list }) })
+    if (one) items.push({ label: 'Trim the start or end…', icon: <Scissors size={14} />, onClick: () => openMusicDialog({ kind: 'trim', song: one }) })
     if (list.some((s) => !s.album || /^\d+\s*[-.]/.test(s.path.split('/').pop() ?? ''))) {
       items.push({ label: 'Fill in from the file name', icon: <Wand2 size={14} />, onClick: () => void fillFromNames(list) })
     }
@@ -1569,6 +1571,9 @@ function PlayerBar({ setView }: { setView: (v: View) => void }) {
         </button>
         <button className={`icon-btn ${panel === 'sound' ? 'mp-on' : ''}`} onClick={() => setPanel(panel === 'sound' ? null : 'sound')} title="Sound: crossfade, equaliser and visualiser" data-mp-sound>
           <SlidersHorizontal size={16} />
+        </button>
+        <button className="icon-btn" onClick={() => song && openMusicDialog({ kind: 'trim', song })} title="Trim this song: cut bits off the start or end" disabled={!song} data-mp-bar-trim>
+          <Scissors size={15} />
         </button>
         <button className="icon-btn" onClick={openFullPlayer} title="Full-screen Now playing, with lyrics" data-mp-full>
           <Maximize2 size={15} />

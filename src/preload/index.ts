@@ -628,6 +628,7 @@ const api: NotesApi = {
   musicTagsSetCover: (paths, source) => ipcRenderer.invoke('musicTags:setCover', paths, source),
   musicTagsFindCovers: (artist, album) => ipcRenderer.invoke('musicTags:findCovers', artist, album),
   musicTagsChooseImage: () => ipcRenderer.invoke('musicTags:chooseImage'),
+  musicTagsTrim: (path, start, end) => ipcRenderer.invoke('musicTags:trim', path, start, end),
   localMusicImport: (files) => ipcRenderer.invoke('localMusic:import', files),
   localMusicChooseImport: () => ipcRenderer.invoke('localMusic:chooseImport'),
   localMusicMove: (moves) => ipcRenderer.invoke('localMusic:move', moves),

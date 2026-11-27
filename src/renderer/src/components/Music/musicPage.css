@@ -1769,3 +1769,30 @@ body.motion-off .mp-eq i {
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
+
+/* Trim song (TrimSong.tsx): the audio editor's waveform in a small window */
+.mp-trim h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mp-trim .ae-wave {
+  height: 130px;
+}
+.mp-trim-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 50px 0;
+  justify-content: center;
+  color: var(--text-muted);
+}
+.mp-trim-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}

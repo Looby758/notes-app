@@ -940,7 +940,7 @@ function briefingTool(server: McpServer, deps: ToolDeps): void {
   )
 }
 
-const PAGE_LIST = 'home, calendar, music, money, flashcards, countdowns, world clocks, email, messages, app studio, convert, comics, videos, video player, games, mini games, skyblock, task manager, volume mixer, files, downloads, screenshots, clips, soundboard, macros, discord, wiki, graph, timeline, terminal, ask ai, ai chat, pdf editor, publishing, screens, studio, send files, find and replace, add-ons, uninstaller, key remapper, web, settings'
+const PAGE_LIST = 'home, calendar, music, money, flashcards, countdowns, world clocks, email, messages, app studio, convert, comics, videos, video player, games, mini games, skyblock, task manager, volume mixer, files, downloads, screenshots, clips, soundboard, macros, discord, wiki, graph, timeline, terminal, ask ai, ai chat, pdf editor, audio editor, publishing, screens, studio, send files, find and replace, add-ons, uninstaller, key remapper, web, settings'
 
 function pageTool(server: McpServer, deps: ToolDeps): void {
   windowTool(server, deps, 'open_page', {

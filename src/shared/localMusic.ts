@@ -52,7 +52,8 @@ export interface LocalLibrary {
 export const LOCAL_LIMIT = 20_000
 
 const encodePath = (path: string): string => path.split('/').map(encodeURIComponent).join('/')
-export const localSongUrl = (path: string): string => `vault://music/${encodePath(path)}`
+/** A song's file; `version` (when the file changed, like `added`) makes a changed file (a trimmed song, say) load fresh rather than from what the window kept of the old one. */
+export const localSongUrl = (path: string, version?: number): string => `vault://music/${encodePath(path)}${version ? `?v=${version}` : ''}`
 /** The song's cover; `version` (when the file changed) makes a new cover show at once rather than the old one kept for a while. */
 export const localArtUrl = (path: string, version?: number): string => `vault://musicart/${encodePath(path)}${version ? `?v=${version}` : ''}`
 

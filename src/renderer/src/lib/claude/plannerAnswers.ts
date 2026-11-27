@@ -56,6 +56,7 @@ const PAGES: Record<string, string> = {
   'ask ai': tabs.AI_TAB,
   'ai chat': tabs.CHAT_TAB,
   'pdf editor': tabs.PDF_EDITOR_TAB,
+  'audio editor': tabs.AUDIO_EDITOR_TAB,
   publishing: tabs.PUBLISHING_TAB,
   screens: tabs.SCREENS_TAB,
   studio: tabs.STUDIO_TAB,
