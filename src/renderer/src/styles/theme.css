@@ -24677,3 +24677,17 @@ img.tm-icon {
   font-size: 12px;
   font-family: var(--font-mono);
 }
+
+/* How far the release check's tests have got. */
+.release-test-bar {
+  height: 4px;
+  max-width: 260px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+.release-test-bar > div {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.4s ease;
+}

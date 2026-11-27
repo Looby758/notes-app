@@ -1,5 +1,5 @@
-import { ipcMain, net, shell } from 'electron'
-import { execFile } from 'child_process'
+import { app, ipcMain, net, shell } from 'electron'
+import { execFile, spawn, type ChildProcess } from 'child_process'
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { isAbsolute, join, relative } from 'path'
 import { bumpVersion, releaseBase, VERSION_BUMPS, type VersionBump } from '@shared/appStudio'
@@ -8,6 +8,7 @@ import {
   aheadBehind,
   CHECK_LABELS,
   explainProblem,
+  finishedTestFile,
   isNotesList,
   isVersionTag,
   lastLines,
@@ -23,7 +24,8 @@ import {
   type FixResult,
   type MainStatus,
   type Problem,
-  type ReleaseResult
+  type ReleaseResult,
+  type TestProgress
 } from '@shared/releaseCheck'
 import { appInfo, github, GitHubError, token, validRepo } from './appStudio'
 import type { AppInfo } from '@shared/appStudio'
@@ -54,21 +56,9 @@ interface Ran {
  * with no one to answer): it fails, and the sign-in fix asks in a terminal instead.
  */
 async function run(folder: string, tool: 'git' | 'npm', args: string[], opts: { timeout?: number; interactive?: boolean } = {}): Promise<Ran> {
-  // The PATH the Terminal would have, so npm (and the node it needs) is found even when Orbit was
-  // opened from the Dock or Finder.
-  const env = await toolEnv({ GIT_TERMINAL_PROMPT: '0', FORCE_COLOR: '0', NO_COLOR: '1', CI: 'true' })
-  if (!opts.interactive) env.GCM_INTERACTIVE = 'never'
-  if (tool === 'npm') withoutNpmFlags(env)
-  // npm.cmd only runs through the shell on Windows, which joins the arguments with spaces, so any
-  // with a space are quoted. They're all fixed here, never typed in.
-  const viaShell = tool === 'npm' && WINDOWS
-  let cmd = tool === 'npm' ? (WINDOWS ? 'npm.cmd' : 'npm') : 'git'
-  if (tool === 'npm' && !WINDOWS) {
-    const found = await findTool('npm')
-    if (!found) return { ok: false, out: 'spawn npm ENOENT', npmMissing: true }
-    cmd = found
-  }
-  const argv = viaShell ? args.map((a) => (/\s/.test(a) ? `"${a}"` : a)) : args
+  const how = await command(tool, args, opts.interactive)
+  if (!how) return { ok: false, out: 'spawn npm ENOENT', npmMissing: true }
+  const { cmd, argv, env, viaShell } = how
   return new Promise((done) => {
     execFile(cmd, argv, { cwd: folder, timeout: opts.timeout ?? 60_000, windowsHide: true, maxBuffer: 32 * 1024 * 1024, shell: viaShell, env }, (err, stdout, stderr) => {
       let out = [String(stdout ?? ''), String(stderr ?? '')].filter((s) => s.trim()).join('\n')
@@ -78,6 +68,119 @@ async function run(folder: string, tool: 'git' | 'npm', args: string[], opts: { 
       done({ ok: !err, out, npmMissing: missing })
     })
   })
+}
+
+/** How to start git or npm here: the program, its arguments and environment. Null when npm can't be found. */
+async function command(tool: 'git' | 'npm', args: string[], interactive = false): Promise<{ cmd: string; argv: string[]; env: NodeJS.ProcessEnv; viaShell: boolean } | null> {
+  // The PATH the Terminal would have, so npm (and the node it needs) is found even when Orbit was
+  // opened from the Dock or Finder.
+  const env = await toolEnv({ GIT_TERMINAL_PROMPT: '0', FORCE_COLOR: '0', NO_COLOR: '1', CI: 'true' })
+  if (!interactive) env.GCM_INTERACTIVE = 'never'
+  if (tool === 'npm') withoutNpmFlags(env)
+  // npm.cmd only runs through the shell on Windows, which joins the arguments with spaces, so any
+  // with a space are quoted. They're all fixed here, never typed in.
+  const viaShell = tool === 'npm' && WINDOWS
+  let cmd = tool === 'npm' ? (WINDOWS ? 'npm.cmd' : 'npm') : 'git'
+  if (tool === 'npm' && !WINDOWS) {
+    const found = await findTool('npm')
+    if (!found) return null
+    cmd = found
+  }
+  const argv = viaShell ? args.map((a) => (/\s/.test(a) ? `"${a}"` : a)) : args
+  return { cmd, argv, env, viaShell }
+}
+
+const minutes = (ms: number): string => (ms >= 60_000 ? `${Math.round(ms / 60_000)} minute${Math.round(ms / 60_000) === 1 ? '' : 's'}` : `${Math.round(ms / 1000)} seconds`)
+
+interface Watched extends Ran {
+  /** Why it was stopped early, in plain words (it hung, or took too long). */
+  stopped?: string
+}
+
+/**
+ * Runs npm and hands over its output a line at a time, for the release check's progress. Unlike
+ * execFile, a stop takes everything npm started with it (vitest and its workers), not only npm:
+ * killing just npm used to leave the tests running, and the check waiting on them. It's stopped
+ * when it says nothing new for `quiet` (stuck), or runs past `limit`.
+ */
+async function runWatched(
+  folder: string,
+  args: string[],
+  opts: { limit: number; quiet?: number; what: string; onLine?: (line: string) => void; signal?: AbortSignal }
+): Promise<Watched> {
+  const how = await command('npm', args)
+  if (!how) return { ok: false, out: 'spawn npm ENOENT', npmMissing: true }
+  const { cmd, argv, env, viaShell } = how
+  return new Promise((done) => {
+    let out = ''
+    let partial = ''
+    let stopped: string | undefined
+    let finished = false
+    // Its own process group (not on Windows, where taskkill /T finds the children), so all of it can be stopped at once.
+    const child = spawn(cmd, argv, { cwd: folder, windowsHide: true, shell: viaShell, env, detached: !WINDOWS, stdio: ['ignore', 'pipe', 'pipe'] })
+    const stop = (why: string): void => {
+      if (finished || stopped) return
+      stopped = why
+      killTree(child)
+    }
+    let quietTimer: NodeJS.Timeout | undefined
+    const heard = (): void => {
+      if (!opts.quiet) return
+      clearTimeout(quietTimer)
+      quietTimer = setTimeout(() => stop(`${opts.what} stopped making progress: nothing new for ${minutes(opts.quiet!)}, so Orbit stopped them.`), opts.quiet)
+    }
+    const limitTimer = setTimeout(() => stop(`${opts.what} were still going after ${minutes(opts.limit)}, so Orbit stopped them.`), opts.limit)
+    const onAbort = (): void => stop('Stopped, because the check was started again.')
+    opts.signal?.addEventListener('abort', onAbort)
+    heard()
+    const take = (d: Buffer): void => {
+      const text = d.toString()
+      if (out.length < 32 * 1024 * 1024) out += text
+      partial += text
+      const lines = partial.split(/\r?\n/)
+      partial = lines.pop() ?? ''
+      for (const line of lines) if (line.trim()) opts.onLine?.(line)
+      heard()
+    }
+    child.stdout?.on('data', take)
+    child.stderr?.on('data', take)
+    const finish = (code: number | null, err?: NodeJS.ErrnoException): void => {
+      if (finished) return
+      finished = true
+      clearTimeout(quietTimer)
+      clearTimeout(limitTimer)
+      opts.signal?.removeEventListener('abort', onAbort)
+      if (partial.trim()) opts.onLine?.(partial)
+      let text = out.trim()
+      if (err?.code === 'ENOENT') text += `\nspawn ${cmd} ENOENT`
+      if (stopped) text += `\n${stopped}`
+      const missing = !!err?.code && err.code === 'ENOENT'
+      done({ ok: !stopped && !err && code === 0, out: text, npmMissing: missing || (code !== 0 && /'npm(\.cmd)?' is not recognized/i.test(text)), stopped })
+    }
+    child.on('error', (err) => finish(null, err))
+    // 'exit', not 'close': something npm started can keep the output open after npm has gone, and
+    // that mustn't keep the check waiting. A moment's grace lets the last lines arrive.
+    child.on('exit', (code) => {
+      if (stopped) killTree(child)
+      setTimeout(() => finish(code), 300)
+    })
+    child.on('close', (code) => finish(code))
+  })
+}
+
+/** Stops a program and everything it started. */
+function killTree(child: ChildProcess): void {
+  if (!child.pid) return
+  try {
+    if (WINDOWS) execFile('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true }, () => undefined)
+    else process.kill(-child.pid, 'SIGKILL')
+  } catch {
+    try {
+      child.kill('SIGKILL')
+    } catch {
+      // Already gone.
+    }
+  }
 }
 
 /**
@@ -286,8 +389,74 @@ function testsFailed(folder: string, p: Problem, output: string): Check {
   return fromProblem('tests', p, output)
 }
 
-/** The type check (when there is one) and the tests, as GitHub's build runs them. */
-async function runTests(folder: string): Promise<Check> {
+/** Folders and files skipped when counting an app's test files. */
+const NOT_TESTS = new Set(['node_modules', '.git', 'out', 'dist', 'build', 'release', 'coverage', '.next', '.vite'])
+
+/** The app's test files (a.test.ts, b.spec.tsx), so the progress can say "120 of 210". Undefined when there are too many to count quickly. */
+export function countTestFiles(folder: string): string[] | undefined {
+  const found: string[] = []
+  const todo = [folder]
+  let seen = 0
+  while (todo.length) {
+    const dir = todo.pop()!
+    let names: string[]
+    try {
+      names = readdirSync(dir)
+    } catch {
+      continue
+    }
+    for (const name of names) {
+      if (++seen > 50_000) return undefined
+      if (name.startsWith('.') && name !== '.') continue
+      const full = join(dir, name)
+      if (/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(name)) found.push(relative(folder, full).split('\\').join('/'))
+      else if (!NOT_TESTS.has(name) && !/\.\w+$/.test(name)) {
+        try {
+          if (statSync(full).isDirectory()) todo.push(full)
+        } catch {
+          // Gone, or not ours to read.
+        }
+      }
+    }
+  }
+  return found.length ? found : undefined
+}
+
+/** How long each stage took the last time it passed, by folder, for a rough time left. */
+const timesFile = (): string => join(app.getPath('userData'), 'release-test-times.json')
+type Times = Record<string, Partial<Record<TestProgress['stage'], number>>>
+function readTimes(): Times {
+  try {
+    return JSON.parse(readFileSync(timesFile(), 'utf8')) as Times
+  } catch {
+    return {}
+  }
+}
+function saveTime(folder: string, stage: TestProgress['stage'], ms: number): void {
+  try {
+    const times = readTimes()
+    times[folder] = { ...times[folder], [stage]: Math.round(ms) }
+    writeFileSync(timesFile(), JSON.stringify(times))
+  } catch {
+    // Only a guess for next time.
+  }
+}
+
+/**
+ * How long the release check's type check and tests may take. The type check can't say how far
+ * it's got, so it only has a time limit; vitest and jest say something each time a test file
+ * finishes, so that long with nothing new means one is stuck. (Changed by the tests.)
+ */
+export const testLimits = { typecheck: 10 * 60_000, tests: 15 * 60_000, quiet: 3 * 60_000 }
+
+/** The test run going on in each folder, so starting the check again stops the old one first. */
+const testRuns = new Map<string, AbortController>()
+
+/**
+ * The type check (when there is one) and the tests, as GitHub's build runs them. Says how far it's
+ * got as it goes, and stops (saying why) when the tests get stuck or run too long.
+ */
+async function runTests(folder: string, progress: (p: TestProgress) => void = () => undefined): Promise<Check> {
   let scripts: Record<string, string> = {}
   try {
     scripts = (JSON.parse(readFileSync(join(folder, 'package.json'), 'utf8')) as { scripts?: Record<string, string> }).scripts ?? {}
@@ -296,22 +465,74 @@ async function runTests(folder: string): Promise<Check> {
   }
   const hasTests = !!scripts.test && !/no test specified/.test(scripts.test)
   if (!hasTests && !scripts.typecheck) return check('tests', 'skip', 'This app has no tests.')
-  let output = ''
-  if (scripts.typecheck) {
-    const r = await run(folder, 'npm', ['run', 'typecheck'], { timeout: 10 * 60_000 })
-    output += r.out
-    if (r.npmMissing) return npmMissing('tests', r.out)
-    if (!r.ok) return testsFailed(folder, explainProblem(r.out, { windows: WINDOWS, source: 'tests' }), output)
+  testRuns.get(folder)?.abort()
+  const controller = new AbortController()
+  testRuns.set(folder, controller)
+  try {
+    const times = readTimes()[folder] ?? {}
+    const stages = (scripts.typecheck ? 1 : 0) + (hasTests ? 1 : 0)
+    let output = ''
+    if (scripts.typecheck) {
+      const startedAt = Date.now()
+      progress({ folder, stage: 'typecheck', stages, startedAt, filesDone: 0, testsDone: 0, failed: 0, expectedMs: times.typecheck })
+      const r = await runWatched(folder, ['run', 'typecheck'], { limit: testLimits.typecheck, what: 'The type check', signal: controller.signal })
+      output += r.out
+      if (controller.signal.aborted) return check('tests', 'skip', 'Started again.')
+      if (r.npmMissing) return npmMissing('tests', r.out)
+      if (r.stopped) return testsStopped(folder, r.stopped.replace('were still going', 'was still going').replace('stopped them', 'stopped it'), output)
+      if (!r.ok) return testsFailed(folder, explainProblem(r.out, { windows: WINDOWS, source: 'tests' }), output)
+      saveTime(folder, 'typecheck', Date.now() - startedAt)
+    }
+    if (hasTests) {
+      const files = countTestFiles(folder)
+      const startedAt = Date.now()
+      const p: TestProgress = { folder, stage: 'tests', stages, startedAt, filesDone: 0, filesTotal: files?.length, testsDone: 0, failed: 0, expectedMs: times.tests }
+      const done = new Set<string>()
+      let sent = 0
+      progress({ ...p })
+      const r = await runWatched(folder, ['test'], {
+        limit: testLimits.tests,
+        quiet: testLimits.quiet,
+        what: 'The tests',
+        signal: controller.signal,
+        onLine: (line) => {
+          const f = finishedTestFile(line)
+          if (!f) return
+          done.add(f.file)
+          p.filesDone++
+          p.testsDone += f.tests
+          p.failed += f.failed
+          // More finished than were counted (the counting missed some): stop claiming a total.
+          if (p.filesTotal && p.filesDone > p.filesTotal) p.filesTotal = undefined
+          if (Date.now() - sent > 400) {
+            sent = Date.now()
+            progress({ ...p })
+          }
+        }
+      })
+      output += '\n' + r.out
+      if (controller.signal.aborted) return check('tests', 'skip', 'Started again.')
+      if (r.npmMissing) return npmMissing('tests', r.out)
+      if (r.stopped) {
+        const left = files?.filter((f) => !done.has(f) && ![...done].some((d) => d.endsWith(f) || f.endsWith(d)))
+        const where = left?.length && left.length <= 5 ? ` Still running: ${left.join(', ')}.` : p.filesDone ? ` ${p.filesDone}${p.filesTotal ? ` of ${p.filesTotal}` : ''} test files had finished.` : ''
+        return testsStopped(folder, r.stopped + where, output)
+      }
+      if (!r.ok) return testsFailed(folder, explainProblem(r.out, { windows: WINDOWS, source: 'tests' }), output)
+      saveTime(folder, 'tests', Date.now() - startedAt)
+      const count = /Tests\s+(\d+) passed/.exec(r.out)?.[1]
+      return check('tests', 'pass', `${scripts.typecheck ? 'The type check and ' : ''}${count ? `all ${count} tests` : 'the tests'} passed.`.replace(/^./, (c) => c.toUpperCase()), { output: lastLines(output, 30) })
+    }
+    return check('tests', 'pass', 'The type check passed.', { output: lastLines(output, 30) })
+  } finally {
+    if (testRuns.get(folder) === controller) testRuns.delete(folder)
   }
-  if (hasTests) {
-    const r = await run(folder, 'npm', ['test'], { timeout: 15 * 60_000 })
-    output += '\n' + r.out
-    if (r.npmMissing) return npmMissing('tests', r.out)
-    if (!r.ok) return testsFailed(folder, explainProblem(r.out, { windows: WINDOWS, source: 'tests' }), output)
-    const count = /Tests\s+(\d+) passed/.exec(r.out)?.[1]
-    return check('tests', 'pass', `${scripts.typecheck ? 'The type check and ' : ''}${count ? `all ${count} tests` : 'the tests'} passed.`.replace(/^t/, 'T'), { output: lastLines(output, 30) })
-  }
-  return check('tests', 'pass', 'The type check passed.', { output: lastLines(output, 30) })
+}
+
+/** Tests that hung or ran too long: kept in the problem history, with what they'd said so far. */
+function testsStopped(folder: string, text: string, output: string): Check {
+  recordStudioError(folder, 'tests', 'Type check and tests', 'The tests didn’t finish', text, output)
+  return check('tests', 'fail', `${text} Run npm test in the terminal to see which test is stuck.`, { output: lastLines(output, 40), fixes: ['ask-claude'] })
 }
 
 /** The release: npm sets the version, commits and tags it; then the commit and tag are pushed. */
@@ -705,9 +926,13 @@ export function setupReleaseHelper(): void {
     )
   })
   // Not under once(): the tests run while you look at (and fix) the other checks.
-  ipcMain.handle('apps:releaseTests', (_e, folder: unknown) => {
+  ipcMain.handle('apps:releaseTests', (e, folder: unknown) => {
     if (!validFolder(folder)) throw new Error('Not allowed')
-    return runTests(folder).then((r) => (sawTests(folder, r), r))
+    const sender = e?.sender
+    const progress = (p: TestProgress): void => {
+      if (sender && !sender.isDestroyed()) sender.send('apps:releaseTestsProgress', p)
+    }
+    return runTests(folder, progress).then((r) => (sawTests(folder, r), r))
   })
   ipcMain.handle('apps:release', (_e, folder: unknown, bump: unknown, expected: unknown) => {
     if (!validFolder(folder) || !validBump(bump) || typeof expected !== 'string') throw new Error('Not allowed')

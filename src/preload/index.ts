@@ -852,6 +852,7 @@ const api: NotesApi = {
   appsHealth: (folder) => ipcRenderer.invoke('apps:health', folder),
   appsPreflight: (folder, bump) => ipcRenderer.invoke('apps:preflight', folder, bump),
   appsReleaseTests: (folder) => ipcRenderer.invoke('apps:releaseTests', folder),
+  onReleaseTestsProgress: (callback) => on('apps:releaseTestsProgress', callback),
   appsRelease: (folder, bump, expected) => ipcRenderer.invoke('apps:release', folder, bump, expected),
   appsReleaseFix: (folder, fix, tag) => ipcRenderer.invoke('apps:releaseFix', folder, fix, tag),
   appsMainStatus: (folder) => ipcRenderer.invoke('apps:mainStatus', folder),

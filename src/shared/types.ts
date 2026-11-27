@@ -1,7 +1,7 @@
 import type { SpokenWord, TranscribeProgress, TranscriberState } from './transcribe'
 import type { MadeApp, NewApp } from './appStarters'
 import type { AppInfo, BugReport, GitHubStatus, HealthReport, MergedPull, PullRequest, Release, TestCopy, VersionBump } from './appStudio'
-import type { BuildStatus, Check, FixResult, MainStatus, Preflight, ReleaseResult } from './releaseCheck'
+import type { BuildStatus, Check, FixResult, MainStatus, Preflight, ReleaseResult, TestProgress } from './releaseCheck'
 import type { DriveSpace, ExplorerEntry, ExplorerPlace, PasteMode, PcIndexStatus } from './explorer'
 import type { FileTagStore, TagColour } from './fileTags'
 import type { BinListing } from './recycleBin'
@@ -1525,6 +1525,8 @@ export interface NotesApi {
   appsPreflight(folder: string, bump: VersionBump): Promise<Preflight>
   /** Runs the app's type check and tests, as GitHub's build would. */
   appsReleaseTests(folder: string): Promise<Check>
+  /** Where appsReleaseTests is up to (type check or tests, files done, time), as it runs. */
+  onReleaseTestsProgress(callback: (p: TestProgress) => void): () => void
   /** Releases the app: npm version, then pushes the commit and tag. `expected` is the version the checks were for. */
   appsRelease(folder: string, bump: VersionBump, expected: string): Promise<ReleaseResult>
   /** One of the release helper's one-click fixes (put-away, switch-main, pull, finish-push, delete-tag, retag). */

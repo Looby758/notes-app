@@ -14,7 +14,9 @@ import {
   type FixId,
   type Preflight,
   type Problem,
-  type RecoveryId
+  type RecoveryId,
+  type TestProgress,
+  testProgressText
 } from '@shared/releaseCheck'
 import type { TerminalProject } from '../../store/terminals'
 import { refreshApps, setSection, useAppStudio } from '../../store/appStudio'
@@ -263,6 +265,7 @@ export function ReleaseFlow({ project, appKey, repo, bump }: { project: Terminal
   const info = useAppStudio((s) => s.info[project.folder])
   const [pre, setPre] = useState<Preflight | null>(null)
   const [tests, setTests] = useState<Check | null>(null)
+  const [progress, setProgress] = useState<TestProgress | null>(null)
   const [checking, setChecking] = useState(false)
   const [error, setError] = useState('')
   const [confirm, setConfirm] = useState(false)
@@ -270,14 +273,19 @@ export function ReleaseFlow({ project, appKey, repo, bump }: { project: Terminal
   const [result, setResult] = useState<{ ok: boolean; text: string; problem?: Problem; output?: string; tag?: string } | null>(null)
   const [notesFor, setNotesFor] = useState<string | null>(null)
   const run = useRef(0)
+  // The tests have their own count: re-checking after a fix (or writing the notes) mustn't throw
+  // away a test run that's still going, or its row would say "Running…" forever.
+  const testRun = useRef(0)
   const main = info?.mainBranch ?? 'main'
 
   const mainTick = useMainTick((s) => s.tick)
   // A different bump is a different release, and new commits from main mean checking again.
   useEffect(() => {
     run.current++
+    testRun.current++
     setPre(null)
     setTests(null)
+    setProgress(null)
     setResult(null)
     setConfirm(false)
     setChecking(false)
@@ -290,10 +298,12 @@ export function ReleaseFlow({ project, appKey, repo, bump }: { project: Terminal
     setResult(null)
     setConfirm(false)
     if (withTests) {
+      const t = ++testRun.current
       setTests(null)
+      setProgress(null)
       window.api.appsReleaseTests(project.folder).then(
-        (c) => id === run.current && setTests(c),
-        (err) => id === run.current && setTests({ id: 'tests', label: 'Tests pass', state: 'fail', text: errorMessage(err) })
+        (c) => t === testRun.current && setTests(c),
+        (err) => t === testRun.current && setTests({ id: 'tests', label: 'Tests pass', state: 'fail', text: errorMessage(err) })
       )
     }
     try {
@@ -306,7 +316,18 @@ export function ReleaseFlow({ project, appKey, repo, bump }: { project: Terminal
     }
   }
 
-  const checks = pre ? pre.checks.map((c) => (c.id === 'tests' ? (tests ?? c) : c)) : []
+  // Where the tests are up to, with the time ticking along while they run.
+  useEffect(() => window.api.onReleaseTestsProgress((p) => p.folder === project.folder && setProgress(p)), [project.folder])
+  const [now, setNow] = useState(Date.now())
+  const testsRunning = !!pre && !tests && pre.checks.some((c) => c.id === 'tests' && c.state === 'running')
+  useEffect(() => {
+    if (!testsRunning) return
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [testsRunning])
+  const runningTests = (c: Check): Check => (progress ? { ...c, text: testProgressText(progress, now) } : c)
+  const checks = pre ? pre.checks.map((c) => (c.id === 'tests' ? (tests ?? runningTests(c)) : c)) : []
+  const testShare = testsRunning && progress?.stage === 'tests' && progress.filesTotal ? progress.filesDone / progress.filesTotal : null
   const ready = !!pre && !checking && readyToRelease(checks)
   const problems = checks.filter((c) => c.state === 'fail').length
 
@@ -324,6 +345,7 @@ export function ReleaseFlow({ project, appKey, repo, bump }: { project: Terminal
         setResult({ ok: true, tag: r.tag, output: r.output, text: info?.releaseWorkflow ? `${r.tag} is on GitHub. GitHub is building the installers now; it takes a few minutes.` : `${r.tag} is made and pushed. This app has no release workflow, so build the installers here.` })
         setPre(null)
         setTests(null)
+        setProgress(null)
         if (repo) window.setTimeout(() => void loadReleases(repo), 15_000)
       } else {
         setResult({ ok: false, tag: r.tag, problem: r.problem, output: r.output, text: r.step === 'push' ? 'The version was set, but it couldn’t be pushed to GitHub.' : 'The version couldn’t be set.' })
@@ -370,7 +392,7 @@ export function ReleaseFlow({ project, appKey, repo, bump }: { project: Terminal
               {checking ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />}
             </button>
             {pre && (
-              <button className="icon-btn" title="Close" onClick={() => (run.current++, setPre(null), setTests(null))}>
+              <button className="icon-btn" title="Close" onClick={() => (run.current++, testRun.current++, setPre(null), setTests(null), setProgress(null))}>
                 <X size={14} />
               </button>
             )}
@@ -385,6 +407,11 @@ export function ReleaseFlow({ project, appKey, repo, bump }: { project: Terminal
                   <FixButtons fixes={c.fixes} main={main} context={context({ title: c.label, detail: c.text, fixes: c.fixes }, { output: c.output, tag: c.tag ?? pre?.tag })} />
                 )}
                 {c.id === 'notes' && notesFor && pre && <NotesWriter project={project} repo={repo} version={notesFor} onCancel={() => setNotesFor(null)} onDone={() => (setNotesFor(null), void check(false))} />}
+                {c.id === 'tests' && testShare !== null && (
+                  <div className="release-test-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(testShare * 100)}>
+                    <div style={{ width: `${Math.min(100, testShare * 100)}%` }} />
+                  </div>
+                )}
                 {c.state !== 'pass' && <Details output={c.output} />}
               </div>
             </div>

@@ -31,7 +31,8 @@ vi.mock('electron', () => ({
 vi.mock('./log', () => ({ logError: vi.fn() }))
 
 const call = <T>(name: string, ...args: unknown[]): Promise<T> => Promise.resolve().then(() => handlers.get(name)!(null, ...args) as T)
-const quiet = { stdio: ['ignore', 'pipe', 'ignore'] as ('ignore' | 'pipe')[] }
+/** Never waits forever: a git that hangs fails the test after 30 seconds instead of hanging the whole run. */
+const quiet = { stdio: ['ignore', 'pipe', 'ignore'] as ('ignore' | 'pipe')[], timeout: 30_000 }
 const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8', ...quiet }).trim()
 const byId = (p: Preflight, id: Check['id']): Check => p.checks.find((c) => c.id === id)!
 
@@ -69,7 +70,10 @@ const remoteTags = (origin: string): string[] =>
     .filter(Boolean)
 
 beforeAll(async () => {
-  Object.assign(process.env, { GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.com', GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.com', GIT_CONFIG_NOSYSTEM: '1' })
+  // The computer's own git settings stay out: a signing key (which can wait for a passphrase with
+  // no one to type it), hooks or a credential helper would make these hang or fail.
+  writeFileSync(join(home, 'gitconfig'), '[init]\n\tdefaultBranch = main\n')
+  Object.assign(process.env, { GIT_CONFIG_GLOBAL: join(home, 'gitconfig'), GIT_TERMINAL_PROMPT: '0', GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.com', GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.com', GIT_CONFIG_NOSYSTEM: '1' })
   const { setupReleaseHelper } = await import('./releaseHelper')
   setupReleaseHelper()
 })
@@ -396,6 +400,100 @@ describe('release helper (with real git)', { timeout: 60_000 }, () => {
     expect(c.text).toMatch(/^A test tripped over localStorage/)
     expect(c.fixes).toEqual(['ask-claude'])
     expect(c.output).toContain('localStorage is not defined')
+  })
+
+  /** Sets the app's test script to a node script (written next to package.json), and its test files. */
+  function testScript(source: string, testFiles: string[] = []): void {
+    writeFileSync(join(app, 'fake-tests.cjs'), source)
+    for (const f of testFiles) {
+      mkdirSync(join(app, f, '..'), { recursive: true })
+      writeFileSync(join(app, f), '')
+    }
+    const pkg = JSON.parse(readFileSync(join(app, 'package.json'), 'utf8'))
+    pkg.scripts.test = 'node fake-tests.cjs'
+    writeFileSync(join(app, 'package.json'), JSON.stringify(pkg))
+  }
+  /** Still running (a stopped program that nothing has collected yet, a zombie, doesn't count). */
+  const alive = (pid: number): boolean => {
+    try {
+      process.kill(pid, 0)
+    } catch {
+      return false
+    }
+    try {
+      return !/^\d+ \(.*\) Z/.test(readFileSync(`/proc/${pid}/stat`, 'utf8'))
+    } catch {
+      return true
+    }
+  }
+
+  it('says how far the tests have got as they run', async () => {
+    testScript(
+      `const lines = [' ✓ src/a.test.ts (3 tests) 5ms', ' ❯ src/b.test.ts (2 tests | 1 skipped) 4ms', ' ✓ src/c.test.ts (5 tests) 9ms', '', ' Tests  10 passed (10)']
+      let i = 0
+      const t = setInterval(() => { console.log(lines[i++]); if (i === lines.length) { clearInterval(t) } }, 450)`,
+      ['src/a.test.ts', 'src/b.test.ts', 'src/c.test.ts']
+    )
+    const seen: import('@shared/releaseCheck').TestProgress[] = []
+    const sender = { isDestroyed: () => false, send: (channel: string, p: import('@shared/releaseCheck').TestProgress) => channel === 'apps:releaseTestsProgress' && seen.push(p) }
+    const c = (await handlers.get('apps:releaseTests')!({ sender }, app)) as Check
+    expect(c).toMatchObject({ state: 'pass', text: 'All 10 tests passed.' })
+    expect(seen[0]).toMatchObject({ folder: app, stage: 'tests', stages: 1, filesDone: 0, filesTotal: 3 })
+    expect(seen.at(-1)).toMatchObject({ filesDone: 3, filesTotal: 3, testsDone: 10 })
+    // Next time it has last time's length to guess the time left from.
+    await handlers.get('apps:releaseTests')!({ sender }, app)
+    expect(seen.find((p) => p.filesDone === 0 && p.expectedMs)?.expectedMs).toBeGreaterThan(1000)
+  })
+
+  it('stops tests that get stuck, with everything they started, and says which file', async () => {
+    const { testLimits } = await import('./releaseHelper')
+    const before = { ...testLimits }
+    Object.assign(testLimits, { quiet: 1500 })
+    try {
+      // Like vitest: a worker it started (which would carry on after npm is stopped), then one file finishes and one never does.
+      testScript(
+        `const { spawn } = require('child_process')
+        const worker = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'inherit' })
+        require('fs').writeFileSync('worker.pid', String(worker.pid))
+        console.log(' ✓ src/fine.test.ts (2 tests) 3ms')
+        setInterval(() => {}, 1000)`,
+        ['src/fine.test.ts', 'src/stuck.test.ts']
+      )
+      const started = Date.now()
+      const c = await call<Check>('apps:releaseTests', app)
+      expect(Date.now() - started).toBeLessThan(15_000)
+      expect(c.state).toBe('fail')
+      expect(c.text).toMatch(/^The tests stopped making progress: nothing new for 2 seconds, so Orbit stopped them\. Still running: src\/stuck\.test\.ts\./)
+      expect(c.output).toContain('fine.test.ts')
+      const worker = Number(readFileSync(join(app, 'worker.pid'), 'utf8'))
+      await new Promise((r) => setTimeout(r, 300))
+      expect(alive(worker)).toBe(false)
+    } finally {
+      Object.assign(testLimits, before)
+    }
+  })
+
+  it('stops tests that take too long, saying so', async () => {
+    const { testLimits } = await import('./releaseHelper')
+    const before = { ...testLimits }
+    Object.assign(testLimits, { tests: 1500 })
+    try {
+      testScript(`setInterval(() => console.log(' ✓ src/again.test.ts (1 test) 1ms'), 200)`)
+      const c = await call<Check>('apps:releaseTests', app)
+      expect(c.state).toBe('fail')
+      expect(c.text).toMatch(/^The tests were still going after 2 seconds, so Orbit stopped them\./)
+    } finally {
+      Object.assign(testLimits, before)
+    }
+  })
+
+  it('stops the old test run when the check is started again', async () => {
+    testScript(`setTimeout(() => console.log(' Tests  1 passed (1)'), 1500)`)
+    const first = call<Check>('apps:releaseTests', app)
+    await new Promise((r) => setTimeout(r, 300))
+    const second = call<Check>('apps:releaseTests', app)
+    expect(await first).toMatchObject({ state: 'skip', text: 'Started again.' })
+    expect(await second).toMatchObject({ state: 'pass' })
   })
 
   it('reads GitHub’s build of a release (made-up GitHub answers)', async () => {
