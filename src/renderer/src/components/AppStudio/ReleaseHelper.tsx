@@ -1,15 +1,21 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { create } from 'zustand'
-import { AlertTriangle, Check as CheckIcon, ClipboardCopy, CircleSlash, ExternalLink, Hammer, Loader2, RefreshCw, Rocket, ShieldCheck, Sparkles, X } from 'lucide-react'
+import { AlertTriangle, Check as CheckIcon, ChevronDown, ChevronRight, Circle, ClipboardCopy, CircleSlash, Clock, ExternalLink, Hammer, Loader2, RefreshCw, Rocket, ShieldCheck, Sparkles, X } from 'lucide-react'
 import { changelogSource, newTokenUrl, plainChangelog, type VersionBump } from '@shared/appStudio'
 import {
   buildPhase,
+  clockTime,
+  jobProgress,
   jobsLine,
   notesItems,
   problemCard,
   readyToRelease,
   recoveryActions,
+  runTimeText,
+  type BuildJob,
   type BuildStatus,
+  type BuildStep,
+  type JobState,
   type Check,
   type FixId,
   type Preflight,
@@ -50,6 +56,7 @@ const FIX_LABELS: Record<FixId, string> = {
   'finish-push': 'Push it',
   'delete-tag': 'Delete the leftover tag',
   'write-notes': 'Write the notes',
+  'drop-notes': 'Take out the leftover notes',
   'sign-in': 'Sign in (in the terminal)',
   'connect-github': 'Connect GitHub',
   'new-token': 'Make a new token',
@@ -97,6 +104,8 @@ async function runFix(fix: FixId, c: FixContext): Promise<void> {
       return server(fix, c.tag)
     case 'write-notes':
       return c.writeNotes(c.version)
+    case 'drop-notes':
+      return server(fix, c.version)
     case 'sign-in':
       // In the terminal, git can ask (or Git Credential Manager pops up its sign-in window).
       runProjectCommand(c.project, 'git push --dry-run')
@@ -342,7 +351,7 @@ export function ReleaseFlow({ project, appKey, repo, bump }: { project: Terminal
     try {
       const r = await window.api.appsRelease(project.folder, bump, pre.next)
       if (r.ok) {
-        setResult({ ok: true, tag: r.tag, output: r.output, text: info?.releaseWorkflow ? `${r.tag} is on GitHub. GitHub is building the installers now; it takes a few minutes.` : `${r.tag} is made and pushed. This app has no release workflow, so build the installers here.` })
+        setResult({ ok: true, tag: r.tag, output: r.output, text: info?.releaseWorkflow ? `${r.tag} is on GitHub. Orbit is watching GitHub build the installers below.` : `${r.tag} is made and pushed. This app has no release workflow, so build the installers here.` })
         setPre(null)
         setTests(null)
         setProgress(null)
@@ -449,6 +458,7 @@ export function ReleaseFlow({ project, appKey, repo, bump }: { project: Terminal
           <Details output={result.output} label={result.ok ? 'Show what git said' : 'Show what it said'} />
         </div>
       )}
+      {result?.ok && result.tag && repo && info?.releaseWorkflow && <BuildCard project={project} appKey={appKey} repo={repo} tag={result.tag} inline />}
     </div>
   )
 }
@@ -469,22 +479,104 @@ const RECOVERY_HINTS: Record<RecoveryId, string> = {
   'give-up': 'Deletes the draft release and the tag. The next release can use this number again.'
 }
 
+/** Inline build cards showing now, by folder, so the one lower down the page steps aside for them. */
+const useInlineBuild = create<Record<string, number>>(() => ({}))
+const inlineBuild = (folder: string, by: number): void => useInlineBuild.setState((s) => ({ [folder]: Math.max(0, (s[folder] ?? 0) + by) }))
+
+const JOB_ICON: Record<JobState, ReactNode> = {
+  waiting: <Clock size={14} />,
+  running: <Loader2 size={14} className="spin" />,
+  done: <CheckIcon size={14} />,
+  failed: <X size={14} />,
+  skipped: <CircleSlash size={14} />,
+  cancelled: <CircleSlash size={14} />
+}
+
+const stepIcon = (s: BuildStep): ReactNode =>
+  s.status !== 'completed' ? (
+    s.status === 'in_progress' ? <Loader2 size={12} className="spin" /> : <Circle size={12} />
+  ) : s.conclusion === 'success' ? (
+    <CheckIcon size={12} />
+  ) : s.conclusion === 'skipped' ? (
+    <CircleSlash size={12} />
+  ) : (
+    <X size={12} />
+  )
+
+/** GitHub's build, job by job (Windows, Mac…): where each is up to, its time so far and time left. */
+function BuildJobs({ jobs, now }: { jobs: BuildJob[]; now: number }) {
+  const [open, setOpen] = useState<Record<string, boolean>>({})
+  return (
+    <ul className="build-jobs">
+      {jobs.map((j) => {
+        const p = jobProgress(j, now)
+        // A failed job shows its steps until it's closed, so the one that failed is in view.
+        const shown = open[j.name] ?? p.state === 'failed'
+        const steps = j.steps?.filter((s) => s.conclusion !== 'skipped') ?? []
+        return (
+          <li key={j.name} className={`build-job build-job-${p.state}`}>
+            <button className="build-job-top" onClick={() => setOpen((o) => ({ ...o, [j.name]: !shown }))} disabled={!steps.length} title={steps.length ? (shown ? 'Hide the steps' : 'Show the steps') : undefined}>
+              <span className="build-job-icon">{JOB_ICON[p.state]}</span>
+              <strong>{p.label}</strong>
+              <span className="build-job-text">{p.text}</span>
+              <span className="board-spacer" />
+              <span className="build-job-time">
+                {p.state === 'running' && p.elapsed ? `${p.elapsed}${p.left ? ` · ${p.left}` : ''}` : p.state !== 'done' ? p.elapsed : ''}
+              </span>
+              {!!steps.length && (shown ? <ChevronDown size={13} /> : <ChevronRight size={13} />)}
+            </button>
+            {p.state === 'running' && p.share !== undefined && (
+              <div className="release-test-bar build-job-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(p.share * 100)}>
+                <div style={{ width: `${Math.max(3, p.share * 100)}%` }} />
+              </div>
+            )}
+            {shown && (
+              <ol className="build-steps">
+                {steps.map((s, i) => (
+                  <li key={i} className={`build-step build-step-${s.status === 'completed' ? (s.conclusion ?? 'done') : s.status}`}>
+                    {stepIcon(s)} {s.name}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
 /**
- * After a release: what GitHub's build is doing. While it builds, which installers are done; if it
- * fails, why (read from the build's log) and buttons to get it out anyway.
+ * After a release: what GitHub's build is doing. While it builds, each job (Windows, Mac…) with the
+ * step it's on, its time so far and time left; once it's done, a link to the release, or if it
+ * fails, why (read from the build's log) and buttons to get it out anyway. `inline` is the one
+ * shown straight after pressing release; `tag` is the version to watch (else the app's own).
  */
-export function BuildCard({ project, appKey, repo }: { project: TerminalProject; appKey: string; repo: string }) {
+export function BuildCard({ project, appKey, repo, tag: forTag, inline }: { project: TerminalProject; appKey: string; repo: string; tag?: string; inline?: boolean }) {
   const info = useAppStudio((s) => s.info[project.folder])
   const tick = useBuildTick((s) => s.tick)
+  const shownInline = useInlineBuild((s) => (s[project.folder] ?? 0) > 0)
   const [status, setStatus] = useState<BuildStatus | null>(null)
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<RecoveryId | null>(null)
   const [confirm, setConfirm] = useState<RecoveryId | null>(null)
   const [writing, setWriting] = useState(false)
-  const tag = info?.version ? `v${info.version}` : null
+  const [now, setNow] = useState(Date.now())
+  const tag = forTag ?? (info?.version ? `v${info.version}` : null)
+  const shown = useRef(Date.now())
+  const lastPhase = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!inline) return
+    inlineBuild(project.folder, 1)
+    return () => inlineBuild(project.folder, -1)
+  }, [inline, project.folder])
+
+  // The card lower down the page sits still while one shows straight after a release.
+  const active = !!inline || !shownInline
 
   const load = async (): Promise<void> => {
-    if (!tag || !/^v\d+\.\d+\.\d+$/.test(tag)) return
+    if (!active || !tag || !/^v\d+\.\d+\.\d+$/.test(tag)) return
     setLoading(true)
     try {
       setStatus(await window.api.appsBuildStatus(project.folder, repo, tag))
@@ -497,19 +589,42 @@ export function BuildCard({ project, appKey, repo }: { project: TerminalProject;
 
   useEffect(() => {
     void load()
-  }, [tag, tick])
+  }, [tag, tick, active])
 
   const phase = status ? buildPhase(status) : 'unknown'
-  // While GitHub builds, look again every 30 seconds.
+  const watching = active && (phase === 'building' || phase === 'waiting' || (inline && !status))
+  // While GitHub builds, look again every 10 seconds, and keep the clocks ticking in between.
   useEffect(() => {
-    if (phase !== 'building' && phase !== 'waiting') return
-    const t = window.setInterval(() => void load(), 30_000)
-    return () => window.clearInterval(t)
-  }, [phase, tag])
+    if (!watching) return
+    const look = window.setInterval(() => void load(), 10_000)
+    const clock = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => (window.clearInterval(look), window.clearInterval(clock))
+  }, [watching, tag])
 
-  if (!status || !tag) return null
+  // Say so when a build that was being watched finishes, wherever you are in Orbit.
+  useEffect(() => {
+    if (!status || !active) return
+    const before = lastPhase.current
+    lastPhase.current = phase
+    if (before !== 'building' && before !== 'waiting') return
+    if (phase === 'published') {
+      notify(`${tag} is out on GitHub.`, 'info')
+      void loadReleases(repo)
+    } else if (phase === 'failed') notify(`GitHub’s build of ${tag} failed. See App Studio’s Releases for why.`, 'error')
+  }, [status])
+
+  if (!inline && shownInline) return null
+  if (!status || !tag) {
+    return inline ? (
+      <div className="release-build-live">
+        <span className="muted">
+          <Loader2 size={13} className="spin" /> Asking GitHub how the build’s going…
+        </span>
+      </div>
+    ) : null
+  }
   if (!status.tagHere && !status.tagOnGitHub && !status.release) return null
-  if (phase === 'published' && !status.error) {
+  if (phase === 'published' && !status.error && !inline) {
     return (
       <div className="release-build ok">
         <CheckIcon size={14} /> {tag} is out{status.run ? ` (${jobsLine(status.run.jobs)})` : ''}.
@@ -552,27 +667,45 @@ export function BuildCard({ project, appKey, repo }: { project: TerminalProject;
     }
   }
 
+  const jobs = status.run?.jobs ?? []
+  const done = jobs.filter((j) => j.status === 'completed' && j.conclusion === 'success').length
   const headline: Record<string, string> = {
     'not-pushed': `${tag} was made on this computer but never reached GitHub.`,
-    waiting: `${tag} is on GitHub. Waiting for the build to start…`,
-    building: `GitHub is building ${tag}.`,
+    waiting: `${tag} is on GitHub. Waiting for the build to start (${clockTime(now - shown.current)})…`,
+    building: `GitHub is building ${tag}${jobs.length ? `: ${done} of ${jobs.length} jobs done` : ''}.`,
     failed: `GitHub’s build of ${tag} failed, so it isn’t out yet.`,
     draft: `${tag} is still a draft on GitHub: its build didn’t finish.`,
+    published: `${tag} is out! The installers are on GitHub for everyone.`,
     unknown: `Couldn’t tell what GitHub is doing with ${tag}.`
   }
+  const time = status.run ? runTimeText(status.run, now) : ''
+  const share = phase === 'building' && jobs.length ? jobs.reduce((sum, j) => sum + (jobProgress(j, now).share ?? 0), 0) / jobs.length : null
 
   return (
-    <section className={`appstudio-card release-build-card release-build-${phase}`}>
+    <section className={`appstudio-card release-build-card release-build-${phase}${inline ? ' release-build-inline' : ''}`}>
       <div className="appstudio-card-top">
-        {phase === 'building' || phase === 'waiting' ? <Loader2 size={16} className="spin" /> : phase === 'failed' || phase === 'not-pushed' || phase === 'draft' ? <AlertTriangle size={16} /> : <Hammer size={16} />}
-        <h3>{tag} on GitHub</h3>
+        {phase === 'building' || phase === 'waiting' ? <Loader2 size={16} className="spin" /> : phase === 'published' ? <CheckIcon size={16} /> : phase === 'failed' || phase === 'not-pushed' || phase === 'draft' ? <AlertTriangle size={16} /> : <Hammer size={16} />}
+        <h3>{inline ? `GitHub’s build of ${tag}` : `${tag} on GitHub`}</h3>
         <span className="board-spacer" />
+        {time && <span className="build-run-time">{time}</span>}
         <button className="icon-btn" title="Look again" disabled={loading} onClick={() => void load()}>
           {loading ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />}
         </button>
       </div>
       <strong>{headline[phase]}</strong>
-      {status.run && !!status.run.jobs.length && <span className="muted">{jobsLine(status.run.jobs)}</span>}
+      {share !== null && (
+        <div className="release-test-bar build-run-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(share * 100)}>
+          <div style={{ width: `${Math.max(2, share * 100)}%` }} />
+        </div>
+      )}
+      {!!jobs.length && <BuildJobs jobs={jobs} now={now} />}
+      {phase === 'published' && status.release && (
+        <div className="release-fixes">
+          <a className="btn btn-primary" href={status.release.url} target="_blank" rel="noreferrer">
+            <ExternalLink size={13} /> Open the release on GitHub
+          </a>
+        </div>
+      )}
       {status.problem && (phase === 'failed' || phase === 'draft') && (
         <div className="release-result">
           <strong>{status.problem.title}</strong>

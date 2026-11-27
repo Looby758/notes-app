@@ -18846,6 +18846,120 @@ button.board-add-picture:hover {
   gap: 4px;
   align-self: flex-start;
 }
+.release-build-inline {
+  margin-top: 8px;
+}
+.release-build-published {
+  border-color: color-mix(in srgb, #2ea043 45%, var(--border));
+}
+.release-build-published .appstudio-card-top > svg:first-child {
+  color: #2ea043;
+}
+.release-build-live {
+  margin-top: 8px;
+  font-size: 12.5px;
+}
+.build-run-time {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.release-build-card .build-run-bar {
+  max-width: none;
+}
+.build-jobs {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.build-job {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.build-job-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.build-job-top:disabled {
+  cursor: default;
+}
+.build-job-top strong {
+  min-width: 70px;
+}
+.build-job-text {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.build-job-time {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.build-job-icon {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+.build-job-running .build-job-icon {
+  color: var(--accent);
+}
+.build-job-done .build-job-icon {
+  color: #2ea043;
+}
+.build-job-failed {
+  border-color: color-mix(in srgb, #d1453b 45%, var(--border));
+}
+.build-job-failed .build-job-icon,
+.build-job-failed .build-job-text {
+  color: #d1453b;
+}
+.build-jobs .build-job-bar {
+  max-width: none;
+}
+.build-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.build-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.build-step-success svg {
+  color: #2ea043;
+}
+.build-step-in_progress {
+  color: var(--text);
+}
+.build-step-in_progress svg {
+  color: var(--accent);
+}
+.build-step-failure {
+  color: #d1453b;
+}
 
 /* ---------- Money: accounts, net worth and IOUs ---------- */
 

@@ -18,6 +18,8 @@ export type FixId =
   | 'delete-tag'
   /** Write the "What's new" notes for the version into the app's code. */
   | 'write-notes'
+  /** Take out "What's new" notes for versions newer than the one being released (never released). */
+  | 'drop-notes'
   /** Sign in to GitHub for git (a push in the terminal, so git can ask). */
   | 'sign-in'
   /** Connect GitHub in App Studio. */
@@ -200,6 +202,14 @@ const plural = (n: number, one: string, many = one + 's'): string => `${n} ${n =
  * specific, so a failed test explains itself before the "npm test failed" that follows it.
  */
 const RULES: Rule[] = [
+  {
+    test: /keeps the notes newest first/i,
+    problem: () => ({
+      title: 'The What’s new list is out of order',
+      detail: 'A test checks the app’s What’s new list goes newest version first, and it doesn’t. Usually that’s notes left over from a version you gave up on, sitting above the new ones. Check again: Orbit spots leftovers and can take them out.',
+      fixes: ['ask-claude']
+    })
+  },
   {
     test: /has notes for the current version|(?:FAIL|×|✗)\s+\S*whats-?new\.test/i,
     problem: (_m, ctx) => ({
@@ -413,9 +423,53 @@ export function notesItems(text: string): string[] {
 
 const quote = (s: string): string => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, ' ')}'`
 
+const versionParts = (v: string): number[] => v.split('.').map(Number)
+/** 1 when a is the newer version, -1 when b is, 0 when they're the same. */
+export function compareVersion(a: string, b: string): number {
+  const x = versionParts(a)
+  const y = versionParts(b)
+  for (let i = 0; i < 3; i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) > (y[i] ?? 0) ? 1 : -1
+  return 0
+}
+
+/** Notes for versions newer than the one being released: left over from a version that was given up on. */
+export const staleNotes = (versions: string[], next: string): string[] => versions.filter((v) => compareVersion(v, next) > 0)
+
+interface NotesEntry {
+  version: string
+  /** Where its `{` is, and just after its `}`. */
+  start: number
+  end: number
+}
+
+/** The entries in a notes list, found by matching their braces (skipping over strings). */
+function notesEntries(source: string): NotesEntry[] {
+  const out: NotesEntry[] = []
+  for (const m of source.matchAll(/\bversion\s*:\s*['"`](\d+\.\d+\.\d+)['"`]/g)) {
+    const start = source.lastIndexOf('{', m.index)
+    if (start < 0) continue
+    let depth = 0
+    let quote = ''
+    let end = -1
+    for (let i = start; i < source.length && end < 0; i++) {
+      const c = source[i]
+      if (quote) {
+        if (c === '\\') i++
+        else if (c === quote) quote = ''
+      } else if (c === "'" || c === '"' || c === '`') quote = c
+      else if (c === '{') depth++
+      else if (c === '}' && --depth === 0) end = i + 1
+    }
+    if (end > 0) out.push({ version: m[1], start, end })
+  }
+  return out
+}
+
+const lineStart = (source: string, at: number): number => source.lastIndexOf('\n', at - 1) + 1
+
 /**
- * The file with an entry for `version` added at the top of its list (newest first), indented like
- * the entries already there. Null when there's no list to add to, or it already has that version.
+ * The file with an entry for `version` added to its list, in version order (newest first), indented
+ * like the entries already there. Null when there's no list to add to, or it already has that version.
  */
 export function addNotesEntry(source: string, version: string, items: string[]): string | null {
   if (notesVersions(source).includes(version)) return null
@@ -429,10 +483,38 @@ export function addNotesEntry(source: string, version: string, items: string[]):
   const unit = indent.includes('\t') ? '\t' : indent.length >= 2 ? indent.slice(0, 2) : '  '
   const lines = [`${indent}{`, `${indent}${unit}version: '${version}',`, `${indent}${unit}items: [`]
   items.forEach((item, i) => lines.push(`${indent}${unit}${unit}${quote(item)}${i < items.length - 1 ? ',' : ''}`))
-  lines.push(`${indent}${unit}]`, `${indent}}${/^\s*\]/.test(rest) ? '' : ','}`)
+  lines.push(`${indent}${unit}]`, `${indent}}`)
   // Windows line endings stay Windows line endings (git on Windows often checks files out that way).
   const eol = source.includes('\r\n') ? '\r\n' : '\n'
+  const entries = notesEntries(source).filter((e) => e.start >= at)
+  // Below any newer entries (notes written ahead for a bigger version), so the list stays in order.
+  if (entries.length && compareVersion(entries[0].version, version) > 0) {
+    const older = entries.find((e) => compareVersion(e.version, version) < 0)
+    if (older) {
+      const line = lineStart(source, older.start)
+      return source.slice(0, line) + lines.join(eol) + ',' + eol + source.slice(line)
+    }
+    const last = entries[entries.length - 1]
+    const comma = /^\s*,/.test(source.slice(last.end)) ? '' : ','
+    const after = last.end + (comma ? 0 : source.slice(last.end).indexOf(',') + 1)
+    return source.slice(0, after) + comma + eol + lines.join(eol) + source.slice(after)
+  }
+  lines[lines.length - 1] += /^\s*\]/.test(rest) ? '' : ','
   return source.slice(0, at) + eol + lines.join(eol) + (/^[ \t]*\r?\n/.test(rest) ? '' : eol) + rest
+}
+
+/** The file without the entries for these versions (and their lines). Null when none were there. */
+export function removeNotesEntries(source: string, versions: string[]): string | null {
+  const gone = notesEntries(source).filter((e) => versions.includes(e.version))
+  if (!gone.length) return null
+  let out = source
+  for (const e of gone.sort((a, b) => b.start - a.start)) {
+    const from = lineStart(out, e.start)
+    // The comma after it, and the rest of its line.
+    const tail = /^[ \t]*,?[ \t]*(\r?\n)?/.exec(out.slice(e.end))
+    out = out.slice(0, from) + out.slice(e.end + (tail ? tail[0].length : 0))
+  }
+  return out
 }
 
 // ---------- After the release: GitHub's build ----------
@@ -445,6 +527,19 @@ export interface BuildJob {
   conclusion: string | null
   /** The step it failed on. */
   failedStep?: string
+  /** When GitHub started and finished it (ISO times). */
+  started?: string
+  finished?: string
+  /** Its steps, in order, as GitHub lists them. */
+  steps?: BuildStep[]
+  /** How long it took on the last good builds (ms), for the time left. */
+  usualMs?: number
+}
+
+export interface BuildStep {
+  name: string
+  status: string
+  conclusion: string | null
 }
 
 export interface BuildStatus {
@@ -456,7 +551,7 @@ export interface BuildStatus {
   /** The release on GitHub for the tag. */
   release?: { draft: boolean; prerelease: boolean; url: string }
   /** The newest GitHub Actions run for the tag. */
-  run?: { id: number; status: string; conclusion: string | null; url: string; started: string; jobs: BuildJob[] }
+  run?: { id: number; status: string; conclusion: string | null; url: string; started: string; finished?: string; usualMs?: number; jobs: BuildJob[] }
   /** Why it failed, when it did (read from the failed job's log). */
   problem?: Problem
   /** The end of the failed job's log. */
@@ -509,6 +604,72 @@ export function jobsLine(jobs: BuildJob[]): string {
       return `${name} ${j.conclusion === 'cancelled' ? 'cancelled' : 'failed'}${j.failedStep ? ` (${j.failedStep})` : ''}`
     })
     .join(' · ')
+}
+
+export type JobState = 'waiting' | 'running' | 'done' | 'failed' | 'skipped' | 'cancelled'
+
+export interface JobProgress {
+  /** "Windows" for "Build (Windows)". */
+  label: string
+  state: JobState
+  /** "Step 4 of 9: Build and upload installers", "Waiting for a computer", "Done in 6:12"… */
+  text: string
+  /** How far through it is (0 to 1), when that can be told. */
+  share?: number
+  /** "3:05" so far (or in all, once it's done). */
+  elapsed?: string
+  /** "about 4 min left", "almost done", "taking longer than usual (6:10)". */
+  left?: string
+}
+
+const ms = (iso?: string): number | undefined => {
+  const t = iso ? Date.parse(iso) : NaN
+  return Number.isFinite(t) ? t : undefined
+}
+
+/** Rough time left from how long it usually takes. */
+export function leftText(elapsed: number, usualMs?: number): string {
+  if (!usualMs) return ''
+  const left = usualMs - elapsed
+  if (left < 0) return `taking longer than usual (${clockTime(usualMs)})`
+  if (left < 15_000) return 'almost done'
+  return left < 60_000 ? `about ${Math.ceil(left / 10_000) * 10} seconds left` : `about ${Math.round(left / 60_000)} min left`
+}
+
+/** What one of GitHub's build jobs is doing, in words, with its time so far and time left. */
+export function jobProgress(j: BuildJob, now: number): JobProgress {
+  const label = j.name.replace(/^Build \((.+)\)$/, '$1')
+  const start = ms(j.started)
+  const end = ms(j.finished)
+  const steps = j.steps ?? []
+  if (j.status === 'completed') {
+    const took = start && end ? clockTime(end - start) : undefined
+    if (j.conclusion === 'success') return { label, state: 'done', text: took ? `Done in ${took}` : 'Done', share: 1, elapsed: took }
+    if (j.conclusion === 'skipped') return { label, state: 'skipped', text: 'Skipped' }
+    if (j.conclusion === 'cancelled') return { label, state: 'cancelled', text: 'Cancelled', elapsed: took }
+    return { label, state: 'failed', text: j.failedStep ? `Failed at “${j.failedStep}”` : 'Failed', elapsed: took }
+  }
+  if (j.status !== 'in_progress' || !start) return { label, state: 'waiting', text: j.status === 'queued' ? 'Waiting for one of GitHub’s computers' : 'Waiting for the jobs before it', share: 0 }
+  const elapsed = Math.max(0, now - start)
+  const at = steps.findIndex((s) => s.status !== 'completed')
+  const text = steps.length && at >= 0 ? `Step ${at + 1} of ${steps.length}: ${steps[at].name}` : 'Starting…'
+  const byTime = j.usualMs ? elapsed / j.usualMs : undefined
+  const bySteps = steps.length ? Math.max(0, at) / steps.length : undefined
+  const share = Math.min(0.97, byTime ?? bySteps ?? 0)
+  return { label, state: 'running', text, share, elapsed: clockTime(elapsed), left: leftText(elapsed, j.usualMs) || undefined }
+}
+
+/** The whole build: "4:12 so far, about 3 min left" or "Took 7:40". */
+export function runTimeText(run: NonNullable<BuildStatus['run']>, now: number): string {
+  const start = ms(run.started)
+  if (!start) return ''
+  if (run.status === 'completed') {
+    const end = ms(run.finished)
+    return end ? `Took ${clockTime(end - start)}` : ''
+  }
+  const elapsed = Math.max(0, now - start)
+  const left = leftText(elapsed, run.usualMs)
+  return `${clockTime(elapsed)} so far${left ? `, ${left}` : ''}`
 }
 
 /** Only plain version tags are touched by the recovery buttons. */

@@ -4,6 +4,8 @@ import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import {
   addNotesEntry,
+  removeNotesEntries,
+  staleNotes,
   aheadBehind,
   buildPhase,
   cleanOutput,
@@ -12,7 +14,10 @@ import {
   failedTests,
   finishedTestFile,
   isNotesList,
+  jobProgress,
   jobsLine,
+  leftText,
+  runTimeText,
   notesItems,
   notesVersions,
   problemCard,
@@ -250,6 +255,101 @@ describe('after the release: GitHub’s build', () => {
         { name: 'Build (Mac)', status: 'in_progress', conclusion: null }
       ])
     ).toBe('Create draft release ✓ · Windows failed (Run npm test) · Mac building…')
+  })
+})
+
+describe('notes left over from a version that was given up on', () => {
+  // As it was: 1.16.0 was given up on, but its notes stayed at the top.
+  const list = `export const RELEASE_NOTES: readonly ReleaseNotes[] = [
+  {
+    version: '1.16.0',
+    items: [
+      'Music page: never stuck on "Looking for your music" {really}'
+    ]
+  },
+  {
+    version: '1.15.2',
+    items: ['Find songs with accents']
+  },
+  {
+    version: '1.15.1',
+    items: []
+  }
+]
+`
+
+  it('spots notes newer than the version being released', () => {
+    expect(staleNotes(notesVersions(list), '1.15.3')).toEqual(['1.16.0'])
+    expect(staleNotes(notesVersions(list), '1.16.0')).toEqual([])
+    expect(staleNotes(['1.10.0', '1.9.9'], '1.9.10')).toEqual(['1.10.0'])
+  })
+
+  it('writes new notes in version order, below newer ones', () => {
+    expect(notesVersions(addNotesEntry(list, '1.15.3', ['Fix'])!)).toEqual(['1.16.0', '1.15.3', '1.15.2', '1.15.1'])
+    expect(notesVersions(addNotesEntry(list, '1.17.0', ['New'])!)).toEqual(['1.17.0', '1.16.0', '1.15.2', '1.15.1'])
+    const last = addNotesEntry(list, '1.0.0', ['Old'])!
+    expect(notesVersions(last)).toEqual(['1.16.0', '1.15.2', '1.15.1', '1.0.0'])
+    // Still a list that loads.
+    for (const out of [addNotesEntry(list, '1.15.3', ['Fix'])!, last]) {
+      const js = ts.transpileModule(out.replace(': readonly ReleaseNotes[]', ''), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText
+      const mod = { exports: {} as { RELEASE_NOTES?: { version: string }[] } }
+      new Function('module', 'exports', js)(mod, mod.exports)
+      expect(mod.exports.RELEASE_NOTES?.length).toBe(4)
+    }
+  })
+
+  it('takes the leftover notes out, leaving the rest as it was', () => {
+    const out = removeNotesEntries(list, ['1.16.0'])!
+    expect(notesVersions(out)).toEqual(['1.15.2', '1.15.1'])
+    expect(out).toBe(list.replace(/  \{\n    version: '1\.16\.0'[\s\S]*?\n  \},\n/, ''))
+    expect(notesVersions(removeNotesEntries(list, ['1.15.1'])!)).toEqual(['1.16.0', '1.15.2'])
+    expect(removeNotesEntries(list, ['2.0.0'])).toBeNull()
+  })
+
+  it('explains a list out of order', () => {
+    const p = explainProblem(" FAIL  src/shared/whatsNew.test.ts > what's new > keeps the notes newest first\nAssertionError: expected -1 to be 1", { tag: 'v1.15.3' })
+    expect(p.title).toBe('The What’s new list is out of order')
+  })
+})
+
+describe('jobProgress', () => {
+  const now = Date.parse('2026-11-27T16:10:00Z')
+  const steps = [
+    { name: 'Set up job', status: 'completed', conclusion: 'success' },
+    { name: 'Install packages', status: 'completed', conclusion: 'success' },
+    { name: 'Build and upload installers', status: 'in_progress', conclusion: null },
+    { name: 'Complete job', status: 'queued', conclusion: null }
+  ]
+
+  it('says which step a running job is on, with its time so far and time left', () => {
+    const p = jobProgress({ name: 'Build (Windows)', status: 'in_progress', conclusion: null, started: '2026-11-27T16:07:00Z', steps, usualMs: 8 * 60_000 }, now)
+    expect(p).toMatchObject({ label: 'Windows', state: 'running', text: 'Step 3 of 4: Build and upload installers', elapsed: '3:00', left: 'about 5 min left' })
+    expect(p.share).toBeCloseTo(3 / 8)
+  })
+
+  it('goes by the steps when it has never built before', () => {
+    const p = jobProgress({ name: 'Build (Mac)', status: 'in_progress', conclusion: null, started: '2026-11-27T16:09:30Z', steps }, now)
+    expect(p.share).toBe(0.5)
+    expect(p.left).toBeUndefined()
+  })
+
+  it('says when a job is waiting, done or failed', () => {
+    expect(jobProgress({ name: 'Publish release', status: 'queued', conclusion: null }, now)).toMatchObject({ state: 'waiting', text: 'Waiting for one of GitHub’s computers' })
+    expect(jobProgress({ name: 'Build (Mac)', status: 'completed', conclusion: 'success', started: '2026-11-27T16:00:00Z', finished: '2026-11-27T16:06:12Z' }, now)).toMatchObject({ state: 'done', text: 'Done in 6:12' })
+    expect(jobProgress({ name: 'Build (Windows)', status: 'completed', conclusion: 'failure', failedStep: 'Run npm test' }, now)).toMatchObject({ state: 'failed', text: 'Failed at “Run npm test”' })
+  })
+
+  it('words the time left', () => {
+    expect(leftText(60_000)).toBe('')
+    expect(leftText(60_000, 65_000)).toBe('almost done')
+    expect(leftText(60_000, 100_000)).toBe('about 40 seconds left')
+    expect(leftText(9 * 60_000, 8 * 60_000)).toBe('taking longer than usual (8:00)')
+  })
+
+  it('times the whole build', () => {
+    const run = { id: 1, status: 'in_progress', conclusion: null, url: '', started: '2026-11-27T16:06:00Z', usualMs: 9 * 60_000, jobs: [] }
+    expect(runTimeText(run, now)).toBe('4:00 so far, about 5 min left')
+    expect(runTimeText({ ...run, status: 'completed', conclusion: 'success', finished: '2026-11-27T16:13:40Z' }, now)).toBe('Took 7:40')
   })
 })
 
