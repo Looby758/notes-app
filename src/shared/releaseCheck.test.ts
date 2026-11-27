@@ -7,8 +7,10 @@ import {
   aheadBehind,
   buildPhase,
   cleanOutput,
+  clockTime,
   explainProblem,
   failedTests,
+  finishedTestFile,
   isNotesList,
   jobsLine,
   notesItems,
@@ -18,7 +20,9 @@ import {
   recoveryActions,
   type BuildStatus,
   mainStatusText,
-  type Check
+  type Check,
+  testProgressText,
+  type TestProgress
 } from './releaseCheck'
 
 // The kinds of output the release has stopped on before (shortened, but as the tools print it).
@@ -259,5 +263,27 @@ describe('mainStatusText', () => {
     expect(mainStatusText({ ...base, branch: 'feature', onMain: false, behind: 2 })).toBe('This folder’s main is 2 commits behind GitHub’s main.')
     expect(mainStatusText({ ...base, linked: false })).toMatch(/isn’t linked to GitHub/)
     expect(mainStatusText({ ...base, problem: 'Couldn’t check GitHub.' })).toBe('Couldn’t check GitHub.')
+  })
+})
+
+describe('test progress', () => {
+  it('reads finished test files from vitest and jest', () => {
+    expect(finishedTestFile(' ✓ src/shared/voiceDsp.test.ts (6 tests) 113ms')).toEqual({ file: 'src/shared/voiceDsp.test.ts', tests: 6, failed: 0 })
+    expect(finishedTestFile(' ❯ src/c.test.ts (5 tests | 1 failed | 2 skipped) 6ms')).toEqual({ file: 'src/c.test.ts', tests: 5, failed: 1 })
+    expect(finishedTestFile(' √ src\\a.spec.tsx (1 test) 1ms')).toEqual({ file: 'src\\a.spec.tsx', tests: 1, failed: 0 })
+    expect(finishedTestFile('FAIL src/b.test.js')).toEqual({ file: 'src/b.test.js', tests: 0, failed: 1 })
+    expect(finishedTestFile(' ❯ src/c.test.ts:2:27')).toBeNull()
+    expect(finishedTestFile(' Tests  10 passed (10)')).toBeNull()
+  })
+
+  it('says the step, how far, and roughly how long is left', () => {
+    const start = 1_000_000
+    const p: TestProgress = { folder: '/a', stage: 'typecheck', stages: 2, startedAt: start, filesDone: 0, testsDone: 0, failed: 0, expectedMs: 40_000 }
+    expect(testProgressText(p, start + 10_000)).toBe('Step 1 of 2: checking the types. 0:10 so far, about 30 seconds left.')
+    expect(testProgressText(p, start + 55_000)).toBe('Step 1 of 2: checking the types. 0:55 so far, taking longer than last time (0:40).')
+    const t: TestProgress = { ...p, stage: 'tests', filesDone: 105, filesTotal: 210, testsDone: 1204, failed: 0, expectedMs: undefined }
+    expect(testProgressText(t, start + 42_000)).toBe('Step 2 of 2: running the tests. 105 of 210 files done (1,204 tests). 0:42 so far, about 50 seconds left.')
+    expect(testProgressText({ ...t, stages: 1, failed: 2, filesTotal: undefined }, start + 5_000)).toBe('Running the tests. 105 files done (1,204 tests), 2 failed so far. 0:05 so far.')
+    expect(clockTime(75_000)).toBe('1:15')
   })
 })

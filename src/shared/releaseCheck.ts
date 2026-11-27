@@ -513,3 +513,60 @@ export function jobsLine(jobs: BuildJob[]): string {
 
 /** Only plain version tags are touched by the recovery buttons. */
 export const isVersionTag = (tag: string): boolean => /^v\d+\.\d+\.\d+$/.test(tag)
+
+/** Where the release check's type check and tests are up to, sent while they run. */
+export interface TestProgress {
+  folder: string
+  stage: 'typecheck' | 'tests'
+  /** How many stages this run has (1 when there's no type check). */
+  stages: number
+  /** When this stage started (ms since 1970). */
+  startedAt: number
+  /** Test files finished, and how many there are (when the files could be counted). */
+  filesDone: number
+  filesTotal?: number
+  testsDone: number
+  failed: number
+  /** How long this stage took the last time it passed, for a rough time left. */
+  expectedMs?: number
+}
+
+/** One finished test file in vitest's (✓ a.test.ts (12 tests | 1 failed) 30ms) or jest's (PASS a.test.ts) output. */
+export function finishedTestFile(line: string): { file: string; tests: number; failed: number } | null {
+  const v = /^\s*(?:✓|√|❯|×|✗|↓)\s+(\S+\.(?:test|spec)\.[cm]?[jt]sx?)\s+\((\d+) tests?([^)]*)\)/.exec(line)
+  if (v) return { file: v[1], tests: Number(v[2]), failed: Number(/(\d+) failed/.exec(v[3])?.[1] ?? 0) }
+  const j = /^\s*(PASS|FAIL)\s+(\S+\.(?:test|spec)\.[cm]?[jt]sx?)\b/.exec(line)
+  if (j) return { file: j[2], tests: 0, failed: j[1] === 'FAIL' ? 1 : 0 }
+  return null
+}
+
+/** 75000 → "1:15". */
+export function clockTime(ms: number): string {
+  const s = Math.max(0, Math.round(ms / 1000))
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+
+/** Rough time left: from how far through the files it is, else from how long it took last time. */
+export function timeLeft(p: TestProgress, now: number): string {
+  const elapsed = now - p.startedAt
+  let left: number | undefined
+  if (p.filesTotal && p.filesDone >= 3 && elapsed > 3000) left = (elapsed / p.filesDone) * (p.filesTotal - p.filesDone)
+  else if (p.expectedMs) left = p.expectedMs - elapsed
+  if (left === undefined) return ''
+  if (left < 0) return p.expectedMs ? `taking longer than last time (${clockTime(p.expectedMs)})` : ''
+  if (left < 10_000) return 'almost done'
+  return left < 60_000 ? `about ${Math.ceil(left / 10_000) * 10} seconds left` : `about ${Math.round(left / 60_000)} min left`
+}
+
+/** "Step 2 of 2: running the tests. 120 of 210 files done (1,204 tests). 0:42 so far, about 20 seconds left." */
+export function testProgressText(p: TestProgress, now: number): string {
+  const step = p.stages > 1 ? `Step ${p.stage === 'typecheck' ? 1 : 2} of ${p.stages}: ` : ''
+  let what = p.stage === 'typecheck' ? `${step}checking the types.` : `${step}running the tests.`
+  if (p.stage === 'tests' && (p.filesDone || p.filesTotal)) {
+    what += ` ${p.filesDone}${p.filesTotal ? ` of ${p.filesTotal}` : ''} file${(p.filesTotal ?? p.filesDone) === 1 ? '' : 's'} done`
+    if (p.testsDone) what += ` (${p.testsDone.toLocaleString('en-GB')} tests)`
+    what += p.failed ? `, ${p.failed} failed so far.` : '.'
+  }
+  const left = timeLeft(p, now)
+  return `${what.replace(/^./, (c) => c.toUpperCase())} ${clockTime(now - p.startedAt)} so far${left ? `, ${left}` : ''}.`
+}
