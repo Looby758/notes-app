@@ -18,13 +18,6 @@ export const RELEASE_NOTES: readonly ReleaseNotes[] = [
     ]
   },
   {
-    version: '1.16.0',
-    items: [
-      'Find playlist songs whose names have accents',
-      'Music page: never stuck on "Looking for your music"'
-    ]
-  },
-  {
     version: '1.15.2',
     items: [
       'Find playlist songs whose names have accents',
