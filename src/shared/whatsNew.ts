@@ -12,6 +12,12 @@ export interface ReleaseNotes {
 /** Newest first. Add an entry with each release. */
 export const RELEASE_NOTES: readonly ReleaseNotes[] = [
   {
+    version: '1.15.5',
+    items: [
+      'SkyBlock: paste a new Hypixel key right where it says the key ran out'
+    ]
+  },
+  {
     version: '1.15.4',
     items: [
       'App studio improvements'
