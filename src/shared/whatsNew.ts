@@ -12,6 +12,12 @@ export interface ReleaseNotes {
 /** Newest first. Add an entry with each release. */
 export const RELEASE_NOTES: readonly ReleaseNotes[] = [
   {
+    version: '1.15.4',
+    items: [
+      'App studio improvements'
+    ]
+  },
+  {
     version: '1.15.3',
     items: [
       'Add an audio editor, and trimming songs from the Music page'
