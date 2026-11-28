@@ -49,6 +49,8 @@ export interface Survival {
   rewindTo: (index: number) => void
   /** Swap in a saved world. It's paused, and rewinding starts again from here. */
   load: (w: SurvivalWorld) => void
+  /** Jump to a copy of the world from earlier (undo): later rewind points are dropped, and it pauses. */
+  restore: (w: SurvivalWorld) => void
 }
 
 export function useSurvival(): Survival {
@@ -148,5 +150,16 @@ export function useSurvival(): Survival {
     [refresh]
   )
 
-  return { world, snapshots, options, running, setRunning, speed, setSpeed, version, refresh, stepOnce, restart, rewindTo, load }
+  const restore = useCallback(
+    (w: SurvivalWorld) => {
+      world.current = snapshotSurvival(w)
+      const kept = snapshots.current.filter((s) => s.tick <= w.tick && s.map === w.map)
+      snapshots.current = kept.length ? kept : [snapshotSurvival(w)]
+      setRunning(false)
+      refresh()
+    },
+    [refresh]
+  )
+
+  return { world, snapshots, options, running, setRunning, speed, setSpeed, version, refresh, stepOnce, restart, rewindTo, load, restore }
 }

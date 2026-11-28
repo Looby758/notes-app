@@ -12,6 +12,7 @@ import {
   partOfDay,
   personById,
   quickStart,
+  snapshotSurvival,
   spawnGroup,
   spawnSupplies,
   spawnWalkers,
@@ -22,6 +23,7 @@ import { SURVIVAL_SPEEDS, useSurvival } from './useSurvival'
 import SurvivalView, { type Selection } from './SurvivalView'
 import { BuildingCard, CreatorPanel, GroupCard, GroupList, PersonCard, StoryPanel, newCreator, when, type Creator } from './SurvivalPanels'
 import { Slider, Toggle } from './Panels'
+import { recordUndo, UNDO_KEY } from '../../lib/undo'
 import SavesDialog from './SavesDialog'
 import { AUTOSAVE, writeSave } from './saveFiles'
 
@@ -114,16 +116,35 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
     if (s) setPanel('groups')
   }
 
+  /**
+   * Does something you placed or ordered, and puts it on Ctrl+Z: undoing it jumps the world back to
+   * the moment just before (paused), and redoing jumps to just after.
+   */
+  const change = (label: string, fn: () => void): void => {
+    const before = snapshotSurvival(sv.world.current)
+    fn()
+    const after = snapshotSurvival(sv.world.current)
+    recordUndo({
+      label: `${label} (Day ${dayOf(before.tick)}, ${clockText(before.tick)})`,
+      undo: () => {
+        sv.restore(before)
+        setSelection(null)
+      },
+      redo: () => sv.restore(after)
+    })
+  }
+
   const onPick = (x: number, y: number, hit: Selection): void => {
     const world = sv.world.current
     if (picking) {
       const g = groupById(world, picking.group)
       if (g) {
-        if (picking.order === 'explore') giveOrder(world, g, { kind: 'explore', x, y })
+        if (picking.order === 'explore') change(`Told ${g.name} to scout`, () => giveOrder(world, g, { kind: 'explore', x, y }))
         else {
           const b = buildingAt(world, x, y, 1)
           if (!b) return // Keep waiting for a click on a building.
-          giveOrder(world, g, { kind: picking.order, building: b.id })
+          const order = picking.order
+          change(`Told ${g.name} to ${order === 'move' ? 'move to' : 'search'} ${b.name}`, () => giveOrder(world, g, { kind: order, building: b.id }))
         }
       }
       setPicking(null)
@@ -137,23 +158,24 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
         else select(hit)
         return
       case 'people': {
-        const g = spawnGroup(world, creator.draft, x, y)
+        let g = null as unknown as ReturnType<typeof spawnGroup>
+        change(`Placed ${creator.draft.name}`, () => (g = spawnGroup(world, creator.draft, x, y)))
         setCreator(newCreator(world, creator.kind))
         select({ kind: 'group', id: g.id })
         setTool('select')
         break
       }
       case 'walker':
-        spawnWalkers(world, x, y, walkerCount, false)
+        change(`Placed ${walkerCount === 1 ? 'a walker' : `${walkerCount} walkers`}`, () => spawnWalkers(world, x, y, walkerCount, false))
         break
       case 'herd':
-        spawnWalkers(world, x, y, herdSize, true)
+        change(`Placed a herd of ${herdSize}`, () => spawnWalkers(world, x, y, herdSize, true))
         break
       case 'supplies':
-        spawnSupplies(world, x, y)
+        change('Placed supplies', () => spawnSupplies(world, x, y))
         break
       case 'noise':
-        makeNoise(world, x, y, 50)
+        change('Made a noise', () => makeNoise(world, x, y, 50))
         break
     }
     sv.refresh()
@@ -330,7 +352,8 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
                 <button
                   className="btn btn-primary"
                   onClick={() => {
-                    const g = quickStart(w)
+                    let g = null as unknown as ReturnType<typeof quickStart>
+                    change('Ready-made start', () => (g = quickStart(w)))
                     select({ kind: 'group', id: g.id })
                     setFocus({ x: g.homeX, y: g.homeY, n: Date.now() })
                     sv.setRunning(true)
@@ -375,7 +398,7 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
             ))}
           </nav>
           <div className="evo-side-scroll">
-            {panel === 'groups' && <GroupsTab world={w} selection={selection} select={select} picking={picking} setPicking={setPicking} refresh={sv.refresh} fogGroup={fogGroup} version={sv.version} />}
+            {panel === 'groups' && <GroupsTab world={w} selection={selection} select={select} picking={picking} setPicking={setPicking} refresh={sv.refresh} fogGroup={fogGroup} version={sv.version} onOrder={change} />}
             {panel === 'add' && (
               <AddTab
                 world={w}
@@ -477,7 +500,8 @@ function GroupsTab({
   picking,
   setPicking,
   refresh,
-  fogGroup
+  fogGroup,
+  onOrder
 }: {
   world: SurvivalWorld
   selection: Selection
@@ -487,6 +511,7 @@ function GroupsTab({
   refresh: () => void
   fogGroup: number | null
   version: number
+  onOrder: (label: string, fn: () => void) => void
 }) {
   if (selection?.kind === 'person') {
     const p = personById(world, selection.id)
@@ -504,6 +529,7 @@ function GroupsTab({
           picking={picking?.group === g.id ? picking.order : null}
           onPickOrder={(o) => setPicking(o ? { group: g.id, order: o } : null)}
           onChanged={refresh}
+          onOrder={onOrder}
         />
       )
   }
@@ -547,6 +573,7 @@ function AddTab({
           ))}
         </div>
         {tool === 'select' && <p className="evo-hint">Pick something to add, then click the map. Groups only find out about what you add when they see it.</p>}
+        <p className="evo-hint">Placed something by mistake? {UNDO_KEY} takes it back and jumps to the moment before you placed it.</p>
         {tool === 'walker' && <Slider label="Walkers per click" value={walkerCount} min={1} max={30} step={1} onChange={setWalkerCount} />}
         {tool === 'herd' && (
           <>

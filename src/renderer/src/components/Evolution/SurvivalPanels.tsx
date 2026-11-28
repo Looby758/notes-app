@@ -229,7 +229,8 @@ export function GroupCard({
   onSelect,
   onPickOrder,
   picking,
-  onChanged
+  onChanged,
+  onOrder
 }: {
   world: SurvivalWorld
   g: Group
@@ -237,6 +238,8 @@ export function GroupCard({
   onPickOrder: (o: OrderKind | null) => void
   picking: OrderKind | null
   onChanged: () => void
+  /** Gives an order so it can be undone with Ctrl+Z. */
+  onOrder: (label: string, fn: () => void) => void
 }) {
   const ms = membersOf(world, g)
   const camp = campOf(world, g)
@@ -303,7 +306,7 @@ export function GroupCard({
             onClick={() => {
               if (o.pick) onPickOrder(picking === o.kind ? null : o.kind)
               else {
-                giveOrder(world, g, { kind: o.kind })
+                onOrder(`Told ${g.name}: ${o.label.toLowerCase()}`, () => giveOrder(world, g, { kind: o.kind }))
                 onChanged()
               }
             }}
