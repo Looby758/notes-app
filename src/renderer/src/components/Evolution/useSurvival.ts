@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { DAY, SURVIVAL_STEPS_PER_SECOND, createSurvivalWorld, snapshotSurvival, stepSurvival, type SurvivalWorld } from '@shared/survival'
+import { DAY, SURVIVAL_STEPS_PER_SECOND, type SurvivalWorld } from '@shared/survival'
+import { areaById, createGlobe, pendingCount, snapshotGlobe, stepGlobe, type Globe } from '@shared/globe'
 
 /** A copy of the world is kept every this many steps (in-game minutes) for rewinding. */
 const SNAPSHOT_EVERY = DAY / 4
@@ -28,8 +29,8 @@ function readOptions(): SurvivalOptionsState {
   return { seed: 30, harshness: 0.5 }
 }
 
-/** A world with nothing in it yet: not worth a rewind point once something's been placed. */
-const isEmpty = (w: SurvivalWorld): boolean => !w.groups.length && !w.walkers.length && !w.fallen.length
+/** A globe with nothing in it yet: not worth a rewind point once something's been placed. */
+const isEmpty = (g: Globe): boolean => !g.parties.length && g.areas.every((a) => !a.world.groups.length && !a.world.walkers.length && !a.world.fallen.length)
 
 function thin<T>(list: T[]): T[] {
   const half = Math.floor(list.length / 2)
@@ -37,8 +38,15 @@ function thin<T>(list: T[]): T[] {
 }
 
 export interface Survival {
+  /** The whole world: every area on the globe, and everyone on the road between them. */
+  globe: React.MutableRefObject<Globe>
+  /** The area you're looking at. */
   world: React.MutableRefObject<SurvivalWorld>
-  snapshots: React.MutableRefObject<SurvivalWorld[]>
+  areaId: number
+  setArea: (id: number) => void
+  /** The first area with a question waiting for you, if any. */
+  pendingArea: () => number | null
+  snapshots: React.MutableRefObject<Globe[]>
   options: SurvivalOptionsState
   running: boolean
   setRunning: (on: boolean) => void
@@ -60,20 +68,39 @@ export interface Survival {
   lookingBack: () => boolean
   /** Adds a rewind point for right now (after you place something), dropping any kept future. */
   mark: () => void
-  /** Swap in a saved world. It's paused, and rewinding starts again from here. */
-  load: (w: SurvivalWorld) => void
+  /** Swap in a saved globe. It's paused, and rewinding starts again from here. */
+  load: (g: Globe) => void
   /**
    * Jump to a copy of the world (undo/redo), paused. With `snaps`, the rewind points are put back
    * exactly as they were; otherwise later ones are dropped.
    */
-  restore: (w: SurvivalWorld, snaps?: SurvivalWorld[]) => void
+  restore: (g: Globe, snaps?: Globe[]) => void
 }
 
 export function useSurvival(): Survival {
   const [options, setOptions] = useState(readOptions)
-  const world = useRef<SurvivalWorld>(null as unknown as SurvivalWorld)
-  if (!world.current) world.current = createSurvivalWorld(options)
-  const snapshots = useRef<SurvivalWorld[]>([snapshotSurvival(world.current)])
+  const globe = useRef<Globe>(null as unknown as Globe)
+  if (!globe.current) globe.current = createGlobe(options)
+  const [areaId, setAreaId] = useState(() => globe.current.areas[0].id)
+  const areaRef = useRef(areaId)
+  const world = useRef<SurvivalWorld>(globe.current.areas[0].world)
+  /** Points `world` at the area being looked at (after the globe is swapped for another copy). */
+  const sync = useCallback(() => {
+    const a = areaById(globe.current, areaRef.current) ?? globe.current.areas[0]
+    areaRef.current = a.id
+    world.current = a.world
+  }, [])
+  const setArea = useCallback(
+    (id: number) => {
+      areaRef.current = id
+      setAreaId(id)
+      sync()
+      setVersion((v) => v + 1)
+    },
+    [sync]
+  )
+  const pendingArea = useCallback((): number | null => globe.current.areas.find((a) => a.world.pending.length)?.id ?? null, [])
+  const snapshots = useRef<Globe[]>([snapshotGlobe(globe.current)])
   // It starts paused: there's nobody in the world until you put someone there.
   const [running, setRunning] = useState(false)
   const [speed, setSpeed] = useState<SurvivalSpeed>(1)
@@ -87,14 +114,14 @@ export function useSurvival(): Survival {
 
   const advance = useCallback((n: number, budget: number): void => {
     const start = performance.now()
-    const w = world.current
+    const g = globe.current
     // Playing on from the past: what came after is replaced by what happens now.
-    if (n > 0 && !w.pending.length) dropFuture(w.tick)
+    if (n > 0 && !pendingCount(g)) dropFuture(g.tick)
     for (let i = 0; i < n; i++) {
-      if (w.pending.length) break
-      stepSurvival(w)
-      if (w.tick % SNAPSHOT_EVERY === 0) {
-        snapshots.current.push(snapshotSurvival(w))
+      if (pendingCount(g)) break
+      stepGlobe(g)
+      if (g.tick % SNAPSHOT_EVERY === 0) {
+        snapshots.current.push(snapshotGlobe(g))
         if (snapshots.current.length > MAX_SNAPSHOTS) snapshots.current = thin(snapshots.current)
       }
       if (performance.now() - start > budget) break
@@ -114,9 +141,11 @@ export function useSurvival(): Survival {
       const want = Math.floor(carry)
       carry -= want
       advance(want, FRAME_BUDGET_MS)
-      if (world.current.pending.length) {
-        // A group is waiting on you: stop until you've answered.
+      const waiting = pendingArea()
+      if (waiting != null) {
+        // A group is waiting on you: stop until you've answered, and go to where it is.
         setRunning(false)
+        if (waiting !== areaRef.current) setArea(waiting)
         setVersion((v) => v + 1)
         return
       }
@@ -128,7 +157,7 @@ export function useSurvival(): Survival {
     }
     frame = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(frame)
-  }, [running, speed, advance])
+  }, [running, speed, advance, pendingArea, setArea])
 
   const stepOnce = useCallback(() => {
     advance(10, 1000)
@@ -144,12 +173,15 @@ export function useSurvival(): Survival {
       } catch {
         // Not remembered, but it still works.
       }
-      world.current = createSurvivalWorld(next)
-      snapshots.current = [snapshotSurvival(world.current)]
+      globe.current = createGlobe(next)
+      areaRef.current = globe.current.areas[0].id
+      setAreaId(areaRef.current)
+      sync()
+      snapshots.current = [snapshotGlobe(globe.current)]
       setRunning(false)
       refresh()
     },
-    [options, refresh]
+    [options, refresh, sync]
   )
 
   const rewindTo = useCallback(
@@ -157,63 +189,69 @@ export function useSurvival(): Survival {
       const snap = snapshots.current[index]
       if (!snap) return
       const list = snapshots.current
-      const live = world.current
+      const live = globe.current
       const last = list[list.length - 1]
       // Keep "now" on the slider so you can come back to it.
-      if (last && live.tick > last.tick) list.push(snapshotSurvival(live))
-      else if (last && live.tick === last.tick && index !== list.length - 1) list[list.length - 1] = snapshotSurvival(live)
-      world.current = snapshotSurvival(snap)
+      if (last && live.tick > last.tick) list.push(snapshotGlobe(live))
+      else if (last && live.tick === last.tick && index !== list.length - 1) list[list.length - 1] = snapshotGlobe(live)
+      globe.current = snapshotGlobe(snap)
+      sync()
       setRunning(false)
       refresh()
     },
-    [refresh]
+    [refresh, sync]
   )
 
   const lookingBack = useCallback((): boolean => {
     const last = snapshots.current[snapshots.current.length - 1]
-    return !!last && last.tick > world.current.tick
+    return !!last && last.tick > globe.current.tick
   }, [])
 
   const backToNow = useCallback(() => {
     const list = snapshots.current
-    if (list.length) world.current = snapshotSurvival(list[list.length - 1])
+    if (list.length) globe.current = snapshotGlobe(list[list.length - 1])
+    sync()
     refresh()
-  }, [refresh])
+  }, [refresh, sync])
 
   const mark = useCallback(() => {
-    const w = world.current
-    let list = snapshots.current.filter((s) => s.tick < w.tick)
-    if (!isEmpty(w)) list = list.filter((s) => !isEmpty(s))
-    list.push(snapshotSurvival(w))
+    const g = globe.current
+    let list = snapshots.current.filter((s) => s.tick < g.tick)
+    if (!isEmpty(g)) list = list.filter((s) => !isEmpty(s))
+    list.push(snapshotGlobe(g))
     snapshots.current = list.length > MAX_SNAPSHOTS ? thin(list) : list
   }, [])
 
   const load = useCallback(
-    (w: SurvivalWorld) => {
-      world.current = w
-      snapshots.current = [snapshotSurvival(w)]
+    (g: Globe) => {
+      globe.current = g
+      sync()
+      setAreaId(areaRef.current)
+      snapshots.current = [snapshotGlobe(g)]
       setRunning(false)
       refresh()
     },
-    [refresh]
+    [refresh, sync]
   )
 
   const restore = useCallback(
-    (w: SurvivalWorld, snaps?: SurvivalWorld[]) => {
-      world.current = snapshotSurvival(w)
+    (g: Globe, snaps?: Globe[]) => {
+      globe.current = snapshotGlobe(g)
+      sync()
+      setAreaId(areaRef.current)
       if (snaps) {
         snapshots.current = snaps.slice()
         setRunning(false)
         refresh()
         return
       }
-      const kept = snapshots.current.filter((s) => s.tick <= w.tick && s.map === w.map)
-      snapshots.current = kept.length ? kept : [snapshotSurvival(w)]
+      const kept = snapshots.current.filter((s) => s.tick <= g.tick && s.seed === g.seed)
+      snapshots.current = kept.length ? kept : [snapshotGlobe(g)]
       setRunning(false)
       refresh()
     },
     [refresh]
   )
 
-  return { world, snapshots, options, running, setRunning, speed, setSpeed, version, refresh, stepOnce, restart, rewindTo, backToNow, lookingBack, mark, load, restore }
+  return { globe, world, areaId, setArea, pendingArea, snapshots, options, running, setRunning, speed, setSpeed, version, refresh, stepOnce, restart, rewindTo, backToNow, lookingBack, mark, load, restore }
 }

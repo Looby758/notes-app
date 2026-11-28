@@ -14,6 +14,8 @@
  * restored to rewind.
  */
 
+import { cultureOf, type CultureId } from './cultures'
+
 // ---------- time ----------
 
 export const DAY = 1440
@@ -86,6 +88,8 @@ export interface MapData {
   towns: Town[]
   /** Where the main road leaves the map, and where it goes. */
   exits: { x: number; y: number; label: string }[]
+  /** Whose names and words the area uses (American by default). */
+  culture?: CultureId
 }
 
 export type BuildingKind = 'house' | 'store' | 'pharmacy' | 'gas' | 'police' | 'school' | 'church' | 'warehouse' | 'farm' | 'cache'
@@ -300,6 +304,14 @@ export interface Order {
 
 export type Relation = 'ally' | 'avoid' | 'enemy'
 
+export interface AreaMemory {
+  seen: Int32Array
+  danger: Uint16Array
+  known: Record<number, { tick: number; loot: Supplies | null }>
+  creeks: number[]
+  camp: number | null
+}
+
 export interface Group {
   id: number
   name: string
@@ -328,6 +340,10 @@ export interface Group {
   /** The step they last fought each other group. */
   fought: Record<number, number>
   order: Order | null
+  /** Heading off the map for somewhere far away: everyone walks to (x, y) at the edge. */
+  leaving: { x: number; y: number; to: string; lat?: number; lon?: number } | null
+  /** What they knew about other areas they've been in, by area id, for when they go back. */
+  away: Record<number, AreaMemory>
   created: number
   peak: number
   alive: boolean
@@ -554,6 +570,24 @@ function areaClear(tiles: Uint8Array, x: number, y: number, w: number, h: number
 export interface SurvivalOptions {
   seed: number
   harshness: number
+  /** Where on the globe this area is. Left out, it's the stretch of country outside Atlanta. */
+  place?: AreaPlace
+}
+
+export interface AreaPlace {
+  /** Shown at the top of the map, like "Outside Paris, France". */
+  region: string
+  culture: CultureId
+  /** A famous city the area is in: the biggest town is the city itself. */
+  city?: { name: string; size: 1 | 2 | 3 }
+  /** Where the highway off the map goes, like "To Lyon". */
+  exit: string
+  /** Every id in this area starts here, so people and groups stay unique across the globe. */
+  idBase: number
+  /** The step the area starts on (the globe's clock). */
+  tick: number
+  /** The first line of its log. */
+  intro: string
 }
 
 export function createSurvivalWorld(opts: SurvivalOptions): SurvivalWorld {
@@ -582,10 +616,13 @@ export function createSurvivalWorld(opts: SurvivalOptions): SurvivalWorld {
   }
 
   // Towns.
-  const names = [...TOWN_NAMES]
+  const place = opts.place
+  const culture = place ? cultureOf(place.culture) : null
+  const names = [...(culture ? culture.towns : TOWN_NAMES)]
   const takeName = () => names.splice(Math.floor(random(r) * names.length), 1)[0]
+  const big = place?.city ? 24 + place.city.size * 4 : 24
   const towns: Town[] = [
-    { name: takeName(), x: Math.round(between(r, 40, 70)), y: Math.round(between(r, 35, 55)), r: 24 },
+    { name: place?.city ? place.city.name : takeName(), x: Math.round(between(r, big + 12, big + 30)), y: Math.round(between(r, 35, 55)), r: big },
     { name: takeName(), x: Math.round(between(r, 170, 200)), y: Math.round(between(r, 35, 60)), r: 18 },
     { name: takeName(), x: Math.round(between(r, 100, 140)), y: Math.round(between(r, 110, 128)), r: 16 }
   ]
@@ -597,11 +634,11 @@ export function createSurvivalWorld(opts: SurvivalOptions): SurvivalWorld {
   const exitY = Math.round(between(r, 70, 100))
   road(tiles, towns[1].x, exitY, MAP_W - 1, exitY, 2)
   road(tiles, towns[1].x, towns[1].y, towns[1].x, exitY, 2)
-  const exits = [{ x: MAP_W - 2, y: exitY, label: 'To Atlanta' }]
+  const exits = [{ x: MAP_W - 2, y: exitY, label: place ? place.exit : 'To Atlanta' }]
 
   // Each town: a grid of streets, cleared of trees, with buildings in the blocks.
   const buildings: Building[] = []
-  let nextId = 1
+  let nextId = (place?.idBase ?? 0) + 1
   const add = (kind: BuildingKind, name: string, town: string | null, x: number, y: number, bw: number, bh: number): Building | null => {
     if (!areaClear(tiles, x, y, bw, bh) || overlaps(buildings, x, y, bw, bh)) return null
     const b: Building = { id: nextId++, kind, name, town, x, y, w: bw, h: bh, loot: lootFor(r, kind, bw * bh, plenty), fort: kind === 'police' ? 15 : 0 }
@@ -609,7 +646,8 @@ export function createSurvivalWorld(opts: SurvivalOptions): SurvivalWorld {
     buildings.push(b)
     return b
   }
-  const surnames = [...LAST]
+  const surnames = [...(culture ? culture.last : LAST)]
+  const word = (kind: Parameters<NonNullable<typeof culture>['building']>[0], t: string): string => culture!.building(kind, t, () => random(r))
   const surname = () => pick(r, surnames)
 
   towns.forEach((t, ti) => {
@@ -624,14 +662,26 @@ export function createSurvivalWorld(opts: SurvivalOptions): SurvivalWorld {
       if (half > 4) road(tiles, xx, t.y - half, xx, t.y + half, 1)
     }
     // The town's main buildings go near the middle; the biggest town gets all of them.
-    const specials: [BuildingKind, string, number, number][] = [
-      ['store', `${t.name} Grocery`, 8, 6],
-      ['pharmacy', `${t.name} Pharmacy`, 5, 4],
-      ['police', `${t.name} Police Station`, 7, 5],
-      ['church', `${pick(r, ['First Baptist', 'St. Mark’s', 'Grace Methodist', 'Calvary'])} Church`, 6, 6],
-      ['school', `${t.name} ${pick(r, ['High School', 'Elementary', 'Middle School'])}`, 10, 7],
-      ['warehouse', `${t.name} ${pick(r, ['Feed & Supply', 'Lumber Yard', 'Distribution Center'])}`, 10, 7]
-    ]
+    const specials: [BuildingKind, string, number, number][] = culture
+      ? [
+          ['store', word('store', t.name), 8, 6],
+          ['pharmacy', word('pharmacy', t.name), 5, 4],
+          ['police', word('police', t.name), 7, 5],
+          ['church', word('church', t.name), 6, 6],
+          ['school', word('school', t.name), 10, 7],
+          ['warehouse', word('warehouse', t.name), 10, 7]
+        ]
+      : [
+          ['store', `${t.name} Grocery`, 8, 6],
+          ['pharmacy', `${t.name} Pharmacy`, 5, 4],
+          ['police', `${t.name} Police Station`, 7, 5],
+          ['church', `${pick(r, ['First Baptist', 'St. Mark’s', 'Grace Methodist', 'Calvary'])} Church`, 6, 6],
+          ['school', `${t.name} ${pick(r, ['High School', 'Elementary', 'Middle School'])}`, 10, 7],
+          ['warehouse', `${t.name} ${pick(r, ['Feed & Supply', 'Lumber Yard', 'Distribution Center'])}`, 10, 7]
+        ]
+    // A big city gets a second set of the big buildings in another part of town.
+    if (ti === 0 && place?.city && place.city.size >= 2)
+      for (const [kind, , bw, bh] of specials.slice(0, 4)) specials.push([kind, culture ? word(kind as 'store', `${t.name} ${pick(r, ['East', 'West', 'North', 'South'])}`) : `${t.name} ${kind}`, bw, bh])
     const wanted = ti === 0 ? specials : specials.filter((_, i) => i < 4 || chance(r, 0.5))
     for (const [kind, name, bw, bh] of wanted) {
       for (let tries = 0; tries < 60; tries++) {
@@ -640,13 +690,13 @@ export function createSurvivalWorld(opts: SurvivalOptions): SurvivalWorld {
         if (add(kind, name, t.name, Math.round(t.x + Math.cos(a) * d), Math.round(t.y + Math.sin(a) * d), bw, bh)) break
       }
     }
-    const houses = Math.round(t.r * 1.6)
+    const houses = Math.round(t.r * (ti === 0 && place?.city ? 2.6 : 1.6))
     for (let i = 0, tries = 0; i < houses && tries < 600; tries++) {
       const a = random(r) * Math.PI * 2
       const d = Math.sqrt(random(r)) * t.r
       const bw = int(r, 3, 5)
       const bh = int(r, 3, 4)
-      if (add('house', `${surname()} house`, t.name, Math.round(t.x + Math.cos(a) * d), Math.round(t.y + Math.sin(a) * d), bw, bh)) i++
+      if (add('house', culture ? word('house', surname()) : `${surname()} house`, t.name, Math.round(t.x + Math.cos(a) * d), Math.round(t.y + Math.sin(a) * d), bw, bh)) i++
     }
   })
 
@@ -656,13 +706,13 @@ export function createSurvivalWorld(opts: SurvivalOptions): SurvivalWorld {
     const y = int(r, 10, MAP_H - 10)
     if (tiles[y * MAP_W + x] !== TILE.road) continue
     if (towns.some((t) => dist(x, y, t.x, t.y) < t.r + 6)) continue
-    if (add('gas', `${pick(r, ['Route 9', 'Hwy 41', 'Crossroads', 'Old Mill'])} Gas`, null, x + 3, y + 3, 5, 4)) i++
+    if (add('gas', culture ? word('gas', '') : `${pick(r, ['Route 9', 'Hwy 41', 'Crossroads', 'Old Mill'])} Gas`, null, x + 3, y + 3, 5, 4)) i++
   }
   for (let i = 0, tries = 0; i < 9 && tries < 600; tries++) {
     const x = int(r, 8, MAP_W - 14)
     const y = int(r, 8, MAP_H - 12)
     if (towns.some((t) => dist(x, y, t.x, t.y) < t.r + 8)) continue
-    const name = `${surname()} farm`
+    const name = culture ? word('farm', surname()) : `${surname()} farm`
     const fx = x - 6
     const fy = y + 5
     const b = add('farm', name, null, x, y, 5, 4)
@@ -681,8 +731,8 @@ export function createSurvivalWorld(opts: SurvivalOptions): SurvivalWorld {
   }
 
   return {
-    map: { seed: opts.seed, region: 'Outside Atlanta, Georgia', tiles, towns, exits },
-    tick: 0,
+    map: { seed: opts.seed, region: place ? place.region : 'Outside Atlanta, Georgia', tiles, towns, exits, culture: place?.culture },
+    tick: place?.tick ?? 0,
     rng: (opts.seed * 7919 + 17) | 0,
     nextId,
     harshness: clamp(opts.harshness, 0, 1),
@@ -694,7 +744,7 @@ export function createSurvivalWorld(opts: SurvivalOptions): SurvivalWorld {
     herds: [],
     corpses: [],
     noises: [],
-    log: [{ tick: 0, text: `Day ${START_DAY} of the outbreak. The roads outside Atlanta are quiet.` }],
+    log: [{ tick: place?.tick ?? 0, text: place ? place.intro : `Day ${START_DAY} of the outbreak. The roads outside Atlanta are quiet.` }],
     pending: [],
     waiting: {},
     fights: [],
@@ -712,6 +762,10 @@ export function snapshotSurvival(w: SurvivalWorld): SurvivalWorld {
 export function upgradeSurvival(w: SurvivalWorld): SurvivalWorld {
   w.fights ??= []
   w.shots ??= []
+  for (const g of w.groups) {
+    g.leaving ??= null
+    g.away ??= {}
+  }
   for (const f of w.fights) f.out ??= []
   for (const p of w.people) {
     p.sex ??= p.id % 2 ? 'm' : 'f'
@@ -779,8 +833,11 @@ export function doingText(w: SurvivalWorld, p: Person): string {
       return 'Barricading camp'
     case 'follow':
       return 'Moving with the group'
-    case 'move':
+    case 'move': {
+      const leaving = groupById(w, p.group)?.leaving
+      if (leaving) return p.task.phase === 'work' ? `Waiting at the road out for ${leaving.to}` : `Heading out for ${leaving.to}`
       return `Heading to ${b ? b.name : 'a new camp'}`
+    }
     case 'scavenge':
       return p.task.phase === 'go' ? `Heading to ${where}` : p.task.phase === 'work' ? `Searching ${where}` : `Bringing supplies back from ${where}`
     case 'explore':
@@ -849,18 +906,19 @@ export interface PersonDraft {
 }
 
 /** A first name for someone of this sex that nobody in `taken` already has. */
-export function firstName(w: { rng: number }, sex: Sex, taken: string[]): string {
+export function firstName(w: { rng: number }, sex: Sex, taken: string[], culture?: CultureId): string {
+  const c = culture ? cultureOf(culture) : null
   let name = ''
   for (let i = 0; i < 30; i++) {
-    name = pick(w, sex === 'f' ? FIRST_F : FIRST_M)
+    name = pick(w, c ? c.first[sex] : sex === 'f' ? FIRST_F : FIRST_M)
     if (!taken.some((t) => t.split(' ')[0] === name)) break
   }
   return name
 }
 
-export function randomPerson(w: { rng: number }, taken: string[] = [], opts: { age?: number; sex?: Sex; surname?: string } = {}): PersonDraft {
+export function randomPerson(w: { rng: number }, taken: string[] = [], opts: { age?: number; sex?: Sex; surname?: string; culture?: CultureId } = {}): PersonDraft {
   const sex: Sex = opts.sex ?? (chance(w, 0.5) ? 'f' : 'm')
-  const name = `${firstName(w, sex, taken)} ${opts.surname ?? pick(w, LAST)}`
+  const name = `${firstName(w, sex, taken, opts.culture)} ${opts.surname ?? pick(w, opts.culture ? cultureOf(opts.culture).last : LAST)}`
   const roll = random(w)
   const age = opts.age ?? (roll < 0.08 ? int(w, 7, 13) : roll < 0.18 ? int(w, 14, 17) : roll < 0.85 ? int(w, 18, 54) : int(w, 55, 75))
   const traits: Trait[] = []
@@ -889,14 +947,15 @@ export function takenNames(w: SurvivalWorld): string[] {
  */
 export function randomPeople(w: SurvivalWorld, n: number): PersonDraft[] {
   const taken = takenNames(w)
+  const culture = w.map?.culture
   const out: PersonDraft[] = []
   for (let i = 0; i < n; i++) {
     const adult = out.find((q) => q.age >= 22 && q.age <= 55)
     let p: PersonDraft
-    if (adult && i === 1 && chance(w, 0.35)) p = randomPerson(w, taken, { sex: adult.sex === 'f' ? 'm' : 'f', age: clamp(adult.age + int(w, -6, 6), 19, 60), surname: adult.name.split(' ')[1] })
+    if (adult && i === 1 && chance(w, 0.35)) p = randomPerson(w, taken, { sex: adult.sex === 'f' ? 'm' : 'f', age: clamp(adult.age + int(w, -6, 6), 19, 60), surname: surnameOf(adult), culture })
     else {
-      p = randomPerson(w, taken)
-      if (p.age < 16 && adult && chance(w, 0.7)) p.name = `${p.name.split(' ')[0]} ${adult.name.split(' ')[1]}`
+      p = randomPerson(w, taken, { culture })
+      if (p.age < 16 && adult && chance(w, 0.7)) p.name = `${p.name.split(' ')[0]} ${surnameOf(adult)}`
     }
     taken.push(p.name)
     out.push(p)
@@ -937,6 +996,8 @@ function newGroup(w: SurvivalWorld, draft: GroupDraft, x: number, y: number): Gr
     met: {},
     fought: {},
     order: null,
+    leaving: null,
+    away: {},
     created: w.tick,
     peak: n,
     alive: true,
@@ -1126,6 +1187,68 @@ export function giveOrder(w: SurvivalWorld, g: Group, order: Order | null): void
                 : 'fetch water'
   log(w, `You told ${g.name} to ${what}.`, { group: g.id })
   if (minuteOfDay(w.tick) >= 6 * 60 && minuteOfDay(w.tick) < 18 * 60) planDay(w, g)
+}
+
+// ---------- leaving for somewhere far away (the globe moves them) ----------
+
+/** The group packs up and walks to (x, y) at the edge of the map, to set off for `to`. */
+export function sendAway(w: SurvivalWorld, g: Group, x: number, y: number, to: string, dest?: { lat: number; lon: number }): void {
+  g.leaving = { x: clamp(x, 1, MAP_W - 2), y: clamp(y, 1, MAP_H - 2), to, ...dest }
+  g.order = null
+  g.camp = null
+  log(w, `${g.name} packed up and set off for ${to}.`, { group: g.id, big: true })
+  for (const p of membersOf(w, g)) {
+    p.asleep = false
+    p.task = { kind: 'move', phase: 'go', x: g.leaving.x + between(w, -1.5, 1.5), y: g.leaving.y + between(w, -1.5, 1.5) }
+  }
+}
+
+/** Calls off leaving: they go back to looking after themselves here. */
+export function stayHere(w: SurvivalWorld, g: Group): void {
+  if (!g.leaving) return
+  g.leaving = null
+  log(w, `${g.name} decided to stay after all.`, { group: g.id })
+  planNow(w, g)
+}
+
+/** Everyone still with the group has reached the road out. */
+export function readyToLeave(w: SurvivalWorld, g: Group): boolean {
+  if (!g.leaving || !g.alive) return false
+  const ms = membersOf(w, g)
+  return ms.length > 0 && ms.every((p) => dist(p.x, p.y, g.leaving!.x, g.leaving!.y) < 4)
+}
+
+/** Takes a group (and anyone it's holding) out of this area entirely. */
+export function takeOutGroup(w: SurvivalWorld, g: Group): { group: Group; people: Person[] } {
+  const people = w.people.filter((p) => p.group === g.id)
+  w.people = w.people.filter((p) => p.group !== g.id)
+  w.groups = w.groups.filter((x) => x !== g)
+  w.pending = w.pending.filter((d) => d.group !== g.id)
+  w.fights = w.fights.filter((f) => f.a !== g.id && f.b !== g.id)
+  for (const o of w.groups) delete o.met[g.id]
+  return { group: g, people }
+}
+
+/** Brings a group that's arrived from somewhere else into this area at (x, y). */
+export function bringInGroup(w: SurvivalWorld, g: Group, people: Person[], x: number, y: number, from: string): void {
+  g.leaving = null
+  g.camp = null
+  g.order = null
+  g.homeX = x
+  g.homeY = y
+  w.groups.push(g)
+  people.forEach((p, i) => {
+    const a = (i / Math.max(1, people.length)) * Math.PI * 2
+    p.x = clamp(x + Math.cos(a) * 1.5, 1, MAP_W - 2)
+    p.y = clamp(y + Math.sin(a) * 1.5, 1, MAP_H - 2)
+    p.fleeUntil = 0
+    p.asleep = false
+    p.task = { kind: 'camp', phase: 'work', x: p.x, y: p.y }
+  })
+  w.people.push(...people)
+  log(w, `${g.name} arrived ${nearestPlace(w, x, y)}, after the long road from ${from}.`, { group: g.id, people, big: true })
+  look(w, g, membersOf(w, g), true)
+  planNow(w, g)
 }
 
 // ---------- sight and knowledge ----------
@@ -1376,6 +1499,14 @@ function planDay(w: SurvivalWorld, g: Group): void {
   const ms = membersOf(w, g)
   if (!ms.length) return
   pickLeader(w, g)
+  if (g.leaving) {
+    // Moving on: everyone heads for the road out.
+    for (const p of ms) {
+      p.asleep = false
+      if (p.task.kind !== 'move') p.task = { kind: 'move', phase: 'go', x: g.leaving.x + between(w, -1.5, 1.5), y: g.leaving.y + between(w, -1.5, 1.5) }
+    }
+    return
+  }
   const order = g.order
   g.order = null
 
@@ -1944,6 +2075,10 @@ function personTick(w: SurvivalWorld, g: Group, p: Person, grid: Grid, buf: Walk
   }
   if (t.phase === 'go') {
     if (moveToward(p, t.x, t.y, speedOf(w, p, false))) {
+      if (t.kind === 'move' && g.leaving) {
+        t.phase = 'work'
+        return
+      }
       if (t.kind === 'move') {
         setHome(w, p, 'camp')
         return
@@ -1957,6 +2092,7 @@ function personTick(w: SurvivalWorld, g: Group, p: Person, grid: Grid, buf: Walk
     if (moveToward(p, t.x, t.y, speedOf(w, p, false))) arriveHome(w, g, p)
     return
   }
+  if (g.leaving && t.kind === 'move') return // Waiting at the road out for the others.
   // Working: drift toward the work spot, then do it.
   if (dist(p.x, p.y, t.x, t.y) > 0.3) moveToward(p, t.x, t.y, speedOf(w, p, false) * 0.5)
   doWork(w, g, p)
@@ -2271,7 +2407,7 @@ function birth(w: SurvivalWorld, g: Group, mother: Person): void {
   mother.dueAt = 0
   const father = mother.partner != null ? personById(w, mother.partner) : undefined
   const surname = surnameOf(father ?? mother) || surnameOf(mother)
-  const draft = randomPerson(w, takenNames(w), { age: 0, surname })
+  const draft = randomPerson(w, takenNames(w), { age: 0, surname, culture: w.map.culture })
   draft.traits = draft.traits.slice(0, 2)
   draft.weapon = 'none'
   const baby = newPerson(w, draft, g, mother.x, mother.y)

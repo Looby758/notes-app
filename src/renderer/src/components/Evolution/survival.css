@@ -603,3 +603,43 @@
 .evo-chip.sv-danger {
   color: #ff8a8a;
 }
+
+/* ---------- the globe ---------- */
+.sv-globe {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+.sv-globe:active {
+  cursor: grabbing;
+}
+.sv-globe.picking {
+  cursor: crosshair;
+}
+.sv-views button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sv-waiting {
+  position: absolute;
+  left: 50%;
+  top: 56px;
+  transform: translateX(-50%);
+  cursor: pointer;
+  z-index: 5;
+  border: none;
+  font: inherit;
+}
+.sv-travel h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

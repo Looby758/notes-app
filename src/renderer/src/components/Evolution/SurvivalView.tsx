@@ -30,6 +30,8 @@ interface Props {
   fitKey: number
   /** Ask the view to centre on a point. */
   focus: { x: number; y: number; n: number } | null
+  /** Scrolling out past the whole map: go up to the globe. */
+  onZoomOut?: () => void
 }
 
 const PX = 6 // tile size in the cached map picture
@@ -97,7 +99,7 @@ function mapPicture(map: MapData): HTMLCanvasElement {
 }
 
 /** The map: zoom with the wheel, drag to move around, click to pick. */
-export default function SurvivalView({ world, selection, fogGroup, placing, onPick, fitKey, focus }: Props) {
+export default function SurvivalView({ world, selection, fogGroup, placing, onPick, fitKey, focus, onZoomOut }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const wrap = useRef<HTMLDivElement>(null)
   const cam = useRef({ x: MAP_W / 2, y: MAP_H / 2, z: 5 })
@@ -409,7 +411,14 @@ export default function SurvivalView({ world, selection, fogGroup, placing, onPi
       onWheel={(e) => {
         const before = toWorld(e)
         const c = cam.current
-        c.z = Math.max(1, Math.min(40, c.z * Math.exp(-e.deltaY * 0.0015)))
+        // Scrolling out past the whole area goes up to the globe.
+        const box = wrap.current?.getBoundingClientRect()
+        const fit = box ? Math.max(1, Math.min(box.width / MAP_W, box.height / MAP_H)) : 1
+        if (onZoomOut && e.deltaY > 0 && c.z <= fit * 0.72) {
+          onZoomOut()
+          return
+        }
+        c.z = Math.max(onZoomOut ? fit * 0.7 : 1, Math.min(40, c.z * Math.exp(-e.deltaY * 0.0015)))
         const after = toWorld(e)
         c.x += before.x - after.x
         c.y += before.y - after.y

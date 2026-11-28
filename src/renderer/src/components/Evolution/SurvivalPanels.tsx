@@ -19,6 +19,7 @@ import {
   freePrisoner,
   prisonersOf,
   recruitPrisoner,
+  stayHere,
   giveOrder,
   groupById,
   healthText,
@@ -139,7 +140,7 @@ export function CreatorPanel({ world, creator, setCreator }: { world: SurvivalWo
     const people = d.people.slice(0, n)
     const taken = [...takenNames(world), ...people.map((p) => p.name)]
     while (people.length < n) {
-      const p = randomPerson({ rng: (Math.random() * 2 ** 31) | 0 }, taken)
+      const p = randomPerson({ rng: (Math.random() * 2 ** 31) | 0 }, taken, { culture: world.map.culture })
       taken.push(p.name)
       people.push(p)
     }
@@ -239,7 +240,8 @@ export function GroupCard({
   onPickOrder,
   picking,
   onChanged,
-  onOrder
+  onOrder,
+  onTravel
 }: {
   world: SurvivalWorld
   g: Group
@@ -249,6 +251,8 @@ export function GroupCard({
   onChanged: () => void
   /** Gives an order so it can be undone with Ctrl+Z. */
   onOrder: (label: string, fn: () => void) => void
+  /** Pick somewhere far away on the globe for them to go. */
+  onTravel?: () => void
 }) {
   const ms = membersOf(world, g)
   const camp = campOf(world, g)
@@ -335,6 +339,21 @@ export function GroupCard({
           </button>
         ))}
       </div>
+      {onTravel && !g.leaving && (
+        <div className="sv-orders">
+          <button className="evo-chip" title="Pick a place anywhere on the globe. They walk the whole way, carrying what they have." onClick={onTravel} data-sv-travel-order>
+            Travel far away…
+          </button>
+        </div>
+      )}
+      {g.leaving && (
+        <p className="sv-callout" data-sv-leaving>
+          Packing up and heading for {g.leaving.to}. They'll set off once everyone reaches the road out.{' '}
+          <button className="sv-link" onClick={() => { onOrder(`Told ${g.name} to stay`, () => stayHere(world, g)); onChanged() }}>
+            Stay after all
+          </button>
+        </p>
+      )}
       {picking && <p className="sv-callout">{ORDERS.find((o) => o.kind === picking)?.hint}.</p>}
 
       <div className="evo-sub">People</div>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { FolderOpen, Save, Trash2, X } from 'lucide-react'
-import { clockText, dayOf, type SurvivalWorld } from '@shared/survival'
+import { clockText, dayOf } from '@shared/survival'
+import type { Globe } from '@shared/globe'
 import { AUTOSAVE, deleteSave, listSaves, readSave, writeSave, type SaveMeta } from './saveFiles'
 
 function ago(t: number): string {
@@ -15,7 +16,7 @@ function ago(t: number): string {
  * Save and load, like a game: pick a save to overwrite it or load it, or type a new name to make a
  * new one. The autosave has its own slot that's rewritten every 5 minutes.
  */
-export default function SavesDialog({ world, onLoad, onClose, onSaved }: { world: SurvivalWorld; onLoad: (w: SurvivalWorld, name: string) => void; onClose: () => void; onSaved: () => void }) {
+export default function SavesDialog({ world, onLoad, onClose, onSaved }: { world: Globe; onLoad: (w: Globe, name: string) => void; onClose: () => void; onSaved: () => void }) {
   const [saves, setSaves] = useState<SaveMeta[] | null>(null)
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
@@ -70,7 +71,7 @@ export default function SavesDialog({ world, onLoad, onClose, onSaved }: { world
           </button>
         </div>
         <p className="muted">
-          It's Day {dayOf(world.tick)}, {clockText(world.tick)}. Click a save to overwrite it, or type a new name. Loading replaces what's on the map now. It also autosaves every 5 minutes.
+          It's Day {dayOf(world.tick)}, {clockText(world.tick)}. Click a save to overwrite it, or type a new name. Loading replaces the whole world as it is now. It also autosaves every 5 minutes, and whenever you click off.
         </p>
         <div className="sv-save-list">
           {saves === null && <p className="muted">Reading saves…</p>}
@@ -80,7 +81,7 @@ export default function SavesDialog({ world, onLoad, onClose, onSaved }: { world
               <div className="sv-save-info">
                 <b>{s.name}</b>
                 <em>
-                  Day {dayOf(s.tick)}, {clockText(s.tick)} · saved {ago(s.savedAt)} · {s.walkers} walkers
+                  Day {dayOf(s.tick)}, {clockText(s.tick)} · saved {ago(s.savedAt)} · {s.walkers} walkers{s.places && s.places > 1 ? ` · ${s.places} places` : ''}
                 </em>
                 <span className="sv-save-groups">
                   {s.groups.length

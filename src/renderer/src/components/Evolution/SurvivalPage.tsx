@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Eye, EyeOff, Save, Footprints, History, Moon, MousePointer2, Package, Pause, Play, RotateCcw, Skull, Sparkles, StepForward, Sun, Users, Volume2 } from 'lucide-react'
+import { Eye, EyeOff, Globe2, Save, Footprints, History, Moon, MousePointer2, Package, Pause, Play, RotateCcw, Skull, Sparkles, StepForward, Sun, Users, Volume2 } from 'lucide-react'
 import {
   answerDecision,
   buildingAt,
@@ -8,11 +8,11 @@ import {
   dayOf,
   giveOrder,
   groupById,
+  membersOf,
   makeNoise,
   partOfDay,
   personById,
   quickStart,
-  snapshotSurvival,
   spawnGroup,
   spawnSupplies,
   spawnWalkers,
@@ -21,6 +21,9 @@ import {
 } from '@shared/survival'
 import { SURVIVAL_SPEEDS, useSurvival } from './useSurvival'
 import SurvivalView, { type Selection } from './SurvivalView'
+import GlobeView, { type GlobePick } from './GlobeView'
+import { GlobePanel } from './GlobePanels'
+import { allGroups, areaById, openArea, sendGroupTo, snapshotGlobe, turnBack } from '@shared/globe'
 import { BuildingCard, CreatorPanel, GroupCard, GroupList, PersonCard, StoryPanel, newCreator, when, type Creator } from './SurvivalPanels'
 import { Slider, Toggle } from './Panels'
 import { recordUndo, UNDO_KEY } from '../../lib/undo'
@@ -65,6 +68,14 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
   const [focus, setFocus] = useState<{ x: number; y: number; n: number } | null>(null)
   const [savesOpen, setSavesOpen] = useState(false)
   const [lastSave, setLastSave] = useState<{ text: string; at: number } | null>(null)
+  // Looking at one area up close, or the whole globe.
+  const [view, setView] = useState<'area' | 'globe'>('area')
+  const [globePick, setGlobePick] = useState<GlobePick>(null)
+  const [globeFocus, setGlobeFocus] = useState<{ lat: number; lon: number; zoom?: number; n: number } | null>(null)
+  // Picking where a group should travel to.
+  const [travel, setTravel] = useState<{ areaId: number; groupId: number } | null>(null)
+  const globe = sv.globe.current
+  const area = areaById(globe, sv.areaId) ?? globe.areas[0]
 
   // Autosave into one slot: every 5 minutes, and whenever you click off (leave the page, switch to
   // Creatures, switch app or close the window), if something has happened since the last one.
@@ -73,8 +84,9 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
   autosave.current = () => {
     // While you're looking back, the autosave keeps the latest point, not the past you're viewing.
     const snapsNow = sv.snapshots.current
-    const world = sv.lookingBack() ? snapsNow[snapsNow.length - 1] : sv.world.current
-    if (!world || world.tick === autoTick.current || (!world.groups.length && !world.walkers.length)) return
+    const world = sv.lookingBack() ? snapsNow[snapsNow.length - 1] : sv.globe.current
+    const empty = !world.parties.length && world.areas.every((a) => !a.world.groups.length && !a.world.walkers.length)
+    if (!world || world.tick === autoTick.current || empty) return
     autoTick.current = world.tick
     writeSave(AUTOSAVE, world, true)
       .then(() => setLastSave({ text: 'Autosaved', at: Date.now() }))
@@ -99,6 +111,11 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
     }
   }, [])
 
+  // People you make up belong where you're putting them: new names when you change place.
+  useEffect(() => {
+    setCreator((c) => newCreator(sv.world.current, c.kind))
+  }, [sv.areaId, sv.world])
+
   // Whose fog of war is shown: the group you're looking at.
   const selGroupId = selection?.kind === 'group' ? selection.id : selection?.kind === 'person' ? personById(w, selection.id)?.group ?? null : null
   const selGroup = selGroupId != null ? groupById(w, selGroupId) : undefined
@@ -120,7 +137,7 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
       if (t.closest('input, textarea, select, [contenteditable="true"]') || !document.querySelector('[data-sv-page]')) return
       if (e.key === ' ') {
         e.preventDefault()
-        if (!w.pending.length) sv.setRunning(!sv.running)
+        if (sv.pendingArea() == null) sv.setRunning(!sv.running)
       } else if (e.key === 'Escape') {
         setPicking(null)
         setTool('select')
@@ -140,13 +157,13 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
    * the moment just before (paused), and redoing jumps to just after.
    */
   const change = (label: string, fn: () => void): void => {
-    const before = snapshotSurvival(sv.world.current)
+    const before = snapshotGlobe(sv.globe.current)
     const snapsBefore = sv.snapshots.current.slice()
     fn()
     // A rewind point right after it, so rewinding never lands on a world from before you placed it
     // without it being a point you chose.
     sv.mark()
-    const after = snapshotSurvival(sv.world.current)
+    const after = snapshotGlobe(sv.globe.current)
     const snapsAfter = sv.snapshots.current.slice()
     recordUndo({
       label: `${label} (Day ${dayOf(before.tick)}, ${clockText(before.tick)})`,
@@ -205,14 +222,40 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
     sv.refresh()
   }
 
-  const people = w.people.length
-  const groupsAlive = w.groups.filter((g) => g.alive).length
+  const everyone = allGroups(globe)
+  const people = view === 'globe' ? everyone.reduce((n, x) => n + x.people, 0) : w.people.length
+  const groupsAlive = view === 'globe' ? everyone.length : w.groups.filter((g) => g.alive).length
+  const walkers = view === 'globe' ? globe.areas.reduce((n, a) => n + a.world.walkers.length, 0) : w.walkers.length
   const snaps = sv.snapshots.current
   const lookingBack = sv.lookingBack()
   let snapAt = snaps.length - 1
   while (snapAt > 0 && snaps[snapAt].tick > w.tick) snapAt--
   const dark = darkness(w.tick)
   const decision = w.pending[0]
+  const waitingArea = sv.pendingArea()
+
+  /** Go down to an area (and look at a group there). */
+  const enter = (areaId: number, groupId?: number): void => {
+    sv.setArea(areaId)
+    setView('area')
+    setTravel(null)
+    setGlobePick(null)
+    const a = areaById(sv.globe.current, areaId)
+    const g = groupId != null && a ? groupById(a.world, groupId) : undefined
+    setSelection(g ? { kind: 'group', id: g.id } : null)
+    const lead = g && a ? membersOf(a.world, g)[0] : undefined
+    if (lead) setFocus({ x: lead.x, y: lead.y, n: Date.now() })
+    else {
+      setFocus(null)
+      setFitKey((k) => k + 1)
+    }
+    setPanel('groups')
+  }
+  const showGlobe = (): void => {
+    setView('globe')
+    setGlobePick({ kind: 'area', id: area.id })
+    setGlobeFocus({ lat: area.lat, lon: area.lon, n: Date.now() })
+  }
 
   // Pop-ups for the big moments.
   const [seenBig, setSeenBig] = useState(0)
@@ -224,17 +267,25 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
     <div className="evo-page sv-page" data-evo-page data-sv-page ref={pageRef}>
       <header className="evo-bar">
         {switcher}
+        <div className="evo-seg sv-views" role="radiogroup" aria-label="View">
+          <button className={view === 'globe' ? 'on' : ''} onClick={showGlobe} title="The whole world: every place and every group" data-sv-view="globe">
+            <Globe2 size={13} /> Globe
+          </button>
+          <button className={view === 'area' ? 'on' : ''} onClick={() => enter(area.id, selGroupId ?? undefined)} title="Down to the people" data-sv-view="area">
+            {area.name}
+          </button>
+        </div>
         <div className="evo-transport">
           <button
             className="evo-play"
             onClick={() => sv.setRunning(!sv.running)}
-            disabled={!!decision}
-            title={decision ? 'Answer the question first' : sv.running ? 'Pause (Space)' : 'Play (Space)'}
+            disabled={waitingArea != null}
+            title={waitingArea != null ? 'Answer the question first' : sv.running ? 'Pause (Space)' : 'Play (Space)'}
             data-evo-play
           >
             {sv.running ? <Pause size={16} /> : <Play size={16} />}
           </button>
-          <button className="icon-btn" onClick={sv.stepOnce} disabled={sv.running || !!decision} title="Ten minutes on">
+          <button className="icon-btn" onClick={sv.stepOnce} disabled={sv.running || waitingArea != null} title="Ten minutes on">
             <StepForward size={15} />
           </button>
           <div className="evo-seg" role="radiogroup" aria-label="Speed">
@@ -244,7 +295,7 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
               </button>
             ))}
           </div>
-          <button className="icon-btn" onClick={() => sv.restart()} title="Start again with an empty map">
+          <button className="icon-btn" onClick={() => { sv.restart(); setView('area'); setSelection(null) }} title="Start again with an empty world">
             <RotateCcw size={15} />
           </button>
           <button
@@ -276,14 +327,27 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
             Alive <b>{people}</b>
           </span>
           <span>
-            Walkers <b>{w.walkers.length}</b>
+            Walkers <b>{walkers}</b>
           </span>
         </div>
       </header>
 
       <div className="evo-main">
         <div className="evo-stage">
-          <SurvivalView world={sv.world} selection={selection} fogGroup={fogGroup} placing={tool !== 'select' || !!picking} onPick={onPick} fitKey={fitKey} focus={focus} />
+          {view === 'globe' ? (
+            <GlobeView
+              globe={sv.globe}
+              version={sv.version}
+              pick={globePick}
+              onPick={setGlobePick}
+              onEnter={(id) => enter(id)}
+              focus={globeFocus}
+              picking={!!travel}
+            />
+          ) : (
+            <SurvivalView key={area.id} world={sv.world} selection={selection} fogGroup={fogGroup} placing={tool !== 'select' || !!picking} onPick={onPick} fitKey={fitKey} focus={focus} onZoomOut={showGlobe} />
+          )}
+          {view === 'area' && (
           <div className="evo-toolbox" role="toolbar" aria-label="Tools">
             {TOOLS.map((t) => (
               <button
@@ -300,17 +364,21 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
                 <t.icon size={15} />
               </button>
             ))}
+            <button onClick={showGlobe} title="Zoom out to the globe" data-sv-zoom-out>
+              <Globe2 size={15} />
+            </button>
           </div>
+          )}
           <div className="sv-region">
-            {w.map.region} · Day {dayOf(w.tick)} of the outbreak
-            {fogGroup != null && selGroup && (
+            {view === 'globe' ? `The world · ${globe.areas.length} place${globe.areas.length === 1 ? '' : 's'} open` : w.map.region} · Day {dayOf(w.tick)} of the outbreak
+            {view === 'area' && fogGroup != null && selGroup && (
               <span>
                 <Eye size={12} /> Showing what {selGroup.name} knows
               </span>
             )}
           </div>
 
-          {toastsShown.length > 0 && !decision && (
+          {view === 'area' && toastsShown.length > 0 && !decision && (
             <div className="sv-toasts">
               {toastsShown.map((l, i) => {
                 const g = l.group != null ? groupById(w, l.group) : undefined
@@ -340,12 +408,13 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
 
           {savesOpen && (
             <SavesDialog
-              world={w}
+              world={globe}
               onClose={() => setSavesOpen(false)}
               onSaved={() => setLastSave({ text: 'Saved', at: Date.now() })}
               onLoad={(loaded, name) => {
                 sv.load(loaded)
                 autoTick.current = loaded.tick
+                setView('area')
                 setSelection(null)
                 setSavesOpen(false)
                 setLastSave({ text: `Loaded "${name}"`, at: Date.now() })
@@ -353,13 +422,20 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
             />
           )}
 
-          {decision && !savesOpen && <DecisionCard world={w} onAnswer={(choice) => {
+          {decision && !savesOpen && <DecisionCard world={w} place={globe.areas.length > 1 ? area.name : undefined} onAnswer={(choice) => {
             answerDecision(w, decision.id, choice)
-            if (!w.pending.length) sv.setRunning(true)
+            const next = sv.pendingArea()
+            if (next == null) sv.setRunning(true)
+            else if (next !== area.id) sv.setArea(next)
             sv.refresh()
           }} />}
+          {view === 'globe' && waitingArea != null && !decision && (
+            <button className="sv-callout sv-waiting" onClick={() => enter(waitingArea)}>
+              A group in {areaById(globe, waitingArea)?.name} is waiting on you. Go there
+            </button>
+          )}
 
-          {w.groups.length === 0 && !w.fallen.length && !lookingBack && tool === 'select' && (
+          {view === 'area' && globe.areas.length === 1 && everyone.length === 0 && !w.fallen.length && !lookingBack && tool === 'select' && (
             <div className="sv-start" data-sv-start>
               <h3>Survival mode</h3>
               <p>It's Day {dayOf(w.tick)} of the outbreak, in the country outside Atlanta, Georgia. The map is empty until you fill it.</p>
@@ -375,6 +451,9 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
                 </li>
               </ol>
               <p className="muted">Click a group to follow it: you'll see its fog of war, its plans, its story and what it has learned. You can give it orders any time.</p>
+              <p className="muted">
+                Want to start somewhere else? <Globe2 size={12} /> Globe at the top left shows the whole world: click anywhere on land, from Paris to Tokyo, to open a place there.
+              </p>
               <div className="sv-start-actions">
                 <button
                   className="btn btn-primary"
@@ -426,6 +505,41 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
         </div>
 
         <aside className="evo-side">
+          {view === 'globe' ? (
+            <div className="evo-side-scroll">
+              <GlobePanel
+                globe={globe}
+                pick={globePick}
+                setPick={setGlobePick}
+                onEnter={enter}
+                onOpen={(lat, lon) => {
+                  let opened = null as ReturnType<typeof openArea>
+                  change('Opened a place', () => (opened = openArea(sv.globe.current, lat, lon)))
+                  if (opened) enter(opened.id)
+                }}
+                travel={travel}
+                onSend={(lat, lon, name) => {
+                  const from = travel && areaById(sv.globe.current, travel.areaId)
+                  const g = from && groupById(from.world, travel.groupId)
+                  if (from && g) change(`Sent ${g.name} to ${name}`, () => sendGroupTo(from, g, lat, lon, name))
+                  const back = travel
+                  setTravel(null)
+                  if (back) enter(back.areaId, back.groupId)
+                }}
+                onCancelTravel={() => {
+                  const back = travel
+                  setTravel(null)
+                  if (back) enter(back.areaId, back.groupId)
+                }}
+                onTurnBack={(id) => {
+                  const p = sv.globe.current.parties.find((x) => x.id === id)
+                  if (p) change(`Turned ${p.group.name} back`, () => turnBack(sv.globe.current, p))
+                  sv.refresh()
+                }}
+              />
+            </div>
+          ) : (
+          <>
           <nav className="evo-tabs">
             {PANELS.map((p) => (
               <button key={p.id} className={panel === p.id ? 'on' : ''} onClick={() => setPanel(p.id)} data-evo-tab={p.id}>
@@ -434,7 +548,26 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
             ))}
           </nav>
           <div className="evo-side-scroll">
-            {panel === 'groups' && <GroupsTab world={w} selection={selection} select={select} picking={picking} setPicking={setPicking} refresh={sv.refresh} fogGroup={fogGroup} version={sv.version} onOrder={change} />}
+            {panel === 'groups' && (
+              <GroupsTab
+                world={w}
+                selection={selection}
+                select={select}
+                picking={picking}
+                setPicking={setPicking}
+                refresh={sv.refresh}
+                fogGroup={fogGroup}
+                version={sv.version}
+                onOrder={change}
+                onTravel={(groupId) => {
+                  sv.setRunning(false)
+                  setTravel({ areaId: area.id, groupId })
+                  setView('globe')
+                  setGlobePick(null)
+                  setGlobeFocus({ lat: area.lat, lon: area.lon, zoom: 6, n: Date.now() })
+                }}
+              />
+            )}
             {panel === 'add' && (
               <AddTab
                 world={w}
@@ -468,11 +601,18 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
                     sv.refresh()
                   }}
                 />
-                <div className="evo-sub">The map</div>
+                <div className="evo-sub">This place</div>
                 <p className="muted">
-                  {w.map.towns.map((t) => t.name).join(', ')}, and the farms and woods between them. Map {w.map.seed}.
+                  {w.map.region}: {w.map.towns.map((t) => t.name).join(', ')}, and the farms and woods between them.
+                </p>
+                <div className="evo-sub">The world</div>
+                <p className="muted">
+                  {globe.areas.length} place{globe.areas.length === 1 ? '' : 's'} open, {globe.parties.length} group{globe.parties.length === 1 ? '' : 's'} on the road. World {globe.seed}.
                 </p>
                 <div className="sv-row">
+                  <button className="btn" onClick={showGlobe}>
+                    <Globe2 size={13} /> See the globe
+                  </button>
                   <button
                     className="btn"
                     onClick={() => {
@@ -481,7 +621,7 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
                       setFitKey((k) => k + 1)
                     }}
                   >
-                    <RotateCcw size={13} /> Empty this map
+                    <RotateCcw size={13} /> Start again
                   </button>
                   <button
                     className="btn"
@@ -491,26 +631,29 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
                       setFitKey((k) => k + 1)
                     }}
                   >
-                    New map
+                    New world
                   </button>
                 </div>
-                <p className="muted">Stage one is one made-up area. The whole globe, real cities and following several groups across it come next.</p>
               </div>
             )}
           </div>
+          </>
+          )}
         </aside>
       </div>
     </div>
   )
 }
 
-function DecisionCard({ world, onAnswer }: { world: SurvivalWorld; onAnswer: (choice?: string) => void }) {
+function DecisionCard({ world, place, onAnswer }: { world: SurvivalWorld; place?: string; onAnswer: (choice?: string) => void }) {
   const d = world.pending[0]
   const g = groupById(world, d.group)
   return (
     <div className="sv-decision" role="dialog" aria-label={d.title} data-sv-decision>
       <div className="sv-decision-card" style={{ borderTopColor: g?.color }}>
-        <em>{g?.name} is asking you · {when(world.tick)}</em>
+        <em>
+          {g?.name} is asking you{place ? ` in ${place}` : ''} · {when(world.tick)}
+        </em>
         <h3>{d.title}</h3>
         <p>{d.text}</p>
         <div className="sv-decision-options">
@@ -537,7 +680,8 @@ function GroupsTab({
   setPicking,
   refresh,
   fogGroup,
-  onOrder
+  onOrder,
+  onTravel
 }: {
   world: SurvivalWorld
   selection: Selection
@@ -548,6 +692,7 @@ function GroupsTab({
   fogGroup: number | null
   version: number
   onOrder: (label: string, fn: () => void) => void
+  onTravel: (groupId: number) => void
 }) {
   if (selection?.kind === 'person') {
     const p = personById(world, selection.id)
@@ -566,6 +711,7 @@ function GroupsTab({
           onPickOrder={(o) => setPicking(o ? { group: g.id, order: o } : null)}
           onChanged={refresh}
           onOrder={onOrder}
+          onTravel={() => onTravel(g.id)}
         />
       )
   }
