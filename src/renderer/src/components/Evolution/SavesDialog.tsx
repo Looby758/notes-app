@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { FolderOpen, Save, Trash2, X } from 'lucide-react'
 import { clockText, dayOf, type SurvivalWorld } from '@shared/survival'
-import { AUTOSAVE, deleteSave, listSaves, readSave, writeSave, type SaveMeta } from './survivalSaves'
+import { AUTOSAVE, deleteSave, listSaves, readSave, writeSave, type SaveMeta } from './saveFiles'
 
 function ago(t: number): string {
   const s = Math.round((Date.now() - t) / 1000)
