@@ -66,21 +66,38 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
   const [savesOpen, setSavesOpen] = useState(false)
   const [lastSave, setLastSave] = useState<{ text: string; at: number } | null>(null)
 
-  // Autosave every 5 minutes into one slot, whenever something has happened since the last one.
+  // Autosave into one slot: every 5 minutes, and whenever you click off (leave the page, switch to
+  // Creatures, switch app or close the window), if something has happened since the last one.
   const autoTick = useRef(-1)
+  const autosave = useRef<() => void>(() => undefined)
+  autosave.current = () => {
+    // While you're looking back, the autosave keeps the latest point, not the past you're viewing.
+    const snapsNow = sv.snapshots.current
+    const world = sv.lookingBack() ? snapsNow[snapsNow.length - 1] : sv.world.current
+    if (!world || world.tick === autoTick.current || (!world.groups.length && !world.walkers.length)) return
+    autoTick.current = world.tick
+    writeSave(AUTOSAVE, world, true)
+      .then(() => setLastSave({ text: 'Autosaved', at: Date.now() }))
+      .catch(() => setLastSave({ text: 'Autosave failed', at: Date.now() }))
+  }
   useEffect(() => {
-    const timer = setInterval(() => {
-      // While you're looking back, the autosave keeps the latest point, not the past you're viewing.
-      const snapsNow = sv.snapshots.current
-      const world = sv.lookingBack() ? snapsNow[snapsNow.length - 1] : sv.world.current
-      if (world.tick === autoTick.current || (!world.groups.length && !world.walkers.length)) return
-      autoTick.current = world.tick
-      writeSave(AUTOSAVE, world, true)
-        .then(() => setLastSave({ text: 'Autosaved', at: Date.now() }))
-        .catch(() => setLastSave({ text: "Autosave failed", at: Date.now() }))
-    }, 5 * 60 * 1000)
-    return () => clearInterval(timer)
-  }, [sv.world])
+    const save = (): void => autosave.current()
+    const hidden = (): void => {
+      if (document.visibilityState === 'hidden') save()
+    }
+    const timer = setInterval(save, 5 * 60 * 1000)
+    window.addEventListener('blur', save)
+    window.addEventListener('beforeunload', save)
+    document.addEventListener('visibilitychange', hidden)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('blur', save)
+      window.removeEventListener('beforeunload', save)
+      document.removeEventListener('visibilitychange', hidden)
+      // Leaving the page (another tab in Orbit, or Creatures mode).
+      save()
+    }
+  }, [])
 
   // Whose fog of war is shown: the group you're looking at.
   const selGroupId = selection?.kind === 'group' ? selection.id : selection?.kind === 'person' ? personById(w, selection.id)?.group ?? null : null
