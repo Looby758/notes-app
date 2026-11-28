@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Eye, EyeOff, Footprints, History, Moon, MousePointer2, Package, Pause, Play, RotateCcw, Skull, Sparkles, StepForward, Sun, Users, Volume2 } from 'lucide-react'
+import { Eye, EyeOff, Save, Footprints, History, Moon, MousePointer2, Package, Pause, Play, RotateCcw, Skull, Sparkles, StepForward, Sun, Users, Volume2 } from 'lucide-react'
 import {
   answerDecision,
   buildingAt,
@@ -22,6 +22,8 @@ import { SURVIVAL_SPEEDS, useSurvival } from './useSurvival'
 import SurvivalView, { type Selection } from './SurvivalView'
 import { BuildingCard, CreatorPanel, GroupCard, GroupList, PersonCard, StoryPanel, newCreator, when, type Creator } from './SurvivalPanels'
 import { Slider, Toggle } from './Panels'
+import SavesDialog from './SurvivalSaves'
+import { AUTOSAVE, writeSave } from './survivalSaves'
 
 type Tool = 'select' | 'people' | 'walker' | 'herd' | 'supplies' | 'noise'
 type PanelId = 'groups' | 'add' | 'story' | 'world'
@@ -59,6 +61,22 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
   const [showFog, setShowFog] = useState(true)
   const [fitKey, setFitKey] = useState(0)
   const [focus, setFocus] = useState<{ x: number; y: number; n: number } | null>(null)
+  const [savesOpen, setSavesOpen] = useState(false)
+  const [lastSave, setLastSave] = useState<{ text: string; at: number } | null>(null)
+
+  // Autosave every 5 minutes into one slot, whenever something has happened since the last one.
+  const autoTick = useRef(-1)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const world = sv.world.current
+      if (world.tick === autoTick.current || (!world.groups.length && !world.walkers.length)) return
+      autoTick.current = world.tick
+      writeSave(AUTOSAVE, world, true)
+        .then(() => setLastSave({ text: 'Autosaved', at: Date.now() }))
+        .catch(() => setLastSave({ text: "Autosave failed", at: Date.now() }))
+    }, 5 * 60 * 1000)
+    return () => clearInterval(timer)
+  }, [sv.world])
 
   // Whose fog of war is shown: the group you're looking at.
   const selGroupId = selection?.kind === 'group' ? selection.id : selection?.kind === 'person' ? personById(w, selection.id)?.group ?? null : null
@@ -180,6 +198,22 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
           <button className="icon-btn" onClick={() => sv.restart()} title="Start again with an empty map">
             <RotateCcw size={15} />
           </button>
+          <button
+            className="btn"
+            onClick={() => {
+              sv.setRunning(false)
+              setSavesOpen(true)
+            }}
+            title="Save this world, or go back to a save"
+            data-sv-saves-open
+          >
+            <Save size={13} /> Save / load
+          </button>
+          {lastSave && (
+            <span className="sv-autosaved">
+              {lastSave.text} {new Date(lastSave.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
         </div>
         <div className="evo-stats">
           <span className="sv-clock">
@@ -255,7 +289,22 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
             </div>
           )}
 
-          {decision && <DecisionCard world={w} onAnswer={(choice) => {
+          {savesOpen && (
+            <SavesDialog
+              world={w}
+              onClose={() => setSavesOpen(false)}
+              onSaved={() => setLastSave({ text: 'Saved', at: Date.now() })}
+              onLoad={(loaded, name) => {
+                sv.load(loaded)
+                autoTick.current = loaded.tick
+                setSelection(null)
+                setSavesOpen(false)
+                setLastSave({ text: `Loaded "${name}"`, at: Date.now() })
+              }}
+            />
+          )}
+
+          {decision && !savesOpen && <DecisionCard world={w} onAnswer={(choice) => {
             answerDecision(w, decision.id, choice)
             if (!w.pending.length) sv.setRunning(true)
             sv.refresh()

@@ -47,6 +47,8 @@ export interface Survival {
   /** A fresh, empty world. */
   restart: (opts?: Partial<SurvivalOptionsState>) => void
   rewindTo: (index: number) => void
+  /** Swap in a saved world. It's paused, and rewinding starts again from here. */
+  load: (w: SurvivalWorld) => void
 }
 
 export function useSurvival(): Survival {
@@ -136,5 +138,15 @@ export function useSurvival(): Survival {
     [refresh]
   )
 
-  return { world, snapshots, options, running, setRunning, speed, setSpeed, version, refresh, stepOnce, restart, rewindTo }
+  const load = useCallback(
+    (w: SurvivalWorld) => {
+      world.current = w
+      snapshots.current = [snapshotSurvival(w)]
+      setRunning(false)
+      refresh()
+    },
+    [refresh]
+  )
+
+  return { world, snapshots, options, running, setRunning, speed, setSpeed, version, refresh, stepOnce, restart, rewindTo, load }
 }
