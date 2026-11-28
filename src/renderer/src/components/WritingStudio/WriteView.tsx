@@ -7,8 +7,8 @@ import {
   Ghost,
   History,
   Loader2,
-  MapPin,
   Pause,
+  Pencil,
   Play,
   Plus,
   ShieldCheck,
@@ -25,6 +25,7 @@ import {
   chapterWords,
   checkContinuity,
   countWords,
+  dateLabel,
   entityById,
   findMentions,
   findQuote,
@@ -57,7 +58,7 @@ import {
   useTake,
   useWriting
 } from '../../store/writingStudio'
-import { runGhostReader } from '../../lib/writingAi'
+import { runGhostReader, showAiProblem } from '../../lib/writingAi'
 import StoryEditor, { type Mark } from './StoryEditor'
 
 /** Writing: the chapters and scenes down the side, the page in the middle, and checks, the ghost reader and the time-lapse on the right. */
@@ -180,8 +181,10 @@ function Outline({ story, current }: { story: Story; current: string }) {
           <div className="ws-chapter-head">
             {renaming === c.id ? (
               <input
-                className="text-input"
+                className="ws-input ws-chapter-rename"
                 autoFocus
+                onFocus={(e) => e.target.select()}
+                placeholder="Chapter name"
                 defaultValue={c.title}
                 onBlur={(e) => {
                   renameChapter(c.id, e.target.value.trim())
@@ -193,12 +196,15 @@ function Outline({ story, current }: { story: Story; current: string }) {
                 }}
               />
             ) : (
-              <button className="ws-chapter-title" onDoubleClick={() => setRenaming(c.id)} title="Double-click to rename">
+              <button className="ws-chapter-title" onClick={() => openScene(c.scenes[0].id)} onDoubleClick={() => setRenaming(c.id)} title={`${c.title} (double-click to rename)`}>
                 {c.title}
               </button>
             )}
             <span className="ws-count">{chapterWords(c).toLocaleString()}</span>
             <div className="ws-row-actions">
+              <button className="icon-btn" onClick={() => setRenaming(c.id)} title="Name this chapter" data-ws-rename-chapter>
+                <Pencil size={11} />
+              </button>
               <button className="icon-btn" disabled={ci === 0} onClick={() => moveChapter(c.id, -1)} title="Move up">
                 <ChevronUp size={12} />
               </button>
@@ -221,7 +227,7 @@ function Outline({ story, current }: { story: Story; current: string }) {
           </button>
         </section>
       ))}
-      <button className="btn ws-add-chapter" onClick={addChapter} data-ws-add-chapter>
+      <button className="btn ws-add-chapter" onClick={() => setRenaming(addChapter())} data-ws-add-chapter>
         <Plus size={13} /> Add a chapter
       </button>
       <div className="ws-pacing-key">
@@ -269,7 +275,17 @@ function SceneHead({ scene, chapter, compare, setCompare }: { story: Story; scen
   return (
     <div className="ws-scene-head">
       <div className="ws-scene-title">
-        <span className="ws-scene-chapter">{chapter.title}</span>
+        <input
+          className="ws-scene-chapter"
+          key={`ch${chapter.id}${chapter.title}`}
+          defaultValue={chapter.title}
+          maxLength={120}
+          onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== chapter.title && renameChapter(chapter.id, e.target.value.trim())}
+          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+          aria-label="Chapter name"
+          title="Click to name this chapter"
+          data-ws-chapter-name
+        />
         <input
           className="ws-scene-title-input"
           key={scene.id}
@@ -375,90 +391,97 @@ function SceneDetails({ story, scene }: { story: Story; scene: Scene }) {
   const chars = story.entities.filter((e) => e.kind === 'character')
   const places = story.entities.filter((e) => e.kind === 'location')
   const cast = facts?.cast ?? []
-  const missing = chars.filter((c) => !cast.includes(c.id))
+  const mentioned = facts?.mentioned ?? []
+  const others = chars.filter((c) => !cast.includes(c.id) && !mentioned.includes(c.id))
   const detectedPlace = facts?.place && !scene.place ? entityById(story, facts.place)?.name : null
+  const name = (id: string): string => entityById(story, id)?.name ?? ''
+
+  /** In the scene after all (or not): what you say wins over what the text suggests. */
+  const setHere = (id: string, here: boolean): void =>
+    updateScene(scene.id, (s) => {
+      s.castAdd = s.castAdd.filter((x) => x !== id)
+      s.castRemove = s.castRemove.filter((x) => x !== id)
+      if (here) s.castAdd.push(id)
+      else s.castRemove.push(id)
+    })
+
   return (
     <div className="ws-details" data-ws-details>
-      <label className="ws-detail" title="When this happens in the story: a date like 2026-03-14, or Day 12">
-        <span>When</span>
-        <input
-          className="text-input"
-          key={`d${scene.id}`}
-          defaultValue={scene.date}
-          placeholder="Day 1"
-          maxLength={40}
-          onBlur={(e) => e.target.value !== scene.date && updateScene(scene.id, (s) => void (s.date = e.target.value.trim()))}
-          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-          data-ws-scene-date
-        />
-        <input className="text-input ws-time" type="time" value={scene.time} onChange={(e) => updateScene(scene.id, (s) => void (s.time = e.target.value))} title="Time (optional)" />
-      </label>
-      <label className="ws-detail">
-        <MapPin size={13} />
-        <select value={scene.place} onChange={(e) => updateScene(scene.id, (s) => void (s.place = e.target.value))} data-ws-scene-place>
-          <option value="">{detectedPlace ? `${detectedPlace} (from the text)` : places.length ? 'Where? (from the text)' : 'Add locations in the story brain'}</option>
-          {places.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <div className="ws-cast" data-ws-cast>
-        {cast.map((id) => {
-          const e = entityById(story, id)
-          if (!e) return null
-          const added = scene.castAdd.includes(id)
-          return (
-            <span key={id} className={`ws-chip ${added ? 'added' : ''}`} title={added ? 'Added by you' : 'Named in this scene'}>
-              {e.name}
-              <button
-                onClick={() =>
-                  updateScene(scene.id, (s) => {
-                    s.castAdd = s.castAdd.filter((x) => x !== id)
-                    if (!added) s.castRemove = [...new Set([...s.castRemove, id])]
-                  })
-                }
-                title="Not really in this scene"
-              >
-                <X size={10} />
-              </button>
-            </span>
-          )
-        })}
-        {scene.castRemove.length > 0 && (
-          <button className="link-button" onClick={() => updateScene(scene.id, (s) => void (s.castRemove = []))} title={`Taken out: ${scene.castRemove.map((id) => entityById(story, id)?.name).filter(Boolean).join(', ')}`}>
-            <Undo2 size={11} /> {scene.castRemove.length} taken out
-          </button>
-        )}
-        {missing.length > 0 && (
-          <select
-            className="ws-cast-add"
-            value=""
-            onChange={(e) => {
-              const id = e.target.value
-              if (id)
-                updateScene(scene.id, (s) => {
-                  s.castRemove = s.castRemove.filter((x) => x !== id)
-                  if (!s.castAdd.includes(id)) s.castAdd.push(id)
-                })
-            }}
-            title="Someone in this scene the text doesn't name"
-          >
-            <option value="">+ Someone else</option>
-            {missing.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
+      <div className="ws-details-row">
+        <label className="ws-detail" title="When this happens in the story: a day number like 3 (or Day 3), or a date like 1888-10-31">
+          <span className="ws-detail-label">When</span>
+          <input
+            className="ws-input"
+            key={`d${scene.id}`}
+            defaultValue={scene.date}
+            placeholder="Day 1"
+            maxLength={40}
+            onBlur={(e) => e.target.value.trim() !== scene.date && updateScene(scene.id, (s) => void (s.date = e.target.value.trim()))}
+            onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+            data-ws-scene-date
+          />
+          <input className="ws-input ws-time" type="time" value={scene.time} onChange={(e) => updateScene(scene.id, (s) => void (s.time = e.target.value))} title="Time (optional)" />
+        </label>
+        <label className="ws-detail">
+          <span className="ws-detail-label">Where</span>
+          <select className="ws-select" value={scene.place} onChange={(e) => updateScene(scene.id, (s) => void (s.place = e.target.value))} data-ws-scene-place>
+            <option value="">{detectedPlace ? `${detectedPlace} (from the text)` : places.length ? 'From the text' : 'Add places in the story brain'}</option>
+            {places.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
               </option>
             ))}
           </select>
-        )}
-        {!chars.length && (
-          <span className="ws-hint">
-            <UserPlus size={12} /> Add characters in the story brain and they’re spotted in every scene.
-          </span>
-        )}
+        </label>
       </div>
+      <div className="ws-details-row">
+        <span className="ws-detail-label">In the scene</span>
+        <div className="ws-cast" data-ws-cast>
+          {cast.map((id) => (
+            <span key={id} className={`ws-chip ${scene.castAdd.includes(id) ? 'added' : ''}`} title={scene.castAdd.includes(id) ? 'You added them' : 'Named in this scene'}>
+              {name(id)}
+              <button onClick={() => setHere(id, false)} title="Not really here (just mentioned)" data-ws-cast-out={id}>
+                <X size={10} />
+              </button>
+            </span>
+          ))}
+          {!cast.length && chars.length > 0 && <span className="ws-hint">Nobody yet</span>}
+          {others.length > 0 && (
+            <select
+              className="ws-select ws-cast-add"
+              value=""
+              onChange={(e) => e.target.value && setHere(e.target.value, true)}
+              title="Someone in this scene the text doesn't name"
+            >
+              <option value="">+ Add someone</option>
+              {others.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          )}
+          {!chars.length && (
+            <span className="ws-hint">
+              <UserPlus size={12} /> Add characters in the story brain and they’re spotted in every scene.
+            </span>
+          )}
+        </div>
+      </div>
+      {mentioned.length > 0 && (
+        <div className="ws-details-row">
+          <span className="ws-detail-label" title="Talked or thought about, but not in the scene. They don't count as meeting anyone here.">
+            Mentioned
+          </span>
+          <div className="ws-cast" data-ws-mentioned>
+            {mentioned.map((id) => (
+              <button key={id} className="ws-chip ws-chip-mention" onClick={() => setHere(id, true)} title="Actually in this scene? Click to move them in" data-ws-cast-in={id}>
+                {name(id)} <Plus size={10} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -491,7 +514,7 @@ function CompareTake({ scene, takeId, onPick, onClose }: { scene: Scene; takeId:
   return (
     <div className="ws-compare-pane" data-ws-compare-pane>
       <div className="ws-compare-head">
-        <select value={takeId} onChange={(e) => onPick(e.target.value)} disabled={others.length < 2} aria-label="Which take">
+        <select className="ws-select" value={takeId} onChange={(e) => onPick(e.target.value)} disabled={others.length < 2} aria-label="Which take">
           {others.map((t) => (
             <option key={t.id} value={t.id}>
               {t.name}
@@ -556,7 +579,7 @@ function ChecksPanel({ story, scene, onJump }: { story: Story; scene: Scene; onJ
       {clashes.map((c, n) => (
         <div key={`c${n}`} className="ws-issue-row clash">
           <span>
-            {name(c.character)} is at {name(c.places[0])} and {name(c.places[1])} on {c.date}.
+            {name(c.character)} is at {name(c.places[0])} and {name(c.places[1])} on {dateLabel(c.date)}.
           </span>
           <button className="link-button" onClick={() => openScene(c.scenes[0] === scene.id ? c.scenes[1] : c.scenes[0])}>
             Go to “{sceneTitle(c.scenes[0] === scene.id ? c.scenes[1] : c.scenes[0])}”
@@ -581,7 +604,7 @@ function GhostPanel({ story, chapter, onJump }: { story: Story; chapter: Chapter
       const got = await runGhostReader(story, chapter.id, (done, of) => of > 1 && setBusy(`Reading part ${done + 1} of ${of}…`))
       if (!got.length) notify('The ghost reader didn’t have anything to say this time. Try again, or after writing a bit more.', 'info')
     } catch (err) {
-      notify(err)
+      showAiProblem(err)
     } finally {
       setBusy(null)
     }
@@ -660,7 +683,7 @@ function TimeLapse({ scene, onClose }: { scene: Scene; onClose: () => void }) {
           {playing ? <Pause size={15} /> : <Play size={15} />}
         </button>
         <input type="range" min={0} max={total} value={at} onChange={(e) => setAt(Number(e.target.value))} disabled={!total} aria-label="Point in the writing" data-ws-timelapse-slider />
-        <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label="Speed">
+        <select className="ws-select" value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label="Speed">
           {SPEEDS.map((s) => (
             <option key={s} value={s}>
               {s}×

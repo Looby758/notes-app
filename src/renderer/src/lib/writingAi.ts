@@ -20,13 +20,39 @@ import {
   type GhostNote,
   type Story
 } from '@shared/writing'
+import type { WritingAiJob } from '@shared/types'
 import { change } from '../store/writingStudio'
+import { notify } from '../store/notify'
+import { useUI } from '../store/ui'
+import { openSpecialTab, SETTINGS_TAB } from './editorController'
 
 /**
  * The Writing Studio's offline AI jobs: the ghost reader, the "how" notes in the who-met-who grid,
  * and asking the story brain. They all run on the offline AI (main/ai.ts → writing), so the story
  * never leaves this computer.
  */
+
+/** The offline AI isn't downloaded yet. */
+export class NeedsOfflineAi extends Error {}
+
+async function run(job: WritingAiJob): Promise<string> {
+  const reply = await window.api.aiWriting(job)
+  if ('text' in reply) return reply.text
+  throw reply.missing ? new NeedsOfflineAi(reply.problem) : new Error(reply.problem)
+}
+
+/** Shows why an AI job didn't work; for a missing offline AI, with a button that opens where to get it. */
+export function showAiProblem(err: unknown): void {
+  if (err instanceof NeedsOfflineAi)
+    notify(err.message, 'info', {
+      label: 'Set it up',
+      run: () => {
+        openSpecialTab(SETTINGS_TAB)
+        useUI.setState({ settingsSection: 'ai' })
+      }
+    })
+  else notify(err)
+}
 
 /** A first-time reader's reactions to a chapter, saved with the story. Long chapters are read in parts. */
 export async function runGhostReader(story: Story, chapterId: string, onPart?: (done: number, of: number) => void): Promise<GhostNote[]> {
@@ -42,7 +68,7 @@ export async function runGhostReader(story: Story, chapterId: string, onPart?: (
   const notes: GhostNote[] = []
   for (let i = 0; i < parts.length; i++) {
     onPart?.(i, parts.length)
-    const reply = await window.api.aiWriting({ kind: 'ghost', storyTitle: story.title, chapterTitle: chapter.title, part: parts[i], known, partNo: i + 1, parts: parts.length })
+    const reply = await run({ kind: 'ghost', storyTitle: story.title, chapterTitle: chapter.title, part: parts[i], known, partNo: i + 1, parts: parts.length })
     for (const g of parseGhost(reply, parts[i])) notes.push({ id: newId(), ...g })
   }
   change(null, (s) => {
@@ -78,7 +104,7 @@ export async function writeHows(story: Story, sceneId: string, pairs: [string, s
   if (!placed || !pairs.length) return 0
   const text = activeTake(placed.scene).text
   const name = (id: string): string => entityById(story, id)?.name ?? 'Someone'
-  const reply = await window.api.aiWriting({ kind: 'hows', sceneTitle: placed.scene.title, text, pairs: pairs.map(([a, b]) => [name(a), name(b)]) })
+  const reply = await run({ kind: 'hows', sceneTitle: placed.scene.title, text, pairs: pairs.map(([a, b]) => [name(a), name(b)]) })
   const lines = parseHows(reply, pairs.length)
   const print = fingerprint(text)
   let n = 0
@@ -113,6 +139,6 @@ export async function askBrain(story: Story, question: string, upTo = Infinity) 
     budget -= text.length
     excerpts.push({ label: labels.get(id)!, title: `${placed.chapter.title} – ${placed.scene.title}`, text })
   }
-  const reply = await window.api.aiWriting({ kind: 'ask', question, summary, excerpts })
+  const reply = await run({ kind: 'ask', question, summary, excerpts })
   return answerLinks(reply, labels)
 }

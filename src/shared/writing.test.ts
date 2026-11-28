@@ -8,6 +8,8 @@ import {
   chapterHtml,
   chapterPlain,
   checkContinuity,
+  dateLabel,
+  isJustMention,
   countWords,
   diffText,
   epubFiles,
@@ -140,6 +142,30 @@ describe('the brain', () => {
     expect(early).toContain(pairKey(mara.id, jun.id))
   })
 
+  it('tells someone in the scene from someone only mentioned', () => {
+    const rick = person('Rick Grimes')
+    const daryl = person('Daryl Dixon')
+    const story = newStory('x')
+    story.entities = [rick, daryl]
+    const text = 'The story starts with Rick Grimes entering the CDC. He is thinking about how Daryl went out hunting last week and didn’t come back.'
+    story.chapters = [{ ...newChapter('One'), scenes: [scene('Opening', text)] }]
+    const s = buildBrain(story).scenes[0]
+    expect(s.cast).toEqual([rick.id])
+    expect(s.mentioned).toEqual([daryl.id])
+    expect(buildBrain(story).pairs.size).toBe(0)
+  })
+
+  it('counts speech about someone as a mention, and speech to someone as them being there', () => {
+    const daryl = person('Daryl')
+    const at = (text: string): boolean => isJustMention(text, findMentions(text, [daryl])[0])
+    expect(at('“Where’s Daryl?” Rick asked.')).toBe(true)
+    expect(at('“Daryl, get down!” Rick shouted.')).toBe(false)
+    expect(at('“Get down, Daryl!” Rick shouted.')).toBe(false)
+    expect(at('Rick missed Daryl.')).toBe(true)
+    expect(at('Daryl raised the crossbow.')).toBe(false)
+    expect(at('He thought about it. Daryl came back at dawn.')).toBe(false)
+  })
+
   it('lets you add and take out characters by hand', () => {
     const { story, mara, theo, jun } = sample()
     story.chapters[0].scenes[0].castRemove = [theo.id]
@@ -165,6 +191,9 @@ describe('the story calendar', () => {
     expect(storyDateKey('day 3')).toBe(3)
     expect(storyDateKey('2026-03-14')! - storyDateKey('2026-03-13')!).toBe(1)
     expect(storyDateKey('next Tuesday')).toBeNull()
+    expect(storyDateKey('1')).toBe(1)
+    expect(dateLabel('1')).toBe('Day 1')
+    expect(dateLabel('1888-10-31')).toBe('1888-10-31')
   })
 
   it('warns when a character is in two places on the same day', () => {

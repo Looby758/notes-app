@@ -1,6 +1,6 @@
 import { useDeferredValue, useMemo } from 'react'
 import { AlertTriangle, CalendarDays, MapPin, Undo2 } from 'lucide-react'
-import { allScenes, buildBrain, calendarClashes, calendarOrder, entityById, flashbacks, type SceneFacts, type Story } from '@shared/writing'
+import { allScenes, buildBrain, dateLabel, calendarClashes, calendarOrder, entityById, flashbacks, type SceneFacts, type Story } from '@shared/writing'
 import { openScene, updateScene, useWriting } from '../../store/writingStudio'
 
 /**
@@ -43,7 +43,7 @@ export default function CalendarView() {
               <div key={i} className="ws-clash">
                 <AlertTriangle size={14} />
                 <span>
-                  <b>{name(c.character)}</b> is at {name(c.places[0])} in “{title(c.scenes[0])}” and at {name(c.places[1])} in “{title(c.scenes[1])}”, both on {c.date}.
+                  <b>{name(c.character)}</b> is at {name(c.places[0])} in “{title(c.scenes[0])}” and at {name(c.places[1])} in “{title(c.scenes[1])}”, both on {dateLabel(c.date)}.
                 </span>
                 <button className="link-button" onClick={() => openScene(c.scenes[1])}>
                   Fix it
@@ -62,7 +62,7 @@ export default function CalendarView() {
         <ol className="ws-timeline">
           {days.map((d) => (
             <li key={d.date + d.scenes[0].id} className="ws-day-group">
-              <div className="ws-day-label">{d.date}</div>
+              <div className="ws-day-label">{dateLabel(d.date)}</div>
               <div className="ws-day-scenes">
                 {d.scenes.map((s) => (
                   <TimelineScene key={s.id} story={story} s={s} clash={clashScenes.has(s.id)} flashback={back.has(s.id)} />

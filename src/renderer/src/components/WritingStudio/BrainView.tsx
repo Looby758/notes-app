@@ -3,6 +3,7 @@ import { Check, Grid3x3, HeartHandshake, Loader2, MessageCircleQuestion, Plus, S
 import {
   allScenes,
   buildBrain,
+  dateLabel,
   ENTITY_KINDS,
   entityById,
   fingerprint,
@@ -31,7 +32,7 @@ import {
   useWriting,
   type BrainTab
 } from '../../store/writingStudio'
-import { askBrain, scenesNeedingHows, writeHows } from '../../lib/writingAi'
+import { askBrain, scenesNeedingHows, showAiProblem, writeHows } from '../../lib/writingAi'
 
 /**
  * The story brain: a page for every character, location, item, group and event; who has met who;
@@ -104,7 +105,7 @@ function SceneLink({ story, id, extra }: { story: Story; id: string; extra?: str
     <button className="ws-scene-link" onClick={() => openScene(id)} title="Open this scene" data-ws-scene-link={id}>
       <span className="ws-scene-link-ch">{p.chapter.title}</span>
       <span className="ws-scene-link-title">{p.scene.title}</span>
-      {p.scene.date && <span className="ws-scene-link-date">{p.scene.date}</span>}
+      {p.scene.date && <span className="ws-scene-link-date">{dateLabel(p.scene.date)}</span>}
       {extra && <span className="ws-scene-link-extra">{extra}</span>}
     </button>
   )
@@ -286,7 +287,7 @@ function EntityPage({ entity }: { entity: Entity }) {
       {entity.kind === 'character' && (
         <label className="ws-field ws-dies">
           <span>Dies in</span>
-          <select value={entity.diesIn ?? ''} onChange={(e) => updateEntity(entity.id, (x) => (e.target.value ? (x.diesIn = e.target.value) : delete x.diesIn), 'Changed when someone dies')}>
+          <select className="ws-select" value={entity.diesIn ?? ''} onChange={(e) => updateEntity(entity.id, (x) => (e.target.value ? (x.diesIn = e.target.value) : delete x.diesIn), 'Changed when someone dies')}>
             <option value="">Doesn’t die (so far)</option>
             {allScenes(story).map((p) => (
               <option key={p.scene.id} value={p.scene.id}>
@@ -306,7 +307,7 @@ function EntityPage({ entity }: { entity: Entity }) {
         </h3>
         {!scenesHere.length && <p className="ws-panel-empty">Not named in any scene{limit !== Infinity ? ' yet at this point' : ''}.</p>}
         {scenesHere.map((id) => (
-          <SceneLink key={id} story={story} id={id} />
+          <SceneLink key={id} story={story} id={id} extra={brain.scenes.find((s) => s.id === id)?.mentioned.includes(entity.id) ? 'mentioned' : undefined} />
         ))}
       </section>
     </article>
@@ -412,7 +413,7 @@ function MetGrid() {
       }
       notify(`Wrote ${n} note${n === 1 ? '' : 's'}. Have a look and tick the ones that are right.`, 'info')
     } catch (err) {
-      notify(err)
+      showAiProblem(err)
     } finally {
       setBusy(null)
     }
@@ -502,7 +503,7 @@ function PairPanel({ a, b, onClose }: { a: string; b: string; onClose: () => voi
     try {
       for (const id of missing) await writeHows(useWriting.getState().story!, id, [[a, b]])
     } catch (err) {
-      notify(err)
+      showAiProblem(err)
     } finally {
       setBusy(false)
     }
@@ -612,7 +613,7 @@ function Relationships() {
   return (
     <div className="ws-rels" data-ws-relationships>
       <div className="ws-rel-add">
-        <select value={a} onChange={(e) => setA(e.target.value)} aria-label="First character">
+        <select className="ws-select" value={a} onChange={(e) => setA(e.target.value)} aria-label="First character">
           <option value="">Someone…</option>
           {chars.map((c) => (
             <option key={c.id} value={c.id}>
@@ -621,7 +622,7 @@ function Relationships() {
           ))}
         </select>
         <span>and</span>
-        <select value={b} onChange={(e) => setB(e.target.value)} aria-label="Second character">
+        <select className="ws-select" value={b} onChange={(e) => setB(e.target.value)} aria-label="Second character">
           <option value="">someone else…</option>
           {chars
             .filter((c) => c.id !== a)
@@ -674,7 +675,7 @@ function Relationships() {
                       placeholder="Friends"
                       onBlur={(e) => updateRelationship(r.id, (x) => void (x.steps.find((y) => y.id === s.id)!.label = e.target.value.trim()))}
                     />
-                    <select value={s.scene} onChange={(e) => updateRelationship(r.id, (x) => void (x.steps.find((y) => y.id === s.id)!.scene = e.target.value))} aria-label="From which scene">
+                    <select className="ws-select" value={s.scene} onChange={(e) => updateRelationship(r.id, (x) => void (x.steps.find((y) => y.id === s.id)!.scene = e.target.value))} aria-label="From which scene">
                       {scenes.map((p) => (
                         <option key={p.scene.id} value={p.scene.id}>
                           from {p.chapter.title} – {p.scene.title}
@@ -728,7 +729,7 @@ function Ask() {
     try {
       setAnswer({ q: question, parts: await askBrain(story, question, upTo) })
     } catch (err) {
-      notify(err)
+      showAiProblem(err)
     } finally {
       setBusy(false)
     }

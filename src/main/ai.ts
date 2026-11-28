@@ -2,7 +2,7 @@ import { app, safeStorage } from 'electron'
 import { readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import Anthropic from '@anthropic-ai/sdk'
-import type { AiAskTurn, AiEngine, AiExtraContext, AiChat, AiChatMessage, AiNote, AiReply, AiSortRow, AiStatus, WritingAiJob } from '@shared/types'
+import type { AiAskTurn, AiEngine, AiExtraContext, AiChat, AiChatMessage, AiNote, AiReply, AiSortRow, AiStatus, WritingAiJob, WritingAiReply } from '@shared/types'
 import { AI_BUDGET, ASK_SYSTEM, askPrompt, GHOST_SYSTEM, ghostPrompt, HOWS_SYSTEM, howsPrompt } from '@shared/writing'
 import { cleanReply, fitTexts, HARD_NOTE, LOCAL_CONTEXT_CHARS, MEANING_SYSTEM, meaningPrompt, MONEY_SORT_SYSTEM, moneySortPrompt, parseMoneySort } from '@shared/localAi'
 import { parseRelatedWords } from '@shared/emailSearch'
@@ -314,8 +314,16 @@ export async function meaning(word: string, sentence: string): Promise<string> {
  * The Writing Studio's jobs, on the offline AI only: stories are private, so they never go to
  * Claude. The prompts are in shared/writing.ts; every text is cut to what the model can read.
  */
-export async function writing(job: WritingAiJob): Promise<string> {
-  if (!localAiInstalled()) throw new Error('This needs the offline AI. Get it in Settings → AI helper (it’s free and runs on this computer).')
+export async function writing(job: WritingAiJob): Promise<WritingAiReply> {
+  if (!localAiInstalled()) return { problem: 'This needs the offline AI. It’s free and runs on this computer.', missing: true }
+  try {
+    return { text: await writingJob(job) }
+  } catch (err) {
+    return { problem: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+async function writingJob(job: WritingAiJob): Promise<string> {
   const s = (v: unknown, max: number): string => String(v ?? '').slice(0, max)
   let system: string
   let prompt: string

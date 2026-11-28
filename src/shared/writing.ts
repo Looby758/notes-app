@@ -439,6 +439,42 @@ export function findMentions(text: string, entities: Entity[]): Mention[] {
 
 // ---------- the brain ----------
 
+const MENTION_CUES = new Set(
+  `about of remember remembered remembers remembering miss missed misses missing thought thinking think thinks wonder wondered wondering
+  dream dreamt dreamed dreaming mention mentioned heard without since reminded memory memories grave photo picture letter news rumour rumours
+  rumor rumors how where whether`.split(/\s+/)
+)
+
+/**
+ * A name used in passing rather than someone being there: in someone else's speech ("“Where's
+ * Daryl?”"), or just after words like "thinking about", "remembered", "missed", "since". Someone
+ * spoken to ("“Daryl, get down!”") is there. Rough on purpose; you can always move people by hand.
+ */
+export function isJustMention(text: string, m: Mention): boolean {
+  const paraStart = text.lastIndexOf('\n', m.start - 1) + 1
+  const before = text.slice(paraStart, m.start)
+  const opens = (before.match(/“/g) ?? []).length
+  const closes = (before.match(/”/g) ?? []).length
+  const straight = (before.match(/"/g) ?? []).length
+  const inQuote = opens > closes || straight % 2 === 1
+  if (inQuote) {
+    const after = text.slice(m.end, m.end + 3)
+    // Spoken to: right after the opening quote and followed by a comma, or ", Daryl." at the end.
+    const spokenTo = (/[“"]\s*$/.test(before) && /^[,!]/.test(after)) || (/,\s*$/.test(before) && /^[.!?]?[”"]/.test(after))
+    return !spokenTo
+  }
+  const words = before.toLowerCase().match(/[a-z’']+/g) ?? []
+  const sentenceBreak = /[.!?]["”’)]*\s*$/.test(before)
+  if (sentenceBreak) return false
+  return words.slice(-3).some((w) => MENTION_CUES.has(w))
+}
+
+/** "1" or "Day 1" reads as "Day 1"; a date stays as written. */
+export function dateLabel(date: string): string {
+  const d = date.trim()
+  return /^-?\d{1,5}$/.test(d) ? `Day ${d}` : d
+}
+
 export interface SceneFacts {
   id: string
   chapter: string
@@ -452,6 +488,8 @@ export interface SceneFacts {
   place: string | null
   /** How often each entity is named. */
   mentions: Record<string, number>
+  /** Characters only talked or thought about here, not in the scene themselves. */
+  mentioned: string[]
   date: string
   time: string
   /** For putting scenes in story order on the calendar, or null if it has no date. */
@@ -466,7 +504,7 @@ export function storyDateKey(date: string): number | null {
     const t = Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]))
     return Number.isFinite(t) ? Math.round(t / 86_400_000) : null
   }
-  const day = /^day\s*(-?\d+)$/i.exec(d)
+  const day = /^(?:day\s*)?(-?\d{1,5})$/i.exec(d)
   if (day) return Number(day[1])
   return null
 }
@@ -476,8 +514,11 @@ export function sceneFacts(story: Story, placed: PlacedScene, mentions = findMen
   const counts: Record<string, number> = {}
   for (const m of mentions) counts[m.entity] = (counts[m.entity] ?? 0) + 1
   const kind = new Map(story.entities.map((e) => [e.id, e.kind]))
-  const named = Object.keys(counts).filter((id) => kind.get(id) === 'character')
-  const cast = [...new Set([...named, ...scene.castAdd.filter((id) => kind.get(id) === 'character')])].filter((id) => !scene.castRemove.includes(id))
+  const text = sceneText(scene)
+  // In the scene: named at least once other than in passing ("thinking about Daryl", or in someone's speech).
+  const here = new Set(mentions.filter((m) => kind.get(m.entity) === 'character' && !isJustMention(text, m)).map((m) => m.entity))
+  const cast = [...new Set([...here, ...scene.castAdd.filter((id) => kind.get(id) === 'character')])].filter((id) => !scene.castRemove.includes(id))
+  const mentioned = Object.keys(counts).filter((id) => kind.get(id) === 'character' && !cast.includes(id))
   let place: string | null = scene.place && kind.get(scene.place) === 'location' ? scene.place : null
   if (!place) {
     // The location named most, the first one named on a tie.
@@ -498,6 +539,7 @@ export function sceneFacts(story: Story, placed: PlacedScene, mentions = findMen
     title: scene.title,
     words: countWords(sceneText(scene)),
     cast,
+    mentioned,
     place,
     mentions: counts,
     date: scene.date,

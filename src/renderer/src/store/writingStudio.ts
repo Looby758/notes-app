@@ -333,14 +333,16 @@ export function openScene(id: string): void {
   useWriting.setState({ scene: id, view: 'write' })
 }
 
-export function addChapter(): void {
+/** Adds a chapter and returns its id (so its name can be typed straight away). */
+export function addChapter(): string | null {
   const story = useWriting.getState().story
-  if (!story) return
+  if (!story) return null
   const ch = newChapter(`Chapter ${story.chapters.length + 1}`)
   change('Added a chapter', (s) => {
     s.chapters.push(ch)
   })
   useWriting.setState({ scene: ch.scenes[0].id })
+  return ch.id
 }
 
 export function addScene(chapterId: string): void {
