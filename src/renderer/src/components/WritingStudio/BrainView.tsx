@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState, type CSSProperties } from 'react'
+import { useDeferredValue, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { BookMarked, Check, EyeOff, Grid3x3, HeartHandshake, Loader2, MessageCircleQuestion, Plus, Sparkles, Trash2, Users, X } from 'lucide-react'
 import {
   allScenes,
@@ -721,6 +721,20 @@ function Relationships() {
 
 // ---------- ask ----------
 
+/** **bold** and *italic* in an answer, shown as such instead of as stars. */
+function inlineMarks(text: string): ReactNode[] {
+  const out: ReactNode[] = []
+  const re = /\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|__([^_\n]+)__/g
+  let last = 0
+  for (let m = re.exec(text); m; m = re.exec(text)) {
+    if (m.index > last) out.push(text.slice(last, m.index))
+    out.push(m[2] ? <em key={m.index}>{m[2]}</em> : <strong key={m.index}>{m[1] ?? m[3]}</strong>)
+    last = m.index + m[0].length
+  }
+  if (last < text.length) out.push(text.slice(last))
+  return out
+}
+
 function Ask() {
   const { story, upTo } = useBrain()
   const asOf = useWriting((s) => s.asOf)
@@ -771,7 +785,7 @@ function Ask() {
                   {sceneOf(story, p.scene)?.scene.title ?? p.label}
                 </button>
               ) : (
-                <span key={i}>{p.text}</span>
+                <span key={i}>{inlineMarks(p.text)}</span>
               )
             )}
           </p>

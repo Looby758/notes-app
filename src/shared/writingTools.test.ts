@@ -247,4 +247,20 @@ describe('the new story parts', () => {
     expect(summary).toContain('- Carol (dies in [S3] Chapter 2 – Tracks)')
     expect(brainSummary(w.story, buildBrain(w.story, 0), sceneLabels(w.story), 1)).not.toContain('dies in')
   })
+
+  it('tells the AI about secrets, setups and canon', () => {
+    const w = walkers()
+    w.story.secrets = [
+      { id: 'x', text: 'Daryl was bitten', cues: [], learns: [{ id: 'l', who: w.carol, scene: w.s[3] }, { id: 'm', who: READER, scene: '' }] },
+      { id: 'y', text: 'Rick hid the map', cues: [], learns: [] }
+    ]
+    w.story.threads = [{ id: 't', label: 'The rifle', setup: { scene: w.s[1], quote: 'x' }, payoffs: [], dropped: false }]
+    w.story.canon = { source: 'TWD', splitAt: w.s[2], splitNote: 'Glenn lives', facts: [{ id: 'f', entity: w.daryl, label: 'Status', value: 'alive', changed: false }] }
+    const summary = brainSummary(w.story, buildBrain(w.story), sceneLabels(w.story))
+    expect(summary).toContain('- Daryl was bitten: Carol finds out in [S4] Chapter 2 – The truth; the reader knows from the start')
+    expect(summary).toContain('- Rick hid the map (true in the story; nobody is listed as knowing yet)')
+    expect(summary).toContain('- The rifle, set up in [S2] Chapter 1 – Supper (not paid off yet)')
+    expect(summary).toContain('- The story breaks from canon in [S3] Chapter 2 – Tracks: Glenn lives')
+    expect(summary).toContain('- Daryl Dixon: Status: alive in canon')
+  })
 })

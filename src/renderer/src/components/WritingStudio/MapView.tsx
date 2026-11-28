@@ -1,9 +1,10 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject, type PointerEvent as ReactPointerEvent } from 'react'
-import { Brush, Eraser, ImagePlus, Loader2, Map as MapIcon, MapPin, Pause, Play, Redo2, SkipBack, Trash2, Undo2, X } from 'lucide-react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import { Brush, ImagePlus, Loader2, Map as MapIcon, MapPin, Pause, Play, SkipBack, Trash2, X } from 'lucide-react'
 import { buildBrain, entityById, mapFile, type Story } from '@shared/writing'
 import { mapSteps } from '@shared/writingTools'
 import { notify } from '../../store/notify'
 import { change, openScene, useWriting } from '../../store/writingStudio'
+import MapSketch, { type MapPicture } from './MapSketch'
 
 /**
  * The story map: a picture of your world (uploaded or sketched here) with your locations pinned on
@@ -11,11 +12,6 @@ import { change, openScene, useWriting } from '../../store/writingStudio'
  * The picture is kept in its own file (writing-map-<id>.json) so the story file stays small.
  */
 
-interface MapPicture {
-  image: string
-  w: number
-  h: number
-}
 
 const COLOURS = ['#f472b6', '#60a5fa', '#4ade80', '#fbbf24', '#a78bfa', '#f87171', '#2dd4bf', '#fb923c', '#e879f9', '#a3e635']
 
@@ -24,9 +20,12 @@ async function shrink(src: string): Promise<MapPicture> {
   const img = new Image()
   img.src = src
   await img.decode()
-  const scale = Math.min(1, 2400 / Math.max(img.naturalWidth, img.naturalHeight))
-  const w = Math.max(1, Math.round(img.naturalWidth * scale))
-  const h = Math.max(1, Math.round(img.naturalHeight * scale))
+  // An SVG with no size of its own reports 0 across: draw it at 1600px wide.
+  const nw = img.naturalWidth || 1600
+  const nh = img.naturalHeight || 1000
+  const scale = Math.min(1, 2400 / Math.max(nw, nh))
+  const w = Math.max(1, Math.round(nw * scale))
+  const h = Math.max(1, Math.round(nh * scale))
   const c = document.createElement('canvas')
   c.width = w
   c.height = h
@@ -71,14 +70,20 @@ export default function MapView() {
 
   const upload = async (f: File | undefined): Promise<void> => {
     if (!f) return
-    if (!f.type.startsWith('image/')) return notify('That isn’t a picture. Try a PNG, JPG or WebP.', 'info')
-    const url = URL.createObjectURL(f)
+    // Go by the file's name as well as its type: a saved web picture can arrive with no type, or a
+    // name like "map.svg.jpeg".
+    if (!f.type.startsWith('image/') && !/\.(png|jpe?g|webp|gif|bmp|svg|avif)$/i.test(f.name)) return notify('That isn’t a picture. Try a PNG, JPG or WebP.', 'info')
     try {
+      // Read it as a data URL: the app's security rules block blob: pictures, which is why uploads failed.
+      const url = await new Promise<string>((ok, fail) => {
+        const r = new FileReader()
+        r.onload = () => ok(String(r.result))
+        r.onerror = () => fail(r.error)
+        r.readAsDataURL(f)
+      })
       await save(await shrink(url))
     } catch {
       notify('That picture couldn’t be opened.', 'info')
-    } finally {
-      URL.revokeObjectURL(url)
     }
   }
 
@@ -91,7 +96,7 @@ export default function MapView() {
 
   if (sketch)
     return (
-      <SketchPad
+      <MapSketch
         under={sketch === 'over' ? pic : null}
         onCancel={() => setSketch(null)}
         onDone={(p) => {
@@ -370,144 +375,6 @@ function PinCard({ story, place, at, onPage }: { story: Story; place: string; at
       <button className="link-button" onClick={onPage}>
         Open its page
       </button>
-    </div>
-  )
-}
-
-// ---------- sketching ----------
-
-const INKS = [
-  { id: 'ink', label: 'Ink', c: '#3b3227' },
-  { id: 'water', label: 'Water', c: '#4a7fb5' },
-  { id: 'forest', label: 'Forest', c: '#4f8a4b' },
-  { id: 'earth', label: 'Earth', c: '#9a6b3f' },
-  { id: 'red', label: 'Roads', c: '#b64a3a' }
-]
-const SIZES = [3, 8, 20]
-const PAPER = '#efe6d2'
-
-function SketchPad({ under, onCancel, onDone }: { under: MapPicture | null; onCancel: () => void; onDone: (p: MapPicture) => void }) {
-  const canvas = useRef<HTMLCanvasElement>(null)
-  const [ink, setInk] = useState(INKS[0].c)
-  const [size, setSize] = useState(SIZES[1])
-  const [erase, setErase] = useState(false)
-  const undo = useRef<ImageData[]>([])
-  const redo = useRef<ImageData[]>([])
-  const [, bump] = useState(0)
-  const w = under?.w ?? 1600
-  const h = under?.h ?? 1000
-
-  useEffect(() => {
-    const c = canvas.current!
-    const g = c.getContext('2d')!
-    g.fillStyle = PAPER
-    g.fillRect(0, 0, w, h)
-    if (under) {
-      const img = new Image()
-      img.onload = () => g.drawImage(img, 0, 0, w, h)
-      img.src = under.image
-    }
-  }, [under, w, h])
-
-  const snapshot = (): void => {
-    const g = canvas.current!.getContext('2d')!
-    undo.current = [...undo.current.slice(-24), g.getImageData(0, 0, w, h)]
-    redo.current = []
-    bump((n) => n + 1)
-  }
-
-  const down = (e: ReactPointerEvent<HTMLCanvasElement>): void => {
-    const c = canvas.current!
-    c.setPointerCapture(e.pointerId)
-    snapshot()
-    const g = c.getContext('2d')!
-    const r = c.getBoundingClientRect()
-    const pt = (ev: { clientX: number; clientY: number }): [number, number] => [((ev.clientX - r.left) / r.width) * w, ((ev.clientY - r.top) / r.height) * h]
-    g.lineCap = 'round'
-    g.lineJoin = 'round'
-    g.strokeStyle = erase ? PAPER : ink
-    g.lineWidth = (erase ? size * 2.5 : size) * (w / 1600)
-    let [lx, ly] = pt(e)
-    g.beginPath()
-    g.arc(lx, ly, g.lineWidth / 2, 0, Math.PI * 2)
-    g.fillStyle = g.strokeStyle
-    g.fill()
-    const move = (ev: PointerEvent): void => {
-      const [x, y] = pt(ev)
-      g.beginPath()
-      g.moveTo(lx, ly)
-      g.lineTo(x, y)
-      g.stroke()
-      ;[lx, ly] = [x, y]
-    }
-    const up = (): void => {
-      c.removeEventListener('pointermove', move)
-      c.removeEventListener('pointerup', up)
-    }
-    c.addEventListener('pointermove', move)
-    c.addEventListener('pointerup', up)
-  }
-
-  const step = (from: MutableRefObject<ImageData[]>, to: MutableRefObject<ImageData[]>): void => {
-    const g = canvas.current!.getContext('2d')!
-    const last = from.current.pop()
-    if (!last) return
-    to.current.push(g.getImageData(0, 0, w, h))
-    g.putImageData(last, 0, 0)
-    bump((n) => n + 1)
-  }
-
-  return (
-    <div className="ws-sketch" data-ws-sketch>
-      <div className="ws-sketch-tools">
-        {INKS.map((k) => (
-          <button
-            key={k.id}
-            className={`ws-swatch ${!erase && ink === k.c ? 'on' : ''}`}
-            style={{ '--c': k.c } as CSSProperties}
-            onClick={() => {
-              setInk(k.c)
-              setErase(false)
-            }}
-            title={k.label}
-          />
-        ))}
-        <span className="ws-tool-sep" />
-        {SIZES.map((s) => (
-          <button key={s} className={`ws-size ${size === s ? 'on' : ''}`} onClick={() => setSize(s)} title={`${s === 3 ? 'Thin' : s === 8 ? 'Medium' : 'Thick'} brush`}>
-            <i style={{ width: Math.min(16, s + 2), height: Math.min(16, s + 2) }} />
-          </button>
-        ))}
-        <button className={`ws-size ${erase ? 'on' : ''}`} onClick={() => setErase(!erase)} title="Rubber">
-          <Eraser size={15} />
-        </button>
-        <span className="ws-tool-sep" />
-        <button className="icon-btn" onClick={() => step(undo, redo)} disabled={!undo.current.length} title="Undo">
-          <Undo2 size={15} />
-        </button>
-        <button className="icon-btn" onClick={() => step(redo, undo)} disabled={!redo.current.length} title="Redo">
-          <Redo2 size={15} />
-        </button>
-        <span className="ws-sketch-grow" />
-        <button className="btn" onClick={onCancel}>
-          Cancel
-        </button>
-        <button
-          className="btn btn-primary"
-          onClick={() => {
-            const c = canvas.current!
-            let image = c.toDataURL('image/webp', 0.9)
-            if (!image.startsWith('data:image/webp')) image = c.toDataURL('image/png')
-            onDone({ image, w, h })
-          }}
-          data-ws-sketch-done
-        >
-          Use this map
-        </button>
-      </div>
-      <div className="ws-sketch-stage">
-        <canvas ref={canvas} width={w} height={h} style={{ aspectRatio: `${w} / ${h}` }} onPointerDown={down} className={erase ? 'erasing' : ''} />
-      </div>
     </div>
   )
 }

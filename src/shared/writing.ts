@@ -1288,6 +1288,40 @@ export function brainSummary(story: Story, brain: Brain, labels: Map<string, str
     }
     lines.push('')
   }
+  // Secrets, setups and canon: things the text alone may not say.
+  const at = (scene: string): number | undefined => findScene(story, scene)?.order
+  const tag = (scene: string): string => {
+    const p = findScene(story, scene)
+    return p ? `${labels.get(scene) ?? ''} ${p.chapter.title} – ${p.scene.title}`.trim() : 'a deleted scene'
+  }
+  const secrets = story.secrets.filter((x) => x.text.trim())
+  if (secrets.length) {
+    lines.push('Secrets (who knows, and when they find out):')
+    for (const x of secrets) {
+      const who = x.learns
+        .filter((l) => !l.scene || (at(l.scene) ?? Infinity) <= limitOrder)
+        .map((l) => `${l.who === READER ? 'the reader' : name(l.who)} ${l.scene ? `finds out in ${tag(l.scene)}` : 'knows from the start'}`)
+      lines.push(`- ${x.text}${who.length ? `: ${who.join('; ')}` : ' (true in the story; nobody is listed as knowing yet)'}`)
+    }
+    lines.push('')
+  }
+  const threads = story.threads.filter((t) => (at(t.setup.scene) ?? Infinity) <= limitOrder)
+  if (threads.length) {
+    lines.push('Setups and payoffs:')
+    for (const t of threads) {
+      const paid = t.payoffs.filter((p) => (at(p.scene) ?? Infinity) <= limitOrder)
+      lines.push(`- ${t.label}, set up in ${tag(t.setup.scene)}${paid.length ? `, paid off in ${paid.map((p) => tag(p.scene)).join(', ')}` : t.dropped ? ' (let go)' : ' (not paid off yet)'}`)
+    }
+    lines.push('')
+  }
+  const canon = story.canon
+  if (canon.source || canon.facts.length) {
+    lines.push(`Canon${canon.source ? ` (fanfic of ${canon.source})` : ''}:`)
+    if (canon.splitAt) lines.push(`- The story breaks from canon in ${tag(canon.splitAt)}${canon.splitNote ? `: ${canon.splitNote}` : ''}`)
+    for (const f of canon.facts.filter((f) => f.label && f.value))
+      lines.push(`- ${f.entity ? `${name(f.entity)}: ` : ''}${f.label}: ${f.value} in canon${f.changed ? ' (changed in this story)' : ''}`)
+    lines.push('')
+  }
   lines.push('Scenes in order:')
   for (const s of brain.scenes) {
     const placed = findScene(story, s.id)
