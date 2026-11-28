@@ -329,7 +329,7 @@ export function findAnomalies(id: string, hours: readonly Point[], recent: reado
   if (g !== null && gaps.length >= s.minPoints) {
     const { mid: m, spread } = robust(gaps)
     const z = (g - m) / Math.max(spread, 0.01)
-    if (z >= s.minZ + 1 && g >= 0.1 && g >= 2 * m)
+    if (z >= s.minZ + 1 && g >= 0.15 && g >= 2 * m)
       out.push({ id, kind: 'spread', z, change: g, before: m, now: g, coins, score: z * weight * 0.8 })
   }
 
@@ -360,7 +360,7 @@ export function settled(a: Anomaly | undefined, s = ANOMALY_SETTINGS): boolean {
  * Odd moves that go together (items that usually move together, moving the same way now) become
  * one group, biggest first. `together(a, b)` says whether two items usually move together.
  */
-export function groupAnomalies(list: readonly Anomaly[], together: (a: string, b: string) => boolean): Anomaly[][] {
+export function groupAnomalies(list: readonly Anomaly[], together: (a: Anomaly, b: Anomaly) => boolean): Anomaly[][] {
   const left = [...list].sort((a, b) => b.score - a.score)
   const groups: Anomaly[][] = []
   while (left.length) {
@@ -368,7 +368,7 @@ export function groupAnomalies(list: readonly Anomaly[], together: (a: string, b
     const group = [lead]
     for (let i = 0; i < left.length; i++) {
       const o = left[i]
-      if (o.kind === lead.kind && o.id !== lead.id && together(lead.id, o.id)) {
+      if (o.kind === lead.kind && o.id !== lead.id && together(lead, o)) {
         group.push(o)
         left.splice(i--, 1)
       }
@@ -427,12 +427,15 @@ export function contextLines(at: number, terms: readonly MayorTerm[], events: re
   const out: string[] = []
   for (const t of terms) if (t.start > at - lookBack && t.start <= at && terms.indexOf(t) > 0) out.push(`${t.name} became mayor ${span(at - t.start)} earlier`)
   for (const e of events) {
-    if (e.start > at - lookBack && e.start <= at) out.push(`${e.name} started ${span(at - e.start)} earlier`)
-    else if (e.end > at - lookBack && e.end <= at) out.push(`${e.name} ended ${span(at - e.end)} earlier`)
-    else if (e.start > at && e.start - at < lookBack) out.push(`${e.name} starts in ${span(e.start - at)}`)
+    // "Jerry’s Workshop opens" reads as "opened" and "opens in", not "opens started".
+    const opens = / opens$/.test(e.name)
+    const name = e.name.replace(/ opens$/, '')
+    if (e.start > at - lookBack && e.start <= at) out.push(`${name} ${opens ? 'opened' : 'started'} ${span(at - e.start)} earlier`)
+    else if (e.end > at - lookBack && e.end <= at) out.push(`${name} ${opens ? 'closed' : 'ended'} ${span(at - e.end)} earlier`)
+    else if (e.start > at && e.start - at < lookBack) out.push(`${name} ${opens ? 'opens' : 'starts'} in ${span(e.start - at)}`)
   }
   for (const m of marks) if (m.kind !== 'gap' && m.at > at - lookBack && m.at <= at) out.push(`${m.kind === 'firesale' ? 'Fire sale' : 'News'}: ${m.text}`)
-  return out
+  return shownContext(out, 4)
 }
 
 // ---------- questions for you ----------
@@ -490,20 +493,52 @@ export function shortCoins(n: number): string {
   return n.toFixed(a >= 10 ? 1 : 2)
 }
 
-export function questionText(kind: AnomalyKind, items: readonly QuestionItem[], context: readonly string[], windowHours = ANOMALY_SETTINGS.windowHours): string {
+/** The odd move in one or two sentences, without the context or the question. */
+export function questionHeadline(kind: AnomalyKind, items: readonly QuestionItem[], windowHours = ANOMALY_SETTINGS.windowHours): string {
   const lead = items[0]
+  const name = cleanName(lead.name)
   const others = items.length - 1
-  const along = others ? ` ${others} item${others === 1 ? '' : 's'} that usually move${others === 1 ? 's' : ''} with it did the same.` : ''
-  const why = context.length ? ` Around then: ${context.join('; ')}.` : ' Nothing on the SkyBlock calendar explains it.'
   const hours = `${windowHours} hour${windowHours === 1 ? '' : 's'}`
   const move =
     kind === 'spread'
-      ? `${lead.name}’s buy and sell prices are ${pct(lead.now)} apart, when they’re usually ${pct(lead.before)} apart.`
+      ? `${name}’s buy and sell prices are ${pct(lead.now)} apart (usually ${pct(lead.before)}).`
       : kind === 'volume'
-        ? `${lead.name} is being traded far more than usual: ${pct(lead.change)} more in ${hours}.`
-        : `${lead.name}’s price is ${kind === 'up' ? 'up' : 'down'} ${pct(lead.change)} in ${hours} (${shortCoins(lead.before)} → ${shortCoins(lead.now)} coins).`
-  return `${move}${along}${why} Any idea why?`
+        ? `${name} is being traded far more than usual: ${pct(lead.change)} more in ${hours}.`
+        : `${name}’s price is ${kind === 'up' ? 'up' : 'down'} ${pct(lead.change)} in ${hours} (${shortCoins(lead.before)} → ${shortCoins(lead.now)} coins).`
+  const along = !others
+    ? ''
+    : kind === 'spread'
+      ? ` ${others} other item${others === 1 ? '' : 's'} did the same.`
+      : ` ${others} item${others === 1 ? '' : 's'} that usually move${others === 1 ? 's' : ''} with it did the same.`
+  return move + along
 }
+
+/** The whole question in one paragraph (for notes and the AI). */
+export function questionText(kind: AnomalyKind, items: readonly QuestionItem[], context: readonly string[], windowHours = ANOMALY_SETTINGS.windowHours): string {
+  const why = context.length ? ` Around then: ${context.join('; ')}.` : ' Nothing on the SkyBlock calendar explains it.'
+  return `${questionHeadline(kind, items, windowHours)}${why} Any idea why?`
+}
+
+/** The few context lines worth showing: mayors and events first, then at most one fire sale and one news item. */
+export function shownContext(lines: readonly string[], max = 3): string[] {
+  const rank = (l: string): number => (l.startsWith('News:') ? 2 : l.startsWith('Fire sale:') ? 1 : 0)
+  const out: string[] = []
+  let sales = 0
+  let news = 0
+  for (const l of [...lines].sort((a, b) => rank(a) - rank(b))) {
+    if (rank(l) === 1 && sales++) continue
+    if (rank(l) === 2 && news++) continue
+    out.push(l)
+  }
+  return out.slice(0, max)
+}
+
+/** Item names without the odd symbols some carry (gemstone icons and the like, which show as boxes). */
+export const cleanName = (name: string): string =>
+  name
+    .replace(/[\uE000-\uF8FF\uFFFD\u2E00-\u2E7F]/g, '')
+    .replace(/^[^\p{L}\p{N}]+/u, '')
+    .trim() || name
 
 /** What you said the last few times the same item did the same thing. */
 export function pastAnswers(questions: readonly MarketQuestion[], itemId: string, kind: AnomalyKind): string[] {

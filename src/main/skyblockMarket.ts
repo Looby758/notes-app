@@ -8,6 +8,7 @@ import {
   answerNotePath,
   ANOMALY_SETTINGS,
   bazaarName,
+  cleanName,
   checkRule,
   cleanRule,
   contextLines,
@@ -35,6 +36,7 @@ import {
   pointNear,
   QUESTION_SETTINGS,
   questionText,
+  shownContext,
   rowOf,
   ruleScore,
   ruleText,
@@ -151,6 +153,16 @@ function load(): Stored {
   try {
     const s = JSON.parse(readFileSync(dir('state.json'), 'utf8')) as Partial<Stored>
     stored = { ...fresh(), ...s, version: 1 }
+    // An early version marked every old news post as happening at once: drop those bunches.
+    const perTime = new Map<number, number>()
+    for (const m of stored.marks) if (m.kind === 'news') perTime.set(m.at, (perTime.get(m.at) ?? 0) + 1)
+    stored.marks = stored.marks.filter((m) => m.kind !== 'news' || (perTime.get(m.at) ?? 0) < 3)
+    for (const q of stored.questions) {
+      // Questions from that version listed all of it: drop their news entirely.
+      if (q.context.filter((c) => c.startsWith('News:')).length >= 3) q.context = q.context.filter((c) => !c.startsWith('News:'))
+      q.context = shownContext(q.context.map((c) => c.replace(/ opens (starts|started|ended)\b/, (_m, w: string) => ({ starts: ' opens', started: ' opened', ended: ' closed' })[w] ?? _m)), 4)
+      q.text = questionText(q.kind, q.items, q.context)
+    }
   } catch {
     stored = fresh()
   }
@@ -357,7 +369,7 @@ function latest(): { at: number; rows: Map<string, Point> } | null {
 }
 
 export function marketName(id: string): string {
-  return itemNameOf(id) ?? itemNameOf(neuId(id)) ?? bazaarName(id)
+  return cleanName(itemNameOf(id) ?? itemNameOf(neuId(id)) ?? bazaarName(id))
 }
 
 function firstDataAt(): number {
@@ -457,12 +469,12 @@ async function extras(now: number): Promise<void> {
     s.newsAt = now
     try {
       const body = (await getJson(`${HYPIXEL}/v2/skyblock/news`, { 'API-Key': key })) as { items?: { title?: string; text?: string; link?: string }[] }
+      // The first time, it's all old news: remember it without marking it as happening now.
+      const first = s.seenNews.length === 0
       for (const n of body.items ?? []) {
         const title = [n.title, n.text].filter(Boolean).join(': ')
         if (!title || s.seenNews.includes(title)) continue
-        const first = s.seenNews.length === 0
         s.seenNews = [...s.seenNews, title].slice(-200)
-        // The first time, it's old news: remember it without marking it as happening now.
         if (!first) s.marks.push({ at: now, kind: 'news', text: title })
       }
     } catch {
@@ -528,7 +540,8 @@ function findQuestions(now: number): void {
 
   const all = [...found.values()].flat()
   if (!all.length) return
-  const groups = pickNew(groupAnomalies(all, together), s.questions, s.mutes, now)
+  // Gaps opening between buy and sell tend to come in bunches, and say little each: one question for all of them.
+  const groups = pickNew(groupAnomalies(all, (a, b) => a.kind === 'spread' || together(a.id, b.id)), s.questions, s.mutes, now)
   const events = eventsAround(now - 12 * HOUR, now + 12 * HOUR)
   for (const g of groups) {
     const lead = g[0]

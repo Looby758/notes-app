@@ -22,6 +22,8 @@ import {
   parseCoflHistory,
   pickNew,
   questionText,
+  questionHeadline,
+  shownContext,
   rowOf,
   ruleText,
   seriesOf,
@@ -121,7 +123,7 @@ describe('grouping and picking', () => {
   const a = (id: string, score: number, kind: Anomaly['kind'] = 'up'): Anomaly => ({ id, kind, z: 5, change: 0.3, before: 1, now: 1.3, coins: 1e7, score })
 
   it('puts items that move together into one question', () => {
-    const groups = groupAnomalies([a('A', 5), a('B', 9), a('C', 3), a('C', 2, 'volume')], (x, y) => [x, y].sort().join() === 'A,B')
+    const groups = groupAnomalies([a('A', 5), a('B', 9), a('C', 3), a('C', 2, 'volume')], (x, y) => [x.id, y.id].sort().join() === 'A,B')
     expect(groups.map((g) => g.map((x) => x.id))).toEqual([['B', 'A'], ['C', 'C']])
   })
 
@@ -160,6 +162,7 @@ describe('mayors and context', () => {
     ]
     const lines = contextLines(12 * HOUR, terms, [{ name: 'Spooky Festival', start: 11 * HOUR, end: 13 * HOUR }], [{ at: 11.5 * HOUR, kind: 'firesale', text: 'Mushroom hat' }])
     expect(lines).toEqual(['Derpy became mayor 2 hours earlier', 'Spooky Festival started 1 hour earlier', 'Fire sale: Mushroom hat'])
+    expect(contextLines(12 * HOUR, [], [{ name: 'Jerry’s Workshop opens', start: 20 * HOUR, end: 30 * HOUR }], [])).toEqual(['Jerry’s Workshop opens in 8 hours'])
   })
 
   it('finds past calendar events', () => {
@@ -175,6 +178,8 @@ describe('questions', () => {
   it('reads like a person asking', () => {
     const text = questionText('up', [{ id: 'ENCHANTED_GOLD', name: 'Enchanted Gold', change: 0.38, before: 12.1, now: 16.7 }, { id: 'X', name: 'X', change: 0.3, before: 1, now: 1.3 }], [])
     expect(text).toBe('Enchanted Gold’s price is up 38% in 3 hours (12.1 → 16.7 coins). 1 item that usually moves with it did the same. Nothing on the SkyBlock calendar explains it. Any idea why?')
+    expect(questionHeadline('spread', [{ id: 'A', name: '\uE001 Fine Amethyst Gemstone', change: 0.2, before: 0.08, now: 0.21 }, { id: 'B', name: 'B', change: 0, before: 0, now: 0 }])).toBe('Fine Amethyst Gemstone’s buy and sell prices are 21% apart (usually 8%). 1 other item did the same.')
+    expect(shownContext(['News: a', 'News: b', 'Fire sale: x', 'Fire sale: y', 'Diaz became mayor 1 hour earlier'])).toEqual(['Diaz became mayor 1 hour earlier', 'Fire sale: x', 'News: a'])
   })
 
   it('becomes a note in the vault', () => {

@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Activity, Brain, Check, CircleHelp, Clock, Loader2, Pause, Play, Search, Send, Sparkles, Trash2, TrendingDown, TrendingUp, Undo2, X } from 'lucide-react'
 import {
+  cleanName,
   mid,
+  questionHeadline,
   ruleScore,
+  shownContext,
   ruleText,
   shortCoins,
   span,
@@ -111,14 +114,18 @@ export function QuestionCard({ q, onState, compact }: { q: MarketQuestion; onSta
     }
   }
   const open = q.status === 'open' || q.status === 'later'
+  const lead = q.items[0]
+  const others = q.items.slice(1)
+  const context = shownContext(q.context)
+  const badge = q.kind === 'spread' ? `${Math.round((lead?.now ?? 0) * 100)}% gap` : q.kind === 'volume' ? `trading ${pct(lead?.change ?? 0)}` : pct(lead?.change ?? 0)
   return (
     <div className={`sbm-q ${q.status} ${compact ? 'compact' : ''}`} data-sbm-question={q.status}>
       <div className="sbm-q-head">
-        <ItemPic id={q.items[0]?.id ?? ''} name={q.items[0]?.name ?? ''} size={28} />
+        <ItemPic id={lead?.id ?? ''} name={lead?.name ?? ''} size={28} />
         <div className="sbm-q-title">
           <b>
-            <Icon size={13} className={`sbm-kind ${q.kind}`} /> {q.items[0]?.name}
-            {q.kind === 'up' || q.kind === 'down' ? <span className={`sbm-pct ${q.kind}`}> {pct(q.items[0].change)}</span> : null}
+            <Icon size={13} className={`sbm-kind ${q.kind}`} /> {cleanName(lead?.name ?? '')}
+            <span className={`sbm-pct ${q.kind}`}> {badge}</span>
           </b>
           <small className="faint">
             {ago(q.at)}
@@ -128,8 +135,26 @@ export function QuestionCard({ q, onState, compact }: { q: MarketQuestion; onSta
           </small>
         </div>
       </div>
-      <Sparkline id={q.items[0]?.id ?? ''} at={q.at} />
-      <p className="sbm-q-text">{q.text}</p>
+      <Sparkline id={lead?.id ?? ''} at={q.at} />
+      <p className="sbm-q-text">{questionHeadline(q.kind, [lead])}</p>
+      {others.length > 0 && (
+        <p className="sbm-q-also faint">
+          Also: {others.slice(0, 4).map((i) => cleanName(i.name)).join(', ')}
+          {others.length > 4 ? ` and ${others.length - 4} more` : ''}
+        </p>
+      )}
+      <div className="sbm-q-context">
+        <small>Around then</small>
+        {context.length ? (
+          <ul>
+            {context.map((c, i) => (
+              <li key={i}>{c}</li>
+            ))}
+          </ul>
+        ) : (
+          <span className="faint">Nothing on the SkyBlock calendar.</span>
+        )}
+      </div>
       {q.history.length > 0 && (
         <ul className="sbm-q-history">
           {q.history.map((h, i) => (
@@ -156,13 +181,13 @@ export function QuestionCard({ q, onState, compact }: { q: MarketQuestion; onSta
           </div>
         </div>
       ) : open ? (
-        <div className="sbm-q-actions">
-          <button className="btn btn-primary" disabled={busy} onClick={() => setWriting(true)} data-sbm-explain>
+        <div className="sbm-q-actions one-row">
+          <button className="btn btn-primary" disabled={busy} onClick={() => setWriting(true)} title="Say what you think happened" data-sbm-explain>
             Explain
           </button>
           {q.status !== 'later' && (
             <button className="btn" disabled={busy} onClick={() => void send({ action: 'later' })} title="Keep it open and say how it goes" data-sbm-later>
-              <Clock size={13} /> Look into it later
+              <Clock size={13} /> Later
             </button>
           )}
           <button className="btn" disabled={busy} onClick={() => void send({ action: 'unknown' })} title="Orbit watches for it happening again" data-sbm-unknown>

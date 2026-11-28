@@ -25542,3 +25542,45 @@ img.tm-icon {
 .sbm-search:focus-within {
   border-color: var(--accent);
 }
+.sbm-q-also {
+  margin: -2px 0 0;
+  font-size: 12.5px;
+}
+.sbm-q-context {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.sbm-q-context small {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+}
+.sbm-q-context ul {
+  margin: 0;
+  padding-left: 16px;
+}
+.sbm-q-context li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sbm-q-actions.one-row {
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+.sbm-q-actions.one-row .btn {
+  padding: 4px 10px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.sbm-q-actions.one-row .link-button {
+  white-space: nowrap;
+  font-size: 12.5px;
+}
