@@ -81,6 +81,8 @@ export const COMICS_TAB = 'comics:'
 export const PDF_EDITOR_TAB = 'pdf-editor:'
 /** Trim sound files (components/AudioEditor); what's open is in store/audioEditor. */
 export const AUDIO_EDITOR_TAB = 'audio-editor:'
+/** The Writing Studio: stories with chapters, scenes and a story brain, kept apart from notes (components/WritingStudio, store/writingStudio). */
+export const WRITING_TAB = 'writing:'
 /** Downloaded wikis, read offline (components/Wiki). */
 export const WIKI_TAB = 'wiki:'
 /** The mini games, from Sudoku to Chess (components/MiniGames); which one is showing is in store/miniGames. */

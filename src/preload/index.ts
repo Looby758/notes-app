@@ -733,6 +733,7 @@ const api: NotesApi = {
   aiSetEngine: (use) => ipcRenderer.invoke('ai:setEngine', use),
   aiSortMoney: (rows, categories) => ipcRenderer.invoke('ai:sortMoney', rows, categories),
   aiMeaning: (word, sentence) => ipcRenderer.invoke('ai:meaning', word, sentence),
+  aiWriting: (job) => ipcRenderer.invoke('ai:writing', job),
   aiSuggest: (title, before) => ipcRenderer.invoke('ai:suggest', title, before),
   transcriberState: () => ipcRenderer.invoke('transcribe:state'),
   transcriberSetup: (model) => ipcRenderer.invoke('transcribe:setup', model),

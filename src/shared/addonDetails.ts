@@ -1,6 +1,6 @@
 /** The store's categories, in order, and the add-ons in each (every add-on the store shows is in exactly one). */
 export const ADDON_CATEGORIES: { name: string; addons: string[] }[] = [
-  { name: 'Notes and writing', addons: ['summon-bar', 'canvas-board', 'mind-map', 'sketch', 'graph', 'random-note', 'flashcards', 'zen'] },
+  { name: 'Notes and writing', addons: ['summon-bar', 'canvas-board', 'mind-map', 'sketch', 'graph', 'random-note', 'flashcards', 'zen', 'writing-studio'] },
   { name: 'Plan your time', addons: ['calendar', 'weather', 'countdowns', 'clocks'] },
   { name: 'Money and passwords', addons: ['money', 'passwords'] },
   { name: 'Friends and messages', addons: ['email', 'messages', 'discord-voice'] },
@@ -83,6 +83,7 @@ export const ADDON_ABOUT: Record<string, string> = {
   'task-manager': 'See what’s running and what it’s using: CPU, memory, disk and network. End an app that’s stuck or slowing everything down.',
   uninstaller: 'Remove an app properly, along with the files, settings and leftovers it would normally leave behind, and see how much space you get back.',
   mixer: 'A volume slider for each app, so games, Discord and Spotify can each be as loud as you want.',
+  'writing-studio': 'A full-screen place for writing stories, kept apart from your notes: chapters and scenes, takes, word goals, a story calendar and map, and a story brain that keeps track of every character, place, relationship and secret. It checks continuity, canon and each character’s voice as you write, and exports to AO3, Wattpad and e-book.',
   'audio-editor': 'Trim a song, voice memo or recording: see its waveform, listen, pick the part you want and save it as a new MP3 or WAV. The original stays as it is.',
   screens: 'Change your monitors’ brightness, contrast and input from Orbit, with hotkeys for each, without touching the buttons on the screen.',
   files: 'Browse the files on your computer in a tab, with previews, tags, zips and a search of the whole PC. Open two folders side by side to drag files between them.',
@@ -264,6 +265,12 @@ export const ADDON_HOW: Record<string, [lead: string, text: string][]> = {
     ['A slider for each app', 'Everything making sound gets its own volume, so a game, Discord and Spotify can each be as loud as you like.'],
     ['Mute one thing', 'Silence just one app without touching the rest.'],
     ['Quieter music while people talk', 'In a Discord call, music dips while someone speaks and comes back a moment after.']
+  ],
+  'writing-studio': [
+    ['Chapters, scenes and takes', 'Write each scene as many ways as you like and pick the one to keep. Word goals for the story and for each day.'],
+    ['A story brain', 'A page for every character, place, item and group. It notices who is in each scene, so you can see who has met who, and when.'],
+    ['Keeps it straight', 'A story calendar warns when someone is in two places at once, and green eyes get flagged when their page says brown.'],
+    ['Ready to post', 'Copy a chapter for AO3 or Wattpad, or save the whole story as an e-book.']
   ],
   'audio-editor': [
     ['Open a sound file', 'Drop one in, or press Trim audio on a sound file in Files. MP3, WAV, M4A, FLAC, OGG and more.'],

@@ -53,6 +53,7 @@ const A = {
   music: ['music', 'disc-3', 'All your|music.', 'Your own songs and Spotify, one player'],
   songid: ['music', 'audio-lines', 'What’s|this song?', 'Find the song in any video or game'],
   soundboard: ['music', 'volume-2', 'Sounds on|a button.', 'Play them into your Discord call'],
+  'writing-studio': ['notes', 'feather', 'Write the|whole story.', 'Chapters, characters and a story brain'],
   'audio-editor': ['music', 'audio-waveform', 'Snip it|to size.', 'Trim songs, voice memos and recordings'],
   mixer: ['music', 'sliders-vertical', 'Every app,|its own volume.', 'Games, Discord and Spotify, just right'],
   'video-player': ['watch', 'circle-play', 'Press|play.', 'Almost any video, with subtitles'],

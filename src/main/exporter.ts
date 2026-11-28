@@ -13,6 +13,7 @@ import { convertedPath } from './converter'
 const FILTERS: Record<SaveFormat, Electron.FileFilter> = {
   pdf: { name: 'PDF', extensions: ['pdf'] },
   docx: { name: 'Word document', extensions: ['docx'] },
+  epub: { name: 'E-book', extensions: ['epub'] },
   html: { name: 'Web page', extensions: ['html'] },
   md: { name: 'Markdown', extensions: ['md'] },
   txt: { name: 'Text', extensions: ['txt'] },

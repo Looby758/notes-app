@@ -34,6 +34,7 @@ import {
   FILESENDER_TAB,
   PDF_EDITOR_TAB,
   AUDIO_EDITOR_TAB,
+  WRITING_TAB,
   COMICS_TAB,
   WIKI_TAB,
   MINIGAMES_TAB,
@@ -95,6 +96,7 @@ import FileSenderPage from '../FileSender/FileSenderPage'
 import DownloadsPage from '../Downloads/DownloadsPage'
 import PdfEditorPage from '../PdfEditor/PdfEditorPage'
 import AudioEditorPage from '../AudioEditor/AudioEditorPage'
+import WritingStudioPage from '../WritingStudio/WritingStudioPage'
 import MiniGamesPage from '../MiniGames/MiniGamesPage'
 import ComicsPage from '../Comics/ComicsPage'
 import WikiPage from '../Wiki/WikiPage'
@@ -261,6 +263,7 @@ export default function Pane({ pane }: { pane: string }) {
         {shown === FILESENDER_TAB && <FileSenderPage />}
         {shown === PDF_EDITOR_TAB && <PdfEditorPage />}
         {shown === AUDIO_EDITOR_TAB && <AudioEditorPage />}
+        {shown === WRITING_TAB && <WritingStudioPage />}
         {shown === COMICS_TAB && <ComicsPage />}
         {shown === WIKI_TAB && <WikiPage />}
         {shown === MINIGAMES_TAB && <MiniGamesPage />}
