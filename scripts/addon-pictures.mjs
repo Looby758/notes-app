@@ -61,6 +61,7 @@ const A = {
   games: ['gaming', 'gamepad-2', 'Every game,|one shelf.', 'Steam and the rest, ready to play'],
   skyblock: ['gaming', 'pickaxe', 'Plan your|SkyBlock.', 'Profiles, goals and event timers'],
   'mini-games': ['gaming', 'puzzle', 'A quick|break.', 'Sudoku, Wordle, Chess and more'],
+  evolution: ['gaming', 'dna', 'Watch life|evolve.', 'Design species and a world'],
   clips: ['gaming', 'history', 'Save that|moment.', 'The last 30 seconds, on a key'],
   'video-projects': ['video', 'clapperboard', 'Every video,|one place.', 'Script, research and uploads'],
   studio: ['video', 'video', 'Record or|go live.', 'Screen, webcam and voiceover'],

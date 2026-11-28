@@ -38,6 +38,7 @@ import {
   WIKI_TAB,
   MINIGAMES_TAB,
   CLOCKS_TAB,
+  EVOLUTION_TAB,
   COUNTDOWNS_TAB,
   SKYBLOCK_GOALS_TAB,
   PUBLISHING_TAB,
@@ -99,6 +100,7 @@ import MiniGamesPage from '../MiniGames/MiniGamesPage'
 import ComicsPage from '../Comics/ComicsPage'
 import WikiPage from '../Wiki/WikiPage'
 import WorldClocksPage from '../Clocks/WorldClocksPage'
+import EvolutionPage from '../Evolution/EvolutionPage'
 import CountdownsPage from '../Countdowns/CountdownsPage'
 import SkyblockGoalsPage from '../Games/SkyblockGoalsPage'
 import PublishingPage from '../Publishing/PublishingPage'
@@ -265,6 +267,7 @@ export default function Pane({ pane }: { pane: string }) {
         {shown === WIKI_TAB && <WikiPage />}
         {shown === MINIGAMES_TAB && <MiniGamesPage />}
         {shown === CLOCKS_TAB && <WorldClocksPage />}
+        {shown === EVOLUTION_TAB && <EvolutionPage />}
         {shown === COUNTDOWNS_TAB && <CountdownsPage />}
         {shown === SKYBLOCK_GOALS_TAB && <SkyblockGoalsPage />}
         {shown === PUBLISHING_TAB && <PublishingPage />}

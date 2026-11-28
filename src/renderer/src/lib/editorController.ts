@@ -88,6 +88,8 @@ export const MINIGAMES_TAB = 'minigames:'
 /** Tabs of features folded into others: Sudoku and Minesweeper open Mini games, the old video downloader opens Downloads. */
 const OLD_TABS: Record<string, string> = { 'sudoku:': 'minigames:', 'minesweeper:': 'minigames:', 'downloader:': 'downloads:' }
 const renameOldTab = (t: string): string => OLD_TABS[t] ?? t
+/** Evolution Lab: design species and a world and watch them evolve (components/Evolution). */
+export const EVOLUTION_TAB = 'evolution:'
 /** Clocks for places around the world (components/Clocks). */
 export const CLOCKS_TAB = 'clocks:'
 /** Big countdown cards (components/Countdowns). */

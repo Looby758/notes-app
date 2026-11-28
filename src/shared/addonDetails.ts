@@ -7,7 +7,7 @@ export const ADDON_CATEGORIES: { name: string; addons: string[] }[] = [
   { name: 'AI and the web', addons: ['ask', 'ai-chat', 'claude', 'grok', 'offline-ai', 'web'] },
   { name: 'Music and sound', addons: ['music', 'songid', 'soundboard', 'mixer', 'audio-editor'] },
   { name: 'Watch and read', addons: ['video-player', 'comics', 'wiki'] },
-  { name: 'Gaming', addons: ['games', 'skyblock', 'mini-games', 'clips'] },
+  { name: 'Gaming', addons: ['games', 'skyblock', 'mini-games', 'evolution', 'clips'] },
   { name: 'Make videos', addons: ['video-projects', 'studio', 'screenshots', 'timeline', 'streamer'] },
   { name: 'Files and downloads', addons: ['files', 'downloads', 'convert', 'pdf-editor', 'filesender'] },
   { name: 'Phone and screens', addons: ['phone', 'second-screen', 'screens'] },
@@ -76,6 +76,8 @@ export const ADDON_ABOUT: Record<string, string> = {
   // Play
   games: 'All your Steam and other games in one place, with their covers. For Hypixel SkyBlock, it can sum up each session: coins per hour, drops and XP.',
   skyblock: 'See a SkyBlock profile like SkyCrypt does, plan ironman goals step by step, and keep an eye on event timers.',
+  evolution:
+    'Build a world and design the species in it, then watch them evolve. Nobody tells them how to survive: they get better by trial and error, generation after generation, and you can pause, speed up or rewind any time.',
   'mini-games': 'Quick games for a break: Sudoku, Minesweeper, Nonograms, Jigsaw, Wordle, Word search, Hangman, Solitaire, Blackjack, 2048, Breakout and Chess.',
 
   // Tools
@@ -300,6 +302,12 @@ export const ADDON_HOW: Record<string, [lead: string, text: string][]> = {
     ['Look up a profile', 'Type a player’s name to see their SkyBlock profile laid out like SkyCrypt: skills, slayers, dungeons, accessories, pets and more.'],
     ['Plan ironman goals', 'Pick an item you want and Orbit breaks it into a crafting tree with every raw material, then tracks what you’ve got.'],
     ['Keep an eye on timers', 'Event timers show what’s coming up, so you don’t miss one.']
+  ],
+  evolution: [
+    ['You decide everything', 'Make your own species: what they eat, who they hunt, how big, fast and sharp-eyed they start, and whether the ones they catch turn into one of them.'],
+    ['Shape the world', 'Draw walls, lush land, barren land and danger zones, and set how fast food grows, how harsh life is and how much babies change.'],
+    ['Evolution by trial and error', 'Every creature has a small brain that starts out random. The ones that happen to survive have babies with their genes, changed a little, so each generation gets better.'],
+    ['Watch it happen', 'Pause, speed up to thousands of steps a second, or rewind. Click a creature to follow it and see its brain light up, and see the charts of how each species is changing.']
   ],
   'mini-games': [
     ['Twelve games in one tab', 'Sudoku, Minesweeper, Nonograms, Jigsaw, Wordle, Word search, Hangman, Solitaire, Blackjack, 2048, Breakout and Chess.'],

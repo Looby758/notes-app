@@ -9,7 +9,7 @@ import { Images, Clock, Send } from 'lucide-react'
 import { useNoteIndex } from '../../store/noteIndex'
 import { ArrowDownToLine, Keyboard, Repeat2, Upload } from 'lucide-react'
 import { AudioWaveform, FilePen, Music2, Target } from 'lucide-react'
-import { Activity, PackageX, Puzzle } from 'lucide-react'
+import { Activity, Dna, PackageX, Puzzle } from 'lucide-react'
 import { isMindMap, openExport, toggleMindMap, useUI } from '../../store/ui'
 import {
   activateTab,
@@ -36,6 +36,7 @@ import {
   WIKI_TAB,
   MINIGAMES_TAB,
   CLOCKS_TAB,
+  EVOLUTION_TAB,
   COUNTDOWNS_TAB,
   SKYBLOCK_GOALS_TAB,
   PUBLISHING_TAB,
@@ -127,6 +128,7 @@ function tabTitle(id: string, web: Record<string, WebPage>): string {
   if (id === WIKI_TAB) return 'Wikis'
   if (id === MINIGAMES_TAB) return 'Mini games'
   if (id === CLOCKS_TAB) return 'World clocks'
+  if (id === EVOLUTION_TAB) return 'Evolution Lab'
   if (id === COUNTDOWNS_TAB) return 'Countdowns'
   if (id === SKYBLOCK_GOALS_TAB) return 'SkyBlock'
   if (id === PUBLISHING_TAB) return 'Publishing'
@@ -365,6 +367,7 @@ export default function TabBar({ pane }: { pane: string }) {
               {id === WIKI_TAB && <Library size={13} className="tab-icon" />}
               {id === MINIGAMES_TAB && <Joystick size={13} className="tab-icon" />}
               {id === CLOCKS_TAB && <Globe2 size={13} className="tab-icon" />}
+              {id === EVOLUTION_TAB && <Dna size={13} className="tab-icon" />}
               {id === COUNTDOWNS_TAB && <Hourglass size={13} className="tab-icon" />}
               {id === SKYBLOCK_GOALS_TAB && <Target size={13} className="tab-icon" />}
               {id === PUBLISHING_TAB && <Upload size={13} className="tab-icon" />}
