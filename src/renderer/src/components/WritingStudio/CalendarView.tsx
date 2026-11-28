@@ -82,7 +82,7 @@ export default function CalendarView() {
                   <span className="ws-scene-link-title">{s.title}</span>
                 </button>
                 <input
-                  className="text-input"
+                  className="ws-input"
                   placeholder="Day 1"
                   maxLength={40}
                   onKeyDown={(e) => {

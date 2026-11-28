@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
   ChevronDown,
   ChevronUp,
@@ -302,7 +302,7 @@ function SceneHead({ scene, chapter, compare, setCompare }: { story: Story; scen
           renamingTake === t.id ? (
             <input
               key={t.id}
-              className="text-input ws-take-rename"
+              className="ws-input ws-take-rename"
               autoFocus
               defaultValue={t.name}
               onBlur={(e) => {
@@ -624,8 +624,8 @@ function GhostPanel({ story, chapter, onJump }: { story: Story; chapter: Chapter
         {busy ? <Loader2 size={13} className="spin" /> : <Ghost size={13} />} {busy ?? (notes.length ? 'Read it again' : 'Read this chapter')}
       </button>
       <ul className="ws-ghost-list">
-        {notes.map((g) => (
-          <li key={g.id}>
+        {notes.map((g, i) => (
+          <li key={g.id} style={{ '--i': i } as CSSProperties}>
             <button onClick={() => find(g.quote)} title="Show this bit">
               <q>{g.quote}</q>
               <span>{g.reaction}</span>

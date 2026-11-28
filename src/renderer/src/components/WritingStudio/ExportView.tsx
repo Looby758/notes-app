@@ -39,7 +39,7 @@ export default function ExportView() {
           </p>
           <label className="ws-field">
             <span>Author name (on the e-book)</span>
-            <input className="text-input" defaultValue={story.author} maxLength={120} placeholder="Your name or pen name" onBlur={(e) => setStoryField({ author: e.target.value.trim() })} data-ws-author />
+            <input className="ws-input" defaultValue={story.author} maxLength={120} placeholder="Your name or pen name" onBlur={(e) => setStoryField({ author: e.target.value.trim() })} data-ws-author />
           </label>
           <div className="ws-export-buttons">
             <button className="btn btn-primary" onClick={() => void save(() => saveEpub(useWriting.getState().story!))} data-ws-save-epub>

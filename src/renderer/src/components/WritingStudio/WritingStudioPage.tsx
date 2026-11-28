@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { ArrowLeft, BookOpen, Brain, CalendarDays, Feather, Maximize2, Minimize2, PenLine, Plus, Share, Target, Trash2, X } from 'lucide-react'
 import { storyWords, wordsToday, writingStreak, type StoryListing } from '@shared/writing'
 import { useVault } from '../../store/vault'
@@ -7,6 +7,7 @@ import WriteView from './WriteView'
 import BrainView from './BrainView'
 import CalendarView from './CalendarView'
 import ExportView from './ExportView'
+import Segmented from './Segmented'
 import './writingStudio.css'
 
 /**
@@ -90,7 +91,7 @@ function Library() {
         {adding && (
           <div className="ws-new-story">
             <input
-              className="text-input"
+              className="ws-input"
               autoFocus
               value={title}
               maxLength={120}
@@ -123,8 +124,8 @@ function Library() {
         )}
 
         <div className="ws-shelf">
-          {library.map((l) => (
-            <StoryCard key={l.id} l={l} />
+          {library.map((l, i) => (
+            <StoryCard key={l.id} l={l} i={i} />
           ))}
         </div>
       </div>
@@ -132,10 +133,10 @@ function Library() {
   )
 }
 
-function StoryCard({ l }: { l: StoryListing }) {
+function StoryCard({ l, i }: { l: StoryListing; i: number }) {
   const [confirm, setConfirm] = useState(false)
   return (
-    <article className="ws-card" data-ws-story-card={l.id}>
+    <article className="ws-card" style={{ '--i': i } as CSSProperties} data-ws-story-card={l.id}>
       <button className="ws-card-open" onClick={() => void openStory(l.id)}>
         <span className="ws-card-spine" aria-hidden />
         <h3>{l.title}</h3>
@@ -189,7 +190,7 @@ function StoryScreen() {
         </button>
         {editingTitle ? (
           <input
-            className="text-input ws-title-input"
+            className="ws-input ws-title-input"
             autoFocus
             defaultValue={story.title}
             maxLength={120}
@@ -207,13 +208,7 @@ function StoryScreen() {
             {story.title}
           </button>
         )}
-        <nav className="ws-views" role="tablist">
-          {VIEWS.map((v) => (
-            <button key={v.id} role="tab" aria-selected={view === v.id} className={`ws-view ${view === v.id ? 'on' : ''}`} onClick={() => useWriting.setState({ view: v.id })} data-ws-view={v.id}>
-              <v.icon size={14} /> {v.label}
-            </button>
-          ))}
-        </nav>
+        <Segmented className="ws-views" items={VIEWS} value={view} onChange={(id) => useWriting.setState({ view: id })} attr="data-ws-view" />
         <div className="ws-bar-right">
           <GoalMeter onClick={() => setGoals((g) => !g)} />
           <button className="icon-btn" onClick={toggleFull} title={full ? 'Leave full screen (Esc)' : 'Full screen'} data-ws-full>
@@ -222,7 +217,7 @@ function StoryScreen() {
         </div>
         {goals && <GoalsPopover onClose={() => setGoals(false)} />}
       </header>
-      <div className="ws-body">
+      <div className="ws-body" key={view}>
         {view === 'write' && <WriteView />}
         {view === 'brain' && <BrainView />}
         {view === 'calendar' && <CalendarView />}
@@ -240,17 +235,40 @@ function GoalMeter({ onClick }: { onClick: () => void }) {
   const total = storyWords(story)
   const daily = story.dailyGoal
   const pct = daily ? Math.min(1, today / daily) : 0
+  const hit = daily > 0 && today >= daily
+  // A little burst the moment today's goal is reached (not when a story opens already past it).
+  const wasHit = useRef<boolean | null>(null)
+  const [burst, setBurst] = useState(false)
+  useEffect(() => {
+    if (wasHit.current === false && hit) {
+      setBurst(true)
+      const t = setTimeout(() => setBurst(false), 1400)
+      wasHit.current = hit
+      return () => clearTimeout(t)
+    }
+    wasHit.current = hit
+  }, [hit])
   return (
-    <button className={`ws-goal ${daily && today >= daily ? 'done' : ''}`} onClick={onClick} title="Word goals" data-ws-goal>
-      {daily > 0 && (
-        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
-          <circle cx="9" cy="9" r="7" className="ws-goal-track" />
-          <circle cx="9" cy="9" r="7" className="ws-goal-fill" strokeDasharray={`${pct * 44} 44`} transform="rotate(-90 9 9)" />
-        </svg>
-      )}
-      {daily === 0 && <Target size={14} />}
+    <button className={`ws-goal ${hit ? 'done' : ''} ${burst ? 'burst' : ''}`} onClick={onClick} title={hit ? 'Today’s goal done!' : 'Word goals'} data-ws-goal>
+      <span className="ws-goal-ring">
+        {daily > 0 ? (
+          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
+            <circle cx="9" cy="9" r="7" className="ws-goal-track" />
+            <circle cx="9" cy="9" r="7" className="ws-goal-fill" strokeDasharray={`${pct * 44} 44`} transform="rotate(-90 9 9)" />
+          </svg>
+        ) : (
+          <Target size={14} />
+        )}
+        {burst && (
+          <span className="ws-sparks" aria-hidden>
+            {Array.from({ length: 8 }, (_, i) => (
+              <i key={i} style={{ '--a': `${i * 45}deg` } as CSSProperties} />
+            ))}
+          </span>
+        )}
+      </span>
       <span>
-        <b>{today.toLocaleString()}</b>
+        <b key={today}>{today.toLocaleString()}</b>
         {daily ? ` / ${daily.toLocaleString()}` : ''} today
       </span>
       <span className="ws-goal-total">· {total.toLocaleString()} total</span>
@@ -281,11 +299,11 @@ function GoalsPopover({ onClose }: { onClose: () => void }) {
     <div className="ws-popover ws-goals" ref={ref} data-ws-goals>
       <label>
         <span>Words a day</span>
-        <input className="text-input" type="number" min={0} step={50} defaultValue={story.dailyGoal || ''} placeholder="e.g. 500" onChange={(e) => setStoryField({ dailyGoal: Math.max(0, Math.floor(Number(e.target.value) || 0)) })} data-ws-daily-goal />
+        <input className="ws-input" type="number" min={0} step={50} defaultValue={story.dailyGoal || ''} placeholder="e.g. 500" onChange={(e) => setStoryField({ dailyGoal: Math.max(0, Math.floor(Number(e.target.value) || 0)) })} data-ws-daily-goal />
       </label>
       <label>
         <span>Words for the whole story</span>
-        <input className="text-input" type="number" min={0} step={1000} defaultValue={story.goal || ''} placeholder="e.g. 80000" onChange={(e) => setStoryField({ goal: Math.max(0, Math.floor(Number(e.target.value) || 0)) })} data-ws-story-goal />
+        <input className="ws-input" type="number" min={0} step={1000} defaultValue={story.goal || ''} placeholder="e.g. 80000" onChange={(e) => setStoryField({ goal: Math.max(0, Math.floor(Number(e.target.value) || 0)) })} data-ws-story-goal />
       </label>
       {story.goal > 0 && (
         <div className="ws-goal-bar" title={`${Math.round((total / story.goal) * 100)}%`}>
@@ -317,7 +335,7 @@ function LeftOffPrompt() {
         <h2>Where did you leave off?</h2>
         <p>One line for next time, like “Mara is about to open the door.” It’s the first thing you’ll see when you come back.</p>
         <input
-          className="text-input"
+          className="ws-input"
           autoFocus
           value={text}
           maxLength={500}

@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from 'react'
+import { useDeferredValue, useMemo, useState, type CSSProperties } from 'react'
 import { Check, Grid3x3, HeartHandshake, Loader2, MessageCircleQuestion, Plus, Sparkles, Trash2, Users, X } from 'lucide-react'
 import {
   allScenes,
@@ -32,6 +32,7 @@ import {
   useWriting,
   type BrainTab
 } from '../../store/writingStudio'
+import Segmented from './Segmented'
 import { askBrain, scenesNeedingHows, showAiProblem, writeHows } from '../../lib/writingAi'
 
 /**
@@ -62,16 +63,10 @@ export default function BrainView() {
   return (
     <div className="ws-brain" data-ws-brain>
       <div className="ws-brain-bar">
-        <nav className="ws-subtabs" role="tablist">
-          {TABS.map((t) => (
-            <button key={t.id} role="tab" aria-selected={tab === t.id} className={`ws-subtab ${tab === t.id ? 'on' : ''}`} onClick={() => useWriting.setState({ brainTab: t.id })} data-ws-brain-tab={t.id}>
-              <t.icon size={14} /> {t.label}
-            </button>
-          ))}
-        </nav>
+        <Segmented className="ws-subtabs" items={TABS} value={tab} onChange={(id) => useWriting.setState({ brainTab: id })} attr="data-ws-brain-tab" />
         <AsOfSlider />
       </div>
-      <div className="ws-brain-body">
+      <div className="ws-brain-body" key={tab}>
         {tab === 'pages' && <Pages />}
         {tab === 'met' && <MetGrid />}
         {tab === 'relationships' && <Relationships />}
@@ -144,7 +139,7 @@ function Pages() {
               </div>
               {adding === k.id && (
                 <input
-                  className="text-input"
+                  className="ws-input"
                   autoFocus
                   value={newName}
                   maxLength={80}
@@ -228,7 +223,7 @@ function EntityPage({ entity }: { entity: Entity }) {
       <label className="ws-field">
         <span>Also called</span>
         <input
-          className="text-input"
+          className="ws-input"
           defaultValue={entity.aliases.join(', ')}
           placeholder={entity.kind === 'character' ? 'Nicknames, titles, surname… (commas between)' : 'Other names (commas between)'}
           onBlur={(e) =>
@@ -243,7 +238,7 @@ function EntityPage({ entity }: { entity: Entity }) {
       <label className="ws-field">
         <span>Notes</span>
         <textarea
-          className="text-input"
+          className="ws-input ws-textarea"
           rows={4}
           defaultValue={entity.about}
           placeholder="Anything you want to remember"
@@ -256,9 +251,9 @@ function EntityPage({ entity }: { entity: Entity }) {
         <h3>Facts</h3>
         {entity.facts.map((f) => (
           <div key={f.id} className="ws-fact">
-            <input className="text-input" defaultValue={f.label} placeholder="What" onBlur={(e) => updateEntity(entity.id, (x) => void (x.facts.find((y) => y.id === f.id)!.label = e.target.value.trim()))} />
+            <input className="ws-input" defaultValue={f.label} placeholder="What" onBlur={(e) => updateEntity(entity.id, (x) => void (x.facts.find((y) => y.id === f.id)!.label = e.target.value.trim()))} />
             <input
-              className="text-input"
+              className="ws-input"
               defaultValue={f.value}
               placeholder="e.g. brown"
               onBlur={(e) => updateEntity(entity.id, (x) => void (x.facts.find((y) => y.id === f.id)!.value = e.target.value.trim()))}
@@ -458,15 +453,15 @@ function MetGrid() {
               </tr>
             </thead>
             <tbody>
-              {chars.map((r) => (
+              {chars.map((r, ri) => (
                 <tr key={r.id}>
                   <th className="ws-grid-row">{r.name}</th>
-                  {chars.map((c) => {
+                  {chars.map((c, ci) => {
                     if (c.id === r.id) return <td key={c.id} className="ws-cell self" />
                     const k = pairKey(r.id, c.id)
                     const n = brain.pairs.get(k)?.length ?? 0
                     return (
-                      <td key={c.id} className={`ws-cell ${n ? '' : 'never'} ${pair === k ? 'on' : ''}`}>
+                      <td key={c.id} className={`ws-cell ${n ? '' : 'never'} ${pair === k ? 'on' : ''}`} style={{ '--i': ri + ci } as CSSProperties}>
                         <button
                           onClick={() => setPair(pair === k ? null : k)}
                           style={n ? { background: `color-mix(in srgb, var(--accent) ${Math.round(15 + (n / most) * 65)}%, transparent)` } : undefined}
@@ -564,7 +559,7 @@ function PairScene({ story, sceneId, k }: { story: Story; sceneId: string; k: st
       <SceneLink story={story} id={sceneId} />
       {editing ? (
         <input
-          className="text-input"
+          className="ws-input"
           autoFocus
           defaultValue={how?.text ?? ''}
           placeholder="What happens between them here?"
@@ -670,7 +665,7 @@ function Relationships() {
                 return (
                   <li key={s.id} className={`${now?.id === s.id ? 'now' : ''} ${later ? 'later' : ''}`}>
                     <input
-                      className="text-input ws-rel-label"
+                      className="ws-input ws-rel-label"
                       defaultValue={s.label}
                       placeholder="Friends"
                       onBlur={(e) => updateRelationship(r.id, (x) => void (x.steps.find((y) => y.id === s.id)!.label = e.target.value.trim()))}
@@ -683,7 +678,7 @@ function Relationships() {
                       ))}
                     </select>
                     <input
-                      className="text-input ws-rel-note"
+                      className="ws-input ws-rel-note"
                       defaultValue={s.note}
                       placeholder="Why it changed (optional)"
                       onBlur={(e) => updateRelationship(r.id, (x) => void (x.steps.find((y) => y.id === s.id)!.note = e.target.value.trim()))}
@@ -743,7 +738,7 @@ function Ask() {
       </p>
       <div className="ws-ask-row">
         <input
-          className="text-input"
+          className="ws-input"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void ask()}
