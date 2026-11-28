@@ -144,7 +144,7 @@ export function TraitChart({ samples, setup, version }: { samples: Sample[]; set
 /** A creature's brain: what it senses on the left, what it decides on the right, lit up as it thinks. */
 function BrainView({ brain, thought }: { brain: number[]; thought: { inputs: number[]; hidden: number[]; outputs: number[] } }) {
   const W = 300
-  const H = 190
+  const H = 250
   const nIn = BRAIN_INPUTS.length
   const col = [92, 190, 262]
   const yOf = (i: number, n: number): number => 12 + ((H - 24) * (i + 0.5)) / n
@@ -253,6 +253,9 @@ export function CreatureCard({ world, setup, id, onClose }: { world: World; setu
             Caught <b>{c.kills}</b>
           </span>
         )}
+        <span title="Times it was close enough to eat something and chose to leave it">
+          Let meals go <b>{c.spared ?? 0}</b>
+        </span>
       </div>
       <div className="evo-energy" title={`Energy ${Math.round(c.energy)} of ${Math.round(maxEnergyOf(c))}`}>
         <div style={{ width: `${energy * 100}%`, background: sp?.color }} />
@@ -270,7 +273,7 @@ export function CreatureCard({ world, setup, id, onClose }: { world: World; setu
         })}
       </div>
       {thought && <BrainView brain={c.brain} thought={thought} />}
-      <p className="evo-hint">The brain started random. Every line is a number its parents passed down, changed a little each generation. Green pushes, pink holds back.</p>
+      <p className="evo-hint">The brain started random. Every line is a number its parents passed down, changed a little each generation. Green pushes, pink holds back. Nothing tells it when to eat: if Eat is below halfway it leaves a meal it’s touching, and only what works gets passed on.</p>
     </section>
   )
 }

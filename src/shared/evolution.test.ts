@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BRAIN_HIDDEN,
+  BRAIN_INPUTS,
   BRAIN_WEIGHTS,
   PRESETS,
   cleanSetup,
@@ -18,14 +20,16 @@ import {
 const small = (setup: Setup): Setup => ({ ...setup, conditions: { ...setup.conditions, width: 500, height: 400, maxPlants: 300 } })
 
 describe('the brain', () => {
-  it('turns senses into a turn from -1 to 1 and a speed from 0 to 1', () => {
+  it('turns senses into a turn from -1 to 1, a speed from 0 to 1 and an eat from 0 to 1', () => {
     const brain = Array.from({ length: BRAIN_WEIGHTS }, (_, i) => Math.sin(i) * 3)
-    const t = think(brain, [1, 1, -1, 0.5, 0, 0, 1, 0.2, 1])
+    const t = think(brain, [1, 1, -1, 0.5, 0, 0, 1, 0.2, 0.5, 0.3, 0.1, 0.4, 1])
     expect(t.hidden).toHaveLength(6)
     expect(t.outputs[0]).toBeGreaterThanOrEqual(-1)
     expect(t.outputs[0]).toBeLessThanOrEqual(1)
     expect(t.outputs[1]).toBeGreaterThanOrEqual(0)
     expect(t.outputs[1]).toBeLessThanOrEqual(1)
+    expect(t.outputs[2]).toBeGreaterThanOrEqual(0)
+    expect(t.outputs[2]).toBeLessThanOrEqual(1)
   })
 })
 
@@ -83,6 +87,31 @@ describe('worlds', () => {
     const kids = w.creatures.filter((c) => c.generation > 0)
     expect(kids.length).toBeGreaterThan(0)
     expect(kids.every((c) => c.parent != null)).toBe(true)
+  })
+
+  it('only eats what it touches when its brain says to, and remembers what it let go', () => {
+    const nIn = BRAIN_INPUTS.length
+    // Every hidden neuron just follows "Always on"; the Eat output is pushed up or down from there.
+    const brainThat = (eat: number): number[] => {
+      const b = new Array(BRAIN_WEIGHTS).fill(0)
+      for (let h = 0; h < BRAIN_HIDDEN; h++) {
+        b[h * nIn + nIn - 1] = 4
+        b[nIn * BRAIN_HIDDEN + 1 * BRAIN_HIDDEN + h] = -4 // speed: stay put
+        b[nIn * BRAIN_HIDDEN + 2 * BRAIN_HIDDEN + h] = eat
+      }
+      return b
+    }
+    for (const eat of [4, -4]) {
+      const g = newSpecies({ name: 'G', start: 1 })
+      const setup = small({ conditions: { ...DEFAULT_CONDITIONS, plantGrowth: 0 }, species: [g], zones: [] })
+      const w = createWorld(setup)
+      const c = w.creatures[0]
+      c.brain = brainThat(eat)
+      w.plants = [{ x: c.x, y: c.y }]
+      for (let i = 0; i < 40; i++) step(w, setup)
+      expect(w.plants.length).toBe(eat > 0 ? 0 : 1)
+      if (eat < 0) expect(c.spared).toBeGreaterThan(0)
+    }
   })
 
   it('a species with nothing to eat dies out, and that gets noted', () => {

@@ -108,6 +108,11 @@ export interface Creature {
   throttle: number
   babies: number
   kills: number
+  /** Where it was born. Nothing makes it stay there, but its brain can learn to. */
+  homeX: number
+  homeY: number
+  /** Meals it was close enough to take and chose to leave. */
+  spared: number
 }
 
 export interface Plant {
@@ -147,10 +152,15 @@ export const BRAIN_INPUTS = [
   'Danger closeness',
   'Wall ahead',
   'Energy',
+  'Food around',
+  'Prey around',
+  'Home direction',
+  'Far from home',
   'Always on'
 ] as const
 export const BRAIN_HIDDEN = 6
-export const BRAIN_OUTPUTS = ['Turn', 'Speed'] as const
+/** Eat: above halfway it takes a meal it's touching, below it leaves it. Nothing says when to hold back. */
+export const BRAIN_OUTPUTS = ['Turn', 'Speed', 'Eat'] as const
 export const BRAIN_WEIGHTS = BRAIN_INPUTS.length * BRAIN_HIDDEN + BRAIN_HIDDEN * BRAIN_OUTPUTS.length
 
 export interface Thought {
@@ -159,7 +169,7 @@ export interface Thought {
   outputs: number[]
 }
 
-/** Runs a brain: inputs to a hidden layer to turn (-1 to 1) and speed (0 to 1). */
+/** Runs a brain: inputs to a hidden layer to turn (-1 to 1), speed (0 to 1) and eat (0 to 1). */
 export function think(brain: readonly number[], inputs: readonly number[]): Thought {
   const nIn = BRAIN_INPUTS.length
   const hidden: number[] = []
@@ -175,7 +185,7 @@ export function think(brain: readonly number[], inputs: readonly number[]): Thou
     for (let h = 0; h < BRAIN_HIDDEN; h++) sum += hidden[h] * brain[base + o * BRAIN_HIDDEN + h]
     raw.push(sum)
   }
-  return { inputs: [...inputs], hidden, outputs: [Math.tanh(raw[0]), 1 / (1 + Math.exp(-raw[1]))] }
+  return { inputs: [...inputs], hidden, outputs: [Math.tanh(raw[0]), 1 / (1 + Math.exp(-raw[1])), 1 / (1 + Math.exp(-raw[2]))] }
 }
 
 // ---------- the genes ----------
@@ -288,7 +298,10 @@ export function spawn(world: World, setup: Setup, speciesId: string, count: numb
       brain: randomBrain(world),
       throttle: 0,
       babies: 0,
-      kills: 0
+      kills: 0,
+      homeX: spot.x,
+      homeY: spot.y,
+      spared: 0
     })
     made++
   }
@@ -409,6 +422,8 @@ function sense(c: Creature, ctx: StepContext): Senses {
   const sight = c.traits.sight
   const sight2 = sight * sight
   let plant: Plant | null = null
+  let plantsSeen = 0
+  let preySeen = 0
   let plantD = sight2
   let plantDx = 0
   let plantDy = 0
@@ -417,6 +432,7 @@ function sense(c: Creature, ctx: StepContext): Senses {
       const dx = offset(c.x, p.x, width, wrap)
       const dy = offset(c.y, p.y, height, wrap)
       const d = dx * dx + dy * dy
+      if (d < sight2) plantsSeen++
       if (d < plantD) {
         plantD = d
         plant = p
@@ -441,6 +457,7 @@ function sense(c: Creature, ctx: StepContext): Senses {
       const dx = offset(c.x, o.x, width, wrap)
       const dy = offset(c.y, o.y, height, wrap)
       const d = dx * dx + dy * dy
+      if (d < sight2 && hunts.includes(o.species)) preySeen++
       if (d < preyD && hunts.includes(o.species)) {
         preyD = d
         prey = o
@@ -468,6 +485,8 @@ function sense(c: Creature, ctx: StepContext): Senses {
     }
   }
   const close = (d2: number): number => 1 - Math.sqrt(d2) / sight
+  const homeDx = offset(c.x, c.homeX ?? c.x, width, wrap)
+  const homeDy = offset(c.y, c.homeY ?? c.y, height, wrap)
   const inputs = [
     plant ? relativeAngle(c.angle, plantDx, plantDy) : 0,
     plant ? close(plantD) : 0,
@@ -477,6 +496,10 @@ function sense(c: Creature, ctx: StepContext): Senses {
     threat ? close(threatD) : 0,
     wallAhead,
     Math.min(1, c.energy / maxEnergyOf(c)),
+    Math.min(1, plantsSeen / 10),
+    Math.min(1, preySeen / 8),
+    homeDx || homeDy ? relativeAngle(c.angle, homeDx, homeDy) : 0,
+    Math.min(1, Math.hypot(homeDx, homeDy) / 300),
     1
   ]
   return { inputs, plant, prey }
@@ -531,6 +554,7 @@ export function step(world: World, setup: Setup): void {
     }
     const senses = sense(cr, ctx)
     const out = think(cr.brain, senses.inputs).outputs
+    const wantsToEat = out[2] >= 0.5
     cr.angle += out[0] * TURN_RATE
     cr.throttle = out[1]
     const v = cr.traits.speed * cr.throttle * MOVE_SCALE
@@ -563,8 +587,10 @@ export function step(world: World, setup: Setup): void {
       const dx = offset(cr.x, p.x, width, wrap)
       const dy = offset(cr.y, p.y, height, wrap)
       if (dx * dx + dy * dy <= (r + 2) * (r + 2)) {
-        eaten.add(p)
-        cr.energy += c.plantEnergy * (meatAndPlants ? 0.7 : 1)
+        if (wantsToEat) {
+          eaten.add(p)
+          cr.energy += c.plantEnergy * (meatAndPlants ? 0.7 : 1)
+        } else if (world.tick % 20 === cr.id % 20) cr.spared++
       }
     }
 
@@ -574,7 +600,9 @@ export function step(world: World, setup: Setup): void {
       const dx = offset(cr.x, prey.x, width, wrap)
       const dy = offset(cr.y, prey.y, height, wrap)
       const reach = r + radiusOf(prey)
-      if (dx * dx + dy * dy <= reach * reach) {
+      if (dx * dx + dy * dy <= reach * reach && !wantsToEat) {
+        if (world.tick % 20 === cr.id % 20) cr.spared++
+      } else if (dx * dx + dy * dy <= reach * reach) {
         const meal = prey.energy * 0.6 + 25 * prey.traits.size * prey.traits.size
         cr.energy += meal * (meatAndPlants ? 0.7 : 1)
         prey.energy = 0
@@ -608,7 +636,10 @@ export function step(world: World, setup: Setup): void {
           brain: genes.brain,
           throttle: 0,
           babies: 0,
-          kills: 0
+          kills: 0,
+          homeX: cr.x,
+          homeY: cr.y,
+          spared: 0
         })
         cr.babies++
       }
@@ -633,7 +664,10 @@ export function step(world: World, setup: Setup): void {
       brain: genes.brain,
       throttle: 0,
       babies: 0,
-      kills: 0
+      kills: 0,
+      homeX: prey.x,
+      homeY: prey.y,
+      spared: 0
     })
   }
 
@@ -766,6 +800,39 @@ export const PRESETS: Preset[] = [
       const grazers = newSpecies({ name: 'Grazers', color: '#4ade80', start: 70, traits: { size: 0.9, speed: 1, sight: 80, litter: 2 } })
       const hunters = newSpecies({ name: 'Hunters', color: '#f87171', start: 10, eatsPlants: false, hunts: [grazers.id], lifespan: 3600, traits: { size: 1.3, speed: 1.2, sight: 120, litter: 1 } })
       return { conditions: { ...DEFAULT_CONDITIONS }, species: [grazers, hunters], zones: [] }
+    }
+  },
+  {
+    id: 'rooms',
+    name: 'Grazers and hunters in rooms',
+    blurb: 'The same food chain split into rooms with small doorways. A family that eats its room bare starves; one that leaves some alive might last.',
+    make: () => {
+      const grazers = newSpecies({ name: 'Grazers', color: '#4ade80', start: 70, traits: { size: 0.9, speed: 1, sight: 80, litter: 2 } })
+      const hunters = newSpecies({ name: 'Hunters', color: '#f87171', start: 10, eatsPlants: false, hunts: [grazers.id], lifespan: 3600, traits: { size: 1.3, speed: 1.2, sight: 120, litter: 1 } })
+      const W = DEFAULT_CONDITIONS.width
+      const H = DEFAULT_CONDITIONS.height
+      const cols = 4
+      const rows = 3
+      const gap = 40
+      const t = 12
+      const zones: Zone[] = []
+      for (let i = 1; i < cols; i++)
+        for (let j = 0; j < rows; j++) {
+          const x = (W * i) / cols - t / 2
+          const y0 = (H * j) / rows
+          const y1 = (H * (j + 1)) / rows
+          const mid = (y0 + y1) / 2
+          zones.push({ id: newId('z'), kind: 'wall', x, y: y0, w: t, h: mid - gap / 2 - y0 }, { id: newId('z'), kind: 'wall', x, y: mid + gap / 2, w: t, h: y1 - mid - gap / 2 })
+        }
+      for (let j = 1; j < rows; j++)
+        for (let i = 0; i < cols; i++) {
+          const y = (H * j) / rows - t / 2
+          const x0 = (W * i) / cols
+          const x1 = (W * (i + 1)) / cols
+          const mid = (x0 + x1) / 2
+          zones.push({ id: newId('z'), kind: 'wall', x: x0, y, w: mid - gap / 2 - x0, h: t }, { id: newId('z'), kind: 'wall', x: mid + gap / 2, y, w: x1 - mid - gap / 2, h: t })
+        }
+      return { conditions: { ...DEFAULT_CONDITIONS, wrap: false }, species: [grazers, hunters], zones }
     }
   },
   {
