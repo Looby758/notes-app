@@ -78,6 +78,7 @@ export const ADDONS: AddonInfo[] = [
   { id: 'games', name: 'Games', features: ['games'] },
   { id: 'skyblock', name: 'SkyBlock', features: ['skyblock-goals'] },
   { id: 'mini-games', name: 'Mini games', features: ['mini-games'] },
+  { id: 'evolution', name: 'Evolution Lab', features: ['evolution'] },
 
   // Tools
   { id: 'snip', name: 'Screen snip', features: ['snip', 'snip-picture'] },

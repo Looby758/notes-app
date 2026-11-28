@@ -66,6 +66,7 @@ import {
   Target,
   type LucideIcon
 } from 'lucide-react'
+import { Dna } from 'lucide-react'
 import { openGrokTab } from '../components/Grok/GrokPage'
 import { openSiteTab } from '../components/ChatSite/ChatSite'
 import { useChatSites, useGrok } from '../store/grok'
@@ -108,6 +109,7 @@ import {
   HOME_TAB,
   MESSAGES_TAB,
   CLOCKS_TAB,
+  EVOLUTION_TAB,
   COUNTDOWNS_TAB,
   SKYBLOCK_GOALS_TAB,
   PUBLISHING_TAB,
@@ -243,6 +245,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   games: { icon: Gamepad2, run: () => openSpecialTab(GAMES_TAB) },
   'skyblock-goals': { icon: Target, run: () => openSpecialTab(SKYBLOCK_GOALS_TAB) },
   'mini-games': { icon: Joystick, run: () => openMiniGames(null) },
+  evolution: { icon: Dna, run: () => openSpecialTab(EVOLUTION_TAB) },
   snip: { icon: Scan, run: () => void startSnip() },
   'snip-picture': { icon: Crop, run: () => void startSnip('picture') },
   explorer: { icon: HardDrive, run: () => openSpecialTab(EXPLORER_TAB) },

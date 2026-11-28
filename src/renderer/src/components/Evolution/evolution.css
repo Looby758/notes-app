@@ -1,0 +1,706 @@
+/* Evolution Lab */
+
+.pane-body > .evo-page {
+  flex: 1;
+}
+.evo-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* ---------- top bar ---------- */
+.evo-bar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.evo-bar h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.evo-bar h2 svg {
+  color: var(--accent);
+  filter: drop-shadow(0 0 6px var(--accent-dim));
+}
+.evo-transport {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.evo-play {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  background: var(--accent);
+  color: #07130c;
+  box-shadow: 0 0 0 0 var(--accent-dim), 0 0 16px var(--accent-dim);
+  transition: transform 0.15s var(--ease), box-shadow 0.2s var(--ease);
+}
+.evo-play:hover {
+  transform: scale(1.06);
+  box-shadow: 0 0 0 4px var(--accent-soft), 0 0 22px var(--accent-dim);
+}
+.evo-seg {
+  display: inline-flex;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2px;
+}
+.evo-seg button {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.evo-seg button:hover {
+  color: var(--text);
+}
+.evo-seg button.on {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.evo-seg.small button {
+  font-size: 11px;
+  padding: 3px 7px;
+}
+.evo-stats {
+  display: flex;
+  gap: 18px;
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.evo-stats b {
+  color: var(--text-strong);
+  margin-left: 4px;
+}
+.evo-stats em {
+  font-style: normal;
+  color: var(--text-faint);
+  margin-left: 6px;
+}
+
+/* ---------- layout ---------- */
+.evo-main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.evo-stage {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: #07080c;
+}
+.evo-world {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.evo-world canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.evo-world.tool-select canvas {
+  cursor: pointer;
+}
+.evo-world.tool-wall canvas,
+.evo-world.tool-fertile canvas,
+.evo-world.tool-barren canvas,
+.evo-world.tool-danger canvas {
+  cursor: crosshair;
+}
+.evo-world.tool-erase canvas {
+  cursor: not-allowed;
+}
+.evo-world.tool-food canvas,
+.evo-world.tool-spawn canvas {
+  cursor: copy;
+}
+
+/* Tools float over the world on the left. */
+.evo-toolbox {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 12px;
+  background: rgba(12, 14, 22, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  z-index: 2;
+}
+.evo-toolbox button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: rgba(230, 235, 245, 0.6);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.2s;
+}
+.evo-toolbox button:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.07);
+}
+.evo-toolbox button.on {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18), 0 0 12px rgba(255, 255, 255, 0.08);
+}
+.evo-toolbox .kind-fertile.on,
+.evo-tool.kind-fertile.on,
+.evo-toolbox .kind-food.on,
+.evo-tool.kind-food.on {
+  color: #4ade80;
+}
+.evo-toolbox .kind-danger.on,
+.evo-tool.kind-danger.on {
+  color: #f87171;
+}
+.evo-toolbox .kind-barren.on,
+.evo-tool.kind-barren.on {
+  color: #d6a56e;
+}
+
+.evo-species-strip {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 60%;
+  pointer-events: none;
+  z-index: 2;
+}
+.evo-species-strip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(230, 235, 245, 0.8);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(12, 14, 22, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  font-variant-numeric: tabular-nums;
+  transition: opacity 0.4s;
+}
+.evo-species-strip span.gone {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+.evo-species-strip b {
+  color: #fff;
+}
+.evo-species-strip i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.evo-species-strip .plants i {
+  background: #a0ffbe;
+  box-shadow: 0 0 8px #4ade80;
+}
+
+.evo-rewind {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  color: rgba(230, 235, 245, 0.6);
+  font-size: 12px;
+  background: #0b0d14;
+}
+.evo-rewind input {
+  flex: 1;
+  accent-color: var(--accent);
+}
+.evo-rewind span {
+  min-width: 170px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- side panel ---------- */
+.evo-side {
+  width: 360px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+  background: var(--bg-panel);
+  min-height: 0;
+}
+.evo-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.evo-tabs button {
+  flex: 1;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 7px 4px 9px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.evo-tabs button:hover {
+  color: var(--text);
+}
+.evo-tabs button.on {
+  color: var(--text-strong);
+  border-bottom-color: var(--accent);
+}
+.evo-side-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+.evo-panel-body {
+  padding: 12px 14px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.evo-panel-body .muted,
+.evo-page .muted {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin: 0;
+}
+.evo-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.5;
+}
+.evo-sub {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  margin-top: 8px;
+}
+
+.evo-card {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px 12px;
+}
+.evo-card h4 {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-strong);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.evo-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.evo-card-head h4 {
+  margin: 0;
+}
+.evo-chart {
+  width: 100%;
+  display: block;
+}
+.evo-legend,
+.evo-trait-now {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.evo-trait-now {
+  flex-direction: column;
+}
+.evo-legend i,
+.evo-trait-now i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: 0;
+}
+.evo-legend i.dashed {
+  border-radius: 0;
+  height: 2px;
+  width: 12px;
+  vertical-align: 3px;
+  background: repeating-linear-gradient(90deg, #a0ffbe 0 3px, transparent 3px 6px);
+}
+.evo-trait-now b {
+  font-weight: 500;
+  color: var(--text-faint);
+}
+.up {
+  color: #4ade80 !important;
+}
+.down {
+  color: #fb7185 !important;
+}
+
+.evo-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+
+/* The creature you're watching */
+.evo-facts,
+.evo-genes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.evo-facts b,
+.evo-genes b {
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+.evo-genes em {
+  font-style: normal;
+  font-size: 9px;
+  margin-left: 3px;
+}
+.evo-energy {
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.07);
+  margin: 9px 0;
+  overflow: hidden;
+}
+.evo-energy div {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.25s var(--ease);
+  box-shadow: 0 0 8px currentColor;
+}
+.evo-brain {
+  width: 100%;
+  margin: 10px 0 4px;
+  background: radial-gradient(ellipse at center, rgba(94, 234, 212, 0.06), transparent 70%);
+  border-radius: 8px;
+}
+.evo-brain text {
+  font-size: 8.5px;
+  fill: var(--text-muted);
+  font-family: var(--font-ui);
+}
+.evo-brain circle {
+  transition: fill 0.2s;
+}
+
+.evo-events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.evo-events li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+}
+.evo-events li i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+.evo-events li.extinct span {
+  color: #fb7185;
+}
+.evo-events time {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* ---------- editors ---------- */
+.evo-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--text);
+}
+.evo-slider-top {
+  display: flex;
+  justify-content: space-between;
+}
+.evo-slider-top b {
+  font-weight: 500;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.evo-slider input {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.evo-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+.evo-toggle input {
+  accent-color: var(--accent);
+}
+.evo-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.evo-species {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.evo-species-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.evo-species-top input[type='color'] {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  flex: none;
+}
+.evo-species-top input[type='color']::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.evo-species-top input[type='color']::-webkit-color-swatch {
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+}
+.evo-species-top .text-input {
+  flex: 1;
+  min-width: 0;
+}
+.evo-alive {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.evo-species-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 4px;
+}
+.evo-species-actions .muted {
+  font-size: 11px;
+  line-height: 1.4;
+}
+.evo-add {
+  align-self: flex-start;
+}
+
+.evo-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.evo-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: inherit;
+  font-size: 11.5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.evo-chip:hover {
+  color: var(--text);
+}
+.evo-chip.on {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+
+.evo-tools {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.evo-tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 9px 4px;
+  font: inherit;
+  font-size: 11.5px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.evo-tool:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.evo-tool.on {
+  color: var(--text-strong);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.evo-seed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.evo-seed .text-input {
+  width: 120px;
+}
+
+.evo-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.evo-preset,
+.evo-saved-name {
+  text-align: left;
+  font: inherit;
+  padding: 9px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: border-color 0.15s, transform 0.15s var(--ease);
+}
+.evo-preset:hover,
+.evo-saved-name:hover {
+  border-color: var(--accent);
+  transform: translateX(2px);
+}
+.evo-preset b,
+.evo-saved-name b {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.evo-preset span,
+.evo-saved-name span {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.evo-save {
+  display: flex;
+  gap: 6px;
+}
+.evo-save .text-input {
+  flex: 1;
+}
+.evo-saved {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.evo-saved-name {
+  flex: 1;
+}
+
+@media (max-width: 900px) {
+  .evo-side {
+    width: 300px;
+  }
+  .evo-stats em {
+    display: none;
+  }
+}
