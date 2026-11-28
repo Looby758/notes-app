@@ -21,6 +21,8 @@ export type ZoneKind = 'wall' | 'fertile' | 'barren' | 'danger'
 export interface Zone {
   id: string
   kind: ZoneKind
+  /** Danger areas only: the species it's dangerous for. Empty or missing means every species. */
+  affects?: string[]
   x: number
   y: number
   w: number
@@ -55,6 +57,12 @@ export interface SpeciesSetup {
   infects: boolean
   /** Whether it has babies. A species that only infects can be set not to. */
   breeds: boolean
+  /**
+   * Families keep a patch: one of its own kind from another family that comes too close to someone
+   * else's home gets chased off and loses energy. Rivals are sensed like danger. It doesn't tell them
+   * how to behave; it just means what a family leaves alive near home is more likely to be theirs.
+   */
+  territorial: boolean
   /** How long one lives, in steps (60 steps is about a second at normal speed). */
   lifespan: number
   traits: Traits
@@ -451,12 +459,19 @@ function sense(c: Creature, ctx: StepContext): Senses {
   let threatDx = 0
   let threatDy = 0
   let threat = false
-  if (hunts.length || threats) {
+  const territorial = !!sp?.territorial
+  if (hunts.length || threats || territorial) {
     ctx.creatures.near(c.x, c.y, sight, wrap, (o) => {
       if (o === c || o.energy <= 0) return
       const dx = offset(c.x, o.x, width, wrap)
       const dy = offset(c.y, o.y, height, wrap)
       const d = dx * dx + dy * dy
+      if (territorial && d < threatD && o.species === c.species && !kin(c, o)) {
+        threatD = d
+        threat = true
+        threatDx = dx
+        threatDy = dy
+      }
       if (d < sight2 && hunts.includes(o.species)) preySeen++
       if (d < preyD && hunts.includes(o.species)) {
         preyD = d
@@ -503,6 +518,21 @@ function sense(c: Creature, ctx: StepContext): Senses {
     1
   ]
   return { inputs, plant, prey }
+}
+
+/** Whether a danger area hurts this species (it hurts everyone unless it's set to only some). */
+export function dangerFor(z: Zone, species: string): boolean {
+  return !z.affects?.length || z.affects.includes(species)
+}
+
+/** Parent and child, or brothers and sisters. */
+function kin(a: Creature, b: Creature): boolean {
+  return a.id === b.parent || b.id === a.parent || (a.parent != null && a.parent === b.parent)
+}
+
+/** How far from its own home a creature is. */
+function awayFromHome(c: Creature, width: number, height: number, wrap: boolean): number {
+  return Math.hypot(offset(c.x, c.homeX, width, wrap), offset(c.y, c.homeY, height, wrap))
 }
 
 /** What a creature senses and thinks right now (for showing its brain at work). */
@@ -576,7 +606,22 @@ export function step(world: World, setup: Setup): void {
     }
 
     cr.energy -= energyUse(cr.traits, cr.throttle, c.harshness)
-    if (zoneAt(setup.zones, cr.x, cr.y)?.kind === 'danger') cr.energy -= 0.25 * c.harshness
+    const here = zoneAt(setup.zones, cr.x, cr.y)
+    if (here?.kind === 'danger' && dangerFor(here, cr.species)) cr.energy -= 0.25 * c.harshness
+    // On someone else's patch: whoever is further from their own home gets chased off.
+    if (sp.territorial && world.tick % 4 === cr.id % 4) {
+      const mine = awayFromHome(cr, width, height, wrap)
+      const reach = radiusOf(cr) * 3
+      let chased = false
+      ctx.creatures.near(cr.x, cr.y, reach, wrap, (o) => {
+        if (chased || o === cr || o.energy <= 0 || o.species !== cr.species || kin(cr, o)) return
+        if (awayFromHome(o, width, height, wrap) < mine) chased = true
+      })
+      if (chased) {
+        cr.energy -= 6 * c.harshness
+        cr.angle += Math.PI
+      }
+    }
     const max = maxEnergyOf(cr)
     const r = radiusOf(cr)
     const meatAndPlants = sp.eatsPlants && sp.hunts.length > 0
@@ -778,6 +823,7 @@ export function newSpecies(partial: Partial<SpeciesSetup> = {}): SpeciesSetup {
     hunts: [],
     infects: false,
     breeds: true,
+    territorial: false,
     lifespan: 3000,
     ...partial,
     traits: { size: 1, speed: 1, sight: 90, litter: 2, ...partial.traits }
@@ -799,6 +845,16 @@ export const PRESETS: Preset[] = [
     make: () => {
       const grazers = newSpecies({ name: 'Grazers', color: '#4ade80', start: 70, traits: { size: 0.9, speed: 1, sight: 80, litter: 2 } })
       const hunters = newSpecies({ name: 'Hunters', color: '#f87171', start: 10, eatsPlants: false, hunts: [grazers.id], lifespan: 3600, traits: { size: 1.3, speed: 1.2, sight: 120, litter: 1 } })
+      return { conditions: { ...DEFAULT_CONDITIONS }, species: [grazers, hunters], zones: [] }
+    }
+  },
+  {
+    id: 'territories',
+    name: 'Hunters who keep territories',
+    blurb: 'Grazers and hunters again, but hunter families chase other hunters off their patch. See if the food chain lasts longer.',
+    make: () => {
+      const grazers = newSpecies({ name: 'Grazers', color: '#4ade80', start: 70, traits: { size: 0.9, speed: 1, sight: 80, litter: 2 } })
+      const hunters = newSpecies({ name: 'Hunters', color: '#f87171', start: 10, eatsPlants: false, hunts: [grazers.id], territorial: true, lifespan: 3600, traits: { size: 1.3, speed: 1.2, sight: 120, litter: 1 } })
       return { conditions: { ...DEFAULT_CONDITIONS }, species: [grazers, hunters], zones: [] }
     }
   },
@@ -959,6 +1015,7 @@ export function cleanSetup(raw: unknown): Setup {
       hunts: Array.isArray(s.hunts) ? s.hunts.filter((h): h is string => typeof h === 'string') : [],
       infects: s.infects === true,
       breeds: s.breeds !== false,
+      territorial: s.territorial === true,
       lifespan: Math.round(num(s.lifespan, 3000, 100, 100000)),
       traits: {
         size: clampTrait('size', num(traits.size, 1, -1e9, 1e9)),
@@ -979,7 +1036,8 @@ export function cleanSetup(raw: unknown): Setup {
       x: num(z.x, 0, -1e5, 1e5),
       y: num(z.y, 0, -1e5, 1e5),
       w: num(z.w, 10, 1, 1e5),
-      h: num(z.h, 10, 1, 1e5)
+      h: num(z.h, 10, 1, 1e5),
+      ...(z.kind === 'danger' && Array.isArray(z.affects) ? { affects: z.affects.filter((id): id is string => typeof id === 'string' && ids.has(id)) } : {})
     }))
   return { conditions, species, zones }
 }

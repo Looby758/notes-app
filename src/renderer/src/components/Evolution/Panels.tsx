@@ -91,6 +91,12 @@ function SpeciesEditor({ lab, sp, counts }: { lab: Lab; sp: SpeciesSetup; counts
       <div className="evo-toggles">
         <Toggle label="Has babies" on={sp.breeds} onChange={(v) => change({ breeds: v })} hint="Off for a species that only grows by turning others, like walkers." />
         <Toggle
+          label="Families keep a territory"
+          on={sp.territorial}
+          onChange={(v) => change({ territorial: v })}
+          hint="Others of its kind that come too close to a family's home get chased off. What a family leaves alive near home is more likely to still be there for its kids."
+        />
+        <Toggle
           label="Anyone it catches turns into one of them"
           on={sp.infects}
           onChange={(v) => change({ infects: v })}
@@ -250,6 +256,35 @@ export function LandPanel({ lab, tool, setTool, spawnSpecies, setSpawnSpecies }:
         </div>
       )}
       <div className="evo-sub">Areas ({zones.length})</div>
+      {zones
+        .filter((z) => z.kind === 'danger')
+        .map((z, i) => {
+          const set = (affects: string[]): void => lab.update((s) => ({ ...s, zones: s.zones.map((x) => (x.id === z.id ? { ...x, affects } : x)) }))
+          const all = !z.affects?.length
+          return (
+            <div key={z.id} className="evo-danger-for" data-evo-danger={z.id}>
+              <span className="muted">Danger area {i + 1} hurts:</span>
+              <div className="evo-chips">
+                <button className={`evo-chip ${all ? 'on' : ''}`} onClick={() => set([])}>
+                  Everyone
+                </button>
+                {lab.setup.species.map((sp) => {
+                  const on = !all && !!z.affects?.includes(sp.id)
+                  return (
+                    <button
+                      key={sp.id}
+                      className={`evo-chip ${on ? 'on' : ''}`}
+                      onClick={() => set(on ? (z.affects ?? []).filter((id) => id !== sp.id) : [...(z.affects ?? []), sp.id])}
+                      data-evo-danger-species={sp.id}
+                    >
+                      <i className="evo-dot" style={{ background: sp.color }} /> {sp.name}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
       {zones.length === 0 ? (
         <p className="muted">None yet. Pick Wall, Lush, Barren or Danger and drag on the world.</p>
       ) : (

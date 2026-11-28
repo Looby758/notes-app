@@ -104,6 +104,18 @@ export default function WorldView({ world, setup, tool, spawnSpecies, selected, 
           ctx.lineWidth = (z.kind === 'wall' ? 1.5 : 1) / scale
           ctx.setLineDash(z.kind === 'wall' ? [] : [6 / scale, 5 / scale])
           ctx.strokeRect(z.x, z.y, z.w, z.h)
+          // A danger area for only some species: dots in their colours along the top edge.
+          if (z.kind === 'danger' && z.affects?.length) {
+            ctx.globalAlpha = 1
+            z.affects.forEach((id, i) => {
+              const sp = s.species.find((x) => x.id === id)
+              if (!sp) return
+              ctx.fillStyle = sp.color
+              ctx.beginPath()
+              ctx.arc(z.x + (10 + i * 14) / scale, z.y + 10 / scale, 4.5 / scale, 0, Math.PI * 2)
+              ctx.fill()
+            })
+          }
         }
       }
       ctx.setLineDash([])

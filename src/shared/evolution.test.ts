@@ -114,6 +114,21 @@ describe('worlds', () => {
     }
   })
 
+  it('danger areas can hurt only the species you pick', () => {
+    const a = newSpecies({ name: 'A', start: 10, eatsPlants: false, lifespan: 100000 })
+    const b = newSpecies({ name: 'B', start: 10, eatsPlants: false, lifespan: 100000 })
+    const setup = small({ conditions: { ...DEFAULT_CONDITIONS, plantGrowth: 0 }, species: [a, b], zones: [{ id: 'd', kind: 'danger', x: -10, y: -10, w: 600, h: 500, affects: [a.id] }] })
+    const w = createWorld(setup)
+    for (const c of w.creatures) c.energy = 50
+    for (let i = 0; i < 60; i++) step(w, setup)
+    const avg = (id: string): number => {
+      const cs = w.creatures.filter((c) => c.species === id)
+      return cs.reduce((s, c) => s + c.energy, 0) / Math.max(1, cs.length)
+    }
+    expect(avg(a.id)).toBeLessThan(avg(b.id) - 5)
+    expect(cleanSetup(JSON.parse(JSON.stringify(setup))).zones[0].affects).toEqual([a.id])
+  })
+
   it('a species with nothing to eat dies out, and that gets noted', () => {
     const starving = newSpecies({ name: 'Hungry', start: 20, eatsPlants: false, lifespan: 100000 })
     const setup = small({ conditions: { ...DEFAULT_CONDITIONS, harshness: 5 }, species: [starving], zones: [] })
