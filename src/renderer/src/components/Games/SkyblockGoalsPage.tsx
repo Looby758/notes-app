@@ -25,6 +25,7 @@ import { API_SETTINGS_PATH, describeHours, MC_COLORS, tagLabel, type GoalPlan, t
 import { MODE_NAMES } from '@shared/skyblock'
 import { addHomeCard } from '../../lib/home'
 import { GAMES_TAB, openSpecialTab, SKYBLOCK_GOALS_TAB } from '../../lib/editorController'
+import { MarketPage, takeWantedTab } from './SkyblockMarket'
 import { errorMessage } from '../../lib/paths'
 import { HomeBox } from '../Home/HomePage'
 import type { SbFriend, SbProfilePage } from '@shared/skyblockMore'
@@ -89,12 +90,13 @@ const savedZoom = (): number => {
   }
 }
 
-type Tab = 'profile' | 'progress' | 'goals' | 'helpers' | 'compare'
+type Tab = 'profile' | 'progress' | 'goals' | 'helpers' | 'market' | 'compare'
 
 const PAGE_BANNERS: Record<string, { icon: string; group: string; title: string; line: string }> = {
   progress: { icon: 'EXP_BOTTLE', group: 'Over time', title: 'Progress', line: 'How your profile has grown, every time Orbit has read it.' },
   goals: { icon: 'DIAMOND_PICKAXE', group: 'Planning', title: 'Goals', line: 'What you’re working towards, broken down to the last raw material.' },
   helpers: { icon: 'WORKBENCH', group: 'Planning', title: 'Helpers', line: 'Your day’s to-do list, what you can craft now, Magical Power and minions.' },
+  market: { icon: 'GOLD_INGOT', group: 'Over time', title: 'Market', line: 'The Bazaar as Orbit has recorded it: odd moves, mayors, events, and an AI that looks through it all.' },
   compare: { icon: 'PAINTING', group: 'Others', title: 'Compare', line: 'Line yourself up against friends and anyone you look up.' }
 }
 
@@ -103,6 +105,7 @@ const DOCK: { id: Tab; label: string; icon: string; mineOnly?: boolean }[] = [
   { id: 'progress', label: 'Progress', icon: 'EXP_BOTTLE', mineOnly: true },
   { id: 'goals', label: 'Goals', icon: 'DIAMOND_PICKAXE', mineOnly: true },
   { id: 'helpers', label: 'Helpers', icon: 'WORKBENCH', mineOnly: true },
+  { id: 'market', label: 'Market', icon: 'GOLD_INGOT' },
   { id: 'compare', label: 'Compare', icon: 'COMPASS' }
 ]
 
@@ -114,7 +117,16 @@ export default function SkyblockGoalsPage() {
   const [state, setState] = useGoals(true)
   const [selected, setSelected] = useState<string | null>(null)
   const [view, setView] = useState<'tree' | 'raw' | 'blockers'>('tree')
-  const [tab, setTab] = useState<Tab>('profile')
+  const [tab, setTab] = useState<Tab>(() => (takeWantedTab() as Tab | null) ?? 'profile')
+  // The Home box's "Market" button, when this page is already open.
+  useEffect(() => {
+    const on = (e: Event): void => {
+      takeWantedTab()
+      setTab((e as CustomEvent<Tab>).detail)
+    }
+    window.addEventListener('sbx:tab', on)
+    return () => window.removeEventListener('sbx:tab', on)
+  }, [])
   const [error, setError] = useState<string | null>(null)
   const [packsOpen, setPacksOpen] = useState(false)
   const [mine, setMine] = useState<SbProfilePage | null>(null)
@@ -415,6 +427,7 @@ export default function SkyblockGoalsPage() {
                 />
               )}
               {shownTab === 'progress' && (mine ? <ProgressPage page={mine} /> : <div className="sbg-empty">Your progress shows once Orbit has read your profile.</div>)}
+              {shownTab === 'market' && <MarketPage />}
               {shownTab === 'helpers' && <HelpersPage profileId={mine?.view.profileId ?? ''} view={mine?.view} />}
               {shownTab === 'compare' && <ComparePage mine={mine} other={other} friends={friends} setFriends={setFriends} open={(who) => void openPlayer(who)} />}
               {shownTab === 'goals' && (

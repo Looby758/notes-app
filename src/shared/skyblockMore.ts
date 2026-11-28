@@ -617,6 +617,24 @@ export function upcomingEvents(now: number, limit = 8): SbEvent[] {
   return out.slice(0, limit)
 }
 
+/** The yearly events (Zoo, Spooky, Jerry…) that started between `from` and `to`, oldest first. For looking back as well as ahead. */
+export function yearlyEventsBetween(from: number, to: number): SbEvent[] {
+  const out: SbEvent[] = []
+  if (to <= from) return out
+  const first = skyblockDate(from).year - 1
+  const last = skyblockDate(to).year
+  for (let y = Math.max(1, first); y <= last; y++)
+    for (const e of YEARLY) {
+      const start = sbTime(y, e.month, e.day)
+      const end = start + e.days * SB_DAY
+      if (start >= from && start < to) out.push({ id: `${e.id}-${y}`, name: e.name, icon: e.icon, start, end, live: false })
+    }
+  return out.sort((a, b) => a.start - b.start)
+}
+
+/** The kinds of yearly event, for rules like "before every Spooky Festival". */
+export const YEARLY_EVENT_KINDS: { id: string; name: string }[] = YEARLY.filter((e, i) => YEARLY.findIndex((x) => x.name === e.name) === i).map((e) => ({ id: e.id.replace(/-(summer|winter)$/, ''), name: e.name }))
+
 export interface SbMayor {
   name: string
   perks: { name: string; description: string }[]

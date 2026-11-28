@@ -111,6 +111,7 @@ import { setupGames } from './games'
 import { setupGameCovers } from './gameCovers'
 import { setupSkyblock } from './skyblock'
 import { setupSkyblockGoals } from './skyblockGoals'
+import { setupSkyblockMarket } from './skyblockMarket'
 import { setupSkyblockAddon, SKYBLOCK_TEX_SCHEME } from './skyblockAddon'
 import { applyIconOutsideApp, taskbarIcon } from './appIcon'
 import { broadcastThemes, loadImportedThemes, setupThemes, THEME_SCHEME, themeFilePath, themesDir } from './themes'
@@ -783,6 +784,7 @@ function registerIpc(): void {
   setupGameCovers()
   setupSkyblock({ getMain: () => mainWindow })
   setupSkyblockGoals()
+  setupSkyblockMarket({ getVault: () => vault })
   setupSkyblockAddon()
   setupTerminal(() => vault?.root ?? null)
   setupAppStudio()

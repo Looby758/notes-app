@@ -164,6 +164,11 @@ function getData(): SbData | null {
   return data
 }
 
+/** An item's name from the item list (for the market tracker), or null before the list is downloaded. */
+export function itemNameOf(id: string): string | null {
+  return getData()?.items[id]?.name ?? null
+}
+
 function broadcast(): void {
   for (const win of BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send('skyblockGoals:changed')
 }
