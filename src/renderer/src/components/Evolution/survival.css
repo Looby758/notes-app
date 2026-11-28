@@ -581,3 +581,11 @@
   font-size: 11.5px;
   color: var(--text-muted);
 }
+
+.sv-page .evo-rewind .sv-now {
+  padding: 3px 10px;
+  font-size: 12px;
+}
+.sv-page .evo-rewind [data-sv-looking] {
+  color: #f0c674;
+}

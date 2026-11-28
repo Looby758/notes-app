@@ -70,7 +70,9 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
   const autoTick = useRef(-1)
   useEffect(() => {
     const timer = setInterval(() => {
-      const world = sv.world.current
+      // While you're looking back, the autosave keeps the latest point, not the past you're viewing.
+      const snapsNow = sv.snapshots.current
+      const world = sv.lookingBack() ? snapsNow[snapsNow.length - 1] : sv.world.current
       if (world.tick === autoTick.current || (!world.groups.length && !world.walkers.length)) return
       autoTick.current = world.tick
       writeSave(AUTOSAVE, world, true)
@@ -122,15 +124,20 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
    */
   const change = (label: string, fn: () => void): void => {
     const before = snapshotSurvival(sv.world.current)
+    const snapsBefore = sv.snapshots.current.slice()
     fn()
+    // A rewind point right after it, so rewinding never lands on a world from before you placed it
+    // without it being a point you chose.
+    sv.mark()
     const after = snapshotSurvival(sv.world.current)
+    const snapsAfter = sv.snapshots.current.slice()
     recordUndo({
       label: `${label} (Day ${dayOf(before.tick)}, ${clockText(before.tick)})`,
       undo: () => {
-        sv.restore(before)
+        sv.restore(before, snapsBefore)
         setSelection(null)
       },
-      redo: () => sv.restore(after)
+      redo: () => sv.restore(after, snapsAfter)
     })
   }
 
@@ -184,6 +191,9 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
   const people = w.people.length
   const groupsAlive = w.groups.filter((g) => g.alive).length
   const snaps = sv.snapshots.current
+  const lookingBack = sv.lookingBack()
+  let snapAt = snaps.length - 1
+  while (snapAt > 0 && snaps[snapAt].tick > w.tick) snapAt--
   const dark = darkness(w.tick)
   const decision = w.pending[0]
 
@@ -332,7 +342,7 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
             sv.refresh()
           }} />}
 
-          {groupsAlive === 0 && !w.fallen.length && tool === 'select' && (
+          {w.groups.length === 0 && !w.fallen.length && !lookingBack && tool === 'select' && (
             <div className="sv-start" data-sv-start>
               <h3>Survival mode</h3>
               <p>It's Day {dayOf(w.tick)} of the outbreak, in the country outside Atlanta, Georgia. The map is empty until you fill it.</p>
@@ -370,13 +380,13 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
             </div>
           )}
 
-          <div className="evo-rewind" title="Rewind: drag back to any earlier point. Carrying on from there replaces what came after.">
+          <div className="evo-rewind" title="Rewind: drag back to look at any earlier point, and forward again. Playing on from the past replaces what came after.">
             <History size={14} />
             <input
               type="range"
               min={0}
               max={Math.max(0, snaps.length - 1)}
-              value={snaps.length - 1}
+              value={snapAt}
               onChange={(e) => {
                 sv.setRunning(false)
                 sv.rewindTo(Number(e.target.value))
@@ -385,7 +395,16 @@ export default function SurvivalPage({ switcher }: { switcher: React.ReactNode }
               aria-label="Rewind"
               data-evo-rewind
             />
-            <span>{snaps.length < 2 ? 'Rewind points appear every 6 hours' : `Back as far as ${when(snaps[0].tick)}`}</span>
+            {lookingBack ? (
+              <>
+                <span data-sv-looking>Looking back at {when(w.tick)}. Play carries on from here and replaces what came after.</span>
+                <button className="btn sv-now" onClick={() => sv.backToNow()} data-sv-now>
+                  Back to now
+                </button>
+              </>
+            ) : (
+              <span>{snaps.length < 2 ? 'Rewind points appear every 6 hours' : `Back as far as ${when(snaps[0].tick)}`}</span>
+            )}
           </div>
         </div>
 

@@ -28,6 +28,9 @@ function readOptions(): SurvivalOptionsState {
   return { seed: 30, harshness: 0.5 }
 }
 
+/** A world with nothing in it yet: not worth a rewind point once something's been placed. */
+const isEmpty = (w: SurvivalWorld): boolean => !w.groups.length && !w.walkers.length && !w.fallen.length
+
 function thin<T>(list: T[]): T[] {
   const half = Math.floor(list.length / 2)
   return [...list.slice(0, half).filter((_, i) => i % 2 === 0), ...list.slice(half)]
@@ -46,11 +49,24 @@ export interface Survival {
   stepOnce: () => void
   /** A fresh, empty world. */
   restart: (opts?: Partial<SurvivalOptionsState>) => void
+  /**
+   * Look at an earlier rewind point. Nothing is thrown away: the points after it stay on the slider
+   * (so you can drag forward again) until you play on or change something from there.
+   */
   rewindTo: (index: number) => void
+  /** Jump back to the latest point after looking back. */
+  backToNow: () => void
+  /** True while you're looking at the past and later rewind points are still kept. */
+  lookingBack: () => boolean
+  /** Adds a rewind point for right now (after you place something), dropping any kept future. */
+  mark: () => void
   /** Swap in a saved world. It's paused, and rewinding starts again from here. */
   load: (w: SurvivalWorld) => void
-  /** Jump to a copy of the world from earlier (undo): later rewind points are dropped, and it pauses. */
-  restore: (w: SurvivalWorld) => void
+  /**
+   * Jump to a copy of the world (undo/redo), paused. With `snaps`, the rewind points are put back
+   * exactly as they were; otherwise later ones are dropped.
+   */
+  restore: (w: SurvivalWorld, snaps?: SurvivalWorld[]) => void
 }
 
 export function useSurvival(): Survival {
@@ -64,9 +80,16 @@ export function useSurvival(): Survival {
   const [version, setVersion] = useState(0)
   const refresh = useCallback(() => setVersion((v) => v + 1), [])
 
+  const dropFuture = (tick: number): void => {
+    const last = snapshots.current[snapshots.current.length - 1]
+    if (last && last.tick > tick) snapshots.current = snapshots.current.filter((s) => s.tick <= tick)
+  }
+
   const advance = useCallback((n: number, budget: number): void => {
     const start = performance.now()
     const w = world.current
+    // Playing on from the past: what came after is replaced by what happens now.
+    if (n > 0 && !w.pending.length) dropFuture(w.tick)
     for (let i = 0; i < n; i++) {
       if (w.pending.length) break
       stepSurvival(w)
@@ -133,12 +156,37 @@ export function useSurvival(): Survival {
     (index: number) => {
       const snap = snapshots.current[index]
       if (!snap) return
+      const list = snapshots.current
+      const live = world.current
+      const last = list[list.length - 1]
+      // Keep "now" on the slider so you can come back to it.
+      if (last && live.tick > last.tick) list.push(snapshotSurvival(live))
+      else if (last && live.tick === last.tick && index !== list.length - 1) list[list.length - 1] = snapshotSurvival(live)
       world.current = snapshotSurvival(snap)
-      snapshots.current = snapshots.current.slice(0, index + 1)
+      setRunning(false)
       refresh()
     },
     [refresh]
   )
+
+  const lookingBack = useCallback((): boolean => {
+    const last = snapshots.current[snapshots.current.length - 1]
+    return !!last && last.tick > world.current.tick
+  }, [])
+
+  const backToNow = useCallback(() => {
+    const list = snapshots.current
+    if (list.length) world.current = snapshotSurvival(list[list.length - 1])
+    refresh()
+  }, [refresh])
+
+  const mark = useCallback(() => {
+    const w = world.current
+    let list = snapshots.current.filter((s) => s.tick < w.tick)
+    if (!isEmpty(w)) list = list.filter((s) => !isEmpty(s))
+    list.push(snapshotSurvival(w))
+    snapshots.current = list.length > MAX_SNAPSHOTS ? thin(list) : list
+  }, [])
 
   const load = useCallback(
     (w: SurvivalWorld) => {
@@ -151,8 +199,14 @@ export function useSurvival(): Survival {
   )
 
   const restore = useCallback(
-    (w: SurvivalWorld) => {
+    (w: SurvivalWorld, snaps?: SurvivalWorld[]) => {
       world.current = snapshotSurvival(w)
+      if (snaps) {
+        snapshots.current = snaps.slice()
+        setRunning(false)
+        refresh()
+        return
+      }
       const kept = snapshots.current.filter((s) => s.tick <= w.tick && s.map === w.map)
       snapshots.current = kept.length ? kept : [snapshotSurvival(w)]
       setRunning(false)
@@ -161,5 +215,5 @@ export function useSurvival(): Survival {
     [refresh]
   )
 
-  return { world, snapshots, options, running, setRunning, speed, setSpeed, version, refresh, stepOnce, restart, rewindTo, load, restore }
+  return { world, snapshots, options, running, setRunning, speed, setSpeed, version, refresh, stepOnce, restart, rewindTo, backToNow, lookingBack, mark, load, restore }
 }

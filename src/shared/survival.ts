@@ -196,10 +196,21 @@ export interface LogLine {
   text: string
 }
 
+export type Sex = 'f' | 'm'
+
 export interface Person {
   id: number
   name: string
   age: number
+  sex: Sex
+  /** Their partner's id, if they're together with someone. */
+  partner: number | null
+  /** Parents, children, brothers and sisters, by id (living or not). */
+  family: number[]
+  /** Held prisoner: `group` is then the captors, and `from` the group they were taken from. */
+  held: { from: number; since: number } | null
+  /** Expecting a baby, due at this step (0 if not). */
+  dueAt: number
   group: number
   x: number
   y: number
@@ -368,6 +379,33 @@ export interface Noise {
   until: number
 }
 
+/** Two groups fighting it out, in one place, for a while. */
+export interface Fight {
+  id: number
+  a: number
+  b: number
+  x: number
+  y: number
+  started: number
+  /** It's over by this step at the latest. */
+  until: number
+  /** Deaths on each side. */
+  deadA: number
+  deadB: number
+  /** People taken prisoner during it. */
+  taken: number[]
+}
+
+/** A shot, drawn for a moment. */
+export interface Shot {
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  until: number
+  hit: boolean
+}
+
 export interface WorldLog {
   tick: number
   text: string
@@ -386,7 +424,7 @@ export interface DecisionOption {
 export interface Decision {
   id: number
   group: number
-  kind: 'bite' | 'meet' | 'robbed' | 'camp'
+  kind: 'bite' | 'meet' | 'robbed' | 'camp' | 'prisoner'
   title: string
   text: string
   options: DecisionOption[]
@@ -415,6 +453,8 @@ export interface SurvivalWorld {
   pending: Decision[]
   /** When two groups meet and only one asks you, what the other one already chose ("a:b" → choice). */
   waiting: Record<string, string>
+  fights: Fight[]
+  shots: Shot[]
 }
 
 // ---------- random numbers ----------
@@ -432,12 +472,15 @@ const chance = (w: { rng: number }, p: number): boolean => random(w) < p
 const clamp = (v: number, a: number, b: number): number => (v < a ? a : v > b ? b : v)
 const dist = (ax: number, ay: number, bx: number, by: number): number => Math.hypot(ax - bx, ay - by)
 
-const FIRST = [
-  'Rick', 'Maggie', 'Glenn', 'Carol', 'Daryl', 'Michonne', 'Tara', 'Abraham', 'Rosita', 'Eugene', 'Aaron', 'Sasha',
-  'Tyreese', 'Beth', 'Hershel', 'Dale', 'Andrea', 'Amy', 'Shane', 'Lori', 'Morgan', 'Jesus', 'Ezekiel', 'Jerry',
-  'Nora', 'Owen', 'Priya', 'Marcus', 'Elena', 'Jamal', 'Hannah', 'Luis', 'Grace', 'Theo', 'Ivy', 'Caleb', 'Dana',
-  'Wes', 'Rhea', 'Omar', 'June', 'Felix', 'Tess', 'Ray', 'Lena', 'Hank', 'Mae', 'Cole', 'Nina', 'Sam', 'Bea',
-  'Victor', 'Ada', 'Reggie', 'Lucy', 'Darnell', 'Paige', 'Gus', 'Wendy', 'Eli', 'Kara', 'Boone', 'Della'
+const FIRST_F = [
+  'Maggie', 'Carol', 'Michonne', 'Tara', 'Rosita', 'Sasha', 'Beth', 'Andrea', 'Amy', 'Lori', 'Nora', 'Priya', 'Elena',
+  'Hannah', 'Grace', 'Ivy', 'Dana', 'Rhea', 'June', 'Tess', 'Lena', 'Mae', 'Nina', 'Bea', 'Ada', 'Lucy', 'Paige',
+  'Wendy', 'Kara', 'Della', 'Sam', 'Rose', 'Clara', 'Josie', 'Maya'
+]
+const FIRST_M = [
+  'Rick', 'Glenn', 'Daryl', 'Abraham', 'Eugene', 'Aaron', 'Tyreese', 'Hershel', 'Dale', 'Shane', 'Morgan', 'Jesus',
+  'Ezekiel', 'Jerry', 'Owen', 'Marcus', 'Jamal', 'Luis', 'Theo', 'Caleb', 'Wes', 'Omar', 'Felix', 'Ray', 'Hank', 'Cole',
+  'Victor', 'Reggie', 'Darnell', 'Gus', 'Eli', 'Boone', 'Sam', 'Noah', 'Jack'
 ]
 const LAST = [
   'Walsh', 'Dixon', 'Greene', 'Porter', 'Hale', 'Monroe', 'Reyes', 'Tate', 'Brooks', 'Vance', 'Carver', 'Mercer',
@@ -651,7 +694,9 @@ export function createSurvivalWorld(opts: SurvivalOptions): SurvivalWorld {
     noises: [],
     log: [{ tick: 0, text: `Day ${START_DAY} of the outbreak. The roads outside Atlanta are quiet.` }],
     pending: [],
-    waiting: {}
+    waiting: {},
+    fights: [],
+    shots: []
   }
 }
 
@@ -672,7 +717,10 @@ export function buildingAt(w: SurvivalWorld, x: number, y: number, pad = 0): Bui
 export const groupById = (w: SurvivalWorld, id: number): Group | undefined => w.groups.find((g) => g.id === id)
 export const personById = (w: SurvivalWorld, id: number): Person | undefined => w.people.find((p) => p.id === id)
 const buildingById = (w: SurvivalWorld, id: number | null | undefined): Building | undefined => (id == null ? undefined : w.buildings.find((b) => b.id === id))
-export const membersOf = (w: SurvivalWorld, g: Group): Person[] => w.people.filter((p) => p.group === g.id)
+/** A group's own people (not counting anyone they're holding prisoner). */
+export const membersOf = (w: SurvivalWorld, g: Group): Person[] => w.people.filter((p) => p.group === g.id && !p.held)
+/** People a group is holding prisoner. */
+export const prisonersOf = (w: SurvivalWorld, g: Group): Person[] => w.people.filter((p) => p.group === g.id && p.held)
 export const campOf = (w: SurvivalWorld, g: Group): Building | undefined => buildingById(w, g.camp)
 export const hasLesson = (g: Group, id: LessonId): boolean => g.lessons.some((l) => l.id === id)
 const has = (p: Person, t: Trait): boolean => p.traits.includes(t)
@@ -774,19 +822,27 @@ const listNames = (people: Person[]): string => {
 export interface PersonDraft {
   name: string
   age: number
+  sex: Sex
   traits: Trait[]
   skills: Record<Skill, number>
   weapon: Weapon
 }
 
-export function randomPerson(w: { rng: number }, taken: string[] = []): PersonDraft {
+/** A first name for someone of this sex that nobody in `taken` already has. */
+export function firstName(w: { rng: number }, sex: Sex, taken: string[]): string {
   let name = ''
-  for (let i = 0; i < 20; i++) {
-    name = `${pick(w, FIRST)} ${pick(w, LAST)}`
-    if (!taken.some((t) => t.split(' ')[0] === name.split(' ')[0])) break
+  for (let i = 0; i < 30; i++) {
+    name = pick(w, sex === 'f' ? FIRST_F : FIRST_M)
+    if (!taken.some((t) => t.split(' ')[0] === name)) break
   }
+  return name
+}
+
+export function randomPerson(w: { rng: number }, taken: string[] = [], opts: { age?: number; sex?: Sex; surname?: string } = {}): PersonDraft {
+  const sex: Sex = opts.sex ?? (chance(w, 0.5) ? 'f' : 'm')
+  const name = `${firstName(w, sex, taken)} ${opts.surname ?? pick(w, LAST)}`
   const roll = random(w)
-  const age = roll < 0.08 ? int(w, 7, 13) : roll < 0.18 ? int(w, 14, 17) : roll < 0.85 ? int(w, 18, 54) : int(w, 55, 75)
+  const age = opts.age ?? (roll < 0.08 ? int(w, 7, 13) : roll < 0.18 ? int(w, 14, 17) : roll < 0.85 ? int(w, 18, 54) : int(w, 55, 75))
   const traits: Trait[] = []
   while (traits.length < 2) {
     const t = pick(w, TRAITS).id
@@ -799,7 +855,7 @@ export function randomPerson(w: { rng: number }, taken: string[] = []): PersonDr
   // One thing they were good at before all this.
   skills[pick(w, SKILLS).id] = int(w, 6, 9)
   const weapon: Weapon = age < 14 ? 'none' : pick(w, ['knife', 'knife', 'bat', 'machete', 'pistol', 'pistol', 'rifle', 'shotgun', 'crossbow', 'none'] as Weapon[])
-  return { name, age, traits, skills, weapon }
+  return { name, age, sex, traits, skills, weapon }
 }
 
 /** Names already used by anyone in the world, so a new person doesn't share a first name. */
@@ -807,17 +863,28 @@ export function takenNames(w: SurvivalWorld): string[] {
   return [...w.people.map((p) => p.name), ...w.fallen.map((p) => p.name)]
 }
 
-/** A handful of random people with different first names. */
+/**
+ * A handful of random people with different first names. Some come as families: a couple who share
+ * a surname, and children with a parent's surname.
+ */
 export function randomPeople(w: SurvivalWorld, n: number): PersonDraft[] {
   const taken = takenNames(w)
   const out: PersonDraft[] = []
   for (let i = 0; i < n; i++) {
-    const p = randomPerson(w, taken)
+    const adult = out.find((q) => q.age >= 22 && q.age <= 55)
+    let p: PersonDraft
+    if (adult && i === 1 && chance(w, 0.35)) p = randomPerson(w, taken, { sex: adult.sex === 'f' ? 'm' : 'f', age: clamp(adult.age + int(w, -6, 6), 19, 60), surname: adult.name.split(' ')[1] })
+    else {
+      p = randomPerson(w, taken)
+      if (p.age < 16 && adult && chance(w, 0.7)) p.name = `${p.name.split(' ')[0]} ${adult.name.split(' ')[1]}`
+    }
     taken.push(p.name)
     out.push(p)
   }
   return out
 }
+
+const surnameOf = (p: { name: string }): string => p.name.split(' ').slice(1).join(' ')
 
 export interface GroupDraft {
   name: string
@@ -865,6 +932,11 @@ function newPerson(w: SurvivalWorld, d: PersonDraft, g: Group, x: number, y: num
     id: w.nextId++,
     name: d.name.trim() || 'Someone',
     age: d.age,
+    sex: d.sex ?? 'f',
+    partner: null,
+    family: [],
+    held: null,
+    dueAt: 0,
     group: g.id,
     x,
     y,
@@ -918,8 +990,21 @@ export function spawnGroup(w: SurvivalWorld, draft: GroupDraft, x: number, y: nu
     const a = (i / Math.max(1, draft.people.length)) * Math.PI * 2
     return newPerson(w, d, g, clamp(x + Math.cos(a) * 1.5, 1, MAP_W - 2), clamp(y + Math.sin(a) * 1.5, 1, MAP_H - 2))
   })
-  // People who come in together already know each other a bit.
+  // People who come in together already know each other a bit, and those who share a surname are family.
   for (const p of people) for (const q of people) if (p !== q) p.rel[q.id] = int(w, 5, 35)
+  for (const p of people)
+    for (const q of people) {
+      if (p.id >= q.id || surnameOf(p) !== surnameOf(q)) continue
+      if (p.age >= 18 && q.age >= 18 && p.sex !== q.sex && Math.abs(p.age - q.age) <= 15 && p.partner == null && q.partner == null) {
+        p.partner = q.id
+        q.partner = p.id
+        p.rel[q.id] = q.rel[p.id] = int(w, 70, 95)
+      } else {
+        p.family.push(q.id)
+        q.family.push(p.id)
+        p.rel[q.id] = q.rel[p.id] = int(w, 55, 90)
+      }
+    }
   w.people.push(...people)
   pickLeader(w, g)
   const lead = personById(w, g.leader ?? -1)
@@ -1097,7 +1182,7 @@ export function staleness(w: SurvivalWorld, g: Group, cell: number): number {
 // ---------- the daily plan ----------
 
 function canWork(p: Person): boolean {
-  return !isKid(p) && p.health >= 35 && !p.bitten && p.hunger < 90 && p.thirst < 90
+  return !isKid(p) && !p.held && p.health >= 35 && !p.bitten && p.hunger < 90 && p.thirst < 90
 }
 
 const CARRY: Supplies = { food: 10, water: 8, ammo: 40, meds: 5, parts: 6 }
