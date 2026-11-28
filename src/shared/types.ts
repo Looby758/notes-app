@@ -384,6 +384,12 @@ export interface AiStatus {
 /** Where an AI answer comes from: the offline AI on this computer, or Claude online. */
 export type AiEngine = 'offline' | 'online'
 
+/** A Writing Studio job for the offline AI: a first-time reader's reactions, "how" notes for a scene, or a question about the story. */
+export type WritingAiJob =
+  | { kind: 'ghost'; storyTitle: string; chapterTitle: string; part: string; known: string[]; partNo: number; parts: number }
+  | { kind: 'hows'; sceneTitle: string; text: string; pairs: [string, string][] }
+  | { kind: 'ask'; question: string; summary: string; excerpts: { label: string; title: string; text: string }[] }
+
 /** An answer to a question or chat message. */
 export interface AiReply {
   text: string
@@ -1340,6 +1346,8 @@ export interface NotesApi {
   aiSortMoney(rows: AiSortRow[], categories: { id: string; name: string; income?: boolean }[]): Promise<Record<number, string>>
   /** The dictionary card: what a word means in its sentence, from the offline AI. */
   aiMeaning(word: string, sentence: string): Promise<string>
+  /** The Writing Studio's offline AI jobs (the story never leaves this computer). Resolves with the AI's reply, ready to read. */
+  aiWriting(job: WritingAiJob): Promise<string>
   /** Writing autocomplete: the next few words after `before`, from the offline AI (empty when there's no guess). */
   aiSuggest(title: string, before: string): Promise<string>
   // Auto transcripts (main/transcriber.ts)
@@ -1907,7 +1915,7 @@ export interface OperaImportResult {
   problems: string[]
 }
 
-export type SaveFormat = 'pdf' | 'docx' | 'html' | 'md' | 'txt' | 'jpg' | 'png' | 'webp' | 'mp3' | 'wav' | 'mp4' | 'mov' | 'webm' | 'gif'
+export type SaveFormat = 'pdf' | 'docx' | 'epub' | 'html' | 'md' | 'txt' | 'jpg' | 'png' | 'webp' | 'mp3' | 'wav' | 'mp4' | 'mov' | 'webm' | 'gif'
 
 /** A converted video waiting in a temporary file (videos are too big to pass around in memory). */
 export interface ConvertedFile {

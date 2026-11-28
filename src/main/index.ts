@@ -20,7 +20,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'fs'
 import { readFile } from 'fs/promises'
 import * as fsp from 'fs/promises'
 import { basename, extname, isAbsolute, join, relative } from 'path'
-import type { AiAskTurn, AiExtraContext, AiChat, AiChatMessage, AiEngine, AiNote, AiSortRow, ConfirmOptions, EmailFolder, GoogleEventInput, OutgoingEmail } from '@shared/types'
+import type { AiAskTurn, AiExtraContext, AiChat, AiChatMessage, AiEngine, AiNote, AiSortRow, ConfirmOptions, EmailFolder, GoogleEventInput, OutgoingEmail, WritingAiJob } from '@shared/types'
 import type { MusicAction } from '@shared/spotify'
 import { normalizePrefs, type Prefs } from '@shared/prefs'
 import { activeThemeId, getTheme } from '@shared/themes'
@@ -939,6 +939,7 @@ function registerIpc(): void {
     )
   )
   ipcMain.handle('ai:meaning', (_e, word: string, sentence: string) => ai.meaning(String(word), String(sentence)))
+  ipcMain.handle('ai:writing', (_e, job: WritingAiJob) => ai.writing(job))
   ipcMain.handle('ai:loadChats', () => ai.loadChats())
   ipcMain.handle('ai:saveChats', (_e, chats: AiChat[]) => ai.saveChats(chats))
   ipcMain.handle('handwriting:read', (_e, png: Uint8Array, reader: 'ai' | 'offline') => (reader === 'ai' ? ai.readHandwriting(png) : readHandwritingOffline(png)))

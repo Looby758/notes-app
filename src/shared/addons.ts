@@ -49,6 +49,7 @@ export const ADDONS: AddonInfo[] = [
   { id: 'timeline', name: 'Timeline', features: ['timeline'], needs: ['screenshots'] },
   { id: 'flashcards', name: 'Flashcards', features: ['flashcards'] },
   { id: 'zen', name: 'Zen & focus timer', features: ['zen'] },
+  { id: 'writing-studio', name: 'Writing Studio', features: ['writing-studio'] },
 
   // Money
   { id: 'money', name: 'Money', features: ['money'] },

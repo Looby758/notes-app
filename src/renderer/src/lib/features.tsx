@@ -6,6 +6,7 @@ import {
   ArrowRightLeft,
   FilePen,
   AudioWaveform,
+  Feather,
   AudioLines,
   Clapperboard,
   Cpu,
@@ -89,6 +90,7 @@ import {
   FILESENDER_TAB,
   PDF_EDITOR_TAB,
   AUDIO_EDITOR_TAB,
+  WRITING_TAB,
   STUDIO_TAB,
   APPSTUDIO_TAB,
   CLIPS_TAB,
@@ -250,6 +252,7 @@ const BEHAVIOUR: Record<string, Behaviour> = {
   filesender: { icon: Send, run: () => openSpecialTab(FILESENDER_TAB) },
   'pdf-editor': { icon: FilePen, run: () => openSpecialTab(PDF_EDITOR_TAB) },
   'audio-editor': { icon: AudioWaveform, run: () => openSpecialTab(AUDIO_EDITOR_TAB) },
+  'writing-studio': { icon: Feather, run: () => openSpecialTab(WRITING_TAB) },
   downloads: { icon: ArrowDownToLine, run: () => openSpecialTab(DOWNLOADS_TAB) },
   'offline-ai': {
     icon: Cpu,
