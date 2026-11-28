@@ -616,12 +616,17 @@ export function findMentions(text: string, entities: Entity[]): Mention[] {
 const MENTION_CUES = new Set(
   `about of remember remembered remembers remembering miss missed misses missing thought thinking think thinks wonder wondered wondering
   dream dreamt dreamed dreaming mention mentioned heard without since reminded memory memories grave photo picture letter news rumour rumours
-  rumor rumors how where whether`.split(/\s+/)
+  rumor rumors how where whether find finding seek seeking search searching track tracking rescue rescuing reach reaching`.split(/\s+/)
+)
+/** Two-word cues for someone who isn't there yet: "looking for Maggie", "went after Daryl". */
+const MENTION_PAIRS = new Set(
+  `look for|looking for|looked for|looks for|search for|searched for|wait for|waiting for|waited for|waits for|go after|going after|went after|goes after|go get|went to get|go back for|went back for|back for|ask for|asked for|asking for|call for|called for|calling for`.split('|')
 )
 
 /**
  * A name used in passing rather than someone being there: in someone else's speech ("“Where's
- * Daryl?”"), or just after words like "thinking about", "remembered", "missed", "since". Someone
+ * Daryl?”"), or just after words like "thinking about", "remembered", "missed", "since", or someone
+ * being sought: "to find Maggie", "looking for Maggie". Someone
  * spoken to ("“Daryl, get down!”") is there. Rough on purpose; you can always move people by hand.
  */
 export function isJustMention(text: string, m: Mention): boolean {
@@ -640,7 +645,10 @@ export function isJustMention(text: string, m: Mention): boolean {
   const words = before.toLowerCase().match(/[a-z’']+/g) ?? []
   const sentenceBreak = /[.!?]["”’)]*\s*$/.test(before)
   if (sentenceBreak) return false
-  return words.slice(-3).some((w) => MENTION_CUES.has(w))
+  if (words.slice(-3).some((w) => MENTION_CUES.has(w))) return true
+  const two = words.slice(-2).join(' ')
+  const three = words.slice(-3).join(' ')
+  return MENTION_PAIRS.has(two) || MENTION_PAIRS.has(three)
 }
 
 /** "1" or "Day 1" reads as "Day 1"; a date stays as written. */

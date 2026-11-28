@@ -164,6 +164,11 @@ describe('the brain', () => {
     expect(at('Rick missed Daryl.')).toBe(true)
     expect(at('Daryl raised the crossbow.')).toBe(false)
     expect(at('He thought about it. Daryl came back at dawn.')).toBe(false)
+    expect(at('Rick leaves the Sanctuary with Carol to find Daryl.')).toBe(true)
+    expect(at('They went out looking for Daryl.')).toBe(true)
+    expect(at('Rick went after Daryl.')).toBe(true)
+    expect(at('Rick found Daryl by the fence.')).toBe(false)
+    expect(at('Rick waited with Daryl.')).toBe(false)
   })
 
   it('lets you add and take out characters by hand', () => {
