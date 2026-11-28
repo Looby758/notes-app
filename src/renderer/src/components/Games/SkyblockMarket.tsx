@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Activity, Brain, Check, CircleHelp, Clock, Loader2, Pause, Play, Search, Send, Sparkles, Trash2, TrendingDown, TrendingUp, Undo2, X } from 'lucide-react'
 import {
   mid,
@@ -382,6 +382,53 @@ function ItemSearch({ onPick }: { onPick: (hit: MarketItemHit) => void }) {
 
 // ---------- asking Claude ----------
 
+/** Claude's replies: paragraphs, "- " lists and **bold**, without the asterisks showing. */
+function Rich({ text }: { text: string }) {
+  const italic = (t: string, k: number): ReactNode[] => t.split(/(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])/g).map((p, i) => (i % 2 ? <i key={`${k}-${i}`}>{p}</i> : p))
+  const inline = (line: string): ReactNode[] => line.split(/\*\*(.+?)\*\*/g).flatMap((part, i): ReactNode[] => (i % 2 ? [<b key={i}>{part}</b>] : italic(part, i)))
+  const blocks = text.replace(/^#+\s*/gm, '').split(/\n{2,}/)
+  return (
+    <div className="sbm-rich">
+      {blocks.flatMap((b, i) => {
+        // Within a block, runs of "- " lines become a list and other lines their own paragraph.
+        const out: ReactNode[] = []
+        let list: string[] = []
+        let para: string[] = []
+        const flushList = (): void => {
+          if (list.length)
+            out.push(
+              <ul key={`${i}-${out.length}`}>
+                {list.map((l, j) => (
+                  <li key={j}>{inline(l)}</li>
+                ))}
+              </ul>
+            )
+          list = []
+        }
+        const flushPara = (): void => {
+          if (para.length) out.push(<p key={`${i}-${out.length}`}>{inline(para.join(' '))}</p>)
+          para = []
+        }
+        for (const line of b.split('\n').filter((l) => l.trim())) {
+          const bullet = /^\s*[-*•]\s+(.*)$/.exec(line)
+          if (bullet) {
+            flushPara()
+            list.push(bullet[1])
+          } else {
+            flushList()
+            // A line ending in ":" (or a numbered heading) stands on its own.
+            para.push(line)
+            if (/:\**\s*$/.test(line) || /^\s*\**\d+\./.test(line)) flushPara()
+          }
+        }
+        flushList()
+        flushPara()
+        return out
+      })}
+    </div>
+  )
+}
+
 interface Turn {
   role: 'user' | 'assistant'
   content: string
@@ -426,7 +473,7 @@ function AskPanel({ ready }: { ready: boolean }) {
           )}
           {turns.map((t, i) => (
             <div key={i} className={`sbm-turn ${t.role}`}>
-              {t.content}
+              <Rich text={t.content} />
             </div>
           ))}
           {busy && (
@@ -466,12 +513,22 @@ export function MarketPage() {
   const [found, setFound] = useState<string | null>(null)
 
   const lastAt = state?.lastAt ?? 0
+  const [chartRange, setChartRange] = useState(range)
   useEffect(() => {
     if (!item) return
+    // Only the answer for what's picked now: a slow earlier one mustn't land on top of it.
+    let live = true
     void window.api
       .marketChart(item.id, range)
-      .then(setChart)
-      .catch((err) => notify(cleanErr(err)))
+      .then((c) => {
+        if (!live) return
+        setChart(c)
+        setChartRange(range)
+      })
+      .catch((err) => live && notify(cleanErr(err)))
+    return () => {
+      live = false
+    }
   }, [item, range, lastAt])
   useEffect(() => {
     void window.api
@@ -607,17 +664,26 @@ export function MarketPage() {
         right={
           <div className="sbm-chart-tools">
             <ItemSearch onPick={(h) => setItem({ id: h.id, name: h.name })} />
-            <div className="sbp-chips">
-              {RANGES.map(([id, name]) => (
-                <button key={id} className={`sbp-chip ${range === id ? 'active' : ''}`} onClick={() => setRange(id)}>
-                  {name}
-                </button>
-              ))}
+            <div className="segmented sbm-ranges" data-sbm-ranges>
+              {RANGES.map(([id, name]) => {
+                const short = id === '30d' && state.historyHours < 8 * 24
+                return (
+                  <button
+                    key={id}
+                    className={range === id ? 'selected' : ''}
+                    disabled={short}
+                    title={short ? 'Needs more than a week of history: until then it’s the same as Week' : undefined}
+                    onClick={() => setRange(id)}
+                  >
+                    {name}
+                  </button>
+                )
+              })}
             </div>
           </div>
         }
       >
-        {chart && item && chart.id === item.id ? <PriceChart chart={chart} /> : <Nothing what="Pick an item to see its history." />}
+        {chart && item && chart.id === item.id ? <PriceChart chart={chart} key={`${chart.id}-${chartRange}`} /> : <Nothing what="Pick an item to see its history." />}
         <p className="faint sbm-legend">
           <i className="buy" /> Buy now <i className="sell" /> Sell now <i className="mayor" /> Mayor terms <i className="event" /> Events <i className="pin" /> Questions
           {chart?.imported && ' · the start is from Coflnet (every 2 hours)'}
@@ -652,7 +718,11 @@ export function MarketPage() {
           )
         }
       >
-        {found && <p className="sbm-found">{found}</p>}
+        {found && (
+          <div className="sbm-found">
+            <Rich text={found} />
+          </div>
+        )}
         {state.rules.length === 0 ? (
           <Nothing what="Rules are patterns like “Enchanted Gold rises before every Spooky Festival”. Orbit checks each one every time it happens and keeps score. Press Find rules, or ask the AI to add one." />
         ) : (

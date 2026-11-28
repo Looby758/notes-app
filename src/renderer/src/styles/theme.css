@@ -25410,8 +25410,21 @@ img.tm-icon {
   flex-direction: column;
   min-width: 0;
 }
+.sbm-rich p,
+.sbm-rich ul {
+  margin: 0 0 6px;
+}
+.sbm-rich > :last-child {
+  margin-bottom: 0;
+}
+.sbm-rich ul {
+  padding-left: 18px;
+}
+.sbm-ranges button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 .sbm-found {
-  white-space: pre-wrap;
   margin: 0 0 10px;
   line-height: 1.5;
   font-size: 13px;
@@ -25436,7 +25449,6 @@ img.tm-icon {
   gap: 6px;
 }
 .sbm-turn {
-  white-space: pre-wrap;
   line-height: 1.5;
   padding: 8px 12px;
   border-radius: 10px;
@@ -25467,4 +25479,66 @@ img.tm-icon {
   border: 1px solid var(--border);
   background: var(--bg-raised);
   color: var(--text);
+}
+/* Hover and press feedback for every button in the market tracker (page and Home box). */
+.sbm .btn,
+.sbm-q .btn,
+.sbm button.sbp-chip,
+.sbm-ranges button,
+.sbm-mover,
+.sbm-hits button {
+  transition:
+    background 0.12s var(--ease),
+    border-color 0.12s var(--ease),
+    color 0.12s var(--ease),
+    transform 0.12s var(--ease),
+    filter 0.12s var(--ease);
+}
+.sbm .btn:hover:not(:disabled),
+.sbm-q .btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  transform: translateY(-1px);
+}
+.sbm .btn-primary:hover:not(:disabled),
+.sbm-q .btn-primary:hover:not(:disabled) {
+  background: var(--accent-strong, var(--accent));
+  filter: brightness(1.12);
+}
+.sbm .btn:active:not(:disabled),
+.sbm-q .btn:active:not(:disabled),
+.sbm button.sbp-chip:active {
+  transform: translateY(0) scale(0.97);
+}
+.sbm button.sbp-chip {
+  cursor: pointer;
+  color: var(--text);
+  font: inherit;
+}
+.sbm button.sbp-chip:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  color: var(--text-strong);
+}
+.sbm-ranges button:hover:not(:disabled):not(.selected) {
+  background: var(--bg-hover);
+  color: var(--text-strong);
+}
+.sbm-ranges button.selected {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.sbm-q .link-button:hover:not(:disabled),
+.sbm .link-button:hover:not(:disabled) {
+  color: var(--text-strong);
+}
+.sbm-rules .icon-btn:hover {
+  color: #ff8f8f;
+}
+.sbm-mover:hover,
+.sbm-hits button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.sbm-search:focus-within {
+  border-color: var(--accent);
 }

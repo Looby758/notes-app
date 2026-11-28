@@ -986,7 +986,7 @@ How to work:
 - When you find something that looks like a repeatable pattern tied to a mayor or event, you may add it as a rule with add_rule so Orbit keeps checking it. Say you did.
 - If you'd like the person to check something in game, ask them.
 
-Reply in plain, friendly English, short: a few sentences or a short list, with the key numbers. Use item names, not ids. No tables wider than 4 columns.
+Keep replies short: under 80 words unless they ask for detail, in plain friendly English. Lead with the answer, give the key numbers, and skip the background on what data you looked at. No headings and no tables. Use item names, not ids.
 ${explained.length ? `\nThings the person has explained before:\n${explained.map((q) => `- ${csvTime(q.at)}: ${q.text.replace(/ Any idea why\?$/, '')} They said: "${q.answer}"`).join('\n')}` : ''}`
 }
 
@@ -1005,7 +1005,7 @@ async function suggestRules(): Promise<{ text: string; added: MarketRule[] }> {
       {
         role: 'user',
         content:
-          'Look through the history, the mayors and events, and my answers, and add up to 3 rules with add_rule that you think have real evidence behind them (for example an item that rose before the last two Spooky Festivals, or moved the same way when the same mayor came in). Check each against the price history first. If there isn’t enough data for any yet, say so and say what you’d want to see. Then tell me briefly what you added and why.'
+          'Look through the history, the mayors and events, and my answers, and add up to 3 rules with add_rule that you think have real evidence behind them (for example an item that rose before the last two Spooky Festivals, or moved the same way when the same mayor came in). Check each against the price history first. Then reply in at most 2 short sentences: what you added, or if nothing, why not and the most promising thing to watch.'
       }
     ],
     TOOLS,
