@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from 'react'
 import { Dna, History, Pause, Play, RotateCcw, StepForward } from 'lucide-react'
 import { useLab, SPEEDS } from './useLab'
 import WorldView, { type Tool } from './WorldView'
@@ -23,8 +23,52 @@ const fmt = (n: number): string => n.toLocaleString()
 const MODE_KEY = 'orbit.evolution.mode'
 type Mode = 'creatures' | 'survival'
 
+/** If anything in the lab breaks, show what broke here instead of taking the whole window down. */
+class LabErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null }
+  static getDerivedStateFromError(error: Error): { error: Error } {
+    return { error }
+  }
+  componentDidCatch(error: Error, info: ErrorInfo): void {
+    console.error('[evolution]', error, info.componentStack)
+  }
+  render(): ReactNode {
+    const { error } = this.state
+    if (!error) return this.props.children
+    return (
+      <div className="evo-page" style={{ padding: 24, gap: 10 }}>
+        <h3 style={{ margin: 0 }}>Evolution Lab hit a problem</h3>
+        <p className="muted">The rest of Orbit is fine. Here's what went wrong:</p>
+        <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, userSelect: 'text' }}>{String(error.stack || error.message)}</pre>
+        <button
+          className="btn"
+          style={{ alignSelf: 'flex-start' }}
+          onClick={() => {
+            try {
+              localStorage.removeItem(MODE_KEY)
+            } catch {
+              // Nothing to reset.
+            }
+            this.setState({ error: null })
+          }}
+        >
+          Try again
+        </button>
+      </div>
+    )
+  }
+}
+
 /** Evolution Lab has two modes: creatures that evolve, and a survival sandbox with people. */
 export default function EvolutionPage() {
+  return (
+    <LabErrorBoundary>
+      <EvolutionModes />
+    </LabErrorBoundary>
+  )
+}
+
+function EvolutionModes() {
   const [mode, setMode] = useState<Mode>(() => {
     try {
       return localStorage.getItem(MODE_KEY) === 'survival' ? 'survival' : 'creatures'
