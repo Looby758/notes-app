@@ -385,3 +385,69 @@ export async function interpret(text: string, context: string): Promise<unknown>
     throw new Error(`${who} didn’t understand that one.`)
   }
 }
+
+export interface AiTool {
+  name: string
+  description: string
+  input_schema: { type: 'object'; properties: Record<string, unknown>; required?: string[] }
+}
+
+/**
+ * Claude with tools that run here in Orbit (the SkyBlock market's "ask about the data"): Claude
+ * asks for data, Orbit looks it up and answers, until Claude has what it needs. Claude only, as
+ * the offline AI can't use tools. `run` turns each tool call into text (or throws, which Claude
+ * is told about so it can try something else).
+ */
+export async function askWithTools(
+  system: string,
+  messages: { role: 'user' | 'assistant'; content: string }[],
+  tools: AiTool[],
+  run: (name: string, input: Record<string, unknown>) => Promise<string> | string,
+  maxRounds = 12
+): Promise<{ text: string; toolCalls: number }> {
+  const turns: Anthropic.Beta.BetaMessageParam[] = messages.map((m) => ({ role: m.role, content: m.content }))
+  let toolCalls = 0
+  for (let round = 0; round < maxRounds; round++) {
+    let response: Anthropic.Beta.BetaMessage
+    try {
+      response = await getClient().beta.messages.create({
+        model: MODEL,
+        max_tokens: 16000,
+        output_config: { effort: 'medium' },
+        betas: ['server-side-fallback-2026-07-01'],
+        fallbacks: 'default',
+        system,
+        tools: tools as Anthropic.Beta.BetaTool[],
+        messages: turns
+      })
+    } catch (err) {
+      throw friendly(err)
+    }
+    if (response.stop_reason === 'refusal') throw new Error('Claude couldn’t help with this one.')
+    const uses = response.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === 'tool_use')
+    if (response.stop_reason !== 'tool_use' || !uses.length) {
+      const text = response.content
+        .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text')
+        .map((b) => b.text)
+        .join('')
+        .trim()
+      if (!text) throw new Error('Claude didn’t send anything back. Try again.')
+      return { text, toolCalls }
+    }
+    turns.push({ role: 'assistant', content: response.content as Anthropic.Beta.BetaContentBlockParam[] })
+    const results: Anthropic.Beta.BetaToolResultBlockParam[] = []
+    for (const u of uses) {
+      toolCalls++
+      try {
+        results.push({ type: 'tool_result', tool_use_id: u.id, content: String(await run(u.name, (u.input ?? {}) as Record<string, unknown>)).slice(0, 60_000) })
+      } catch (err) {
+        results.push({ type: 'tool_result', tool_use_id: u.id, content: err instanceof Error ? err.message : String(err), is_error: true })
+      }
+    }
+    turns.push({ role: 'user', content: results })
+  }
+  throw new Error('Claude was still looking things up after a lot of steps. Try a narrower question.')
+}
+
+/** Whether Claude can be asked (the market's AI features need Claude, with your key). */
+export const claudeReady = (): boolean => !!load().apiKey

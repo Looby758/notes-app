@@ -186,6 +186,7 @@ const HOME_BOX_ADDONS: Record<string, string> = {
   countdowns: 'countdowns',
   'skyblock-goals': 'skyblock',
   'skyblock-calendar': 'skyblock',
+  'skyblock-market': 'skyblock',
   screens: 'screens',
   email: 'email',
   clocks: 'clocks'

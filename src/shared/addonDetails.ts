@@ -75,7 +75,7 @@ export const ADDON_ABOUT: Record<string, string> = {
 
   // Play
   games: 'All your Steam and other games in one place, with their covers. For Hypixel SkyBlock, it can sum up each session: coins per hour, drops and XP.',
-  skyblock: 'See a SkyBlock profile like SkyCrypt does, plan ironman goals step by step, and keep an eye on event timers.',
+  skyblock: 'See a SkyBlock profile like SkyCrypt does, plan ironman goals step by step, keep an eye on event timers, and track the Bazaar over time.',
   'mini-games': 'Quick games for a break: Sudoku, Minesweeper, Nonograms, Jigsaw, Wordle, Word search, Hangman, Solitaire, Blackjack, 2048, Breakout and Chess.',
 
   // Tools
@@ -299,7 +299,8 @@ export const ADDON_HOW: Record<string, [lead: string, text: string][]> = {
   skyblock: [
     ['Look up a profile', 'Type a player’s name to see their SkyBlock profile laid out like SkyCrypt: skills, slayers, dungeons, accessories, pets and more.'],
     ['Plan ironman goals', 'Pick an item you want and Orbit breaks it into a crafting tree with every raw material, then tracks what you’ve got.'],
-    ['Keep an eye on timers', 'Event timers show what’s coming up, so you don’t miss one.']
+    ['Keep an eye on timers', 'Event timers show what’s coming up, so you don’t miss one.'],
+    ['Track the Bazaar', 'Orbit records every Bazaar price with the mayor and events, asks you on Home when something moves oddly, and lets you ask the AI about trends.']
   ],
   'mini-games': [
     ['Twelve games in one tab', 'Sudoku, Minesweeper, Nonograms, Jigsaw, Wordle, Word search, Hangman, Solitaire, Blackjack, 2048, Breakout and Chess.'],

@@ -23,6 +23,7 @@ const CHANNEL_ADDONS: Record<string, string> = {
   skyblockPlayers: 'skyblock',
   skyblockProfile: 'skyblock',
   skyblockHelpers: 'skyblock',
+  skyblockMarket: 'skyblock',
   macros: 'macros',
   keyremap: 'keyremap',
   discord: 'discord-voice',

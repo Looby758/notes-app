@@ -1447,6 +1447,24 @@ export interface NotesApi {
   skyblockGoalsUpdate(id: string, change: { amount?: number; pinned?: boolean }): Promise<SkyblockGoalsState>
   skyblockGoalsRemove(id: string): Promise<SkyblockGoalsState>
   onSkyblockGoalsChanged(callback: () => void): () => void
+  // SkyBlock market tracker (src/main/skyblockMarket.ts)
+  marketState(): Promise<import('./skyblockMarket').MarketState>
+  /** Start or stop saving the Bazaar every 5 minutes. */
+  marketRecord(on: boolean): Promise<import('./skyblockMarket').MarketState>
+  marketAnswer(id: string, answer: import('./skyblockMarket').MarketAnswer): Promise<import('./skyblockMarket').MarketState>
+  /** `range`: 1d, 7d, 30d or all. */
+  marketChart(id: string, range: string): Promise<import('./skyblockMarket').MarketChart>
+  marketSearch(query: string): Promise<import('./skyblockMarket').MarketItemHit[]>
+  marketMovers(hours: number): Promise<{ up: { id: string; name: string; change: number; now: number }[]; down: { id: string; name: string; change: number; now: number }[] }>
+  /** Ask Claude about the recorded data (it looks things up itself). */
+  marketAsk(messages: { role: 'user' | 'assistant'; content: string }[]): Promise<string>
+  marketSuggestRules(): Promise<{ text: string; added: import('./skyblockMarket').MarketRule[] }>
+  marketAddRule(rule: unknown): Promise<import('./skyblockMarket').MarketState>
+  marketRemoveRule(id: string): Promise<import('./skyblockMarket').MarketState>
+  marketUnmute(item: string, kind: string): Promise<import('./skyblockMarket').MarketState>
+  /** Fetches the last few days from Coflnet for the busiest items. */
+  marketHeadStart(): Promise<import('./skyblockMarket').MarketState>
+  onMarketChanged(callback: () => void): () => void
   /** The SkyBlock add-on (everything SkyBlock is off until it's downloaded). */
   skyblockAddonState(): Promise<SkyblockAddonState>
   /** Downloads it, or changes its texture packs (best first). Resolves when done or stopped. */
