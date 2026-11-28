@@ -1077,6 +1077,9 @@ button.ws-chip-mention:hover {
   color: var(--text-strong);
 }
 .ws-scene-head {
+  /* Above the scene details below it, so the New take menu isn't hidden behind them. */
+  position: relative;
+  z-index: 4;
   width: min(var(--ws-width), calc(100% - 48px));
   margin: 22px auto 0;
   animation: ws-rise calc(300ms * var(--ws-t)) var(--ws-out) both;
