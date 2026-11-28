@@ -1,4 +1,4 @@
-import { membersOf, type SurvivalWorld } from '@shared/survival'
+import { membersOf, upgradeSurvival, type SurvivalWorld } from '@shared/survival'
 
 /**
  * Save files for survival mode, kept inside Orbit (IndexedDB), so there's no size limit worth
@@ -77,7 +77,7 @@ export async function readSave(name: string): Promise<SurvivalWorld | null> {
   db.close()
   const v = req.result as { format: number; world: SurvivalWorld } | undefined
   if (!v || v.format !== FORMAT || !v.world?.map) return null
-  return v.world
+  return upgradeSurvival(v.world)
 }
 
 export async function deleteSave(name: string): Promise<void> {

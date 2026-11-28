@@ -14,6 +14,11 @@ import {
   clockText,
   dayOf,
   doingText,
+  executePrisoner,
+  fightFor,
+  freePrisoner,
+  prisonersOf,
+  recruitPrisoner,
   giveOrder,
   groupById,
   healthText,
@@ -107,6 +112,10 @@ function PersonEditor({ p, onChange, onRemove }: { p: PersonDraft; onChange: (p:
               </button>
             ))}
           </div>
+          <select className="text-input" value={p.sex} onChange={(e) => onChange({ ...p, sex: e.target.value as PersonDraft['sex'] })} aria-label="Sex">
+            <option value="f">Woman</option>
+            <option value="m">Man</option>
+          </select>
           <select className="text-input" value={p.weapon} onChange={(e) => onChange({ ...p, weapon: e.target.value as PersonDraft['weapon'] })} aria-label="Weapon">
             {WEAPONS.map((x) => (
               <option key={x.id} value={x.id}>
@@ -245,6 +254,9 @@ export function GroupCard({
   const camp = campOf(world, g)
   const lead = personById(world, g.leader ?? -1)
   const n = Math.max(1, ms.length)
+  const held = prisonersOf(world, g)
+  const fight = world.fights.find((f) => f.a === g.id || f.b === g.id)
+  const foe = fight ? groupById(world, fight.a === g.id ? fight.b : fight.a) : undefined
   const logs = useMemo(() => world.log.filter((l) => l.group === g.id).slice(-60).reverse(), [world.log.length, g.id, world.log])
   return (
     <div className="evo-panel-body" data-sv-group-card>
@@ -272,6 +284,14 @@ export function GroupCard({
             <>
               <br />
               <Swords size={11} /> Raiders: they rob or attack anyone they meet
+            </>
+          )}
+          {foe && (
+            <>
+              <br />
+              <span className="sv-bitten">
+                <Swords size={11} /> Fighting {foe.name} right now
+              </span>
             </>
           )}
         </p>
@@ -331,6 +351,40 @@ export function GroupCard({
         ))}
       </div>
 
+      {held.length > 0 && (
+        <>
+          <div className="evo-sub">Prisoners</div>
+          <div className="sv-people" data-sv-prisoners>
+            {held.map((p) => {
+              const from = groupById(world, p.held?.from ?? -1)
+              const first = p.name.split(' ')[0]
+              return (
+                <div key={p.id} className="sv-prisoner">
+                  <button className="sv-person-row" onClick={() => onSelect({ kind: 'person', id: p.id })}>
+                    <b>{p.name}</b>
+                    <em>
+                      From {from?.name ?? 'a group that’s gone'}, held since {when(p.held?.since ?? world.tick)}
+                    </em>
+                    <Bar label="" value={p.health} />
+                  </button>
+                  <div className="sv-orders">
+                    <button className="evo-chip" title="They go back to their people" onClick={() => { onOrder(`Let ${first} go`, () => freePrisoner(world, p)); onChanged() }}>
+                      Let go
+                    </button>
+                    <button className="evo-chip" title="They might say no" onClick={() => { onOrder(`Asked ${first} to join`, () => recruitPrisoner(world, p)); onChanged() }}>
+                      Ask to join
+                    </button>
+                    <button className="evo-chip sv-danger" title="Nobody will forget it" onClick={() => { onOrder(`Executed ${first}`, () => executePrisoner(world, p)); onChanged() }}>
+                      Execute
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
+
       <div className="evo-sub">What they've learned</div>
       {g.lessons.length ? (
         <ul className="sv-lessons">
@@ -356,6 +410,10 @@ export function GroupCard({
 
 export function PersonCard({ world, p, onSelect }: { world: SurvivalWorld; p: Person; onSelect: (s: Selection) => void }) {
   const g = groupById(world, p.group)
+  const partner = p.partner != null ? personById(world, p.partner) : undefined
+  const family = p.family.map((id) => personById(world, id)).filter((q): q is Person => !!q)
+  const heldFrom = p.held ? groupById(world, p.held.from) : undefined
+  const fight = fightFor(world, p)
   const rels = Object.entries(p.rel)
     .map(([id, v]) => ({ q: personById(world, Number(id)), v }))
     .filter((r): r is { q: Person; v: number } => !!r.q)
@@ -383,6 +441,38 @@ export function PersonCard({ world, p, onSelect }: { world: SurvivalWorld; p: Pe
           {p.traits.map((t) => TRAITS.find((x) => x.id === t)?.label).join(', ')} · {WEAPONS.find((x) => x.id === p.weapon)?.label}
           {WEAPONS.find((x) => x.id === p.weapon)?.gun ? ` (${p.ammo} rounds)` : ''} · {p.kills} walkers put down
         </p>
+        {(partner || family.length > 0) && (
+          <p className="muted" data-sv-family>
+            {partner && (
+              <>
+                {partner.sex === 'f' ? 'Wife' : 'Husband'}:{' '}
+                <button className="sv-link" onClick={() => onSelect({ kind: 'person', id: partner.id })}>
+                  {partner.name}
+                </button>
+                {family.length ? ' · ' : ''}
+              </>
+            )}
+            {family.length > 0 && (
+              <>
+                Family:{' '}
+                {family.map((q, i) => (
+                  <span key={q.id}>
+                    {i ? ', ' : ''}
+                    <button className="sv-link" onClick={() => onSelect({ kind: 'person', id: q.id })}>
+                      {q.name.split(' ')[0]}
+                    </button>
+                  </span>
+                ))}
+              </>
+            )}
+          </p>
+        )}
+        {p.held && (
+          <p className="sv-callout" data-sv-held>
+            A prisoner of {g?.name}, taken from {heldFrom?.name ?? 'a group that’s gone'} {when(p.held.since)}.
+          </p>
+        )}
+        {fight && <p className="sv-callout">In a fight right now.</p>}
         <p className="sv-state">
           {healthText(p)} · {mindText(p)}
           {p.bitten && <span className="sv-bitten"> · Bitten on the {p.bitten.limb}</span>}

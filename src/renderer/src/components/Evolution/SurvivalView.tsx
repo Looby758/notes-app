@@ -235,6 +235,18 @@ export default function SurvivalView({ world, selection, fogGroup, placing, onPi
         ctx.stroke()
       }
 
+      // Fights between groups: a red ring where it's happening.
+      for (const f of w.fights) {
+        const pulse = 0.5 + 0.5 * Math.sin(w.tick * 0.8)
+        ctx.strokeStyle = `rgba(255, 90, 90, ${0.35 + pulse * 0.3})`
+        ctx.lineWidth = Math.max(px * 2, 0.2)
+        ctx.setLineDash([px * 6, px * 4])
+        ctx.beginPath()
+        ctx.arc(f.x, f.y, 7, 0, Math.PI * 2)
+        ctx.stroke()
+        ctx.setLineDash([])
+      }
+
       // Walkers.
       const wr = Math.max(0.5, 2.2 * px)
       for (const zk of w.walkers) {
@@ -282,7 +294,8 @@ export default function SurvivalView({ world, selection, fogGroup, placing, onPi
       }
       for (const p of w.people) {
         const g = groupById(w, p.group)
-        const color = g?.color ?? '#fff'
+        // Prisoners are grey, ringed in the colour of whoever holds them.
+        const color = p.held ? '#7d828c' : g?.color ?? '#fff'
         ctx.fillStyle = color
         ctx.beginPath()
         ctx.arc(p.x, p.y, p.age < 14 ? pr * 0.75 : pr, 0, Math.PI * 2)
@@ -290,7 +303,12 @@ export default function SurvivalView({ world, selection, fogGroup, placing, onPi
         ctx.lineWidth = Math.max(px * 1.5, 0.12)
         ctx.strokeStyle = p.bitten ? '#ff4d4d' : p.asleep ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.85)'
         ctx.stroke()
-        if (g?.hostile) {
+        if (p.held && g) {
+          ctx.strokeStyle = g.color
+          ctx.beginPath()
+          ctx.arc(p.x, p.y, pr + px * 2.5, 0, Math.PI * 2)
+          ctx.stroke()
+        } else if (g?.hostile) {
           ctx.strokeStyle = '#ff6b6b'
           ctx.beginPath()
           ctx.arc(p.x, p.y, pr + px * 2.5, 0, Math.PI * 2)
@@ -303,6 +321,16 @@ export default function SurvivalView({ world, selection, fogGroup, placing, onPi
           ctx.arc(p.x, p.y, pr + px * (p.id === selPerson?.id ? 4 : 2.5), 0, Math.PI * 2)
           ctx.stroke()
         }
+      }
+
+      // Shots: a quick line from the shooter, red if it hit.
+      ctx.lineWidth = Math.max(px * 1.5, 0.12)
+      for (const sh of w.shots) {
+        ctx.strokeStyle = sh.hit ? 'rgba(255, 80, 80, 0.95)' : 'rgba(255, 230, 150, 0.8)'
+        ctx.beginPath()
+        ctx.moveTo(sh.x1, sh.y1)
+        ctx.lineTo(sh.x2, sh.y2)
+        ctx.stroke()
       }
 
       // Words: town names when zoomed out, building and people names when zoomed in.

@@ -394,6 +394,8 @@ export interface Fight {
   deadB: number
   /** People taken prisoner during it. */
   taken: number[]
+  /** People who got out of it (ran, or kids sent away). */
+  out: number[]
 }
 
 /** A shot, drawn for a moment. */
@@ -706,6 +708,21 @@ export function snapshotSurvival(w: SurvivalWorld): SurvivalWorld {
   return { ...structuredClone(rest), map }
 }
 
+/** Fills in anything a world saved by an older version doesn't have yet, so old saves still load. */
+export function upgradeSurvival(w: SurvivalWorld): SurvivalWorld {
+  w.fights ??= []
+  w.shots ??= []
+  for (const f of w.fights) f.out ??= []
+  for (const p of w.people) {
+    p.sex ??= p.id % 2 ? 'm' : 'f'
+    p.partner ??= null
+    p.family ??= []
+    p.held ??= null
+    p.dueAt ??= 0
+  }
+  return w
+}
+
 // ---------- looking things up ----------
 
 export const cellOf = (x: number, y: number): number => clamp(Math.floor(y / CELL), 0, CELLS_Y - 1) * CELLS_X + clamp(Math.floor(x / CELL), 0, CELLS_X - 1)
@@ -742,6 +759,9 @@ export function isAtCamp(w: SurvivalWorld, p: Person): boolean {
 
 /** What a person is doing right now, in words. */
 export function doingText(w: SurvivalWorld, p: Person): string {
+  if (p.held) return `Held prisoner by ${groupById(w, p.group)?.name ?? 'another group'}`
+  const f = fightFor(w, p)
+  if (f) return `Fighting ${groupById(w, f.a === p.group ? f.b : f.a)?.name ?? 'another group'}`
   if (p.asleep) return 'Asleep'
   if (p.fleeUntil > w.tick) return 'Running from walkers'
   const b = buildingById(w, p.task.building)
@@ -1562,7 +1582,7 @@ function needsTick(w: SurvivalWorld, g: Group, p: Person): void {
   p.thirst = Math.min(100, p.thirst + (100 / (2.2 * DAY)) * harsh)
   if (p.asleep) p.fatigue = Math.max(0, p.fatigue - 100 / (7 * 60))
   else p.fatigue = Math.min(100, p.fatigue + (p.fleeUntil > w.tick ? 0.25 : 100 / (18 * 60)))
-  if (p.hunger > 60 || p.thirst > 60) eat(w, g, p)
+  if ((p.hunger > 60 || p.thirst > 60) && !p.held) eat(w, g, p)
   if (p.hunger >= 100) p.health -= 0.012 * harsh
   if (p.thirst >= 100) p.health -= 0.03 * harsh
   if (p.hunger < 70 && p.thirst < 70 && !p.bitten && p.health < 100) p.health = Math.min(100, p.health + (p.asleep ? 0.012 : 0.005))
@@ -1799,7 +1819,7 @@ function react(w: SurvivalWorld, g: Group, p: Person, near: Walker[]): boolean {
   }
   noteDanger(w, g, p, near.length)
 
-  const friends = w.people.filter((q) => q.group === g.id && q !== p && !q.asleep && dist(q.x, q.y, p.x, p.y) < 6).length
+  const friends = w.people.filter((q) => q.group === g.id && q !== p && !q.held && !q.asleep && dist(q.x, q.y, p.x, p.y) < 6).length
   const courage = (has(p, 'brave') ? 4 : has(p, 'cautious') ? 1 : 2) + friends * 1.5 + (behindWalls ? 6 : 0) + (p.weapon !== 'none' ? 1 : 0) + (isKid(p) ? -2 : 0)
   const gun = weaponInfo(p.weapon).gun && p.ammo > 0
   const tooMany = near.length > courage && !behindWalls
@@ -1880,9 +1900,18 @@ function personTick(w: SurvivalWorld, g: Group, p: Person, grid: Grid, buf: Walk
     die(w, p, 'died from a bite')
     return
   }
+  if (p.held) {
+    heldTick(w, p)
+    return
+  }
   if (p.bitten && !p.bitten.asked && w.tick % 10 === 0) {
     biteDecision(w, g, p)
     if (w.pending.length) return
+  }
+  const fight = w.fights.length && p.fleeUntil <= w.tick ? fightFor(w, p) : undefined
+  if (fight) {
+    fightTick(w, g, p, fight)
+    return
   }
 
   const sight = Math.min(sightOf(w, p), 9)
@@ -1944,7 +1973,7 @@ function bite(w: SurvivalWorld, p: Person): void {
   const g = groupById(w, p.group)
   log(w, `${p.name} was bitten on the ${limb}.`, { group: g?.id, people: [p], big: true })
   if (g) {
-    const alone = !w.people.some((q) => q.group === g.id && q !== p && dist(q.x, q.y, p.x, p.y) < 10)
+    const alone = !w.people.some((q) => q.group === g.id && q !== p && !q.held && dist(q.x, q.y, p.x, p.y) < 10)
     if (alone && !isAtCamp(w, p) && !hasLesson(g, 'pairs')) learn(w, g, 'pairs', `${p.name.split(' ')[0]} was bitten out there with nobody to help.`)
     g.lossesToday++
     biteDecision(w, g, p)
@@ -1954,7 +1983,7 @@ function bite(w: SurvivalWorld, p: Person): void {
 function biteDecision(w: SurvivalWorld, g: Group, p: Person): void {
   const b = p.bitten
   if (!b || b.asked) return
-  const helper = w.people.find((q) => q.group === g.id && q !== p && !q.asleep && dist(q.x, q.y, p.x, p.y) < 5 && !isKid(q))
+  const helper = w.people.find((q) => q.group === g.id && q !== p && !q.held && !q.asleep && dist(q.x, q.y, p.x, p.y) < 5 && !isKid(q))
   const inTime = b.limb !== 'neck' && w.tick <= b.cutBy
   const canCut = inTime && !!helper
   if (inTime && !helper) return // Nobody to do it yet. They might get back in time.
@@ -2025,15 +2054,21 @@ function applyBite(w: SurvivalWorld, g: Group, p: Person, choice: string): void 
 }
 
 function die(w: SurvivalWorld, p: Person, cause: string, dealtWith = false): void {
-  const g = groupById(w, p.group)
+  // A prisoner isn't mourned by the people holding them; their own group (if it's still out there) is told below.
+  const home = p.held ? groupById(w, p.held.from) : undefined
+  const g = p.held ? undefined : groupById(w, p.group)
   const i = w.people.indexOf(p)
   if (i < 0) return
   w.people.splice(i, 1)
   // Anything they were carrying is dropped where they fell (lost).
   const text = `${p.name} ${cause}.`
-  if (!cause.startsWith('bled out') && !cause.startsWith('was put down')) log(w, text, { group: g?.id, people: [p], big: true })
+  if (!cause.startsWith('bled out') && !cause.startsWith('was put down')) log(w, text, { group: g?.id ?? p.group, people: [p], big: true })
   else personLog(w, p, text)
-  w.fallen.push({ id: p.id, name: p.name, group: p.group, groupName: g?.name ?? '', tick: w.tick, cause, log: p.log, age: p.age })
+  w.fallen.push({ id: p.id, name: p.name, group: p.held ? p.held.from : p.group, groupName: (g ?? home)?.name ?? '', tick: w.tick, cause, log: p.log, age: p.age })
+  for (const q of w.people) {
+    if (q.partner === p.id) q.partner = null
+    if (q.family.includes(p.id)) q.family = q.family.filter((id) => id !== p.id)
+  }
   if (g) {
     g.lossesToday++
     for (const q of w.people) {
@@ -2052,10 +2087,7 @@ function die(w: SurvivalWorld, p: Person, cause: string, dealtWith = false): voi
       const scared = membersOf(w, g).filter((q) => has(q, 'cautious') || has(q, 'paranoid')).length
       if (scared > 0 || chance(w, 0.3)) learn(w, g, 'hide', `Losing ${p.name.split(' ')[0]} on a run scared them.`)
     }
-    if (!membersOf(w, g).length) {
-      g.alive = false
-      log(w, `${g.name} is gone. Nobody is left.`, { group: g.id, big: true })
-    }
+    if (!membersOf(w, g).length) groupGone(w, g)
   }
   if (!dealtWith) w.corpses.push({ x: p.x, y: p.y, turnsAt: w.tick + int(w, 4, 14), name: p.name, person: p.id, group: p.group })
 }
@@ -2103,6 +2135,8 @@ function learn(w: SurvivalWorld, g: Group, id: LessonId, why: string): void {
 }
 
 function dayEnd(w: SurvivalWorld, g: Group): void {
+  prisonersDay(w, g)
+  if (!g.alive) return
   // A good day with guns, and nothing bad came of it: a dangerous lesson.
   if (g.gunKillsToday >= 5 && g.lossesToday === 0 && !hasLesson(g, 'quiet')) learn(w, g, 'trigger', `They put down ${g.gunKillsToday} walkers with guns today and nobody got hurt.`)
   g.gunKillsToday = 0
@@ -2184,12 +2218,14 @@ function encounters(w: SurvivalWorld): void {
     }
 }
 
-function attitude(w: SurvivalWorld, g: Group): 'rob' | 'attack' | 'refuse' | 'talk' | 'invite' {
+function attitude(w: SurvivalWorld, g: Group, other?: Group): 'rob' | 'attack' | 'refuse' | 'talk' | 'invite' {
   if (g.hostile) return 'rob'
   const lead = personById(w, g.leader ?? -1)
   if (hasLesson(g, 'distrust')) return membersOf(w, g).some((p) => has(p, 'hothead')) ? 'attack' : 'refuse'
   if (hasLesson(g, 'welcome') || (lead && has(lead, 'kind'))) return 'invite'
   if (lead && has(lead, 'paranoid')) return 'refuse'
+  // A stranger or two on their own: most groups would rather have the extra hands.
+  if (other && membersOf(w, other).length <= 2 && membersOf(w, g).length >= 2) return 'invite'
   return 'talk'
 }
 
@@ -2223,7 +2259,7 @@ function meet(w: SurvivalWorld, a: Group, b: Group, pa: Person, pb: Person): voi
     return
   }
   if (a.hostile && b.hostile) {
-    battle(w, a, b)
+    startFight(w, a, b)
     return
   }
   // Two ordinary groups. Each decides how it feels about the other; you decide for groups set to ask.
@@ -2244,20 +2280,14 @@ function meet(w: SurvivalWorld, a: Group, b: Group, pa: Person, pb: Person): voi
           { id: 'refuse', label: 'Turn them away', hint: 'Keep their distance.' },
           { id: 'attack', label: 'Attack them', hint: 'Take what they have. People will die.' }
         ],
-        auto: attitude(w, g),
+        auto: attitude(w, g, other),
         data: { a: g.id, b: other.id }
       })
     }
   }
-  if (!a.ask && !b.ask) settleMeeting(w, a, b, attitude(w, a), attitude(w, b))
-  else if (!a.ask) w.waiting[a.id + ':' + b.id] = attitude(w, a)
-  else if (!b.ask) w.waiting[b.id + ':' + a.id] = attitude(w, b)
-}
-
-function strength(w: SurvivalWorld, g: Group): number {
-  return membersOf(w, g)
-    .filter((p) => !isKid(p))
-    .reduce((s, p) => s + (p.health / 100) * (1 + p.skills.fighting * 0.15 + (weaponInfo(p.weapon).gun && p.ammo > 0 ? 1 + p.skills.shooting * 0.2 : 0)), 0)
+  if (!a.ask && !b.ask) settleMeeting(w, a, b, attitude(w, a, b), attitude(w, b, a))
+  else if (!a.ask) w.waiting[a.id + ':' + b.id] = attitude(w, a, b)
+  else if (!b.ask) w.waiting[b.id + ':' + a.id] = attitude(w, b, a)
 }
 
 function shareKnowledge(a: Group, b: Group): void {
@@ -2280,8 +2310,8 @@ function settleMeeting(w: SurvivalWorld, a: Group, b: Group, sa: string, sb: str
   if (sa === 'attack' || sb === 'attack') {
     const attacker = sa === 'attack' ? a : b
     const other = attacker === a ? b : a
-    log(w, `${attacker.name} opened fire on ${other.name}.`, { group: attacker.id, big: true })
-    battle(w, attacker, other)
+    log(w, `${attacker.name} attacked ${other.name}.`, { group: attacker.id, big: true })
+    startFight(w, attacker, other)
     return
   }
   if (sa === 'refuse' || sb === 'refuse') {
@@ -2324,6 +2354,8 @@ function merge(w: SurvivalWorld, host: Group, guest: Group): void {
       p.task = { kind: 'move', phase: 'go', x: s.x, y: s.y, building: camp.id }
     }
   }
+  for (const p of prisonersOf(w, guest)) p.group = host.id
+  for (const p of w.people) if (p.held?.from === guest.id) p.held.from = host.id
   for (const k of SUPPLY_KEYS) {
     host.stash[k] += guest.stash[k]
     guest.stash[k] = 0
@@ -2353,65 +2385,396 @@ function resolveRobbery(w: SurvivalWorld, robber: Group, victim: Group, choice: 
     learn(w, victim, 'distrust', `${robber.name} robbed them.`)
   } else {
     log(w, `${victim.name} refused to hand anything over to ${robber.name}.`, { group: victim.id, big: true })
-    battle(w, robber, victim)
+    startFight(w, robber, victim)
   }
 }
 
-function battle(w: SurvivalWorld, a: Group, b: Group): void {
+// ---------- fights between groups ----------
+
+/** How far from the middle of a fight people still count as in it. */
+const FIGHT_REACH = 18
+
+/** The fight this person is caught up in, if any. */
+export function fightFor(w: SurvivalWorld, p: Person): Fight | undefined {
+  if (p.held) return undefined
+  for (const f of w.fights) {
+    if (f.a !== p.group && f.b !== p.group) continue
+    if (f.out.includes(p.id)) continue
+    if (dist(p.x, p.y, f.x, f.y) < FIGHT_REACH) return f
+  }
+  return undefined
+}
+
+function fighters(w: SurvivalWorld, f: Fight, group: number): Person[] {
+  return w.people.filter((p) => p.group === group && !p.held && !isKid(p) && !f.out.includes(p.id) && dist(p.x, p.y, f.x, f.y) < FIGHT_REACH)
+}
+
+function power(people: Person[]): number {
+  return people.reduce((s, p) => s + (p.health / 100) * (1 + p.skills.fighting * 0.15 + (weaponInfo(p.weapon).gun && p.ammo > 0 ? 1 + p.skills.shooting * 0.2 : 0)), 0)
+}
+
+function strength(w: SurvivalWorld, g: Group): number {
+  return power(membersOf(w, g).filter((p) => !isKid(p)))
+}
+
+/** Two groups start fighting where they are. It plays out over the next minutes, person by person. */
+function startFight(w: SurvivalWorld, a: Group, b: Group): void {
   a.met[b.id] = 'enemy'
   b.met[a.id] = 'enemy'
   a.fought[b.id] = w.tick
   b.fought[a.id] = w.tick
-  const am = membersOf(w, a).filter((p) => !isKid(p))
-  const bm = membersOf(w, b).filter((p) => !isKid(p))
-  const all = [...am, ...bm]
-  if (!all.length) return
-  const cx = all.reduce((s, p) => s + p.x, 0) / all.length
-  const cy = all.reduce((s, p) => s + p.y, 0) / all.length
-  let sa = strength(w, a)
-  let sb = strength(w, b)
-  const dead: Person[] = []
-  for (let round = 0; round < 3 && sa > 0.3 && sb > 0.3; round++) {
-    for (const [side, foe, fs] of [
-      [am, bm, sb],
-      [bm, am, sa]
-    ] as const) {
-      for (const p of side) {
-        if (!w.people.includes(p)) continue
-        const gun = weaponInfo(p.weapon).gun && p.ammo > 0
-        if (gun) p.ammo = Math.max(0, p.ammo - 3)
-        const target = foe.find((q) => w.people.includes(q) && !dead.includes(q))
-        if (!target) break
-        const hit = (gun ? 0.18 + p.skills.shooting * 0.025 : 0.08 + p.skills.fighting * 0.015) * (fs > 0 ? 1 : 0)
-        if (chance(w, hit)) {
-          target.health -= between(w, 15, 55)
-          if (target.health <= 0) {
-            dead.push(target)
-            p.kills++
-          }
-        }
+  if (w.fights.some((f) => (f.a === a.id && f.b === b.id) || (f.a === b.id && f.b === a.id))) return
+  const am = membersOf(w, a)
+  const bm = membersOf(w, b)
+  if (!am.length || !bm.length) return
+  // It starts where they're closest.
+  let best = Infinity
+  let cx = am[0].x
+  let cy = am[0].y
+  for (const p of am)
+    for (const q of bm) {
+      const d = dist(p.x, p.y, q.x, q.y)
+      if (d < best) {
+        best = d
+        cx = (p.x + q.x) / 2
+        cy = (p.y + q.y) / 2
       }
     }
-    for (const p of dead) if (w.people.includes(p)) die(w, p, `was killed fighting ${p.group === a.id ? b.name : a.name}`)
-    sa = strength(w, a)
-    sb = strength(w, b)
-    // The side that's losing badly runs.
-    if (sa < sb * 0.65 || sb < sa * 0.65) break
+  w.fights.push({ id: w.nextId++, a: a.id, b: b.id, x: cx, y: cy, started: w.tick, until: w.tick + 90, deadA: 0, deadB: 0, taken: [], out: [] })
+  for (const p of [...am, ...bm]) if (dist(p.x, p.y, cx, cy) < FIGHT_REACH) p.asleep = false
+  makeNoise(w, cx, cy, 30)
+}
+
+function runFrom(w: SurvivalWorld, p: Person, x: number, y: number): void {
+  const d = Math.max(0.5, dist(p.x, p.y, x, y))
+  p.fleeUntil = w.tick + 30
+  p.fleeX = clamp(p.x + ((p.x - x) / d) * 22, 1, MAP_W - 1)
+  p.fleeY = clamp(p.y + ((p.y - y) / d) * 22, 1, MAP_H - 1)
+  if (p.task.kind !== 'rest') goBack(w, p)
+}
+
+function fightTick(w: SurvivalWorld, g: Group, p: Person, f: Fight): void {
+  // Kids get out of the way. So does anyone badly hurt.
+  if (isKid(p) || p.health < 30) {
+    f.out.push(p.id)
+    if (!isKid(p)) personLog(w, p, 'Got out of the fight, hurt.')
+    runFrom(w, p, f.x, f.y)
+    return
   }
-  makeNoise(w, cx, cy, 60)
-  const winner = sa >= sb ? a : b
-  const loser = winner === a ? b : a
-  if (membersOf(w, loser).length) {
-    log(w, `The fight between ${a.name} and ${b.name} is over. ${loser.name} fell back${dead.length ? `, and ${dead.length} ${dead.length === 1 ? 'person is' : 'people are'} dead` : ''}.`, { group: winner.id, big: true })
-    // The losers lose some of what they had.
-    for (const k of SUPPLY_KEYS) {
-      const n = Math.floor(loser.stash[k] / 3)
-      loser.stash[k] -= n
-      winner.stash[k] += n
+  const foeGroup = f.a === g.id ? f.b : f.a
+  let foe: Person | null = null
+  let fd = Infinity
+  for (const q of w.people) {
+    if (q.group !== foeGroup || q.held || isKid(q) || f.out.includes(q.id)) continue
+    const d = dist(p.x, p.y, q.x, q.y)
+    if (d < fd) {
+      fd = d
+      foe = q
     }
-    for (const p of membersOf(w, loser)) if (p.task.kind !== 'rest') goBack(w, p)
-  } else log(w, `${winner.name} wiped out ${loser.name}.`, { group: winner.id, big: true })
-  if (!loser.hostile) learn(w, loser, 'distrust', `${winner.name} attacked them.`)
+  }
+  if (!foe || fd > FIGHT_REACH * 1.5) return
+  if (p.asleep) p.asleep = false
+  const gun = weaponInfo(p.weapon).gun && p.ammo > 0
+  if (gun && fd < 11) {
+    // Aim, fire, take cover: about one shot every three minutes.
+    if ((w.tick + p.id) % 3 !== 0) return
+    p.ammo--
+    const hit = chance(w, 0.14 + p.skills.shooting * 0.025 - (fd > 7 ? 0.05 : 0) - (has(foe, 'cautious') ? 0.03 : 0))
+    w.shots.push({ x1: p.x, y1: p.y, x2: foe.x + (hit ? 0 : between(w, -1.5, 1.5)), y2: foe.y + (hit ? 0 : between(w, -1.5, 1.5)), until: w.tick + 2, hit })
+    p.skills.shooting = Math.min(10, p.skills.shooting + 0.03)
+    if (hit) wound(w, f, p, foe, chance(w, 0.12) ? 999 : between(w, 20, 55), true)
+    return
+  }
+  if (fd < 1.3) {
+    if ((w.tick + p.id) % 2 !== 0) return
+    if (chance(w, 0.18 + p.skills.fighting * 0.025 + weaponInfo(p.weapon).melee * 0.5 - (p.lostLimb === 'arm' ? 0.1 : 0))) {
+      wound(w, f, p, foe, between(w, 12, 30), false)
+      p.skills.fighting = Math.min(10, p.skills.fighting + 0.03)
+    }
+    return
+  }
+  // Close in, or edge closer to get a shot.
+  moveToward(p, foe.x, foe.y, gun ? speedOf(w, p, false) * 0.5 : speedOf(w, p, true))
+}
+
+function wound(w: SurvivalWorld, f: Fight, by: Person, q: Person, dmg: number, gun: boolean): void {
+  q.health -= dmg
+  q.morale = Math.max(0, q.morale - 4)
+  if (q.health <= 0) {
+    by.kills++
+    if (q.group === f.a) f.deadA++
+    else f.deadB++
+    const foe = groupById(w, by.group)
+    die(w, q, `was killed by ${by.name.split(' ')[0]} of ${foe?.name ?? 'another group'}`)
+    return
+  }
+  // Beaten down, close up: some give up rather than die.
+  if (q.health < 25 && (!gun || dist(by.x, by.y, q.x, q.y) < 4) && chance(w, has(q, 'brave') || has(q, 'hothead') ? 0.1 : 0.3)) capture(w, f, by, q)
+}
+
+function capture(w: SurvivalWorld, f: Fight | null, by: Person, q: Person): void {
+  const captor = groupById(w, by.group)
+  const from = groupById(w, q.group)
+  if (!captor || !from) return
+  q.held = { from: from.id, since: w.tick }
+  q.group = captor.id
+  q.fleeUntil = 0
+  q.asleep = false
+  // They lose their weapon and whatever they were carrying.
+  if (q.ammo > 0) captor.stash.ammo += q.ammo
+  q.ammo = 0
+  q.weapon = 'none'
+  for (const k of SUPPLY_KEYS) {
+    captor.stash[k] += q.carry[k]
+    q.carry[k] = 0
+  }
+  for (const c of membersOf(w, captor)) q.rel[c.id] = Math.min(q.rel[c.id] ?? 0, -30)
+  setHome(w, q, 'camp')
+  if (f) f.taken.push(q.id)
+  log(w, `${q.name} gave up and was taken prisoner by ${captor.name}.`, { group: captor.id, people: [q, by], big: true })
+  personLog(w, q, `Taken prisoner by ${captor.name}.`)
+  if (from.leader === q.id) pickLeader(w, from)
+  if (!membersOf(w, from).length) groupGone(w, from)
+}
+
+/** Nobody free is left in a group: it's over, and anyone it was holding gets loose. */
+function groupGone(w: SurvivalWorld, g: Group): void {
+  if (!g.alive) return
+  g.alive = false
+  log(w, `${g.name} is gone. Nobody is left.`, { group: g.id, big: true })
+  for (const p of prisonersOf(w, g)) release(w, p, `With ${g.name} gone, ${p.name.split(' ')[0]} got loose.`)
+}
+
+function fightsTick(w: SurvivalWorld): void {
+  for (const f of [...w.fights]) {
+    const a = groupById(w, f.a)
+    const b = groupById(w, f.b)
+    if (!a || !b) {
+      w.fights.splice(w.fights.indexOf(f), 1)
+      continue
+    }
+    const fa = fighters(w, f, a.id)
+    const fb = fighters(w, f, b.id)
+    if (!fa.length || !fb.length || w.tick >= f.until) {
+      endFight(w, f, !fa.length && fb.length ? a : !fb.length && fa.length ? b : null)
+      continue
+    }
+    // Gunfire draws the dead in.
+    if (w.tick % 10 === 0 && w.shots.length) makeNoise(w, f.x, f.y, 35)
+    // The side that's losing badly breaks and runs.
+    if (w.tick - f.started > 8 && w.tick % 4 === 0) {
+      const pa = power(fa)
+      const pb = power(fb)
+      const breaks = pa < pb * 0.5 ? a : pb < pa * 0.5 ? b : null
+      if (breaks) {
+        const runners = breaks === a ? fa : fb
+        const chasers = breaks === a ? fb : fa
+        for (const p of runners) {
+          const near = chasers.find((c) => dist(c.x, c.y, p.x, p.y) < 2.5)
+          if (near && (p.health < 40 || p.lostLimb === 'leg') && chance(w, 0.6)) capture(w, f, near, p)
+          else {
+            f.out.push(p.id)
+            runFrom(w, p, f.x, f.y)
+          }
+        }
+        endFight(w, f, breaks)
+      }
+    }
+  }
+  w.shots = w.shots.filter((s) => s.until > w.tick)
+}
+
+function endFight(w: SurvivalWorld, f: Fight, loser: Group | null): void {
+  const i = w.fights.indexOf(f)
+  if (i >= 0) w.fights.splice(i, 1)
+  const a = groupById(w, f.a)!
+  const b = groupById(w, f.b)!
+  if (!loser) {
+    const pa = power(fighters(w, f, a.id))
+    const pb = power(fighters(w, f, b.id))
+    if (pa > pb * 1.4) loser = b
+    else if (pb > pa * 1.4) loser = a
+  }
+  const dead = f.deadA + f.deadB
+  const toll = `${dead ? `${dead} dead` : 'nobody dead'}${f.taken.length ? `, ${f.taken.length} taken prisoner` : ''}`
+  if (!loser) {
+    log(w, `${a.name} and ${b.name} broke off their fight (${toll}).`, { group: a.id, big: true })
+  } else {
+    const winner = loser === a ? b : a
+    if (loser.alive) {
+      const took: string[] = []
+      // Losing near your own camp means they get in and take some of it.
+      const camp = campOf(w, loser)
+      const atCamp = !!camp && dist(f.x, f.y, camp.x + camp.w / 2, camp.y + camp.h / 2) < 14
+      if (atCamp || loser.hostile || winner.hostile)
+        for (const k of SUPPLY_KEYS) {
+          const n = Math.floor(loser.stash[k] / 3)
+          loser.stash[k] -= n
+          winner.stash[k] += n
+          if (n) took.push(`${n} ${SUPPLY_LABEL[k]}`)
+        }
+      log(w, `${winner.name} won the fight with ${loser.name} (${toll}).${took.length ? ` They took ${took.join(', ')}.` : ''}`, { group: winner.id, big: true })
+      for (const p of membersOf(w, loser)) if (dist(p.x, p.y, f.x, f.y) < FIGHT_REACH && p.task.kind !== 'rest' && p.task.phase !== 'back') goBack(w, p)
+    } else log(w, `${winner.name} wiped out ${loser.name}.`, { group: winner.id, big: true })
+    for (const p of membersOf(w, winner)) p.morale = Math.min(100, p.morale + 5)
+    if (!loser.hostile && loser.alive) learn(w, loser, 'distrust', `${winner.name} attacked them.`)
+  }
+  // What to do with anyone taken.
+  for (const g of [a, b]) {
+    const taken = f.taken.map((id) => personById(w, id)).filter((p): p is Person => !!p && !!p.held && p.group === g.id)
+    if (taken.length && g.alive) prisonerDecision(w, g, taken)
+  }
+}
+
+// ---------- prisoners ----------
+
+function prisonerAuto(w: SurvivalWorld, g: Group, from?: Group): string {
+  const lead = personById(w, g.leader ?? -1)
+  if (g.hostile) return lead && (has(lead, 'paranoid') || has(lead, 'hothead')) ? 'kill' : 'keep'
+  if (lead && has(lead, 'kind')) return 'recruit'
+  // Raiders let go just come back.
+  if (from?.hostile) return lead && has(lead, 'hothead') ? 'kill' : 'keep'
+  if (hasLesson(g, 'welcome')) return 'recruit'
+  if (hasLesson(g, 'distrust')) return 'keep'
+  return 'free'
+}
+
+function prisonerDecision(w: SurvivalWorld, g: Group, taken: Person[]): void {
+  const names = taken.map((p) => p.name.split(' ')[0]).join(', ')
+  const from = groupById(w, taken[0].held?.from ?? -1)
+  const auto = prisonerAuto(w, g, from)
+  if (!g.ask) {
+    for (const p of taken) applyPrisoner(w, g, p, auto)
+    return
+  }
+  w.pending.push({
+    id: w.nextId++,
+    group: g.id,
+    kind: 'prisoner',
+    title: `${g.name} took ${taken.length === 1 ? 'a prisoner' : `${taken.length} prisoners`}`,
+    text: `${names}${from ? ` from ${from.name}` : ''}. What happens to ${taken.length === 1 ? 'them' : 'them all'}?`,
+    options: [
+      { id: 'keep', label: 'Keep them locked up', hint: 'They eat your food and might escape. You can decide later from the group card.' },
+      { id: 'recruit', label: 'Ask them to join', hint: "Some will, some won't. Those who won't stay locked up." },
+      { id: 'free', label: 'Let them go', hint: 'They go back to their people, if any are left.' },
+      { id: 'kill', label: 'Execute them', hint: 'Nobody will forget it.' }
+    ],
+    auto,
+    data: { people: taken.map((p) => p.id).join(',') }
+  })
+}
+
+function applyPrisoner(w: SurvivalWorld, g: Group, p: Person, choice: string): void {
+  if (!p.held || p.group !== g.id) return
+  if (choice === 'recruit') recruitPrisoner(w, p)
+  else if (choice === 'free') freePrisoner(w, p)
+  else if (choice === 'kill') executePrisoner(w, p)
+  else personLog(w, p, `Locked up by ${g.name}.`)
+}
+
+/** A prisoner goes free: back to their group, or off on their own if it's gone. */
+function release(w: SurvivalWorld, p: Person, text: string): void {
+  const home = groupById(w, p.held?.from ?? -1)
+  p.held = null
+  if (home?.alive) {
+    p.group = home.id
+    for (const q of membersOf(w, home)) q.rel[p.id] = (q.rel[p.id] ?? 20) + 5
+    goBack(w, p)
+    log(w, `${text} ${p.name.split(' ')[0]} went back to ${home.name}.`, { group: home.id, people: [p], big: true })
+    return
+  }
+  const alone = newGroup(w, { name: `${p.name.split(' ')[0]} (on their own)`, color: GROUP_COLORS[(w.groups.length + 3) % GROUP_COLORS.length], people: [] }, p.x, p.y)
+  alone.peak = 1
+  alone.stash = { food: 2, water: 2, ammo: 0, meds: 0, parts: 0 }
+  w.groups.push(alone)
+  p.group = alone.id
+  pickLeader(w, alone)
+  log(w, `${text} With nowhere to go back to, ${p.name.split(' ')[0]} set off alone.`, { group: alone.id, people: [p], big: true })
+  look(w, alone, [p], true)
+  planNow(w, alone)
+}
+
+export function freePrisoner(w: SurvivalWorld, p: Person): void {
+  if (!p.held) return
+  const captor = groupById(w, p.group)
+  release(w, p, `${captor?.name ?? 'Their captors'} let ${p.name} go.`)
+  // Letting people go makes the other side think again.
+  const home = groupById(w, p.group)
+  if (captor && home && home !== captor && home.met[captor.id] === 'enemy' && !home.hostile && chance(w, 0.5)) {
+    home.met[captor.id] = 'avoid'
+    captor.met[home.id] = 'avoid'
+  }
+}
+
+/** Asks a prisoner to join. They might say no. */
+export function recruitPrisoner(w: SurvivalWorld, p: Person): boolean {
+  const g = groupById(w, p.group)
+  if (!p.held || !g) return false
+  const home = groupById(w, p.held.from)
+  const ms = membersOf(w, g)
+  const lead = personById(w, g.leader ?? -1)
+  const feel = ms.length ? ms.reduce((s, q) => s + (p.rel[q.id] ?? 0), 0) / ms.length : 0
+  const days = (w.tick - p.held.since) / DAY
+  const odds =
+    0.25 + (home?.alive ? 0 : 0.4) + Math.min(0.2, days * 0.04) + (lead && has(lead, 'kind') ? 0.15 : 0) + (has(p, 'loyal') && home?.alive ? -0.3 : 0) + (home?.hostile && !g.hostile ? 0.15 : 0) + feel / 200
+  if (chance(w, odds)) {
+    p.held = null
+    for (const q of ms) {
+      p.rel[q.id] = int(w, 0, 15)
+      q.rel[p.id] = int(w, -10, 10)
+    }
+    setHome(w, p, 'camp')
+    log(w, `${p.name} agreed to join ${g.name}.`, { group: g.id, people: [p], big: true })
+    return true
+  }
+  log(w, `${p.name} refused to join ${g.name}.`, { group: g.id, people: [p] })
+  return false
+}
+
+export function executePrisoner(w: SurvivalWorld, p: Person): void {
+  const g = groupById(w, p.group)
+  if (!p.held || !g) return
+  const home = groupById(w, p.held.from)
+  const by = membersOf(w, g).find((q) => has(q, 'hothead') || has(q, 'paranoid')) ?? personById(w, g.leader ?? -1) ?? membersOf(w, g)[0]
+  log(w, `${by ? by.name.split(' ')[0] : g.name} executed ${p.name}, a prisoner from ${home?.name ?? 'another group'}.`, { group: g.id, people: by ? [p, by] : [p], big: true })
+  for (const q of membersOf(w, g)) if (q !== by) q.morale = Math.max(0, q.morale - (has(q, 'kind') ? 15 : 4))
+  if (by) for (const q of membersOf(w, g)) if (q !== by && has(q, 'kind')) q.rel[by.id] = clamp((q.rel[by.id] ?? 0) - 20, -100, 100)
+  die(w, p, `was executed by ${g.name}`, true)
+  if (home?.alive && !home.hostile) learn(w, home, 'distrust', `${g.name} executed ${p.name.split(' ')[0]}.`)
+}
+
+function heldTick(w: SurvivalWorld, p: Person): void {
+  const m = minuteOfDay(w.tick)
+  p.asleep = m > 22 * 60 || m < 6 * 60
+  if (w.tick % 60 === 0) setHome(w, p, 'camp')
+  if (dist(p.x, p.y, p.task.x, p.task.y) > 0.3) moveToward(p, p.task.x, p.task.y, speedOf(w, p, false) * 0.8)
+}
+
+/** Once a day: prisoners get fed (or don't), try to get away, or worse. */
+function prisonersDay(w: SurvivalWorld, g: Group): void {
+  const ps = prisonersOf(w, g)
+  if (!ps.length) return
+  const ms = membersOf(w, g)
+  const lead = personById(w, g.leader ?? -1)
+  for (const p of ps) {
+    if (!p.held) continue
+    const days = (w.tick - p.held.since) / DAY
+    if (g.hostile && chance(w, lead && (has(lead, 'paranoid') || has(lead, 'hothead')) ? 0.15 : 0.05)) {
+      executePrisoner(w, p)
+      continue
+    }
+    const guarded = hasLesson(g, 'watch') ? 0.5 : 1
+    const hungry = p.hunger > 70 ? 0.06 : 0
+    if (chance(w, (0.05 + hungry + (has(p, 'brave') ? 0.04 : 0)) * guarded)) {
+      release(w, p, `${p.name} escaped from ${g.name}.`)
+      continue
+    }
+    // Groups that run themselves make up their minds after a few days.
+    if (!g.ask && !g.hostile && days >= 3 && dayOf(w.tick) % 2 === 0) {
+      if (!recruitPrisoner(w, p) && days >= 6) freePrisoner(w, p)
+    }
+  }
+  if (ps.length > ms.length && ms.length) for (const q of ms) q.morale = Math.max(0, q.morale - 2)
 }
 
 // ---------- answering a decision ----------
@@ -2447,9 +2810,14 @@ export function answerDecision(w: SurvivalWorld, id: number, choice?: string): v
       w.waiting[`${g.id}:${other.id}`] = pick
       return
     }
-    const theirs = w.waiting[key] ?? attitude(w, other)
+    const theirs = w.waiting[key] ?? attitude(w, other, g)
     delete w.waiting[key]
     settleMeeting(w, g, other, pick, theirs)
+  } else if (d.kind === 'prisoner') {
+    for (const id of String(d.data.people).split(',')) {
+      const p = personById(w, Number(id))
+      if (p) applyPrisoner(w, g, p, pick)
+    }
   }
 }
 
@@ -2604,7 +2972,12 @@ export function stepSurvival(w: SurvivalWorld): void {
   for (const g of live) {
     if (m === 7 * 60) planDay(w, g)
     if (m === 18 * 60 + 30) for (const p of membersOf(w, g)) if (p.task.phase !== 'back' && !isAtCamp(w, p) && p.task.kind !== 'follow' && p.task.kind !== 'move') goBack(w, p)
-    if (m === 8 * 60 || m === 19 * 60) for (const p of membersOf(w, g)) if (isAtCamp(w, p)) eat(w, g, p)
+    if (m === 8 * 60 || m === 19 * 60) {
+      for (const p of membersOf(w, g)) if (isAtCamp(w, p)) eat(w, g, p)
+      // Prisoners eat if there's enough to go round.
+      const ps = prisonersOf(w, g)
+      if (ps.length && g.stash.food > membersOf(w, g).length && g.stash.water > membersOf(w, g).length) for (const p of ps) eat(w, g, p)
+    }
     if (m === 21 * 60 + 30) {
       // Bed. The guard stays up if they keep watch.
       const ms = membersOf(w, g)
@@ -2645,6 +3018,7 @@ export function stepSurvival(w: SurvivalWorld): void {
     personTick(w, g, p, grid, buf)
     if (w.pending.length) break
   }
+  if (w.fights.length || w.shots.length) fightsTick(w)
   if (w.tick % 4 === 0) for (const g of live) look(w, g, membersOf(w, g))
 
   const dark = darkness(w.tick)

@@ -6,6 +6,9 @@ import {
   TILE,
   answerDecision,
   campOf,
+  freePrisoner,
+  prisonersOf,
+  recruitPrisoner,
   cellOf,
   clockText,
   createSurvivalWorld,
@@ -171,6 +174,57 @@ describe('survival mode', () => {
     run(w, 10)
     expect(a.met[b.id] ?? b.met[a.id] ?? (b.alive ? undefined : 'merged')).toBeDefined()
     expect(w.fallen).toHaveLength(0)
+  })
+
+  it('fights between groups play out over minutes, with shots, and can end in prisoners', () => {
+    let longest = 0
+    let shots = 0
+    let taken = 0
+    for (let seed = 1; seed <= 6; seed++) {
+      const w = createSurvivalWorld({ seed, harshness: 0.5 })
+      const t = w.map.towns[0]
+      spawnGroup(w, { name: 'Camp', color: '#fff', people: randomPeople(w, 5) }, t.x, t.y)
+      const armed = randomPeople(w, 4).map((p) => ({ ...p, weapon: 'pistol' as const, ammo: 20 }))
+      spawnGroup(w, { name: 'Raiders', color: '#f00', hostile: true, people: armed }, t.x + 4, t.y)
+      let ticks = 0
+      for (let i = 0; i < 400; i++) {
+        stepSurvival(w)
+        while (w.pending.length) answerDecision(w, w.pending[0].id)
+        if (w.fights.length) ticks++
+        shots += w.shots.filter((s) => s.until === w.tick + 2).length
+      }
+      longest = Math.max(longest, ticks)
+      taken += w.log.filter((l) => l.text.includes('taken prisoner')).length
+      expect(w.fights).toHaveLength(0)
+    }
+    expect(longest).toBeGreaterThan(10)
+    expect(shots).toBeGreaterThan(20)
+    expect(taken).toBeGreaterThan(0)
+  })
+
+  it('prisoners are kept apart from the group, and can be let go or asked to join', () => {
+    const w = createSurvivalWorld({ seed: 21, harshness: 0.5 })
+    const t = w.map.towns[0]
+    const a = spawnGroup(w, { name: 'A', color: '#fff', people: randomPeople(w, 3) }, t.x, t.y)
+    const b = spawnGroup(w, { name: 'B', color: '#000', people: randomPeople(w, 3) }, t.x + 30, t.y)
+    const ps = membersOf(w, b)
+    for (const p of ps.slice(0, 2)) {
+      p.held = { from: b.id, since: w.tick }
+      p.group = a.id
+    }
+    expect(prisonersOf(w, a)).toHaveLength(2)
+    expect(membersOf(w, a)).toHaveLength(3)
+    freePrisoner(w, ps[0])
+    expect(ps[0].group).toBe(b.id)
+    expect(ps[0].held).toBeNull()
+    let joined = false
+    for (let i = 0; i < 20 && !joined; i++) {
+      ps[1].held = { from: -1, since: w.tick - DAY * 5 }
+      ps[1].group = a.id
+      joined = recruitPrisoner(w, ps[1])
+    }
+    expect(joined).toBe(true)
+    expect(membersOf(w, a)).toContain(ps[1])
   })
 
   it('supplies you drop are found and used', () => {

@@ -589,3 +589,17 @@
 .sv-page .evo-rewind [data-sv-looking] {
   color: #f0c674;
 }
+
+.sv-prisoner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.sv-prisoner .sv-orders {
+  margin: 0;
+}
+.evo-chip.sv-danger {
+  color: #ff8a8a;
+}
