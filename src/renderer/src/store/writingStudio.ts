@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import {
   addRevision,
+  countWords,
+  MAX_CUTS,
   historyFile,
   LIBRARY_FILE,
   listingOf,
@@ -23,6 +25,8 @@ import {
   type StoryListing,
   type TakeHistory
 } from '@shared/writing'
+import type { WritingAiEngine } from '@shared/types'
+import { cutFrom } from '@shared/writingTools'
 import { openSpecialTab, WRITING_TAB } from '../lib/editorController'
 import { recordUndo } from '../lib/undo'
 import { notify } from './notify'
@@ -34,8 +38,8 @@ import { notify } from './notify'
  * None of it is a note, and nothing here touches the notes.
  */
 
-export type StudioView = 'write' | 'brain' | 'calendar' | 'export'
-export type BrainTab = 'pages' | 'met' | 'relationships' | 'ask'
+export type StudioView = 'write' | 'brain' | 'calendar' | 'map' | 'shape' | 'export'
+export type BrainTab = 'pages' | 'met' | 'relationships' | 'secrets' | 'canon' | 'ask'
 
 interface WritingState {
   library: StoryListing[]
@@ -60,6 +64,8 @@ interface WritingState {
   closing: boolean
   /** The line from last time, showing until it's dismissed. */
   welcome: string | null
+  /** Which AI reads the story for the ghost reader, "how" notes, Ask the brain and the stuck button. */
+  ai: WritingAiEngine
 }
 
 export const useWriting = create<WritingState>(() => ({
@@ -76,7 +82,8 @@ export const useWriting = create<WritingState>(() => ({
   asOf: null,
   full: false,
   closing: false,
-  welcome: null
+  welcome: null,
+  ai: 'offline'
 }))
 
 export function openWritingStudio(): void {
@@ -114,7 +121,9 @@ export async function loadLibrary(vault: string | null): Promise<void> {
   useWriting.setState({ library: [], loaded: false, vault, story: null, history: {}, scene: null, entity: null, closing: false, welcome: null })
   try {
     const raw = await window.api.readAppData(LIBRARY_FILE)
-    useWriting.setState({ library: raw ? readLibrary(JSON.parse(raw)) : [], loaded: true })
+    const parsed: unknown = raw ? JSON.parse(raw) : null
+    const ai = (parsed as { ai?: unknown } | null)?.ai === 'claude' ? 'claude' : 'offline'
+    useWriting.setState({ library: parsed ? readLibrary(parsed) : [], loaded: true, ai })
   } catch (err) {
     useWriting.setState({ loaded: true })
     notify(err)
@@ -123,7 +132,13 @@ export async function loadLibrary(vault: string | null): Promise<void> {
 
 function saveLibrary(library: StoryListing[]): void {
   useWriting.setState({ library })
-  writeFile(LIBRARY_FILE, JSON.stringify({ stories: library }, null, 2))
+  writeFile(LIBRARY_FILE, JSON.stringify({ stories: library, ai: useWriting.getState().ai }, null, 2))
+}
+
+/** Which AI the studio uses: the offline one (nothing leaves this computer) or Claude. */
+export function setStudioAi(ai: WritingAiEngine): void {
+  useWriting.setState({ ai })
+  saveLibrary(useWriting.getState().library)
 }
 
 let storyTimer: ReturnType<typeof setTimeout> | undefined
@@ -313,7 +328,12 @@ export function setTakeText(sceneId: string, takeId: string, text: string): void
       ? { ...c, scenes: c.scenes.map((s): Scene => (s.id === sceneId ? { ...s, takes: s.takes.map((t) => (t.id === takeId ? { ...t, text } : t)) } : s)) }
       : c
   )
-  const next = { ...story, chapters }
+  let next: Story = { ...story, chapters }
+  // A passage deleted (not just retyped) goes to the cutting room floor.
+  const scene = story.chapters.flatMap((c) => c.scenes).find((sc) => sc.id === sceneId)
+  const oldText = scene?.takes.find((t) => t.id === takeId)?.text ?? ''
+  const cut = cutFrom(oldText, text)
+  if (cut && scene) next = { ...next, cuts: addCut(next.cuts, cut, scene) }
   // The first change to a take since it was opened: what it said before is the time-lapse's start.
   if (!lastText.has(takeId) && !useWriting.getState().history[takeId]) {
     lastText.set(takeId, story.chapters.flatMap((c) => c.scenes).flatMap((s) => s.takes).find((t) => t.id === takeId)?.text ?? '')
@@ -324,6 +344,24 @@ export function setTakeText(sceneId: string, takeId: string, text: string): void
     takeId,
     setTimeout(() => commitRevision(takeId), 1200)
   )
+}
+
+// ---------- the cutting room floor ----------
+
+function addCut(cuts: Story['cuts'], text: string, scene: Scene): Story['cuts'] {
+  if (cuts.some((c) => c.text === text)) return cuts
+  return [{ id: newId(), text, scene: scene.id, from: scene.title, at: Date.now() }, ...cuts].slice(0, MAX_CUTS)
+}
+
+/** Keeps a deleted scene's or take's writing on the cutting room floor too. */
+function keepCut(s: Story, text: string, scene: Scene): void {
+  if (countWords(text) >= 8) s.cuts = addCut(s.cuts, text.trim(), scene)
+}
+
+export function deleteCut(id: string): void {
+  change('Threw away a cut', (s) => {
+    s.cuts = s.cuts.filter((c) => c.id !== id)
+  })
 }
 
 // ---------- chapters and scenes ----------
@@ -389,6 +427,7 @@ export function deleteScene(id: string): void {
   const scene = chapter?.scenes.find((s) => s.id === id)
   if (!chapter || !scene) return
   change(`Deleted “${scene.title}”`, (s) => {
+    for (const t of scene.takes) keepCut(s, t.text, scene)
     const c = s.chapters.find((x) => x.id === chapter.id)!
     c.scenes = c.scenes.filter((x) => x.id !== id)
     if (!c.scenes.length) c.scenes.push(newScene())
@@ -461,15 +500,16 @@ export function renameTake(sceneId: string, takeId: string, name: string): void 
 }
 
 export function deleteTake(sceneId: string, takeId: string): void {
-  updateScene(
-    sceneId,
-    (sc) => {
-      if (sc.takes.length < 2) return
-      sc.takes = sc.takes.filter((t) => t.id !== takeId)
-      if (sc.take === takeId) sc.take = sc.takes[0].id
-    },
-    'Deleted a take'
-  )
+  change('Deleted a take', (s) => {
+    for (const c of s.chapters)
+      for (const sc of c.scenes) {
+        if (sc.id !== sceneId || sc.takes.length < 2) continue
+        const gone = sc.takes.find((t) => t.id === takeId)
+        if (gone) keepCut(s, gone.text, sc)
+        sc.takes = sc.takes.filter((t) => t.id !== takeId)
+        if (sc.take === takeId) sc.take = sc.takes[0].id
+      }
+  })
 }
 
 /** The time-lapse's "bring this back": an old version of a take becomes a new take, so nothing is lost. */

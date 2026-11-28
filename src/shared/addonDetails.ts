@@ -83,7 +83,7 @@ export const ADDON_ABOUT: Record<string, string> = {
   'task-manager': 'See what’s running and what it’s using: CPU, memory, disk and network. End an app that’s stuck or slowing everything down.',
   uninstaller: 'Remove an app properly, along with the files, settings and leftovers it would normally leave behind, and see how much space you get back.',
   mixer: 'A volume slider for each app, so games, Discord and Spotify can each be as loud as you want.',
-  'writing-studio': 'A full-screen place for writing stories, kept apart from your notes: chapters and scenes, takes, word goals, a story calendar, and a story brain that keeps track of every character, place and relationship, and who has met who.',
+  'writing-studio': 'A full-screen place for writing stories, kept apart from your notes: chapters and scenes, takes, word goals, a story calendar and map, and a story brain that keeps track of every character, place, relationship and secret. It checks continuity, canon and each character’s voice as you write, and exports to AO3, Wattpad and e-book.',
   'audio-editor': 'Trim a song, voice memo or recording: see its waveform, listen, pick the part you want and save it as a new MP3 or WAV. The original stays as it is.',
   screens: 'Change your monitors’ brightness, contrast and input from Orbit, with hotkeys for each, without touching the buttons on the screen.',
   files: 'Browse the files on your computer in a tab, with previews, tags, zips and a search of the whole PC. Open two folders side by side to drag files between them.',

@@ -384,14 +384,21 @@ export interface AiStatus {
 /** Where an AI answer comes from: the offline AI on this computer, or Claude online. */
 export type AiEngine = 'offline' | 'online'
 
-/** The offline AI's answer to a Writing Studio job, or why there isn't one ('missing': the offline AI isn't downloaded). Never thrown, so nothing is logged as a crash. */
-export type WritingAiReply = { text: string } | { problem: string; missing?: boolean }
+/** The AI's answer to a Writing Studio job, or why there isn't one ('missing': the offline AI isn't downloaded, or there's no Anthropic key for Claude). Never thrown, so nothing is logged as a crash. */
+export type WritingAiReply = { text: string } | { problem: string; missing?: 'offline' | 'key' }
 
-/** A Writing Studio job for the offline AI: a first-time reader's reactions, "how" notes for a scene, or a question about the story. */
-export type WritingAiJob =
+/** A Writing Studio AI job: a first-time reader's reactions, "how" notes for a scene, a question about the story, or questions to get unstuck. */
+export type WritingAiJob = (
   | { kind: 'ghost'; storyTitle: string; chapterTitle: string; part: string; known: string[]; partNo: number; parts: number }
   | { kind: 'hows'; sceneTitle: string; text: string; pairs: [string, string][] }
   | { kind: 'ask'; question: string; summary: string; excerpts: { label: string; title: string; text: string }[] }
+  | { kind: 'stuck'; sceneTitle: string; chapterTitle: string; text: string; context: string }
+) & {
+  /** Which AI reads the story: the offline one (the default, nothing leaves the computer) or Claude, when chosen in the studio. */
+  engine?: WritingAiEngine
+}
+
+export type WritingAiEngine = 'offline' | 'claude'
 
 /** An answer to a question or chat message. */
 export interface AiReply {

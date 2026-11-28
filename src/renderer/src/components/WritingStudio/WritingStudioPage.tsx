@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { ArrowLeft, BookOpen, Brain, CalendarDays, Feather, Maximize2, Minimize2, PenLine, Plus, Share, Target, Trash2, X } from 'lucide-react'
+import { Activity, ArrowLeft, BookOpen, Brain, CalendarDays, Cloud, Cpu, Feather, Map as MapIcon, Maximize2, Minimize2, PenLine, Plus, Share, Sparkles, Target, Trash2, X } from 'lucide-react'
 import { storyWords, wordsToday, writingStreak, type StoryListing } from '@shared/writing'
 import { useVault } from '../../store/vault'
-import { closeStory, createStory, loadLibrary, openStory, removeStory, setStoryField, useWriting, type StudioView } from '../../store/writingStudio'
+import { closeStory, createStory, loadLibrary, openStory, removeStory, setStoryField, setStudioAi, useWriting, type StudioView } from '../../store/writingStudio'
 import WriteView from './WriteView'
 import BrainView from './BrainView'
 import CalendarView from './CalendarView'
 import ExportView from './ExportView'
+import MapView from './MapView'
+import ShapeView from './ShapeView'
 import Segmented from './Segmented'
 import './writingStudio.css'
 
@@ -170,7 +172,9 @@ function StoryCard({ l, i }: { l: StoryListing; i: number }) {
 const VIEWS: { id: StudioView; label: string; icon: typeof PenLine }[] = [
   { id: 'write', label: 'Write', icon: PenLine },
   { id: 'brain', label: 'Story brain', icon: Brain },
-  { id: 'calendar', label: 'Story calendar', icon: CalendarDays },
+  { id: 'calendar', label: 'Calendar', icon: CalendarDays },
+  { id: 'map', label: 'Map', icon: MapIcon },
+  { id: 'shape', label: 'Shape', icon: Activity },
   { id: 'export', label: 'Export', icon: Share }
 ]
 
@@ -181,6 +185,8 @@ function StoryScreen() {
   const closing = useWriting((s) => s.closing)
   const [editingTitle, setEditingTitle] = useState(false)
   const [goals, setGoals] = useState(false)
+  const [aiMenu, setAiMenu] = useState(false)
+  const ai = useWriting((s) => s.ai)
 
   return (
     <div className="ws-story" data-ws-story>
@@ -210,17 +216,23 @@ function StoryScreen() {
         )}
         <Segmented className="ws-views" items={VIEWS} value={view} onChange={(id) => useWriting.setState({ view: id })} attr="data-ws-view" />
         <div className="ws-bar-right">
+          <button className={`ws-ai-pill ${ai}`} onClick={() => setAiMenu((o) => !o)} title="Which AI reads your story" data-ws-ai>
+            <Sparkles size={13} /> {ai === 'claude' ? 'Claude' : 'Offline AI'}
+          </button>
           <GoalMeter onClick={() => setGoals((g) => !g)} />
           <button className="icon-btn" onClick={toggleFull} title={full ? 'Leave full screen (Esc)' : 'Full screen'} data-ws-full>
             {full ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
           </button>
         </div>
         {goals && <GoalsPopover onClose={() => setGoals(false)} />}
+        {aiMenu && <AiPopover onClose={() => setAiMenu(false)} />}
       </header>
       <div className="ws-body" key={view}>
         {view === 'write' && <WriteView />}
         {view === 'brain' && <BrainView />}
         {view === 'calendar' && <CalendarView />}
+        {view === 'map' && <MapView />}
+        {view === 'shape' && <ShapeView />}
         {view === 'export' && <ExportView />}
       </div>
       {closing && <LeftOffPrompt />}
@@ -321,6 +333,37 @@ function GoalsPopover({ onClose }: { onClose: () => void }) {
         ))}
       </div>
       <p className="ws-streak">{streak > 0 ? `🔥 ${streak} day${streak === 1 ? '' : 's'} in a row` : 'Write today to start a streak.'}</p>
+    </div>
+  )
+}
+
+/** Picks which AI the studio's AI tools use. */
+function AiPopover({ onClose }: { onClose: () => void }) {
+  const ai = useWriting((s) => s.ai)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const down = (e: MouseEvent): void => {
+      if (ref.current && !ref.current.contains(e.target as Node) && !(e.target as HTMLElement).closest('[data-ws-ai]')) onClose()
+    }
+    document.addEventListener('mousedown', down)
+    return () => document.removeEventListener('mousedown', down)
+  }, [onClose])
+  const options = [
+    { id: 'offline' as const, icon: Cpu, title: 'Offline AI', body: 'Free, and runs on this computer. Your story never leaves it.' },
+    { id: 'claude' as const, icon: Cloud, title: 'Claude', body: 'Sharper and reads more at once. The parts it reads are sent to Anthropic, using your API key from Settings → AI helper.' }
+  ]
+  return (
+    <div className="ws-popover ws-ai-menu" ref={ref} data-ws-ai-menu>
+      <p className="ws-ai-menu-head">The ghost reader, “how” notes, Ask the brain and the stuck button use:</p>
+      {options.map((o) => (
+        <button key={o.id} className={`ws-ai-option ${ai === o.id ? 'on' : ''}`} onClick={() => setStudioAi(o.id)} data-ws-ai-option={o.id}>
+          <o.icon size={16} />
+          <span>
+            <b>{o.title}</b>
+            <span>{o.body}</span>
+          </span>
+        </button>
+      ))}
     </div>
   )
 }

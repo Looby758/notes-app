@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useState, type CSSProperties } from 'react'
-import { Check, Grid3x3, HeartHandshake, Loader2, MessageCircleQuestion, Plus, Sparkles, Trash2, Users, X } from 'lucide-react'
+import { BookMarked, Check, EyeOff, Grid3x3, HeartHandshake, Loader2, MessageCircleQuestion, Plus, Sparkles, Trash2, Users, X } from 'lucide-react'
 import {
   allScenes,
   buildBrain,
@@ -33,7 +33,8 @@ import {
   type BrainTab
 } from '../../store/writingStudio'
 import Segmented from './Segmented'
-import { askBrain, scenesNeedingHows, showAiProblem, writeHows } from '../../lib/writingAi'
+import { CanonDrawer, Secrets, VoiceCard } from './BrainTools'
+import { aiWhere, askBrain, scenesNeedingHows, showAiProblem, writeHows } from '../../lib/writingAi'
 
 /**
  * The story brain: a page for every character, location, item, group and event; who has met who;
@@ -45,6 +46,8 @@ const TABS: { id: BrainTab; label: string; icon: typeof Users }[] = [
   { id: 'pages', label: 'Pages', icon: Users },
   { id: 'met', label: 'Who has met who', icon: Grid3x3 },
   { id: 'relationships', label: 'Relationships', icon: HeartHandshake },
+  { id: 'secrets', label: 'Who knows what', icon: EyeOff },
+  { id: 'canon', label: 'Canon', icon: BookMarked },
   { id: 'ask', label: 'Ask the brain', icon: MessageCircleQuestion }
 ]
 
@@ -70,10 +73,17 @@ export default function BrainView() {
         {tab === 'pages' && <Pages />}
         {tab === 'met' && <MetGrid />}
         {tab === 'relationships' && <Relationships />}
+        {tab === 'secrets' && <SecretsTab />}
+        {tab === 'canon' && <CanonDrawer />}
         {tab === 'ask' && <Ask />}
       </div>
     </div>
   )
+}
+
+function SecretsTab() {
+  const { limit } = useBrain()
+  return <Secrets limit={limit} />
 }
 
 function AsOfSlider() {
@@ -294,6 +304,7 @@ function EntityPage({ entity }: { entity: Entity }) {
       )}
 
       {entity.kind === 'character' && <CharacterLinks entity={entity} />}
+      {entity.kind === 'character' && <VoiceCard entity={entity} />}
       {entity.kind === 'location' && <LocationVisitors entity={entity} />}
 
       <section className="ws-appearances">
@@ -436,7 +447,7 @@ function MetGrid() {
               'Everyone has met everyone.'
             )}
           </p>
-          <button className="btn" onClick={() => void writeAll()} disabled={!!busy} title="The offline AI reads each scene and writes a line on what happens between each pair, for you to check" data-ws-write-hows>
+          <button className="btn" onClick={() => void writeAll()} disabled={!!busy} title="The AI reads each scene and writes a line on what happens between each pair, for you to check" data-ws-write-hows>
             {busy ? <Loader2 size={13} className="spin" /> : <Sparkles size={13} />} {busy ?? 'Write the “how” notes'}
           </button>
         </div>
@@ -713,6 +724,7 @@ function Relationships() {
 function Ask() {
   const { story, upTo } = useBrain()
   const asOf = useWriting((s) => s.asOf)
+  const ai = useWriting((s) => s.ai)
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
   const [answer, setAnswer] = useState<{ q: string; parts: Awaited<ReturnType<typeof askBrain>> } | null>(null)
@@ -733,8 +745,8 @@ function Ask() {
   return (
     <div className="ws-ask" data-ws-ask>
       <p className="ws-panel-tip">
-        Ask anything about your story, like “When did Mara last see her brother?”. Answers link to the scenes. It runs on the offline AI, so your story stays on this computer
-        {asOf !== null ? `, and it only knows what’s happened by the end of ${story.chapters[asOf]?.title}` : ''}.
+        Ask anything about your story, like “When did Mara last see her brother?”. Answers link to the scenes. {aiWhere(ai)}
+        {asOf !== null ? ` It only knows what’s happened by the end of ${story.chapters[asOf]?.title}.` : ''}
       </p>
       <div className="ws-ask-row">
         <input

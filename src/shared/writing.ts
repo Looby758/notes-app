@@ -115,6 +115,90 @@ export interface GhostNote {
   reaction: string
 }
 
+/** A bit of a scene: which scene, and the words picked out in it. */
+export interface Anchor {
+  scene: string
+  quote: string
+}
+
+/** Setups and payoffs: something planted (a gun in a drawer, a promise) and where it comes back. */
+export interface PlotThread {
+  id: string
+  label: string
+  setup: Anchor
+  payoffs: Anchor[]
+  /** You've decided it doesn't need paying off. */
+  dropped: boolean
+}
+
+/** Who knows what: `who` finds the secret out in `scene` ('' for "knew from the start"). */
+export interface SecretLearn {
+  id: string
+  /** A character's id, or READER for the reader. */
+  who: string
+  scene: string
+}
+
+export interface Secret {
+  id: string
+  /** What the secret is, e.g. "Rick was bitten". */
+  text: string
+  /** Words that show it's coming up in a scene, e.g. "bite", "bitten". */
+  cues: string[]
+  learns: SecretLearn[]
+}
+
+/** The reader, in a secret's list of who finds out. */
+export const READER = 'reader'
+
+/** A fact from the source a fanfic is based on, e.g. Rick's eye colour, or that Glenn is dead. */
+export interface CanonFact {
+  id: string
+  /** A character's id, or '' for the world in general. */
+  entity: string
+  label: string
+  value: string
+  /** Changed in your story on purpose, so it's not flagged. */
+  changed: boolean
+}
+
+export interface Canon {
+  /** What it's fanfic of, e.g. "The Walking Dead (TV)". */
+  source: string
+  /** The scene where the story breaks from canon ('' if it doesn't, or not set). */
+  splitAt: string
+  splitNote: string
+  facts: CanonFact[]
+}
+
+/** A reader's comment on a chapter, pasted in from AO3 or Wattpad. */
+export interface ReaderComment {
+  id: string
+  text: string
+  at: number
+}
+
+/** A bit of writing you deleted, kept on the cutting room floor. */
+export interface Cut {
+  id: string
+  text: string
+  scene: string
+  /** The scene's name when it was cut (the scene may be gone since). */
+  from: string
+  at: number
+}
+
+/** The AO3 tag helper's choices (the rest is worked out from the story). */
+export interface Ao3Tags {
+  fandom: string
+  rating: string
+  warnings: string[]
+  /** Extra freeform tags you typed. */
+  extra: string[]
+  /** Suggested tags you took off. */
+  hidden: string[]
+}
+
 export interface LeftOff {
   text: string
   scene: string
@@ -143,6 +227,18 @@ export interface Story {
   days: Record<string, number>
   /** The ghost reader's reactions, by chapter id. */
   ghost: Record<string, GhostNote[]>
+  threads: PlotThread[]
+  secrets: Secret[]
+  canon: Canon
+  /** Readers' comments, by chapter id. */
+  comments: Record<string, ReaderComment[]>
+  /** The cutting room floor, newest first. */
+  cuts: Cut[]
+  /** Where each location is on the story map, as 0–1 across and down. The picture is in its own file (mapFile). */
+  pins: Record<string, { x: number; y: number }>
+  /** The tension you want across the story (Draw the shape), 0–1 at evenly spaced points; empty if not drawn. */
+  shape: number[]
+  tags: Ao3Tags
 }
 
 /** The studio's list of stories (writing-studio.json), so the library shows without opening every story. */
@@ -157,6 +253,9 @@ export interface StoryListing {
 export const LIBRARY_FILE = 'writing-studio.json'
 export const storyFile = (id: string): string => `writing-story-${id}.json`
 export const historyFile = (id: string): string => `writing-history-${id}.json`
+export const mapFile = (id: string): string => `writing-map-${id}.json`
+export const emptyCanon = (): Canon => ({ source: '', splitAt: '', splitNote: '', facts: [] })
+export const emptyTags = (): Ao3Tags => ({ fandom: '', rating: '', warnings: [], extra: [], hidden: [] })
 
 export function newId(): string {
   const bytes = new Uint8Array(8)
@@ -194,7 +293,15 @@ export function newStory(title: string): Story {
     leftOff: null,
     dayStart: null,
     days: {},
-    ghost: {}
+    ghost: {},
+    threads: [],
+    secrets: [],
+    canon: emptyCanon(),
+    comments: {},
+    cuts: [],
+    pins: {},
+    shape: [],
+    tags: emptyTags()
   }
 }
 
@@ -283,7 +390,71 @@ export function readStory(raw: unknown): Story {
       const go = obj(g)
       return { id: goodId(go.id), quote: str(go.quote, 400), reaction: str(go.reaction, 300) }
     })
+  const anchor = (v: unknown): Anchor => {
+    const ao = obj(v)
+    return { scene: str(ao.scene, 40), quote: str(ao.quote, 400) }
+  }
+  const threads = arr(o.threads).map((t): PlotThread => {
+    const to = obj(t)
+    return { id: goodId(to.id), label: str(to.label, 120) || 'Setup', setup: anchor(to.setup), payoffs: arr(to.payoffs).map(anchor).filter((a) => a.scene), dropped: to.dropped === true }
+  })
+  const secrets = arr(o.secrets).map((x): Secret => {
+    const so = obj(x)
+    return {
+      id: goodId(so.id),
+      text: str(so.text, 300),
+      cues: ids(so.cues).map((c) => c.slice(0, 60)).filter(Boolean).slice(0, 30),
+      learns: arr(so.learns).map((l) => {
+        const lo = obj(l)
+        return { id: goodId(lo.id), who: str(lo.who, 40), scene: str(lo.scene, 40) }
+      })
+    }
+  })
+  const co = obj(o.canon)
+  const canon: Canon = {
+    source: str(co.source, 200),
+    splitAt: str(co.splitAt, 40),
+    splitNote: str(co.splitNote, 1000),
+    facts: arr(co.facts).map((f) => {
+      const fo = obj(f)
+      return { id: goodId(fo.id), entity: str(fo.entity, 40), label: str(fo.label, 80), value: str(fo.value, 300), changed: fo.changed === true }
+    })
+  }
+  const comments: Record<string, ReaderComment[]> = {}
+  for (const [k, list] of Object.entries(obj(o.comments)))
+    comments[k] = arr(list)
+      .map((c) => {
+        const cmo = obj(c)
+        return { id: goodId(cmo.id), text: str(cmo.text, 20_000), at: num(cmo.at) }
+      })
+      .filter((c) => c.text.trim())
+  const cuts = arr(o.cuts)
+    .map((c): Cut => {
+      const cuo = obj(c)
+      return { id: goodId(cuo.id), text: str(cuo.text, 200_000), scene: str(cuo.scene, 40), from: str(cuo.from, 120), at: num(cuo.at) }
+    })
+    .filter((c) => c.text.trim())
+    .slice(0, MAX_CUTS)
+  const pins: Record<string, { x: number; y: number }> = {}
+  const unit = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0.5)
+  for (const [k, v] of Object.entries(obj(o.pins))) pins[k] = { x: unit(obj(v).x), y: unit(obj(v).y) }
+  const tg = obj(o.tags)
+  const tags: Ao3Tags = {
+    fandom: str(tg.fandom, 200),
+    rating: str(tg.rating, 60),
+    warnings: ids(tg.warnings).slice(0, 10),
+    extra: ids(tg.extra).map((t) => t.slice(0, 150)).slice(0, 75),
+    hidden: ids(tg.hidden).map((t) => t.slice(0, 150)).slice(0, 200)
+  }
   return {
+    threads,
+    secrets,
+    canon,
+    comments,
+    cuts,
+    pins,
+    shape: arr(o.shape).map(unit).slice(0, 200),
+    tags,
     v: 1,
     id: goodId(o.id),
     title: str(o.title, 120) || 'Untitled story',
@@ -301,6 +472,9 @@ export function readStory(raw: unknown): Story {
     ghost
   }
 }
+
+/** How many cuts the cutting room floor keeps (the oldest go first). */
+export const MAX_CUTS = 300
 
 export function readLibrary(raw: unknown): StoryListing[] {
   return arr(obj(raw).stories)
@@ -721,7 +895,7 @@ export function factKind(label: string): FactKind | null {
 }
 
 /** Sentences with where they start, for checking a fact against the right name. */
-function sentences(text: string): { start: number; text: string }[] {
+export function sentences(text: string): { start: number; text: string }[] {
   const out: { start: number; text: string }[] = []
   const re = /[^.!?\n]+[.!?]*["”’)]*/g
   for (let m = re.exec(text); m; m = re.exec(text)) if (m[0].trim()) out.push({ start: m.index, text: m[0] })
@@ -733,7 +907,15 @@ function sentences(text: string): { start: number; text: string }[] {
  * "sixteen years old" when it says 17, and a character who died earlier turning up again. In a
  * sentence naming more than one character, a fact belongs to the name closest to it.
  */
-export function checkContinuity(story: Story, sceneId: string, text: string): ContinuityIssue[] {
+export function checkContinuity(
+  story: Story,
+  sceneId: string,
+  text: string,
+  /** For the canon drawer: other facts to check against (canon's), and how a mismatch is described. */
+  opts: { factsOf?: (e: Entity) => Fact[]; where?: (e: Entity, f: Fact) => string; deaths?: boolean } = {}
+): ContinuityIssue[] {
+  const factsOf = opts.factsOf ?? ((e: Entity) => e.facts)
+  const where = opts.where ?? ((e: Entity, f: Fact) => `${e.name}’s ${f.label.toLowerCase()}: ${f.value} on their page.`)
   const issues: ContinuityIssue[] = []
   const placed = findScene(story, sceneId)
   const mentions = findMentions(text, story.entities)
@@ -741,7 +923,7 @@ export function checkContinuity(story: Story, sceneId: string, text: string): Co
   const charMentions = mentions.filter((m) => chars.has(m.entity))
 
   // Back from the dead.
-  if (placed) {
+  if (placed && opts.deaths !== false) {
     const orderOf = new Map(allScenes(story).map((p) => [p.scene.id, p.order]))
     for (const c of chars.values()) {
       if (!c.diesIn) continue
@@ -755,7 +937,7 @@ export function checkContinuity(story: Story, sceneId: string, text: string): Co
     }
   }
 
-  const checkable = [...chars.values()].filter((c) => c.facts.some((f) => f.value.trim() && factKind(f.label)))
+  const checkable = [...chars.values()].filter((c) => factsOf(c).some((f) => f.value.trim() && factKind(f.label)))
   if (!checkable.length) return issues
   const wordRe = /[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*/gu
   for (const sentence of sentences(text)) {
@@ -767,11 +949,13 @@ export function checkContinuity(story: Story, sceneId: string, text: string): Co
     for (let m = wordRe.exec(sentence.text); m; m = wordRe.exec(sentence.text)) words.push({ w: m[0], start: sentence.start + m.index, end: sentence.start + m.index + m[0].length })
     const nearest = (pos: number): string => {
       let best = here[0]
-      for (const m of here) if (Math.abs(m.start - pos) < Math.abs(best.start - pos)) best = m
+      // Measured from the end of a name before it ("Carol’s green eyes") and the start of one after.
+      const gap = (m: { start: number; end: number }): number => (m.end <= pos ? pos - m.end : m.start - pos)
+      for (const m of here) if (gap(m) < gap(best)) best = m
       return best.entity
     }
     for (const c of checkable) {
-      for (const fact of c.facts) {
+      for (const fact of factsOf(c)) {
         const kind = factKind(fact.label)
         if (!kind || !fact.value.trim()) continue
         if (kind.kind === 'colour') {
@@ -787,7 +971,7 @@ export function checkContinuity(story: Story, sceneId: string, text: string): Co
               const colour = COLOURS.includes(lw) ? lw : COLOURS.includes(base) ? base : null
               if (!colour) continue
               const same = expected.some((e) => e === colour || (e.startsWith('blond') && colour.startsWith('blond')) || (['grey', 'gray'].includes(e) && ['grey', 'gray'].includes(colour)))
-              if (!same) issues.push({ start: n.start, end: n.end, entity: c.id, message: `${c.name}’s ${fact.label.toLowerCase()}: ${fact.value} on their page.` })
+              if (!same) issues.push({ start: n.start, end: n.end, entity: c.id, message: where(c, fact) })
             }
           })
         } else {
@@ -798,7 +982,7 @@ export function checkContinuity(story: Story, sceneId: string, text: string): Co
             const got = readNumber(m[1])
             const at = sentence.start + m.index
             if (got === null || got === want || nearest(at) !== c.id) continue
-            issues.push({ start: at, end: at + m[1].length, entity: c.id, message: `${c.name} is ${fact.value} on their page.` })
+            issues.push({ start: at, end: at + m[1].length, entity: c.id, message: opts.where ? where(c, fact) : `${c.name} is ${fact.value} on their page.` })
           }
         }
       }
@@ -1028,8 +1212,8 @@ If those two don't actually interact in this scene, write "no direct interaction
 Reply with one line per pair, in exactly this form, and nothing else:
 <number>. <what happens>`
 
-export function howsPrompt(sceneTitle: string, text: string, pairs: [string, string][]): string {
-  return `Scene: ${sceneTitle}\n\n${text.slice(0, AI_BUDGET)}\n\nPairs:\n${pairs.map(([a, b], i) => `${i + 1}. ${a} and ${b}`).join('\n')}`
+export function howsPrompt(sceneTitle: string, text: string, pairs: [string, string][], budget = AI_BUDGET): string {
+  return `Scene: ${sceneTitle}\n\n${text.slice(0, budget)}\n\nPairs:\n${pairs.map(([a, b], i) => `${i + 1}. ${a} and ${b}`).join('\n')}`
 }
 
 /** Reads "1. first meet at the market" lines back into one note per pair (by position in the list). */
@@ -1047,6 +1231,28 @@ export function parseHows(reply: string, count: number): (string | null)[] {
   return out
 }
 
+export const STUCK_SYSTEM = `You help a writer who is stuck on a scene of their own story. You never write any of the story for them.
+Ask exactly three short, sharp questions that would help them work out what happens next. Make each question about this story: its characters, what they want, what they know, what's at stake, what's been set up. No generic writing advice.
+Reply with exactly three lines, in this form, and nothing else:
+1. <question>
+2. <question>
+3. <question>`
+
+export function stuckPrompt(chapterTitle: string, sceneTitle: string, context: string, text: string): string {
+  return `Chapter: ${chapterTitle}\nScene: ${sceneTitle}\n\nWhat the story notes say about this scene:\n${context || '(nothing yet)'}\n\nThe scene so far${text.trim() ? '' : ' (empty: they have not started it)'}:\n${text}`
+}
+
+/** The three questions from the stuck button's reply. */
+export function parseStuck(reply: string): string[] {
+  const out: string[] = []
+  for (const line of reply.split('\n')) {
+    const m = /^\s*(?:\d+[.):]|[-*•])\s*(.+)$/.exec(line)
+    const q = m?.[1].trim().replace(/^["“]|["”]$/g, '')
+    if (q && q.length > 8 && !out.includes(q)) out.push(q.slice(0, 300))
+  }
+  return out.slice(0, 3)
+}
+
 export const ASK_SYSTEM = `You answer questions about a writer's own story, using only the story notes and scenes you're given.
 Scenes are labelled like [S4]. When you mention something that happens in a scene, put its label right after, e.g. "They first meet at the market [S2]."
 If the notes don't say, say you can't tell from what's written so far. Never make up events. Keep answers short: a few sentences or a short list.`
@@ -1060,7 +1266,9 @@ export function brainSummary(story: Story, brain: Brain, labels: Map<string, str
     if (!list.length) continue
     lines.push(`${kind.plural}:`)
     for (const e of list) {
-      const extra = [e.aliases.length ? `also called ${e.aliases.join(', ')}` : '', ...e.facts.filter((f) => f.label && f.value).map((f) => `${f.label}: ${f.value}`)]
+      const died = e.diesIn ? findScene(story, e.diesIn) : null
+      const death = died && died.order <= limitOrder ? `dies in ${labels.get(died.scene.id) ?? ''} ${died.chapter.title} – ${died.scene.title}`.replace(/\s+/g, ' ') : ''
+      const extra = [e.aliases.length ? `also called ${e.aliases.join(', ')}` : '', ...e.facts.filter((f) => f.label && f.value).map((f) => `${f.label}: ${f.value}`), death]
         .filter(Boolean)
         .join('; ')
       const about = e.about.trim().replace(/\s+/g, ' ').slice(0, 300)

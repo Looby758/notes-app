@@ -3,7 +3,7 @@ import { readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import Anthropic from '@anthropic-ai/sdk'
 import type { AiAskTurn, AiEngine, AiExtraContext, AiChat, AiChatMessage, AiNote, AiReply, AiSortRow, AiStatus, WritingAiJob, WritingAiReply } from '@shared/types'
-import { AI_BUDGET, ASK_SYSTEM, askPrompt, GHOST_SYSTEM, ghostPrompt, HOWS_SYSTEM, howsPrompt } from '@shared/writing'
+import { AI_BUDGET, ASK_SYSTEM, askPrompt, GHOST_SYSTEM, ghostPrompt, HOWS_SYSTEM, howsPrompt, STUCK_SYSTEM, stuckPrompt } from '@shared/writing'
 import { cleanReply, fitTexts, HARD_NOTE, LOCAL_CONTEXT_CHARS, MEANING_SYSTEM, meaningPrompt, MONEY_SORT_SYSTEM, moneySortPrompt, parseMoneySort } from '@shared/localAi'
 import { parseRelatedWords } from '@shared/emailSearch'
 import { localAiInstalled, localAiState, localComplete, type LocalMessage } from './localAi'
@@ -311,47 +311,58 @@ export async function meaning(word: string, sentence: string): Promise<string> {
 }
 
 /**
- * The Writing Studio's jobs, on the offline AI only: stories are private, so they never go to
- * Claude. The prompts are in shared/writing.ts; every text is cut to what the model can read.
+ * The Writing Studio's jobs. They run on the offline AI unless the writer picked Claude in the
+ * studio (each story stays on this computer otherwise). The prompts are in shared/writing.ts; every
+ * text is cut to what the offline model can read, and Claude is given more.
  */
 export async function writing(job: WritingAiJob): Promise<WritingAiReply> {
-  if (!localAiInstalled()) return { problem: 'This needs the offline AI. It’s free and runs on this computer.', missing: true }
+  const claude = job?.engine === 'claude'
+  if (claude && !load().apiKey) return { problem: 'To use Claude, add your Anthropic API key in Settings → AI helper.', missing: 'key' }
+  if (!claude && !localAiInstalled()) return { problem: 'This needs the offline AI. It’s free and runs on this computer.', missing: 'offline' }
   try {
-    return { text: await writingJob(job) }
+    return { text: await writingJob(job, claude) }
   } catch (err) {
     return { problem: err instanceof Error ? err.message : String(err) }
   }
 }
 
-async function writingJob(job: WritingAiJob): Promise<string> {
+async function writingJob(job: WritingAiJob, claude: boolean): Promise<string> {
   const s = (v: unknown, max: number): string => String(v ?? '').slice(0, max)
+  // Claude can read a whole chapter or more at once.
+  const budget = claude ? AI_BUDGET * 4 : AI_BUDGET
+  const context = claude ? LOCAL_CONTEXT_CHARS * 4 : LOCAL_CONTEXT_CHARS
   let system: string
   let prompt: string
   let maxTokens = 700
   if (job.kind === 'ghost') {
     system = GHOST_SYSTEM
     const known = (Array.isArray(job.known) ? job.known : []).slice(0, 60).map((k) => s(k, 80))
-    prompt = ghostPrompt(s(job.storyTitle, 120), s(job.chapterTitle, 120), s(job.part, AI_BUDGET), known, Number(job.partNo) || 1, Number(job.parts) || 1)
+    prompt = ghostPrompt(s(job.storyTitle, 120), s(job.chapterTitle, 120), s(job.part, budget), known, Number(job.partNo) || 1, Number(job.parts) || 1)
   } else if (job.kind === 'hows') {
     system = HOWS_SYSTEM
     const pairs = (Array.isArray(job.pairs) ? job.pairs : []).slice(0, 30).map(([a, b]) => [s(a, 80), s(b, 80)] as [string, string])
     if (!pairs.length) return ''
-    prompt = howsPrompt(s(job.sceneTitle, 120), s(job.text, AI_BUDGET), pairs)
+    prompt = howsPrompt(s(job.sceneTitle, 120), s(job.text, budget), pairs, budget)
     maxTokens = 60 + pairs.length * 40
   } else if (job.kind === 'ask') {
     system = ASK_SYSTEM
-    const excerpts = (Array.isArray(job.excerpts) ? job.excerpts : []).slice(0, 12).map((e) => ({ label: s(e.label, 10), title: s(e.title, 160), text: s(e.text, AI_BUDGET) }))
-    prompt = askPrompt(s(job.question, 1000), s(job.summary, LOCAL_CONTEXT_CHARS), excerpts).slice(0, Math.floor(LOCAL_CONTEXT_CHARS * 0.85))
+    const excerpts = (Array.isArray(job.excerpts) ? job.excerpts : []).slice(0, 12).map((e) => ({ label: s(e.label, 10), title: s(e.title, 160), text: s(e.text, budget) }))
+    prompt = askPrompt(s(job.question, 1000), s(job.summary, context), excerpts).slice(0, Math.floor(context * 0.85))
     maxTokens = 600
+  } else if (job.kind === 'stuck') {
+    system = STUCK_SYSTEM
+    prompt = stuckPrompt(s(job.chapterTitle, 120), s(job.sceneTitle, 120), s(job.context, 6000), s(job.text, budget))
+    maxTokens = 400
   } else {
     throw new Error('Unknown writing job.')
   }
+  if (claude) return askClaude(system, [{ role: 'user', content: prompt }], 'low')
   const reply = await localComplete(
     [
       { role: 'system', content: system },
       { role: 'user', content: prompt }
     ],
-    { maxTokens, temperature: job.kind === 'ghost' ? 0.7 : 0.2 }
+    { maxTokens, temperature: job.kind === 'ghost' || job.kind === 'stuck' ? 0.7 : 0.2 }
   )
   return cleanReply(reply).text
 }

@@ -17,28 +17,35 @@ import {
   sceneText,
   splitForAi,
   AI_BUDGET,
+  parseStuck,
   type GhostNote,
   type Story
 } from '@shared/writing'
 import type { WritingAiJob } from '@shared/types'
-import { change } from '../store/writingStudio'
+import { sceneContext } from '@shared/writingTools'
+import { change, useWriting } from '../store/writingStudio'
 import { notify } from '../store/notify'
 import { useUI } from '../store/ui'
 import { openSpecialTab, SETTINGS_TAB } from './editorController'
 
 /**
- * The Writing Studio's offline AI jobs: the ghost reader, the "how" notes in the who-met-who grid,
- * and asking the story brain. They all run on the offline AI (main/ai.ts → writing), so the story
- * never leaves this computer.
+ * The Writing Studio's AI jobs: the ghost reader, the "how" notes in the who-met-who grid, asking
+ * the story brain and the stuck button. They run on the offline AI (main/ai.ts → writing), so the
+ * story never leaves this computer, unless you pick Claude in the studio.
  */
 
-/** The offline AI isn't downloaded yet. */
+/** The AI isn't ready: the offline one isn't downloaded, or Claude has no API key. */
 export class NeedsOfflineAi extends Error {}
 
 async function run(job: WritingAiJob): Promise<string> {
-  const reply = await window.api.aiWriting(job)
+  const reply = await window.api.aiWriting({ ...job, engine: useWriting.getState().ai })
   if ('text' in reply) return reply.text
   throw reply.missing ? new NeedsOfflineAi(reply.problem) : new Error(reply.problem)
+}
+
+/** A line for the AI panels saying which AI reads the story. */
+export function aiWhere(ai: 'offline' | 'claude'): string {
+  return ai === 'claude' ? 'It uses Claude, so the parts it reads are sent to Anthropic.' : 'It runs on the offline AI, so your story stays on this computer.'
 }
 
 /** Shows why an AI job didn't work; for a missing offline AI, with a button that opens where to get it. */
@@ -141,4 +148,15 @@ export async function askBrain(story: Story, question: string, upTo = Infinity) 
   }
   const reply = await run({ kind: 'ask', question, summary, excerpts })
   return answerLinks(reply, labels)
+}
+
+/** The stuck button: three questions about the scene (never any writing), from the scene and what the brain knows. */
+export async function stuckQuestions(story: Story, sceneId: string): Promise<string[]> {
+  const placed = allScenes(story).find((p) => p.scene.id === sceneId)
+  if (!placed) return []
+  const text = sceneText(placed.scene)
+  const reply = await run({ kind: 'stuck', chapterTitle: placed.chapter.title, sceneTitle: placed.scene.title, context: sceneContext(story, sceneId), text: text.slice(-AI_BUDGET) })
+  const qs = parseStuck(reply)
+  if (!qs.length) throw new Error('The AI didn’t come up with questions this time. Try again.')
+  return qs
 }

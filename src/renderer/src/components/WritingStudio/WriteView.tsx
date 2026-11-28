@@ -4,17 +4,22 @@ import {
   ChevronUp,
   Columns2,
   Copy,
+  Flag,
   Ghost,
+  HelpCircle,
   History,
   Loader2,
+  MessageSquareQuote,
   Pause,
   Pencil,
   Play,
   Plus,
+  Scissors,
   ShieldCheck,
   Trash2,
   Undo2,
   UserPlus,
+  Volume2,
   X
 } from 'lucide-react'
 import {
@@ -58,8 +63,10 @@ import {
   useTake,
   useWriting
 } from '../../store/writingStudio'
-import { runGhostReader, showAiProblem } from '../../lib/writingAi'
+import { aiWhere, runGhostReader, showAiProblem } from '../../lib/writingAi'
+import { canonIssues, secretSlips, storyLines, threadMarks, voiceFlags } from '@shared/writingTools'
 import StoryEditor, { type Mark } from './StoryEditor'
+import { CommentsPanel, CutsPanel, lovedMarks, ReadAloudBar, StuckPanel, ThreadsPanel, useEditorBridge, toolCounts } from './WriteTools'
 
 /** Writing: the chapters and scenes down the side, the page in the middle, and checks, the ghost reader and the time-lapse on the right. */
 
@@ -106,12 +113,25 @@ export function PacingStrip({ p, title }: { p: Pacing; title?: string }) {
   )
 }
 
+type Panel = 'checks' | 'threads' | 'ghost' | 'comments' | 'cuts' | 'stuck' | 'timelapse'
+
+const TOOLS: { id: Panel; title: string; icon: typeof Ghost }[] = [
+  { id: 'checks', title: 'Checks: continuity, canon, secrets and voice', icon: ShieldCheck },
+  { id: 'threads', title: 'Setups and payoffs', icon: Flag },
+  { id: 'ghost', title: 'Ghost reader', icon: Ghost },
+  { id: 'comments', title: 'Reader comments', icon: MessageSquareQuote },
+  { id: 'cuts', title: 'Cutting room floor', icon: Scissors },
+  { id: 'stuck', title: 'Stuck?', icon: HelpCircle },
+  { id: 'timelapse', title: 'Time-lapse', icon: History }
+]
+
 export default function WriteView() {
   const story = useWriting((s) => s.story)!
   const sceneId = useWriting((s) => s.scene)
   const welcome = useWriting((s) => s.welcome)
   const placed = useMemo(() => allScenes(story).find((p) => p.scene.id === sceneId) ?? allScenes(story)[0], [story, sceneId])
-  const [panel, setPanel] = useState<'checks' | 'ghost' | 'timelapse' | null>(null)
+  const [panel, setPanel] = useState<Panel | null>(null)
+  const [reading, setReading] = useState(false)
   const [focus, setFocus] = useState<{ from: number; to: number; nonce: number } | null>(null)
   const [compare, setCompare] = useState<string | null>(null)
 
@@ -120,6 +140,7 @@ export default function WriteView() {
   }, [placed, sceneId])
 
   if (!placed) return null
+  const counts = toolCounts(story, placed.chapter)
   const jump = (scene: string, from: number, to: number): void => {
     if (scene !== placed.scene.id) openScene(scene)
     // After the scene's editor has started.
@@ -127,7 +148,7 @@ export default function WriteView() {
   }
 
   return (
-    <div className={`ws-write ${panel ? 'with-panel' : ''}`} data-ws-write>
+    <div className={`ws-write ${panel && panel !== 'timelapse' ? 'with-panel' : ''}`} data-ws-write>
       <Outline story={story} current={placed.scene.id} />
       <main className="ws-page">
         {welcome && (
@@ -141,30 +162,39 @@ export default function WriteView() {
         )}
         <SceneHead story={story} scene={placed.scene} chapter={placed.chapter} compare={compare} setCompare={setCompare} />
         <SceneDetails story={story} scene={placed.scene} />
+        {reading && panel !== 'timelapse' && <ReadAloudBar scene={placed.scene} onClose={() => setReading(false)} />}
         {panel === 'timelapse' ? (
           <TimeLapse scene={placed.scene} onClose={() => setPanel(null)} />
         ) : (
           <div className={`ws-editors ${compare ? 'split' : ''}`}>
-            <SceneEditor story={story} scene={placed.scene} focus={focus} />
+            <SceneEditor story={story} scene={placed.scene} chapter={placed.chapter} focus={focus} />
             {compare && <CompareTake scene={placed.scene} takeId={compare} onPick={setCompare} onClose={() => setCompare(null)} />}
           </div>
         )}
       </main>
       <aside className="ws-tools">
         <div className="ws-tool-buttons">
-          <button className={`ws-tool ${panel === 'checks' ? 'on' : ''}`} onClick={() => setPanel(panel === 'checks' ? null : 'checks')} title="Continuity checks" data-ws-tool="checks">
-            <ShieldCheck size={16} />
-            <CheckCount story={story} scene={placed.scene} />
-          </button>
-          <button className={`ws-tool ${panel === 'ghost' ? 'on' : ''}`} onClick={() => setPanel(panel === 'ghost' ? null : 'ghost')} title="Ghost reader" data-ws-tool="ghost">
-            <Ghost size={16} />
-          </button>
-          <button className={`ws-tool ${panel === 'timelapse' ? 'on' : ''}`} onClick={() => setPanel(panel === 'timelapse' ? null : 'timelapse')} title="Time-lapse" data-ws-tool="timelapse">
-            <History size={16} />
+          {TOOLS.map((t) => (
+            <button key={t.id} className={`ws-tool ${panel === t.id ? 'on' : ''}`} onClick={() => setPanel(panel === t.id ? null : t.id)} title={t.title} data-ws-tool={t.id}>
+              <t.icon size={16} />
+              {t.id === 'checks' && <CheckCount story={story} scene={placed.scene} />}
+              {t.id === 'threads' && counts.open > 0 && <span className="ws-badge soft">{counts.open}</span>}
+              {t.id === 'comments' && counts.comments > 0 && <span className="ws-badge soft">{counts.comments}</span>}
+            </button>
+          ))}
+          <span className="ws-tool-sep" />
+          <button className={`ws-tool ${reading ? 'on' : ''}`} onClick={() => setReading(!reading)} title="Read it to me" data-ws-tool="read">
+            <Volume2 size={16} />
           </button>
         </div>
-        {panel === 'checks' && <ChecksPanel story={story} scene={placed.scene} onJump={jump} />}
-        {panel === 'ghost' && <GhostPanel story={story} chapter={placed.chapter} onJump={jump} />}
+        <div className="ws-panel-host" key={panel ?? 'none'}>
+          {panel === 'checks' && <ChecksPanel story={story} scene={placed.scene} onJump={jump} />}
+          {panel === 'ghost' && <GhostPanel story={story} chapter={placed.chapter} onJump={jump} />}
+          {panel === 'threads' && <ThreadsPanel story={story} scene={placed.scene} onJump={jump} />}
+          {panel === 'comments' && <CommentsPanel story={story} chapter={placed.chapter} onJump={jump} />}
+          {panel === 'cuts' && <CutsPanel story={story} />}
+          {panel === 'stuck' && <StuckPanel story={story} scene={placed.scene} />}
+        </div>
       </aside>
     </div>
   )
@@ -486,23 +516,40 @@ function SceneDetails({ story, scene }: { story: Story; scene: Scene }) {
   )
 }
 
-function SceneEditor({ story, scene, focus }: { story: Story; scene: Scene; focus: { from: number; to: number; nonce: number } | null }) {
+function SceneEditor({ story, scene, chapter, focus }: { story: Story; scene: Scene; chapter: Chapter; focus: { from: number; to: number; nonce: number } | null }) {
   const take = activeTake(scene)
   const text = useDeferredValue(take.text)
+  const issues = useSceneIssues(story, scene, text)
+  const reading = useEditorBridge((s) => s.reading)
+  const insert = useEditorBridge((s) => s.insert)
+  const follow = useEditorBridge((s) => s.follow)
   const marks = useMemo((): Mark[] => {
     const kinds = new Map(story.entities.map((e) => [e.id, e]))
     const out: Mark[] = findMentions(text, story.entities).map((m) => {
       const e = kinds.get(m.entity)!
       return { from: m.start, to: m.end, kind: 'name', entityKind: e.kind, title: e.name }
     })
-    for (const i of checkContinuity(story, scene.id, text)) out.push({ from: i.start, to: i.end, kind: 'issue', title: i.message })
+    for (const i of issues) out.push({ from: i.start, to: i.end, kind: 'issue', title: i.message })
+    for (const t of threadMarks(story, scene.id, text)) out.push(t)
+    for (const l of lovedMarks(story, chapter, scene.id)) out.push({ ...l, kind: 'loved' })
+    if (reading) out.push({ ...reading, kind: 'reading' })
     return out
-    // Names and pages, not every keystroke elsewhere in the story.
+    // Names, pages, setups and comments, not every keystroke elsewhere in the story.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, story.entities, scene.id])
+  }, [text, story.entities, story.threads, story.comments, issues, reading, scene.id, chapter])
   return (
     <div className="ws-editor-wrap">
-      <StoryEditor docKey={take.id} text={take.text} onChange={(t) => setTakeText(scene.id, take.id, t)} marks={marks} focusRange={focus} hint="Start writing this scene…" />
+      <StoryEditor
+        docKey={take.id}
+        text={take.text}
+        onChange={(t) => setTakeText(scene.id, take.id, t)}
+        marks={marks}
+        focusRange={focus}
+        hint="Start writing this scene…"
+        onSelect={(sel) => useEditorBridge.setState({ sel })}
+        insert={insert}
+        follow={follow}
+      />
     </div>
   )
 }
@@ -543,10 +590,42 @@ function CompareTake({ scene, takeId, onPick, onClose }: { scene: Scene; takeId:
 
 // ---------- checks ----------
 
+type Issue = ReturnType<typeof checkContinuity>[number] & { group: 'page' | 'canon' | 'secret' | 'voice' }
+
+/** Every dialogue line in the story, worked out once per version of the story (it's the slow part of the voice check). */
+const linesCache = new WeakMap<Story['chapters'], ReturnType<typeof storyLines>>()
+function linesOf(story: Story): ReturnType<typeof storyLines> {
+  let hit = linesCache.get(story.chapters)
+  if (!hit) {
+    hit = storyLines(story)
+    linesCache.set(story.chapters, hit)
+  }
+  return hit
+}
+
+/** Everything in a scene's text that goes against the pages, canon, who knows what, or how someone talks. */
+function sceneIssues(story: Story, sceneId: string, text: string): Issue[] {
+  return [
+    ...checkContinuity(story, sceneId, text).map((i) => ({ ...i, group: 'page' as const })),
+    ...canonIssues(story, sceneId, text).map((i) => ({ ...i, group: 'canon' as const })),
+    ...secretSlips(story, sceneId, text).map((i) => ({ ...i, group: 'secret' as const })),
+    ...voiceFlags(story, sceneId, text, linesOf(story)).map((i) => ({ ...i, group: 'voice' as const }))
+  ].sort((a, b) => a.start - b.start)
+}
+
+function useSceneIssues(story: Story, scene: Scene, text: string): Issue[] {
+  const deferred = useDeferredValue(story)
+  return useMemo(
+    () => sceneIssues(deferred, scene.id, text),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [text, deferred.entities, deferred.canon, deferred.secrets, deferred.chapters.length, scene.id]
+  )
+}
+
 function useChecks(story: Story, scene: Scene) {
   const deferred = useDeferredValue(story)
   return useMemo(() => {
-    const issues = checkContinuity(deferred, scene.id, sceneText(scene))
+    const issues = sceneIssues(deferred, scene.id, sceneText(scene))
     const clashes = calendarClashes(buildBrain(deferred)).filter((c) => c.scenes.includes(scene.id))
     return { issues, clashes }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -559,6 +638,22 @@ function CheckCount({ story, scene }: { story: Story; scene: Scene }) {
   return n ? <span className="ws-badge">{n}</span> : null
 }
 
+/** The words around a spot, cut at whole words. */
+function snippet(text: string, start: number, end: number): string {
+  let a = Math.max(0, start - 30)
+  let b = Math.min(text.length, end + 30)
+  if (a > 0) a = text.indexOf(' ', a) + 1 || a
+  if (b < text.length) b = text.lastIndexOf(' ', b) > end ? text.lastIndexOf(' ', b) : b
+  return `${a > 0 ? '…' : ''}${text.slice(a, b).trim()}${b < text.length ? '…' : ''}`
+}
+
+const GROUPS: { id: Issue['group']; title: string }[] = [
+  { id: 'page', title: 'Character pages' },
+  { id: 'canon', title: 'Canon' },
+  { id: 'secret', title: 'Who knows what' },
+  { id: 'voice', title: 'Doesn’t sound like them' }
+]
+
 function ChecksPanel({ story, scene, onJump }: { story: Story; scene: Scene; onJump: (scene: string, from: number, to: number) => void }) {
   const { issues, clashes } = useChecks(story, scene)
   const text = sceneText(scene)
@@ -566,28 +661,42 @@ function ChecksPanel({ story, scene, onJump }: { story: Story; scene: Scene; onJ
   const sceneTitle = (id: string): string => allScenes(story).find((p) => p.scene.id === id)?.scene.title ?? 'another scene'
   return (
     <div className="ws-panel" data-ws-checks>
-      <h3>Continuity</h3>
+      <h3>Checks</h3>
       {!issues.length && !clashes.length && (
-        <p className="ws-panel-empty">Nothing in this scene goes against your character pages or the story calendar.</p>
+        <p className="ws-panel-empty">Nothing in this scene goes against your character pages, canon, who knows what, the story calendar or how your characters talk.</p>
       )}
-      {issues.map((i, n) => (
-        <button key={n} className="ws-issue-row" onClick={() => onJump(scene.id, i.start, i.end)}>
-          <q>{text.slice(Math.max(0, i.start - 20), i.end + 20).trim()}</q>
-          <span>{i.message}</span>
-        </button>
-      ))}
-      {clashes.map((c, n) => (
-        <div key={`c${n}`} className="ws-issue-row clash">
-          <span>
-            {name(c.character)} is at {name(c.places[0])} and {name(c.places[1])} on {dateLabel(c.date)}.
-          </span>
-          <button className="link-button" onClick={() => openScene(c.scenes[0] === scene.id ? c.scenes[1] : c.scenes[0])}>
-            Go to “{sceneTitle(c.scenes[0] === scene.id ? c.scenes[1] : c.scenes[0])}”
-          </button>
+      {GROUPS.map((g) => {
+        const list = issues.filter((i) => i.group === g.id)
+        if (!list.length) return null
+        return (
+          <div key={g.id} className={`ws-check-group ${g.id}`}>
+            <h4>{g.title}</h4>
+            {list.map((i, n) => (
+              <button key={n} className="ws-issue-row" onClick={() => onJump(scene.id, i.start, i.end)}>
+                <q>{snippet(text, i.start, i.end)}</q>
+                <span>{i.message}</span>
+              </button>
+            ))}
+          </div>
+        )
+      })}
+      {clashes.length > 0 && (
+        <div className="ws-check-group">
+          <h4>Story calendar</h4>
+          {clashes.map((c, n) => (
+            <div key={`c${n}`} className="ws-issue-row clash">
+              <span>
+                {name(c.character)} is at {name(c.places[0])} and {name(c.places[1])} on {dateLabel(c.date)}.
+              </span>
+              <button className="link-button" onClick={() => openScene(c.scenes[0] === scene.id ? c.scenes[1] : c.scenes[0])}>
+                Go to “{sceneTitle(c.scenes[0] === scene.id ? c.scenes[1] : c.scenes[0])}”
+              </button>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
       <p className="ws-panel-tip">
-        Facts on a character’s page (eye colour, hair, age) are checked as you write, and someone who has died gets flagged if they turn up later.
+        Checked as you write: facts on character pages and in the canon drawer, someone who has died turning up, secrets slipping out before a character finds out, and lines that don’t sound like the character saying them.
       </p>
     </div>
   )
@@ -596,6 +705,7 @@ function ChecksPanel({ story, scene, onJump }: { story: Story; scene: Scene; onJ
 // ---------- the ghost reader ----------
 
 function GhostPanel({ story, chapter, onJump }: { story: Story; chapter: Chapter; onJump: (scene: string, from: number, to: number) => void }) {
+  const ai = useWriting((s) => s.ai)
   const [busy, setBusy] = useState<string | null>(null)
   const notes = story.ghost[chapter.id] ?? []
   const run = async (): Promise<void> => {
@@ -619,7 +729,9 @@ function GhostPanel({ story, chapter, onJump }: { story: Story; chapter: Chapter
   return (
     <div className="ws-panel" data-ws-ghost>
       <h3>Ghost reader</h3>
-      <p className="ws-panel-tip">Reads “{chapter.title}” as if for the first time and reacts as it goes. It runs on the offline AI, so your story stays on this computer.</p>
+      <p className="ws-panel-tip">
+        Reads “{chapter.title}” as if for the first time and reacts as it goes. {aiWhere(ai)}
+      </p>
       <button className="btn btn-primary" onClick={() => void run()} disabled={!!busy} data-ws-ghost-run>
         {busy ? <Loader2 size={13} className="spin" /> : <Ghost size={13} />} {busy ?? (notes.length ? 'Read it again' : 'Read this chapter')}
       </button>
