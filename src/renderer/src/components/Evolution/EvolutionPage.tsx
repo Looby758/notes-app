@@ -4,7 +4,9 @@ import { useLab, SPEEDS } from './useLab'
 import WorldView, { type Tool } from './WorldView'
 import { LandPanel, SpeciesPanel, StartPanel, TOOLS, WorldPanel } from './Panels'
 import { CreatureCard, EventList, PopulationChart, TraitChart } from './Watch'
+import SurvivalPage from './SurvivalPage'
 import './evolution.css'
+import './survival.css'
 
 type PanelId = 'watch' | 'species' | 'world' | 'land' | 'start'
 
@@ -18,11 +20,49 @@ const PANELS: { id: PanelId; label: string }[] = [
 
 const fmt = (n: number): string => n.toLocaleString()
 
+const MODE_KEY = 'orbit.evolution.mode'
+type Mode = 'creatures' | 'survival'
+
+/** Evolution Lab has two modes: creatures that evolve, and a survival sandbox with people. */
+export default function EvolutionPage() {
+  const [mode, setMode] = useState<Mode>(() => {
+    try {
+      return localStorage.getItem(MODE_KEY) === 'survival' ? 'survival' : 'creatures'
+    } catch {
+      return 'creatures'
+    }
+  })
+  const choose = (m: Mode): void => {
+    setMode(m)
+    try {
+      localStorage.setItem(MODE_KEY, m)
+    } catch {
+      // Not remembered next time, that's all.
+    }
+  }
+  const switcher = (
+    <div className="evo-mode">
+      <h2>
+        <Dna size={18} /> Evolution Lab
+      </h2>
+      <div className="evo-seg" role="radiogroup" aria-label="Mode">
+        <button className={mode === 'creatures' ? 'on' : ''} onClick={() => choose('creatures')} data-evo-mode="creatures">
+          Creatures
+        </button>
+        <button className={mode === 'survival' ? 'on' : ''} onClick={() => choose('survival')} data-evo-mode="survival">
+          Survival
+        </button>
+      </div>
+    </div>
+  )
+  return mode === 'survival' ? <SurvivalPage switcher={switcher} /> : <CreatureLab switcher={switcher} />
+}
+
 /**
- * Evolution Lab: build a world, fill it with species you design, and watch them get better at
+ * Creatures: build a world, fill it with species you design, and watch them get better at
  * surviving by trial and error. Pause, speed up or rewind whenever you like.
  */
-export default function EvolutionPage() {
+function CreatureLab({ switcher }: { switcher: React.ReactNode }) {
   const lab = useLab()
   const [panel, setPanel] = useState<PanelId>('watch')
   const [tool, setTool] = useState<Tool>('select')
@@ -60,9 +100,7 @@ export default function EvolutionPage() {
   return (
     <div className="evo-page" data-evo-page>
       <header className="evo-bar">
-        <h2>
-          <Dna size={18} /> Evolution Lab
-        </h2>
+        {switcher}
         <div className="evo-transport">
           <button className="evo-play" onClick={() => lab.setRunning(!lab.running)} title={lab.running ? 'Pause (Space)' : 'Play (Space)'} data-evo-play>
             {lab.running ? <Pause size={16} /> : <Play size={16} />}

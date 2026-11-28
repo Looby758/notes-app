@@ -6,7 +6,7 @@ import type { Tool } from './WorldView'
 
 const PALETTE = ['#4ade80', '#f87171', '#60a5fa', '#fbbf24', '#c084fc', '#f472b6', '#2dd4bf', '#fb923c', '#a3a380', '#e5e7eb']
 
-function Slider({
+export function Slider({
   label,
   hint,
   value,
@@ -36,7 +36,7 @@ function Slider({
   )
 }
 
-function Toggle({ label, hint, on, onChange }: { label: string; hint?: string; on: boolean; onChange: (v: boolean) => void }) {
+export function Toggle({ label, hint, on, onChange }: { label: string; hint?: string; on: boolean; onChange: (v: boolean) => void }) {
   return (
     <label className="evo-toggle" title={hint}>
       <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} />
