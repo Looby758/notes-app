@@ -22,7 +22,9 @@ const MAX_SAMPLES = 1500
 /** How long the simulation may take per frame, so the page stays smooth at high speeds. */
 const FRAME_BUDGET_MS = 12
 
-export const SPEEDS = [1, 2, 5, 20, 100, 1000] as const
+export const SPEEDS = [0.25, 0.5, 1, 2, 5, 20, 100, 1000] as const
+/** Steps a second at 1× speed, the same on any screen (it doesn't depend on the monitor's refresh rate). */
+const STEPS_PER_SECOND = 20
 export type Speed = (typeof SPEEDS)[number]
 
 const SETUP_KEY = 'orbit.evolution.setup'
@@ -96,7 +98,7 @@ export function useLab(): Lab {
   const samples = useRef<Sample[]>([sample(world.current, setup)])
   const snapshots = useRef<World[]>([snapshot(world.current)])
   const [running, setRunning] = useState(true)
-  const [speed, setSpeed] = useState<Speed>(2)
+  const [speed, setSpeed] = useState<Speed>(1)
   const [version, setVersion] = useState(0)
   const [stepsPerSecond, setStepsPerSecond] = useState(0)
   const [saved, setSaved] = useState<SavedSetup[]>(() => {
@@ -152,9 +154,12 @@ export function useLab(): Lab {
     let counted = 0
     let countStart = performance.now()
     let carry = 0
+    let last = performance.now()
     const loop = (now: number): void => {
-      // Speed 1 is 60 steps a second; slower frame rates still keep the same pace.
-      carry += speed
+      // Paced by the clock, not by frames, so a 144 Hz monitor doesn't run it faster.
+      const dt = Math.min(100, now - last)
+      last = now
+      carry += (speed * STEPS_PER_SECOND * dt) / 1000
       const want = Math.floor(carry)
       carry -= want
       counted += advance(want, FRAME_BUDGET_MS)
