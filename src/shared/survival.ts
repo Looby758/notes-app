@@ -2137,6 +2137,8 @@ function learn(w: SurvivalWorld, g: Group, id: LessonId, why: string): void {
 function dayEnd(w: SurvivalWorld, g: Group): void {
   prisonersDay(w, g)
   if (!g.alive) return
+  lifeDay(w, g, g.lossesToday)
+  if (!g.alive) return
   // A good day with guns, and nothing bad came of it: a dangerous lesson.
   if (g.gunKillsToday >= 5 && g.lossesToday === 0 && !hasLesson(g, 'quiet')) learn(w, g, 'trigger', `They put down ${g.gunKillsToday} walkers with guns today and nobody got hurt.`)
   g.gunKillsToday = 0
@@ -2184,6 +2186,151 @@ function dayEnd(w: SurvivalWorld, g: Group): void {
       } else setCamp(w, g, best.b, `It's ${ms.length > (camp.w * camp.h) / 2 ? 'roomier' : 'safer'} than ${camp.name}.`)
     }
   }
+}
+
+// ---------- life goes on: couples, babies, falling out ----------
+
+/** How long a baby takes, in steps. */
+export const PREGNANCY = 270 * DAY
+
+const isAdult = (p: Person): boolean => p.age >= 18
+
+/** Once a day: people pair up, have babies when it's safe, fall out, blame the leader, and sometimes split off. */
+function lifeDay(w: SurvivalWorld, g: Group, losses: number): void {
+  const ms = membersOf(w, g)
+  if (!ms.length) return
+  const day = dayOf(w.tick)
+  // Birthdays: everyone gets a year older each year.
+  if (day > START_DAY && (day - START_DAY) % 365 === 0) for (const p of [...ms, ...prisonersOf(w, g)]) p.age++
+
+  // Pairing up.
+  for (const p of ms) {
+    if (p.partner != null || !isAdult(p) || p.age > 65) continue
+    for (const q of ms) {
+      if (q === p || q.partner != null || !isAdult(q) || q.sex === p.sex || p.family.includes(q.id) || Math.abs(p.age - q.age) > 15) continue
+      if ((p.rel[q.id] ?? 0) >= 70 && (q.rel[p.id] ?? 0) >= 70 && chance(w, 0.12)) {
+        p.partner = q.id
+        q.partner = p.id
+        log(w, `${p.name.split(' ')[0]} and ${q.name.split(' ')[0]} are together now.`, { group: g.id, people: [p, q], big: true })
+        break
+      }
+    }
+  }
+
+  // Babies, when it feels safe enough.
+  const camp = campOf(w, g)
+  const fedDays = Math.min(g.stash.food, g.stash.water) / (ms.length * 2)
+  const safe = !!camp && camp.fort >= 30 && fedDays >= 4 && losses === 0 && !w.fights.some((f) => f.a === g.id || f.b === g.id)
+  for (const p of ms) {
+    if (p.sex !== 'f') continue
+    if (p.dueAt > 0) {
+      if (w.tick >= p.dueAt) birth(w, g, p)
+      continue
+    }
+    const partner = p.partner != null ? personById(w, p.partner) : undefined
+    if (!safe || !partner || partner.group !== g.id || partner.held || p.age < 18 || p.age > 44 || p.bitten) continue
+    if (chance(w, 0.03)) {
+      p.dueAt = w.tick + PREGNANCY
+      log(w, `${p.name.split(' ')[0]} is pregnant. ${partner.name.split(' ')[0]} is the father.`, { group: g.id, people: [p, partner], big: true })
+    }
+  }
+
+  // Falling out.
+  for (const p of ms)
+    for (const q of ms) {
+      if (p.id >= q.id || !isAtCamp(w, p) || !isAtCamp(w, q)) continue
+      const bad = Math.min(p.rel[q.id] ?? 0, q.rel[p.id] ?? 0)
+      if (bad > -30 || !chance(w, 0.15)) continue
+      p.morale = Math.max(0, p.morale - 5)
+      q.morale = Math.max(0, q.morale - 5)
+      p.rel[q.id] = clamp((p.rel[q.id] ?? 0) - 4, -100, 100)
+      q.rel[p.id] = clamp((q.rel[p.id] ?? 0) - 4, -100, 100)
+      if (has(p, 'hothead') && has(q, 'hothead') && chance(w, 0.3)) {
+        p.health -= between(w, 5, 15)
+        q.health -= between(w, 5, 15)
+        log(w, `${p.name.split(' ')[0]} and ${q.name.split(' ')[0]} came to blows.`, { group: g.id, people: [p, q], big: true })
+      } else log(w, `${p.name.split(' ')[0]} and ${q.name.split(' ')[0]} had a bad argument.`, { group: g.id, people: [p, q] })
+    }
+
+  // A bad day: some blame whoever's in charge.
+  const lead = g.decide === 'leader' ? personById(w, g.leader ?? -1) : undefined
+  if (lead && losses > 0)
+    for (const p of ms) {
+      if (p === lead || has(p, 'loyal') || p.partner === lead.id || p.family.includes(lead.id)) continue
+      p.rel[lead.id] = clamp((p.rel[lead.id] ?? 0) - losses * (has(p, 'hothead') || has(p, 'paranoid') ? 12 : 6), -100, 100)
+    }
+
+  // Enough of them can't stand the leader: they leave and start their own group.
+  if (lead && ms.length >= 6 && !g.hostile) {
+    const fed = ms.filter((p) => p !== lead && (p.rel[lead.id] ?? 0) < -40)
+    if (fed.length >= 2 && chance(w, 0.35)) splitGroup(w, g, lead, fed)
+  }
+}
+
+function birth(w: SurvivalWorld, g: Group, mother: Person): void {
+  mother.dueAt = 0
+  const father = mother.partner != null ? personById(w, mother.partner) : undefined
+  const surname = surnameOf(father ?? mother) || surnameOf(mother)
+  const draft = randomPerson(w, takenNames(w), { age: 0, surname })
+  draft.traits = draft.traits.slice(0, 2)
+  draft.weapon = 'none'
+  const baby = newPerson(w, draft, g, mother.x, mother.y)
+  baby.family = [mother.id, ...(father ? [father.id] : [])]
+  for (const pid of baby.family) {
+    const parent = personById(w, pid)
+    if (!parent) continue
+    parent.family.push(baby.id)
+    parent.rel[baby.id] = 95
+    baby.rel[parent.id] = 95
+    parent.morale = Math.min(100, parent.morale + 25)
+  }
+  w.people.push(baby)
+  setHome(w, baby, 'camp')
+  const ms = membersOf(w, g)
+  for (const q of ms) if (q !== mother && q !== father) q.morale = Math.min(100, q.morale + 8)
+  const medic = ms.reduce((a, q) => Math.max(a, q.skills.medicine), 0)
+  const usedMeds = g.stash.meds > 0
+  if (usedMeds) g.stash.meds--
+  log(w, `${mother.name.split(' ')[0]} had a baby: ${baby.name}.`, { group: g.id, people: [mother, baby], big: true })
+  if (chance(w, Math.max(0.01, 0.08 - medic * 0.006 - (usedMeds ? 0.02 : 0)))) die(w, mother, 'died giving birth', false)
+}
+
+function splitGroup(w: SurvivalWorld, g: Group, lead: Person, fed: Person[]): void {
+  const leaving = new Set(fed)
+  // Partners, families and close friends go with them.
+  for (const p of membersOf(w, g)) {
+    if (p === lead || leaving.has(p)) continue
+    const toLeaver = Math.max(...fed.map((q) => p.rel[q.id] ?? 0))
+    if (fed.some((q) => q.partner === p.id || q.family.includes(p.id)) || (toLeaver > 50 && toLeaver > (p.rel[lead.id] ?? 0) + 20)) leaving.add(p)
+  }
+  const out = [...leaving]
+  if (out.length >= membersOf(w, g).length) return
+  const head = out.reduce((a, b) => (b.skills.leadership > a.skills.leadership ? b : a))
+  const color = GROUP_COLORS.find((c) => !w.groups.some((o) => o.alive && o.color === c)) ?? GROUP_COLORS[(w.groups.length + 1) % GROUP_COLORS.length]
+  const ng = newGroup(w, { name: `${surnameOf(head) || head.name}'s group`, color, people: [], decide: 'leader', ask: g.ask }, head.x, head.y)
+  ng.peak = out.length
+  w.groups.push(ng)
+  const share = out.length / membersOf(w, g).length
+  for (const k of SUPPLY_KEYS) {
+    const n = Math.floor(g.stash[k] * share)
+    g.stash[k] -= n
+    ng.stash[k] = n
+  }
+  for (const p of out) {
+    p.group = ng.id
+    p.task = { kind: 'follow', phase: 'work', x: head.x, y: head.y, with: [head.id] }
+  }
+  head.task = { kind: 'camp', phase: 'work', x: head.x, y: head.y }
+  ng.seen.set(g.seen)
+  ng.danger.set(g.danger)
+  ng.known = { ...g.known }
+  ng.creeks = [...g.creeks]
+  ng.lessons = g.lessons.map((l) => ({ ...l }))
+  g.met[ng.id] = 'avoid'
+  ng.met[g.id] = 'avoid'
+  pickLeader(w, ng)
+  log(w, `${out.length} people had enough of ${lead.name.split(' ')[0]} and left ${g.name}, led by ${head.name}. They're ${ng.name} now.`, { group: g.id, people: out, big: true })
+  planNow(w, ng)
 }
 
 // ---------- meeting other groups ----------

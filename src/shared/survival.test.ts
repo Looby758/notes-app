@@ -227,6 +227,41 @@ describe('survival mode', () => {
     expect(membersOf(w, a)).toContain(ps[1])
   })
 
+  it('a pregnancy ends in a baby who joins the family', () => {
+    const w = createSurvivalWorld({ seed: 31, harshness: 0.3 })
+    const g = quickStart(w)
+    const ms = membersOf(w, g)
+    const mum = ms[0]
+    const dad = ms[1]
+    mum.sex = 'f'
+    mum.age = 30
+    dad.sex = 'm'
+    mum.partner = dad.id
+    dad.partner = mum.id
+    mum.dueAt = w.tick + 10
+    run(w, DAY)
+    const baby = w.people.find((p) => p.age === 0)
+    expect(baby).toBeDefined()
+    expect(baby!.family).toContain(dad.id)
+    expect(dad.family).toContain(baby!.id)
+    expect(w.log.some((l) => l.text.includes('had a baby'))).toBe(true)
+  })
+
+  it('people who can’t stand the leader leave and start their own group', () => {
+    const w = createSurvivalWorld({ seed: 32, harshness: 0.3 })
+    const t = w.map.towns[0]
+    const g = spawnGroup(w, { name: 'Big', color: '#fff', people: randomPeople(w, 8), decide: 'leader' }, t.x, t.y)
+    let split = false
+    for (let d = 0; d < 15 && !split; d++) {
+      const lead = g.leader!
+      for (const p of membersOf(w, g).slice(0, 4)) if (p.id !== lead) p.rel[lead] = -90
+      run(w, DAY)
+      split = w.groups.filter((x) => x.alive).length > 1
+    }
+    expect(split).toBe(true)
+    expect(w.log.some((l) => l.text.includes('had enough of'))).toBe(true)
+  })
+
   it('supplies you drop are found and used', () => {
     const w = createSurvivalWorld({ seed: 11, harshness: 0.5 })
     const t = w.map.towns[2]

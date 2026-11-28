@@ -473,6 +473,7 @@ export function PersonCard({ world, p, onSelect }: { world: SurvivalWorld; p: Pe
           </p>
         )}
         {fight && <p className="sv-callout">In a fight right now.</p>}
+        {p.dueAt > 0 && <p className="sv-callout" data-sv-expecting>Expecting a baby, due {when(p.dueAt)}.</p>}
         <p className="sv-state">
           {healthText(p)} · {mindText(p)}
           {p.bitten && <span className="sv-bitten"> · Bitten on the {p.bitten.limb}</span>}
